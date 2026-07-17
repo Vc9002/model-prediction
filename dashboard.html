@@ -41,6 +41,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 input.order-price{width:62px;padding:5px 6px;font-family:var(--mono);font-size:12px}
 .order-wrap{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .order-note{font-size:10.5px;color:var(--dim)}
+.exit-wrap{display:grid;grid-template-columns:auto 62px auto 66px auto;align-items:center;gap:4px;white-space:nowrap}
+.exit-wrap input{width:62px;padding:5px 6px}.exit-wrap .shares{width:66px}
+.exit-wrap .order-note{grid-column:1/-1}
 /* matrix */
 table.matrix{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px}
 table.matrix th,table.matrix td{border:1px solid var(--accent);padding:8px 10px;text-align:center}
@@ -214,7 +217,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <h2>Today's Picks <span id="todayDate" class="dim"></span></h2>
       <div class="kpis" id="todayKpis"></div>
-      <div class="small dim" style="margin-bottom:8px">Every ledger pick for today's games (ET). All picks are 0-unit paper research. <b>Only "+EV vs market" rows are tail candidates</b> — "no edge" means the market prices the same side higher than the model does; those are logged to measure the model against the market, not to bet. Sorted best edge first.</div>
+      <div class="small dim" style="margin-bottom:8px">Every ledger pick for today's games (ET). <b>1U = $7.50.</b> All picks remain paper research until you submit a separate order. <b>Only "+EV vs market" rows are tail candidates</b> — "no edge" means the market prices the same side higher than the model does. Sorted best edge first.</div>
       <div id="todayPicks"></div>
     </div>
   </section>
@@ -716,21 +719,10 @@ async function previewSell(pickId){
   showModal(`<h2 class="green">Resting sell order placed</h2><pre>${esc(JSON.stringify(result,null,1))}</pre>`);
 }
 window.openSell=openSell; window.previewSell=previewSell;
-function openPositionSell(i){
-  const p=(window._livePositions||{})[i];
-  if(!p){showModal('<h2 class="red">Position not found — refresh the portfolio</h2>');return;}
-  const held=Number(p.available_quantity||p.quantity)||0;
-  showModal(`<h2>Sell live position — rest an exit limit</h2>
-    <p><b>${esc(p.title||p.market_slug)}</b> · outcome <b>${esc(p.outcome||(p.side==="long"?"YES":"NO"))}</b> · you hold <b>${held.toFixed(2)}</b> shares</p>
-    <p class="dim small">Cost basis $${p.cost_basis_usd==null?"—":Number(p.cost_basis_usd).toFixed(2)} · current value $${p.cash_value_usd==null?"—":Number(p.cash_value_usd).toFixed(2)}. The order rests at or above the current bid (post-only, no crossing) and closes shares you already hold.</p>
-    <label>Sell limit price <input id="posSellPrice" type="number" min="0.01" max="0.99" step="0.01" value="0.50"></label><br><br>
-    <label>Shares to sell <input id="posSellShares" type="number" min="1" step="1" max="${held}" value="${Math.floor(held)||1}"></label>
-    <span class="dim small"> · max ${held.toFixed(2)} held</span><br><br>
-    <button class="primary" onclick="previewPositionSell(${i})">Review exact sell order</button>`);
-}
 async function previewPositionSell(i){
   const p=(window._livePositions||{})[i];
-  const price=Number($("#posSellPrice").value),size_shares=Number($("#posSellShares").value);
+  if(!p){showModal('<h2 class="red">Position not found — refresh the portfolio</h2>');return;}
+  const price=Number($(`#posSellPrice-${i}`).value),size_shares=Number($(`#posSellShares-${i}`).value);
   const held=Number(p.available_quantity||p.quantity)||0;
   if(size_shares>held+1e-9){showModal(`<h2 class="red">Too many shares</h2><p>You hold ${held.toFixed(2)}; cannot sell ${size_shares}.</p>`);return;}
   const response=await fetch("/api/order/preview-position",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -745,9 +737,9 @@ async function previewPositionSell(i){
   const result=await submitResponse.json();
   if(result.status!=="submitted"){showModal(`<h2 class="red">Sell not placed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;}
   await refreshAll();
-  showModal(`<h2 class="green">Resting sell order placed</h2><pre>${esc(JSON.stringify(result,null,1))}</pre>`);
+  showModal(`<h2 class="green">Resting sell order accepted</h2><p>Exchange order ID <b>${esc(result.order_id||"received")}</b>. A resting order may have no immediate executions.</p>`);
 }
-window.openPositionSell=openPositionSell; window.previewPositionSell=previewPositionSell;
+window.previewPositionSell=previewPositionSell;
 async function manualRefresh(btn){
   const label=btn?btn.textContent:null;
   if(btn){btn.disabled=true;btn.textContent="↻ …";}
@@ -793,7 +785,7 @@ async function previewBuy(pickId,price,units){
     showModal(`<h2 class="red">Order not placed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;
   }
   await refreshAll();
-  showModal(`<h2 class="green">Resting order placed</h2><pre>${esc(JSON.stringify(result,null,1))}</pre>`);
+  showModal(`<h2 class="green">Resting order accepted</h2><p>Exchange order ID <b>${esc(result.order_id||"received")}</b>. A resting order may have no immediate executions.</p>`);
 }
 const escAttr=s=>esc(s).replace(/"/g,"&quot;");
 window.openBuy=openBuy;window.previewBuy=previewBuy;
@@ -823,6 +815,8 @@ async function renderFolio(){
     window._livePositions={};
     (o.positions||[]).forEach((p,i)=>{
       const linked=p.model_pick;
+      const held=Number(p.available_quantity||p.quantity)||0;
+      const exitPrice=Number(p.exit_limit_default||0.50).toFixed(2);
       window._livePositions[i]=p;
       html+=`<tr>
         <td>${esc(p.title||p.market_slug)}</td><td>${esc(p.outcome||"—")}</td><td>${p.side==="long"?"YES":"NO"}</td>
@@ -830,7 +824,9 @@ async function renderFolio(){
         <td>${p.cash_value_usd==null?"—":"$"+fmt(p.cash_value_usd,2)}</td>
         <td class="${Number(p.unrealized_pnl_usd)>=0?"green":"red"}">${p.unrealized_pnl_usd==null?"—":(p.unrealized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.unrealized_pnl_usd),2)}</td>
         <td>${linked?`<span class="pill win">${esc(linked.model_version)}</span>`:"—"}</td><td class="dim">${shortDate(p.updated_at_utc)}</td>
-        <td><button class="sell" onclick="openPositionSell(${i})">Sell</button></td>
+        <td><span class="exit-wrap" title="Post-only GTC exit; exact confirmation follows">$<input id="posSellPrice-${i}" aria-label="sell limit price" type="number" min="0.01" max="0.99" step="0.01" value="${exitPrice}">
+          <span class="dim">shares</span><input class="shares" id="posSellShares-${i}" aria-label="shares to sell" type="number" min="0.01" step="0.01" max="${held}" value="${held.toFixed(2)}">
+          <button class="sell" onclick="previewPositionSell(${i})">Sell</button><span class="order-note">${p.bid==null?"bid unavailable":cents(p.bid)+" bid"} · ${held.toFixed(2)} available</span></span></td>
       </tr>`;});
     html+=`</table>`;
     $("#folioOpen").innerHTML=html;

@@ -185,6 +185,13 @@ class PolymarketUSClient:
                         price = float(side["price"])
                     except (KeyError, TypeError, ValueError):
                         continue
+                # The gateway can briefly expose boundary quotes (0 or 1) on
+                # inactive or transitioning sides. They are not executable
+                # probabilities and cannot be converted into finite odds.
+                # Drop the entire binary market below unless both sides remain
+                # valid, rather than aborting the daily slate.
+                if not 0 < price < 1:
+                    continue
                 team = side.get("team") or {}
                 selection = side["description"].lower()
                 line = market.get("line")
@@ -208,6 +215,8 @@ class PolymarketUSClient:
                         "is_long": bool(side.get("long")),
                     }
                 )
+            if len(sides) != 2:
+                continue
             markets.append(
                 {
                     "market_id": str(market["id"]),

@@ -7,7 +7,6 @@ and many more. Provides complete match data with scores going back to 2002.
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 

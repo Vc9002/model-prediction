@@ -171,6 +171,112 @@ def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_p
     assert saved[-1]["price"] == 0.55
 
 
+def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: Path) -> None:
+    pick = {
+        "pick_id": "qualified-prompt",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+    }
+    quote = {
+        "market_slug": "wnba-prompt",
+        "side": "long",
+        "ask": 0.60,
+        "fresh": True,
+        "market_state": "MARKET_STATE_OPEN",
+    }
+    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quote)
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+    accepted = {
+        "status": "submitted",
+        "order_id": "exchange-resting-1",
+        "order_state": None,
+        "raw_response": {"id": "exchange-resting-1", "executions": []},
+    }
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0,
+            stdout="Order: BUY ... Confirm? (Y/N): " + json.dumps(accepted), stderr="",
+        ),
+    )
+
+    preview = dashboard_server.preview_order(
+        {"pick_id": pick["pick_id"], "price": 0.55, "size_shares": 10}
+    )
+    result = dashboard_server.submit_order({"nonce": preview["nonce"]})
+
+    assert result["status"] == "submitted"
+    assert result["order_id"] == "exchange-resting-1"
+    assert dashboard_server._load_orders()["orders"][-1]["status"] == "submitted"
+
+
+def test_position_sell_refuses_more_than_available(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server,
+        "live_portfolio_view",
+        lambda: {
+            "status": "live",
+            "open": {
+                "positions": [
+                    {
+                        "market_slug": "mlb-held",
+                        "side": "short",
+                        "available_quantity": 18.0,
+                    }
+                ]
+            },
+        },
+    )
+    monkeypatch.setattr(
+        dashboard_server,
+        "_live_bbo",
+        lambda slug: {"short": {"bid": 0.35, "ask": 0.37}},
+    )
+
+    result = dashboard_server.preview_position_sell(
+        {"market_slug": "mlb-held", "side": "short", "price": 0.50, "size_shares": 19}
+    )
+
+    assert result["status"] == "refused"
+    assert "18" in result["error"]
+
+
+def test_position_sell_previews_verified_holding(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server,
+        "live_portfolio_view",
+        lambda: {
+            "status": "live",
+            "open": {
+                "positions": [
+                    {
+                        "market_slug": "mlb-held",
+                        "side": "short",
+                        "available_quantity": 18.0,
+                    }
+                ]
+            },
+        },
+    )
+    monkeypatch.setattr(
+        dashboard_server,
+        "_live_bbo",
+        lambda slug: {"short": {"bid": 0.35, "ask": 0.37}},
+    )
+
+    result = dashboard_server.preview_position_sell(
+        {"market_slug": "mlb-held", "side": "short", "price": 0.50, "size_shares": 18}
+    )
+
+    assert result["status"] == "preview"
+    assert result["verified_available_quantity"] == 18.0
+
+
 def test_resting_order_refuses_crossing_the_current_ask(monkeypatch) -> None:
     pick = {
         "pick_id": "qualified-2",

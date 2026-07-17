@@ -62,6 +62,44 @@ def test_slate_normalizes_executable_side_prices_and_lines() -> None:
     assert sides[1]["american_odds"] == -122
 
 
+def test_slate_skips_market_with_boundary_probability_instead_of_aborting() -> None:
+    event = {
+        "id": "event-boundary",
+        "slug": "wnba-boundary-2026-07-17",
+        "title": "Away vs. Home",
+        "startTime": "2026-07-17T23:00:00Z",
+        "markets": [
+            {
+                "id": "bad-market",
+                "slug": "bad-market",
+                "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+                "marketSides": [
+                    {"id": "bad-long", "description": "Away", "long": True, "quote": {"value": "0"}},
+                    {"id": "bad-short", "description": "Home", "long": False, "quote": {"value": "1"}},
+                ],
+            },
+            {
+                "id": "good-market",
+                "slug": "good-market",
+                "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+                "marketSides": [
+                    {"id": "good-long", "description": "Away", "long": True, "quote": {"value": "0.45"}},
+                    {"id": "good-short", "description": "Home", "long": False, "quote": {"value": "0.57"}},
+                ],
+            },
+        ],
+    }
+
+    http_client = httpx.Client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"events": [event]}))
+    )
+    slate = PolymarketUSClient("https://example.test", http_client).slate(
+        "WNBA", date(2026, 7, 17)
+    )
+
+    assert [market["market_slug"] for market in slate[0]["markets"]] == ["good-market"]
+
+
 def test_snapshot_store_uses_last_observation_before_game(tmp_path) -> None:
     store = PolymarketSnapshotStore(tmp_path / "snapshots.jsonl")
     for observed, price in (

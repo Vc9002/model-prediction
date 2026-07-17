@@ -729,7 +729,29 @@ def _pick_quote(row: dict) -> dict | None:
 def _load_orders() -> dict:
     payload = _read_json(ORDERS_FILE) or {}
     orders = payload.get("orders") if isinstance(payload, dict) else None
-    return {"orders": list(orders) if isinstance(orders, list) else []}
+    rows = list(orders) if isinstance(orders, list) else []
+    repaired = False
+    # Older dashboard builds mixed the CLI confirmation prompt into stdout.
+    # The exchange could accept an order and return an ID, while json.loads()
+    # rejected the combined prompt + JSON and locally recorded it as refused.
+    # Recover those durable exchange acknowledgements so a refresh cannot offer
+    # the same model order a second time.
+    for row in rows:
+        if row.get("status") != "refused" or not isinstance(row.get("error"), str):
+            continue
+        decoded = _decode_command_output(row["error"])
+        if decoded.get("status") == "submitted" and decoded.get("order_id"):
+            row.update(
+                status="submitted",
+                order_id=str(decoded["order_id"]),
+                order_state=decoded.get("order_state"),
+                error=None,
+            )
+            repaired = True
+    result = {"orders": rows}
+    if repaired:
+        _save_orders(result)
+    return result
 
 
 def _save_orders(payload: dict) -> None:
@@ -737,6 +759,28 @@ def _save_orders(payload: dict) -> None:
     temporary = ORDERS_FILE.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(payload, indent=2, default=str) + "\n", encoding="utf-8")
     os.replace(temporary, ORDERS_FILE)
+
+
+def _decode_command_output(raw: str) -> dict:
+    """Decode a CLI JSON result even when an interactive prompt precedes it."""
+    try:
+        value = json.loads(raw)
+        return value if isinstance(value, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        pass
+    decoder = json.JSONDecoder()
+    best: dict = {}
+    for index, character in enumerate(str(raw)):
+        if character != "{":
+            continue
+        try:
+            value, end = decoder.raw_decode(str(raw)[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict) and not str(raw)[index + end :].strip():
+            best = value
+            break
+    return best
 
 
 def _latest_order_for_pick(row: dict, quote: dict | None) -> dict | None:
@@ -996,9 +1040,8 @@ def submit_order(payload: dict) -> dict:
         env=_runner_env(),
     )
     raw = process.stdout if process.returncode == 0 else process.stderr
-    try:
-        result = json.loads(raw)
-    except json.JSONDecodeError:
+    result = _decode_command_output(raw)
+    if not result:
         result = {"status": "refused", "error": raw[-1000:] or "order command failed"}
     record = {
         **ticket,
@@ -1042,6 +1085,23 @@ def preview_position_sell(payload: dict) -> dict:
         return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
     if not 0 < size_shares <= 1_000_000:
         return {"status": "refused", "error": "shares must be greater than 0"}
+    portfolio = live_portfolio_view()
+    position = next(
+        (
+            item
+            for item in (portfolio.get("open") or {}).get("positions", [])
+            if item.get("market_slug") == slug and item.get("side") == side
+        ),
+        None,
+    )
+    if portfolio.get("status") != "live" or position is None:
+        return {"status": "refused", "error": "live position could not be verified"}
+    held = _number(position.get("available_quantity"), 0.0)
+    if size_shares > held + 1e-9:
+        return {
+            "status": "refused",
+            "error": f"cannot sell {size_shares:g} shares; only {held:g} are available",
+        }
     snapshot = _live_bbo(slug)
     bid = None
     if snapshot:
@@ -1059,7 +1119,8 @@ def preview_position_sell(payload: dict) -> dict:
         "nonce": nonce, "kind": "position_sell",
         "market_slug": slug, "side": side, "price": price, "size_shares": size_shares,
         "estimated_proceeds_usd": round(price * size_shares, 2),
-        "current_bid": bid, "created_at": time.time(), "expires_at": time.time() + 300,
+        "current_bid": bid, "verified_available_quantity": held,
+        "created_at": time.time(), "expires_at": time.time() + 300,
     }
     with _ORDER_LOCK:
         _ORDER_PREVIEWS[nonce] = ticket
@@ -1072,6 +1133,19 @@ def submit_position_sell(payload: dict) -> dict:
         ticket = _ORDER_PREVIEWS.pop(nonce, None)
     if ticket is None or ticket.get("kind") != "position_sell" or time.time() > float(ticket["expires_at"]):
         return {"status": "refused", "error": "sell preview expired; preview it again"}
+    portfolio = live_portfolio_view()
+    position = next(
+        (
+            item
+            for item in (portfolio.get("open") or {}).get("positions", [])
+            if item.get("market_slug") == ticket["market_slug"]
+            and item.get("side") == ticket["side"]
+        ),
+        None,
+    )
+    held = _number((position or {}).get("available_quantity"), 0.0)
+    if portfolio.get("status") != "live" or position is None or ticket["size_shares"] > held + 1e-9:
+        return {"status": "refused", "error": "available live shares changed; preview the sell again"}
     # Re-check the bid moved-through condition against a fresh quote.
     snapshot = _live_bbo(ticket["market_slug"])
     if snapshot:
@@ -1091,9 +1165,8 @@ def submit_position_sell(payload: dict) -> dict:
         env=_runner_env(),
     )
     raw = process.stdout if process.returncode == 0 else process.stderr
-    try:
-        result = json.loads(raw)
-    except json.JSONDecodeError:
+    result = _decode_command_output(raw)
+    if not result:
         result = {"status": "refused", "error": raw[-1000:] or "sell command failed"}
     record = {**ticket, "nonce": None, "status": result.get("status", "refused"),
               "order_id": result.get("order_id"), "order_state": result.get("order_state"),
@@ -1799,6 +1872,16 @@ def live_portfolio_view() -> dict:
         metadata = item.get("marketMetadata") or {}
         cost = _amount_value(item.get("cost"))
         cash_value = _amount_value(item.get("cashValue"))
+        quote = _live_bbo(str(slug)) or {}
+        side_quote = quote.get(side) or {}
+        bid = _number(side_quote.get("bid"), None)
+        ask = _number(side_quote.get("ask"), None)
+        mark = cash_value / abs(net) if cash_value is not None and abs(net) > 0 else None
+        exit_default = (
+            min(0.99, round(float(bid) + 0.01, 2))
+            if bid is not None
+            else min(0.99, max(0.01, round(float(mark or 0.5), 2)))
+        )
         positions.append(
             {
                 "market_slug": str(slug),
@@ -1811,6 +1894,9 @@ def live_portfolio_view() -> dict:
                 ),
                 "cost_basis_usd": cost,
                 "cash_value_usd": cash_value,
+                "bid": bid,
+                "ask": ask,
+                "exit_limit_default": exit_default,
                 "realized_pnl_usd": _amount_value(item.get("realized")),
                 "unrealized_pnl_usd": (
                     round(cash_value - cost, 2)

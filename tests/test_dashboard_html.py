@@ -50,3 +50,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "Model Bet Execution History" in html
     assert ".filter(p=>p.model_pick)" in html
     assert "model picks are not shown here" in html
+    assert 'id="posSellPrice-${i}"' in html
+    assert 'id="posSellShares-${i}"' in html
+    assert "openPositionSell" not in html
+    assert "Resting order accepted" in html
