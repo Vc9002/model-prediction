@@ -14,6 +14,18 @@ SPORT_KEYS = {
     "WNBA": "basketball_wnba",
     "NFL": "americanfootball_nfl",
     "WORLD_CUP": "soccer_fifa_world_cup",
+    "BRAZIL_SERIE_B": "soccer_brazil_serie_b",
+    "K_LEAGUE_1": "soccer_korea_kleague1",
+    "ELITESERIEN": "soccer_norway_eliteserien",
+    "CSL": "soccer_china_superleague",
+    "SUPERLIGA": "soccer_denmark_superliga",
+    "LIGA_MX": "soccer_mexico_ligamx",
+    "BRASILEIRAO": "soccer_brazil_campeonato",
+    "ARGENTINA": "soccer_argentina_primera_division",
+    "EREDIVISIE": "soccer_netherlands_eredivisie",
+    "LIGUE_1": "soccer_france_ligue_one",
+    "CHAMPIONSHIP": "soccer_efl_champ",
+    "COPA_LIBERTADORES": "soccer_conmebol_copa_libertadores",
 }
 
 

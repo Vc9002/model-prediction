@@ -1018,6 +1018,95 @@ def submit_order(payload: dict) -> dict:
     return {**result, "pick_id": ticket["pick_id"]}
 
 
+def _live_bbo(market_slug: str) -> dict | None:
+    """Fetch a fresh BBO for one market slug from the public gateway."""
+    try:
+        from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+        return PolymarketUSClient().snapshot(market_slug)
+    except Exception:  # noqa: BLE001 - any failure => no quote, caller handles
+        return None
+
+
+def preview_position_sell(payload: dict) -> dict:
+    """Preview a resting SELL limit against a held live exchange position."""
+    slug = str(payload.get("market_slug") or "")
+    side = str(payload.get("side") or "long")
+    if not slug or side not in ("long", "short"):
+        return {"status": "refused", "error": "market_slug and side (long|short) are required"}
+    try:
+        price = round(float(payload.get("price")), 2)
+        size_shares = float(payload.get("size_shares"))
+    except (TypeError, ValueError):
+        return {"status": "refused", "error": "price and shares must be numeric"}
+    if not 0.01 <= price <= 0.99 or abs(price * 100 - round(price * 100)) > 1e-8:
+        return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
+    if not 0 < size_shares <= 1_000_000:
+        return {"status": "refused", "error": "shares must be greater than 0"}
+    snapshot = _live_bbo(slug)
+    bid = None
+    if snapshot:
+        bid = (snapshot.get(side) or {}).get("bid")
+    if bid is not None and price <= float(bid):
+        return {
+            "status": "refused",
+            "error": (
+                f"resting sell price must be above the current {side} bid {float(bid):.2f}; "
+                "crossing orders are blocked"
+            ),
+        }
+    nonce = secrets.token_urlsafe(24)
+    ticket = {
+        "nonce": nonce, "kind": "position_sell",
+        "market_slug": slug, "side": side, "price": price, "size_shares": size_shares,
+        "estimated_proceeds_usd": round(price * size_shares, 2),
+        "current_bid": bid, "created_at": time.time(), "expires_at": time.time() + 300,
+    }
+    with _ORDER_LOCK:
+        _ORDER_PREVIEWS[nonce] = ticket
+    return {"status": "preview", **ticket}
+
+
+def submit_position_sell(payload: dict) -> dict:
+    nonce = str(payload.get("nonce") or "")
+    with _ORDER_LOCK:
+        ticket = _ORDER_PREVIEWS.pop(nonce, None)
+    if ticket is None or ticket.get("kind") != "position_sell" or time.time() > float(ticket["expires_at"]):
+        return {"status": "refused", "error": "sell preview expired; preview it again"}
+    # Re-check the bid moved-through condition against a fresh quote.
+    snapshot = _live_bbo(ticket["market_slug"])
+    if snapshot:
+        bid = (snapshot.get(ticket["side"]) or {}).get("bid")
+        if bid is not None and ticket["price"] <= float(bid):
+            return {"status": "refused", "error": "bid moved above your limit; preview the sell again"}
+    command = _resolve_runner() + [
+        "sell-position",
+        "--market-slug", ticket["market_slug"],
+        "--side", ticket["side"],
+        "--price", str(ticket["price"]),
+        "--size-shares", str(ticket["size_shares"]),
+        "--execute",
+    ]
+    process = subprocess.run(
+        command, cwd=ROOT, input="Y\n", capture_output=True, text=True, timeout=30,
+        env=_runner_env(),
+    )
+    raw = process.stdout if process.returncode == 0 else process.stderr
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        result = {"status": "refused", "error": raw[-1000:] or "sell command failed"}
+    record = {**ticket, "nonce": None, "status": result.get("status", "refused"),
+              "order_id": result.get("order_id"), "order_state": result.get("order_state"),
+              "submitted_at_utc": datetime.now(timezone.utc).isoformat(), "error": result.get("error")}
+    with _ORDER_LOCK:
+        orders = _load_orders()
+        orders["orders"].append(record)
+        _save_orders(orders)
+    with _CACHE_LOCK:
+        _CACHE.clear()
+    return result
+
+
 def live_gateway_slate(sport: str, day: str) -> dict:
     """Read-only live discovery quotes from the public gateway (indicative)."""
     league = {"mlb": "mlb", "nba": "nba", "wnba": "wnba", "nfl": "nfl"}.get(sport)
@@ -1340,6 +1429,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(start_action(str(payload.get("action")), payload))
         elif parsed.path == "/api/order/preview":
             self._send(preview_order(payload))
+        elif parsed.path == "/api/order/preview-position":
+            self._send(preview_position_sell(payload))
+        elif parsed.path == "/api/order/submit-position":
+            self._send(submit_position_sell(payload))
         elif parsed.path == "/api/order/submit":
             self._send(submit_order(payload))
         else:

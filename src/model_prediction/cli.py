@@ -303,6 +303,16 @@ def parser() -> argparse.ArgumentParser:
         help="explicitly authorize an active-model positive-edge research row as a manual order",
     )
 
+    sell_position = commands.add_parser(
+        "sell-position",
+        help="place a resting SELL limit against a live exchange position (no model pick)",
+    )
+    sell_position.add_argument("--market-slug", required=True)
+    sell_position.add_argument("--side", required=True, choices=["long", "short"])
+    sell_position.add_argument("--price", type=float, required=True, help="limit price 0-1")
+    sell_position.add_argument("--size-shares", type=float, required=True)
+    sell_position.add_argument("--execute", dest="execute_flag", action="store_true")
+
     research_score = commands.add_parser("score-research")
     research_score.add_argument("--pick-id", action="append", dest="pick_ids")
     research_score.add_argument("--all-research", action="store_true")
@@ -1232,6 +1242,34 @@ def main(argv: list[str] | None = None) -> None:
                 execute_flag=args.execute_flag,
                 user_command=True,
                 manual_research_order=manual,
+            )
+        elif args.command == "sell-position":
+            # Close a live exchange position you already hold. There is no
+            # model pick and no unit cap (a sell returns capital); the hard
+            # gates (credentials, post-only, confirmation, audit) still apply.
+            ticket = OrderTicket(
+                market_slug=args.market_slug,
+                token_side=args.side,
+                action="sell",
+                order_type="limit_gtc",
+                price=args.price,
+                size_shares=args.size_shares,
+                pick_id=f"live-position:{args.market_slug}:{args.side}",
+                estimated_cost_usd=round(args.price * args.size_shares, 2),
+                maximum_cost_usd=None,
+                authorization_type="live_position_exit",
+            )
+            synthetic_row = {
+                "record_type": "LIVE_POSITION_EXIT",
+                "status": "open",
+                "reason_code": "LIVE_POSITION_EXIT",
+            }
+            output = PolymarketExecutor(audit).execute(
+                ticket,
+                synthetic_row,
+                execute_flag=args.execute_flag,
+                user_command=True,
+                manual_research_order=True,
             )
         elif args.command == "exposure":
             rows = ledger.rows()

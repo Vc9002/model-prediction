@@ -780,15 +780,18 @@ async function renderFolio(){
   else if(!openCount){$("#folioOpen").innerHTML=`<p class="dim">The exchange reports no open positions.</p>`;}
   else {
     let html=`<table class="data"><tr>
-      <th>Market</th><th>Outcome</th><th>Side</th><th>Shares</th><th>Cost</th><th>Value</th><th>Unrealized</th><th>Model link</th><th>Updated</th></tr>`;
-    (o.positions||[]).forEach(p=>{
+      <th>Market</th><th>Outcome</th><th>Side</th><th>Shares</th><th>Cost</th><th>Value</th><th>Unrealized</th><th>Model link</th><th>Updated</th><th>Exit</th></tr>`;
+    window._livePositions={};
+    (o.positions||[]).forEach((p,i)=>{
       const linked=p.model_pick;
+      window._livePositions[i]=p;
       html+=`<tr>
         <td>${esc(p.title||p.market_slug)}</td><td>${esc(p.outcome||"—")}</td><td>${p.side==="long"?"YES":"NO"}</td>
         <td>${fmt(p.quantity,2)}</td><td>${p.cost_basis_usd==null?"—":"$"+fmt(p.cost_basis_usd,2)}</td>
         <td>${p.cash_value_usd==null?"—":"$"+fmt(p.cash_value_usd,2)}</td>
         <td class="${Number(p.unrealized_pnl_usd)>=0?"green":"red"}">${p.unrealized_pnl_usd==null?"—":(p.unrealized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.unrealized_pnl_usd),2)}</td>
         <td>${linked?`<span class="pill win">${esc(linked.model_version)}</span>`:"—"}</td><td class="dim">${shortDate(p.updated_at_utc)}</td>
+        <td><button class="sell" onclick="openPositionSell(${i})">Sell</button></td>
       </tr>`;});
     html+=`</table>`;
     $("#folioOpen").innerHTML=html;

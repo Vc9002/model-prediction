@@ -12,3 +12,5 @@
 2026-07-17T15:06:46 job finished: daily-1784300762 :: ok in 44.3s
 2026-07-17T15:15:20 job started: refresh_prices-1784301320 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
 2026-07-17T15:15:25 job finished: refresh_prices-1784301320 :: ok in 5.2s
+2026-07-17T15:25:56 job started: refresh_prices-1784301956 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
+2026-07-17T15:26:04 job finished: refresh_prices-1784301956 :: ok in 8.8s
