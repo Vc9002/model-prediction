@@ -381,6 +381,9 @@ def parser() -> argparse.ArgumentParser:
             child.add_argument("--reason", default="manual_governance")
             child.add_argument("--review-after")
     ban_commands.add_parser("list")
+
+    collect = commands.add_parser("collect-scores", help="pull recent soccer scores from The Odds API (free tier, last 3 days)")
+    collect.add_argument("--days", type=int, default=3, help="days to look back (max 3 on free tier)")
     return root
 
 
@@ -1009,6 +1012,8 @@ def main(argv: list[str] | None = None) -> None:
                 no_snapshot_bbo=False,
             )
             slate = _polymarket_slate(slate_args, config)
+            from .data_sources.odds_soccer_scores import collect_soccer_scores
+            soccer_collection = collect_soccer_scores(days_from=3)
             forecast_result = {
                 sport: _forecast_learned_sport(
                     sport, args.date, True, config, registry, bans, ledger,
@@ -1065,6 +1070,7 @@ def main(argv: list[str] | None = None) -> None:
                 "step2_3_forecast_and_log": forecast_result,
                 "step3b_polymarket_odds_snapshots": odds_by_sport,
                 "step4_settlement": settlement,
+                "step1b_soccer_scores": soccer_collection,
                 "step5_summary": _summary(config, ledger),
             }
         elif args.command == "ingest":
@@ -1289,6 +1295,9 @@ def main(argv: list[str] | None = None) -> None:
             }
         elif args.command == "ban-team":
             output = _handle_ban(args, bans)
+        elif args.command == "collect-scores":
+            from .data_sources.odds_soccer_scores import collect_soccer_scores
+            output = collect_soccer_scores(days_from=args.days)
         elif args.command == "score-research":
             if bool(args.pick_ids) == bool(args.all_research):
                 raise ValueError("provide either --pick-id or --all-research")

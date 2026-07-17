@@ -1576,11 +1576,11 @@ def _amount_value(value) -> float | None:
 def _live_model_links() -> dict[tuple[str, str], dict]:
     """Connect exchange contracts to model rows without treating picks as positions."""
     links: dict[tuple[str, str], dict] = {}
-    for row in _dedupe_picks(read_picks()):
-        quote = _pick_quote(row)
-        if quote is None:
-            continue
-        links[(str(quote["market_slug"]), str(quote["side"]))] = {
+    all_rows = read_picks()
+    rows_by_id = {str(row.get("pick_id") or ""): row for row in all_rows}
+
+    def _link(row: dict) -> dict:
+        return {
             "pick_id": str(row.get("pick_id") or ""),
             "league": str(row.get("league") or ""),
             "away_team": str(row.get("away_team") or ""),
@@ -1590,6 +1590,22 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
             "model_probability": _number(row.get("model_probability"), None),
             "model_version": str(row.get("model_version") or ""),
         }
+
+    for row in _dedupe_picks(all_rows):
+        quote = _pick_quote(row)
+        if quote is None:
+            continue
+        links[(str(quote["market_slug"]), str(quote["side"]))] = _link(row)
+    # A submitted dashboard order is durable evidence that the exchange
+    # contract came from a model-ledger row, even after quotes or games age out.
+    for order in _load_orders()["orders"]:
+        if order.get("status") != "submitted":
+            continue
+        row = rows_by_id.get(str(order.get("pick_id") or ""))
+        slug = str(order.get("market_slug") or "")
+        side = str(order.get("side") or "")
+        if row is not None and slug and side:
+            links[(slug, side)] = _link(row)
     return links
 
 

@@ -101,7 +101,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span class="chip mono dim" id="dataTxt">Data: …</span>
   <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
   <span class="chip dim" id="updatedTxt">Updated: —</span>
-  <span class="chip dim">refresh <span id="countdown" class="mono">—</span>s</span>
+  <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
+  <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
   <span style="flex:1"></span>
   <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button onclick="bootstrapDialog()">Bootstrap</button>
@@ -165,8 +166,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div style="overflow:auto;max-height:520px"><table class="data" id="pickTable"></table></div>
     </div>
     <div class="card">
-      <h2>Live Portfolio History</h2>
-      <div class="small dim" id="ledgerLiveStatus" style="margin-bottom:8px">Exchange-confirmed trades and settlements only.</div>
+      <h2>Model Bet Execution History</h2>
+      <div class="small dim" id="ledgerLiveStatus" style="margin-bottom:8px">Only exchange activity linked to a model pick appears here.</div>
       <div class="kpis" id="ledgerLiveKpis"></div>
       <div id="ledgerLiveHistory"></div>
     </div>
@@ -708,6 +709,46 @@ async function previewSell(pickId){
   showModal(`<h2 class="green">Resting sell order placed</h2><pre>${esc(JSON.stringify(result,null,1))}</pre>`);
 }
 window.openSell=openSell; window.previewSell=previewSell;
+function openPositionSell(i){
+  const p=(window._livePositions||{})[i];
+  if(!p){showModal('<h2 class="red">Position not found — refresh the portfolio</h2>');return;}
+  const held=Number(p.available_quantity||p.quantity)||0;
+  showModal(`<h2>Sell live position — rest an exit limit</h2>
+    <p><b>${esc(p.title||p.market_slug)}</b> · outcome <b>${esc(p.outcome||(p.side==="long"?"YES":"NO"))}</b> · you hold <b>${held.toFixed(2)}</b> shares</p>
+    <p class="dim small">Cost basis $${p.cost_basis_usd==null?"—":Number(p.cost_basis_usd).toFixed(2)} · current value $${p.cash_value_usd==null?"—":Number(p.cash_value_usd).toFixed(2)}. The order rests at or above the current bid (post-only, no crossing) and closes shares you already hold.</p>
+    <label>Sell limit price <input id="posSellPrice" type="number" min="0.01" max="0.99" step="0.01" value="0.50"></label><br><br>
+    <label>Shares to sell <input id="posSellShares" type="number" min="1" step="1" max="${held}" value="${Math.floor(held)||1}"></label>
+    <span class="dim small"> · max ${held.toFixed(2)} held</span><br><br>
+    <button class="primary" onclick="previewPositionSell(${i})">Review exact sell order</button>`);
+}
+async function previewPositionSell(i){
+  const p=(window._livePositions||{})[i];
+  const price=Number($("#posSellPrice").value),size_shares=Number($("#posSellShares").value);
+  const held=Number(p.available_quantity||p.quantity)||0;
+  if(size_shares>held+1e-9){showModal(`<h2 class="red">Too many shares</h2><p>You hold ${held.toFixed(2)}; cannot sell ${size_shares}.</p>`);return;}
+  const response=await fetch("/api/order/preview-position",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({confirm:true,market_slug:p.market_slug,side:p.side,price,size_shares})});
+  const preview=await response.json();
+  if(preview.status!=="preview"){showModal(`<h2 class="red">Sell blocked</h2><pre>${esc(preview.error||JSON.stringify(preview))}</pre>`);return;}
+  const exact=`SELL ${preview.size_shares} shares of ${preview.market_slug} (${preview.side}) at ${Number(preview.price).toFixed(2)}. Estimated proceeds $${Number(preview.estimated_proceeds_usd).toFixed(2)}. Current bid ${preview.current_bid==null?"n/a":Number(preview.current_bid).toFixed(2)}. This creates a real post-only GTC resting SELL order to exit your position.`;
+  if(!window.confirm(exact+"\n\nPlace this real-money sell order?"))return;
+  showModal("<h2>Submitting exact sell order…</h2>");
+  const submitResponse=await fetch("/api/order/submit-position",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({confirm:true,nonce:preview.nonce})});
+  const result=await submitResponse.json();
+  if(result.status!=="submitted"){showModal(`<h2 class="red">Sell not placed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;}
+  await refreshAll();
+  showModal(`<h2 class="green">Resting sell order placed</h2><pre>${esc(JSON.stringify(result,null,1))}</pre>`);
+}
+window.openPositionSell=openPositionSell; window.previewPositionSell=previewPositionSell;
+async function manualRefresh(btn){
+  const label=btn?btn.textContent:null;
+  if(btn){btn.disabled=true;btn.textContent="↻ …";}
+  await refreshAll();
+  resetTimer();
+  if(btn){btn.disabled=false;btn.textContent=label;}
+}
+window.manualRefresh=manualRefresh;
 function openBuy(pickId,initialPrice){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
   if(!p){showModal('<h2 class="red">Pick not found</h2>');return;}
@@ -822,16 +863,18 @@ async function renderFolio(){
 }
 function renderLedgerLiveHistory(b){
   const h=b.recent_history||{activities:[],count:0,trade_count:0,settlement_count:0,realized_pnl_usd:0};
-  const activityCount=Number(h.count)||0,tradeCount=Number(h.trade_count)||0,
-        settlementCount=Number(h.settlement_count)||0;
+  const activities=(h.activities||[]).filter(p=>p.model_pick);
+  const activityCount=activities.length,
+        tradeCount=activities.filter(p=>p.type==="trade").length,
+        settlementCount=activities.filter(p=>p.type==="settlement").length;
   const historyStart=b.history_start_date||"today";
   $("#ledgerLiveStatus").innerHTML=b.status==="live"
-    ?`<span class="green">Exchange synced</span> · tracking began ${esc(historyStart)} ET; earlier activity is ignored and model statistics remain separate.`
-    :`<span class="red">Live sync unavailable</span> · ${esc(b.error||"authentication required")} · showing persisted exchange history since ${esc(historyStart)} only.`;
-  $("#ledgerLiveKpis").innerHTML=`<div class="k"><b>${activityCount}</b><span>portfolio events</span></div><div class="k"><b>${tradeCount}</b><span>trades</span></div><div class="k"><b>${settlementCount}</b><span>settlements</span></div>`;
-  if(!activityCount){$("#ledgerLiveHistory").innerHTML=`<p class="dim">No confirmed exchange activity has been synced since ${esc(historyStart)}.</p>`;return;}
+    ?`<span class="green">Exchange synced</span> · model-linked activity since ${esc(historyStart)} ET only; unrelated portfolio bets stay in Portfolio.`
+    :`<span class="red">Live sync unavailable</span> · ${esc(b.error||"authentication required")} · model picks remain above; unrelated portfolio bets are never imported.`;
+  $("#ledgerLiveKpis").innerHTML=`<div class="k"><b>${activityCount}</b><span>model bet events</span></div><div class="k"><b>${tradeCount}</b><span>model fills</span></div><div class="k"><b>${settlementCount}</b><span>model settlements</span></div>`;
+  if(!activityCount){$("#ledgerLiveHistory").innerHTML=`<p class="dim">No exchange activity linked to a model pick has been confirmed since ${esc(historyStart)}.</p>`;return;}
   let html=`<table class="data"><tr><th>Date</th><th>Source</th><th>Market</th><th>Price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Related model pick</th></tr>`;
-  (h.activities||[]).forEach(p=>{html+=`<tr><td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">live ${p.type}</span></td><td>${esc(p.title||p.market_slug)}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td><td>${p.realized_pnl_usd==null?"—":"$"+fmt(p.realized_pnl_usd,2)}</td><td>${p.model_pick?esc(p.model_pick.pick_id):"—"}</td></tr>`;});
+  activities.forEach(p=>{html+=`<tr><td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">model ${p.type}</span></td><td>${esc(p.title||p.market_slug)}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td><td>${p.realized_pnl_usd==null?"—":"$"+fmt(p.realized_pnl_usd,2)}</td><td>${esc(p.model_pick.pick_id)}</td></tr>`;});
   $("#ledgerLiveHistory").innerHTML=html+`</table>`;
 }
 function marker(p){
