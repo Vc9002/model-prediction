@@ -1217,7 +1217,11 @@ def main(argv: list[str] | None = None) -> None:
                 # The "limit below model probability" rule is a BUY guard (do not
                 # pay more than fair value). A SELL is an exit at a target price
                 # and is exempt.
-                if args.action == "buy" and args.price >= model_probability:
+                if (
+                    args.action == "buy"
+                    and execution_config.get("manual_research_require_positive_edge", True)
+                    and args.price >= model_probability
+                ):
                     raise ExecutionGateError(
                         "REFUSED: manual buy limit must remain below the model probability."
                     )

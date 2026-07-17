@@ -361,13 +361,14 @@ function renderMatrix(m){
       let cls="n",l1="⬛ no data",l2="—";
       if(c.state==="qualified"){
         cls="q";l1=`✅ ${pct(c.hit_rate)}`;
-        l2=c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`;
+        l2=mk==="total"?`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`:
+          (c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`);
       }else if(c.state==="tested_not_qualified"){
         cls="t";l1=`🔴 ${pct(c.hit_rate)}`;
         l2=`${c.calls} calls · below gate`;
       }else if(c.state==="research_total_candidate"){
-        cls="r";l1=`🧪 MAE ${fmt(c.mae,2)}`;
-        l2=`${c.holdout_rows??"—"} games · base ${fmt(c.baseline_mae,2)} · shadow only`;
+        cls="r";l1=`🧪 ${pct(c.hit_rate)}`;
+        l2=`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`;
       }else if(c.state==="blocked"){
         cls="b";l1="⛔ blocked";l2="missing valid contract lines";
       }else if(c.state==="model_untested"){
@@ -383,6 +384,44 @@ function renderMatrix(m){
 }
 function drill(sport,market){
   const cell=(state.matrix.grid[sport]||{})[market]||{};
+  if(market==="total"&&(cell.state==="qualified"||cell.state==="research_total_candidate")){
+    const calls=Number(cell.calls)||0,hits=calls&&cell.hit_rate!=null?Math.round(calls*Number(cell.hit_rate)):null;
+    const reason=String(cell.qualification||"not reported").replaceAll("_"," ");
+    const qualified=cell.state==="qualified";
+    const note=qualified?
+      `<div class="alert info">✅ Passed the research validation gate. This does not prove edge against timestamp-valid market contract lines.</div>`:
+      `<div class="alert warn">Research validation only · ${esc(reason)}. No executable total is implied.</div>`;
+    const metric=(value,label)=>`<div class="k"><b>${value}</b><span>${label}</span></div>`;
+    let html=`<h2>${sport.toUpperCase()} — TOTAL VALIDATION</h2>${note}<div class="kpis">
+      ${metric(pct(cell.hit_rate),"holdout hit rate")}
+      ${metric(cell.calls??"—","holdout calls")}
+      ${metric(hits??"—","holdout wins")}
+      ${metric(cell.holdout_rows??"—","locked-holdout games")}
+      ${metric(fmt(cell.brier,3),"holdout brier")}
+    </div><h2>Validation cohorts</h2><table class="data">
+      <tr><th>Train games</th><th>Threshold-validation games</th><th>Locked-holdout games</th></tr>
+      <tr><td>${cell.train_rows??"—"}</td><td>${cell.validation_rows??"—"}</td><td>${cell.holdout_rows??"—"}</td></tr>
+    </table><h2 style="margin-top:16px">Model validation details</h2><table class="data">
+      <tr><th>Reference total</th><th>Call threshold</th><th>Holdout MAE</th><th>Baseline MAE</th><th>Qualification</th></tr>
+      <tr><td>${fmt(cell.reference_line,1)}</td><td>${pct(cell.threshold)}</td><td>${fmt(cell.mae,3)}</td><td>${fmt(cell.baseline_mae,3)}</td><td>${esc(reason)}</td></tr>
+    </table>`;
+    showModal(html);return;
+  }
+  if(market==="total"){
+    const reason=String(cell.readiness||"NO_VALIDATION_ARTIFACT").replaceAll("_"," ");
+    const validCalls=cell.state==="blocked"?0:"—";
+    showModal(`<h2>${sport.toUpperCase()} — TOTAL VALIDATION</h2>
+      <div class="alert warn">No valid hit-rate percentage exists yet. Totals vary by game, so validation requires timestamp-valid pregame contract lines; a fixed league-average line would be misleading.</div>
+      <div class="kpis">
+        <div class="k"><b>—</b><span>valid hit rate</span></div>
+        <div class="k"><b>${validCalls}</b><span>valid holdout calls</span></div>
+        <div class="k"><b>50</b><span>minimum calls</span></div>
+        <div class="k"><b>${cell.state==="blocked"?"BLOCKED":"NO DATA"}</b><span>validation status</span></div>
+      </div><h2>Validation requirement</h2><table class="data">
+        <tr><th>Current result</th><th>Required evidence</th><th>Qualification gate</th></tr>
+        <tr><td>${esc(reason)}</td><td>Game-specific line + point-in-time inputs</td><td>≥60% hit rate · ≥50 locked-holdout calls</td></tr>
+      </table>`);return;
+  }
   const picks=state.picks.filter(p=>String(p.league).toLowerCase()===sport&&String(p.market_type)===market.replace("moneyline","moneyline"));
   const monthly={};
   picks.filter(p=>p.status==="settled"&&(p.result==="win"||p.result==="loss")).forEach(p=>{
@@ -390,8 +429,7 @@ function drill(sport,market){
     monthly[mo]=monthly[mo]||{pnl:0,w:0,c:0};
     monthly[mo].pnl+=pickPnl(p); monthly[mo].c++; monthly[mo].w+=p.result==="win";
   });
-  const totalNote=cell.state==="qualified"?`<div class="alert info">✅ Qualified totals model — ${cell.calls||0} calls, ${pct(cell.hit_rate||0)} hit rate. Reference line derived from league average; no historical contract lines required.</div>`:cell.state==="research_total_candidate"?`<div class="alert warn">Research totals baseline. Holdout MAE ${fmt(cell.mae,3)} vs ${fmt(cell.baseline_mae,3)} baseline. Below qualification gate or insufficient calls.</div>`:"";
-  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>${totalNote}
+  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>
   <div class="kpis">
     <div class="k"><b>${pct(cell.hit_rate)}</b><span>holdout hit rate</span></div>
     <div class="k"><b>${cell.calls??"—"}</b><span>holdout calls</span></div>
@@ -679,16 +717,19 @@ function orderControl(p,compact=false){
     return `<span class="pill ${exchangeState==="pending_cancel"?"open":"win"}" title="${escAttr((order.order_id||"")+(exchangeState?" · "+exchangeState:""))}">${label}</span>`;
   }
   if(order.status==="filled")return `<span class="pill win" title="${escAttr(order.order_id||"")}">filled</span>`;
-  const ask=p.quote?.ask;
-  const defaultPrice=ask!=null?(Math.max(1,Math.ceil(Number(ask)*100-1e-9)-1)/100).toFixed(2):"";
+  const bid=p.quote?.bid,ask=p.quote?.ask;
+  const defaultPrice=ask!=null?Number(ask).toFixed(2):"";
   const inputId=`orderPrice-${p.pick_id}`;
-  const reason=p.buy_ready?"Set a post-only GTC limit price":(p.buy_block_reason||"order unavailable");
-  const auth=p.order_authorization==="manual_research_override"?"manual":"model";
+  const reason=p.buy_ready?"Current ask buys immediately; a lower price rests on the book":(p.buy_block_reason||"order unavailable");
+  const auth=p.order_authorization==="manual_research_override"?"MAN":"MOD";
   const blocked=reason.includes("older")?"scan prices":reason.includes("POLYMARKET_")?"API key needed":"blocked";
-  const prior=["canceled","rejected","expired","replaced"].includes(order.status)?order.status+" · ":"";
-  return `<span class="order-wrap${compact?" compact":""}" title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
+  const priorLabel={canceled:"CXL",rejected:"REJ",expired:"EXP",replaced:"RPL"}[order.status];
+  const prior=priorLabel?priorLabel+" · ":"";
+  const book=bid!=null&&ask!=null?`B ${cents(bid)} / A ${cents(ask)} · `:ask!=null?`A ${cents(ask)} · `:"";
+  const title=[reason,bid!=null?`Bid ${cents(bid)}`:"",ask!=null?`Ask ${cents(ask)}`:"",order.status?`Previous order ${order.status}`:""].filter(Boolean).join(" · ");
+  return `<span class="order-wrap${compact?" compact":""}" title="${escAttr(title)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
     `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
-    `<span class="order-note">${prior}${ask!=null?cents(ask)+" ask · ":""}${p.buy_ready?auth:blocked}</span></span>`;
+    `<span class="order-note">${prior}${book}${p.buy_ready?auth:blocked}</span></span>`;
 }
 function openSell(pickId){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
@@ -767,7 +808,7 @@ async function openBuy(pickId,initialPrice){
   }
   const ask=Number(p.quote.ask);
   const typed=Number(initialPrice);
-  const price=typed>0&&typed<1?typed:Math.max(1,Math.ceil(ask*100-1e-9)-1)/100;
+  const price=typed>0&&typed<1?typed:ask;
   const units=Number(p.units)||Number(p.suggested_paper_units)||0;
   await previewBuy(pickId,price,units);
 }
@@ -781,7 +822,10 @@ async function previewBuy(pickId,price,units){
   if(preview.status!=="preview"){
     showModal(`<h2 class="red">Order blocked</h2><pre>${esc(preview.error||JSON.stringify(preview))}</pre>`);return;
   }
-  const exact=`BUY ${preview.size_shares} shares of ${preview.market_slug} (${preview.side}) at ${Number(preview.price).toFixed(2)}. Size ${Number(preview.units).toFixed(2)}U at $${Number(preview.unit_value_usd).toFixed(2)}/U; maximum cost $${Number(preview.estimated_cost_usd).toFixed(2)}. This creates a real post-only GTC resting order.`;
+  const behavior=preview.execution_mode==="marketable_limit"?
+    `This is an immediate-or-cancel buy capped at ${Number(preview.price).toFixed(2)}; it can fill now at that price or better, and any unfilled remainder cancels.`:
+    `This creates a post-only GTC resting order below the current ask.`;
+  const exact=`BUY ${preview.size_shares} shares of ${preview.market_slug} (${preview.side}) at a maximum of ${Number(preview.price).toFixed(2)}. Size ${Number(preview.units).toFixed(2)}U at $${Number(preview.unit_value_usd).toFixed(2)}/U; maximum cost $${Number(preview.estimated_cost_usd).toFixed(2)}. ${behavior}`;
   if(!window.confirm(exact+"\n\nPlace this real-money order?"))return;
   showModal("<h2>Submitting exact order…</h2>");
   const submitResponse=await fetch("/api/order/submit",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -791,7 +835,9 @@ async function previewBuy(pickId,price,units){
     showModal(`<h2 class="red">Order not placed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;
   }
   await refreshAll();
-  showModal(`<h2 class="green">Resting order accepted</h2><p>Exchange order ID <b>${esc(result.order_id||"received")}</b>. A resting order may have no immediate executions.</p>`);
+  const placed=preview.execution_mode==="marketable_limit"?"Market-price buy submitted":"Resting order accepted";
+  const note=preview.execution_mode==="marketable_limit"?"Check the Portfolio or execution history for the confirmed fill.":"A resting order may have no immediate executions.";
+  showModal(`<h2 class="green">${placed}</h2><p>Exchange order ID <b>${esc(result.order_id||"received")}</b>. ${note}</p>`);
 }
 const escAttr=s=>esc(s).replace(/"/g,"&quot;");
 window.openBuy=openBuy;window.previewBuy=previewBuy;

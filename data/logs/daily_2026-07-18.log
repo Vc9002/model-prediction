@@ -1,0 +1,250 @@
+=== model-prediction daily 2026-07-18 ===
+Started: Sat Jul 18 00:20:48 CST 2026
+{
+  "date": "2026-07-18",
+  "step1_polymarket_search": {
+    "bbo_capture": {
+      "captured": 241,
+      "failure_details": [],
+      "failures": 0,
+      "missing_executable_ask": 0,
+      "skipped_nonqualification_contracts": 29,
+      "sports_scope": [
+        "mlb",
+        "nba",
+        "nfl",
+        "wnba"
+      ],
+      "status": "ok",
+      "storage": "data/odds/<sport>/2026-07-18/polymarket_snapshots.jsonl",
+      "timestamp_valid": true
+    },
+    "event_count": 31,
+    "leagues_with_events": [
+      "MLB",
+      "NBA",
+      "WNBA",
+      "WORLD_CUP",
+      "WTA"
+    ]
+  },
+  "step1b_soccer_scores": {
+    "ARGENTINA": {
+      "matches_returned": 18,
+      "new_games": 0,
+      "status": "ok"
+    },
+    "BRASILEIRAO": {
+      "matches_returned": 23,
+      "new_games": 2,
+      "status": "ok"
+    },
+    "BRAZIL_SERIE_B": {
+      "matches_returned": 20,
+      "new_games": 1,
+      "status": "ok"
+    },
+    "CHAMPIONSHIP": {
+      "matches_returned": 12,
+      "new_games": 0,
+      "status": "ok"
+    },
+    "COPA_LIBERTADORES": {
+      "matches_returned": 9,
+      "new_games": 0,
+      "status": "ok"
+    },
+    "CSL": {
+      "matches_returned": 8,
+      "new_games": 4,
+      "status": "ok"
+    },
+    "ELITESERIEN": {
+      "matches_returned": 9,
+      "new_games": 1,
+      "status": "ok"
+    },
+    "EREDIVISIE": {
+      "matches_returned": 9,
+      "new_games": 0,
+      "status": "ok"
+    },
+    "K_LEAGUE_1": {
+      "matches_returned": 12,
+      "new_games": 0,
+      "status": "ok"
+    },
+    "LIGA_MX": {
+      "matches_returned": 18,
+      "new_games": 2,
+      "status": "ok"
+    },
+    "LIGUE_1": {
+      "matches_returned": 12,
+      "new_games": 0,
+      "status": "ok"
+    },
+    "SUPERLIGA": {
+      "matches_returned": 6,
+      "new_games": 0,
+      "status": "ok"
+    },
+    "historical_path": "data/historical/soccer_games_all.jsonl",
+    "total_new_games": 10
+  },
+  "step2_3_forecast_and_log": {
+    "mlb": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-elo-trend-lr-v3.json",
+      "calls": 2,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-18",
+      "logged": 1,
+      "logged_pick_ids": [
+        "93a3540bf0dd49bb"
+      ],
+      "model_version": "mlb-elo-trend-lr-v3",
+      "note": "Logged 1 of 2 calls against stored executable asks; 0 duplicates, 1 without a matched quote.",
+      "qualified_shadow_calls": 2,
+      "scheduled_games": 15,
+      "skipped": [],
+      "sport": "mlb",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [
+        {
+          "event_id": "401816164",
+          "reason": "model edge 0.0069 below 2% minimum over executable ask 0.6000"
+        }
+      ],
+      "zero_unit_research_calls": 0
+    },
+    "nba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-18",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nba-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nfl": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-18",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nfl-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nfl",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "soccer": {
+      "logged": 0,
+      "reason": "unsupported ESPN league: SOCCER",
+      "sport": "soccer",
+      "status": "forecast_unavailable"
+    },
+    "wnba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json",
+      "calls": 2,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-18",
+      "logged": 1,
+      "logged_pick_ids": [
+        "c884dc7cf1104640"
+      ],
+      "model_version": "wnba-elo-trend-lr-v3",
+      "note": "Logged 1 of 2 calls against stored executable asks; 0 duplicates, 1 without a matched quote.",
+      "qualified_shadow_calls": 2,
+      "scheduled_games": 3,
+      "skipped": [
+        {
+          "event_id": "401857078",
+          "reason": "insufficient_team_history: Portland Fire=3, Minnesota Lynx=113, required=10"
+        }
+      ],
+      "sport": "wnba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [
+        {
+          "event_id": "401857079",
+          "reason": "model edge -0.0759 below 2% minimum over executable ask 0.7700"
+        }
+      ],
+      "zero_unit_research_calls": 0
+    }
+  },
+  "step3b_polymarket_odds_snapshots": {
+    "mlb": {
+      "moneyline_snapshots": 15,
+      "snapshots": 180,
+      "spread_snapshots": 90,
+      "total_snapshots": 75,
+      "with_executable_bbo": 180
+    },
+    "nba": {
+      "moneyline_snapshots": 7,
+      "snapshots": 7,
+      "spread_snapshots": 0,
+      "total_snapshots": 0,
+      "with_executable_bbo": 7
+    },
+    "wnba": {
+      "moneyline_snapshots": 3,
+      "snapshots": 54,
+      "spread_snapshots": 24,
+      "total_snapshots": 27,
+      "with_executable_bbo": 54
+    }
+  },
+  "step4_settlement": {
+    "failures": [],
+    "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+    "settled": [],
+    "still_open": [
+      "103bf81cbfea407b",
+      "69b8edc361c5483f",
+      "1784b306a2764ca0",
+      "c6927110c2754085",
+      "ec5e7cc40c1a4c2b",
+      "d0e98df55d684f7a",
+      "3b98081a1ff04c62",
+      "f592ac231a074ea9",
+      "3405fe6d522c42ec",
+      "93a3540bf0dd49bb",
+      "c884dc7cf1104640"
+    ],
+    "voided": []
+  },
+  "step5_summary": {
+    "bankroll_reference_units": 5,
+    "date_et": "2026-07-17",
+    "mean_probability_clv": null,
+    "note": "Shadow research accounting only; no real-money authorization.",
+    "open_picks": 11,
+    "open_units": 0,
+    "picks_logged_today": 11,
+    "picks_settled_today": 0,
+    "qualified_pnl_units_all_time": 0,
+    "research_progress": {
+      "iteration_policy": "continuous_no_parameter_freezes",
+      "measured_edge_forward_picks": 0,
+      "measured_edge_settled": 0,
+      "promotion_requires": "versioned walk-forward ablation and locked holdout"
+    }
+  }
+}
+Finished: Sat Jul 18 00:21:32 CST 2026

@@ -371,7 +371,7 @@ def test_position_sell_previews_verified_holding(monkeypatch) -> None:
     assert result["verified_available_quantity"] == 18.0
 
 
-def test_buy_at_current_ask_creates_marketable_ioc_preview(monkeypatch) -> None:
+def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: Path) -> None:
     pick = {
         "pick_id": "qualified-2",
         "status": "open",
@@ -392,6 +392,21 @@ def test_buy_at_current_ask_creates_marketable_ioc_preview(monkeypatch) -> None:
     )
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
+    submitted = {}
+
+    def fake_run(command, **kwargs):
+        submitted["command"] = command
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=0,
+            stdout=json.dumps(
+                {"status": "submitted", "order_id": "ioc-123", "order_state": "ORDER_STATE_FILLED"}
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(dashboard_server.subprocess, "run", fake_run)
 
     result = dashboard_server.preview_order(
         {"pick_id": "qualified-2", "price": 0.60, "size_shares": 10}
@@ -401,6 +416,12 @@ def test_buy_at_current_ask_creates_marketable_ioc_preview(monkeypatch) -> None:
     assert result["order_type"] == "limit_ioc"
     assert result["execution_mode"] == "marketable_limit"
     assert result["reference_ask"] == 0.60
+
+    placed = dashboard_server.submit_order({"nonce": result["nonce"]})
+
+    assert placed["status"] == "submitted"
+    order_type_index = submitted["command"].index("--order-type")
+    assert submitted["command"][order_type_index + 1] == "limit_ioc"
 
 
 def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch) -> None:
@@ -486,6 +507,11 @@ def test_manual_research_limit_cannot_exceed_model_probability(monkeypatch) -> N
             "quote": {"market_slug": "wnba-example", "side": "long", "ask": 0.64},
         },
     )
+    monkeypatch.setattr(
+        dashboard_server,
+        "_config_payload",
+        lambda: {"execution": {"manual_research_require_positive_edge": True}},
+    )
 
     result = dashboard_server.preview_order(
         {"pick_id": "manual-edge-cap", "price": 0.58, "size_shares": 10}
@@ -493,6 +519,40 @@ def test_manual_research_limit_cannot_exceed_model_probability(monkeypatch) -> N
 
     assert result["status"] == "refused"
     assert "below the model probability" in result["error"]
+
+
+def test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled(monkeypatch) -> None:
+    pick = {
+        "pick_id": "manual-market-price",
+        "status": "open",
+        "record_type": "RESEARCH_OBSERVATION",
+        "units": 0,
+        "model_probability": 0.58,
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_decorate_pick",
+        lambda row: {
+            **row,
+            "buy_ready": True,
+            "buy_block_reason": "ready",
+            "quote": {"market_slug": "wnba-example", "side": "long", "ask": 0.64},
+        },
+    )
+    monkeypatch.setattr(dashboard_server, "_suggested_units", lambda row: 1.25)
+    monkeypatch.setattr(
+        dashboard_server,
+        "_config_payload",
+        lambda: {"execution": {"manual_research_require_positive_edge": False}},
+    )
+
+    result = dashboard_server.preview_order(
+        {"pick_id": "manual-market-price", "price": 0.64, "size_shares": 10}
+    )
+
+    assert result["status"] == "preview"
+    assert result["order_type"] == "limit_ioc"
 
 
 def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, tmp_path: Path) -> None:

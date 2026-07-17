@@ -515,17 +515,25 @@ def matrix() -> dict:
         if score_model.get("status") == "research_score_model_candidate":
             qual = (score_model.get("market_qualification") or {}).get("reason", "")
             state = "qualified" if qual == "qualified" else "research_total_candidate"
+            called_holdout = score_model.get("holdout") or {}
             row["total"] = {
                 "state": state,
                 "mae": holdout.get("mae"),
                 "baseline_mae": holdout.get("baseline_mae"),
                 "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
                 "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
-                "holdout_rows": (score_model.get("training") or {}).get("holdout_rows"),
+                "holdout_rows": score_model.get("holdout_observations")
+                or (score_model.get("training") or {}).get("holdout_rows"),
+                "train_rows": score_model.get("train_observations"),
+                "validation_rows": score_model.get("validation_observations"),
                 "readiness": readiness.get(total_key),
                 "qualification": qual,
-                "calls": score_model.get("holdout", {}).get("calls"),
-                "hit_rate": score_model.get("holdout", {}).get("hit_rate"),
+                "calls": called_holdout.get("calls"),
+                "hit_rate": called_holdout.get("hit_rate"),
+                "brier": called_holdout.get("brier"),
+                "reference_line": score_model.get("reference_line"),
+                "threshold": score_model.get("threshold"),
+                "model": score_model.get("model"),
             }
         else:
             total_readiness = readiness.get(total_key)
@@ -1014,9 +1022,15 @@ def preview_order(payload: dict) -> dict:
             }
         maximum_cost = None
     else:
-        # Buy path (unchanged): limit below model prob for manual, cost <= unit cap,
-        # rest below the ask.
-        if manual and price >= float(row.get("model_probability") or 0):
+        # Buy path: limit below model probability for manual research and keep
+        # the authorized unit cap. A limit at/above the ask becomes an IOC
+        # marketable limit; a lower limit remains post-only GTC.
+        execution_config = (_config_payload().get("execution") or {}) if manual else {}
+        if (
+            manual
+            and execution_config.get("manual_research_require_positive_edge", True)
+            and price >= float(row.get("model_probability") or 0)
+        ):
             return {
                 "status": "refused",
                 "error": (
@@ -1034,14 +1048,9 @@ def preview_order(payload: dict) -> dict:
                     f"{float(row.get('units') or 0):g}U cap (${maximum_cost:.2f})"
                 ),
             }
-        if price >= float(quote["ask"]):
-            return {
-                "status": "refused",
-                "error": (
-                    f"resting buy price must be below the current ask {float(quote['ask']):.2f}; "
-                    "crossing orders are blocked"
-                ),
-            }
+    ask = float(quote["ask"]) if action == "buy" else None
+    marketable = action == "buy" and price >= ask
+    order_type = "limit_ioc" if marketable else "limit_gtc"
     nonce = secrets.token_urlsafe(24)
     ticket = {
         "nonce": nonce,
@@ -1056,6 +1065,9 @@ def preview_order(payload: dict) -> dict:
         "estimated_cost_usd": estimated_cost,
         "estimated_proceeds_usd": estimated_cost if action == "sell" else None,
         "maximum_cost_usd": maximum_cost,
+        "order_type": order_type,
+        "execution_mode": "marketable_limit" if marketable else "resting_limit",
+        "reference_ask": ask,
         "manual_research_order": manual,
         "created_at": time.time(),
         "expires_at": time.time() + 300,
@@ -1089,8 +1101,21 @@ def submit_order(payload: dict) -> dict:
         ready, reason = _order_readiness(row, quote)
         if not ready:
             return {"status": "refused", "error": reason}
-        if ticket["price"] >= float(quote["ask"]):
-            return {"status": "refused", "error": "ask changed; preview the order again"}
+        ask = float(quote["ask"])
+        if ticket.get("order_type") == "limit_ioc":
+            if ticket["price"] < ask:
+                return {
+                    "status": "refused",
+                    "error": (
+                        f"current ask moved to {ask:.2f}, above your {ticket['price']:.2f} "
+                        "buy cap; preview the order again"
+                    ),
+                }
+        elif ticket["price"] >= ask:
+            return {
+                "status": "refused",
+                "error": "ask moved down through your resting limit; preview the order again",
+            }
     command = _resolve_runner() + [
         "execute",
         "--pick-id", ticket["pick_id"],
@@ -1098,7 +1123,7 @@ def submit_order(payload: dict) -> dict:
         "--price", str(ticket["price"]),
         "--side", ticket["side"],
         "--action", action,
-        "--order-type", "limit_gtc",
+        "--order-type", ticket.get("order_type", "limit_gtc"),
         "--market-slug", ticket["market_slug"],
         "--execute",
     ]

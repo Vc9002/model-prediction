@@ -55,7 +55,9 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "openPositionSell" not in html
     assert "Resting order accepted" in html
     assert '"cancel pending"' in html
-    assert '["canceled","rejected","expired","replaced"]' in html
+    assert 'canceled:"CXL"' in html
+    assert 'rejected:"REJ"' in html
+    assert '`B ${cents(bid)} / A ${cents(ask)} · `' in html
     assert "holdout games" in html
     assert "TOTAL VALIDATION" in html
     assert "Validation cohorts" in html
