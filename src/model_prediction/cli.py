@@ -537,6 +537,15 @@ def _forecast_learned_sport(
                      "reason": "no stored executable moneyline BBO matched this matchup"}
                 )
                 continue
+            # Gate: require minimum edge over executable Polymarket ask.
+            # Model probability must exceed the market ask by at least 2% (absolute).
+            model_edge = candidate.model_probability - quote["executable_ask"]
+            if model_edge < 0.02:
+                unmatched.append(
+                    {"event_id": candidate.event_id,
+                     "reason": f"model edge {model_edge:.4f} below 2% minimum over executable ask {quote['executable_ask']:.4f}"}
+                )
+                continue
             request = PickRequest(
                 event_start_utc=candidate.event_start_utc,
                 event_id=candidate.event_id,

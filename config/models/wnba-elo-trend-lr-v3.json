@@ -1,0 +1,133 @@
+{
+  "artifact_hash": "286653236675a65e58674d10837572801218599b31772016e9d8575bfefa53b4",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        2.8197049211,
+        -0.0409081592
+      ],
+      "confidence_threshold": 0.50176304,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "intercept": -1.3782274464,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "wnba-elo-trend-lr-v3",
+  "qualification": {
+    "brier_score": 0.216677,
+    "calibration": {
+      "brier_score": 0.2166773497323785,
+      "calibration_intercept": -0.05021823854222526,
+      "calibration_slope": 1.2654973099345785,
+      "expected_calibration_error": 0.03296506659350808,
+      "log_loss": 0.6238525359373351,
+      "reliability_buckets": [
+        {
+          "count": 32,
+          "hit_rate": 0.53125,
+          "lower": 0.5,
+          "mean_p": 0.5493533347713679,
+          "upper": 0.6
+        },
+        {
+          "count": 42,
+          "hit_rate": 0.6904761904761905,
+          "lower": 0.6,
+          "mean_p": 0.6537324432324854,
+          "upper": 0.7
+        },
+        {
+          "count": 23,
+          "hit_rate": 0.782608695652174,
+          "lower": 0.7,
+          "mean_p": 0.7358666364064829,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 97,
+      "status": "ok"
+    },
+    "called_rate": 0.960396,
+    "calls": 97,
+    "every_called_month_positive_at_minus_110": true,
+    "every_qualifying_month_positive_at_minus_110": true,
+    "failures": [],
+    "framework": "locked_complete_date_60_20_20",
+    "hit_rate": 0.659794,
+    "hits": 64,
+    "locked_holdout": true,
+    "market_type": "moneyline",
+    "meets_primary_holdout_metrics": true,
+    "minimum_calls": 50,
+    "minimum_hit_rate": 0.6,
+    "monthly_at_minus_110": [
+      {
+        "calls": 16,
+        "hit_rate": 0.875,
+        "hits": 14,
+        "month": "2025-08",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 10.727273
+      },
+      {
+        "calls": 49,
+        "hit_rate": 0.673469,
+        "hits": 33,
+        "month": "2025-09",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 14.0
+      },
+      {
+        "calls": 5,
+        "hit_rate": 1.0,
+        "hits": 5,
+        "month": "2025-10",
+        "qualification_status": "insufficient_calls",
+        "units_at_minus_110": 4.545455
+      },
+      {
+        "calls": 27,
+        "hit_rate": 0.444444,
+        "hits": 12,
+        "month": "2026-07",
+        "qualification_status": "partial_month",
+        "units_at_minus_110": -4.090909
+      }
+    ],
+    "monthly_minimum_calls": 10,
+    "price_diagnostics": null,
+    "qualification_eligible": true,
+    "qualified": true,
+    "roi": null,
+    "secondary_reporting_complete": true,
+    "selectivity": 0.960396,
+    "total_predictions": 101,
+    "units_at_minus_110": 25.181818
+  },
+  "schema_version": "1",
+  "sport": "wnba",
+  "training": {
+    "coefficient_fit": {
+      "end": "2025-07-02",
+      "observations": 346,
+      "start": "2024-06-01"
+    },
+    "locked_holdout": {
+      "end": "2026-07-16",
+      "observations": 101,
+      "start": "2025-08-24"
+    },
+    "market_inputs_used": false,
+    "threshold_selection": {
+      "end": "2025-08-23",
+      "observations": 130,
+      "start": "2025-07-03"
+    },
+    "threshold_source": "later validation cohort; never locked holdout",
+    "walk_forward_features": true
+  }
+}

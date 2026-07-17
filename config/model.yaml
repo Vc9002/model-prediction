@@ -108,8 +108,8 @@ models:
     family: elo_trend_logistic_regression
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: mlb-elo-trend-lr-v2
-    production_artifact: config/models/mlb-elo-trend-lr-v2.json
+    active_production_version: mlb-elo-trend-lr-v3
+    production_artifact: config/models/mlb-elo-trend-lr-v3.json
     active_research_version: measured-edge-margin-v1 + measured-edge-totals-v1
     active_research_name: Measured Edge Paired Models
     legacy_research_rollback: legacy-measured-edge
@@ -136,16 +136,16 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: nba-elo-trend-lr-v2
-    production_artifact: config/models/nba-elo-trend-lr-v2.json
-    protected_versions: [nba-elo-trend-v1, nba-elo-trend-lr-v1, nba-elo-trend-lr-v2]
+    active_production_version: nba-elo-trend-lr-v3
+    production_artifact: config/models/nba-elo-trend-lr-v3.json
+    protected_versions: [nba-elo-trend-v1, nba-elo-trend-lr-v1, nba-elo-trend-lr-v3]
   WNBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: wnba-elo-trend-lr-v2
-    production_artifact: config/models/wnba-elo-trend-lr-v2.json
-    protected_versions: [wnba-elo-trend-v1, wnba-elo-trend-lr-v1, wnba-elo-trend-lr-v2]
+    active_production_version: wnba-elo-trend-lr-v3
+    production_artifact: config/models/wnba-elo-trend-lr-v3.json
+    protected_versions: [wnba-elo-trend-v1, wnba-elo-trend-lr-v1, wnba-elo-trend-lr-v3]
   SOCCER:
     family: poisson_dixon_coles
     status: research
@@ -157,8 +157,8 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: nfl-elo-trend-lr-v2
-    production_artifact: config/models/nfl-elo-trend-lr-v2.json
+    active_production_version: nfl-elo-trend-lr-v3
+    production_artifact: config/models/nfl-elo-trend-lr-v3.json
   TENNIS:
     family: surface_blended_elo
     status: research

@@ -351,6 +351,8 @@ def status() -> dict:
         "tests": tests or {"status": "not_run_this_session"},
         "validation_status": validation.get("status"),
         "promotion_allowed": validation.get("promotion_allowed"),
+        "polymarket_odds": odds_summary(),
+        "edge_filter_min": 0.02,
     }
 
 
@@ -405,6 +407,42 @@ def backtests() -> list[dict]:
                 "size_kb": round(path.stat().st_size / 1024, 1),
             })
     return items
+
+
+def odds_summary(sport: str | None = None) -> dict:
+    """Per-sport summary of stored Polymarket odds snapshots for today."""
+    today = _today()
+    sports = [sport] if sport else list(SPORTS)
+    result: dict = {}
+    for s in sports:
+        path = DATA / "odds" / s / today / "polymarket_snapshots.jsonl"
+        if not path.exists():
+            result[s] = {"snapshots": 0, "status": "no_data"}
+            continue
+        snaps = []
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    snaps.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        moneyline = [s for s in snaps if s.get("market_type") == "moneyline"]
+        spread = [s for s in snaps if s.get("market_type") == "spread"]
+        total = [s for s in snaps if s.get("market_type") == "total"]
+        with_bbo = [s for s in snaps
+                    if (s.get("long") or {}).get("ask") is not None
+                    and (s.get("short") or {}).get("ask") is not None]
+        result[s] = {
+            "snapshots": len(snaps),
+            "moneyline": len(moneyline),
+            "spread": len(spread),
+            "total": len(total),
+            "with_executable_bbo": len(with_bbo),
+            "date": today,
+        }
+    return result if sport is None else result.get(sport, {})
 
 
 def market_snapshots(sport: str, day: str) -> dict:
@@ -715,6 +753,10 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/today":
                 day = query.get("date") or _today()
                 self._send(_cached(f"today:{day}", 20, lambda: today_picks(day)))
+            elif route == "/api/odds":
+                sport = query.get("sport")
+                self._send(_cached(f"odds:{sport or 'all'}", 30,
+                                   lambda: odds_summary(sport if sport else None)))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(timezone.utc).isoformat()[:19]})
             else:
@@ -785,11 +827,11 @@ def _save_archive(archive: dict) -> None:
 
 
 def archive_action(action: str, scope: str) -> dict:
-    """Hide settled ledger rows from the TABLE VIEW only.
+    """Persistently hide safe ledger rows from the dashboard table.
 
     picks.xlsx is never touched: archived rows keep feeding performance,
     calibration, backtests, and research. This is a display ledger-clear,
-    not a data delete. Open picks are never archived.
+    not a data delete. Open rows with positive units are never archived.
     """
     archive = _load_archive()
     if action == "restore":
@@ -810,7 +852,7 @@ def archive_action(action: str, scope: str) -> dict:
             for row in read_picks()
             if row.get("status") == "open"
             and row.get("record_type") == "QUALIFIED_SHADOW_CALL"
-            and (row.get("units") or 0) and float(row.get("units") or 0) > 0
+            and float(row.get("units") or 0) > 0
         }
         blocked = sorted(requested & exposed)
         allowed = requested - exposed
@@ -831,10 +873,15 @@ def archive_action(action: str, scope: str) -> dict:
     today = datetime.now(timezone.utc).astimezone(EASTERN).date()
     days = {"day": 0, "week": 6, "month": 29}.get(scope)
     existing = set(archive["pick_ids"])
-    added = 0
+    added = protected = 0
     for row in read_picks():
-        if row.get("status") != "settled":
-            continue  # open picks never leave the view
+        if (
+            row.get("status") == "open"
+            and row.get("record_type") == "QUALIFIED_SHADOW_CALL"
+            and float(row.get("units") or 0) > 0
+        ):
+            protected += 1
+            continue
         pick_id = str(row.get("pick_id"))
         if pick_id in existing:
             continue
@@ -855,6 +902,7 @@ def archive_action(action: str, scope: str) -> dict:
     with _CACHE_LOCK:
         _CACHE.clear()
     return {"status": "ok", "action": f"clear:{scope}", "archived_now": added,
+            "protected_open_staked": protected,
             "archived_total": len(existing),
             "note": "View-only: all rows remain in picks.xlsx and keep feeding research metrics."}
 
@@ -909,8 +957,13 @@ def main() -> None:
     ThreadingHTTPServer.daemon_threads = True
     ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
-    print(f"dashboard: http://127.0.0.1:{options.port}/  (read-only; Ctrl-C to stop)")
-    server.serve_forever()
+    print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\ndashboard stopped")
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":

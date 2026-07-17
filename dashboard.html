@@ -383,7 +383,7 @@ function renderPicks(){
     return (x>y?1:x<y?-1:0)*(sortAsc?1:-1);});
   const perf=state.perf||{};
   $("#pickKpis").innerHTML=`
-    <div class="k"><b>${perf.total_picks??rows.length}</b><span>picks</span></div>
+    <div class="k"><b>${rows.length}</b><span>shown picks</span></div>
     <div class="k"><b>${pct(perf.win_rate)}</b><span>win rate</span></div>
     <div class="k"><b class="${(perf.total_pnl||0)>=0?"green":"red"}">${fmt(perf.total_pnl)}</b><span>total P&amp;L (U)</span></div>
     <div class="k"><b>${pct(perf.roi)}</b><span>ROI</span></div>
@@ -401,18 +401,20 @@ function renderPicks(){
       <td class="${pickPnl(p)>=0?"green":"red"}">${fmt(pickPnl(p))}</td>
       <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;});
   $("#pickTable").innerHTML=html;
+  window.updateSelCount?.();
 }
 window.setSort=k=>{if(sortKey===k)sortAsc=!sortAsc;else{sortKey=k;sortAsc=false;}renderPicks();};
 async function clearLedger(scope){
-  const label={day:"today's settled picks",week:"the last 7 days of settled picks",
-    month:"the last 30 days of settled picks",all:"ALL settled picks"}[scope];
-  if(!window.confirm(`Clear ${label} from the ledger VIEW?\n\nNothing is deleted — every row stays in picks.xlsx and keeps feeding performance, calibration, and research. Open picks are never cleared. Restorable anytime.`))return;
+  const label={day:"today's picks",week:"the last 7 days of picks",
+    month:"the last 30 days of picks",all:"ALL picks"}[scope];
+  if(!window.confirm(`Clear ${label} from your local ledger view?\n\nThe rows disappear persistently from this dashboard. Research history stays intact so model results are not corrupted. Open picks with real units stay visible. Restorable anytime.`))return;
   try{
     const r=await fetch("/api/archive",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({action:"clear",scope,confirm:true})});
     const d=await r.json();
     if(d.status!=="ok"){alert(d.error||"failed");return;}
     await refreshAll();
+    alert(`Removed ${d.archived_now} row(s) from your local ledger view.`);
   }catch(e){alert("server unreachable: "+e.message);}
 }
 async function restoreLedger(){
@@ -432,7 +434,7 @@ window.updateSelCount=()=>{
 async function clearSelected(){
   const ids=$$(".rowSel").filter(c=>c.checked).map(c=>c.value);
   if(!ids.length)return;
-  if(!window.confirm(`Clear ${ids.length} selected row(s) from the ledger VIEW?\n\nNothing is deleted — rows stay in picks.xlsx and keep feeding research. Restorable anytime.`))return;
+  if(!window.confirm(`Clear ${ids.length} selected row(s) from your local ledger view?\n\nThe rows disappear persistently from this dashboard. Research history stays intact. Restorable anytime.`))return;
   try{
     const r=await fetch("/api/archive",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({action:"clear_ids",pick_ids:ids,confirm:true})});

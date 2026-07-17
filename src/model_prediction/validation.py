@@ -34,10 +34,10 @@ QUALIFICATION_MINIMUM_HIT_RATE = 0.60
 MINIMUM_CALLS = 50
 MINIMUM_MONTHLY_CALLS = 10
 LEARNED_ARTIFACT_VERSIONS = {
-    "mlb": "mlb-elo-trend-lr-v2",
-    "nba": "nba-elo-trend-lr-v2",
-    "wnba": "wnba-elo-trend-lr-v2",
-    "nfl": "nfl-elo-trend-lr-v2",
+    "mlb": "mlb-elo-trend-lr-v3",
+    "nba": "nba-elo-trend-lr-v3",
+    "wnba": "wnba-elo-trend-lr-v3",
+    "nfl": "nfl-elo-trend-lr-v3",
 }
 
 
