@@ -76,8 +76,17 @@ canvas{width:100%;height:180px;display:block}
 /* live picks */
 .pick{border:1px solid var(--accent);border-left:4px solid transparent;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-family:var(--mono);font-size:12.5px}
 .pick.hi{border-left-color:var(--green)} .pick.med{border-left-color:var(--yellow)}
-.edgebar{height:8px;background:rgba(255,255,255,.07);border-radius:4px;position:relative;overflow:hidden;margin-top:4px}
+.pick-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.pick-copy{min-width:0;line-height:1.45}
+.pick-event,.pick-metrics{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.pick-event{margin-bottom:2px}.pick-event>span,.pick-metrics>span{white-space:nowrap}
+.pick-action{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end}
+.pick-action .order-wrap{display:grid;grid-template-columns:auto 62px auto;gap:4px;align-items:center}
+.pick-action .order-note{grid-column:1/-1;text-align:right}
+.edgebar{height:6px;background:rgba(255,255,255,.07);border-radius:4px;position:relative;overflow:hidden;margin-top:7px}
+.edgebar:after{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,255,255,.28)}
 .edgebar i{position:absolute;top:0;bottom:0;left:50%}
+@media(max-width:850px){.pick-row{align-items:flex-start;flex-direction:column}.pick-action{width:100%;justify-content:flex-start}.pick-action .order-note{text-align:left}}
 /* alerts */
 .alert{display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
 .alert.warn{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.4);animation:pulse 2.5s infinite}
@@ -633,15 +642,15 @@ async function renderToday(){
       const sizing=actualU>0?`size <b class="green">${actualU.toFixed(2)}U / $${(actualU*unitValue).toFixed(2)}</b>`:
         suggested>0?`size <b class="${edge>0?"green":"dim"}">${Number(suggested).toFixed(2)}U / $${(Number(suggested)*unitValue).toFixed(2)}</b> <span class="dim">(suggested paper)</span>`:"";
       const d=document.createElement("div");d.className="pick "+cls;
-      d.innerHTML=`<b>${p.away_team} @ ${p.home_team}</b>
-        <span class="dim">· ${p.start_et} · ${p.market_type}</span> ${res}<br>
-        pick <b>${pickLabel(p)}</b>
-        · model <b>${conf?pct(conf):"—"}</b>
-        · market <b>${cents(market)}</b> <span class="dim">(${market?pct(market):"—"})</span>
-        · edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b>
-        ${sizing?("· "+sizing):""}
-        <span class="dim">· ${p.model_version||""}</span> · ${orderControl(p,true)}
-        <div class="edgebar"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(48,Math.abs(edge||0)*400)}px;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`;
+      d.innerHTML=`<div class="pick-row"><div class="pick-copy">
+        <div class="pick-event"><b>${p.away_team} @ ${p.home_team}</b><span class="dim">${p.start_et} · ${p.market_type}</span>${res}</div>
+        <div class="pick-metrics"><span>pick <b>${pickLabel(p)}</b></span>
+        <span>model <b>${conf?pct(conf):"—"}</b></span>
+        <span>market <b>${cents(market)}</b> <span class="dim">(${market?pct(market):"—"})</span></span>
+        <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
+        ${sizing?`<span>${sizing}</span>`:""}<span class="dim">${p.model_version||""}</span></div>
+        </div><div class="pick-action">${orderControl(p,true)}</div></div>
+        <div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`;
       d.onclick=()=>showModal(`<h2>${p.away_team} @ ${p.home_team}</h2><pre>${esc(JSON.stringify(p,null,1))}</pre>`);
       box.appendChild(d);
     });

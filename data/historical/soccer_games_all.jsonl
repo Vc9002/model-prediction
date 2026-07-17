@@ -2139,3 +2139,995 @@
 {"away_score":1,"away_team":"Aalesund","event_id":"oddsapi:soccer_norway_eliteserien:2026-07-16:d1a128e4","event_start_utc":"2026-07-16T17:00:00Z","home_score":6,"home_team":"V\u00e5lerenga","league":"ELITESERIEN"}
 {"away_score":1,"away_team":"Atlante FC","event_id":"oddsapi:soccer_mexico_ligamx:2026-07-17:13f94ffd","event_start_utc":"2026-07-17T01:00:00Z","home_score":2,"home_team":"Necaxa","league":"LIGA_MX"}
 {"away_score":1,"away_team":"Tigres","event_id":"oddsapi:soccer_mexico_ligamx:2026-07-17:c13f4ed3","event_start_utc":"2026-07-17T03:10:00Z","home_score":3,"home_team":"Tijuana","league":"LIGA_MX"}
+{"away_score":0,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77256","event_start_utc":"2025-08-22T18:30:00Z","home_score":6,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77257","event_start_utc":"2025-08-23T13:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77258","event_start_utc":"2025-08-23T13:30:00Z","home_score":4,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77259","event_start_utc":"2025-08-23T13:30:00Z","home_score":1,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77262","event_start_utc":"2025-08-23T13:30:00Z","home_score":2,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77264","event_start_utc":"2025-08-23T13:30:00Z","home_score":1,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77263","event_start_utc":"2025-08-23T16:30:00Z","home_score":3,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77260","event_start_utc":"2025-08-24T13:30:00Z","home_score":0,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77261","event_start_utc":"2025-08-24T15:30:00Z","home_score":0,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77273","event_start_utc":"2025-08-29T18:30:00Z","home_score":0,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77266","event_start_utc":"2025-08-30T13:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77267","event_start_utc":"2025-08-30T13:30:00Z","home_score":3,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77268","event_start_utc":"2025-08-30T13:30:00Z","home_score":1,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77271","event_start_utc":"2025-08-30T13:30:00Z","home_score":1,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77270","event_start_utc":"2025-08-30T16:30:00Z","home_score":2,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77269","event_start_utc":"2025-08-31T13:30:00Z","home_score":1,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77265","event_start_utc":"2025-08-31T15:30:00Z","home_score":3,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77272","event_start_utc":"2025-08-31T17:30:00Z","home_score":4,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77275","event_start_utc":"2025-09-12T18:30:00Z","home_score":3,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77276","event_start_utc":"2025-09-13T13:30:00Z","home_score":3,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77277","event_start_utc":"2025-09-13T13:30:00Z","home_score":0,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77279","event_start_utc":"2025-09-13T13:30:00Z","home_score":3,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77280","event_start_utc":"2025-09-13T13:30:00Z","home_score":2,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77282","event_start_utc":"2025-09-13T13:30:00Z","home_score":0,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77274","event_start_utc":"2025-09-13T16:30:00Z","home_score":5,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77281","event_start_utc":"2025-09-14T13:30:00Z","home_score":2,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77278","event_start_utc":"2025-09-14T15:30:00Z","home_score":0,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77288","event_start_utc":"2025-09-19T18:30:00Z","home_score":2,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77287","event_start_utc":"2025-09-20T13:30:00Z","home_score":0,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77289","event_start_utc":"2025-09-20T13:30:00Z","home_score":1,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77290","event_start_utc":"2025-09-20T13:30:00Z","home_score":1,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77291","event_start_utc":"2025-09-20T13:30:00Z","home_score":2,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77286","event_start_utc":"2025-09-20T16:30:00Z","home_score":3,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77284","event_start_utc":"2025-09-21T13:30:00Z","home_score":3,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77283","event_start_utc":"2025-09-21T15:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77285","event_start_utc":"2025-09-21T17:30:00Z","home_score":1,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77292","event_start_utc":"2025-09-26T18:30:00Z","home_score":4,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77294","event_start_utc":"2025-09-27T13:30:00Z","home_score":0,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77296","event_start_utc":"2025-09-27T13:30:00Z","home_score":0,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77298","event_start_utc":"2025-09-27T13:30:00Z","home_score":1,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77299","event_start_utc":"2025-09-27T13:30:00Z","home_score":2,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":6,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77295","event_start_utc":"2025-09-27T16:30:00Z","home_score":4,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77293","event_start_utc":"2025-09-28T13:30:00Z","home_score":1,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77300","event_start_utc":"2025-09-28T15:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77297","event_start_utc":"2025-09-28T17:30:00Z","home_score":0,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77308","event_start_utc":"2025-10-03T18:30:00Z","home_score":0,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77301","event_start_utc":"2025-10-04T13:30:00Z","home_score":2,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77303","event_start_utc":"2025-10-04T13:30:00Z","home_score":1,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77304","event_start_utc":"2025-10-04T13:30:00Z","home_score":1,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77307","event_start_utc":"2025-10-04T13:30:00Z","home_score":3,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77302","event_start_utc":"2025-10-04T16:30:00Z","home_score":0,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77305","event_start_utc":"2025-10-05T13:30:00Z","home_score":1,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77309","event_start_utc":"2025-10-05T15:30:00Z","home_score":4,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77306","event_start_utc":"2025-10-05T17:30:00Z","home_score":0,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77315","event_start_utc":"2025-10-17T18:30:00Z","home_score":3,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77312","event_start_utc":"2025-10-18T13:30:00Z","home_score":3,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77313","event_start_utc":"2025-10-18T13:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77314","event_start_utc":"2025-10-18T13:30:00Z","home_score":0,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77317","event_start_utc":"2025-10-18T13:30:00Z","home_score":2,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77318","event_start_utc":"2025-10-18T13:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77310","event_start_utc":"2025-10-18T16:30:00Z","home_score":2,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77311","event_start_utc":"2025-10-19T13:30:00Z","home_score":2,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77316","event_start_utc":"2025-10-19T15:30:00Z","home_score":0,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77322","event_start_utc":"2025-10-24T18:30:00Z","home_score":1,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77320","event_start_utc":"2025-10-25T13:30:00Z","home_score":2,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77324","event_start_utc":"2025-10-25T13:30:00Z","home_score":0,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":6,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77325","event_start_utc":"2025-10-25T13:30:00Z","home_score":0,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77326","event_start_utc":"2025-10-25T13:30:00Z","home_score":3,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77327","event_start_utc":"2025-10-25T13:30:00Z","home_score":0,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77321","event_start_utc":"2025-10-25T16:30:00Z","home_score":1,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77319","event_start_utc":"2025-10-26T14:30:00Z","home_score":2,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77323","event_start_utc":"2025-10-26T16:30:00Z","home_score":2,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77332","event_start_utc":"2025-10-31T19:30:00Z","home_score":0,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77329","event_start_utc":"2025-11-01T14:30:00Z","home_score":1,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77330","event_start_utc":"2025-11-01T14:30:00Z","home_score":3,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77333","event_start_utc":"2025-11-01T14:30:00Z","home_score":0,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77334","event_start_utc":"2025-11-01T14:30:00Z","home_score":0,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77335","event_start_utc":"2025-11-01T14:30:00Z","home_score":1,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77328","event_start_utc":"2025-11-01T17:30:00Z","home_score":3,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77336","event_start_utc":"2025-11-02T14:30:00Z","home_score":4,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77331","event_start_utc":"2025-11-02T16:30:00Z","home_score":2,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77340","event_start_utc":"2025-11-07T19:30:00Z","home_score":2,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77337","event_start_utc":"2025-11-08T14:30:00Z","home_score":6,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77343","event_start_utc":"2025-11-08T14:30:00Z","home_score":2,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77344","event_start_utc":"2025-11-08T14:30:00Z","home_score":3,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77345","event_start_utc":"2025-11-08T14:30:00Z","home_score":1,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77342","event_start_utc":"2025-11-08T17:30:00Z","home_score":3,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77339","event_start_utc":"2025-11-09T14:30:00Z","home_score":2,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77341","event_start_utc":"2025-11-09T16:30:00Z","home_score":3,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77338","event_start_utc":"2025-11-09T18:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77348","event_start_utc":"2025-11-21T19:30:00Z","home_score":1,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77346","event_start_utc":"2025-11-22T14:30:00Z","home_score":6,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77347","event_start_utc":"2025-11-22T14:30:00Z","home_score":3,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77350","event_start_utc":"2025-11-22T14:30:00Z","home_score":1,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77351","event_start_utc":"2025-11-22T14:30:00Z","home_score":1,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77353","event_start_utc":"2025-11-22T14:30:00Z","home_score":0,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77354","event_start_utc":"2025-11-22T17:30:00Z","home_score":3,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77349","event_start_utc":"2025-11-23T14:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77352","event_start_utc":"2025-11-23T16:30:00Z","home_score":0,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77360","event_start_utc":"2025-11-28T19:30:00Z","home_score":0,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77355","event_start_utc":"2025-11-29T14:30:00Z","home_score":3,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77359","event_start_utc":"2025-11-29T14:30:00Z","home_score":1,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77361","event_start_utc":"2025-11-29T14:30:00Z","home_score":1,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77362","event_start_utc":"2025-11-29T14:30:00Z","home_score":3,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77356","event_start_utc":"2025-11-29T17:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77363","event_start_utc":"2025-11-30T14:30:00Z","home_score":2,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77357","event_start_utc":"2025-11-30T16:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77358","event_start_utc":"2025-11-30T18:30:00Z","home_score":4,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77365","event_start_utc":"2025-12-05T19:30:00Z","home_score":0,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":5,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77367","event_start_utc":"2025-12-06T14:30:00Z","home_score":0,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77368","event_start_utc":"2025-12-06T14:30:00Z","home_score":3,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77369","event_start_utc":"2025-12-06T14:30:00Z","home_score":2,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77370","event_start_utc":"2025-12-06T14:30:00Z","home_score":2,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77371","event_start_utc":"2025-12-06T14:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77366","event_start_utc":"2025-12-06T17:30:00Z","home_score":6,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77372","event_start_utc":"2025-12-07T14:30:00Z","home_score":3,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77364","event_start_utc":"2025-12-07T16:30:00Z","home_score":2,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77379","event_start_utc":"2025-12-12T19:30:00Z","home_score":3,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77375","event_start_utc":"2025-12-13T14:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77378","event_start_utc":"2025-12-13T14:30:00Z","home_score":1,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77380","event_start_utc":"2025-12-13T14:30:00Z","home_score":2,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77381","event_start_utc":"2025-12-13T14:30:00Z","home_score":4,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77374","event_start_utc":"2025-12-13T17:30:00Z","home_score":2,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77376","event_start_utc":"2025-12-14T14:30:00Z","home_score":1,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77373","event_start_utc":"2025-12-14T16:30:00Z","home_score":2,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77377","event_start_utc":"2025-12-14T18:30:00Z","home_score":0,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77382","event_start_utc":"2025-12-19T19:30:00Z","home_score":2,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77385","event_start_utc":"2025-12-20T14:30:00Z","home_score":0,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77386","event_start_utc":"2025-12-20T14:30:00Z","home_score":3,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77387","event_start_utc":"2025-12-20T14:30:00Z","home_score":0,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77389","event_start_utc":"2025-12-20T14:30:00Z","home_score":0,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77390","event_start_utc":"2025-12-20T14:30:00Z","home_score":1,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77384","event_start_utc":"2025-12-20T17:30:00Z","home_score":1,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77383","event_start_utc":"2025-12-21T14:30:00Z","home_score":0,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77388","event_start_utc":"2025-12-21T16:30:00Z","home_score":0,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77393","event_start_utc":"2026-01-09T19:30:00Z","home_score":3,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77394","event_start_utc":"2026-01-10T14:30:00Z","home_score":2,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77398","event_start_utc":"2026-01-10T14:30:00Z","home_score":2,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77400","event_start_utc":"2026-01-10T14:30:00Z","home_score":2,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77392","event_start_utc":"2026-01-10T17:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77397","event_start_utc":"2026-01-11T14:30:00Z","home_score":4,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77391","event_start_utc":"2026-01-11T16:30:00Z","home_score":8,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77404","event_start_utc":"2026-01-13T17:30:00Z","home_score":3,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77401","event_start_utc":"2026-01-13T19:30:00Z","home_score":3,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77402","event_start_utc":"2026-01-13T19:30:00Z","home_score":2,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77405","event_start_utc":"2026-01-14T17:30:00Z","home_score":2,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77403","event_start_utc":"2026-01-14T19:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77407","event_start_utc":"2026-01-14T19:30:00Z","home_score":5,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77408","event_start_utc":"2026-01-14T19:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77406","event_start_utc":"2026-01-15T19:30:00Z","home_score":1,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77412","event_start_utc":"2026-01-16T19:30:00Z","home_score":3,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77410","event_start_utc":"2026-01-17T14:30:00Z","home_score":3,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77414","event_start_utc":"2026-01-17T14:30:00Z","home_score":1,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77416","event_start_utc":"2026-01-17T14:30:00Z","home_score":1,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77417","event_start_utc":"2026-01-17T14:30:00Z","home_score":2,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77418","event_start_utc":"2026-01-17T14:30:00Z","home_score":0,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":5,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77411","event_start_utc":"2026-01-17T17:30:00Z","home_score":1,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77413","event_start_utc":"2026-01-18T14:30:00Z","home_score":1,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77415","event_start_utc":"2026-01-18T16:30:00Z","home_score":2,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77426","event_start_utc":"2026-01-23T19:30:00Z","home_score":0,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77419","event_start_utc":"2026-01-24T14:30:00Z","home_score":1,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77420","event_start_utc":"2026-01-24T14:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77421","event_start_utc":"2026-01-24T14:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77423","event_start_utc":"2026-01-24T14:30:00Z","home_score":3,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77427","event_start_utc":"2026-01-24T14:30:00Z","home_score":0,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77425","event_start_utc":"2026-01-24T17:30:00Z","home_score":0,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77424","event_start_utc":"2026-01-25T14:30:00Z","home_score":0,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77422","event_start_utc":"2026-01-25T16:30:00Z","home_score":2,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77395","event_start_utc":"2026-01-27T19:30:00Z","home_score":0,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77399","event_start_utc":"2026-01-27T19:30:00Z","home_score":1,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77435","event_start_utc":"2026-01-30T19:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77428","event_start_utc":"2026-01-31T14:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77430","event_start_utc":"2026-01-31T14:30:00Z","home_score":1,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77431","event_start_utc":"2026-01-31T14:30:00Z","home_score":1,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77433","event_start_utc":"2026-01-31T14:30:00Z","home_score":2,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77434","event_start_utc":"2026-01-31T14:30:00Z","home_score":3,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77436","event_start_utc":"2026-01-31T17:30:00Z","home_score":2,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77432","event_start_utc":"2026-02-01T14:30:00Z","home_score":1,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77429","event_start_utc":"2026-02-01T16:30:00Z","home_score":3,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77442","event_start_utc":"2026-02-06T19:30:00Z","home_score":1,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77438","event_start_utc":"2026-02-07T14:30:00Z","home_score":1,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77439","event_start_utc":"2026-02-07T14:30:00Z","home_score":2,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77441","event_start_utc":"2026-02-07T14:30:00Z","home_score":1,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77443","event_start_utc":"2026-02-07T14:30:00Z","home_score":2,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77444","event_start_utc":"2026-02-07T14:30:00Z","home_score":0,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77440","event_start_utc":"2026-02-07T17:30:00Z","home_score":1,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77445","event_start_utc":"2026-02-08T14:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77437","event_start_utc":"2026-02-08T16:30:00Z","home_score":5,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77448","event_start_utc":"2026-02-13T19:30:00Z","home_score":4,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77446","event_start_utc":"2026-02-14T14:30:00Z","home_score":4,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77447","event_start_utc":"2026-02-14T14:30:00Z","home_score":3,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77450","event_start_utc":"2026-02-14T14:30:00Z","home_score":0,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77453","event_start_utc":"2026-02-14T14:30:00Z","home_score":3,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77454","event_start_utc":"2026-02-14T14:30:00Z","home_score":3,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77451","event_start_utc":"2026-02-14T17:30:00Z","home_score":3,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77452","event_start_utc":"2026-02-15T14:30:00Z","home_score":1,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77449","event_start_utc":"2026-02-15T16:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77457","event_start_utc":"2026-02-20T19:30:00Z","home_score":1,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77455","event_start_utc":"2026-02-21T14:30:00Z","home_score":3,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77459","event_start_utc":"2026-02-21T14:30:00Z","home_score":2,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77460","event_start_utc":"2026-02-21T14:30:00Z","home_score":1,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77463","event_start_utc":"2026-02-21T14:30:00Z","home_score":2,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77458","event_start_utc":"2026-02-21T17:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77456","event_start_utc":"2026-02-22T14:30:00Z","home_score":2,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77461","event_start_utc":"2026-02-22T16:30:00Z","home_score":2,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77462","event_start_utc":"2026-02-22T18:30:00Z","home_score":3,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77470","event_start_utc":"2026-02-27T19:30:00Z","home_score":2,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77464","event_start_utc":"2026-02-28T14:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77467","event_start_utc":"2026-02-28T14:30:00Z","home_score":2,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77469","event_start_utc":"2026-02-28T14:30:00Z","home_score":1,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77471","event_start_utc":"2026-02-28T14:30:00Z","home_score":0,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77466","event_start_utc":"2026-02-28T17:30:00Z","home_score":2,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77468","event_start_utc":"2026-03-01T14:30:00Z","home_score":4,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77465","event_start_utc":"2026-03-01T16:30:00Z","home_score":2,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77472","event_start_utc":"2026-03-01T18:30:00Z","home_score":1,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77409","event_start_utc":"2026-03-04T19:30:00Z","home_score":0,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77473","event_start_utc":"2026-03-06T19:30:00Z","home_score":4,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77474","event_start_utc":"2026-03-07T14:30:00Z","home_score":3,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77475","event_start_utc":"2026-03-07T14:30:00Z","home_score":2,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77476","event_start_utc":"2026-03-07T14:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77477","event_start_utc":"2026-03-07T14:30:00Z","home_score":1,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77480","event_start_utc":"2026-03-07T14:30:00Z","home_score":2,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77481","event_start_utc":"2026-03-07T17:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77479","event_start_utc":"2026-03-08T14:30:00Z","home_score":0,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77478","event_start_utc":"2026-03-08T16:30:00Z","home_score":1,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77488","event_start_utc":"2026-03-13T19:30:00Z","home_score":2,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77482","event_start_utc":"2026-03-14T14:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77483","event_start_utc":"2026-03-14T14:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77484","event_start_utc":"2026-03-14T14:30:00Z","home_score":2,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77489","event_start_utc":"2026-03-14T14:30:00Z","home_score":1,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77490","event_start_utc":"2026-03-14T17:30:00Z","home_score":1,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77486","event_start_utc":"2026-03-15T14:30:00Z","home_score":0,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77485","event_start_utc":"2026-03-15T16:30:00Z","home_score":0,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77487","event_start_utc":"2026-03-15T18:30:00Z","home_score":1,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77494","event_start_utc":"2026-03-20T19:30:00Z","home_score":5,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77491","event_start_utc":"2026-03-21T14:30:00Z","home_score":4,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77495","event_start_utc":"2026-03-21T14:30:00Z","home_score":0,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77498","event_start_utc":"2026-03-21T14:30:00Z","home_score":3,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77499","event_start_utc":"2026-03-21T14:30:00Z","home_score":3,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77492","event_start_utc":"2026-03-21T17:30:00Z","home_score":3,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77493","event_start_utc":"2026-03-22T14:30:00Z","home_score":2,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77497","event_start_utc":"2026-03-22T16:30:00Z","home_score":1,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":5,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77496","event_start_utc":"2026-03-22T18:30:00Z","home_score":2,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77500","event_start_utc":"2026-04-04T13:30:00Z","home_score":6,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77502","event_start_utc":"2026-04-04T13:30:00Z","home_score":2,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77503","event_start_utc":"2026-04-04T13:30:00Z","home_score":1,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77505","event_start_utc":"2026-04-04T13:30:00Z","home_score":2,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77507","event_start_utc":"2026-04-04T13:30:00Z","home_score":1,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77508","event_start_utc":"2026-04-04T13:30:00Z","home_score":1,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77504","event_start_utc":"2026-04-04T16:30:00Z","home_score":0,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77506","event_start_utc":"2026-04-05T13:30:00Z","home_score":1,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77501","event_start_utc":"2026-04-05T15:30:00Z","home_score":2,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77514","event_start_utc":"2026-04-10T18:30:00Z","home_score":2,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77509","event_start_utc":"2026-04-11T13:30:00Z","home_score":0,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77511","event_start_utc":"2026-04-11T13:30:00Z","home_score":1,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77513","event_start_utc":"2026-04-11T13:30:00Z","home_score":1,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77516","event_start_utc":"2026-04-11T13:30:00Z","home_score":3,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":5,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77515","event_start_utc":"2026-04-11T16:30:00Z","home_score":0,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77517","event_start_utc":"2026-04-12T13:30:00Z","home_score":3,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77512","event_start_utc":"2026-04-12T15:30:00Z","home_score":4,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77510","event_start_utc":"2026-04-12T17:30:00Z","home_score":0,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77525","event_start_utc":"2026-04-17T18:30:00Z","home_score":1,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77519","event_start_utc":"2026-04-18T13:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77522","event_start_utc":"2026-04-18T13:30:00Z","home_score":3,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77524","event_start_utc":"2026-04-18T13:30:00Z","home_score":1,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77526","event_start_utc":"2026-04-18T13:30:00Z","home_score":2,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77520","event_start_utc":"2026-04-18T16:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77521","event_start_utc":"2026-04-19T13:30:00Z","home_score":2,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77518","event_start_utc":"2026-04-19T15:30:00Z","home_score":4,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77523","event_start_utc":"2026-04-19T17:30:00Z","home_score":1,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77529","event_start_utc":"2026-04-24T18:30:00Z","home_score":3,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":4,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77528","event_start_utc":"2026-04-25T13:30:00Z","home_score":3,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77531","event_start_utc":"2026-04-25T13:30:00Z","home_score":0,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77532","event_start_utc":"2026-04-25T13:30:00Z","home_score":1,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77533","event_start_utc":"2026-04-25T13:30:00Z","home_score":2,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77534","event_start_utc":"2026-04-25T13:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77535","event_start_utc":"2026-04-25T16:30:00Z","home_score":1,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77530","event_start_utc":"2026-04-26T13:30:00Z","home_score":1,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77527","event_start_utc":"2026-04-26T15:30:00Z","home_score":4,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77536","event_start_utc":"2026-05-02T13:30:00Z","home_score":3,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77538","event_start_utc":"2026-05-02T13:30:00Z","home_score":1,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77540","event_start_utc":"2026-05-02T13:30:00Z","home_score":1,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77542","event_start_utc":"2026-05-02T13:30:00Z","home_score":2,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77544","event_start_utc":"2026-05-02T13:30:00Z","home_score":3,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77537","event_start_utc":"2026-05-02T16:30:00Z","home_score":4,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77543","event_start_utc":"2026-05-03T13:30:00Z","home_score":1,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77541","event_start_utc":"2026-05-03T15:30:00Z","home_score":1,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77539","event_start_utc":"2026-05-03T17:30:00Z","home_score":1,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Eintracht Frankfurt","event_id":"openligadb:bl1:77545","event_start_utc":"2026-05-08T18:30:00Z","home_score":3,"home_team":"Borussia Dortmund","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC St. Pauli","event_id":"openligadb:bl1:77547","event_start_utc":"2026-05-09T13:30:00Z","home_score":2,"home_team":"RB Leipzig","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Bayer 04 Leverkusen","event_id":"openligadb:bl1:77548","event_start_utc":"2026-05-09T13:30:00Z","home_score":3,"home_team":"VfB Stuttgart","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Borussia M\u00f6nchengladbach","event_id":"openligadb:bl1:77550","event_start_utc":"2026-05-09T13:30:00Z","home_score":3,"home_team":"FC Augsburg","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"SV Werder Bremen","event_id":"openligadb:bl1:77551","event_start_utc":"2026-05-09T13:30:00Z","home_score":1,"home_team":"TSG Hoffenheim","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"FC Bayern M\u00fcnchen","event_id":"openligadb:bl1:77549","event_start_utc":"2026-05-09T16:30:00Z","home_score":0,"home_team":"VfL Wolfsburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"SC Freiburg","event_id":"openligadb:bl1:77553","event_start_utc":"2026-05-10T13:30:00Z","home_score":3,"home_team":"Hamburger SV","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"1. FC Heidenheim 1846","event_id":"openligadb:bl1:77552","event_start_utc":"2026-05-10T15:30:00Z","home_score":1,"home_team":"1. FC K\u00f6ln","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC Union Berlin","event_id":"openligadb:bl1:77546","event_start_utc":"2026-05-10T17:30:00Z","home_score":0,"home_team":"1. FSV Mainz 05","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"1. FC K\u00f6ln","event_id":"openligadb:bl1:77554","event_start_utc":"2026-05-16T13:30:00Z","home_score":5,"home_team":"FC Bayern M\u00fcnchen","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hamburger SV","event_id":"openligadb:bl1:77555","event_start_utc":"2026-05-16T13:30:00Z","home_score":1,"home_team":"Bayer 04 Leverkusen","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"VfB Stuttgart","event_id":"openligadb:bl1:77556","event_start_utc":"2026-05-16T13:30:00Z","home_score":2,"home_team":"Eintracht Frankfurt","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"RB Leipzig","event_id":"openligadb:bl1:77557","event_start_utc":"2026-05-16T13:30:00Z","home_score":4,"home_team":"SC Freiburg","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"Borussia Dortmund","event_id":"openligadb:bl1:77558","event_start_utc":"2026-05-16T13:30:00Z","home_score":0,"home_team":"SV Werder Bremen","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"TSG Hoffenheim","event_id":"openligadb:bl1:77559","event_start_utc":"2026-05-16T13:30:00Z","home_score":4,"home_team":"Borussia M\u00f6nchengladbach","league":"BUNDESLIGA"}
+{"away_score":0,"away_team":"FC Augsburg","event_id":"openligadb:bl1:77560","event_start_utc":"2026-05-16T13:30:00Z","home_score":4,"home_team":"1. FC Union Berlin","league":"BUNDESLIGA"}
+{"away_score":3,"away_team":"VfL Wolfsburg","event_id":"openligadb:bl1:77561","event_start_utc":"2026-05-16T13:30:00Z","home_score":1,"home_team":"FC St. Pauli","league":"BUNDESLIGA"}
+{"away_score":2,"away_team":"1. FSV Mainz 05","event_id":"openligadb:bl1:77562","event_start_utc":"2026-05-16T13:30:00Z","home_score":0,"home_team":"1. FC Heidenheim 1846","league":"BUNDESLIGA"}
+{"away_score":1,"away_team":"Hertha BSC","event_id":"openligadb:bl2:77576","event_start_utc":"2025-08-01T18:30:00Z","home_score":2,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:77577","event_start_utc":"2025-08-02T11:00:00Z","home_score":1,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:77578","event_start_utc":"2025-08-02T11:00:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:77580","event_start_utc":"2025-08-02T11:00:00Z","home_score":3,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:77582","event_start_utc":"2025-08-02T11:00:00Z","home_score":4,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:77584","event_start_utc":"2025-08-02T18:30:00Z","home_score":5,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:77579","event_start_utc":"2025-08-03T11:30:00Z","home_score":0,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:77581","event_start_utc":"2025-08-03T11:30:00Z","home_score":1,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:77583","event_start_utc":"2025-08-03T11:30:00Z","home_score":3,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:77589","event_start_utc":"2025-08-08T16:30:00Z","home_score":0,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:77591","event_start_utc":"2025-08-08T16:30:00Z","home_score":1,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:77587","event_start_utc":"2025-08-09T11:00:00Z","home_score":0,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:77592","event_start_utc":"2025-08-09T11:00:00Z","home_score":3,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:77593","event_start_utc":"2025-08-09T11:00:00Z","home_score":1,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:77588","event_start_utc":"2025-08-09T18:30:00Z","home_score":1,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:77585","event_start_utc":"2025-08-10T11:30:00Z","home_score":0,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:77586","event_start_utc":"2025-08-10T11:30:00Z","home_score":2,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:77590","event_start_utc":"2025-08-10T11:30:00Z","home_score":0,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:77594","event_start_utc":"2025-08-22T16:30:00Z","home_score":2,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:77601","event_start_utc":"2025-08-22T16:30:00Z","home_score":2,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:77595","event_start_utc":"2025-08-23T11:00:00Z","home_score":1,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:77596","event_start_utc":"2025-08-23T11:00:00Z","home_score":2,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:77597","event_start_utc":"2025-08-23T11:00:00Z","home_score":3,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:77600","event_start_utc":"2025-08-23T18:30:00Z","home_score":2,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Hertha BSC","event_id":"openligadb:bl2:77598","event_start_utc":"2025-08-24T11:30:00Z","home_score":0,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:77599","event_start_utc":"2025-08-24T11:30:00Z","home_score":0,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:77602","event_start_utc":"2025-08-24T11:30:00Z","home_score":1,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:77608","event_start_utc":"2025-08-29T16:30:00Z","home_score":0,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:77609","event_start_utc":"2025-08-29T16:30:00Z","home_score":0,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:77603","event_start_utc":"2025-08-30T11:00:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:77604","event_start_utc":"2025-08-30T11:00:00Z","home_score":1,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:77610","event_start_utc":"2025-08-30T11:00:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:77606","event_start_utc":"2025-08-30T18:30:00Z","home_score":0,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":5,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:77605","event_start_utc":"2025-08-31T11:30:00Z","home_score":4,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:77607","event_start_utc":"2025-08-31T11:30:00Z","home_score":3,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:77611","event_start_utc":"2025-08-31T11:30:00Z","home_score":0,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"VfL Bochum","event_id":"openligadb:bl2:77613","event_start_utc":"2025-09-12T16:30:00Z","home_score":1,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:77620","event_start_utc":"2025-09-12T16:30:00Z","home_score":2,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:77614","event_start_utc":"2025-09-13T11:00:00Z","home_score":2,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:77616","event_start_utc":"2025-09-13T11:00:00Z","home_score":2,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:77618","event_start_utc":"2025-09-13T11:00:00Z","home_score":0,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Hertha BSC","event_id":"openligadb:bl2:77615","event_start_utc":"2025-09-13T18:30:00Z","home_score":0,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:77612","event_start_utc":"2025-09-14T11:30:00Z","home_score":2,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:77617","event_start_utc":"2025-09-14T11:30:00Z","home_score":0,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:77619","event_start_utc":"2025-09-14T11:30:00Z","home_score":1,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:77624","event_start_utc":"2025-09-19T16:30:00Z","home_score":4,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:77628","event_start_utc":"2025-09-19T16:30:00Z","home_score":1,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:77622","event_start_utc":"2025-09-20T11:00:00Z","home_score":0,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:77626","event_start_utc":"2025-09-20T11:00:00Z","home_score":0,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":4,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:77627","event_start_utc":"2025-09-20T11:00:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:77625","event_start_utc":"2025-09-20T18:30:00Z","home_score":2,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:77621","event_start_utc":"2025-09-21T11:30:00Z","home_score":3,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:77623","event_start_utc":"2025-09-21T11:30:00Z","home_score":0,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:77629","event_start_utc":"2025-09-21T11:30:00Z","home_score":2,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:77636","event_start_utc":"2025-09-26T16:30:00Z","home_score":2,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:77637","event_start_utc":"2025-09-26T16:30:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:77631","event_start_utc":"2025-09-27T11:00:00Z","home_score":1,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:77632","event_start_utc":"2025-09-27T11:00:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:77633","event_start_utc":"2025-09-27T11:00:00Z","home_score":1,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:77630","event_start_utc":"2025-09-27T18:30:00Z","home_score":0,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:77634","event_start_utc":"2025-09-28T11:30:00Z","home_score":3,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Hertha BSC","event_id":"openligadb:bl2:77635","event_start_utc":"2025-09-28T11:30:00Z","home_score":0,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:77638","event_start_utc":"2025-09-28T11:30:00Z","home_score":3,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:77641","event_start_utc":"2025-10-03T16:30:00Z","home_score":2,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:77645","event_start_utc":"2025-10-03T16:30:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:77639","event_start_utc":"2025-10-04T11:00:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"VfL Bochum","event_id":"openligadb:bl2:77642","event_start_utc":"2025-10-04T11:00:00Z","home_score":3,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:77643","event_start_utc":"2025-10-04T11:00:00Z","home_score":2,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:77647","event_start_utc":"2025-10-04T18:30:00Z","home_score":3,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":4,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:77640","event_start_utc":"2025-10-05T11:30:00Z","home_score":0,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:77644","event_start_utc":"2025-10-05T11:30:00Z","home_score":2,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:77646","event_start_utc":"2025-10-05T11:30:00Z","home_score":1,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:77651","event_start_utc":"2025-10-17T16:30:00Z","home_score":1,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:77653","event_start_utc":"2025-10-17T16:30:00Z","home_score":0,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:77650","event_start_utc":"2025-10-18T11:00:00Z","home_score":4,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:77652","event_start_utc":"2025-10-18T11:00:00Z","home_score":2,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:77656","event_start_utc":"2025-10-18T11:00:00Z","home_score":2,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hertha BSC","event_id":"openligadb:bl2:77648","event_start_utc":"2025-10-18T18:30:00Z","home_score":3,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:77649","event_start_utc":"2025-10-19T11:30:00Z","home_score":6,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:77654","event_start_utc":"2025-10-19T11:30:00Z","home_score":1,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:77655","event_start_utc":"2025-10-19T11:30:00Z","home_score":0,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":4,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:77661","event_start_utc":"2025-10-24T16:30:00Z","home_score":1,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:77662","event_start_utc":"2025-10-24T16:30:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:77657","event_start_utc":"2025-10-25T11:00:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:77664","event_start_utc":"2025-10-25T11:00:00Z","home_score":2,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:77665","event_start_utc":"2025-10-25T11:00:00Z","home_score":1,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:77660","event_start_utc":"2025-10-25T18:30:00Z","home_score":1,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:77658","event_start_utc":"2025-10-26T12:30:00Z","home_score":2,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:77659","event_start_utc":"2025-10-26T12:30:00Z","home_score":1,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Hannover 96","event_id":"openligadb:bl2:77663","event_start_utc":"2025-10-26T12:30:00Z","home_score":0,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:77667","event_start_utc":"2025-10-31T17:30:00Z","home_score":2,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:77674","event_start_utc":"2025-10-31T17:30:00Z","home_score":2,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:77670","event_start_utc":"2025-11-01T12:00:00Z","home_score":2,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:77671","event_start_utc":"2025-11-01T12:00:00Z","home_score":2,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:77672","event_start_utc":"2025-11-01T12:00:00Z","home_score":2,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:77673","event_start_utc":"2025-11-01T19:30:00Z","home_score":2,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:77666","event_start_utc":"2025-11-02T12:30:00Z","home_score":2,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:77668","event_start_utc":"2025-11-02T12:30:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:77669","event_start_utc":"2025-11-02T12:30:00Z","home_score":1,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:77679","event_start_utc":"2025-11-07T17:30:00Z","home_score":1,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:77683","event_start_utc":"2025-11-07T17:30:00Z","home_score":1,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:77678","event_start_utc":"2025-11-08T12:00:00Z","home_score":2,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:77680","event_start_utc":"2025-11-08T12:00:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:77682","event_start_utc":"2025-11-08T12:00:00Z","home_score":4,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hertha BSC","event_id":"openligadb:bl2:77677","event_start_utc":"2025-11-08T19:30:00Z","home_score":0,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:77675","event_start_utc":"2025-11-09T12:30:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:77676","event_start_utc":"2025-11-09T12:30:00Z","home_score":0,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"VfL Bochum","event_id":"openligadb:bl2:77681","event_start_utc":"2025-11-09T12:30:00Z","home_score":0,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78051","event_start_utc":"2025-11-21T17:30:00Z","home_score":1,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78057","event_start_utc":"2025-11-21T17:30:00Z","home_score":1,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:78052","event_start_utc":"2025-11-22T12:00:00Z","home_score":0,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78053","event_start_utc":"2025-11-22T12:00:00Z","home_score":2,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78059","event_start_utc":"2025-11-22T12:00:00Z","home_score":0,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78058","event_start_utc":"2025-11-22T19:30:00Z","home_score":4,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78054","event_start_utc":"2025-11-23T12:30:00Z","home_score":4,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78055","event_start_utc":"2025-11-23T12:30:00Z","home_score":2,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78056","event_start_utc":"2025-11-23T12:30:00Z","home_score":2,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78063","event_start_utc":"2025-11-28T17:30:00Z","home_score":3,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78065","event_start_utc":"2025-11-28T17:30:00Z","home_score":2,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78060","event_start_utc":"2025-11-29T12:00:00Z","home_score":0,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78064","event_start_utc":"2025-11-29T12:00:00Z","home_score":0,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78066","event_start_utc":"2025-11-29T12:00:00Z","home_score":2,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78062","event_start_utc":"2025-11-29T19:30:00Z","home_score":3,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78061","event_start_utc":"2025-11-30T12:30:00Z","home_score":0,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78067","event_start_utc":"2025-11-30T12:30:00Z","home_score":1,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78068","event_start_utc":"2025-11-30T12:30:00Z","home_score":2,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78071","event_start_utc":"2025-12-05T17:30:00Z","home_score":0,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:78076","event_start_utc":"2025-12-05T17:30:00Z","home_score":2,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78069","event_start_utc":"2025-12-06T12:00:00Z","home_score":1,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78070","event_start_utc":"2025-12-06T12:00:00Z","home_score":1,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78072","event_start_utc":"2025-12-06T12:00:00Z","home_score":3,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78075","event_start_utc":"2025-12-06T19:30:00Z","home_score":3,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78073","event_start_utc":"2025-12-07T12:30:00Z","home_score":2,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78074","event_start_utc":"2025-12-07T12:30:00Z","home_score":0,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78077","event_start_utc":"2025-12-07T12:30:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78083","event_start_utc":"2025-12-12T17:30:00Z","home_score":3,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78086","event_start_utc":"2025-12-12T17:30:00Z","home_score":2,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78079","event_start_utc":"2025-12-13T12:00:00Z","home_score":3,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":4,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78080","event_start_utc":"2025-12-13T12:00:00Z","home_score":0,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78085","event_start_utc":"2025-12-13T12:00:00Z","home_score":0,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78081","event_start_utc":"2025-12-13T19:30:00Z","home_score":0,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78078","event_start_utc":"2025-12-14T12:30:00Z","home_score":1,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78082","event_start_utc":"2025-12-14T12:30:00Z","home_score":1,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78084","event_start_utc":"2025-12-14T12:30:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78089","event_start_utc":"2025-12-19T17:30:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78093","event_start_utc":"2025-12-19T17:30:00Z","home_score":1,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78088","event_start_utc":"2025-12-20T12:00:00Z","home_score":2,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78090","event_start_utc":"2025-12-20T12:00:00Z","home_score":2,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78091","event_start_utc":"2025-12-20T12:00:00Z","home_score":2,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78087","event_start_utc":"2025-12-20T19:30:00Z","home_score":2,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hannover 96","event_id":"openligadb:bl2:78092","event_start_utc":"2025-12-21T12:30:00Z","home_score":2,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78094","event_start_utc":"2025-12-21T12:30:00Z","home_score":1,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78095","event_start_utc":"2025-12-21T12:30:00Z","home_score":2,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78102","event_start_utc":"2026-01-16T17:30:00Z","home_score":1,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78107","event_start_utc":"2026-01-16T17:30:00Z","home_score":0,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78104","event_start_utc":"2026-01-17T12:00:00Z","home_score":3,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78106","event_start_utc":"2026-01-17T12:00:00Z","home_score":0,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78108","event_start_utc":"2026-01-17T12:00:00Z","home_score":2,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78105","event_start_utc":"2026-01-17T19:30:00Z","home_score":0,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78100","event_start_utc":"2026-01-18T12:30:00Z","home_score":2,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78101","event_start_utc":"2026-01-18T12:30:00Z","home_score":3,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hannover 96","event_id":"openligadb:bl2:78103","event_start_utc":"2026-01-18T12:30:00Z","home_score":3,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78114","event_start_utc":"2026-01-23T17:30:00Z","home_score":2,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78117","event_start_utc":"2026-01-23T17:30:00Z","home_score":2,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78112","event_start_utc":"2026-01-24T12:00:00Z","home_score":2,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78113","event_start_utc":"2026-01-24T12:00:00Z","home_score":2,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78115","event_start_utc":"2026-01-24T12:00:00Z","home_score":0,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78111","event_start_utc":"2026-01-24T19:30:00Z","home_score":1,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78109","event_start_utc":"2026-01-25T12:30:00Z","home_score":1,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78110","event_start_utc":"2026-01-25T12:30:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78116","event_start_utc":"2026-01-25T12:30:00Z","home_score":2,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:78120","event_start_utc":"2026-01-30T17:30:00Z","home_score":1,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78122","event_start_utc":"2026-01-30T17:30:00Z","home_score":1,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78118","event_start_utc":"2026-01-31T12:00:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78119","event_start_utc":"2026-01-31T12:00:00Z","home_score":2,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78124","event_start_utc":"2026-01-31T12:00:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78126","event_start_utc":"2026-01-31T19:30:00Z","home_score":1,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78121","event_start_utc":"2026-02-01T12:30:00Z","home_score":2,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78123","event_start_utc":"2026-02-01T12:30:00Z","home_score":2,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78125","event_start_utc":"2026-02-01T12:30:00Z","home_score":1,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":5,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78132","event_start_utc":"2026-02-06T17:30:00Z","home_score":4,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78134","event_start_utc":"2026-02-06T17:30:00Z","home_score":1,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78127","event_start_utc":"2026-02-07T12:00:00Z","home_score":0,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78128","event_start_utc":"2026-02-07T12:00:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78133","event_start_utc":"2026-02-07T12:00:00Z","home_score":2,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78131","event_start_utc":"2026-02-07T19:30:00Z","home_score":4,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78129","event_start_utc":"2026-02-08T12:30:00Z","home_score":1,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78130","event_start_utc":"2026-02-08T12:30:00Z","home_score":3,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78135","event_start_utc":"2026-02-08T12:30:00Z","home_score":3,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78139","event_start_utc":"2026-02-13T17:30:00Z","home_score":0,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78141","event_start_utc":"2026-02-13T17:30:00Z","home_score":5,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78140","event_start_utc":"2026-02-14T12:00:00Z","home_score":1,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Hannover 96","event_id":"openligadb:bl2:78142","event_start_utc":"2026-02-14T12:00:00Z","home_score":2,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78143","event_start_utc":"2026-02-14T12:00:00Z","home_score":2,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78144","event_start_utc":"2026-02-14T19:30:00Z","home_score":1,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78136","event_start_utc":"2026-02-15T12:30:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78137","event_start_utc":"2026-02-15T12:30:00Z","home_score":0,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78138","event_start_utc":"2026-02-15T12:30:00Z","home_score":0,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78145","event_start_utc":"2026-02-20T17:30:00Z","home_score":1,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78151","event_start_utc":"2026-02-20T17:30:00Z","home_score":2,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78146","event_start_utc":"2026-02-21T12:00:00Z","home_score":3,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78148","event_start_utc":"2026-02-21T12:00:00Z","home_score":3,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78150","event_start_utc":"2026-02-21T12:00:00Z","home_score":2,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78152","event_start_utc":"2026-02-21T19:30:00Z","home_score":5,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78147","event_start_utc":"2026-02-22T12:30:00Z","home_score":5,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78149","event_start_utc":"2026-02-22T12:30:00Z","home_score":0,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78153","event_start_utc":"2026-02-22T12:30:00Z","home_score":2,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78156","event_start_utc":"2026-02-27T17:30:00Z","home_score":2,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78162","event_start_utc":"2026-02-27T17:30:00Z","home_score":3,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78154","event_start_utc":"2026-02-28T12:00:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78157","event_start_utc":"2026-02-28T12:00:00Z","home_score":1,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hannover 96","event_id":"openligadb:bl2:78161","event_start_utc":"2026-02-28T12:00:00Z","home_score":0,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78159","event_start_utc":"2026-02-28T19:30:00Z","home_score":1,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78155","event_start_utc":"2026-03-01T12:30:00Z","home_score":1,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78158","event_start_utc":"2026-03-01T12:30:00Z","home_score":2,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78160","event_start_utc":"2026-03-01T12:30:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78164","event_start_utc":"2026-03-06T17:30:00Z","home_score":1,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78170","event_start_utc":"2026-03-06T17:30:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78165","event_start_utc":"2026-03-07T12:00:00Z","home_score":1,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78168","event_start_utc":"2026-03-07T12:00:00Z","home_score":0,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78169","event_start_utc":"2026-03-07T12:00:00Z","home_score":2,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78163","event_start_utc":"2026-03-07T19:30:00Z","home_score":3,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78166","event_start_utc":"2026-03-08T12:30:00Z","home_score":3,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78167","event_start_utc":"2026-03-08T12:30:00Z","home_score":1,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78171","event_start_utc":"2026-03-08T12:30:00Z","home_score":1,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78173","event_start_utc":"2026-03-13T17:30:00Z","home_score":1,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78176","event_start_utc":"2026-03-13T17:30:00Z","home_score":2,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78172","event_start_utc":"2026-03-14T12:00:00Z","home_score":2,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78178","event_start_utc":"2026-03-14T12:00:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78179","event_start_utc":"2026-03-14T12:00:00Z","home_score":2,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78175","event_start_utc":"2026-03-14T19:30:00Z","home_score":1,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78174","event_start_utc":"2026-03-15T12:30:00Z","home_score":3,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:78177","event_start_utc":"2026-03-15T12:30:00Z","home_score":2,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78180","event_start_utc":"2026-03-15T12:30:00Z","home_score":6,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78185","event_start_utc":"2026-03-20T17:30:00Z","home_score":3,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78186","event_start_utc":"2026-03-20T17:30:00Z","home_score":1,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78182","event_start_utc":"2026-03-21T12:00:00Z","home_score":3,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78183","event_start_utc":"2026-03-21T12:00:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78187","event_start_utc":"2026-03-21T12:00:00Z","home_score":3,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78188","event_start_utc":"2026-03-21T19:30:00Z","home_score":1,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78181","event_start_utc":"2026-03-22T12:30:00Z","home_score":2,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":5,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78184","event_start_utc":"2026-03-22T12:30:00Z","home_score":2,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78189","event_start_utc":"2026-03-22T12:30:00Z","home_score":1,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78191","event_start_utc":"2026-04-04T11:00:00Z","home_score":4,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78192","event_start_utc":"2026-04-04T11:00:00Z","home_score":3,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78197","event_start_utc":"2026-04-04T11:00:00Z","home_score":2,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78198","event_start_utc":"2026-04-04T18:30:00Z","home_score":0,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78190","event_start_utc":"2026-04-05T11:30:00Z","home_score":0,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78193","event_start_utc":"2026-04-05T11:30:00Z","home_score":1,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78194","event_start_utc":"2026-04-05T11:30:00Z","home_score":0,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78195","event_start_utc":"2026-04-05T11:30:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78196","event_start_utc":"2026-04-05T11:30:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78202","event_start_utc":"2026-04-10T16:30:00Z","home_score":1,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78203","event_start_utc":"2026-04-10T16:30:00Z","home_score":4,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78204","event_start_utc":"2026-04-11T11:00:00Z","home_score":0,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78205","event_start_utc":"2026-04-11T11:00:00Z","home_score":0,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78207","event_start_utc":"2026-04-11T11:00:00Z","home_score":0,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Hannover 96","event_id":"openligadb:bl2:78206","event_start_utc":"2026-04-11T18:30:00Z","home_score":0,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78199","event_start_utc":"2026-04-12T11:30:00Z","home_score":4,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78200","event_start_utc":"2026-04-12T11:30:00Z","home_score":1,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78201","event_start_utc":"2026-04-12T11:30:00Z","home_score":4,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78208","event_start_utc":"2026-04-17T16:30:00Z","home_score":3,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78209","event_start_utc":"2026-04-17T16:30:00Z","home_score":3,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78210","event_start_utc":"2026-04-18T11:00:00Z","home_score":2,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78215","event_start_utc":"2026-04-18T11:00:00Z","home_score":1,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78216","event_start_utc":"2026-04-18T11:00:00Z","home_score":2,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78211","event_start_utc":"2026-04-18T18:30:00Z","home_score":1,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78212","event_start_utc":"2026-04-19T11:30:00Z","home_score":3,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78213","event_start_utc":"2026-04-19T11:30:00Z","home_score":4,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78214","event_start_utc":"2026-04-19T11:30:00Z","home_score":1,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78219","event_start_utc":"2026-04-24T16:30:00Z","home_score":3,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78220","event_start_utc":"2026-04-24T16:30:00Z","home_score":0,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Hannover 96","event_id":"openligadb:bl2:78221","event_start_utc":"2026-04-25T11:00:00Z","home_score":1,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78223","event_start_utc":"2026-04-25T11:00:00Z","home_score":0,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78225","event_start_utc":"2026-04-25T11:00:00Z","home_score":2,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78224","event_start_utc":"2026-04-25T18:30:00Z","home_score":3,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78217","event_start_utc":"2026-04-26T11:30:00Z","home_score":2,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78218","event_start_utc":"2026-04-26T11:30:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78222","event_start_utc":"2026-04-26T11:30:00Z","home_score":1,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78226","event_start_utc":"2026-05-02T11:00:00Z","home_score":2,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78233","event_start_utc":"2026-05-02T11:00:00Z","home_score":1,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78234","event_start_utc":"2026-05-02T11:00:00Z","home_score":1,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78232","event_start_utc":"2026-05-02T18:30:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78227","event_start_utc":"2026-05-03T11:30:00Z","home_score":5,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78228","event_start_utc":"2026-05-03T11:30:00Z","home_score":1,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78229","event_start_utc":"2026-05-03T11:30:00Z","home_score":2,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78230","event_start_utc":"2026-05-03T11:30:00Z","home_score":3,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78231","event_start_utc":"2026-05-03T11:30:00Z","home_score":1,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"Karlsruher SC","event_id":"openligadb:bl2:78237","event_start_utc":"2026-05-08T16:30:00Z","home_score":2,"home_team":"SC Paderborn 07","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"DSC Arminia Bielefeld","event_id":"openligadb:bl2:78239","event_start_utc":"2026-05-08T16:30:00Z","home_score":2,"home_team":"1. FC Kaiserslautern","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC Magdeburg","event_id":"openligadb:bl2:78235","event_start_utc":"2026-05-09T11:00:00Z","home_score":1,"home_team":"Holstein Kiel","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hannover 96","event_id":"openligadb:bl2:78236","event_start_utc":"2026-05-09T11:00:00Z","home_score":1,"home_team":"VfL Bochum","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Dynamo Dresden","event_id":"openligadb:bl2:78243","event_start_utc":"2026-05-09T11:00:00Z","home_score":2,"home_team":"Eintracht Braunschweig","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"FC Schalke 04","event_id":"openligadb:bl2:78240","event_start_utc":"2026-05-09T18:30:00Z","home_score":3,"home_team":"1. FC N\u00fcrnberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV 07 Elversberg","event_id":"openligadb:bl2:78238","event_start_utc":"2026-05-10T11:30:00Z","home_score":3,"home_team":"Fortuna D\u00fcsseldorf","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SpVgg Greuther F\u00fcrth","event_id":"openligadb:bl2:78241","event_start_utc":"2026-05-10T11:30:00Z","home_score":2,"home_team":"Hertha BSC","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"SV Darmstadt 98","event_id":"openligadb:bl2:78242","event_start_utc":"2026-05-10T11:30:00Z","home_score":1,"home_team":"Preu\u00dfen M\u00fcnster","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Preu\u00dfen M\u00fcnster","event_id":"openligadb:bl2:78244","event_start_utc":"2026-05-17T13:30:00Z","home_score":3,"home_team":"SV 07 Elversberg","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"1. FC Kaiserslautern","event_id":"openligadb:bl2:78245","event_start_utc":"2026-05-17T13:30:00Z","home_score":0,"home_team":"1. FC Magdeburg","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"VfL Bochum","event_id":"openligadb:bl2:78246","event_start_utc":"2026-05-17T13:30:00Z","home_score":1,"home_team":"Karlsruher SC","league":"BUNDESLIGA_2"}
+{"away_score":3,"away_team":"1. FC N\u00fcrnberg","event_id":"openligadb:bl2:78247","event_start_utc":"2026-05-17T13:30:00Z","home_score":3,"home_team":"Hannover 96","league":"BUNDESLIGA_2"}
+{"away_score":2,"away_team":"SC Paderborn 07","event_id":"openligadb:bl2:78248","event_start_utc":"2026-05-17T13:30:00Z","home_score":0,"home_team":"SV Darmstadt 98","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Fortuna D\u00fcsseldorf","event_id":"openligadb:bl2:78249","event_start_utc":"2026-05-17T13:30:00Z","home_score":3,"home_team":"SpVgg Greuther F\u00fcrth","league":"BUNDESLIGA_2"}
+{"away_score":0,"away_team":"Eintracht Braunschweig","event_id":"openligadb:bl2:78250","event_start_utc":"2026-05-17T13:30:00Z","home_score":1,"home_team":"FC Schalke 04","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Hertha BSC","event_id":"openligadb:bl2:78251","event_start_utc":"2026-05-17T13:30:00Z","home_score":6,"home_team":"DSC Arminia Bielefeld","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"Holstein Kiel","event_id":"openligadb:bl2:78252","event_start_utc":"2026-05-17T13:30:00Z","home_score":2,"home_team":"Dynamo Dresden","league":"BUNDESLIGA_2"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78253","event_start_utc":"2025-08-01T17:00:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78254","event_start_utc":"2025-08-02T12:00:00Z","home_score":1,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":0,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78257","event_start_utc":"2025-08-02T12:00:00Z","home_score":0,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":3,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78260","event_start_utc":"2025-08-02T12:00:00Z","home_score":3,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78261","event_start_utc":"2025-08-02T12:00:00Z","home_score":0,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":2,"away_team":"SC Verl","event_id":"openligadb:bl3:78262","event_start_utc":"2025-08-02T12:00:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78259","event_start_utc":"2025-08-02T14:30:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":0,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78256","event_start_utc":"2025-08-03T11:30:00Z","home_score":0,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78255","event_start_utc":"2025-08-03T14:30:00Z","home_score":2,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78258","event_start_utc":"2025-08-03T17:30:00Z","home_score":3,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":2,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78272","event_start_utc":"2025-08-08T17:00:00Z","home_score":0,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78263","event_start_utc":"2025-08-09T12:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":0,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78265","event_start_utc":"2025-08-09T12:00:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78268","event_start_utc":"2025-08-09T12:00:00Z","home_score":1,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":4,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78269","event_start_utc":"2025-08-09T12:00:00Z","home_score":2,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78270","event_start_utc":"2025-08-09T12:00:00Z","home_score":3,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":2,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78271","event_start_utc":"2025-08-09T14:30:00Z","home_score":2,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":4,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78267","event_start_utc":"2025-08-10T11:30:00Z","home_score":0,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78266","event_start_utc":"2025-08-10T14:30:00Z","home_score":1,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78264","event_start_utc":"2025-08-10T17:30:00Z","home_score":2,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":4,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78278","event_start_utc":"2025-08-22T17:00:00Z","home_score":3,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"SC Verl","event_id":"openligadb:bl3:78275","event_start_utc":"2025-08-23T12:00:00Z","home_score":1,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78277","event_start_utc":"2025-08-23T12:00:00Z","home_score":2,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78279","event_start_utc":"2025-08-23T12:00:00Z","home_score":3,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78281","event_start_utc":"2025-08-23T12:00:00Z","home_score":0,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78282","event_start_utc":"2025-08-23T12:00:00Z","home_score":4,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78280","event_start_utc":"2025-08-23T14:30:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78274","event_start_utc":"2025-08-24T11:30:00Z","home_score":1,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78276","event_start_utc":"2025-08-24T14:30:00Z","home_score":2,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":0,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78273","event_start_utc":"2025-08-24T17:30:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":0,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78284","event_start_utc":"2025-08-29T17:00:00Z","home_score":1,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78283","event_start_utc":"2025-08-30T12:00:00Z","home_score":4,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78286","event_start_utc":"2025-08-30T12:00:00Z","home_score":1,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":2,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78288","event_start_utc":"2025-08-30T12:00:00Z","home_score":0,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78290","event_start_utc":"2025-08-30T12:00:00Z","home_score":1,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":3,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78291","event_start_utc":"2025-08-30T12:00:00Z","home_score":2,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78287","event_start_utc":"2025-08-30T14:30:00Z","home_score":0,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":2,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78285","event_start_utc":"2025-08-31T11:30:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78292","event_start_utc":"2025-08-31T14:30:00Z","home_score":0,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":3,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78289","event_start_utc":"2025-08-31T17:30:00Z","home_score":2,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":3,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78298","event_start_utc":"2025-09-12T17:00:00Z","home_score":1,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":3,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78294","event_start_utc":"2025-09-13T12:00:00Z","home_score":2,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":3,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78295","event_start_utc":"2025-09-13T12:00:00Z","home_score":1,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":3,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78296","event_start_utc":"2025-09-13T12:00:00Z","home_score":0,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78299","event_start_utc":"2025-09-13T12:00:00Z","home_score":3,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":4,"away_team":"SC Verl","event_id":"openligadb:bl3:78302","event_start_utc":"2025-09-13T12:00:00Z","home_score":2,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":3,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78300","event_start_utc":"2025-09-13T14:30:00Z","home_score":1,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78297","event_start_utc":"2025-09-14T11:30:00Z","home_score":0,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":3,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78293","event_start_utc":"2025-09-14T14:30:00Z","home_score":0,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78301","event_start_utc":"2025-09-14T17:30:00Z","home_score":3,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78303","event_start_utc":"2025-09-16T17:00:00Z","home_score":3,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78305","event_start_utc":"2025-09-16T17:00:00Z","home_score":2,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":0,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78308","event_start_utc":"2025-09-16T17:00:00Z","home_score":2,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78311","event_start_utc":"2025-09-16T17:00:00Z","home_score":2,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":3,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78312","event_start_utc":"2025-09-16T17:00:00Z","home_score":0,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78304","event_start_utc":"2025-09-17T17:00:00Z","home_score":0,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78306","event_start_utc":"2025-09-17T17:00:00Z","home_score":2,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78307","event_start_utc":"2025-09-17T17:00:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":6,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78309","event_start_utc":"2025-09-17T17:00:00Z","home_score":2,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78310","event_start_utc":"2025-09-17T17:00:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78313","event_start_utc":"2025-09-19T17:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78314","event_start_utc":"2025-09-20T12:00:00Z","home_score":0,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78315","event_start_utc":"2025-09-20T12:00:00Z","home_score":2,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78317","event_start_utc":"2025-09-20T12:00:00Z","home_score":3,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":2,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78319","event_start_utc":"2025-09-20T12:00:00Z","home_score":3,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78320","event_start_utc":"2025-09-20T12:00:00Z","home_score":3,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":5,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78321","event_start_utc":"2025-09-20T14:30:00Z","home_score":1,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":1,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78318","event_start_utc":"2025-09-21T11:30:00Z","home_score":1,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78322","event_start_utc":"2025-09-21T14:30:00Z","home_score":2,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78316","event_start_utc":"2025-09-21T17:30:00Z","home_score":2,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":0,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78326","event_start_utc":"2025-09-26T17:00:00Z","home_score":5,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78325","event_start_utc":"2025-09-27T12:00:00Z","home_score":2,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78327","event_start_utc":"2025-09-27T12:00:00Z","home_score":1,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78328","event_start_utc":"2025-09-27T12:00:00Z","home_score":1,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78330","event_start_utc":"2025-09-27T12:00:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":5,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78332","event_start_utc":"2025-09-27T12:00:00Z","home_score":1,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78323","event_start_utc":"2025-09-27T14:30:00Z","home_score":6,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":0,"away_team":"SC Verl","event_id":"openligadb:bl3:78329","event_start_utc":"2025-09-28T11:30:00Z","home_score":2,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78331","event_start_utc":"2025-09-28T14:30:00Z","home_score":1,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":0,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78324","event_start_utc":"2025-09-28T17:30:00Z","home_score":0,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":0,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78333","event_start_utc":"2025-09-30T17:00:00Z","home_score":0,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78334","event_start_utc":"2025-09-30T17:00:00Z","home_score":0,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":3,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78337","event_start_utc":"2025-09-30T17:00:00Z","home_score":1,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":3,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78338","event_start_utc":"2025-09-30T17:00:00Z","home_score":2,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78339","event_start_utc":"2025-09-30T17:00:00Z","home_score":0,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78335","event_start_utc":"2025-10-01T17:00:00Z","home_score":5,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":0,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78336","event_start_utc":"2025-10-01T17:00:00Z","home_score":2,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78340","event_start_utc":"2025-10-01T17:00:00Z","home_score":3,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":2,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78341","event_start_utc":"2025-10-01T17:00:00Z","home_score":2,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":2,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78342","event_start_utc":"2025-10-01T17:00:00Z","home_score":2,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":2,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78350","event_start_utc":"2025-10-03T17:00:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":4,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78343","event_start_utc":"2025-10-04T12:00:00Z","home_score":1,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78344","event_start_utc":"2025-10-04T12:00:00Z","home_score":4,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78345","event_start_utc":"2025-10-04T12:00:00Z","home_score":4,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78349","event_start_utc":"2025-10-04T12:00:00Z","home_score":1,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":2,"away_team":"SC Verl","event_id":"openligadb:bl3:78352","event_start_utc":"2025-10-04T12:00:00Z","home_score":1,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":2,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78347","event_start_utc":"2025-10-04T14:30:00Z","home_score":3,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":2,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78346","event_start_utc":"2025-10-05T11:30:00Z","home_score":2,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78348","event_start_utc":"2025-10-05T14:30:00Z","home_score":1,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":3,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78351","event_start_utc":"2025-10-05T17:30:00Z","home_score":1,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":2,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78356","event_start_utc":"2025-10-17T17:00:00Z","home_score":0,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":4,"away_team":"SC Verl","event_id":"openligadb:bl3:78353","event_start_utc":"2025-10-18T12:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78354","event_start_utc":"2025-10-18T12:00:00Z","home_score":3,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":4,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78357","event_start_utc":"2025-10-18T12:00:00Z","home_score":0,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78358","event_start_utc":"2025-10-18T12:00:00Z","home_score":3,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78360","event_start_utc":"2025-10-18T12:00:00Z","home_score":0,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78361","event_start_utc":"2025-10-18T14:30:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":2,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78355","event_start_utc":"2025-10-19T11:30:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78362","event_start_utc":"2025-10-19T14:30:00Z","home_score":3,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":2,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78359","event_start_utc":"2025-10-19T17:30:00Z","home_score":1,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":2,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78367","event_start_utc":"2025-10-24T17:00:00Z","home_score":1,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78363","event_start_utc":"2025-10-25T12:00:00Z","home_score":3,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78364","event_start_utc":"2025-10-25T12:00:00Z","home_score":2,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":3,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78366","event_start_utc":"2025-10-25T12:00:00Z","home_score":4,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":2,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78368","event_start_utc":"2025-10-25T12:00:00Z","home_score":3,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":0,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78371","event_start_utc":"2025-10-25T12:00:00Z","home_score":5,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":2,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78372","event_start_utc":"2025-10-25T14:30:00Z","home_score":1,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78370","event_start_utc":"2025-10-26T12:30:00Z","home_score":1,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":4,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78365","event_start_utc":"2025-10-26T15:30:00Z","home_score":2,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":1,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78369","event_start_utc":"2025-10-26T18:30:00Z","home_score":1,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78373","event_start_utc":"2025-10-31T18:00:00Z","home_score":3,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":3,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78374","event_start_utc":"2025-11-01T13:00:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":3,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78375","event_start_utc":"2025-11-01T13:00:00Z","home_score":4,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":0,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78376","event_start_utc":"2025-11-01T13:00:00Z","home_score":0,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":2,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78378","event_start_utc":"2025-11-01T13:00:00Z","home_score":0,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":0,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78381","event_start_utc":"2025-11-01T13:00:00Z","home_score":3,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":2,"away_team":"SC Verl","event_id":"openligadb:bl3:78377","event_start_utc":"2025-11-01T15:30:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78382","event_start_utc":"2025-11-02T12:30:00Z","home_score":2,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78380","event_start_utc":"2025-11-02T15:30:00Z","home_score":2,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78379","event_start_utc":"2025-11-02T18:30:00Z","home_score":2,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78390","event_start_utc":"2025-11-07T18:00:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":2,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78384","event_start_utc":"2025-11-08T13:00:00Z","home_score":1,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":5,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78386","event_start_utc":"2025-11-08T13:00:00Z","home_score":0,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78387","event_start_utc":"2025-11-08T13:00:00Z","home_score":0,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78391","event_start_utc":"2025-11-08T13:00:00Z","home_score":1,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78392","event_start_utc":"2025-11-08T13:00:00Z","home_score":2,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78383","event_start_utc":"2025-11-08T15:30:00Z","home_score":1,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":3,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78385","event_start_utc":"2025-11-09T12:30:00Z","home_score":1,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78389","event_start_utc":"2025-11-09T15:30:00Z","home_score":4,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78388","event_start_utc":"2025-11-09T18:30:00Z","home_score":0,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78402","event_start_utc":"2025-11-21T18:00:00Z","home_score":4,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78393","event_start_utc":"2025-11-22T13:00:00Z","home_score":1,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":5,"away_team":"SC Verl","event_id":"openligadb:bl3:78394","event_start_utc":"2025-11-22T13:00:00Z","home_score":1,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78397","event_start_utc":"2025-11-22T13:00:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78398","event_start_utc":"2025-11-22T13:00:00Z","home_score":2,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":2,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78399","event_start_utc":"2025-11-22T13:00:00Z","home_score":0,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78396","event_start_utc":"2025-11-22T15:30:00Z","home_score":1,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78401","event_start_utc":"2025-11-23T12:30:00Z","home_score":2,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":0,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78395","event_start_utc":"2025-11-23T15:30:00Z","home_score":0,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":3,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78400","event_start_utc":"2025-11-23T18:30:00Z","home_score":2,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78408","event_start_utc":"2025-11-28T18:00:00Z","home_score":3,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":3,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78403","event_start_utc":"2025-11-29T13:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78404","event_start_utc":"2025-11-29T13:00:00Z","home_score":3,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78406","event_start_utc":"2025-11-29T13:00:00Z","home_score":0,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":2,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78407","event_start_utc":"2025-11-29T13:00:00Z","home_score":3,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":1,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78410","event_start_utc":"2025-11-29T13:00:00Z","home_score":3,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":3,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78412","event_start_utc":"2025-11-29T15:30:00Z","home_score":2,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":3,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78409","event_start_utc":"2025-11-30T12:30:00Z","home_score":0,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78411","event_start_utc":"2025-11-30T15:30:00Z","home_score":4,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78405","event_start_utc":"2025-11-30T18:30:00Z","home_score":2,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78419","event_start_utc":"2025-12-05T18:00:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78414","event_start_utc":"2025-12-06T13:00:00Z","home_score":0,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":2,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78416","event_start_utc":"2025-12-06T13:00:00Z","home_score":3,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":2,"away_team":"SC Verl","event_id":"openligadb:bl3:78418","event_start_utc":"2025-12-06T13:00:00Z","home_score":2,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78420","event_start_utc":"2025-12-06T13:00:00Z","home_score":0,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":0,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78422","event_start_utc":"2025-12-06T13:00:00Z","home_score":1,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78421","event_start_utc":"2025-12-06T15:30:00Z","home_score":3,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78413","event_start_utc":"2025-12-07T12:30:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":2,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78417","event_start_utc":"2025-12-07T15:30:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":2,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78415","event_start_utc":"2025-12-07T18:30:00Z","home_score":2,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":5,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78426","event_start_utc":"2025-12-12T18:00:00Z","home_score":3,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78423","event_start_utc":"2025-12-13T13:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78424","event_start_utc":"2025-12-13T13:00:00Z","home_score":1,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78425","event_start_utc":"2025-12-13T13:00:00Z","home_score":0,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":0,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78429","event_start_utc":"2025-12-13T13:00:00Z","home_score":0,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":3,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78430","event_start_utc":"2025-12-13T13:00:00Z","home_score":0,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78431","event_start_utc":"2025-12-13T15:30:00Z","home_score":0,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78427","event_start_utc":"2025-12-14T12:30:00Z","home_score":3,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78428","event_start_utc":"2025-12-14T15:30:00Z","home_score":3,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":3,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78432","event_start_utc":"2025-12-14T18:30:00Z","home_score":2,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":2,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78437","event_start_utc":"2025-12-19T18:00:00Z","home_score":2,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":2,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78433","event_start_utc":"2025-12-20T13:00:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78435","event_start_utc":"2025-12-20T13:00:00Z","home_score":4,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":2,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78436","event_start_utc":"2025-12-20T13:00:00Z","home_score":1,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78438","event_start_utc":"2025-12-20T13:00:00Z","home_score":1,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":2,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78440","event_start_utc":"2025-12-20T13:00:00Z","home_score":3,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":2,"away_team":"SC Verl","event_id":"openligadb:bl3:78441","event_start_utc":"2025-12-20T15:30:00Z","home_score":0,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":1,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78439","event_start_utc":"2025-12-21T12:30:00Z","home_score":1,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78442","event_start_utc":"2025-12-21T15:30:00Z","home_score":3,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":0,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78434","event_start_utc":"2025-12-21T18:30:00Z","home_score":0,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":3,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78447","event_start_utc":"2026-01-16T18:00:00Z","home_score":0,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78443","event_start_utc":"2026-01-17T13:00:00Z","home_score":1,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78445","event_start_utc":"2026-01-17T13:00:00Z","home_score":0,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78446","event_start_utc":"2026-01-17T13:00:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":1,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78450","event_start_utc":"2026-01-17T13:00:00Z","home_score":1,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":2,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78451","event_start_utc":"2026-01-17T13:00:00Z","home_score":5,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":3,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78449","event_start_utc":"2026-01-17T15:30:00Z","home_score":0,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":4,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78444","event_start_utc":"2026-01-18T12:30:00Z","home_score":0,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":0,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78452","event_start_utc":"2026-01-18T15:30:00Z","home_score":2,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78448","event_start_utc":"2026-01-18T18:30:00Z","home_score":4,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78455","event_start_utc":"2026-01-23T18:00:00Z","home_score":2,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78454","event_start_utc":"2026-01-24T13:00:00Z","home_score":2,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":3,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78456","event_start_utc":"2026-01-24T13:00:00Z","home_score":0,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78458","event_start_utc":"2026-01-24T13:00:00Z","home_score":2,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78461","event_start_utc":"2026-01-24T13:00:00Z","home_score":4,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":3,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78462","event_start_utc":"2026-01-24T13:00:00Z","home_score":2,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":0,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78460","event_start_utc":"2026-01-24T15:30:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":4,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78453","event_start_utc":"2026-01-25T12:30:00Z","home_score":0,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78457","event_start_utc":"2026-01-25T15:30:00Z","home_score":1,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"SC Verl","event_id":"openligadb:bl3:78459","event_start_utc":"2026-01-25T18:30:00Z","home_score":2,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78468","event_start_utc":"2026-01-30T18:00:00Z","home_score":3,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78463","event_start_utc":"2026-01-31T13:00:00Z","home_score":0,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":3,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78464","event_start_utc":"2026-01-31T13:00:00Z","home_score":1,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78466","event_start_utc":"2026-01-31T13:00:00Z","home_score":3,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":3,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78467","event_start_utc":"2026-01-31T13:00:00Z","home_score":0,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":2,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78470","event_start_utc":"2026-01-31T13:00:00Z","home_score":2,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":1,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78472","event_start_utc":"2026-01-31T15:30:00Z","home_score":0,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":0,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78465","event_start_utc":"2026-02-01T12:30:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":0,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78471","event_start_utc":"2026-02-01T15:30:00Z","home_score":4,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78469","event_start_utc":"2026-02-01T18:30:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78473","event_start_utc":"2026-02-06T18:00:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":0,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78474","event_start_utc":"2026-02-07T13:00:00Z","home_score":0,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78476","event_start_utc":"2026-02-07T13:00:00Z","home_score":0,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78477","event_start_utc":"2026-02-07T13:00:00Z","home_score":2,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78478","event_start_utc":"2026-02-07T13:00:00Z","home_score":2,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":0,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78479","event_start_utc":"2026-02-07T13:00:00Z","home_score":0,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78475","event_start_utc":"2026-02-07T15:30:00Z","home_score":2,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":2,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78482","event_start_utc":"2026-02-08T12:30:00Z","home_score":2,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":3,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78481","event_start_utc":"2026-02-08T15:30:00Z","home_score":3,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":2,"away_team":"SC Verl","event_id":"openligadb:bl3:78480","event_start_utc":"2026-02-08T18:30:00Z","home_score":4,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":2,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78484","event_start_utc":"2026-02-13T18:00:00Z","home_score":2,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":0,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78483","event_start_utc":"2026-02-14T13:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":2,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78487","event_start_utc":"2026-02-14T13:00:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":1,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78488","event_start_utc":"2026-02-14T13:00:00Z","home_score":6,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":5,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78489","event_start_utc":"2026-02-14T13:00:00Z","home_score":0,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78491","event_start_utc":"2026-02-14T13:00:00Z","home_score":3,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":2,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78490","event_start_utc":"2026-02-14T15:30:00Z","home_score":3,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78486","event_start_utc":"2026-02-15T12:30:00Z","home_score":1,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":3,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78485","event_start_utc":"2026-02-15T15:30:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78492","event_start_utc":"2026-02-15T18:30:00Z","home_score":1,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78494","event_start_utc":"2026-02-20T18:00:00Z","home_score":3,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78493","event_start_utc":"2026-02-21T13:00:00Z","home_score":3,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":0,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78497","event_start_utc":"2026-02-21T13:00:00Z","home_score":3,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78498","event_start_utc":"2026-02-21T13:00:00Z","home_score":2,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78499","event_start_utc":"2026-02-21T13:00:00Z","home_score":3,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"SC Verl","event_id":"openligadb:bl3:78500","event_start_utc":"2026-02-21T13:00:00Z","home_score":3,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78495","event_start_utc":"2026-02-21T15:30:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":0,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78501","event_start_utc":"2026-02-22T12:30:00Z","home_score":1,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":2,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78496","event_start_utc":"2026-02-22T15:30:00Z","home_score":1,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":3,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78502","event_start_utc":"2026-02-22T18:30:00Z","home_score":1,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78511","event_start_utc":"2026-02-27T18:00:00Z","home_score":1,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":0,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78504","event_start_utc":"2026-02-28T13:00:00Z","home_score":2,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":3,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78505","event_start_utc":"2026-02-28T13:00:00Z","home_score":1,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":2,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78507","event_start_utc":"2026-02-28T13:00:00Z","home_score":3,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78508","event_start_utc":"2026-02-28T13:00:00Z","home_score":2,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78509","event_start_utc":"2026-02-28T13:00:00Z","home_score":1,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":0,"away_team":"SC Verl","event_id":"openligadb:bl3:78506","event_start_utc":"2026-02-28T15:30:00Z","home_score":0,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":1,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78503","event_start_utc":"2026-03-01T12:30:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78510","event_start_utc":"2026-03-01T15:30:00Z","home_score":1,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":2,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78512","event_start_utc":"2026-03-01T18:30:00Z","home_score":2,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":2,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78515","event_start_utc":"2026-03-03T18:00:00Z","home_score":1,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":3,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78516","event_start_utc":"2026-03-03T18:00:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":0,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78517","event_start_utc":"2026-03-03T18:00:00Z","home_score":2,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78521","event_start_utc":"2026-03-03T18:00:00Z","home_score":2,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":2,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78522","event_start_utc":"2026-03-03T18:00:00Z","home_score":1,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78513","event_start_utc":"2026-03-04T18:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":0,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78514","event_start_utc":"2026-03-04T18:00:00Z","home_score":0,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":3,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78518","event_start_utc":"2026-03-04T18:00:00Z","home_score":1,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78519","event_start_utc":"2026-03-04T18:00:00Z","home_score":1,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78520","event_start_utc":"2026-03-04T18:00:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78525","event_start_utc":"2026-03-06T18:00:00Z","home_score":0,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":3,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78526","event_start_utc":"2026-03-07T13:00:00Z","home_score":1,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":0,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78527","event_start_utc":"2026-03-07T13:00:00Z","home_score":0,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78528","event_start_utc":"2026-03-07T13:00:00Z","home_score":2,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":4,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78531","event_start_utc":"2026-03-07T13:00:00Z","home_score":2,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":2,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78532","event_start_utc":"2026-03-07T13:00:00Z","home_score":3,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":2,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78529","event_start_utc":"2026-03-07T15:30:00Z","home_score":0,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78523","event_start_utc":"2026-03-08T12:30:00Z","home_score":3,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":2,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78530","event_start_utc":"2026-03-08T15:30:00Z","home_score":4,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":2,"away_team":"SC Verl","event_id":"openligadb:bl3:78524","event_start_utc":"2026-03-08T18:30:00Z","home_score":1,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78539","event_start_utc":"2026-03-13T18:00:00Z","home_score":4,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78533","event_start_utc":"2026-03-14T13:00:00Z","home_score":1,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78536","event_start_utc":"2026-03-14T13:00:00Z","home_score":4,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78537","event_start_utc":"2026-03-14T13:00:00Z","home_score":5,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":2,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78538","event_start_utc":"2026-03-14T13:00:00Z","home_score":3,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":2,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78540","event_start_utc":"2026-03-14T13:00:00Z","home_score":4,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78541","event_start_utc":"2026-03-14T15:30:00Z","home_score":0,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78534","event_start_utc":"2026-03-15T12:30:00Z","home_score":1,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78542","event_start_utc":"2026-03-15T15:30:00Z","home_score":4,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":3,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78535","event_start_utc":"2026-03-15T18:30:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78547","event_start_utc":"2026-03-20T18:00:00Z","home_score":0,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78543","event_start_utc":"2026-03-21T13:00:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":2,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78544","event_start_utc":"2026-03-21T13:00:00Z","home_score":1,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78546","event_start_utc":"2026-03-21T13:00:00Z","home_score":1,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":2,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78548","event_start_utc":"2026-03-21T13:00:00Z","home_score":5,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78552","event_start_utc":"2026-03-21T13:00:00Z","home_score":3,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78551","event_start_utc":"2026-03-21T15:30:00Z","home_score":3,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78550","event_start_utc":"2026-03-22T12:30:00Z","home_score":0,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78549","event_start_utc":"2026-03-22T15:30:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":2,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78545","event_start_utc":"2026-03-22T18:30:00Z","home_score":1,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78556","event_start_utc":"2026-04-04T12:00:00Z","home_score":4,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":3,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78557","event_start_utc":"2026-04-04T12:00:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":3,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78558","event_start_utc":"2026-04-04T12:00:00Z","home_score":0,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78561","event_start_utc":"2026-04-04T12:00:00Z","home_score":1,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":5,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78562","event_start_utc":"2026-04-04T12:00:00Z","home_score":3,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":1,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78554","event_start_utc":"2026-04-04T14:30:00Z","home_score":3,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":0,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78560","event_start_utc":"2026-04-04T14:30:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":0,"away_team":"SC Verl","event_id":"openligadb:bl3:78555","event_start_utc":"2026-04-05T11:30:00Z","home_score":1,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":0,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78553","event_start_utc":"2026-04-05T14:30:00Z","home_score":1,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78559","event_start_utc":"2026-04-05T17:30:00Z","home_score":3,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78564","event_start_utc":"2026-04-07T17:00:00Z","home_score":1,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78568","event_start_utc":"2026-04-07T17:00:00Z","home_score":3,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":0,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78570","event_start_utc":"2026-04-07T17:00:00Z","home_score":1,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":0,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78571","event_start_utc":"2026-04-07T17:00:00Z","home_score":1,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":3,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78573","event_start_utc":"2026-04-07T17:00:00Z","home_score":1,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78563","event_start_utc":"2026-04-08T17:00:00Z","home_score":1,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":2,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78566","event_start_utc":"2026-04-08T17:00:00Z","home_score":1,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78567","event_start_utc":"2026-04-08T17:00:00Z","home_score":1,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":4,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78569","event_start_utc":"2026-04-08T17:00:00Z","home_score":1,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":2,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78572","event_start_utc":"2026-04-08T17:00:00Z","home_score":1,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78583","event_start_utc":"2026-04-10T17:00:00Z","home_score":1,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":4,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78574","event_start_utc":"2026-04-11T12:00:00Z","home_score":1,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78575","event_start_utc":"2026-04-11T12:00:00Z","home_score":2,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":0,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78579","event_start_utc":"2026-04-11T12:00:00Z","home_score":2,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78580","event_start_utc":"2026-04-11T12:00:00Z","home_score":3,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":1,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78581","event_start_utc":"2026-04-11T12:00:00Z","home_score":3,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78578","event_start_utc":"2026-04-11T14:30:00Z","home_score":5,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":0,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78577","event_start_utc":"2026-04-12T11:30:00Z","home_score":1,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"SC Verl","event_id":"openligadb:bl3:78576","event_start_utc":"2026-04-12T14:30:00Z","home_score":1,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":2,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78582","event_start_utc":"2026-04-12T17:30:00Z","home_score":2,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":3,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78590","event_start_utc":"2026-04-17T17:00:00Z","home_score":1,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78584","event_start_utc":"2026-04-18T12:00:00Z","home_score":0,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":1,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78585","event_start_utc":"2026-04-18T12:00:00Z","home_score":0,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78591","event_start_utc":"2026-04-18T12:00:00Z","home_score":3,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":0,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78592","event_start_utc":"2026-04-18T12:00:00Z","home_score":2,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":0,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78593","event_start_utc":"2026-04-18T12:00:00Z","home_score":0,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78587","event_start_utc":"2026-04-18T14:30:00Z","home_score":2,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":3,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78588","event_start_utc":"2026-04-19T11:30:00Z","home_score":5,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":2,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78586","event_start_utc":"2026-04-19T14:30:00Z","home_score":2,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":3,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78589","event_start_utc":"2026-04-19T17:30:00Z","home_score":3,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78600","event_start_utc":"2026-04-24T17:00:00Z","home_score":3,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":2,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78596","event_start_utc":"2026-04-25T12:00:00Z","home_score":2,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":1,"away_team":"SC Verl","event_id":"openligadb:bl3:78597","event_start_utc":"2026-04-25T12:00:00Z","home_score":2,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":5,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78598","event_start_utc":"2026-04-25T12:00:00Z","home_score":2,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":2,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78602","event_start_utc":"2026-04-25T12:00:00Z","home_score":3,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":3,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78603","event_start_utc":"2026-04-25T12:00:00Z","home_score":0,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":2,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78595","event_start_utc":"2026-04-25T14:30:00Z","home_score":2,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":2,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78594","event_start_utc":"2026-04-26T11:30:00Z","home_score":0,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":2,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78601","event_start_utc":"2026-04-26T14:30:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":2,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78599","event_start_utc":"2026-04-26T17:30:00Z","home_score":3,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":0,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78604","event_start_utc":"2026-05-02T12:00:00Z","home_score":2,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78609","event_start_utc":"2026-05-02T12:00:00Z","home_score":2,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78611","event_start_utc":"2026-05-02T12:00:00Z","home_score":1,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78612","event_start_utc":"2026-05-02T12:00:00Z","home_score":4,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78613","event_start_utc":"2026-05-02T12:00:00Z","home_score":1,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78606","event_start_utc":"2026-05-02T14:30:00Z","home_score":6,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":2,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78607","event_start_utc":"2026-05-02T14:30:00Z","home_score":0,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":1,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78610","event_start_utc":"2026-05-03T11:30:00Z","home_score":2,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":3,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78608","event_start_utc":"2026-05-03T14:30:00Z","home_score":2,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":5,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78605","event_start_utc":"2026-05-03T17:30:00Z","home_score":3,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":0,"away_team":"MSV Duisburg","event_id":"openligadb:bl3:78616","event_start_utc":"2026-05-08T17:00:00Z","home_score":0,"home_team":"Erzgebirge Aue","league":"LIGA_3"}
+{"away_score":1,"away_team":"SSV Ulm 1846","event_id":"openligadb:bl3:78617","event_start_utc":"2026-05-09T12:00:00Z","home_score":1,"home_team":"VfL Osnabr\u00fcck","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Wehen Wiesbaden","event_id":"openligadb:bl3:78618","event_start_utc":"2026-05-09T12:00:00Z","home_score":2,"home_team":"Energie Cottbus","league":"LIGA_3"}
+{"away_score":3,"away_team":"VfB Stuttgart II","event_id":"openligadb:bl3:78619","event_start_utc":"2026-05-09T12:00:00Z","home_score":5,"home_team":"Hansa Rostock","league":"LIGA_3"}
+{"away_score":0,"away_team":"SC Verl","event_id":"openligadb:bl3:78621","event_start_utc":"2026-05-09T12:00:00Z","home_score":1,"home_team":"Rot-Weiss Essen","league":"LIGA_3"}
+{"away_score":2,"away_team":"FC Ingolstadt 04","event_id":"openligadb:bl3:78622","event_start_utc":"2026-05-09T12:00:00Z","home_score":1,"home_team":"TSV 1860 M\u00fcnchen","league":"LIGA_3"}
+{"away_score":0,"away_team":"Jahn Regensburg","event_id":"openligadb:bl3:78614","event_start_utc":"2026-05-09T14:30:00Z","home_score":1,"home_team":"SV Waldhof Mannheim","league":"LIGA_3"}
+{"away_score":2,"away_team":"1. FC Schweinfurt 05","event_id":"openligadb:bl3:78620","event_start_utc":"2026-05-10T11:30:00Z","home_score":3,"home_team":"TSV Havelse","league":"LIGA_3"}
+{"away_score":3,"away_team":"Alemannia Aachen","event_id":"openligadb:bl3:78615","event_start_utc":"2026-05-10T14:30:00Z","home_score":0,"home_team":"Viktoria K\u00f6ln","league":"LIGA_3"}
+{"away_score":2,"away_team":"1. FC Saarbr\u00fccken","event_id":"openligadb:bl3:78623","event_start_utc":"2026-05-10T17:30:00Z","home_score":3,"home_team":"TSG 1899 Hoffenheim II","league":"LIGA_3"}
+{"away_score":4,"away_team":"Hansa Rostock","event_id":"openligadb:bl3:78624","event_start_utc":"2026-05-16T11:30:00Z","home_score":3,"home_team":"1. FC Saarbr\u00fccken","league":"LIGA_3"}
+{"away_score":1,"away_team":"SV Waldhof Mannheim","event_id":"openligadb:bl3:78625","event_start_utc":"2026-05-16T11:30:00Z","home_score":5,"home_team":"FC Ingolstadt 04","league":"LIGA_3"}
+{"away_score":4,"away_team":"VfL Osnabr\u00fcck","event_id":"openligadb:bl3:78626","event_start_utc":"2026-05-16T11:30:00Z","home_score":3,"home_team":"VfB Stuttgart II","league":"LIGA_3"}
+{"away_score":3,"away_team":"Rot-Weiss Essen","event_id":"openligadb:bl3:78627","event_start_utc":"2026-05-16T11:30:00Z","home_score":2,"home_team":"SSV Ulm 1846","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSG 1899 Hoffenheim II","event_id":"openligadb:bl3:78628","event_start_utc":"2026-05-16T11:30:00Z","home_score":2,"home_team":"SV Wehen Wiesbaden","league":"LIGA_3"}
+{"away_score":1,"away_team":"Energie Cottbus","event_id":"openligadb:bl3:78629","event_start_utc":"2026-05-16T11:30:00Z","home_score":0,"home_team":"Jahn Regensburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"Viktoria K\u00f6ln","event_id":"openligadb:bl3:78630","event_start_utc":"2026-05-16T11:30:00Z","home_score":1,"home_team":"MSV Duisburg","league":"LIGA_3"}
+{"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78631","event_start_utc":"2026-05-16T11:30:00Z","home_score":6,"home_team":"Alemannia Aachen","league":"LIGA_3"}
+{"away_score":0,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78632","event_start_utc":"2026-05-16T11:30:00Z","home_score":3,"home_team":"SC Verl","league":"LIGA_3"}
+{"away_score":4,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78633","event_start_utc":"2026-05-16T11:30:00Z","home_score":2,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
