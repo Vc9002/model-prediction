@@ -1,6 +1,10 @@
 from model_prediction.units import Exposure, UnitPolicy, recommend_units
 
 
+def test_current_unit_is_seven_fifty_dollars() -> None:
+    assert UnitPolicy().unit_value_usd == 7.5
+
+
 def test_unvalidated_model_is_capped_at_research_minimum() -> None:
     result = recommend_units(0.70, 0.01, -110, Exposure(), validated_model=False)
     assert result.is_call

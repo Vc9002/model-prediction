@@ -27,6 +27,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
+import yaml
+
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
@@ -40,6 +42,7 @@ LOG_FILE = DASH_DIR / "server.log"
 JOBS_FILE = DASH_DIR / "jobs.json"
 ARCHIVE_FILE = DASH_DIR / "archive.json"
 ORDERS_FILE = DASH_DIR / "orders.json"
+CONFIG_FILE = ROOT / "config" / "model.yaml"
 
 
 def _log(message: str) -> None:
@@ -144,6 +147,15 @@ def _read_json(path: Path):
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+
+
+def _unit_value_usd() -> float:
+    try:
+        payload = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
+        value = float((payload.get("bankroll") or {}).get("unit_value_usd", 7.5))
+    except (OSError, TypeError, ValueError, yaml.YAMLError):
+        return 7.5
+    return value if value > 0 else 7.5
 
 
 _PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
@@ -357,6 +369,7 @@ def status() -> dict:
         "promotion_allowed": validation.get("promotion_allowed"),
         "polymarket_odds": odds_summary(),
         "edge_filter_min": 0.02,
+        "unit_value_usd": _unit_value_usd(),
     }
 
 
@@ -620,13 +633,23 @@ def _save_orders(payload: dict) -> None:
     os.replace(temporary, ORDERS_FILE)
 
 
-def _latest_order_by_pick() -> dict[str, dict]:
-    output: dict[str, dict] = {}
-    for order in _load_orders()["orders"]:
-        pick_id = str(order.get("pick_id") or "")
-        if pick_id:
-            output[pick_id] = order
-    return output
+def _latest_order_for_pick(row: dict, quote: dict | None) -> dict | None:
+    """Find an order across equivalent model-version rows for the same contract side."""
+    orders = _load_orders()["orders"]
+    pick_id = str(row.get("pick_id") or "")
+    direct = [order for order in orders if str(order.get("pick_id") or "") == pick_id]
+    if direct:
+        return direct[-1]
+    if quote is None:
+        return None
+    equivalent = [
+        order
+        for order in orders
+        if order.get("status") == "submitted"
+        and order.get("market_slug") == quote.get("market_slug")
+        and order.get("side") == quote.get("side")
+    ]
+    return equivalent[-1] if equivalent else None
 
 
 def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
@@ -655,14 +678,58 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
 def _decorate_pick(row: dict) -> dict:
     quote = _pick_quote(row)
     ready, reason = _order_readiness(row, quote)
-    order = _latest_order_by_pick().get(str(row.get("pick_id") or ""))
+    order = _latest_order_for_pick(row, quote)
     return {
         **row,
         "quote": quote,
         "order": order,
         "buy_ready": ready,
         "buy_block_reason": reason,
+        "unit_value_usd": _unit_value_usd(),
     }
+
+
+def _pick_identity(row: dict) -> tuple[str, ...]:
+    """Canonical dashboard identity, independent of model version or logged price."""
+    event = str(row.get("event_id") or "").strip()
+    if not event:
+        event = "|".join(
+            str(row.get(key) or "").strip().casefold()
+            for key in ("event_start_utc", "away_team", "home_team")
+        )
+    line = row.get("line")
+    try:
+        line_value = f"{float(line):g}" if line not in (None, "") else ""
+    except (TypeError, ValueError):
+        line_value = str(line or "").strip().casefold()
+    return (
+        str(row.get("league") or "").strip().casefold(),
+        event,
+        str(row.get("market_type") or "").strip().casefold(),
+        str(row.get("selection") or "").strip().casefold(),
+        line_value,
+        str(row.get("period") or row.get("horizon") or "").strip().casefold(),
+    )
+
+
+def _dedupe_picks(rows: list[dict]) -> list[dict]:
+    """Keep the latest ledger observation for each actual bet shown in the UI."""
+    latest: dict[tuple[str, ...], tuple[str, int, dict]] = {}
+    for index, row in enumerate(rows):
+        rank = (str(row.get("created_at_utc") or ""), index, row)
+        key = _pick_identity(row)
+        if key not in latest or rank[:2] >= latest[key][:2]:
+            latest[key] = rank
+    return [item[2] for item in sorted(latest.values(), key=lambda item: item[1])]
+
+
+def dashboard_picks() -> list[dict]:
+    """Latest unique picks with persistent local-clear and order state attached."""
+    archived = set(_load_archive()["pick_ids"])
+    return [
+        {**_decorate_pick(row), "archived": str(row.get("pick_id")) in archived}
+        for row in _dedupe_picks(read_picks())
+    ]
 
 
 def preview_order(payload: dict) -> dict:
@@ -683,6 +750,16 @@ def preview_order(payload: dict) -> dict:
         return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
     if not 0 < size_shares <= 100000:
         return {"status": "refused", "error": "shares must be greater than 0 and at most 100,000"}
+    estimated_cost = round(price * size_shares, 2)
+    maximum_cost = round(float(row.get("units") or 0) * _unit_value_usd(), 2)
+    if estimated_cost > maximum_cost + 0.005:
+        return {
+            "status": "refused",
+            "error": (
+                f"order cost ${estimated_cost:.2f} exceeds this pick's "
+                f"{float(row.get('units') or 0):g}U cap (${maximum_cost:.2f})"
+            ),
+        }
     if price >= float(quote["ask"]):
         return {
             "status": "refused",
@@ -699,7 +776,10 @@ def preview_order(payload: dict) -> dict:
         "side": quote["side"],
         "price": price,
         "size_shares": size_shares,
-        "estimated_cost_usd": round(price * size_shares, 2),
+        "units": round(estimated_cost / _unit_value_usd(), 4),
+        "unit_value_usd": _unit_value_usd(),
+        "estimated_cost_usd": estimated_cost,
+        "maximum_cost_usd": maximum_cost,
         "created_at": time.time(),
         "expires_at": time.time() + 300,
     }
@@ -1005,12 +1085,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/matrix":
                 self._send(_cached("matrix", 60, matrix))
             elif route == "/api/picks":
-                def _picks_with_archive():
-                    archived = set(_load_archive()["pick_ids"])
-                    return [{**_decorate_pick(row),
-                             "archived": str(row.get("pick_id")) in archived}
-                            for row in read_picks()]
-                self._send(_cached("picks", 30, _picks_with_archive))
+                self._send(_cached("picks", 30, dashboard_picks))
             elif route == "/api/performance":
                 self._send(_cached("performance", 30, lambda: performance(read_picks())))
             elif route == "/api/backtests":
@@ -1087,9 +1162,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def today_picks(day: str) -> dict:
-    """Every ledger pick whose game is played on the given US-Eastern date."""
+    """Latest unique, locally visible picks played on a US-Eastern date."""
     rows = []
-    for row in read_picks():
+    archived = set(_load_archive()["pick_ids"])
+    for row in _dedupe_picks(read_picks()):
+        if str(row.get("pick_id")) in archived:
+            continue
         start = row.get("event_start_utc")
         if not start:
             continue

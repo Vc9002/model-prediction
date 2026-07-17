@@ -32,6 +32,7 @@ team_ban_list:
   - market_efficiency
   - manual_governance
 bankroll:
+  unit_value_usd: 7.5
   reference_units: 5
   kelly_fraction: 0.5
   min_edge: 0.02
@@ -70,7 +71,7 @@ execution:
   requirements:
   - explicit user execute command in the current turn
   - --execute CLI flag
-  - POLYMARKET_PRIVATE_KEY environment variable
+  - POLYMARKET_KEY_ID and POLYMARKET_SECRET_KEY environment variables
   - interactive Y/N confirmation of exact order details
   - QUALIFIED_SHADOW_CALL picks only
   - unit engine caps still apply
@@ -152,9 +153,10 @@ models:
     - wnba-elo-trend-lr-v3
   SOCCER:
     family: elo_trend_logistic_regression
-    status: research
+    status: shadow_qualified
     origin: statistical_model
-    active_research_version: soccer-elo-trend-lr-v1
+    active_production_version: soccer-elo-trend-lr-v1
+    production_artifact: config/models/soccer-elo-trend-lr-v1.json
     leagues:
     - EPL
     - LA_LIGA

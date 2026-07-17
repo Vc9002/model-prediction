@@ -32,3 +32,12 @@ def test_dashboard_inline_javascript_parses() -> None:
             check=True,
             capture_output=True,
         )
+
+
+def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+
+    assert 'class="order-price"' in html
+    assert 'step="0.01"' in html
+    assert 'placeholder=".50"' in html
+    assert "1U = $" in html

@@ -90,4 +90,10 @@ def market_odds_snapshot_path(config: dict[str, Any]) -> Path:
 
 def unit_policy(config: dict[str, Any]) -> UnitPolicy:
     values = config["bankroll"]
-    return UnitPolicy(**{field: values[field] for field in UnitPolicy.__dataclass_fields__})
+    defaults = UnitPolicy()
+    return UnitPolicy(
+        **{
+            field: values.get(field, getattr(defaults, field))
+            for field in UnitPolicy.__dataclass_fields__
+        }
+    )

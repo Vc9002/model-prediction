@@ -8,6 +8,7 @@ from .pricing import american_to_decimal, implied_probability
 
 @dataclass(frozen=True)
 class UnitPolicy:
+    unit_value_usd: float = 7.5
     reference_units: float = 5.0
     kelly_fraction: float = 0.5
     min_edge: float = 0.02
@@ -106,4 +107,3 @@ def recommend_units(
     if units < policy.min_pick_units:
         return UnitRecommendation(False, 0, edge, adjusted_edge, confidence, "unit exposure cap reached")
     return UnitRecommendation(True, units, edge, adjusted_edge, confidence, "qualified shadow call")
-

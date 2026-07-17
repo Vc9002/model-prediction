@@ -36,6 +36,7 @@ button{background:var(--accent);border:1px solid #2a4a80;color:var(--text);borde
 button:hover{border-color:var(--green)}
 button.primary{background:#0d4f35;border-color:var(--green)}
 button:disabled{opacity:.45;cursor:not-allowed}
+input.order-price{width:62px;padding:5px 6px;font-family:var(--mono);font-size:12px}
 /* matrix */
 table.matrix{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px}
 table.matrix th,table.matrix td{border:1px solid var(--accent);padding:8px 10px;text-align:center}
@@ -594,8 +595,9 @@ async function renderToday(){
         :'<span class="pill open">'+(p.status||"open")+'</span>')+" "+evBadge;
       const actualU=Number(p.units)||0;
       const suggested=p.suggested_paper_units;
-      const sizing=actualU>0?`size <b class="green">${actualU.toFixed(2)}U</b>`:
-        suggested>0?`size <b class="${edge>0?"green":"dim"}">${Number(suggested).toFixed(2)}U</b> <span class="dim">(suggested paper)</span>`:"";
+      const unitValue=Number(p.unit_value_usd||state.status?.unit_value_usd||7.5);
+      const sizing=actualU>0?`size <b class="green">${actualU.toFixed(2)}U / $${(actualU*unitValue).toFixed(2)}</b>`:
+        suggested>0?`size <b class="${edge>0?"green":"dim"}">${Number(suggested).toFixed(2)}U / $${(Number(suggested)*unitValue).toFixed(2)}</b> <span class="dim">(suggested paper)</span>`:"";
       const d=document.createElement("div");d.className="pick "+cls;
       d.innerHTML=`<b>${p.away_team} @ ${p.home_team}</b>
         <span class="dim">· ${p.start_et} · ${p.market_type}</span> ${res}<br>
@@ -627,12 +629,15 @@ function orderControl(p,compact=false){
   const order=p.order||{};
   if(order.status==="submitted")return `<span class="pill win" title="${escAttr(order.order_id||"")}">order placed</span>`;
   const ask=p.quote?.ask;
-  const label=ask!=null?`Buy · ${Number(ask).toFixed(2)}`:"Buy";
+  const defaultPrice=ask!=null?Math.max(.01,Math.round((Number(ask)-.01)*100)/100).toFixed(2):"";
+  const inputId=`orderPrice-${p.pick_id}`;
   const reason=p.buy_ready?"Set a post-only GTC limit price":(p.buy_block_reason||"order unavailable");
-  return `<button class="${p.buy_ready?"primary":""}" title="${escAttr(reason)}" onclick="event.stopPropagation();openBuy('${p.pick_id}')">${label}</button>`+
-    (!compact&&!p.buy_ready?`<div class="dim small">${esc(reason)}</div>`:"");
+  return `<span title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()"> `+
+    `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button></span>`+
+    (ask!=null?`<div class="dim small">ask ${Number(ask).toFixed(2)}${!p.buy_ready?` · ${esc(reason)}`:""}</div>`:
+      (!compact?`<div class="dim small">${esc(reason)}</div>`:""));
 }
-function openBuy(pickId){
+function openBuy(pickId,initialPrice){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
   if(!p){showModal('<h2 class="red">Pick not found</h2>');return;}
   if(p.order?.status==="submitted"){
@@ -644,23 +649,29 @@ function openBuy(pickId){
       <button onclick="confirmAction('refresh_prices','Scan and save fresh executable prices now?')">Scan Prices</button>`);return;
   }
   const ask=Number(p.quote.ask);
-  const defaultPrice=Math.max(.01,Math.round((ask-.01)*100)/100).toFixed(2);
+  const typed=Number(initialPrice);
+  const defaultPrice=(typed>0&&typed<1?typed:Math.max(.01,Math.round((ask-.01)*100)/100)).toFixed(2);
+  const unitValue=Number(p.unit_value_usd||state.status?.unit_value_usd||7.5);
+  const maxUnits=Number(p.units)||0;
   showModal(`<h2>Resting limit order</h2>
     <p><b>${esc(pickLabel(p))}</b> · current executable ask <b>${ask.toFixed(2)}</b></p>
     <p class="dim small">Post-only means your price must stay below the ask; it will rest instead of crossing immediately.</p>
     <label>Limit price <input id="buyPrice" type="number" min="0.01" max="0.99" step="0.01" value="${defaultPrice}"></label><br><br>
-    <label>Shares <input id="buyShares" type="number" min="0.01" max="100000" step="0.01" value="1"></label><br><br>
+    <label>Units <input id="buyUnits" type="number" min="0.25" max="${maxUnits}" step="0.25" value="${maxUnits}"></label>
+    <span class="dim small"> · 1U = $${unitValue.toFixed(2)} · max ${maxUnits.toFixed(2)}U / $${(maxUnits*unitValue).toFixed(2)}</span><br><br>
     <button class="primary" onclick="previewBuy('${p.pick_id}')">Review exact order</button>`);
 }
 async function previewBuy(pickId){
-  const price=Number($("#buyPrice").value),size_shares=Number($("#buyShares").value);
+  const price=Number($("#buyPrice").value),units=Number($("#buyUnits").value);
+  const unitValue=Number(state.status?.unit_value_usd||7.5);
+  const size_shares=Math.floor((units*unitValue/price)*100)/100;
   const response=await fetch("/api/order/preview",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({confirm:true,pick_id:pickId,price,size_shares})});
   const preview=await response.json();
   if(preview.status!=="preview"){
     showModal(`<h2 class="red">Order blocked</h2><pre>${esc(preview.error||JSON.stringify(preview))}</pre>`);return;
   }
-  const exact=`BUY ${preview.size_shares} shares of ${preview.market_slug} (${preview.side}) at ${Number(preview.price).toFixed(2)}. Maximum cost $${Number(preview.estimated_cost_usd).toFixed(2)}. This creates a real post-only GTC resting order.`;
+  const exact=`BUY ${preview.size_shares} shares of ${preview.market_slug} (${preview.side}) at ${Number(preview.price).toFixed(2)}. Size ${Number(preview.units).toFixed(2)}U at $${Number(preview.unit_value_usd).toFixed(2)}/U; maximum cost $${Number(preview.estimated_cost_usd).toFixed(2)}. This creates a real post-only GTC resting order.`;
   if(!window.confirm(exact+"\n\nPlace this real-money order?"))return;
   showModal("<h2>Submitting exact order…</h2>");
   const submitResponse=await fetch("/api/order/submit",{method:"POST",headers:{"Content-Type":"application/json"},

@@ -199,3 +199,74 @@ def test_resting_order_refuses_crossing_the_current_ask(monkeypatch) -> None:
 
     assert result["status"] == "refused"
     assert "below the current ask" in result["error"]
+
+
+def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch) -> None:
+    pick = {
+        "pick_id": "qualified-cap",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_pick_quote",
+        lambda row: {
+            "market_slug": "nfl-example",
+            "side": "long",
+            "ask": 0.60,
+            "fresh": True,
+            "market_state": "MARKET_STATE_OPEN",
+        },
+    )
+    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+
+    result = dashboard_server.preview_order(
+        {"pick_id": "qualified-cap", "price": 0.55, "size_shares": 14}
+    )
+
+    assert result["status"] == "refused"
+    assert "1U cap ($7.50)" in result["error"]
+
+
+def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, tmp_path: Path) -> None:
+    old = {
+        "pick_id": "old-v2",
+        "event_id": "game-1",
+        "event_start_utc": "2026-07-17T23:30:00Z",
+        "created_at_utc": "2026-07-17T10:00:00Z",
+        "league": "WNBA",
+        "market_type": "moneyline",
+        "selection": "away",
+        "model_version": "v2",
+        "status": "open",
+    }
+    latest = {
+        **old,
+        "pick_id": "latest-v3",
+        "created_at_utc": "2026-07-17T14:00:00Z",
+        "model_version": "v3",
+    }
+    archived_only = {
+        **old,
+        "pick_id": "archived-only",
+        "event_id": "game-2",
+        "selection": "home",
+    }
+    archive_path = tmp_path / "archive.json"
+    archive_path.write_text(
+        json.dumps({"pick_ids": ["old-v2", "archived-only"]}), encoding="utf-8"
+    )
+    monkeypatch.setattr(dashboard_server, "ARCHIVE_FILE", archive_path)
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [old, latest, archived_only])
+    monkeypatch.setattr(dashboard_server, "_decorate_pick", lambda row: row)
+
+    ledger = dashboard_server.dashboard_picks()
+    today = dashboard_server.today_picks("2026-07-17")
+
+    assert [row["pick_id"] for row in ledger] == ["latest-v3", "archived-only"]
+    assert [row["pick_id"] for row in today["picks"]] == ["latest-v3"]
+    assert today["count"] == 1
