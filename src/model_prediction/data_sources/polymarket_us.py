@@ -250,6 +250,25 @@ class PolymarketSnapshotStore:
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(snapshot, sort_keys=True, separators=(",", ":")) + "\n")
 
+    def latest(self, slug: str) -> dict[str, Any] | None:
+        """Return the newest stored snapshot for one exact contract."""
+        if not self.path.exists():
+            return None
+        latest: dict[str, Any] | None = None
+        with self.path.open(encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if item.get("market_slug") != slug:
+                    continue
+                if latest is None or str(item.get("observed_at_utc") or "") >= str(
+                    latest.get("observed_at_utc") or ""
+                ):
+                    latest = item
+        return latest
+
     def closing_snapshot(self, slug: str, event_start_utc: str) -> dict[str, Any] | None:
         if not self.path.exists():
             return None
@@ -345,6 +364,81 @@ def capture_slate_snapshots(
         "failure_details": failure_details,
         "timestamp_valid": True,
         "sports_scope": sorted(qualification_sports),
+        "storage": f"data/odds/<sport>/{game_date}/polymarket_snapshots.jsonl",
+    }
+
+
+def refresh_contract_snapshots(
+    client: PolymarketUSClient,
+    contracts: list[dict[str, str]],
+    data_root: str | Path,
+    game_date: str,
+) -> dict[str, Any]:
+    """Refresh only explicitly selected, previously mapped ledger contracts.
+
+    Contract metadata is copied from the last saved discovery snapshot. This
+    keeps the refresh path bounded and prevents it from querying a whole sport
+    merely to rediscover contracts already attached to ledger picks.
+    """
+    unique: dict[tuple[str, str], dict[str, str]] = {}
+    for contract in contracts:
+        sport = str(contract.get("sport") or "").strip().lower()
+        slug = str(contract.get("market_slug") or "").strip()
+        if sport and slug:
+            unique[(sport, slug)] = {"sport": sport, "market_slug": slug}
+
+    refreshed = missing_bbo = failures = 0
+    failure_details: list[dict[str, str]] = []
+    refreshed_contracts: list[dict[str, str]] = []
+    for (sport, slug), contract in sorted(unique.items()):
+        store = PolymarketSnapshotStore.for_sport_date(data_root, sport, game_date)
+        previous = store.latest(slug)
+        if previous is None:
+            failures += 1
+            failure_details.append(
+                {
+                    **contract,
+                    "reason": "no prior exact contract mapping; broad discovery was not attempted",
+                }
+            )
+            continue
+        try:
+            snapshot = client.snapshot(slug)
+            observed = parse_utc(snapshot["observed_at_utc"])
+            event_start = parse_utc(snapshot["event_start_utc"])
+            snapshot.update(
+                {
+                    key: previous.get(key)
+                    for key in ("league", "event_id", "market_type", "line")
+                }
+            )
+            snapshot.update(
+                {
+                    "timestamp_valid": observed <= event_start,
+                    "usage": "prospective_executable_bbo",
+                }
+            )
+            store.append(snapshot)
+        except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
+            failures += 1
+            failure_details.append({**contract, "reason": str(error)[:200]})
+            continue
+        refreshed += 1
+        refreshed_contracts.append(contract)
+        if snapshot["long"].get("ask") is None or snapshot["short"].get("ask") is None:
+            missing_bbo += 1
+
+    return {
+        "status": "ok" if failures == 0 else "partial",
+        "requested_contracts": len(contracts),
+        "unique_contracts": len(unique),
+        "refreshed": refreshed,
+        "missing_executable_ask": missing_bbo,
+        "failures": failures,
+        "failure_details": failure_details,
+        "refreshed_contracts": refreshed_contracts,
+        "scope": "today_open_visible_ledger_contracts_only",
+        "broad_discovery_attempted": False,
         "storage": f"data/odds/<sport>/{game_date}/polymarket_snapshots.jsonl",
     }
 

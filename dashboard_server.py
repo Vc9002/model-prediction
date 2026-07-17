@@ -35,6 +35,18 @@ except ImportError:  # pragma: no cover
     load_workbook = None
 
 ROOT = Path(__file__).resolve().parent
+
+# Load .env file so subprocess CLI commands inherit Polymarket keys
+_ENV_PATH = ROOT / ".env"
+if _ENV_PATH.exists():
+    with _ENV_PATH.open(encoding="utf-8") as _fh:
+        for _line in _fh:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _key, _, _val = _line.partition("=")
+                if _key.strip() and _key.strip() not in os.environ:
+                    os.environ[_key.strip()] = _val.strip()
+
 DATA = ROOT / "data"
 OUTPUTS = ROOT / "outputs" / "latest"
 DASH_DIR = ROOT / "dashboard"
@@ -427,6 +439,7 @@ def status() -> dict:
         "validation_status": validation.get("status"),
         "promotion_allowed": validation.get("promotion_allowed"),
         "polymarket_odds": odds_summary(),
+        "polymarket_configured": bool(os.environ.get("POLYMARKET_PRIVATE_KEY")),
         "edge_filter_min": 0.02,
         "unit_value_usd": _unit_value_usd(),
     }
@@ -1021,7 +1034,21 @@ def _action_command(name: str, payload: dict) -> list[str]:
     if name == "daily":
         return cli + ["daily", "--date", str(payload.get("date") or _today())]
     if name == "refresh_prices":
-        return cli + ["polymarket-slate", "--all", "--date", str(payload.get("date") or _today())]
+        day = str(payload.get("date") or _today())
+        command = cli + ["polymarket-ledger-prices", "--date", day]
+        seen: set[tuple[str, str]] = set()
+        for row in today_picks(day)["picks"]:
+            if row.get("status") != "open":
+                continue
+            quote = row.get("quote") or {}
+            sport = str(row.get("league") or "").strip().lower()
+            slug = str(quote.get("market_slug") or "").strip()
+            target = (sport, slug)
+            if sport not in SPORTS or not slug or target in seen:
+                continue
+            seen.add(target)
+            command += ["--contract", f"{sport}={slug}"]
+        return command
     if name == "settle":
         return cli + ["settle", "--all-unsettled"]
     if name == "bootstrap":

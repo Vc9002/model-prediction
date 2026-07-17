@@ -45,6 +45,7 @@ from .data_sources.polymarket_us import (
     PolymarketUSClient,
     capture_slate_snapshots,
     probability_to_american,
+    refresh_contract_snapshots,
 )
 from .data_sources.the_odds_api import TheOddsAPIClient
 from .domain import (
@@ -128,6 +129,19 @@ def parser() -> argparse.ArgumentParser:
     )
     snapshot.add_argument("--slug", required=True)
     snapshot.add_argument("--sport", help="store under data/odds/{sport}/{date}/ instead of the flat file")
+
+    ledger_prices = commands.add_parser(
+        "polymarket-ledger-prices",
+        help="refresh BBOs only for exact contracts selected from today's visible ledger",
+    )
+    ledger_prices.add_argument("--date", required=True)
+    ledger_prices.add_argument(
+        "--contract",
+        action="append",
+        default=[],
+        metavar="SPORT=MARKET_SLUG",
+        help="repeat for each unique ledger contract",
+    )
 
     clv = commands.add_parser("polymarket-clv", help="probability CLV from the final stored pregame snapshot")
     clv.add_argument("--slug", required=True)
@@ -876,6 +890,18 @@ def main(argv: list[str] | None = None) -> None:
                 store = PolymarketSnapshotStore(polymarket_snapshot_path(config))
             store.append(snapshot)
             output = snapshot
+        elif args.command == "polymarket-ledger-prices":
+            contracts = []
+            for value in args.contract:
+                sport, separator, slug = value.partition("=")
+                if not separator or not sport or not slug:
+                    raise ValueError("contract must use SPORT=MARKET_SLUG")
+                if sport not in SPORTS:
+                    raise ValueError(f"unsupported contract sport: {sport}")
+                contracts.append({"sport": sport, "market_slug": slug})
+            output = refresh_contract_snapshots(
+                PolymarketUSClient(), contracts, data_root, args.date
+            )
         elif args.command == "polymarket-clv":
             if not 0 < args.decision_price < 1:
                 raise ValueError("decision price must be between 0 and 1")
