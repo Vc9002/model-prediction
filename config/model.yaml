@@ -1,6 +1,6 @@
 schema_version: '2'
 project:
-  execution_mode: shadow
+  execution_mode: live_manual
   timezone: UTC
   ledger_path: data/picks.xlsx
   audit_path: data/events.jsonl
@@ -68,12 +68,15 @@ data_sources:
     optional_upgrade: sportsdataio
 execution:
   status: hard_gated
+  allow_manual_research_orders: true
+  manual_research_require_active_model: true
+  manual_research_require_positive_edge: true
   requirements:
   - explicit user execute command in the current turn
   - --execute CLI flag
   - POLYMARKET_KEY_ID and POLYMARKET_SECRET_KEY environment variables
   - interactive Y/N confirmation of exact order details
-  - QUALIFIED_SHADOW_CALL picks only
+  - qualified calls, or an explicit manual override on an active-model positive-edge research row
   - unit engine caps still apply
   - audit chain entry for every order
 model_iteration_policy:
