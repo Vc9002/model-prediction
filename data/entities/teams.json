@@ -110,6 +110,8 @@
     {"canonical_team_id":"nfl-sf","league":"NFL","canonical_name":"San Francisco 49ers","abbreviation":"SF","aliases":[{"source_name":"SFO"},{"source_name":"49ers"}]},
     {"canonical_team_id":"nfl-tb","league":"NFL","canonical_name":"Tampa Bay Buccaneers","abbreviation":"TB","aliases":[{"source_name":"TAM"},{"source_name":"Bucs"}]},
     {"canonical_team_id":"nfl-ten","league":"NFL","canonical_name":"Tennessee Titans","abbreviation":"TEN","aliases":[]},
-    {"canonical_team_id":"nfl-was","league":"NFL","canonical_name":"Washington Commanders","abbreviation":"WAS","aliases":[{"source_name":"WSH"}]}
+    {"canonical_team_id":"nfl-was","league":"NFL","canonical_name":"Washington Commanders","abbreviation":"WAS","aliases":[{"source_name":"WSH"}]},
+
+    {"canonical_team_id":"world-cup-kor","league":"WORLD_CUP","canonical_name":"Korea Republic","abbreviation":"KOR","aliases":[{"source":"common","source_name":"South Korea"},{"source":"common","source_name":"Republic of Korea"},{"source":"common","source_name":"Korean Republic"},{"source":"fifa","source_name":"Korea Republic"}]}
   ]
 }

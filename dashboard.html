@@ -103,6 +103,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <button data-tab="matrix" class="on">Matrix</button>
     <button data-tab="picks">Ledger</button>
     <button data-tab="perf">Performance</button>
+    <button data-tab="folio">Portfolio</button>
     <button data-tab="today">Today</button>
     <button data-tab="market">Market</button>
     <button data-tab="research">Research</button>
@@ -164,6 +165,19 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="card"><h2>Monthly P&amp;L</h2><canvas id="cMonth"></canvas></div>
       <div class="card"><h2>Calibration</h2><canvas id="cCal"></canvas></div>
       <div class="card"><h2>Streaks &amp; CLV</h2><div id="streaks" class="mono" style="padding-top:14px;line-height:2"></div></div>
+    </div>
+  </section>
+
+  <section id="tab-folio" style="display:none">
+    <div class="card">
+      <h2>Portfolio — Open Positions</h2>
+      <div class="kpis" id="folioOpenKpis"></div>
+      <div id="folioOpen"></div>
+    </div>
+    <div class="card">
+      <h2>Recent History <span class="dim" style="font-size:12px">(last 7 days)</span></h2>
+      <div class="kpis" id="folioHistKpis"></div>
+      <div id="folioHistory"></div>
     </div>
   </section>
 
@@ -601,6 +615,68 @@ function pickLabel(p){
   return `${team||sel.toUpperCase()}${p.line?(" "+p.line):""}`;
 }
 const renderLive=renderToday; // legacy name used by refreshAll
+
+/* ---------- Portfolio tab ---------- */
+async function renderFolio(){
+  const b=await api("/api/bets");
+  // --- open positions ---
+  const o=b.open;
+  $("#folioOpenKpis").innerHTML=`
+    <div class="k"><b>${o.count}</b><span>open picks</span></div>
+    <div class="k"><b>${o.qualified_count}</b><span>qualified</span></div>
+    <div class="k"><b>${o.research_count}</b><span>research</span></div>
+    <div class="k"><b>${fmt(o.total_units,1)}</b><span>total units</span></div>`;
+  if(!o.count){$("#folioOpen").innerHTML=`<p class="dim">No open positions.</p>`;}
+  else {
+    let html=`<table class="data"><tr>
+      <th>League</th><th>Matchup</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Units</th><th>Type</th></tr>`;
+    o.open.forEach(p=>{
+      const match=`${p.away_team} @ ${p.home_team}`;
+      const pick=marker(p);
+      const edgeCls=p.edge!=null&&p.edge>=0.02?"green":p.edge!=null&&p.edge>0?"yellow":"red";
+      html+=`<tr>
+        <td>${p.league}</td><td class=\"dim\">${match}</td><td>${pick}</td>
+        <td>${fmt(p.model_probability,3)}</td><td>${fmt(p.market_implied_probability,3)}</td>
+        <td class=\"${edgeCls}\">${p.edge!=null?(p.edge>=0?"+":"")+fmt(p.edge,3):"—"}</td>
+        <td>${fmt(p.units,1)}</td><td><span class=\"pill ${p.record_type===\"QUALIFIED_SHADOW_CALL\"?\"win\":\"open\"}\">${p.record_type===\"QUALIFIED_SHADOW_CALL\"?\"qualified\":\"research\"}</span></td>
+      </tr>`;});
+    html+=`</table>`;
+    $("#folioOpen").innerHTML=html;
+  }
+  // --- recent history ---
+  const h=b.recent_history;
+  const hr=h.hit_rate!=null?`${fmt(h.hit_rate*100,1)}%`:"—";
+  $("#folioHistKpis").innerHTML=`
+    <div class="k"><b>${h.count}</b><span>settled (7d)</span></div>
+    <div class="k"><b>${h.wins}-${h.losses}${h.pushes?`-${h.pushes}`:""}</b><span>W-L${h.pushes?"-P":""}</span></div>
+    <div class="k"><b>${hr}</b><span>hit rate</span></div>
+    <div class="k"><b class=\"${h.total_pnl>=0?\"green\":\"red\"}\">${h.total_pnl>=0?\"+\":\"\"}${fmt(h.total_pnl,2)}</b><span>P&amp;L units</span></div>`;
+  if(!h.count){$("#folioHistory").innerHTML=`<p class="dim">No settled picks in the last 7 days.</p>`;}
+  else {
+    let html=`<table class="data"><tr>
+      <th>League</th><th>Matchup</th><th>Pick</th><th>Result</th><th>Score</th><th>Model</th><th>P&amp;L</th></tr>`;
+    h.history.forEach(p=>{
+      const match=`${p.away_team} @ ${p.home_team}`;
+      const pick=marker(p);
+      const resCls=p.result==="win"?"win":p.result==="loss"?"loss":"push";
+      html+=`<tr>
+        <td>${p.league}</td><td class=\"dim\">${match}</td><td>${pick}</td>
+        <td><span class=\"pill ${resCls}\">${p.result}</span></td>
+        <td class=\"dim\">${p.away_score||"—"}-${p.home_score||"—"}</td>
+        <td>${fmt(p.model_probability,3)}</td>
+        <td class=\"${p.pnl_units>=0?\"green\":\"red\"}\">${p.pnl_units>=0?\"+\":\"\"}${fmt(p.pnl_units,2)}</td>
+      </tr>`;});
+    html+=`</table>`;
+    $("#folioHistory").innerHTML=html;
+  }
+}
+function marker(p){
+  const sel=String(p.selection||"").toLowerCase();
+  const t=sel==="home"?p.home_team:sel==="away"?p.away_team:null;
+  if(p.market_type==="moneyline")return t?`${t} ML`:sel.toUpperCase();
+  if(p.market_type==="spread"){const l=Number(p.line);return t?`${t} ${isNaN(l)?"":(l>0?"+"+l:l)}`:sel;}
+  return `${sel.toUpperCase()} ${p.line??""}`;
+}
 function gotoTab(name){const b=$$("#tabs button").find(x=>x.dataset.tab===name);if(b)b.click();}
 
 /* ---------- market ---------- */
@@ -726,7 +802,7 @@ function resetTimer(){
 async function refreshAll(){
   try{
     const [s,m,p,perf]=await Promise.all([api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance")]);
-    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); populateFilters(); renderPicks(); renderLive(); renderResearch();
+    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); populateFilters(); renderPicks(); renderLive(); renderFolio(); renderResearch();
   }catch(e){
     $("#updatedTxt").innerHTML='<span class="red">Updated: SERVER UNREACHABLE — is dashboard_server.py running?</span>';
   }

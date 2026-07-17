@@ -757,6 +757,15 @@ class Handler(BaseHTTPRequestHandler):
                 sport = query.get("sport")
                 self._send(_cached(f"odds:{sport or 'all'}", 30,
                                    lambda: odds_summary(sport if sport else None)))
+            elif route == "/api/open":
+                self._send(_cached("open", 15, open_picks))
+            elif route == "/api/history":
+                days = int(query.get("days", "30"))
+                sport = query.get("sport")
+                self._send(_cached(f"history:{days}:{sport or 'all'}", 30,
+                                   lambda: history_picks(days, sport)))
+            elif route == "/api/bets":
+                self._send(_cached("bets", 15, bets_view))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(timezone.utc).isoformat()[:19]})
             else:
@@ -809,6 +818,109 @@ def today_picks(day: str) -> dict:
         "count": len(rows),
         "open": sum(1 for r in rows if r.get("status") == "open"),
         "settled": sum(1 for r in rows if r.get("status") == "settled"),
+    }
+
+
+def open_picks() -> dict:
+    """All open ledger picks with model probability, market odds, and edge."""
+    rows = []
+    for row in read_picks():
+        if row.get("status") != "open":
+            continue
+        model_p = _number(row.get("model_probability"))
+        market_p = _number(row.get("market_implied_probability"))
+        edge = model_p - market_p if model_p and market_p else None
+        rows.append({
+            "pick_id": str(row.get("pick_id", "")),
+            "league": str(row.get("league", "")),
+            "away_team": str(row.get("away_team", "")),
+            "home_team": str(row.get("home_team", "")),
+            "selection": str(row.get("selection", "")),
+            "market_type": str(row.get("market_type", "")),
+            "event_start_utc": str(row.get("event_start_utc", "")),
+            "model_probability": round(model_p, 4) if model_p else None,
+            "market_implied_probability": round(market_p, 4) if market_p else None,
+            "edge": round(edge, 4) if edge is not None else None,
+            "american_odds": row.get("american_odds"),
+            "units": _number(row.get("units")),
+            "record_type": str(row.get("record_type", "")),
+            "model_version": str(row.get("model_version", "")),
+            "reason_code": str(row.get("reason_code", "")),
+        })
+    # Sort: earliest game first
+    rows.sort(key=lambda r: r["event_start_utc"])
+    qualified = [r for r in rows if r["record_type"] == "QUALIFIED_SHADOW_CALL"]
+    research = [r for r in rows if r["record_type"] == "RESEARCH_OBSERVATION"]
+    return {
+        "open": rows,
+        "count": len(rows),
+        "qualified_count": len(qualified),
+        "research_count": len(research),
+        "total_units": round(sum(r["units"] for r in qualified), 2),
+    }
+
+
+def history_picks(days: int = 30, sport: str | None = None) -> dict:
+    """Settled picks within the last N days, optionally filtered by sport."""
+    cutoff = datetime.now(timezone.utc)
+    rows = []
+    for row in read_picks():
+        if row.get("status") != "settled":
+            continue
+        if sport and str(row.get("league", "")).lower() != sport.lower():
+            continue
+        settled_at = row.get("settled_at_utc")
+        if settled_at:
+            try:
+                settled_dt = datetime.fromisoformat(str(settled_at).replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if (cutoff - settled_dt).days > days:
+                continue
+        model_p = _number(row.get("model_probability"))
+        market_p = _number(row.get("market_implied_probability"))
+        rows.append({
+            "pick_id": str(row.get("pick_id", "")),
+            "league": str(row.get("league", "")),
+            "away_team": str(row.get("away_team", "")),
+            "home_team": str(row.get("home_team", "")),
+            "selection": str(row.get("selection", "")),
+            "market_type": str(row.get("market_type", "")),
+            "result": str(row.get("result", "")),
+            "away_score": row.get("away_score"),
+            "home_score": row.get("home_score"),
+            "model_probability": round(model_p, 4) if model_p else None,
+            "market_implied_probability": round(market_p, 4) if market_p else None,
+            "pnl_units": _number(row.get("pnl_units")),
+            "units": _number(row.get("units")),
+            "settled_at_utc": str(row.get("settled_at_utc", "")),
+            "event_start_utc": str(row.get("event_start_utc", "")),
+            "record_type": str(row.get("record_type", "")),
+            "american_odds": row.get("american_odds"),
+        })
+    rows.sort(key=lambda r: r["settled_at_utc"], reverse=True)
+    wins = sum(1 for r in rows if r["result"] == "win")
+    losses = sum(1 for r in rows if r["result"] == "loss")
+    pushes = sum(1 for r in rows if r["result"] == "push")
+    total_pnl = sum(r["pnl_units"] for r in rows)
+    return {
+        "history": rows,
+        "count": len(rows),
+        "wins": wins,
+        "losses": losses,
+        "pushes": pushes,
+        "hit_rate": round(wins / (wins + losses), 4) if (wins + losses) else None,
+        "total_pnl": round(total_pnl, 4),
+        "days": days,
+        "sport": sport,
+    }
+
+
+def bets_view() -> dict:
+    """Unified view: open picks first, then last 7 days settled."""
+    return {
+        "open": open_picks(),
+        "recent_history": history_picks(days=7),
     }
 
 

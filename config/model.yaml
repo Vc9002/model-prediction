@@ -1,5 +1,4 @@
-schema_version: "2"
-
+schema_version: '2'
 project:
   execution_mode: shadow
   timezone: UTC
@@ -8,12 +7,11 @@ project:
   polymarket_snapshot_path: data/polymarket_us_snapshots.jsonl
   market_odds_snapshot_path: data/market_odds_snapshots.jsonl
   entity_registry_path: data/entities/teams.json
-  ledger_schema_version: "3"
-  audit_schema_version: "1"
-  entity_map_version: "1"
+  ledger_schema_version: '3'
+  audit_schema_version: '1'
+  entity_map_version: '1'
   maximum_data_age_hours: 12
-  maximum_unreviewed_market_disagreement: 0.10
-
+  maximum_unreviewed_market_disagreement: 0.1
 team_ban_list:
   enabled: true
   teams:
@@ -22,14 +20,17 @@ team_ban_list:
     WNBA: []
     NFL: []
     TENNIS: []
-    WORLD_CUP: []
+    WORLD_CUP:
+    - canonical_team_id: world-cup-kor
+      input: South Korea
+      reason: manual_governance
+      review_after: null
   allowed_reasons:
-    - data_quality
-    - injury_uncertainty
-    - model_miss_history
-    - market_efficiency
-    - manual_governance
-
+  - data_quality
+  - injury_uncertainty
+  - model_miss_history
+  - market_efficiency
+  - manual_governance
 bankroll:
   reference_units: 5
   kelly_fraction: 0.5
@@ -41,18 +42,16 @@ bankroll:
   max_event_units: 2.0
   max_team_daily_units: 3.0
   unit_increment: 0.25
-
 research_scoring:
   auto_score_on_settlement: true
   default_units: 1.0
   note: fixed one-unit hypothetical scoring; no real exposure or execution
-
 data_sources:
   market:
     primary: polymarket_us
     polymarket_us:
       base_url: https://gateway.polymarket.us
-      pricing: executable_ask  # never midpoint
+      pricing: executable_ask
     kalshi:
       status: deferred
       reason: requires US residency (CFTC-regulated)
@@ -63,30 +62,27 @@ data_sources:
   sport_data:
     provider: espn_public
     mlb_deep: mlb_statsapi
-    soccer_enrichment: football_data  # requires FOOTBALL_DATA_TOKEN
+    soccer_enrichment: football_data
     tennis_historical: sackmann_csv
     optional_upgrade: sportsdataio
-
 execution:
   status: hard_gated
   requirements:
-    - explicit user execute command in the current turn
-    - --execute CLI flag
-    - POLYMARKET_PRIVATE_KEY environment variable
-    - interactive Y/N confirmation of exact order details
-    - QUALIFIED_SHADOW_CALL picks only
-    - unit engine caps still apply
-    - audit chain entry for every order
-
+  - explicit user execute command in the current turn
+  - --execute CLI flag
+  - POLYMARKET_PRIVATE_KEY environment variable
+  - interactive Y/N confirmation of exact order details
+  - QUALIFIED_SHADOW_CALL picks only
+  - unit engine caps still apply
+  - audit chain entry for every order
 model_iteration_policy:
   status: continuous
   parameter_freezes_allowed: false
   require_versioned_change: true
   require_walk_forward_ablation: true
   require_locked_holdout_before_promotion: true
-
 selection_gate:
-  target_called_hit_rate: 0.60
+  target_called_hit_rate: 0.6
   minimum_locked_holdout_calls: 50
   qualification_metric: locked_holdout_hit_rate
   require_positive_executable_price_ev: false
@@ -95,13 +91,15 @@ selection_gate:
   calibration_role: secondary_reporting
   polymarket_costs_required_for_qualification: false
   missing_artifact_action: no_call
-
 models:
   shared_features:
     trend_analysis:
       enabled: true
       method: exponentially_weighted_opponent_adjusted
-      half_lives_games: [3, 10, 25]
+      half_lives_games:
+      - 3
+      - 10
+      - 25
       prior_strength_games: 12
       require_ablation_gain: true
   MLB:
@@ -125,34 +123,54 @@ models:
         status: active_research
         diagnosis: absolute_run_environment_miss
         experiments_in_order:
-          - totals_specific_market_residual
-          - branched_absolute_run_intensity_head
+        - totals_specific_market_residual
+        - branched_absolute_run_intensity_head
         preserve_paired_score_coherence: true
         locked_chronological_test_required: true
         compare_against:
-          - measured-edge-v1
-          - no_vig_market_probability
+        - measured-edge-v1
+        - no_vig_market_probability
   NBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
     active_production_version: nba-elo-trend-lr-v3
     production_artifact: config/models/nba-elo-trend-lr-v3.json
-    protected_versions: [nba-elo-trend-v1, nba-elo-trend-lr-v1, nba-elo-trend-lr-v3]
+    protected_versions:
+    - nba-elo-trend-v1
+    - nba-elo-trend-lr-v1
+    - nba-elo-trend-lr-v3
   WNBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
     active_production_version: wnba-elo-trend-lr-v3
     production_artifact: config/models/wnba-elo-trend-lr-v3.json
-    protected_versions: [wnba-elo-trend-v1, wnba-elo-trend-lr-v1, wnba-elo-trend-lr-v3]
+    protected_versions:
+    - wnba-elo-trend-v1
+    - wnba-elo-trend-lr-v1
+    - wnba-elo-trend-lr-v3
   SOCCER:
     family: poisson_dixon_coles
     status: research
     origin: statistical_model
     active_research_version: soccer-poisson-dc-v1
-    leagues: [EPL, LA_LIGA, BUNDESLIGA, SERIE_A, LIGUE_1, EREDIVISIE, PRIMEIRA_LIGA, CHAMPIONSHIP, MLS, UCL, WORLD_CUP]
-    markets: [moneyline_3way, total_2_5, btts]
+    leagues:
+    - EPL
+    - LA_LIGA
+    - BUNDESLIGA
+    - SERIE_A
+    - LIGUE_1
+    - EREDIVISIE
+    - PRIMEIRA_LIGA
+    - CHAMPIONSHIP
+    - MLS
+    - UCL
+    - WORLD_CUP
+    markets:
+    - moneyline_3way
+    - total_2_5
+    - btts
   NFL:
     family: elo_trend_normal_approximation
     status: shadow_qualified
@@ -177,18 +195,20 @@ models:
     primary:
       locked_holdout_required: true
       minimum_selective_calls: 50
-      minimum_hit_rate: 0.60
-    secondary_reporting: [brier_score, calibration]
-    optional_diagnostics: [roi, polymarket_bid_ask_costs]
-
+      minimum_hit_rate: 0.6
+    secondary_reporting:
+    - brier_score
+    - calibration
+    optional_diagnostics:
+    - roi
+    - polymarket_bid_ask_costs
 phase_0:
   enabled: true
   baseline_identifiers:
-    - BASELINE_BOOK_RAW
-    - BASELINE_BOOK_NO_VIG
-    - BASELINE_CONSENSUS_NO_VIG
+  - BASELINE_BOOK_RAW
+  - BASELINE_BOOK_NO_VIG
+  - BASELINE_CONSENSUS_NO_VIG
   qualified_calls_allowed: false
-
 calibration:
   default_method: identity
   default_version: identity-v1
