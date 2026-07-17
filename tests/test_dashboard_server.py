@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from unittest.mock import Mock
@@ -144,6 +145,137 @@ def test_matrix_labels_total_score_artifact_as_research_only(monkeypatch, tmp_pa
     assert cell["qualification"] == "BLOCKED_MISSING_LINES"
 
 
+def test_matrix_uses_newest_artifact_backed_soccer_variant(monkeypatch, tmp_path: Path) -> None:
+    output = tmp_path / "outputs"
+    output.mkdir()
+    artifact = tmp_path / "soccer-model.json"
+    artifact.write_text(
+        json.dumps(
+            {
+                "model_version": "soccer-elo-trend-lr-v1",
+                "market_models": {
+                    "moneyline": {
+                        "feature_names": ["elo_probability"],
+                        "confidence_threshold": 0.54397949,
+                    }
+                },
+                "qualification": {
+                    "qualified": True,
+                    "calls": 268,
+                    "hit_rate": 0.600746,
+                    "units_at_minus_110": 39.363636,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    stale = {
+        "production_artifacts": {"soccer": str(artifact)},
+        "sports": {
+            "soccer": {
+                "variants": {
+                    "elo_trend": {
+                        "features": ["elo_probability", "trend_gap"],
+                        "primary_65": {
+                            "learned_threshold": 0.50,
+                            "locked_holdout": {
+                                "qualified": True,
+                                "calls": 432,
+                                "hit_rate": 0.6875,
+                            },
+                        },
+                    }
+                }
+            }
+        },
+    }
+    current = {
+        "production_artifacts": {"soccer": str(artifact)},
+        "sports": {
+            "soccer": {
+                "variants": {
+                    "elo_only": {
+                        "features": ["elo_probability"],
+                        "primary_65": {
+                            "learned_threshold": 0.54397949,
+                            "locked_holdout": {
+                                "qualified": True,
+                                "calls": 268,
+                                "hit_rate": 0.600746,
+                                "units_at_minus_110": 39.363636,
+                            },
+                        },
+                    },
+                    "elo_trend": {
+                        "features": ["elo_probability", "trend_gap"],
+                        "primary_65": {
+                            "learned_threshold": 0.54135498,
+                            "locked_holdout": {
+                                "qualified": False,
+                                "calls": 272,
+                                "hit_rate": 0.599265,
+                            },
+                        },
+                    },
+                    "soccer_3way": {
+                        "features": ["elo_probability", "trend_gap"],
+                        "primary_65": {
+                            "learned_threshold": 0.60980005,
+                            "locked_holdout": {
+                                "qualified": True,
+                                "calls": 53,
+                                "hit_rate": 0.660377,
+                                "units_at_minus_110": 13.818182,
+                            },
+                        },
+                    },
+                }
+            }
+        },
+    }
+    (output / "learned-model-validation-final.json").write_text(
+        json.dumps({"sports": {}}), encoding="utf-8"
+    )
+    stale_path = output / "soccer-validation.json"
+    stale_path.write_text(json.dumps(stale), encoding="utf-8")
+    current_path = output / "soccer-all-data.json"
+    current_path.write_text(json.dumps(current), encoding="utf-8")
+    os.utime(stale_path, (1, 1))
+    os.utime(current_path, (2, 2))
+    monkeypatch.setattr(dashboard_server, "OUTPUTS", output)
+
+    result = dashboard_server.matrix()
+    cell = result["grid"]["soccer"]["moneyline"]
+
+    assert result["source"].endswith("soccer-all-data.json")
+    assert cell["variant_name"] == "elo_only"
+    assert cell["hit_rate"] == 0.600746
+    assert cell["calls"] == 268
+    assert cell["three_way"]["hit_rate"] == 0.660377
+    assert cell["three_way"]["calls"] == 53
+
+
+def test_matrix_marks_mlb_special_markets_blocked_from_readiness(monkeypatch) -> None:
+    meta = {
+        "multi_market_readiness": {
+            "first_five_spread": "BLOCKED_F5_SPREAD",
+            "first_five_total": "BLOCKED_F5_TOTAL",
+            "yrfi_nrfi": "BLOCKED_YRFI_NRFI",
+        }
+    }
+    validation = {"sports": {"mlb": meta}, "production_artifacts": {}}
+
+    monkeypatch.setattr(dashboard_server, "_newest_validation", lambda: (validation, "test"))
+    result = dashboard_server.matrix()["grid"]["mlb"]
+
+    assert result["f5_spread"] == {
+        "state": "blocked",
+        "readiness": "BLOCKED_F5_SPREAD",
+    }
+    assert result["f5_total"]["state"] == "blocked"
+    assert result["yrfi_nrfi"]["state"] == "blocked"
+
+
 def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_path: Path) -> None:
     pick = {
         "pick_id": "qualified-1",
@@ -168,7 +300,14 @@ def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_p
         "run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args=args[0], returncode=0,
-            stdout=json.dumps({"status": "submitted", "order_id": "exchange-123", "order_state": "open"}),
+            stdout=json.dumps(
+                {
+                    "status": "submitted",
+                    "order_id": "exchange-123",
+                    "order_state": "open",
+                    "exchange_price": 0.45,
+                }
+            ),
             stderr="",
         ),
     )
@@ -183,6 +322,9 @@ def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_p
     saved = json.loads((tmp_path / "orders.json").read_text(encoding="utf-8"))["orders"]
     assert saved[-1]["order_id"] == "exchange-123"
     assert saved[-1]["price"] == 0.55
+    assert saved[-1]["exchange_price"] == 0.45
+    assert saved[-1]["price_basis"] == "selected_outcome_probability"
+    assert saved[-1]["exchange_price_basis"] == "long_side_probability"
 
 
 def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: Path) -> None:
@@ -595,32 +737,28 @@ def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, 
     assert today["count"] == 1
 
 
-def test_scan_prices_targets_only_unique_open_visible_today_contracts(monkeypatch) -> None:
+def test_scan_prices_targets_all_unique_open_visible_ledger_contracts(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+    archive_path = tmp_path / "archive.json"
+    archive_path.write_text(json.dumps({"pick_ids": ["archived"]}), encoding="utf-8")
+    monkeypatch.setattr(dashboard_server, "ARCHIVE_FILE", archive_path)
     monkeypatch.setattr(
         dashboard_server,
-        "today_picks",
-        lambda day: {
-            "picks": [
-                {
-                    "league": "WNBA",
-                    "status": "open",
-                    "quote": {"market_slug": "wnba-game-1"},
-                },
-                {
-                    "league": "WNBA",
-                    "status": "open",
-                    "quote": {"market_slug": "wnba-game-1"},
-                },
-                {
-                    "league": "MLB",
-                    "status": "settled",
-                    "quote": {"market_slug": "mlb-finished"},
-                },
-                {"league": "NFL", "status": "open", "quote": None},
-            ]
-        },
+        "read_picks",
+        lambda: [
+            {"pick_id": "today", "event_id": "game-1", "league": "WNBA", "status": "open", "event_start_utc": "2026-07-17T23:30:00Z"},
+            {"pick_id": "tomorrow", "event_id": "game-2", "league": "MLB", "status": "open", "event_start_utc": "2026-07-18T20:10:00Z"},
+            {"pick_id": "settled", "event_id": "game-3", "league": "MLB", "status": "settled", "event_start_utc": "2026-07-17T20:10:00Z"},
+            {"pick_id": "archived", "event_id": "game-4", "league": "NFL", "status": "open", "event_start_utc": "2026-07-18T20:10:00Z"},
+        ],
     )
+    quotes = {
+        "today": {"market_slug": "wnba-game-1"},
+        "tomorrow": {"market_slug": "mlb-game-2"},
+        "settled": {"market_slug": "mlb-finished"},
+        "archived": {"market_slug": "nfl-hidden"},
+    }
+    monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quotes[row["pick_id"]])
 
     command = dashboard_server._action_command(
         "refresh_prices", {"date": "2026-07-17"}
@@ -632,7 +770,9 @@ def test_scan_prices_targets_only_unique_open_visible_today_contracts(monkeypatc
         "--date",
         "2026-07-17",
         "--contract",
-        "wnba=wnba-game-1",
+        "wnba@2026-07-17=wnba-game-1",
+        "--contract",
+        "mlb@2026-07-18=mlb-game-2",
     ]
     assert "--all" not in command
 

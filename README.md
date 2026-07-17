@@ -42,7 +42,7 @@ Steps: Polymarket slate → soccer score collection → forecast + log → settl
 dash
 
 # Run today's pipeline
-model-prediction daily --date $(date +%Y-%m-%d)
+model-prediction daily --date $(TZ=America/New_York date +%Y-%m-%d)
 
 # Collect soccer scores from Odds API
 model-prediction collect-scores

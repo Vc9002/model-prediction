@@ -141,15 +141,15 @@ def parser() -> argparse.ArgumentParser:
 
     ledger_prices = commands.add_parser(
         "polymarket-ledger-prices",
-        help="refresh BBOs only for exact contracts selected from today's visible ledger",
+        help="refresh BBOs only for exact contracts selected from the open ledger",
     )
     ledger_prices.add_argument("--date", required=True)
     ledger_prices.add_argument(
         "--contract",
         action="append",
         default=[],
-        metavar="SPORT=MARKET_SLUG",
-        help="repeat for each unique ledger contract",
+        metavar="SPORT[@GAME_DATE]=MARKET_SLUG",
+        help="repeat for each unique open ledger contract; GAME_DATE is Eastern time",
     )
 
     clv = commands.add_parser("polymarket-clv", help="probability CLV from the final stored pregame snapshot")
@@ -923,12 +923,21 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "polymarket-ledger-prices":
             contracts = []
             for value in args.contract:
-                sport, separator, slug = value.partition("=")
+                sport_day, separator, slug = value.partition("=")
+                sport, day_separator, contract_day = sport_day.partition("@")
                 if not separator or not sport or not slug:
-                    raise ValueError("contract must use SPORT=MARKET_SLUG")
+                    raise ValueError("contract must use SPORT[@GAME_DATE]=MARKET_SLUG")
                 if sport not in SPORTS:
                     raise ValueError(f"unsupported contract sport: {sport}")
-                contracts.append({"sport": sport, "market_slug": slug})
+                if day_separator:
+                    date.fromisoformat(contract_day)
+                contracts.append(
+                    {
+                        "sport": sport,
+                        "market_slug": slug,
+                        "game_date": contract_day if day_separator else args.date,
+                    }
+                )
             output = refresh_contract_snapshots(
                 PolymarketUSClient(), contracts, data_root, args.date
             )

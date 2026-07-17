@@ -216,7 +216,9 @@ def test_ledger_price_refresh_deduplicates_and_never_discovers_a_broad_slate(tmp
             self.slugs.append(slug)
             return {
                 "market_slug": slug,
-                "event_start_utc": "2026-07-18T23:00:00Z",
+                "event_start_utc": (
+                    "2026-07-19T23:00:00Z" if slug == "mlb-next-day" else "2026-07-18T23:00:00Z"
+                ),
                 "observed_at_utc": "2026-07-17T12:05:00Z",
                 "long": {"ask": 0.55},
                 "short": {"ask": 0.47},
@@ -236,26 +238,45 @@ def test_ledger_price_refresh_deduplicates_and_never_discovers_a_broad_slate(tmp
             "short": {"ask": 0.48},
         }
     )
+    next_day_store = PolymarketSnapshotStore.for_sport_date(
+        tmp_path, "mlb", "2026-07-19"
+    )
+    next_day_store.append(
+        {
+            "market_slug": "mlb-next-day",
+            "event_start_utc": "2026-07-19T23:00:00Z",
+            "observed_at_utc": "2026-07-17T12:00:00Z",
+            "league": "MLB",
+            "event_id": "event-2",
+            "market_type": "moneyline",
+            "line": None,
+            "long": {"ask": 0.57},
+            "short": {"ask": 0.45},
+        }
+    )
     client = FakeClient()
 
     result = refresh_contract_snapshots(
         client,
         [
-            {"sport": "wnba", "market_slug": "wnba-away-home"},
-            {"sport": "wnba", "market_slug": "wnba-away-home"},
+            {"sport": "wnba", "game_date": "2026-07-18", "market_slug": "wnba-away-home"},
+            {"sport": "wnba", "game_date": "2026-07-18", "market_slug": "wnba-away-home"},
+            {"sport": "mlb", "game_date": "2026-07-19", "market_slug": "mlb-next-day"},
         ],
         tmp_path,
         "2026-07-18",
     )
 
-    assert client.slugs == ["wnba-away-home"]
-    assert result["requested_contracts"] == 2
-    assert result["unique_contracts"] == 1
-    assert result["refreshed"] == 1
+    assert client.slugs == ["mlb-next-day", "wnba-away-home"]
+    assert result["requested_contracts"] == 3
+    assert result["unique_contracts"] == 2
+    assert result["refreshed"] == 2
     assert result["broad_discovery_attempted"] is False
+    assert result["scope"] == "all_open_visible_ledger_contracts_only"
     latest = store.latest("wnba-away-home")
     assert latest["market_type"] == "moneyline"
     assert latest["event_id"] == "event-1"
+    assert next_day_store.latest("mlb-next-day")["event_id"] == "event-2"
 
 
 def test_ledger_price_refresh_skips_unmapped_contract_without_network_call(tmp_path) -> None:

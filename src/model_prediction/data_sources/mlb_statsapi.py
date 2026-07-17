@@ -266,6 +266,13 @@ def compact_game_snapshot(payload: dict[str, Any], *, snapshot_type: str) -> dic
             "runs": _integer(linescore.get("teams", {}).get(side, {}).get("runs")),
         }
 
+    # First-inning YRFI from linescore innings
+    innings = linescore.get("innings", [])
+    first_inning = innings[0] if innings else {}
+    first_inning_runs_away = _integer(first_inning.get("away", {}).get("runs", 0))
+    first_inning_runs_home = _integer(first_inning.get("home", {}).get("runs", 0))
+    yrfi = 1 if (first_inning_runs_away or 0) + (first_inning_runs_home or 0) > 0 else 0
+
     weather = game_data.get("weather", {})
     officials = [
         {
@@ -294,6 +301,9 @@ def compact_game_snapshot(payload: dict[str, Any], *, snapshot_type: str) -> dic
         "officials": officials,
         "away": sides["away"],
         "home": sides["home"],
+        "first_inning_runs_away": first_inning_runs_away or 0,
+        "first_inning_runs_home": first_inning_runs_home or 0,
+        "yrfi": yrfi,
     }
 
 

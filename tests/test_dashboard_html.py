@@ -44,6 +44,13 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert '"Market price"' in html
     assert '"Odds"' not in html
     assert "shortDate" in html
+    assert '"Game (ET)"' in html
+    assert "gameTimeET(p.event_start_utc)" in html
+    assert 'timeZone:ET_ZONE' in html
+    assert "Scan Open Ledger Prices" in html
+    assert "Scan Today’s Prices" not in html
+    assert "Validated model variants" in html
+    assert "Results remain separate because binary and 1X2 calls" in html
     assert "order-wrap" in html
     assert "Live Portfolio — Exchange Positions" in html
     assert "Model Picks Ledger" in html

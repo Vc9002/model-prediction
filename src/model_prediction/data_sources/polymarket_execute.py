@@ -16,9 +16,12 @@ convention:
    authorization already checked against active-model, edge, ban, and unit caps.
 7. Every submitted order is written to the append-only audit chain.
 
-Orders use the exact user-confirmed price. Resting GTC limits are post-only;
-marketable IOC limits may take liquidity up to that price and cancel any
-unfilled remainder. The midpoint is never silently substituted.
+Orders use the exact user-confirmed outcome price. The Polymarket US API's
+``price.value`` is always expressed in the long/YES coordinate, so a confirmed
+short/NO price of X is submitted as 1-X without changing the user's economic
+limit. Resting GTC limits are post-only; marketable IOC limits may take
+liquidity up to that price and cancel any unfilled remainder. The midpoint is
+never silently substituted.
 
 Submission uses the authenticated Polymarket US retail REST API. It does not
 use the international Polymarket CLOB or a wallet private key.
@@ -161,6 +164,9 @@ class PolymarketExecutor:
                 "action": ticket.action,
                 "order_type": ticket.order_type,
                 "price": ticket.price,
+                "price_basis": "selected_outcome_probability",
+                "exchange_price": submission.get("exchange_price"),
+                "exchange_price_basis": "long_side_probability",
                 "size_shares": ticket.size_shares,
                 "estimated_cost_usd": ticket.estimated_cost_usd,
                 "maximum_cost_usd": ticket.maximum_cost_usd,
@@ -224,7 +230,12 @@ class PolymarketExecutor:
         return output
 
     def _submit(self, ticket: OrderTicket) -> dict[str, Any]:
-        """Submit a capped resting or immediately marketable limit order."""
+        """Submit a capped resting or immediately marketable limit order.
+
+        Polymarket US always expects ``price.value`` in the market's long/YES
+        coordinate, even for a short/NO intent. ``OrderTicket.price`` remains
+        the exact user-confirmed price of the selected outcome.
+        """
         intent = {
             ("buy", "long"): "ORDER_INTENT_BUY_LONG",
             ("buy", "short"): "ORDER_INTENT_BUY_SHORT",
@@ -233,6 +244,9 @@ class PolymarketExecutor:
         }.get((ticket.action, ticket.token_side))
         if intent is None:
             raise ExecutionGateError("REFUSED: unsupported order action/side.")
+        exchange_price = (
+            ticket.price if ticket.token_side == "long" else 1.0 - ticket.price
+        )
         marketable = ticket.order_type == "limit_ioc"
         response = self._request(
             "POST",
@@ -241,7 +255,7 @@ class PolymarketExecutor:
                 "marketSlug": ticket.market_slug,
                 "intent": intent,
                 "type": "ORDER_TYPE_LIMIT",
-                "price": {"value": f"{ticket.price:.2f}", "currency": "USD"},
+                "price": {"value": f"{exchange_price:.2f}", "currency": "USD"},
                 "quantity": ticket.size_shares,
                 "tif": (
                     "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL"
@@ -261,6 +275,7 @@ class PolymarketExecutor:
         return {
             "order_id": str(order_id),
             "order_state": response.get("state") or (response.get("order") or {}).get("state"),
+            "exchange_price": round(exchange_price, 2),
             "raw_response": response,
         }
 

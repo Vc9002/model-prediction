@@ -389,18 +389,23 @@ def refresh_contract_snapshots(
     keeps the refresh path bounded and prevents it from querying a whole sport
     merely to rediscover contracts already attached to ledger picks.
     """
-    unique: dict[tuple[str, str], dict[str, str]] = {}
+    unique: dict[tuple[str, str, str], dict[str, str]] = {}
     for contract in contracts:
         sport = str(contract.get("sport") or "").strip().lower()
         slug = str(contract.get("market_slug") or "").strip()
-        if sport and slug:
-            unique[(sport, slug)] = {"sport": sport, "market_slug": slug}
+        contract_day = str(contract.get("game_date") or game_date).strip()
+        if sport and slug and contract_day:
+            unique[(sport, contract_day, slug)] = {
+                "sport": sport,
+                "game_date": contract_day,
+                "market_slug": slug,
+            }
 
     refreshed = missing_bbo = failures = 0
     failure_details: list[dict[str, str]] = []
     refreshed_contracts: list[dict[str, str]] = []
-    for (sport, slug), contract in sorted(unique.items()):
-        store = PolymarketSnapshotStore.for_sport_date(data_root, sport, game_date)
+    for (sport, contract_day, slug), contract in sorted(unique.items()):
+        store = PolymarketSnapshotStore.for_sport_date(data_root, sport, contract_day)
         previous = store.latest(slug)
         if previous is None:
             failures += 1
@@ -446,9 +451,9 @@ def refresh_contract_snapshots(
         "failures": failures,
         "failure_details": failure_details,
         "refreshed_contracts": refreshed_contracts,
-        "scope": "today_open_visible_ledger_contracts_only",
+        "scope": "all_open_visible_ledger_contracts_only",
         "broad_discovery_attempted": False,
-        "storage": f"data/odds/<sport>/{game_date}/polymarket_snapshots.jsonl",
+        "storage": "data/odds/<sport>/<game_date>/polymarket_snapshots.jsonl",
     }
 
 

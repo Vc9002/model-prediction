@@ -1,7 +1,81 @@
 {
   "history_start_date": "2026-07-17",
-  "last_synced_at_utc": "2026-07-17T16:18:50.523467Z",
+  "last_synced_at_utc": "2026-07-17T22:55:14.749253Z",
   "activities": [
+    {
+      "activity_id": "trade:BAC90DXKM6AH",
+      "type": "trade",
+      "market_slug": "tsc-mlb-sd-kc-2026-07-17-9pt5",
+      "title": "tsc-mlb-sd-kc-2026-07-17-9pt5",
+      "occurred_at_utc": "2026-07-17T22:39:57.467694290Z",
+      "price": 0.54,
+      "quantity": 17.0,
+      "cost_basis_usd": null,
+      "realized_pnl_usd": null,
+      "state": "TRADE_STATE_NEW",
+      "is_aggressor": true,
+      "model_pick": null
+    },
+    {
+      "activity_id": "trade:BA9PREFQE6AH",
+      "type": "trade",
+      "market_slug": "aec-wnba-conn-phx-2026-07-17",
+      "title": "aec-wnba-conn-phx-2026-07-17",
+      "occurred_at_utc": "2026-07-17T19:40:07.476384208Z",
+      "price": 0.37,
+      "quantity": 23.8,
+      "cost_basis_usd": null,
+      "realized_pnl_usd": null,
+      "state": "TRADE_STATE_NEW",
+      "is_aggressor": false,
+      "model_pick": {
+        "pick_id": "3405fe6d522c42ec",
+        "league": "WNBA",
+        "away_team": "Connecticut Sun",
+        "home_team": "Phoenix Mercury",
+        "selection": "home",
+        "market_type": "moneyline",
+        "model_probability": 0.672243,
+        "model_version": "wnba-elo-trend-lr-v3"
+      }
+    },
+    {
+      "activity_id": "trade:BA8X6RJ9E6AH",
+      "type": "trade",
+      "market_slug": "tsc-mlb-min-chc-2026-07-17-10pt5",
+      "title": "tsc-mlb-min-chc-2026-07-17-10pt5",
+      "occurred_at_utc": "2026-07-17T18:44:09.810615041Z",
+      "price": 0.54,
+      "quantity": 18.0,
+      "cost_basis_usd": null,
+      "realized_pnl_usd": null,
+      "state": "TRADE_STATE_NEW",
+      "is_aggressor": false,
+      "model_pick": null
+    },
+    {
+      "activity_id": "trade:BA7J0V3FR6AH",
+      "type": "trade",
+      "market_slug": "aec-wnba-la-chi-2026-07-17",
+      "title": "aec-wnba-la-chi-2026-07-17",
+      "occurred_at_utc": "2026-07-17T17:09:57.438668124Z",
+      "price": 0.47,
+      "quantity": 19.94,
+      "cost_basis_usd": null,
+      "realized_pnl_usd": null,
+      "state": "TRADE_STATE_NEW",
+      "is_aggressor": false,
+      "model_pick": {
+        "pick_id": "f592ac231a074ea9",
+        "league": "WNBA",
+        "away_team": "Los Angeles Sparks",
+        "home_team": "Chicago Sky",
+        "selection": "away",
+        "market_type": "moneyline",
+        "model_probability": 0.580113,
+        "model_version": "wnba-elo-trend-lr-v3"
+      }
+    },
     {
       "activity_id": "trade:BA29PX8G86AH",
       "type": "trade",

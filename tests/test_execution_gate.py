@@ -135,6 +135,64 @@ def test_confirmed_order_records_real_exchange_id(tmp_path, monkeypatch) -> None
     assert result["order_state"] == "ORDER_STATE_NEW"
 
 
+@pytest.mark.parametrize(
+    ("token_side", "confirmed_price", "expected_exchange_price", "expected_intent"),
+    [
+        ("long", 0.47, "0.47", "ORDER_INTENT_BUY_LONG"),
+        ("short", 0.63, "0.37", "ORDER_INTENT_BUY_SHORT"),
+        ("short", 0.56, "0.44", "ORDER_INTENT_BUY_SHORT"),
+    ],
+)
+def test_submit_converts_selected_outcome_price_to_exchange_long_coordinate(
+    tmp_path,
+    monkeypatch,
+    token_side,
+    confirmed_price,
+    expected_exchange_price,
+    expected_intent,
+) -> None:
+    audit_path = tmp_path / "events.jsonl"
+    client = PolymarketExecutor(
+        AuditLog(audit_path),
+        confirm=lambda prompt: "y",
+        environ=US_CREDS,
+    )
+    payloads = []
+
+    def fake_request(method, path, payload):
+        payloads.append(payload)
+        return {"id": "coordinate-order-123", "state": "ORDER_STATE_NEW"}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    selected_ticket = OrderTicket(
+        **{
+            **ticket().__dict__,
+            "token_side": token_side,
+            "price": confirmed_price,
+            "estimated_cost_usd": confirmed_price * ticket().size_shares,
+        }
+    )
+
+    result = client.execute(
+        selected_ticket,
+        qualified_row(),
+        execute_flag=True,
+        user_command=True,
+    )
+
+    assert payloads[-1]["intent"] == expected_intent
+    assert payloads[-1]["price"] == {
+        "value": expected_exchange_price,
+        "currency": "USD",
+    }
+    assert result["exchange_price"] == float(expected_exchange_price)
+    event = AuditLog(audit_path).events()[-1]
+    assert event["payload"]["price"] == confirmed_price
+    assert event["payload"]["price_basis"] == "selected_outcome_probability"
+    assert event["payload"]["exchange_price"] == float(expected_exchange_price)
+    assert event["payload"]["exchange_price_basis"] == "long_side_probability"
+
+
 def test_marketable_limit_uses_ioc_and_can_take_liquidity(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, answer="y", env=US_CREDS)
     payloads = []

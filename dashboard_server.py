@@ -450,7 +450,7 @@ MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
 
 
 def _newest_validation() -> tuple[dict, str]:
-    """Newest learned-model-validation*.json merged with soccer-validation.json."""
+    """Newest core validation merged with the newest artifact-backed soccer report."""
     candidates = sorted(
         OUTPUTS.glob("learned-model-validation*.json"),
         key=lambda path: path.stat().st_mtime,
@@ -462,25 +462,82 @@ def _newest_validation() -> tuple[dict, str]:
         merged["sports"].update(newest.get("sports") or {})
         merged["production_artifacts"].update(newest.get("production_artifacts") or {})
         sources.append(candidates[-1].name)
-    soccer = _read_json(OUTPUTS / "soccer-validation.json") or {}
-    if soccer.get("sports"):
+
+    soccer_candidates: list[tuple[float, Path, dict]] = []
+    for path in OUTPUTS.glob("soccer-*.json"):
+        payload = _read_json(path) or {}
+        if (payload.get("sports") or {}).get("soccer") and (
+            payload.get("production_artifacts") or {}
+        ).get("soccer"):
+            soccer_candidates.append((path.stat().st_mtime, path, payload))
+    if soccer_candidates:
+        _, path, soccer = max(soccer_candidates, key=lambda item: item[0])
         merged["sports"].update(soccer["sports"])
         merged["production_artifacts"].update(soccer.get("production_artifacts") or {})
-        sources.append("soccer-validation.json")
+        sources.append(path.name)
     return merged, " + ".join(sources)
 
 
-def _ml_cell(sport_meta: dict) -> dict:
-    """Moneyline cell from the production variant's primary_65 locked holdout."""
+def _production_artifact(validation: dict, sport: str) -> dict:
+    raw_path = str((validation.get("production_artifacts") or {}).get(sport) or "")
+    if not raw_path:
+        return {}
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = ROOT / path
+    return _read_json(path) or {}
+
+
+def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
+    """Moneyline cell pinned to the active artifact's exact validated variant."""
     variants = sport_meta.get("variants") or {}
-    variant = variants.get("elo_trend") or next(
-        (v for v in variants.values() if isinstance(v, dict) and v.get("primary_65")), None
-    )
+    artifact = artifact or {}
+    market_model = (artifact.get("market_models") or {}).get("moneyline") or {}
+    artifact_features = tuple(market_model.get("feature_names") or ())
+    artifact_qualification = artifact.get("qualification") or {}
+    variant_name = None
+    variant = None
+    for name, candidate in variants.items():
+        if not isinstance(candidate, dict) or tuple(candidate.get("features") or ()) != artifact_features:
+            continue
+        holdout = ((candidate.get("primary_65") or {}).get("locked_holdout") or {})
+        calls_match = artifact_qualification.get("calls") in (None, holdout.get("calls"))
+        artifact_rate = artifact_qualification.get("hit_rate")
+        holdout_rate = holdout.get("hit_rate")
+        rate_match = artifact_rate is None or (
+            holdout_rate is not None and abs(float(artifact_rate) - float(holdout_rate)) < 1e-9
+        )
+        if calls_match and rate_match:
+            variant_name, variant = name, candidate
+            break
+
+    if variant is None and not artifact:
+        for name in ("elo_trend", "elo_only"):
+            candidate = variants.get(name) or {}
+            if ((candidate.get("primary_65") or {}).get("locked_holdout") or {}).get("qualified"):
+                variant_name, variant = name, candidate
+                break
+        if variant is None:
+            match = next(
+                (
+                    (name, candidate)
+                    for name, candidate in variants.items()
+                    if isinstance(candidate, dict) and candidate.get("primary_65")
+                ),
+                (None, None),
+            )
+            variant_name, variant = match
+
     primary = (variant or {}).get("primary_65") or {}
     holdout = primary.get("locked_holdout") or {}
+    if not holdout and artifact_qualification:
+        holdout = artifact_qualification
+        primary = {"learned_threshold": market_model.get("confidence_threshold")}
+        variant_name = "artifact_pinned"
     if not holdout:
         return {"state": "no_data"}
-    return {
+
+    cell = {
         "state": "qualified" if holdout.get("qualified") else "tested_not_qualified",
         "hit_rate": holdout.get("hit_rate"),
         "calls": holdout.get("calls"),
@@ -488,7 +545,24 @@ def _ml_cell(sport_meta: dict) -> dict:
         "brier": holdout.get("brier_score"),
         "threshold": primary.get("learned_threshold"),
         "roi": holdout.get("roi"),
+        "variant": list(artifact_features or tuple((variant or {}).get("features") or ())),
+        "variant_name": variant_name,
+        "model_version": artifact.get("model_version"),
     }
+
+    # Soccer: also show 3-way variant if available
+    three = variants.get("soccer_3way")
+    if three and isinstance(three, dict):
+        tp = three.get("primary_65", {})
+        th = tp.get("locked_holdout", {})
+        if th.get("qualified"):
+            cell["three_way"] = {
+                "hit_rate": th.get("hit_rate"),
+                "calls": th.get("calls"),
+                "units": th.get("units_at_minus_110"),
+            }
+
+    return cell
 
 
 def matrix() -> dict:
@@ -501,7 +575,7 @@ def matrix() -> dict:
     for sport in MATRIX_SPORTS:
         row = {}
         meta = sports_meta.get(sport) or {}
-        row["moneyline"] = _ml_cell(meta)
+        row["moneyline"] = _ml_cell(meta, _production_artifact(validation, sport))
         readiness = meta.get("multi_market_readiness") or {}
         spread_key = "full_game_spread" if sport == "mlb" else "spread"
         total_key = "full_game_total" if sport == "mlb" else "total"
@@ -541,8 +615,20 @@ def matrix() -> dict:
                 "state": "blocked" if total_readiness else "no_data",
                 "readiness": total_readiness,
             }
-        for market in ("f5_spread", "f5_total", "yrfi_nrfi"):
-            row[market] = {"state": "no_data" if sport == "mlb" else "not_applicable"}
+        mlb_special_readiness = {
+            "f5_spread": readiness.get("first_five_spread"),
+            "f5_total": readiness.get("first_five_total"),
+            "yrfi_nrfi": readiness.get("yrfi_nrfi"),
+        }
+        for market, market_readiness in mlb_special_readiness.items():
+            row[market] = (
+                {
+                    "state": "blocked" if market_readiness else "no_data",
+                    "readiness": market_readiness,
+                }
+                if sport == "mlb"
+                else {"state": "not_applicable"}
+            )
         grid[sport] = row
     gate = validation and (
         "locked holdout hit rate >= 65% target (learned threshold), >= 60% floor, >= 50 calls"
@@ -1148,6 +1234,9 @@ def submit_order(payload: dict) -> dict:
         "status": result.get("status", "refused"),
         "order_id": result.get("order_id"),
         "order_state": result.get("order_state"),
+        "exchange_price": result.get("exchange_price"),
+        "price_basis": "selected_outcome_probability",
+        "exchange_price_basis": "long_side_probability",
         "submitted_at_utc": datetime.now(timezone.utc).isoformat(),
         "error": result.get("error"),
     }
@@ -1267,9 +1356,18 @@ def submit_position_sell(payload: dict) -> dict:
     result = _decode_command_output(raw)
     if not result:
         result = {"status": "refused", "error": raw[-1000:] or "sell command failed"}
-    record = {**ticket, "nonce": None, "status": result.get("status", "refused"),
-              "order_id": result.get("order_id"), "order_state": result.get("order_state"),
-              "submitted_at_utc": datetime.now(timezone.utc).isoformat(), "error": result.get("error")}
+    record = {
+        **ticket,
+        "nonce": None,
+        "status": result.get("status", "refused"),
+        "order_id": result.get("order_id"),
+        "order_state": result.get("order_state"),
+        "exchange_price": result.get("exchange_price"),
+        "price_basis": "selected_outcome_probability",
+        "exchange_price_basis": "long_side_probability",
+        "submitted_at_utc": datetime.now(timezone.utc).isoformat(),
+        "error": result.get("error"),
+    }
     with _ORDER_LOCK:
         orders = _load_orders()
         orders["orders"].append(record)
@@ -1333,18 +1431,25 @@ def _action_command(name: str, payload: dict) -> list[str]:
     if name == "refresh_prices":
         day = str(payload.get("date") or _today())
         command = cli + ["polymarket-ledger-prices", "--date", day]
-        seen: set[tuple[str, str]] = set()
-        for row in today_picks(day)["picks"]:
-            if row.get("status") != "open":
+        seen: set[tuple[str, str, str]] = set()
+        archived = set(_load_archive()["pick_ids"])
+        for row in _dedupe_picks(read_picks()):
+            if row.get("status") != "open" or str(row.get("pick_id")) in archived:
                 continue
-            quote = row.get("quote") or {}
+            quote = _pick_quote(row) or {}
             sport = str(row.get("league") or "").strip().lower()
             slug = str(quote.get("market_slug") or "").strip()
-            target = (sport, slug)
+            try:
+                game_day = datetime.fromisoformat(
+                    str(row.get("event_start_utc") or "").replace("Z", "+00:00")
+                ).astimezone(EASTERN).date().isoformat()
+            except ValueError:
+                continue
+            target = (sport, game_day, slug)
             if sport not in SPORTS or not slug or target in seen:
                 continue
             seen.add(target)
-            command += ["--contract", f"{sport}={slug}"]
+            command += ["--contract", f"{sport}@{game_day}={slug}"]
         return command
     if name == "settle":
         return cli + ["settle", "--all-unsettled"]

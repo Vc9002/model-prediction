@@ -28,3 +28,20 @@
 2026-07-17T16:05:23 job finished: refresh_prices-1784304317 :: ok in 5.3s
 2026-07-17T16:10:46 job started: refresh_prices-1784304646 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
 2026-07-17T16:10:51 job finished: refresh_prices-1784304646 :: ok in 5.1s
+2026-07-17T16:24:52 job started: refresh_prices-1784305492 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
+2026-07-17T16:24:58 job finished: refresh_prices-1784305492 :: ok in 5.3s
+2026-07-17T16:25:52 job started: daily-1784305552 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-17
+2026-07-17T16:26:35 job finished: daily-1784305552 :: ok in 43.3s
+2026-07-17T16:29:19 job started: refresh_prices-1784305759 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
+2026-07-17T16:29:24 job finished: refresh_prices-1784305759 :: ok in 5.8s
+2026-07-17T16:29:57 job started: refresh_prices-1784305797 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
+2026-07-17T16:30:03 job finished: refresh_prices-1784305797 :: ok in 5.5s
+2026-07-17T16:34:01 job started: refresh_prices-1784306041 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
+2026-07-17T16:34:07 job finished: refresh_prices-1784306041 :: ok in 5.9s
+2026-07-17T16:37:44 job started: run_tests-1784306264 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m pytest tests/ -q --no-header
+2026-07-17T16:37:52 job finished: run_tests-1784306264 :: ok in 7.7s
+2026-07-17T16:50:21 job started: refresh_prices-1784307021 :: --contract wnba@2026-07-17=aec-wnba-la-chi-2026-07-17 --contract wnba@2026-07-17=aec-wnba-conn-phx-2026-07-17 --contract mlb@2026-07-18=aec-mlb-mia-mil-2026-07-18 --contract wnba@2026-07-18=aec-wnba-ny-ind-2026-07-18
+2026-07-17T16:50:30 job finished: refresh_prices-1784307021 :: ok in 8.9s
+2026-07-17T17:12:41 job started: refresh_prices-1784308361 :: --contract wnba@2026-07-17=aec-wnba-la-chi-2026-07-17 --contract wnba@2026-07-17=aec-wnba-conn-phx-2026-07-17 --contract mlb@2026-07-18=aec-mlb-mia-mil-2026-07-18 --contract wnba@2026-07-18=aec-wnba-ny-ind-2026-07-18
+2026-07-17T17:12:48 job finished: refresh_prices-1784308361 :: ok in 7.2s
+2026-07-17T22:55:38 job started: daily-1784328938 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-17

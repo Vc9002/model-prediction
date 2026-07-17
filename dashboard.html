@@ -118,7 +118,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span style="flex:1"></span>
   <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button onclick="bootstrapDialog()">Bootstrap</button>
-  <button onclick="confirmAction('refresh_prices','Refresh prices only for unique open bets visible on today’s ledger?')">Scan Today’s Prices</button>
+  <button onclick="confirmAction('refresh_prices','Refresh executable bid/ask prices for every unique open pick in the ledger?')">Scan Open Ledger Prices</button>
   <button class="primary" onclick="confirmAction('daily','Run the full daily loop (slate → forecast+log → settle → summary) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
 </div>
 
@@ -361,7 +361,8 @@ function renderMatrix(m){
       let cls="n",l1="⬛ no data",l2="—";
       if(c.state==="qualified"){
         cls="q";l1=`✅ ${pct(c.hit_rate)}`;
-        l2=mk==="total"?`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`:
+        l2=mk==="moneyline"&&c.three_way?`${c.calls} binary · 3W ${pct(c.three_way.hit_rate)}/${c.three_way.calls}c`:
+          mk==="total"?`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`:
           (c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`);
       }else if(c.state==="tested_not_qualified"){
         cls="t";l1=`🔴 ${pct(c.hit_rate)}`;
@@ -429,6 +430,11 @@ function drill(sport,market){
     monthly[mo]=monthly[mo]||{pnl:0,w:0,c:0};
     monthly[mo].pnl+=pickPnl(p); monthly[mo].c++; monthly[mo].w+=p.result==="win";
   });
+  const variantDetails=market==="moneyline"&&cell.three_way?`<h2>Validated model variants</h2><table class="data">
+    <tr><th>Market basis</th><th>Variant</th><th>Holdout hit rate</th><th>Calls</th><th>Status</th></tr>
+    <tr><td>Binary team to win</td><td>${esc(cell.variant_name||"production")}</td><td>${pct(cell.hit_rate)}</td><td>${cell.calls??"—"}</td><td>qualified</td></tr>
+    <tr><td>Three-way 1X2</td><td>soccer_3way</td><td>${pct(cell.three_way.hit_rate)}</td><td>${cell.three_way.calls??"—"}</td><td>qualified separately</td></tr>
+  </table><div class="dim small" style="margin-top:6px">Results remain separate because binary and 1X2 calls are different prediction targets.</div>`:"";
   let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>
   <div class="kpis">
     <div class="k"><b>${pct(cell.hit_rate)}</b><span>holdout hit rate</span></div>
@@ -436,7 +442,7 @@ function drill(sport,market){
     <div class="k"><b>${fmt(cell.units,1)}</b><span>units @ -110</span></div>
     <div class="k"><b>${fmt(cell.brier,3)}</b><span>brier</span></div>
     <div class="k"><b>${fmt(cell.threshold,3)}</b><span>learned threshold</span></div>
-  </div><h2>Ledger months</h2><table class="data"><tr><th>Month</th><th>Calls</th><th>Wins</th><th>P&L</th><th></th></tr>`;
+  </div>${variantDetails}<h2>Ledger months</h2><table class="data"><tr><th>Month</th><th>Calls</th><th>Wins</th><th>P&L</th><th></th></tr>`;
   const months=Object.keys(monthly).sort();
   if(!months.length)html+=`<tr><td colspan=5 class="dim">no settled ledger rows for this cell yet</td></tr>`;
   const maxAbs=Math.max(0.1,...months.map(mo=>Math.abs(monthly[mo].pnl)));
@@ -452,6 +458,18 @@ function drill(sport,market){
 /* ---------- picks ---------- */
 const pickPnl=p=>{const u=Number(p.units)||0; if(u>0)return Number(p.pnl_units)||0;
   return p.research_score_units?Number(p.research_pnl_units)||0:0;};
+const ET_ZONE="America/New_York";
+const etParts=value=>{
+  const d=new Date(String(value||""));
+  if(Number.isNaN(d.getTime()))return null;
+  return Object.fromEntries(new Intl.DateTimeFormat("en-US",{
+    timeZone:ET_ZONE,year:"numeric",month:"2-digit",day:"2-digit",
+    hour:"numeric",minute:"2-digit",hour12:true,
+  }).formatToParts(d).filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+};
+const etDate=value=>{const p=etParts(value);return p?`${p.year}-${p.month}-${p.day}`:"";};
+const gameTimeET=value=>{const p=etParts(value);return p?`${p.month}/${p.day} ${p.hour}:${p.minute} ${p.dayPeriod}`:"—";};
+const todayET=()=>etDate(new Date());
 const shortDate=value=>{const s=String(value||"");return s.length>=16?`${s.slice(5,10).replace("-","/")} ${s.slice(11,16)}`:s;};
 const marketPrice=p=>Number(p.quote?.ask??p.market_implied_probability)||null;
 const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
@@ -473,14 +491,14 @@ function filteredPicks(){
     if(st&&p.status!==st)return false;
     if(r&&p.result!==r)return false;
     if(q&&!(String(p.away_team).toLowerCase().includes(q)||String(p.home_team).toLowerCase().includes(q)||String(p.event_id).includes(q)))return false;
-    // Date range filters on the GAME date, not when the pick was logged.
-    const d=String(p.event_start_utc||p.created_at_utc||"").slice(0,10);
+    // Date range filters on the US-Eastern GAME date, not UTC or log time.
+    const d=etDate(p.event_start_utc||p.created_at_utc);
     if(from&&d<from)return false;
     if(to&&d>to)return false;
     return true;
   });
 }
-let sortKey="created_at_utc",sortAsc=false;
+let sortKey="event_start_utc",sortAsc=false;
 function renderPicks(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
   $("#archCount").textContent=archivedCount;
@@ -495,14 +513,14 @@ function renderPicks(){
     <div class="k"><b class="${(perf.total_pnl||0)>=0?"green":"red"}">${fmt(perf.total_pnl)}</b><span>total P&amp;L (U)</span></div>
     <div class="k"><b>${pct(perf.roi)}</b><span>ROI</span></div>
     <div class="k"><b>${perf.streaks?(perf.streaks.current>0?"W"+perf.streaks.current:perf.streaks.current<0?"L"+(-perf.streaks.current):"—"):"—"}</b><span>streak</span></div>`;
-  const cols=[["created_at_utc","Date"],["league","Sport"],["market_type","Type"],["selection","Pick"],
+  const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
     ["model_probability","Model"],["market_implied_probability","Market price"],["edge","Edge"],
     ["units","Size"],["result","State"],["pnl_units","P&L"]];
   let html=`<tr><th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>`+cols.map(([k,l])=>`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`).join("")+"<th>Order</th><th>Matchup</th></tr>";
   rows.forEach(p=>{
     const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
     const mp=marketPrice(p),edge=edgePoints(p),size=Number(p.units)||Number(p.suggested_paper_units)||0;
-    html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td>${shortDate(p.created_at_utc)}</td><td>${p.league||""}</td>
+    html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td title="Scheduled ${esc(String(p.event_start_utc||""))}">${gameTimeET(p.event_start_utc)}</td><td>${p.league||""}</td>
       <td>${p.market_type||""}</td><td>${pickLabel(p)}</td>
       <td>${p.model_probability?pct(p.model_probability):"—"}</td>
       <td>${cents(mp)} <span class="dim">${mp?pct(mp):"—"}</span></td>
@@ -558,12 +576,14 @@ async function clearSelected(){
 window.clearSelected=clearSelected;
 window.clearLedger=clearLedger; window.restoreLedger=restoreLedger;
 window.preset=which=>{
-  const iso=d=>d.toISOString().slice(0,10);
-  const today=new Date();
+  const today=todayET();
   $("#fStatus").value="";$("#fFrom").value="";$("#fTo").value="";$("#fResult").value="";
-  if(which==="today"){$("#fFrom").value=iso(today);$("#fTo").value=iso(today);}
+  if(which==="today"){$("#fFrom").value=today;$("#fTo").value=today;}
   else if(which==="open"){$("#fStatus").value="open";}
-  else if(which==="7d"){const from=new Date(today-6*864e5);$("#fFrom").value=iso(from);}
+  else if(which==="7d"){
+    const [year,month,day]=today.split("-").map(Number);
+    $("#fFrom").value=new Date(Date.UTC(year,month-1,day-6)).toISOString().slice(0,10);
+  }
   renderPicks();
 };
 function exportCsv(){
@@ -804,7 +824,7 @@ async function openBuy(pickId,initialPrice){
   if(!p.buy_ready){
     showModal(`<h2>Buy unavailable</h2><p class="red">${esc(p.buy_block_reason||"Blocked by the execution gate")}</p>
       <p class="dim small">No order was created. Refresh prices or add the required API credentials, then retry.</p>
-      <button onclick="confirmAction('refresh_prices','Refresh prices only for unique open bets visible on today’s ledger?')">Scan Today’s Prices</button>`);return;
+      <button onclick="confirmAction('refresh_prices','Refresh executable bid/ask prices for every unique open pick in the ledger?')">Scan Open Ledger Prices</button>`);return;
   }
   const ask=Number(p.quote.ask);
   const typed=Number(initialPrice);
@@ -934,7 +954,7 @@ function gotoTab(name){const b=$$("#tabs button").find(x=>x.dataset.tab===name);
 
 /* ---------- market ---------- */
 async function loadMarket(){
-  const sport=$("#mSport").value,day=$("#mDate").value||new Date().toISOString().slice(0,10);
+  const sport=$("#mSport").value,day=$("#mDate").value||todayET();
   const m=await api(`/api/market?sport=${sport}&date=${day}`);
   let html=`<tr><th>Market</th><th>Type</th><th>Line</th><th>Side</th><th>Bid</th><th>Ask</th><th>Spread</th><th>Move</th><th>Depth</th><th>Seen</th></tr>`;
   (m.markets||[]).forEach(r=>{
@@ -1069,7 +1089,7 @@ if(location.protocol==="file:"){
   throw new Error("file:// mode");
 }
 applySettings();
-$("#mDate").value=new Date().toISOString().slice(0,10);
+$("#mDate").value=todayET();
 refreshAll(); loadMarket(); resetTimer();
 </script>
 </body>
