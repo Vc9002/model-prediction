@@ -93,6 +93,13 @@ def test_matrix_labels_total_score_artifact_as_research_only(monkeypatch, tmp_pa
                     "nfl": {
                         "status": "research_score_model_candidate",
                         "training": {"holdout_rows": 101},
+                        "model": "linear_regression_on_elo_trend",
+                        "train_observations": 380,
+                        "validation_observations": 131,
+                        "holdout_observations": 101,
+                        "holdout": {"calls": 56, "hit_rate": 0.553571, "brier": 0.248164},
+                        "reference_line": 46.0,
+                        "threshold": 0.52,
                         "locked_holdout": {
                             "mae": 11.2,
                             "baseline_mae": 11.7,
@@ -127,6 +134,13 @@ def test_matrix_labels_total_score_artifact_as_research_only(monkeypatch, tmp_pa
 
     assert cell["state"] == "research_total_candidate"
     assert cell["holdout_rows"] == 101
+    assert cell["train_rows"] == 380
+    assert cell["validation_rows"] == 131
+    assert cell["calls"] == 56
+    assert cell["hit_rate"] == 0.553571
+    assert cell["brier"] == 0.248164
+    assert cell["reference_line"] == 46.0
+    assert cell["threshold"] == 0.52
     assert cell["qualification"] == "BLOCKED_MISSING_LINES"
 
 

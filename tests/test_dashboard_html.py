@@ -56,3 +56,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "Resting order accepted" in html
     assert '"cancel pending"' in html
     assert '["canceled","rejected","expired","replaced"]' in html
+    assert "holdout games" in html
+    assert "TOTAL VALIDATION" in html
+    assert "Validation cohorts" in html
+    assert "Model validation details" in html

@@ -1,0 +1,145 @@
+{
+  "sports": {
+    "mlb": {
+      "error_sd": 4.4131,
+      "holdout": {
+        "brier": 0.249286,
+        "calls": 38,
+        "hit_rate": 0.657895
+      },
+      "holdout_observations": 806,
+      "league_mean_margin": 0.03,
+      "locked_holdout": {
+        "baseline_mae": 4.4131,
+        "mae": 4.4131
+      },
+      "market_qualification": {
+        "reason": "insufficient_calls"
+      },
+      "model": "linear_regression_on_elo_trend",
+      "qualified": false,
+      "reference_spread": 0.0,
+      "sport": "mlb",
+      "status": "research_score_model_candidate",
+      "threshold": 0.66,
+      "train_observations": 2314,
+      "training": {
+        "holdout_rows": 806
+      },
+      "validation_observations": 585
+    },
+    "nba": {
+      "error_sd": 16.3464,
+      "holdout": {
+        "brier": 0.223595,
+        "calls": 66,
+        "hit_rate": 0.863636
+      },
+      "holdout_observations": 437,
+      "league_mean_margin": 1.89,
+      "locked_holdout": {
+        "baseline_mae": 16.3464,
+        "mae": 16.3464
+      },
+      "market_qualification": {
+        "reason": "qualified"
+      },
+      "model": "linear_regression_on_elo_trend",
+      "qualified": true,
+      "reference_spread": 2.0,
+      "sport": "nba",
+      "status": "research_score_model_candidate",
+      "threshold": 0.76,
+      "train_observations": 1305,
+      "training": {
+        "holdout_rows": 437
+      },
+      "validation_observations": 204
+    },
+    "nfl": {
+      "error_sd": 12.6708,
+      "holdout": {
+        "brier": 0.229003,
+        "calls": 32,
+        "hit_rate": 0.75
+      },
+      "holdout_observations": 109,
+      "league_mean_margin": 2.03,
+      "locked_holdout": {
+        "baseline_mae": 12.6708,
+        "mae": 12.6708
+      },
+      "market_qualification": {
+        "reason": "insufficient_calls"
+      },
+      "model": "linear_regression_on_elo_trend",
+      "qualified": false,
+      "reference_spread": 2.0,
+      "sport": "nfl",
+      "status": "research_score_model_candidate",
+      "threshold": 0.7,
+      "train_observations": 380,
+      "training": {
+        "holdout_rows": 109
+      },
+      "validation_observations": 131
+    },
+    "soccer": {
+      "error_sd": 1.6293,
+      "holdout": {
+        "brier": 0.238242,
+        "calls": 62,
+        "hit_rate": 0.790323
+      },
+      "holdout_observations": 344,
+      "league_mean_margin": 0.33,
+      "locked_holdout": {
+        "baseline_mae": 1.6293,
+        "mae": 1.6293
+      },
+      "market_qualification": {
+        "reason": "qualified"
+      },
+      "model": "linear_regression_on_elo_trend",
+      "qualified": true,
+      "reference_spread": 0.5,
+      "sport": "soccer",
+      "status": "research_score_model_candidate",
+      "threshold": 0.74,
+      "train_observations": 2340,
+      "training": {
+        "holdout_rows": 344
+      },
+      "validation_observations": 842
+    },
+    "wnba": {
+      "error_sd": 13.7414,
+      "holdout": {
+        "brier": 0.226803,
+        "calls": 92,
+        "hit_rate": 0.673913
+      },
+      "holdout_observations": 98,
+      "league_mean_margin": 2.23,
+      "locked_holdout": {
+        "baseline_mae": 13.7414,
+        "mae": 13.7414
+      },
+      "market_qualification": {
+        "reason": "qualified"
+      },
+      "model": "linear_regression_on_elo_trend",
+      "qualified": true,
+      "reference_spread": 2.0,
+      "sport": "wnba",
+      "status": "research_score_model_candidate",
+      "threshold": 0.52,
+      "train_observations": 346,
+      "training": {
+        "holdout_rows": 98
+      },
+      "validation_observations": 133
+    }
+  },
+  "status": "spreads_baseline"
+}

@@ -361,13 +361,14 @@ function renderMatrix(m){
       let cls="n",l1="⬛ no data",l2="—";
       if(c.state==="qualified"){
         cls="q";l1=`✅ ${pct(c.hit_rate)}`;
-        l2=c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`;
+        l2=mk==="total"?`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`:
+          (c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`);
       }else if(c.state==="tested_not_qualified"){
         cls="t";l1=`🔴 ${pct(c.hit_rate)}`;
         l2=`${c.calls} calls · below gate`;
       }else if(c.state==="research_total_candidate"){
-        cls="r";l1=`🧪 MAE ${fmt(c.mae,2)}`;
-        l2=`${c.holdout_rows??"—"} games · base ${fmt(c.baseline_mae,2)} · shadow only`;
+        cls="r";l1=`🧪 ${pct(c.hit_rate)}`;
+        l2=`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`;
       }else if(c.state==="blocked"){
         cls="b";l1="⛔ blocked";l2="missing valid contract lines";
       }else if(c.state==="model_untested"){
@@ -383,6 +384,29 @@ function renderMatrix(m){
 }
 function drill(sport,market){
   const cell=(state.matrix.grid[sport]||{})[market]||{};
+  if(market==="total"&&(cell.state==="qualified"||cell.state==="research_total_candidate")){
+    const calls=Number(cell.calls)||0,hits=calls&&cell.hit_rate!=null?Math.round(calls*Number(cell.hit_rate)):null;
+    const reason=String(cell.qualification||"not reported").replaceAll("_"," ");
+    const qualified=cell.state==="qualified";
+    const note=qualified?
+      `<div class="alert info">✅ Passed the research validation gate. This uses a league-average reference total; it does not prove edge against timestamp-valid market contract lines.</div>`:
+      `<div class="alert warn">Research validation only · ${esc(reason)}. No executable total is implied.</div>`;
+    const metric=(value,label)=>`<div class="k"><b>${value}</b><span>${label}</span></div>`;
+    let html=`<h2>${sport.toUpperCase()} — TOTAL VALIDATION</h2>${note}<div class="kpis">
+      ${metric(pct(cell.hit_rate),"holdout hit rate")}
+      ${metric(cell.calls??"—","holdout calls")}
+      ${metric(hits??"—","holdout wins")}
+      ${metric(cell.holdout_rows??"—","locked-holdout games")}
+      ${metric(fmt(cell.brier,3),"holdout brier")}
+    </div><h2>Validation cohorts</h2><table class="data">
+      <tr><th>Train games</th><th>Threshold-validation games</th><th>Locked-holdout games</th></tr>
+      <tr><td>${cell.train_rows??"—"}</td><td>${cell.validation_rows??"—"}</td><td>${cell.holdout_rows??"—"}</td></tr>
+    </table><h2 style="margin-top:16px">Model validation details</h2><table class="data">
+      <tr><th>Reference total</th><th>Call threshold</th><th>Holdout MAE</th><th>Baseline MAE</th><th>Qualification</th></tr>
+      <tr><td>${fmt(cell.reference_line,1)}</td><td>${pct(cell.threshold)}</td><td>${fmt(cell.mae,3)}</td><td>${fmt(cell.baseline_mae,3)}</td><td>${esc(reason)}</td></tr>
+    </table>`;
+    showModal(html);return;
+  }
   const picks=state.picks.filter(p=>String(p.league).toLowerCase()===sport&&String(p.market_type)===market.replace("moneyline","moneyline"));
   const monthly={};
   picks.filter(p=>p.status==="settled"&&(p.result==="win"||p.result==="loss")).forEach(p=>{
@@ -390,8 +414,7 @@ function drill(sport,market){
     monthly[mo]=monthly[mo]||{pnl:0,w:0,c:0};
     monthly[mo].pnl+=pickPnl(p); monthly[mo].c++; monthly[mo].w+=p.result==="win";
   });
-  const totalNote=cell.state==="qualified"?`<div class="alert info">✅ Qualified totals model — ${cell.calls||0} calls, ${pct(cell.hit_rate||0)} hit rate. Reference line derived from league average; no historical contract lines required.</div>`:cell.state==="research_total_candidate"?`<div class="alert warn">Research totals baseline. Holdout MAE ${fmt(cell.mae,3)} vs ${fmt(cell.baseline_mae,3)} baseline. Below qualification gate or insufficient calls.</div>`:"";
-  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>${totalNote}
+  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>
   <div class="kpis">
     <div class="k"><b>${pct(cell.hit_rate)}</b><span>holdout hit rate</span></div>
     <div class="k"><b>${cell.calls??"—"}</b><span>holdout calls</span></div>
