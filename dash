@@ -1,0 +1,18 @@
+#!/bin/bash
+# dash — start the model-prediction dashboard and open it in the browser
+cd "$HOME/Documents/Poly & Kalshi/model prediction" || exit 1
+
+# Check if already running
+if pgrep -f "dashboard_server.py" > /dev/null 2>&1; then
+    echo "Dashboard already running — opening http://127.0.0.1:8765/"
+    open "http://127.0.0.1:8765/"
+    exit 0
+fi
+
+# Start server in background
+python3 dashboard_server.py &
+sleep 1
+
+# Open browser
+open "http://127.0.0.1:8765/"
+echo "Dashboard started on http://127.0.0.1:8765/"
