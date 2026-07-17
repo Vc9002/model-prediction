@@ -177,9 +177,8 @@ models:
     production_artifact: config/models/nfl-elo-trend-lr-v3.json
   TENNIS:
     family: elo_trend_logistic_regression
-    status: research
+    status: deferred
     origin: statistical_model
-    active_research_version: tennis-elo-trend-lr-v1
   WORLD_CUP:
     family: poisson_dixon_coles
     status: research

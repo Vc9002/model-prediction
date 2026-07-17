@@ -41,3 +41,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert 'step="0.01"' in html
     assert 'placeholder=".50"' in html
     assert "1U = $" in html
+    assert '"Market price"' in html
+    assert '"Odds"' not in html
+    assert "shortDate" in html
+    assert "order-wrap" in html

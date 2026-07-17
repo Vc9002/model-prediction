@@ -37,20 +37,27 @@ button:hover{border-color:var(--green)}
 button.primary{background:#0d4f35;border-color:var(--green)}
 button:disabled{opacity:.45;cursor:not-allowed}
 input.order-price{width:62px;padding:5px 6px;font-family:var(--mono);font-size:12px}
+.order-wrap{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.order-note{font-size:10.5px;color:var(--dim)}
 /* matrix */
 table.matrix{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px}
 table.matrix th,table.matrix td{border:1px solid var(--accent);padding:8px 10px;text-align:center}
 table.matrix th{color:var(--dim);font-weight:600}
-td.cell{cursor:pointer;min-width:96px}
+td.cell{cursor:pointer;min-width:110px;vertical-align:middle;padding:9px 10px}
+td.cell .c1{font-size:13px;font-weight:600;line-height:1.5;white-space:nowrap}
+td.cell .c2{font-size:11px;color:var(--dim);line-height:1.45;white-space:nowrap}
 td.cell.q{background:rgba(0,255,136,.12);border-color:rgba(0,255,136,.5)}
 td.cell.t{background:rgba(255,68,68,.10);border-color:rgba(255,68,68,.4)}
 td.cell.u{background:rgba(255,170,0,.10);border-color:rgba(255,170,0,.4)}
-td.cell.n{color:#556}
-td.cell.na{color:#445;background:rgba(255,255,255,.02)}
+td.cell.r{background:rgba(120,160,255,.08);border-color:rgba(120,160,255,.35)}
+td.cell.b{background:rgba(255,255,255,.03)}
+td.cell.b .c1{color:#667}
+td.cell.n .c1{color:#556}
+td.cell.na .c1{color:#445}
 /* tables */
 table.data{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
-table.data th{color:var(--dim);text-align:left;padding:6px 8px;border-bottom:1px solid var(--accent);cursor:pointer;white-space:nowrap}
-table.data td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap}
+table.data th{color:var(--dim);text-align:left;padding:5px 6px;border-bottom:1px solid var(--accent);cursor:pointer;white-space:nowrap}
+table.data td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap}
 table.data tr:hover td{background:rgba(255,255,255,.03)}
 .pill{padding:1px 8px;border-radius:10px;font-size:11px}
 .pill.win{background:rgba(0,255,136,.15);color:var(--green)}
@@ -118,7 +125,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small dim" id="matrixGate" style="margin-bottom:8px"></div>
       <table class="matrix" id="matrixTable"></table>
       <div class="small dim" style="margin-top:8px">
-        🟢 qualified · 🔴 tested, below gate · 🟡 model exists, untested · ⬛ no data · gray = n/a — click a cell to drill down
+        ✅ qualified · 🔴 tested, below gate · 🧪 research score model (shadow only) · ⛔ blocked, no valid contract lines · 🟡 untested · ⬛ no data · — n/a — click a cell to drill down
       </div>
     </div>
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
@@ -238,6 +245,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
             <label><input type="checkbox" class="sSport" value="nba" checked>NBA</label>
             <label><input type="checkbox" class="sSport" value="wnba" checked>WNBA</label>
             <label><input type="checkbox" class="sSport" value="nfl" checked>NFL</label>
+            <label><input type="checkbox" class="sSport" value="soccer" checked>Soccer</label>
           </span>
         </label>
       </div>
@@ -266,6 +274,9 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.cl
 /* ---------- settings ---------- */
 function applySettings(){
   const s=state.settings;
+  // Migration: settings saved before the soccer model existed lack "soccer";
+  // show it by default rather than silently hiding the new row.
+  if(Array.isArray(s.sports)&&!s.sportsV2){s.sports.push("soccer");s.sportsV2=true;}
   if(s.refresh!==undefined)$("#sRefresh").value=s.refresh;
   if(s.theme){$("#sTheme").value=s.theme;document.documentElement.dataset.theme=s.theme;}
   if(s.minConf)$("#sMinConf").value=s.minConf;
@@ -273,13 +284,13 @@ function applySettings(){
 }
 function saveSettings(){
   state.settings={refresh:$("#sRefresh").value,theme:$("#sTheme").value,
-    minConf:parseFloat($("#sMinConf").value)||0.5,
+    minConf:parseFloat($("#sMinConf").value)||0.5,sportsV2:true,
     sports:$$(".sSport").filter(c=>c.checked).map(c=>c.value)};
   localStorage.setItem("dash-settings",JSON.stringify(state.settings));
   document.documentElement.dataset.theme=state.settings.theme;
   resetTimer(); refreshAll();
 }
-const visibleSports=()=>state.settings.sports||["mlb","nba","wnba","nfl"];
+const visibleSports=()=>state.settings.sports||["mlb","nba","wnba","nfl","soccer"];
 
 /* ---------- fetch helpers ---------- */
 async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);return r.json();}
@@ -322,18 +333,26 @@ function renderMatrix(m){
     html+=`<tr><th>${sport.toUpperCase()}</th>`;
     for(const mk of m.markets){
       const c=m.grid[sport][mk]||{state:"no_data"};
-      let cls="n",label="⬛";
-      if(c.state==="qualified"){cls="q";label=`✅ ${pct(c.hit_rate)}<br><span class="dim small">${c.calls} calls · ${fmt(c.units,1)}U</span>`;}
-      else if(c.state==="tested_not_qualified"){cls="t";label=`🔴 ${pct(c.hit_rate)}<br><span class="dim small">${c.calls} calls · below gate</span>`;}
-      else if(c.state==="research_total_candidate"){
-        cls="u";
-        const interval=Array.isArray(c.mae_gain_interval)?c.mae_gain_interval.map(v=>fmt(v,2)).join(" to "):"—";
-        label=`🧪 score MAE ${fmt(c.mae,2)}<br><span class="dim small">${c.holdout_rows??"—"} games · gain CI ${interval}<br>market betting blocked</span>`;
+      // Every cell renders the SAME two-line template: .c1 = status + primary
+      // metric, .c2 = one dim detail line. No third lines, no mixed styles.
+      let cls="n",l1="⬛ no data",l2="—";
+      if(c.state==="qualified"){
+        cls="q";l1=`✅ ${pct(c.hit_rate)}`;
+        l2=`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`;
+      }else if(c.state==="tested_not_qualified"){
+        cls="t";l1=`🔴 ${pct(c.hit_rate)}`;
+        l2=`${c.calls} calls · below gate`;
+      }else if(c.state==="research_total_candidate"){
+        cls="r";l1=`🧪 MAE ${fmt(c.mae,2)}`;
+        l2=`${c.holdout_rows??"—"} games · base ${fmt(c.baseline_mae,2)} · shadow only`;
+      }else if(c.state==="blocked"){
+        cls="b";l1="⛔ blocked";l2="missing valid contract lines";
+      }else if(c.state==="model_untested"){
+        cls="u";l1="🟡 untested";l2="model exists · no holdout";
+      }else if(c.state==="not_applicable"){
+        cls="na";l1="—";l2="n/a";
       }
-      else if(c.state==="blocked"){cls="na";label=`⛔ blocked<br><span class="dim small">missing valid contract lines</span>`;}
-      else if(c.state==="model_untested"){cls="u";label="🟡 untested";}
-      else if(c.state==="not_applicable"){cls="na";label="—";}
-      html+=`<td class="cell ${cls}" onclick='drill("${sport}","${mk}")'>${label}</td>`;
+      html+=`<td class="cell ${cls}" onclick='drill("${sport}","${mk}")'><div class="c1">${l1}</div><div class="c2">${l2}</div></td>`;
     }
     html+="</tr>";
   }
@@ -372,6 +391,10 @@ function drill(sport,market){
 /* ---------- picks ---------- */
 const pickPnl=p=>{const u=Number(p.units)||0; if(u>0)return Number(p.pnl_units)||0;
   return p.research_score_units?Number(p.research_pnl_units)||0:0;};
+const shortDate=value=>{const s=String(value||"");return s.length>=16?`${s.slice(5,10).replace("-","/")} ${s.slice(11,16)}`:s;};
+const marketPrice=p=>Number(p.quote?.ask??p.market_implied_probability)||null;
+const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
+const edgePoints=p=>{const m=marketPrice(p),model=Number(p.model_probability);return m&&model?model-m:null;};
 function populateFilters(){
   const sports=[...new Set(state.picks.map(p=>p.league))].sort();
   const markets=[...new Set(state.picks.map(p=>p.market_type))].sort();
@@ -411,16 +434,19 @@ function renderPicks(){
     <div class="k"><b class="${(perf.total_pnl||0)>=0?"green":"red"}">${fmt(perf.total_pnl)}</b><span>total P&amp;L (U)</span></div>
     <div class="k"><b>${pct(perf.roi)}</b><span>ROI</span></div>
     <div class="k"><b>${perf.streaks?(perf.streaks.current>0?"W"+perf.streaks.current:perf.streaks.current<0?"L"+(-perf.streaks.current):"—"):"—"}</b><span>streak</span></div>`;
-  const cols=[["created_at_utc","Date"],["league","Sport"],["market_type","Market"],["selection","Pick"],
-    ["line","Line"],["model_probability","Conf"],["american_odds","Odds"],["units","U"],
-    ["status","Status"],["result","Result"],["pnl_units","P&L"]];
+  const cols=[["created_at_utc","Date"],["league","Sport"],["market_type","Type"],["selection","Pick"],
+    ["model_probability","Model"],["market_implied_probability","Market price"],["edge","Edge"],
+    ["units","Size"],["result","State"],["pnl_units","P&L"]];
   let html=`<tr><th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>`+cols.map(([k,l])=>`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`).join("")+"<th>Order</th><th>Matchup</th></tr>";
   rows.forEach(p=>{
     const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
-    html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td>${String(p.created_at_utc||"").slice(0,16)}</td><td>${p.league||""}</td>
-      <td>${p.market_type||""}</td><td>${pickLabel(p)}</td><td>${p.line??""}</td>
-      <td>${p.model_probability?pct(Math.max(p.model_probability,1-p.model_probability)):"—"}</td>
-      <td>${p.american_odds??""}</td><td>${p.units??""}</td><td>${p.status||""}</td><td>${res}</td>
+    const mp=marketPrice(p),edge=edgePoints(p),size=Number(p.units)||Number(p.suggested_paper_units)||0;
+    html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td>${shortDate(p.created_at_utc)}</td><td>${p.league||""}</td>
+      <td>${p.market_type||""}</td><td>${pickLabel(p)}</td>
+      <td>${p.model_probability?pct(p.model_probability):"—"}</td>
+      <td>${cents(mp)} <span class="dim">${mp?pct(mp):"—"}</span></td>
+      <td class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</td>
+      <td>${size?size.toFixed(2)+"U":"—"}</td><td>${res}</td>
       <td class="${pickPnl(p)>=0?"green":"red"}">${fmt(pickPnl(p))}</td>
       <td>${orderControl(p)}</td>
       <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;});
@@ -568,10 +594,7 @@ async function renderToday(){
     box.innerHTML='<div class="dim">No picks logged for today yet. Hit <b>Daily Forecast</b> above — when it finishes, the slate lands here.</div>';
     return;
   }
-  const pickEdge=p=>{
-    const market=Number(p.market_implied_probability);
-    return (p.model_probability!=null&&market)?(p.model_probability-market):null;
-  };
+  const pickEdge=p=>edgePoints(p);
   const bySport={};
   t.picks.forEach(p=>{(bySport[p.league]=bySport[p.league]||[]).push(p);});
   for(const [sport,rows] of Object.entries(bySport)){
@@ -581,7 +604,7 @@ async function renderToday(){
     box.appendChild(h);
     rows.forEach(p=>{
       const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
-      const market=Number(p.market_implied_probability);
+      const market=marketPrice(p);
       const edge=pickEdge(p);
       // Border reflects tailability: green only when the model DISAGREES with
       // the market in our favor. High confidence with negative edge is the
@@ -603,8 +626,8 @@ async function renderToday(){
         <span class="dim">· ${p.start_et} · ${p.market_type}</span> ${res}<br>
         pick <b>${pickLabel(p)}</b>
         · model <b>${conf?pct(conf):"—"}</b>
-        · price ${p.american_odds>0?"+":""}${p.american_odds??"—"} <span class="dim">(${market?pct(market):"—"})</span>
-        · edge <b class="${edge>0?"green":"red"}">${edge!=null?pct(edge):"—"}</b>
+        · market <b>${cents(market)}</b> <span class="dim">(${market?pct(market):"—"})</span>
+        · edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b>
         ${sizing?("· "+sizing):""}
         <span class="dim">· ${p.model_version||""}</span> · ${orderControl(p,true)}
         <div class="edgebar"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(48,Math.abs(edge||0)*400)}px;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`;
@@ -629,13 +652,14 @@ function orderControl(p,compact=false){
   const order=p.order||{};
   if(order.status==="submitted")return `<span class="pill win" title="${escAttr(order.order_id||"")}">order placed</span>`;
   const ask=p.quote?.ask;
-  const defaultPrice=ask!=null?Math.max(.01,Math.round((Number(ask)-.01)*100)/100).toFixed(2):"";
+  const defaultPrice=ask!=null?(Math.max(1,Math.ceil(Number(ask)*100-1e-9)-1)/100).toFixed(2):"";
   const inputId=`orderPrice-${p.pick_id}`;
   const reason=p.buy_ready?"Set a post-only GTC limit price":(p.buy_block_reason||"order unavailable");
-  return `<span title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()"> `+
-    `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button></span>`+
-    (ask!=null?`<div class="dim small">ask ${Number(ask).toFixed(2)}${!p.buy_ready?` · ${esc(reason)}`:""}</div>`:
-      (!compact?`<div class="dim small">${esc(reason)}</div>`:""));
+  const auth=p.order_authorization==="manual_research_override"?"manual":"model";
+  const blocked=reason.includes("older")?"scan prices":reason.includes("POLYMARKET_")?"API key needed":"blocked";
+  return `<span class="order-wrap" title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
+    `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
+    `<span class="order-note">${ask!=null?cents(ask)+" ask · ":""}${p.buy_ready?auth:blocked}</span></span>`;
 }
 function openBuy(pickId,initialPrice){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
@@ -645,16 +669,18 @@ function openBuy(pickId,initialPrice){
   }
   if(!p.buy_ready){
     showModal(`<h2>Buy unavailable</h2><p class="red">${esc(p.buy_block_reason||"Blocked by the execution gate")}</p>
-      <p class="dim small">No order was created. Research-only and zero-unit picks remain non-executable.</p>
+      <p class="dim small">No order was created. Refresh prices or add the required API credentials, then retry.</p>
       <button onclick="confirmAction('refresh_prices','Scan and save fresh executable prices now?')">Scan Prices</button>`);return;
   }
   const ask=Number(p.quote.ask);
   const typed=Number(initialPrice);
-  const defaultPrice=(typed>0&&typed<1?typed:Math.max(.01,Math.round((ask-.01)*100)/100)).toFixed(2);
+  const defaultPrice=(typed>0&&typed<1?typed:Math.max(1,Math.ceil(ask*100-1e-9)-1)/100).toFixed(2);
   const unitValue=Number(p.unit_value_usd||state.status?.unit_value_usd||7.5);
-  const maxUnits=Number(p.units)||0;
+  const maxUnits=Number(p.units)||Number(p.suggested_paper_units)||0;
+  const model=Number(p.model_probability),market=marketPrice(p),edge=model-market;
   showModal(`<h2>Resting limit order</h2>
-    <p><b>${esc(pickLabel(p))}</b> · current executable ask <b>${ask.toFixed(2)}</b></p>
+    <p><b>${esc(pickLabel(p))}</b> · model <b>${pct(model)}</b> · market <b>${cents(market)} (${pct(market)})</b> · edge <b class="green">+${(edge*100).toFixed(1)}pp</b></p>
+    <p>Current ask <b>${cents(ask)}</b> · authorization <b>${p.order_authorization==="manual_research_override"?"manual override":"qualified model"}</b></p>
     <p class="dim small">Post-only means your price must stay below the ask; it will rest instead of crossing immediately.</p>
     <label>Limit price <input id="buyPrice" type="number" min="0.01" max="0.99" step="0.01" value="${defaultPrice}"></label><br><br>
     <label>Units <input id="buyUnits" type="number" min="0.25" max="${maxUnits}" step="0.25" value="${maxUnits}"></label>

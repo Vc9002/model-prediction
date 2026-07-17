@@ -54,7 +54,7 @@ def _log(message: str) -> None:
     except OSError:
         pass
 EASTERN = ZoneInfo("America/New_York")
-SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis")
+SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
 GATEWAY = "https://gateway.polymarket.us"
 
 _CACHE: dict[str, tuple[float, object]] = {}
@@ -156,6 +156,65 @@ def _unit_value_usd() -> float:
     except (OSError, TypeError, ValueError, yaml.YAMLError):
         return 7.5
     return value if value > 0 else 7.5
+
+
+def _config_payload() -> dict:
+    try:
+        payload = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _row_has_banned_team(row: dict) -> bool:
+    config = _config_payload()
+    configured = (config.get("team_ban_list") or {}).get("teams") or {}
+    banned_ids = {
+        str(item.get("canonical_team_id") or "")
+        for values in configured.values()
+        for item in (values or [])
+        if isinstance(item, dict)
+    }
+    registry = _read_json(DATA / "entities" / "teams.json") or {}
+    entries = registry.get("teams") if isinstance(registry, dict) else registry
+    banned_names: set[str] = set()
+    for entry in entries or []:
+        if str(entry.get("canonical_team_id") or "") not in banned_ids:
+            continue
+        banned_names.add(str(entry.get("canonical_name") or "").strip().casefold())
+        for alias in entry.get("aliases") or []:
+            if isinstance(alias, dict):
+                banned_names.add(str(alias.get("source_name") or "").strip().casefold())
+            else:
+                banned_names.add(str(alias or "").strip().casefold())
+    return any(
+        str(row.get(key) or "").strip().casefold() in banned_names
+        for key in ("away_team", "home_team")
+    )
+
+
+def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
+    if row.get("record_type") != "RESEARCH_OBSERVATION":
+        return False, "not a research observation"
+    config = _config_payload()
+    execution = config.get("execution") or {}
+    if not execution.get("allow_manual_research_orders", False):
+        return False, "manual research orders are disabled"
+    league = str(row.get("league") or "").upper()
+    active_version = (config.get("models", {}).get(league, {}) or {}).get(
+        "active_production_version"
+    )
+    if execution.get("manual_research_require_active_model", True):
+        if not active_version or row.get("model_version") != active_version:
+            return False, "pick is not from the active production model"
+    edge = _number(row.get("model_probability")) - _number(
+        row.get("market_implied_probability")
+    )
+    if execution.get("manual_research_require_positive_edge", True) and edge <= 0:
+        return False, "model has no positive edge at the logged market price"
+    if _row_has_banned_team(row):
+        return False, "a team in this matchup is permanently banned"
+    return True, "manual active-model order"
 
 
 _PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
@@ -373,31 +432,63 @@ def status() -> dict:
     }
 
 
+MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
+
+
+def _newest_validation() -> tuple[dict, str]:
+    """Newest learned-model-validation*.json merged with soccer-validation.json."""
+    candidates = sorted(
+        OUTPUTS.glob("learned-model-validation*.json"),
+        key=lambda path: path.stat().st_mtime,
+    )
+    merged: dict = {"sports": {}, "production_artifacts": {}}
+    sources = []
+    if candidates:
+        newest = _read_json(candidates[-1]) or {}
+        merged["sports"].update(newest.get("sports") or {})
+        merged["production_artifacts"].update(newest.get("production_artifacts") or {})
+        sources.append(candidates[-1].name)
+    soccer = _read_json(OUTPUTS / "soccer-validation.json") or {}
+    if soccer.get("sports"):
+        merged["sports"].update(soccer["sports"])
+        merged["production_artifacts"].update(soccer.get("production_artifacts") or {})
+        sources.append("soccer-validation.json")
+    return merged, " + ".join(sources)
+
+
+def _ml_cell(sport_meta: dict) -> dict:
+    """Moneyline cell from the production variant's primary_65 locked holdout."""
+    variants = sport_meta.get("variants") or {}
+    variant = variants.get("elo_trend") or next(
+        (v for v in variants.values() if isinstance(v, dict) and v.get("primary_65")), None
+    )
+    primary = (variant or {}).get("primary_65") or {}
+    holdout = primary.get("locked_holdout") or {}
+    if not holdout:
+        return {"state": "no_data"}
+    return {
+        "state": "qualified" if holdout.get("qualified") else "tested_not_qualified",
+        "hit_rate": holdout.get("hit_rate"),
+        "calls": holdout.get("calls"),
+        "units": holdout.get("units_at_minus_110"),
+        "brier": holdout.get("brier_score"),
+        "threshold": primary.get("learned_threshold"),
+        "roi": holdout.get("roi"),
+    }
+
+
 def matrix() -> dict:
-    audits = sorted(OUTPUTS.glob("termination-audit-*.json"))
-    audit = _read_json(audits[-1]) if audits else None
-    validation = _read_json(OUTPUTS / "learned-model-validation-v2.json") or {}
+    validation, source = _newest_validation()
     total_validation = _read_json(OUTPUTS / "total-score-validation.json") or {}
     total_results = total_validation.get("sports") or {}
-    results = (audit or {}).get("results") or {}
     sports_meta = validation.get("sports") or {}
     markets = ["moneyline", "spread", "total", "f5_spread", "f5_total", "yrfi_nrfi"]
     grid = {}
-    for sport in SPORTS:
+    for sport in MATRIX_SPORTS:
         row = {}
-        ml = results.get(sport) or {}
-        if ml:
-            row["moneyline"] = {
-                "state": "qualified" if ml.get("qualified") else "tested_not_qualified",
-                "hit_rate": ml.get("holdout_hit_rate"),
-                "calls": ml.get("holdout_calls"),
-                "units": ml.get("units_at_minus_110"),
-                "brier": ml.get("brier_score"),
-                "threshold": ml.get("learned_threshold"),
-            }
-        else:
-            row["moneyline"] = {"state": "no_data"}
-        readiness = (sports_meta.get(sport) or {}).get("multi_market_readiness") or {}
+        meta = sports_meta.get(sport) or {}
+        row["moneyline"] = _ml_cell(meta)
+        readiness = meta.get("multi_market_readiness") or {}
         spread_key = "full_game_spread" if sport == "mlb" else "spread"
         total_key = "full_game_total" if sport == "mlb" else "total"
         spread_readiness = readiness.get(spread_key)
@@ -425,11 +516,12 @@ def matrix() -> dict:
                 "readiness": total_readiness,
             }
         for market in ("f5_spread", "f5_total", "yrfi_nrfi"):
-            row[market] = {"state": "not_applicable" if sport != "mlb" else "no_data"}
+            row[market] = {"state": "no_data" if sport == "mlb" else "not_applicable"}
         grid[sport] = row
-    return {"markets": markets, "grid": grid,
-            "source": audits[-1].name if audits else None,
-            "gate": (audit or {}).get("methodology", {}).get("primary_gate")}
+    gate = validation and (
+        "locked holdout hit rate >= 65% target (learned threshold), >= 60% floor, >= 50 calls"
+    )
+    return {"markets": markets, "grid": grid, "source": source, "gate": gate}
 
 
 def backtests() -> list[dict]:
@@ -655,10 +747,17 @@ def _latest_order_for_pick(row: dict, quote: dict | None) -> dict | None:
 def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if row.get("status") != "open":
         return False, "pick is not open"
-    if row.get("record_type") != "QUALIFIED_SHADOW_CALL":
-        return False, "research-only pick; real orders are blocked"
-    if float(row.get("units") or 0) <= 0:
-        return False, "zero-unit pick; real orders are blocked"
+    if row.get("record_type") == "QUALIFIED_SHADOW_CALL":
+        if float(row.get("units") or 0) <= 0:
+            return False, "qualified pick has no authorized units"
+    elif row.get("record_type") == "RESEARCH_OBSERVATION":
+        eligible, reason = _manual_research_eligibility(row)
+        if not eligible:
+            return False, reason
+        if not _suggested_units(row):
+            return False, "manual order has no authorized unit cap"
+    else:
+        return False, "unsupported ledger record type"
     if quote is None:
         return False, "no exact executable Polymarket US market mapping"
     if not quote.get("fresh"):
@@ -679,6 +778,7 @@ def _decorate_pick(row: dict) -> dict:
     quote = _pick_quote(row)
     ready, reason = _order_readiness(row, quote)
     order = _latest_order_for_pick(row, quote)
+    manual, _ = _manual_research_eligibility(row)
     return {
         **row,
         "quote": quote,
@@ -686,6 +786,9 @@ def _decorate_pick(row: dict) -> dict:
         "buy_ready": ready,
         "buy_block_reason": reason,
         "unit_value_usd": _unit_value_usd(),
+        "order_authorization": (
+            "manual_research_override" if manual else "qualified_model"
+        ),
     }
 
 
@@ -727,7 +830,11 @@ def dashboard_picks() -> list[dict]:
     """Latest unique picks with persistent local-clear and order state attached."""
     archived = set(_load_archive()["pick_ids"])
     return [
-        {**_decorate_pick(row), "archived": str(row.get("pick_id")) in archived}
+        {
+            **_decorate_pick(row),
+            "archived": str(row.get("pick_id")) in archived,
+            "suggested_paper_units": _suggested_units(row),
+        }
         for row in _dedupe_picks(read_picks())
     ]
 
@@ -751,7 +858,17 @@ def preview_order(payload: dict) -> dict:
     if not 0 < size_shares <= 100000:
         return {"status": "refused", "error": "shares must be greater than 0 and at most 100,000"}
     estimated_cost = round(price * size_shares, 2)
-    maximum_cost = round(float(row.get("units") or 0) * _unit_value_usd(), 2)
+    manual = row.get("record_type") == "RESEARCH_OBSERVATION"
+    if manual and price >= float(row.get("model_probability") or 0):
+        return {
+            "status": "refused",
+            "error": (
+                f"manual limit {price:.2f} must stay below the model probability "
+                f"{float(row.get('model_probability') or 0):.2f}"
+            ),
+        }
+    authorized_units = _suggested_units(row) if manual else float(row.get("units") or 0)
+    maximum_cost = round(float(authorized_units or 0) * _unit_value_usd(), 2)
     if estimated_cost > maximum_cost + 0.005:
         return {
             "status": "refused",
@@ -780,6 +897,7 @@ def preview_order(payload: dict) -> dict:
         "unit_value_usd": _unit_value_usd(),
         "estimated_cost_usd": estimated_cost,
         "maximum_cost_usd": maximum_cost,
+        "manual_research_order": manual,
         "created_at": time.time(),
         "expires_at": time.time() + 300,
     }
@@ -817,6 +935,8 @@ def submit_order(payload: dict) -> dict:
         "--market-slug", ticket["market_slug"],
         "--execute",
     ]
+    if ticket.get("manual_research_order"):
+        command.append("--manual-research-order")
     process = subprocess.run(
         command,
         cwd=ROOT,
@@ -920,7 +1040,7 @@ def _today() -> str:
 
 
 def _safe_sport(value) -> str:
-    if value not in SPORTS + ("soccer", "tennis"):
+    if value not in SPORTS:
         raise ValueError(f"unsupported sport: {value}")
     return str(value)
 

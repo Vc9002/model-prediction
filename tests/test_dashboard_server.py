@@ -232,6 +232,67 @@ def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch) -> No
     assert "1U cap ($7.50)" in result["error"]
 
 
+def test_active_model_positive_edge_research_pick_is_manually_buyable(monkeypatch) -> None:
+    row = {
+        "record_type": "RESEARCH_OBSERVATION",
+        "status": "open",
+        "league": "WNBA",
+        "model_version": "wnba-elo-trend-lr-v3",
+        "model_probability": 0.58,
+        "market_implied_probability": 0.48,
+    }
+    monkeypatch.setattr(
+        dashboard_server,
+        "_config_payload",
+        lambda: {
+            "execution": {
+                "allow_manual_research_orders": True,
+                "manual_research_require_active_model": True,
+                "manual_research_require_positive_edge": True,
+            },
+            "models": {"WNBA": {"active_production_version": "wnba-elo-trend-lr-v3"}},
+        },
+    )
+    monkeypatch.setattr(dashboard_server, "_row_has_banned_team", lambda item: False)
+    monkeypatch.setattr(dashboard_server, "_suggested_units", lambda item: 1.25)
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+    quote = {"fresh": True, "market_state": "MARKET_STATE_OPEN"}
+
+    ready, reason = dashboard_server._order_readiness(row, quote)
+
+    assert ready is True
+    assert reason == "ready"
+
+
+def test_manual_research_limit_cannot_exceed_model_probability(monkeypatch) -> None:
+    pick = {
+        "pick_id": "manual-edge-cap",
+        "status": "open",
+        "record_type": "RESEARCH_OBSERVATION",
+        "units": 0,
+        "model_probability": 0.58,
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_decorate_pick",
+        lambda row: {
+            **row,
+            "buy_ready": True,
+            "buy_block_reason": "ready",
+            "quote": {"market_slug": "wnba-example", "side": "long", "ask": 0.64},
+        },
+    )
+
+    result = dashboard_server.preview_order(
+        {"pick_id": "manual-edge-cap", "price": 0.58, "size_shares": 10}
+    )
+
+    assert result["status"] == "refused"
+    assert "below the model probability" in result["error"]
+
+
 def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, tmp_path: Path) -> None:
     old = {
         "pick_id": "old-v2",

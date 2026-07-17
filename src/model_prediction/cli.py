@@ -68,6 +68,7 @@ from .models import MODEL_SPECS
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
 from .models.mlb import load_formula_spec
 from .total_score import validate_all_total_score_models
+from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
 
 
@@ -218,8 +219,8 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument(
         "--sports",
         nargs="+",
-        choices=("mlb", "nba", "wnba", "nfl", "soccer", "tennis"),
-        default=("mlb", "nba", "wnba", "nfl", "soccer", "tennis"),
+        choices=("mlb", "nba", "wnba", "nfl", "soccer"),
+        default=("mlb", "nba", "wnba", "nfl", "soccer"),
     )
     validate.add_argument(
         "--output",
@@ -277,6 +278,11 @@ def parser() -> argparse.ArgumentParser:
         dest="execute_flag",
         action="store_true",
         help="actually place the order; without it this is a dry-run preview",
+    )
+    execute.add_argument(
+        "--manual-research-order",
+        action="store_true",
+        help="explicitly authorize an active-model positive-edge research row as a manual order",
     )
 
     research_score = commands.add_parser("score-research")
@@ -1125,6 +1131,51 @@ def main(argv: list[str] | None = None) -> None:
             row = next((r for r in ledger.rows() if r["pick_id"] == args.pick_id), None)
             if row is None:
                 raise KeyError(f"unknown pick id: {args.pick_id}")
+            manual = bool(args.manual_research_order)
+            execution_config = config.get("execution", {})
+            if manual:
+                if not execution_config.get("allow_manual_research_orders", False):
+                    raise ExecutionGateError("REFUSED: manual research orders are disabled in config.")
+                league = League(row["league"])
+                active_version = (config.get("models", {}).get(league.value, {}) or {}).get(
+                    "active_production_version"
+                )
+                if (
+                    execution_config.get("manual_research_require_active_model", True)
+                    and row.get("model_version") != active_version
+                ):
+                    raise ExecutionGateError(
+                        "REFUSED: manual order row was not produced by the active model version."
+                    )
+                model_probability = float(row.get("model_probability") or 0)
+                market_probability = float(row.get("market_implied_probability") or 0)
+                edge = model_probability - market_probability
+                if (
+                    execution_config.get("manual_research_require_positive_edge", True)
+                    and edge <= 0
+                ):
+                    raise ExecutionGateError("REFUSED: manual research order has no positive edge.")
+                if args.price >= model_probability:
+                    raise ExecutionGateError(
+                        "REFUSED: manual limit must remain below the model probability."
+                    )
+                for team_key in ("away_team", "home_team"):
+                    _, banned = bans.check(league, row[team_key])
+                    if banned:
+                        raise ExecutionGateError(
+                            f"REFUSED: {row[team_key]} is on the permanent team ban list."
+                        )
+            policy = unit_policy(config)
+            if manual:
+                maximum_units = edge_scaled_units(
+                    float(row["model_probability"]),
+                    float(row.get("model_uncertainty") or 0),
+                    int(row["american_odds"]),
+                    policy,
+                )
+            else:
+                maximum_units = float(row.get("units") or 0)
+            maximum_cost = round(maximum_units * policy.unit_value_usd, 2)
             ticket = OrderTicket(
                 market_slug=args.market_slug,
                 token_side=args.side,
@@ -1134,9 +1185,17 @@ def main(argv: list[str] | None = None) -> None:
                 size_shares=args.size_shares,
                 pick_id=args.pick_id,
                 estimated_cost_usd=round(args.price * args.size_shares, 2),
+                maximum_cost_usd=maximum_cost,
+                authorization_type=("manual_research_override" if manual else "qualified_model"),
             )
             executor = PolymarketExecutor(audit)
-            output = executor.execute(ticket, row, execute_flag=args.execute_flag, user_command=True)
+            output = executor.execute(
+                ticket,
+                row,
+                execute_flag=args.execute_flag,
+                user_command=True,
+                manual_research_order=manual,
+            )
         elif args.command == "exposure":
             rows = ledger.rows()
             qualified_open = [

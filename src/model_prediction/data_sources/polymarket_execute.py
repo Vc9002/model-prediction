@@ -12,7 +12,8 @@ convention:
 4. An interactive Y/N confirmation shows the exact order (market, side, size,
    price, estimated cost) and receives "Y".
 5. Unit-engine caps were already applied to the pick being executed.
-6. The pick is a QUALIFIED_SHADOW_CALL — research observations are refused.
+6. The pick is qualified, or the caller supplies an explicit manual-research
+   authorization already checked against active-model, edge, ban, and unit caps.
 7. Every submitted order is written to the append-only audit chain.
 
 Resting limits use the exact user-confirmed price and are post-only. Current
@@ -57,13 +58,15 @@ class OrderTicket:
     size_shares: float
     pick_id: str
     estimated_cost_usd: float
+    maximum_cost_usd: float | None = None
+    authorization_type: str = "qualified_model"
 
     def describe(self) -> str:
         return (
             f"Order: {self.action.upper()} {self.size_shares:g} shares "
             f"[{self.token_side}] of {self.market_slug} @ ${self.price:.4f} "
             f"({self.order_type}). Estimated cost: ${self.estimated_cost_usd:.2f}. "
-            f"Pick: {self.pick_id}."
+            f"Authorization: {self.authorization_type}. Pick: {self.pick_id}."
         )
 
 
@@ -88,6 +91,7 @@ class PolymarketExecutor:
         pick_row: dict[str, str],
         execute_flag: bool,
         user_command: bool,
+        manual_research_order: bool = False,
     ) -> dict[str, Any]:
         """Run the full gate; submit only if every condition passes."""
         # Gate 1: explicit user command. The CLI sets this True only for the
@@ -111,10 +115,12 @@ class PolymarketExecutor:
                 f"REFUSED: {', '.join(missing)} is not set. Real-money execution is "
                 "impossible without Polymarket US API credentials; nothing was submitted."
             )
-        # Gate 6: qualified calls only.
-        if pick_row.get("record_type") != RecordType.QUALIFIED_SHADOW_CALL.value:
+        # Gate 6: qualified model call, or an explicit manual authorization
+        # whose active-model/edge/ban checks were completed by the CLI.
+        qualified = pick_row.get("record_type") == RecordType.QUALIFIED_SHADOW_CALL.value
+        if not qualified and not manual_research_order:
             raise ExecutionGateError(
-                "REFUSED: only QUALIFIED_SHADOW_CALL picks can be executed. "
+                "REFUSED: research picks require the explicit manual-research-order override. "
                 f"This pick is {pick_row.get('record_type') or 'unknown'}."
             )
         if pick_row.get("status") != "open":
@@ -122,6 +128,14 @@ class PolymarketExecutor:
         # Gate 5 is upstream (unit engine sized the pick); re-assert sanity.
         if ticket.size_shares <= 0 or not 0 < ticket.price < 1:
             raise ExecutionGateError("REFUSED: order size/price failed sanity checks.")
+        if (
+            ticket.maximum_cost_usd is not None
+            and ticket.estimated_cost_usd > ticket.maximum_cost_usd + 0.005
+        ):
+            raise ExecutionGateError(
+                f"REFUSED: ${ticket.estimated_cost_usd:.2f} exceeds the authorized "
+                f"unit cap of ${ticket.maximum_cost_usd:.2f}."
+            )
         if ticket.order_type != "limit_gtc":
             raise ExecutionGateError(
                 "REFUSED: the US dashboard supports post-only GTC limit orders only."
@@ -149,6 +163,10 @@ class PolymarketExecutor:
                 "price": ticket.price,
                 "size_shares": ticket.size_shares,
                 "estimated_cost_usd": ticket.estimated_cost_usd,
+                "maximum_cost_usd": ticket.maximum_cost_usd,
+                "authorization_type": ticket.authorization_type,
+                "source_record_type": pick_row.get("record_type"),
+                "source_reason_code": pick_row.get("reason_code"),
                 "transaction_hash": submission.get("transaction_hash"),
                 "submitted_at_utc": iso_utc(utc_now()),
             },

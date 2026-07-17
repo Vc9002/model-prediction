@@ -59,11 +59,57 @@ def test_missing_api_credentials_refuses(tmp_path) -> None:
         )
 
 
-def test_research_observation_can_never_execute(tmp_path) -> None:
+def test_research_observation_requires_explicit_manual_override(tmp_path) -> None:
     row = {"record_type": "RESEARCH_OBSERVATION", "status": "open"}
-    with pytest.raises(ExecutionGateError, match="QUALIFIED_SHADOW_CALL"):
+    with pytest.raises(ExecutionGateError, match="manual-research-order"):
         executor(tmp_path, env=US_CREDS).execute(
             ticket(), row, execute_flag=True, user_command=True
+        )
+
+
+def test_explicit_manual_research_override_can_submit(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, answer="y", env=US_CREDS)
+    monkeypatch.setattr(
+        client,
+        "_request",
+        lambda method, path, payload: {"id": "manual-order-123", "state": "ORDER_STATE_NEW"},
+    )
+    row = {
+        "record_type": "RESEARCH_OBSERVATION",
+        "status": "open",
+        "reason_code": "NO_CALL_MISSING_UNCERTAINTY",
+    }
+    manual_ticket = OrderTicket(
+        **{
+            **ticket().__dict__,
+            "maximum_cost_usd": 7.5,
+            "authorization_type": "manual_research_override",
+        }
+    )
+
+    result = client.execute(
+        manual_ticket,
+        row,
+        execute_flag=True,
+        user_command=True,
+        manual_research_order=True,
+    )
+
+    assert result["status"] == "submitted"
+    assert result["order_id"] == "manual-order-123"
+
+
+def test_executor_enforces_authorized_dollar_cap(tmp_path) -> None:
+    oversized = OrderTicket(
+        **{
+            **ticket().__dict__,
+            "estimated_cost_usd": 8.0,
+            "maximum_cost_usd": 7.5,
+        }
+    )
+    with pytest.raises(ExecutionGateError, match="authorized unit cap"):
+        executor(tmp_path, env=US_CREDS).execute(
+            oversized, qualified_row(), execute_flag=True, user_command=True
         )
 
 

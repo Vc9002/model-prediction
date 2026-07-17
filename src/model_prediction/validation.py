@@ -39,7 +39,6 @@ LEARNED_ARTIFACT_VERSIONS = {
     "wnba": "wnba-elo-trend-lr-v3",
     "nfl": "nfl-elo-trend-lr-v3",
     "soccer": "soccer-elo-trend-lr-v1",
-    "tennis": "tennis-elo-trend-lr-v1",
 }
 
 
