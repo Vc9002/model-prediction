@@ -1,78 +1,78 @@
 {
-  "artifact_hash": "0e2201d5a7670074e80393484022b924f1772cd07475e565bb936f776fbcb751",
+  "artifact_hash": "320eb4495a8f2481229f0c9cf74c5d601eee937c05225be5b7c22eda03d5bf9b",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        6.4880393968,
-        -0.182818794
+        6.593432925,
+        -0.2703903916
       ],
-      "confidence_threshold": 0.50102522,
+      "confidence_threshold": 0.5013947,
       "feature_names": [
         "elo_probability",
         "trend_gap"
       ],
-      "intercept": -3.4175586906,
+      "intercept": -3.4674749291,
       "positive_class": "home"
     }
   },
   "method": "logistic_regression",
   "model_version": "soccer-elo-trend-lr-v1",
   "qualification": {
-    "brier_score": 0.217352,
+    "brier_score": 0.224344,
     "calibration": {
-      "brier_score": 0.21735231956034706,
-      "calibration_intercept": 0.3781292288647716,
-      "calibration_slope": 0.5375941050694127,
-      "expected_calibration_error": 0.07452330163455362,
-      "log_loss": 0.6241705099531601,
+      "brier_score": 0.2243440760596643,
+      "calibration_intercept": 0.44950766945051973,
+      "calibration_slope": 0.38456597826181693,
+      "expected_calibration_error": 0.08872926385377829,
+      "log_loss": 0.6413622581773974,
       "reliability_buckets": [
         {
-          "count": 162,
-          "hit_rate": 0.654320987654321,
+          "count": 95,
+          "hit_rate": 0.631578947368421,
           "lower": 0.5,
-          "mean_p": 0.5522577498340434,
+          "mean_p": 0.5571524598631766,
           "upper": 0.6
         },
         {
-          "count": 136,
-          "hit_rate": 0.6764705882352942,
+          "count": 93,
+          "hit_rate": 0.7096774193548387,
           "lower": 0.6,
-          "mean_p": 0.6498904655032828,
+          "mean_p": 0.6406535287620468,
           "upper": 0.7
         },
         {
-          "count": 108,
-          "hit_rate": 0.6203703703703703,
+          "count": 39,
+          "hit_rate": 0.5897435897435898,
           "lower": 0.7,
-          "mean_p": 0.7478117775594053,
+          "mean_p": 0.7431489837941155,
           "upper": 0.8
         },
         {
-          "count": 61,
-          "hit_rate": 0.8524590163934426,
+          "count": 29,
+          "hit_rate": 0.7241379310344828,
           "lower": 0.8,
-          "mean_p": 0.8384399881896847,
+          "mean_p": 0.8366915240144589,
           "upper": 0.9
         },
         {
           "count": 3,
           "hit_rate": 1.0,
           "lower": 0.9,
-          "mean_p": 0.9140073823477751,
+          "mean_p": 0.9185744547963672,
           "upper": 1.0
         }
       ],
-      "sample_size": 470,
+      "sample_size": 259,
       "status": "ok"
     },
-    "called_rate": 0.993658,
-    "calls": 470,
+    "called_rate": 0.996154,
+    "calls": 259,
     "every_called_month_positive_at_minus_110": true,
     "every_qualifying_month_positive_at_minus_110": true,
     "failures": [],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.680851,
-    "hits": 320,
+    "hit_rate": 0.667954,
+    "hits": 173,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": true,
@@ -80,28 +80,28 @@
     "minimum_hit_rate": 0.6,
     "monthly_at_minus_110": [
       {
-        "calls": 212,
-        "hit_rate": 0.688679,
-        "hits": 146,
-        "month": "2026-04",
-        "qualification_status": "qualifying",
-        "units_at_minus_110": 66.727273
-      },
-      {
-        "calls": 247,
-        "hit_rate": 0.668016,
-        "hits": 165,
+        "calls": 181,
+        "hit_rate": 0.674033,
+        "hits": 122,
         "month": "2026-05",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 68.0
+        "units_at_minus_110": 51.909091
       },
       {
-        "calls": 11,
-        "hit_rate": 0.818182,
-        "hits": 9,
+        "calls": 56,
+        "hit_rate": 0.660714,
+        "hits": 37,
         "month": "2026-06",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 14.636364
+      },
+      {
+        "calls": 22,
+        "hit_rate": 0.636364,
+        "hits": 14,
+        "month": "2026-07",
         "qualification_status": "partial_month",
-        "units_at_minus_110": 6.181818
+        "units_at_minus_110": 4.727273
       }
     ],
     "monthly_minimum_calls": 10,
@@ -110,28 +110,28 @@
     "qualified": true,
     "roi": null,
     "secondary_reporting_complete": true,
-    "selectivity": 0.993658,
-    "total_predictions": 473,
-    "units_at_minus_110": 140.909091
+    "selectivity": 0.996154,
+    "total_predictions": 260,
+    "units_at_minus_110": 71.272727
   },
   "schema_version": "1",
   "sport": "soccer",
   "training": {
     "coefficient_fit": {
-      "end": "2026-02-09",
-      "observations": 1561,
+      "end": "2026-02-28",
+      "observations": 1759,
       "start": "2025-08-17"
     },
     "locked_holdout": {
-      "end": "2026-06-17",
-      "observations": 473,
-      "start": "2026-04-11"
+      "end": "2026-07-15",
+      "observations": 260,
+      "start": "2026-05-08"
     },
     "market_inputs_used": false,
     "threshold_selection": {
-      "end": "2026-04-10",
-      "observations": 535,
-      "start": "2026-02-10"
+      "end": "2026-05-05",
+      "observations": 617,
+      "start": "2026-03-01"
     },
     "threshold_source": "later validation cohort; never locked holdout",
     "walk_forward_features": true

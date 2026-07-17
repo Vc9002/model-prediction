@@ -1476,15 +1476,33 @@ def archive_action(action: str, scope: str) -> dict:
         requested = {str(pick_id) for pick_id in scope if str(pick_id)}
         if not requested:
             return {"status": "refused", "error": "no pick ids supplied"}
+        # A visible ledger/Today row is DEDUPED across model versions, so its one
+        # pick_id stands in for every sibling row sharing the same contract
+        # identity. Expand each requested id to its whole identity group,
+        # otherwise dedup resurrects the row from an un-archived sibling.
+        all_rows = read_picks()
+        identity_to_ids: dict[tuple, set[str]] = {}
+        id_to_identity: dict[str, tuple] = {}
+        for row in all_rows:
+            pid = str(row.get("pick_id") or "")
+            if not pid:
+                continue
+            identity = _pick_identity(row)
+            identity_to_ids.setdefault(identity, set()).add(pid)
+            id_to_identity[pid] = identity
+        expanded: set[str] = set()
+        for pid in requested:
+            identity = id_to_identity.get(pid)
+            expanded |= identity_to_ids.get(identity, {pid}) if identity else {pid}
         exposed = {
             str(row.get("pick_id"))
-            for row in read_picks()
+            for row in all_rows
             if row.get("status") == "open"
             and row.get("record_type") == "QUALIFIED_SHADOW_CALL"
             and float(row.get("units") or 0) > 0
         }
-        blocked = sorted(requested & exposed)
-        allowed = requested - exposed
+        blocked = sorted(expanded & exposed)
+        allowed = expanded - exposed
         existing = set(archive["pick_ids"]) | allowed
         archive["pick_ids"] = sorted(existing)
         archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
@@ -1492,7 +1510,8 @@ def archive_action(action: str, scope: str) -> dict:
         _save_archive(archive)
         with _CACHE_LOCK:
             _CACHE.clear()
-        return {"status": "ok", "action": "clear_ids", "archived_now": len(allowed),
+        return {"status": "ok", "action": "clear_ids",
+                "archived_now": len(allowed), "rows_selected": len(requested),
                 "blocked_open_staked": blocked,
                 "archived_total": len(existing),
                 "note": "View-only: rows remain in picks.xlsx and keep feeding research metrics."}

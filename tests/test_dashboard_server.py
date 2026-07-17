@@ -331,3 +331,45 @@ def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, 
     assert [row["pick_id"] for row in ledger] == ["latest-v3", "archived-only"]
     assert [row["pick_id"] for row in today["picks"]] == ["latest-v3"]
     assert today["count"] == 1
+
+
+def test_scan_prices_targets_only_unique_open_visible_today_contracts(monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+    monkeypatch.setattr(
+        dashboard_server,
+        "today_picks",
+        lambda day: {
+            "picks": [
+                {
+                    "league": "WNBA",
+                    "status": "open",
+                    "quote": {"market_slug": "wnba-game-1"},
+                },
+                {
+                    "league": "WNBA",
+                    "status": "open",
+                    "quote": {"market_slug": "wnba-game-1"},
+                },
+                {
+                    "league": "MLB",
+                    "status": "settled",
+                    "quote": {"market_slug": "mlb-finished"},
+                },
+                {"league": "NFL", "status": "open", "quote": None},
+            ]
+        },
+    )
+
+    command = dashboard_server._action_command(
+        "refresh_prices", {"date": "2026-07-17"}
+    )
+
+    assert command == [
+        "model-prediction",
+        "polymarket-ledger-prices",
+        "--date",
+        "2026-07-17",
+        "--contract",
+        "wnba=wnba-game-1",
+    ]
+    assert "--all" not in command

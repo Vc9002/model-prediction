@@ -9,6 +9,7 @@ from model_prediction.data_sources.polymarket_us import (
     PolymarketUSClient,
     capture_slate_snapshots,
     probability_to_american,
+    refresh_contract_snapshots,
 )
 
 
@@ -166,3 +167,71 @@ def test_slate_capture_skips_sports_outside_qualification_scope(tmp_path) -> Non
 
     assert result["captured"] == 0
     assert result["skipped_nonqualification_contracts"] == 1
+
+
+def test_ledger_price_refresh_deduplicates_and_never_discovers_a_broad_slate(tmp_path) -> None:
+    class FakeClient:
+        def __init__(self) -> None:
+            self.slugs = []
+
+        def snapshot(self, slug: str) -> dict:
+            self.slugs.append(slug)
+            return {
+                "market_slug": slug,
+                "event_start_utc": "2026-07-18T23:00:00Z",
+                "observed_at_utc": "2026-07-17T12:05:00Z",
+                "long": {"ask": 0.55},
+                "short": {"ask": 0.47},
+            }
+
+    store = PolymarketSnapshotStore.for_sport_date(tmp_path, "wnba", "2026-07-18")
+    store.append(
+        {
+            "market_slug": "wnba-away-home",
+            "event_start_utc": "2026-07-18T23:00:00Z",
+            "observed_at_utc": "2026-07-17T12:00:00Z",
+            "league": "WNBA",
+            "event_id": "event-1",
+            "market_type": "moneyline",
+            "line": None,
+            "long": {"ask": 0.54},
+            "short": {"ask": 0.48},
+        }
+    )
+    client = FakeClient()
+
+    result = refresh_contract_snapshots(
+        client,
+        [
+            {"sport": "wnba", "market_slug": "wnba-away-home"},
+            {"sport": "wnba", "market_slug": "wnba-away-home"},
+        ],
+        tmp_path,
+        "2026-07-18",
+    )
+
+    assert client.slugs == ["wnba-away-home"]
+    assert result["requested_contracts"] == 2
+    assert result["unique_contracts"] == 1
+    assert result["refreshed"] == 1
+    assert result["broad_discovery_attempted"] is False
+    latest = store.latest("wnba-away-home")
+    assert latest["market_type"] == "moneyline"
+    assert latest["event_id"] == "event-1"
+
+
+def test_ledger_price_refresh_skips_unmapped_contract_without_network_call(tmp_path) -> None:
+    class FailIfCalled:
+        def snapshot(self, slug: str) -> dict:
+            raise AssertionError(f"unexpected broad lookup for {slug}")
+
+    result = refresh_contract_snapshots(
+        FailIfCalled(),
+        [{"sport": "mlb", "market_slug": "unknown-market"}],
+        tmp_path,
+        "2026-07-18",
+    )
+
+    assert result["refreshed"] == 0
+    assert result["failures"] == 1
+    assert "broad discovery was not attempted" in result["failure_details"][0]["reason"]
