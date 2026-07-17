@@ -60,3 +60,5 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "TOTAL VALIDATION" in html
     assert "Validation cohorts" in html
     assert "Model validation details" in html
+    assert "Current ask buys immediately" in html
+    assert "immediate-or-cancel buy" in html

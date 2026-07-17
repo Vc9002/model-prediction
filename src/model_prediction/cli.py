@@ -294,7 +294,11 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--price", type=float, required=True, help="executable ask/bid, 0-1")
     execute.add_argument("--side", default="long", choices=["long", "short"])
     execute.add_argument("--action", default="buy", choices=["buy", "sell"])
-    execute.add_argument("--order-type", default="limit_gtc", choices=["limit_gtc", "market"])
+    execute.add_argument(
+        "--order-type",
+        default="limit_gtc",
+        choices=["limit_gtc", "limit_ioc"],
+    )
     execute.add_argument("--market-slug", required=True)
     execute.add_argument(
         "--execute",

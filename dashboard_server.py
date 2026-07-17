@@ -494,9 +494,7 @@ def _ml_cell(sport_meta: dict) -> dict:
 def matrix() -> dict:
     validation, source = _newest_validation()
     total_validation = _read_json(OUTPUTS / "total-score-validation.json") or {}
-    spread_validation = _read_json(OUTPUTS / "spread-validation.json") or {}
     total_results = total_validation.get("sports") or {}
-    spread_results = spread_validation.get("sports") or {}
     sports_meta = validation.get("sports") or {}
     markets = ["moneyline", "spread", "total", "f5_spread", "f5_total", "yrfi_nrfi"]
     grid = {}
@@ -507,50 +505,27 @@ def matrix() -> dict:
         readiness = meta.get("multi_market_readiness") or {}
         spread_key = "full_game_spread" if sport == "mlb" else "spread"
         total_key = "full_game_total" if sport == "mlb" else "total"
-
-        # Spread cell
-        sp_model = spread_results.get(sport) or {}
-        if sp_model.get("status") == "research_score_model_candidate":
-            qual = (sp_model.get("market_qualification") or {}).get("reason", "")
-            state = "qualified" if qual == "qualified" else "research_spread_candidate"
-            row["spread"] = {
-                "state": state,
-                "mae": (sp_model.get("locked_holdout") or {}).get("mae"),
-                "calls": (sp_model.get("holdout") or {}).get("calls"),
-                "hit_rate": (sp_model.get("holdout") or {}).get("hit_rate"),
-                "holdout_rows": (sp_model.get("training") or {}).get("holdout_rows"),
-                "qualification": qual,
-            }
-        else:
-            spread_readiness = readiness.get(spread_key)
-            row["spread"] = {
-                "state": "blocked" if spread_readiness else "no_data",
-                "readiness": spread_readiness,
-            }
+        spread_readiness = readiness.get(spread_key)
+        row["spread"] = {
+            "state": "blocked" if spread_readiness else "no_data",
+            "readiness": spread_readiness,
+        }
         score_model = total_results.get(sport) or {}
         holdout = score_model.get("locked_holdout") or {}
         if score_model.get("status") == "research_score_model_candidate":
             qual = (score_model.get("market_qualification") or {}).get("reason", "")
             state = "qualified" if qual == "qualified" else "research_total_candidate"
-            called_holdout = score_model.get("holdout") or {}
             row["total"] = {
                 "state": state,
                 "mae": holdout.get("mae"),
                 "baseline_mae": holdout.get("baseline_mae"),
                 "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
                 "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
-                "holdout_rows": score_model.get("holdout_observations")
-                or (score_model.get("training") or {}).get("holdout_rows"),
-                "train_rows": score_model.get("train_observations"),
-                "validation_rows": score_model.get("validation_observations"),
+                "holdout_rows": (score_model.get("training") or {}).get("holdout_rows"),
                 "readiness": readiness.get(total_key),
                 "qualification": qual,
-                "calls": called_holdout.get("calls"),
-                "hit_rate": called_holdout.get("hit_rate"),
-                "brier": called_holdout.get("brier"),
-                "reference_line": score_model.get("reference_line"),
-                "threshold": score_model.get("threshold"),
-                "model": score_model.get("model"),
+                "calls": score_model.get("holdout", {}).get("calls"),
+                "hit_rate": score_model.get("holdout", {}).get("hit_rate"),
             }
         else:
             total_readiness = readiness.get(total_key)

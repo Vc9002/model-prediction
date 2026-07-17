@@ -371,7 +371,7 @@ def test_position_sell_previews_verified_holding(monkeypatch) -> None:
     assert result["verified_available_quantity"] == 18.0
 
 
-def test_resting_order_refuses_crossing_the_current_ask(monkeypatch) -> None:
+def test_buy_at_current_ask_creates_marketable_ioc_preview(monkeypatch) -> None:
     pick = {
         "pick_id": "qualified-2",
         "status": "open",
@@ -397,8 +397,10 @@ def test_resting_order_refuses_crossing_the_current_ask(monkeypatch) -> None:
         {"pick_id": "qualified-2", "price": 0.60, "size_shares": 10}
     )
 
-    assert result["status"] == "refused"
-    assert "below the current ask" in result["error"]
+    assert result["status"] == "preview"
+    assert result["order_type"] == "limit_ioc"
+    assert result["execution_mode"] == "marketable_limit"
+    assert result["reference_ask"] == 0.60
 
 
 def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch) -> None:

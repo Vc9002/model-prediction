@@ -135,6 +135,31 @@ def test_confirmed_order_records_real_exchange_id(tmp_path, monkeypatch) -> None
     assert result["order_state"] == "ORDER_STATE_NEW"
 
 
+def test_marketable_limit_uses_ioc_and_can_take_liquidity(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, answer="y", env=US_CREDS)
+    payloads = []
+
+    def fake_request(method, path, payload):
+        payloads.append(payload)
+        return {"id": "us-ioc-123", "state": "ORDER_STATE_FILLED"}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    marketable = OrderTicket(**{**ticket().__dict__, "order_type": "limit_ioc"})
+
+    result = client.execute(
+        marketable,
+        qualified_row(),
+        execute_flag=True,
+        user_command=True,
+    )
+
+    assert result["status"] == "submitted"
+    assert payloads[-1]["type"] == "ORDER_TYPE_LIMIT"
+    assert payloads[-1]["tif"] == "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL"
+    assert payloads[-1]["participateDontInitiate"] is False
+    assert payloads[-1]["synchronousExecution"] is True
+
+
 def test_portfolio_snapshot_uses_exchange_positions_and_activity_endpoints(
     tmp_path, monkeypatch
 ) -> None:
