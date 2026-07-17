@@ -59,6 +59,7 @@ class ValidationRow:
     defensive_gap: float = 0.0
     consistency_gap: float = 0.0
     hot_cold_gap: float = 0.0
+    outcome_3way: int = 0  # 2=home, 1=draw, 0=away — used for soccer 3-way
 
 
 FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
@@ -83,6 +84,7 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "park_factor",
         "weather_factor",
     ),
+    "soccer_3way": ("elo_probability", "trend_gap"),
 }
 
 
@@ -107,7 +109,8 @@ def build_walk_forward_rows(
             trends = TrendEngine(history)
             home_win_rate_30d, home_games_30d = _trailing_home_rate(history, day)
             for game in day_games:
-                if game.home_score == game.away_score:
+                is_soccer = sport.lower() == "soccer"
+                if not is_soccer and game.home_score == game.away_score:
                     continue
                 home_trend = trends.team_trend(game.home_team)
                 away_trend = trends.team_trend(game.away_team)
@@ -116,9 +119,16 @@ def build_walk_forward_rows(
                     if sport.lower() == "mlb"
                     else {"park_factor": 1.0, "status": "not_applicable"}
                 )
-                # Historical scoreboards contain no point-in-time weather in
-                # the current cache. Keep the neutral value explicit and mark
-                # coverage false so the ablation cannot claim a weather gain.
+                # 3-way outcome for soccer: 2=home, 1=draw, 0=away
+                if is_soccer:
+                    if game.home_score > game.away_score:
+                        outcome_3way = 2
+                    elif game.home_score == game.away_score:
+                        outcome_3way = 1
+                    else:
+                        outcome_3way = 0
+                else:
+                    outcome_3way = 0
                 rows.append(
                     ValidationRow(
                         date=day,
@@ -135,6 +145,7 @@ def build_walk_forward_rows(
                         ),
                         trailing_home_win_rate_30d=home_win_rate_30d,
                         trailing_home_games_30d=home_games_30d,
+                        outcome_3way=outcome_3way,
                     )
                 )
         history.extend(day_games)
@@ -185,10 +196,14 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
         variants_to_run.extend(
             ["elo_trend_adaptive_hfa", "elo_trend_park", "elo_trend_park_weather"]
         )
-    variants = {
-        name: evaluate_variant(train, validation, holdout, FEATURE_VARIANTS[name])
-        for name in variants_to_run
-    }
+    if sport.lower() == "soccer":
+        variants_to_run.append("soccer_3way")
+    variants = {}
+    for name in variants_to_run:
+        if name == "soccer_3way":
+            variants[name] = evaluate_variant_3way(train, validation, holdout, FEATURE_VARIANTS[name])
+        else:
+            variants[name] = evaluate_variant(train, validation, holdout, FEATURE_VARIANTS[name])
     agreement = evaluate_agreement(train, validation, holdout)
     return {
         "sport": sport.lower(),
@@ -570,6 +585,123 @@ def evaluate_agreement(
             holdout,
             DIAGNOSTIC_THRESHOLD_TARGET_HIT_RATE,
         ),
+    }
+
+
+def evaluate_variant_3way(
+    train: Sequence[ValidationRow],
+    validation: Sequence[ValidationRow],
+    holdout: Sequence[ValidationRow],
+    feature_names: Sequence[str],
+) -> dict[str, Any]:
+    """3-way multinomial LR for soccer (home/draw/away)."""
+    model = LogisticRegression(max_iter=2_000, solver="lbfgs")
+    X_train = _matrix(train, feature_names)
+    y_train = [row.outcome_3way for row in train]
+    model.fit(X_train, y_train)
+
+    # Predict on holdout: 3 probabilities per row
+    holdout_probs = model.predict_proba(_matrix(holdout, feature_names))
+    validation_probs = model.predict_proba(_matrix(validation, feature_names))
+
+    # For each row: confidence = max prob, selection = argmax (0=away,1=draw,2=home)
+    val_confidences = [float(max(p)) for p in validation_probs]
+    val_selections = [int(p.argmax()) for p in validation_probs]
+    ho_confidences = [float(max(p)) for p in holdout_probs]
+    ho_selections = [int(p.argmax()) for p in holdout_probs]
+
+    # Learn threshold on validation
+    val_outcomes = [1 if s == r.outcome_3way else 0 for s, r in zip(val_selections, validation)]
+    try:
+        threshold, val_stats = learn_confidence_threshold(
+            val_confidences, val_outcomes,
+            target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+            minimum_calls=MINIMUM_CALLS,
+        )
+    except ValueError as error:
+        return {
+            "features": list(feature_names),
+            "coefficients_by_class": {
+                f"class_{k}": {name: round(float(c), 10) for name, c in zip(feature_names, model.coef_[k])}
+                for k in range(3)
+            },
+            "intercept": [round(float(i), 10) for i in model.intercept_],
+            "primary_65": {"status": "no_validation_threshold", "reason": str(error)},
+        }
+
+    # Grade holdout
+    calls = hits = 0
+    for conf, sel, row in zip(ho_confidences, ho_selections, holdout):
+        if conf < threshold:
+            continue
+        calls += 1
+        hits += 1 if sel == row.outcome_3way else 0
+
+    brier = 0.0
+    if holdout:
+        for p, r in zip(holdout_probs, holdout):
+            y_true = r.outcome_3way
+            brier += sum((p[j] - (1 if j == y_true else 0)) ** 2 for j in range(3))
+        brier /= len(holdout)
+    hit_rate = hits / calls if calls else 0.0
+    units = hits * (10/11) - (calls - hits) if calls else 0.0
+
+    # Monthly breakdown
+    monthly = {}
+    for conf, sel, row in zip(ho_confidences, ho_selections, holdout):
+        if conf < threshold:
+            continue
+        m = row.date[:7]
+        if m not in monthly:
+            monthly[m] = {"calls": 0, "hits": 0}
+        monthly[m]["calls"] += 1
+        monthly[m]["hits"] += 1 if sel == row.outcome_3way else 0
+
+    monthly_list = []
+    for m in sorted(monthly):
+        mc = monthly[m]
+        hr = mc["hits"] / mc["calls"] if mc["calls"] else 0
+        status = "qualifying" if mc["calls"] >= MINIMUM_MONTHLY_CALLS else "insufficient_calls"
+        monthly_list.append({
+            "month": m, "calls": mc["calls"], "hits": mc["hits"],
+            "hit_rate": round(hr, 6), "units_at_minus_110": round(mc["hits"] * (10/11) - (mc["calls"] - mc["hits"]), 6),
+            "qualification_status": status,
+        })
+
+    every_month_positive = all(m["units_at_minus_110"] > 0 for m in monthly_list if m["qualification_status"] == "qualifying")
+    qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
+
+    return {
+        "features": list(feature_names),
+        "coefficients_by_class": {
+            f"class_{k}": {name: round(float(c), 10) for name, c in zip(feature_names, model.coef_[k])}
+            for k in range(3)
+        },
+        "intercept": [round(float(i), 10) for i in model.intercept_],
+        "classes": ["away", "draw", "home"],
+        "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": threshold,
+            "validation": val_stats,
+            "locked_holdout": {
+                "qualified": qualified,
+                "calls": calls,
+                "hits": hits,
+                "hit_rate": round(hit_rate, 6),
+                "units_at_minus_110": round(units, 6),
+                "called_rate": round(calls / len(holdout), 6) if holdout else 0,
+                "qualification_eligible": True,
+                "failures": [] if qualified else ["below qualification gate"],
+                "locked_holdout": True,
+                "brier_score": round(brier, 6),
+                "monthly_at_minus_110": monthly_list,
+                "monthly_minimum_calls": MINIMUM_MONTHLY_CALLS,
+                "every_called_month_positive_at_minus_110": every_month_positive,
+                "every_qualifying_month_positive_at_minus_110": every_month_positive,
+                "total_predictions": len(holdout),
+                "selectivity": round(calls / len(holdout), 6) if holdout else 0,
+            },
+        },
     }
 
 

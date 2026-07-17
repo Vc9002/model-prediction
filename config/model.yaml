@@ -69,8 +69,13 @@ data_sources:
 execution:
   status: hard_gated
   allow_manual_research_orders: true
-  manual_research_require_active_model: true
-  manual_research_require_positive_edge: true
+  # Both relaxed by Vincent 2026-07-17: full manual control over any open
+  # research pick. You see model prob, market price, and edge (negative in red)
+  # and choose to buy anyway. HARD safeguards still apply and are NOT config-
+  # toggleable: interactive confirmation of exact order, unit/dollar cap, team
+  # ban check, and Polymarket credentials.
+  manual_research_require_active_model: false
+  manual_research_require_positive_edge: false
   requirements:
   - explicit user execute command in the current turn
   - --execute CLI flag
@@ -158,6 +163,7 @@ models:
     family: elo_trend_logistic_regression
     status: shadow_qualified
     origin: statistical_model
+    model_type: multinomial_3way
     active_production_version: soccer-elo-trend-lr-v1
     production_artifact: config/models/soccer-elo-trend-lr-v1.json
     leagues:
