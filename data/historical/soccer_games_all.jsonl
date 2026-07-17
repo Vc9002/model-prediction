@@ -3131,3 +3131,13 @@
 {"away_score":1,"away_team":"TSV Havelse","event_id":"openligadb:bl3:78631","event_start_utc":"2026-05-16T11:30:00Z","home_score":6,"home_team":"Alemannia Aachen","league":"LIGA_3"}
 {"away_score":0,"away_team":"TSV 1860 M\u00fcnchen","event_id":"openligadb:bl3:78632","event_start_utc":"2026-05-16T11:30:00Z","home_score":3,"home_team":"SC Verl","league":"LIGA_3"}
 {"away_score":4,"away_team":"Erzgebirge Aue","event_id":"openligadb:bl3:78633","event_start_utc":"2026-05-16T11:30:00Z","home_score":2,"home_team":"1. FC Schweinfurt 05","league":"LIGA_3"}
+{"away_score":1,"away_team":"Santos","event_id":"oddsapi:soccer_brazil_campeonato:2026-07-16:548c2609","event_start_utc":"2026-07-16T22:30:00Z","home_score":2,"home_team":"Botafogo","league":"BRASILEIRAO"}
+{"away_score":0,"away_team":"Vasco da Gama","event_id":"oddsapi:soccer_brazil_campeonato:2026-07-16:19d41aa5","event_start_utc":"2026-07-16T22:30:00Z","home_score":1,"home_team":"Vitoria","league":"BRASILEIRAO"}
+{"away_score":1,"away_team":"Nautico PE","event_id":"oddsapi:soccer_brazil_serie_b:2026-07-16:aadde00b","event_start_utc":"2026-07-16T23:01:00Z","home_score":2,"home_team":"Clube de Regatas Brasil","league":"BRAZIL_SERIE_B"}
+{"away_score":1,"away_team":"Chengdu Rongcheng FC","event_id":"oddsapi:soccer_china_superleague:2026-07-17:29d948e5","event_start_utc":"2026-07-17T11:00:00Z","home_score":1,"home_team":"Qingdao West Coast FC","league":"CSL"}
+{"away_score":1,"away_team":"Liaoning Tieren FC","event_id":"oddsapi:soccer_china_superleague:2026-07-17:b1531f3d","event_start_utc":"2026-07-17T11:35:00Z","home_score":1,"home_team":"Beijing FC","league":"CSL"}
+{"away_score":1,"away_team":"Qingdao Hainiu FC","event_id":"oddsapi:soccer_china_superleague:2026-07-17:80056aa3","event_start_utc":"2026-07-17T11:35:00Z","home_score":5,"home_team":"Henan FC","league":"CSL"}
+{"away_score":2,"away_team":"Shanghai SIPG FC","event_id":"oddsapi:soccer_china_superleague:2026-07-17:fb5e64e9","event_start_utc":"2026-07-17T12:00:00Z","home_score":2,"home_team":"Yunnan Yukun","league":"CSL"}
+{"away_score":1,"away_team":"Aalesund","event_id":"oddsapi:soccer_norway_eliteserien:2026-07-16:dd8596c2","event_start_utc":"2026-07-16T17:00:00Z","home_score":6,"home_team":"V\u00e5lerenga","league":"ELITESERIEN"}
+{"away_score":1,"away_team":"Atlante FC","event_id":"oddsapi:soccer_mexico_ligamx:2026-07-17:ee18b7d4","event_start_utc":"2026-07-17T01:00:00Z","home_score":2,"home_team":"Necaxa","league":"LIGA_MX"}
+{"away_score":1,"away_team":"Tigres","event_id":"oddsapi:soccer_mexico_ligamx:2026-07-17:1d58bb6a","event_start_utc":"2026-07-17T03:10:00Z","home_score":3,"home_team":"Tijuana","league":"LIGA_MX"}

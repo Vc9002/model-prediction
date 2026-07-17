@@ -54,3 +54,5 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert 'id="posSellShares-${i}"' in html
     assert "openPositionSell" not in html
     assert "Resting order accepted" in html
+    assert '"cancel pending"' in html
+    assert '["canceled","rejected","expired","replaced"]' in html

@@ -162,3 +162,28 @@ def test_portfolio_snapshot_uses_exchange_positions_and_activity_endpoints(
         ("GET", "/v1/portfolio/activities", None),
         ("GET", "/v1/account/balances", None),
     ]
+
+
+def test_order_snapshots_read_authoritative_exchange_state(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, env=US_CREDS)
+    called = []
+
+    def fake_request(method, path, payload=None):
+        called.append((method, path, payload))
+        return {
+            "order": {
+                "id": "order-canceled-1",
+                "state": "ORDER_STATE_CANCELED",
+                "marketSlug": "wnba-example",
+                "cumQuantity": 0,
+                "leavesQuantity": 0,
+            }
+        }
+
+    monkeypatch.setattr(client, "_request", fake_request)
+
+    result = client.order_snapshots(["order-canceled-1"])
+
+    assert called == [("GET", "/v1/order/order-canceled-1", None)]
+    assert result["orders"][0]["order_state"] == "ORDER_STATE_CANCELED"
+    assert result["orders"][0]["leaves_quantity"] == 0

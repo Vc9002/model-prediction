@@ -282,6 +282,32 @@ class PolymarketExecutor:
             "observed_at_utc": iso_utc(utc_now()),
         }
 
+    def order_snapshots(self, order_ids: list[str]) -> dict[str, Any]:
+        """Read authoritative exchange state for previously submitted orders."""
+        missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
+        if missing:
+            raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
+        orders = []
+        for order_id in dict.fromkeys(str(value) for value in order_ids if value):
+            response = self._request("GET", f"/v1/order/{order_id}")
+            order = response.get("order") or response
+            if not isinstance(order, dict):
+                continue
+            orders.append(
+                {
+                    "order_id": str(order.get("id") or order_id),
+                    "order_state": order.get("state"),
+                    "market_slug": order.get("marketSlug"),
+                    "cum_quantity": order.get("cumQuantity"),
+                    "leaves_quantity": order.get("leavesQuantity"),
+                }
+            )
+        return {
+            "status": "live",
+            "orders": orders,
+            "observed_at_utc": iso_utc(utc_now()),
+        }
+
     # ---------------------------------------------------------------- cancel
 
     def cancel(self, order_id: str, user_command: bool) -> dict[str, Any]:

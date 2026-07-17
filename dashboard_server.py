@@ -802,6 +802,75 @@ def _latest_order_for_pick(row: dict, quote: dict | None) -> dict | None:
     return equivalent[-1] if equivalent else None
 
 
+def _dashboard_order_status(exchange_state: str | None) -> str:
+    state = str(exchange_state or "").upper()
+    return {
+        "ORDER_STATE_FILLED": "filled",
+        "ORDER_STATE_CANCELED": "canceled",
+        "ORDER_STATE_REPLACED": "replaced",
+        "ORDER_STATE_REJECTED": "rejected",
+        "ORDER_STATE_EXPIRED": "expired",
+    }.get(state, "submitted")
+
+
+def _reconcile_orders() -> None:
+    """Replace local submission state with the exchange's current order state."""
+    payload = _load_orders()
+    active = [
+        order
+        for order in payload["orders"]
+        if order.get("status") == "submitted" and order.get("order_id")
+    ]
+    if not active:
+        return
+    order_ids = sorted({str(order["order_id"]) for order in active})
+
+    def fetch_order_states() -> dict:
+        try:
+            command = _resolve_runner() + ["order-status"]
+            for order_id in order_ids:
+                command.extend(("--order-id", order_id))
+            process = subprocess.run(
+                command,
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                env=_runner_env(),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return {}
+        raw = process.stdout if process.returncode == 0 else process.stderr
+        return _decode_command_output(raw)
+
+    result = _cached("order-states:" + ",".join(order_ids), 10, fetch_order_states)
+    if result.get("status") != "live":
+        return
+    by_id = {
+        str(item.get("order_id")): item
+        for item in result.get("orders", [])
+        if item.get("order_id")
+    }
+    changed = False
+    for order in active:
+        snapshot = by_id.get(str(order["order_id"]))
+        if snapshot is None:
+            continue
+        exchange_state = snapshot.get("order_state")
+        updates = {
+            "order_state": exchange_state,
+            "status": _dashboard_order_status(exchange_state),
+            "cum_quantity": snapshot.get("cum_quantity"),
+            "leaves_quantity": snapshot.get("leaves_quantity"),
+            "last_checked_at_utc": result.get("observed_at_utc"),
+        }
+        if any(order.get(key) != value for key, value in updates.items()):
+            order.update(updates)
+            changed = True
+    if changed:
+        _save_orders(payload)
+
+
 def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if row.get("status") != "open":
         return False, "pick is not open"
@@ -886,6 +955,7 @@ def _dedupe_picks(rows: list[dict]) -> list[dict]:
 
 def dashboard_picks() -> list[dict]:
     """Latest unique picks with persistent local-clear and order state attached."""
+    _reconcile_orders()
     archived = set(_load_archive()["pick_ids"])
     return [
         {
@@ -1669,10 +1739,10 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
         if quote is None:
             continue
         links[(str(quote["market_slug"]), str(quote["side"]))] = _link(row)
-    # A submitted dashboard order is durable evidence that the exchange
-    # contract came from a model-ledger row, even after quotes or games age out.
+    # An exchange-acknowledged dashboard order links later fills back to the
+    # model pick, including a partial fill followed by cancellation.
     for order in _load_orders()["orders"]:
-        if order.get("status") != "submitted":
+        if order.get("status") not in {"submitted", "filled", "canceled", "replaced"}:
             continue
         row = rows_by_id.get(str(order.get("pick_id") or ""))
         slug = str(order.get("market_slug") or "")

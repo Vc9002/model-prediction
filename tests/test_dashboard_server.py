@@ -215,6 +215,86 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
     assert dashboard_server._load_orders()["orders"][-1]["status"] == "submitted"
 
 
+def test_reconcile_order_marks_exchange_cancellation_and_unlocks_retry(
+    monkeypatch, tmp_path: Path
+) -> None:
+    orders_path = tmp_path / "orders.json"
+    orders_path.write_text(
+        json.dumps(
+            {
+                "orders": [
+                    {
+                        "pick_id": "model-pick-1",
+                        "status": "submitted",
+                        "order_id": "exchange-canceled-1",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", orders_path)
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["runner"])
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "status": "live",
+                    "orders": [
+                        {
+                            "order_id": "exchange-canceled-1",
+                            "order_state": "ORDER_STATE_CANCELED",
+                            "cum_quantity": 0,
+                            "leaves_quantity": 0,
+                        }
+                    ],
+                    "observed_at_utc": "2026-07-17T16:00:00Z",
+                }
+            ),
+            stderr="",
+        ),
+    )
+    dashboard_server._CACHE.clear()
+
+    dashboard_server._reconcile_orders()
+
+    saved = json.loads(orders_path.read_text(encoding="utf-8"))["orders"][0]
+    assert saved["status"] == "canceled"
+    assert saved["order_state"] == "ORDER_STATE_CANCELED"
+    assert saved["last_checked_at_utc"] == "2026-07-17T16:00:00Z"
+
+
+def test_reconcile_order_preserves_submission_when_exchange_is_unavailable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    orders_path = tmp_path / "orders.json"
+    orders_path.write_text(
+        json.dumps(
+            {"orders": [{"status": "submitted", "order_id": "exchange-unknown"}]}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", orders_path)
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["runner"])
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=3, stdout="", stderr='{"status":"refused"}'
+        ),
+    )
+    dashboard_server._CACHE.clear()
+
+    dashboard_server._reconcile_orders()
+
+    saved = json.loads(orders_path.read_text(encoding="utf-8"))["orders"][0]
+    assert saved["status"] == "submitted"
+
+
 def test_position_sell_refuses_more_than_available(monkeypatch) -> None:
     monkeypatch.setattr(
         dashboard_server,

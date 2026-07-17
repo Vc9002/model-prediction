@@ -673,16 +673,22 @@ function pickLabel(p){
 }
 function orderControl(p,compact=false){
   const order=p.order||{};
-  if(order.status==="submitted")return `<span class="pill win" title="${escAttr(order.order_id||"")}">order placed</span>`;
+  const exchangeState=String(order.order_state||"").replace("ORDER_STATE_","").toLowerCase();
+  if(order.status==="submitted"){
+    const label=exchangeState==="pending_cancel"?"cancel pending":exchangeState==="partially_filled"?"partially filled":"order placed";
+    return `<span class="pill ${exchangeState==="pending_cancel"?"open":"win"}" title="${escAttr((order.order_id||"")+(exchangeState?" · "+exchangeState:""))}">${label}</span>`;
+  }
+  if(order.status==="filled")return `<span class="pill win" title="${escAttr(order.order_id||"")}">filled</span>`;
   const ask=p.quote?.ask;
   const defaultPrice=ask!=null?(Math.max(1,Math.ceil(Number(ask)*100-1e-9)-1)/100).toFixed(2):"";
   const inputId=`orderPrice-${p.pick_id}`;
   const reason=p.buy_ready?"Set a post-only GTC limit price":(p.buy_block_reason||"order unavailable");
   const auth=p.order_authorization==="manual_research_override"?"manual":"model";
   const blocked=reason.includes("older")?"scan prices":reason.includes("POLYMARKET_")?"API key needed":"blocked";
+  const prior=["canceled","rejected","expired","replaced"].includes(order.status)?order.status+" · ":"";
   return `<span class="order-wrap${compact?" compact":""}" title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
     `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
-    `<span class="order-note">${ask!=null?cents(ask)+" ask · ":""}${p.buy_ready?auth:blocked}</span></span>`;
+    `<span class="order-note">${prior}${ask!=null?cents(ask)+" ask · ":""}${p.buy_ready?auth:blocked}</span></span>`;
 }
 function openSell(pickId){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));

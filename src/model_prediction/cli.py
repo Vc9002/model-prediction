@@ -112,6 +112,11 @@ def parser() -> argparse.ArgumentParser:
         "live-portfolio",
         help="read authenticated exchange positions, activities, and balances",
     )
+    order_status = commands.add_parser(
+        "order-status",
+        help="read authoritative state for submitted exchange orders",
+    )
+    order_status.add_argument("--order-id", action="append", required=True)
 
     slate = commands.add_parser(
         "polymarket-slate", help="read dated sports slates from the public Polymarket US API"
@@ -898,6 +903,8 @@ def main(argv: list[str] | None = None) -> None:
             output = _summary(config, ledger)
         elif args.command == "live-portfolio":
             output = PolymarketExecutor(audit).portfolio_snapshot()
+        elif args.command == "order-status":
+            output = PolymarketExecutor(audit).order_snapshots(args.order_id)
         elif args.command == "polymarket-slate":
             output = _polymarket_slate(args, config)
         elif args.command == "polymarket-snapshot":
