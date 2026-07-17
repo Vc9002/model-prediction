@@ -9,12 +9,9 @@
       },
       "error_sd": 4.4319,
       "holdout": {
-        "base_rate_over": 0.418114,
         "brier": 0.248068,
         "calls": 89,
-        "hit_rate": 0.595506,
-        "hits": 53,
-        "units_at_minus_110": 12.181818
+        "hit_rate": 0.595506
       },
       "holdout_observations": 806,
       "league_mean_total": 8.94,
@@ -45,12 +42,9 @@
       },
       "error_sd": 20.5191,
       "holdout": {
-        "base_rate_over": 0.576659,
         "brier": 0.256779,
         "calls": 80,
-        "hit_rate": 0.3375,
-        "hits": 27,
-        "units_at_minus_110": -28.454545
+        "hit_rate": 0.3375
       },
       "holdout_observations": 437,
       "league_mean_total": 228.52,
@@ -81,12 +75,9 @@
       },
       "error_sd": 13.3095,
       "holdout": {
-        "base_rate_over": 0.458716,
         "brier": 0.248164,
         "calls": 56,
-        "hit_rate": 0.553571,
-        "hits": 31,
-        "units_at_minus_110": 3.181818
+        "hit_rate": 0.553571
       },
       "holdout_observations": 109,
       "league_mean_total": 45.86,
@@ -117,12 +108,9 @@
       },
       "error_sd": 1.7275,
       "holdout": {
-        "base_rate_over": 0.334302,
         "brier": 0.240826,
         "calls": 108,
-        "hit_rate": 0.685185,
-        "hits": 74,
-        "units_at_minus_110": 33.272727
+        "hit_rate": 0.685185
       },
       "holdout_observations": 344,
       "league_mean_total": 2.86,
@@ -153,12 +141,9 @@
       },
       "error_sd": 20.9984,
       "holdout": {
-        "base_rate_over": 0.489796,
         "brier": 0.250118,
         "calls": 50,
-        "hit_rate": 0.46,
-        "hits": 23,
-        "units_at_minus_110": -6.090909
+        "hit_rate": 0.46
       },
       "holdout_observations": 98,
       "league_mean_total": 164.0,

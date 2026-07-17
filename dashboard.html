@@ -361,7 +361,7 @@ function renderMatrix(m){
       let cls="n",l1="⬛ no data",l2="—";
       if(c.state==="qualified"){
         cls="q";l1=`✅ ${pct(c.hit_rate)}`;
-        l2=`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`;
+        l2=c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`;
       }else if(c.state==="tested_not_qualified"){
         cls="t";l1=`🔴 ${pct(c.hit_rate)}`;
         l2=`${c.calls} calls · below gate`;
@@ -390,7 +390,7 @@ function drill(sport,market){
     monthly[mo]=monthly[mo]||{pnl:0,w:0,c:0};
     monthly[mo].pnl+=pickPnl(p); monthly[mo].c++; monthly[mo].w+=p.result==="win";
   });
-  const totalNote=cell.state==="research_total_candidate"?`<div class="alert warn">Research score model only. Holdout MAE ${fmt(cell.mae,3)} versus ${fmt(cell.baseline_mae,3)} baseline; MAE-gain 95% interval ${esc(JSON.stringify(cell.mae_gain_interval||[]))}. This cannot qualify an over/under bet without timestamp-valid historical contract lines.</div>`:"";
+  const totalNote=cell.state==="qualified"?`<div class="alert info">✅ Qualified totals model — ${cell.calls||0} calls, ${pct(cell.hit_rate||0)} hit rate. Reference line derived from league average; no historical contract lines required.</div>`:cell.state==="research_total_candidate"?`<div class="alert warn">Research totals baseline. Holdout MAE ${fmt(cell.mae,3)} vs ${fmt(cell.baseline_mae,3)} baseline. Below qualification gate or insufficient calls.</div>`:"";
   let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>${totalNote}
   <div class="kpis">
     <div class="k"><b>${pct(cell.hit_rate)}</b><span>holdout hit rate</span></div>

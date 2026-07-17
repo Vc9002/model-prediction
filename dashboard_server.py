@@ -513,15 +513,19 @@ def matrix() -> dict:
         score_model = total_results.get(sport) or {}
         holdout = score_model.get("locked_holdout") or {}
         if score_model.get("status") == "research_score_model_candidate":
+            qual = (score_model.get("market_qualification") or {}).get("reason", "")
+            state = "qualified" if qual == "qualified" else "research_total_candidate"
             row["total"] = {
-                "state": "research_total_candidate",
+                "state": state,
                 "mae": holdout.get("mae"),
                 "baseline_mae": holdout.get("baseline_mae"),
                 "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
                 "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
                 "holdout_rows": (score_model.get("training") or {}).get("holdout_rows"),
                 "readiness": readiness.get(total_key),
-                "qualification": (score_model.get("market_qualification") or {}).get("reason"),
+                "qualification": qual,
+                "calls": score_model.get("holdout", {}).get("calls"),
+                "hit_rate": score_model.get("holdout", {}).get("hit_rate"),
             }
         else:
             total_readiness = readiness.get(total_key)
