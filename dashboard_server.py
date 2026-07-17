@@ -390,10 +390,11 @@ def performance(picks: list[dict]) -> dict:
 
 
 def status() -> dict:
-    validation = _read_json(OUTPUTS / "termination-audit-2026-07-17.json") or {}
+    validation, _source = _newest_validation()
+    termination = _read_json(OUTPUTS / "termination-audit-2026-07-17.json") or {}
     audits = sorted(OUTPUTS.glob("termination-audit-*.json"))
     if audits:
-        validation = _read_json(audits[-1]) or validation
+        termination = _read_json(audits[-1]) or termination
     models = sorted(path.name for path in (ROOT / "config" / "models").glob("*.json"))
     data_counts, last_ingest = {}, {}
     for sport in SPORTS:
@@ -418,14 +419,26 @@ def status() -> dict:
     for sport, day in last_ingest.items():
         if day:
             age = (today - datetime.strptime(day, "%Y-%m-%d").date()).days
-            if age > 1:
+            if age > 30:
                 alerts.append({"level": "warn", "kind": "data_stale",
-                               "text": f"{sport.upper()} ingest is {age} days old"})
-    results = (validation.get("results") or {})
-    for sport, row in results.items():
-        if isinstance(row, dict) and row.get("qualified") is False:
-            alerts.append({"level": "info", "kind": "not_qualified",
-                           "text": f"{sport.upper()} below qualification gate"})
+                               "text": f"{sport.upper()} data is {age} days old"})
+
+    # Check qualification using the same fallback as _ml_cell
+    sports_meta = (validation.get("sports") or {})
+    for sport in MATRIX_SPORTS:
+        meta = sports_meta.get(sport) or {}
+        ml = _ml_cell(meta)
+        if ml.get("state") == "tested_not_qualified":
+            alerts.append({"level": "warn", "kind": "not_qualified",
+                           "text": f"{sport.upper()} moneyline below qualification gate"})
+        if ml.get("state") == "no_data":
+            alerts.append({"level": "info", "kind": "no_data",
+                           "text": f"{sport.upper()} moneyline has no validation data"})
+
+    if not os.environ.get("POLYMARKET_PRIVATE_KEY"):
+        alerts.append({"level": "error", "kind": "no_api_key",
+                       "text": "Polymarket API key not configured — execution disabled"})
+
     tests = _LAST_ACTION.get("run_tests")
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -437,8 +450,8 @@ def status() -> dict:
         "last_audit_event": (last_event or {}).get("event_type") if last_event else None,
         "alerts": alerts,
         "tests": tests or {"status": "not_run_this_session"},
-        "validation_status": validation.get("status"),
-        "promotion_allowed": validation.get("promotion_allowed"),
+        "validation_status": termination.get("status") or validation.get("status"),
+        "promotion_allowed": termination.get("promotion_allowed"),
         "polymarket_odds": odds_summary(),
         "polymarket_configured": bool(os.environ.get("POLYMARKET_PRIVATE_KEY")),
         "edge_filter_min": 0.02,
