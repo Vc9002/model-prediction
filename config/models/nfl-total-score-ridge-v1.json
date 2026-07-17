@@ -1,0 +1,63 @@
+{
+  "alpha": 10.0,
+  "artifact_hash": "67e80c3038686a377348b63a639caac5998d12612942ab7fa31b7b7abe45d680",
+  "coefficients": [
+    -0.6157138699,
+    0.1869722298,
+    0.1606142713,
+    -0.299038361,
+    0.4676960599,
+    -0.2410860826,
+    0.6718508398,
+    -0.2946799422,
+    0.2886264178
+  ],
+  "feature_names": [
+    "league_total_mean",
+    "away_scored_5",
+    "away_scored_10",
+    "away_allowed_5",
+    "away_allowed_10",
+    "home_scored_5",
+    "home_scored_10",
+    "home_allowed_5",
+    "home_allowed_10"
+  ],
+  "intercept": 52.3511852878,
+  "locked_holdout": {
+    "baseline_mae": 11.70698,
+    "baseline_rmse": 14.388175,
+    "beats_baseline_mae": true,
+    "mae": 11.203117,
+    "mae_gain_95pct_interval": [
+      -0.068442,
+      1.050856
+    ],
+    "mae_gain_vs_rolling_league_mean": 0.503863,
+    "mean_error": 0.331449,
+    "rmse": 13.901586,
+    "statistically_clear_mae_gain": false
+  },
+  "market_qualification": {
+    "eligible": false,
+    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
+    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+  },
+  "method": "ridge_regression",
+  "model_version": "nfl-total-score-ridge-v1",
+  "schema_version": "1",
+  "sport": "nfl",
+  "status": "research_score_model_candidate",
+  "training": {
+    "holdout_end": "2026-02-08",
+    "holdout_rows": 101,
+    "point_in_time": true,
+    "total_games": 670,
+    "train_end": "2025-10-12",
+    "train_rows": 303,
+    "usable_rows": 505,
+    "validation_end": "2025-11-30",
+    "validation_rows": 101
+  },
+  "validation_residual_sd": 13.287409
+}

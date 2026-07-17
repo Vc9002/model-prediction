@@ -1,0 +1,63 @@
+{
+  "alpha": 10.0,
+  "artifact_hash": "16534142d9f39e67c0215fd3016972cbebacc77c01eb5992d10a6a3860fba721",
+  "coefficients": [
+    0.1405220086,
+    0.0856069444,
+    -0.0006734387,
+    -0.0517873406,
+    0.1525304471,
+    -0.0007254683,
+    0.0499147082,
+    -0.0372018579,
+    0.2951548097
+  ],
+  "feature_names": [
+    "league_total_mean",
+    "away_scored_5",
+    "away_scored_10",
+    "away_allowed_5",
+    "away_allowed_10",
+    "home_scored_5",
+    "home_scored_10",
+    "home_allowed_5",
+    "home_allowed_10"
+  ],
+  "intercept": 5.4642320967,
+  "locked_holdout": {
+    "baseline_mae": 3.632583,
+    "baseline_rmse": 4.64088,
+    "beats_baseline_mae": true,
+    "mae": 3.625886,
+    "mae_gain_95pct_interval": [
+      -0.028008,
+      0.040199
+    ],
+    "mae_gain_vs_rolling_league_mean": 0.006697,
+    "mean_error": -0.175703,
+    "rmse": 4.629355,
+    "statistically_clear_mae_gain": false
+  },
+  "market_qualification": {
+    "eligible": false,
+    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
+    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+  },
+  "method": "ridge_regression",
+  "model_version": "mlb-total-score-ridge-v1",
+  "schema_version": "1",
+  "sport": "mlb",
+  "status": "research_score_model_candidate",
+  "training": {
+    "holdout_end": "2026-07-12",
+    "holdout_rows": 722,
+    "point_in_time": true,
+    "total_games": 3763,
+    "train_end": "2025-09-27",
+    "train_rows": 2164,
+    "usable_rows": 3607,
+    "validation_end": "2026-05-19",
+    "validation_rows": 721
+  },
+  "validation_residual_sd": 4.441004
+}

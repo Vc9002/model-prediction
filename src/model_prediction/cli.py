@@ -67,11 +67,12 @@ from .learned_forward import build_learned_moneyline_slate, match_executable_quo
 from .models import MODEL_SPECS
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
 from .models.mlb import load_formula_spec
+from .total_score import validate_all_total_score_models
 from .validation import run_validation_audit, write_production_artifacts
 
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
-LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl")
+LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
 EASTERN = ZoneInfo("America/New_York")
 
 # League value on a ledger row -> ESPN league key(s) to search for results.
@@ -217,8 +218,8 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument(
         "--sports",
         nargs="+",
-        choices=("mlb", "nba", "wnba", "nfl"),
-        default=("mlb", "nba", "wnba", "nfl"),
+        choices=("mlb", "nba", "wnba", "nfl", "soccer", "tennis"),
+        default=("mlb", "nba", "wnba", "nfl", "soccer", "tennis"),
     )
     validate.add_argument(
         "--output",
@@ -230,6 +231,22 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="write hash-verified learned artifacts under config/models",
     )
+
+    total_validate = commands.add_parser(
+        "validate-totals",
+        help="validate research-only point-in-time combined-score models",
+    )
+    total_validate.add_argument(
+        "--sports",
+        nargs="+",
+        choices=("mlb", "nba", "wnba", "nfl"),
+        default=("mlb", "nba", "wnba", "nfl"),
+    )
+    total_validate.add_argument(
+        "--output",
+        default="outputs/latest/total-score-validation.json",
+    )
+    total_validate.add_argument("--write-artifacts", action="store_true")
 
     reconstruct = commands.add_parser(
         "reconstruct-mlb-markets",
@@ -1053,6 +1070,19 @@ def main(argv: list[str] | None = None) -> None:
                 output["production_artifacts"] = write_production_artifacts(
                     output, PROJECT_ROOT / "config/models"
                 )
+            destination.write_text(
+                json.dumps(output, indent=2, sort_keys=True, default=str) + "\n",
+                encoding="utf-8",
+            )
+            output["report_path"] = str(destination)
+        elif args.command == "validate-totals":
+            output = validate_all_total_score_models(
+                FeatureStore(data_root),
+                args.sports,
+                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+            )
+            destination = PROJECT_ROOT / args.output
+            destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(
                 json.dumps(output, indent=2, sort_keys=True, default=str) + "\n",
                 encoding="utf-8",

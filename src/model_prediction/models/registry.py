@@ -51,17 +51,17 @@ MODEL_SPECS = {
     ),
     League.SOCCER: ModelSpec(
         League.SOCCER,
-        "Poisson goal model with Dixon-Coles low-score correction",
-        "three-way result, O/U 2.5, BTTS",
-        "correlated Poisson score matrix",
-        ("EWMA attack/defense strength", "form points", "over/BTTS base rates"),
+        "Elo + opponent-adjusted trend logistic regression",
+        "moneyline home-win probability",
+        "binary logistic regression",
+        ("Elo home-win probability", "offensive momentum gap"),
     ),
     League.TENNIS: ModelSpec(
         League.TENNIS,
-        "surface-blended Elo",
-        "match winner (flat call)",
-        "Elo logistic",
-        ("surface Elo", "overall Elo", "recent form"),
+        "Elo + opponent-adjusted trend logistic regression",
+        "moneyline home-win probability",
+        "binary logistic regression",
+        ("Elo home-win probability", "offensive momentum gap"),
     ),
     League.WORLD_CUP: ModelSpec(
         League.WORLD_CUP,
@@ -89,21 +89,18 @@ def get_model(sport: str) -> Any:
     """Return the unified model object for a sport key."""
     key = sport.lower()
     factories: dict[str, Callable[[], Any]] = {}
-    from .nba import nba_model
-    from .nfl import nfl_model
     from .soccer import soccer_model
     from .tennis import tennis_model
-    from .wnba import wnba_model
 
     factories = {
-        "nba": nba_model,
-        "nfl": nfl_model,
-        "wnba": wnba_model,
         "soccer": soccer_model,
         "tennis": tennis_model,
     }
-    if key == "mlb":
-        raise ValueError("use model_prediction.learned_forward.build_learned_moneyline_slate")
+    if key in ("mlb", "nba", "wnba", "nfl"):
+        raise ValueError(
+            f"{sport} production uses learned_forward.build_learned_moneyline_slate; "
+            "this registry is for research/backtest models only"
+        )
     if key not in factories:
         raise ValueError(f"no unified model for sport: {sport}")
     return factories[key]()

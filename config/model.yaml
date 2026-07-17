@@ -151,26 +151,19 @@ models:
     - wnba-elo-trend-lr-v1
     - wnba-elo-trend-lr-v3
   SOCCER:
-    family: poisson_dixon_coles
+    family: elo_trend_logistic_regression
     status: research
     origin: statistical_model
-    active_research_version: soccer-poisson-dc-v1
+    active_research_version: soccer-elo-trend-lr-v1
     leagues:
     - EPL
     - LA_LIGA
     - BUNDESLIGA
     - SERIE_A
-    - LIGUE_1
-    - EREDIVISIE
-    - PRIMEIRA_LIGA
-    - CHAMPIONSHIP
     - MLS
     - UCL
     - WORLD_CUP
-    markets:
-    - moneyline_3way
-    - total_2_5
-    - btts
+    markets: [moneyline]
   NFL:
     family: elo_trend_normal_approximation
     status: shadow_qualified
@@ -178,10 +171,10 @@ models:
     active_production_version: nfl-elo-trend-lr-v3
     production_artifact: config/models/nfl-elo-trend-lr-v3.json
   TENNIS:
-    family: surface_blended_elo
+    family: elo_trend_logistic_regression
     status: research
     origin: statistical_model
-    active_research_version: tennis-surface-elo-v1
+    active_research_version: tennis-elo-trend-lr-v1
   WORLD_CUP:
     family: poisson_dixon_coles
     status: research

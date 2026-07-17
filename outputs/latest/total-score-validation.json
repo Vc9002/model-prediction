@@ -1,0 +1,265 @@
+{
+  "artifacts": {
+    "mlb": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-total-score-ridge-v1.json",
+    "nba": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-total-score-ridge-v1.json",
+    "nfl": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-total-score-ridge-v1.json",
+    "wnba": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-total-score-ridge-v1.json"
+  },
+  "qualification_note": "No sport is totals-betting qualified without timestamp-valid historical contract lines.",
+  "schema_version": "1",
+  "sports": {
+    "mlb": {
+      "alpha": 10.0,
+      "artifact_hash": "16534142d9f39e67c0215fd3016972cbebacc77c01eb5992d10a6a3860fba721",
+      "coefficients": [
+        0.1405220086,
+        0.0856069444,
+        -0.0006734387,
+        -0.0517873406,
+        0.1525304471,
+        -0.0007254683,
+        0.0499147082,
+        -0.0372018579,
+        0.2951548097
+      ],
+      "feature_names": [
+        "league_total_mean",
+        "away_scored_5",
+        "away_scored_10",
+        "away_allowed_5",
+        "away_allowed_10",
+        "home_scored_5",
+        "home_scored_10",
+        "home_allowed_5",
+        "home_allowed_10"
+      ],
+      "intercept": 5.4642320967,
+      "locked_holdout": {
+        "baseline_mae": 3.632583,
+        "baseline_rmse": 4.64088,
+        "beats_baseline_mae": true,
+        "mae": 3.625886,
+        "mae_gain_95pct_interval": [
+          -0.028008,
+          0.040199
+        ],
+        "mae_gain_vs_rolling_league_mean": 0.006697,
+        "mean_error": -0.175703,
+        "rmse": 4.629355,
+        "statistically_clear_mae_gain": false
+      },
+      "market_qualification": {
+        "eligible": false,
+        "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
+        "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+      },
+      "method": "ridge_regression",
+      "model_version": "mlb-total-score-ridge-v1",
+      "schema_version": "1",
+      "sport": "mlb",
+      "status": "research_score_model_candidate",
+      "training": {
+        "holdout_end": "2026-07-12",
+        "holdout_rows": 722,
+        "point_in_time": true,
+        "total_games": 3763,
+        "train_end": "2025-09-27",
+        "train_rows": 2164,
+        "usable_rows": 3607,
+        "validation_end": "2026-05-19",
+        "validation_rows": 721
+      },
+      "validation_residual_sd": 4.441004
+    },
+    "nba": {
+      "alpha": 10.0,
+      "artifact_hash": "4cd335ac89a0a8c5906d9a7730c4e6c6b594b8d07e96d255e2e48f4aafd0b9ee",
+      "coefficients": [
+        -0.5153986369,
+        0.1088512565,
+        0.5760235699,
+        -0.0458801862,
+        0.492926243,
+        -0.1560764241,
+        0.8455917759,
+        0.030781872,
+        0.4903080119
+      ],
+      "feature_names": [
+        "league_total_mean",
+        "away_scored_5",
+        "away_scored_10",
+        "away_allowed_5",
+        "away_allowed_10",
+        "home_scored_5",
+        "home_scored_10",
+        "home_allowed_5",
+        "home_allowed_10"
+      ],
+      "intercept": 78.2202551943,
+      "locked_holdout": {
+        "baseline_mae": 16.209385,
+        "baseline_rmse": 20.107096,
+        "beats_baseline_mae": true,
+        "mae": 15.83859,
+        "mae_gain_95pct_interval": [
+          -0.267318,
+          0.984008
+        ],
+        "mae_gain_vs_rolling_league_mean": 0.370795,
+        "mean_error": -2.363646,
+        "rmse": 19.812714,
+        "statistically_clear_mae_gain": false
+      },
+      "market_qualification": {
+        "eligible": false,
+        "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
+        "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+      },
+      "method": "ridge_regression",
+      "model_version": "nba-total-score-ridge-v1",
+      "schema_version": "1",
+      "sport": "nba",
+      "status": "research_score_model_candidate",
+      "training": {
+        "holdout_end": "2026-01-05",
+        "holdout_rows": 366,
+        "point_in_time": true,
+        "total_games": 1996,
+        "train_end": "2025-04-08",
+        "train_rows": 1098,
+        "usable_rows": 1830,
+        "validation_end": "2025-11-12",
+        "validation_rows": 366
+      },
+      "validation_residual_sd": 20.105523
+    },
+    "nfl": {
+      "alpha": 10.0,
+      "artifact_hash": "67e80c3038686a377348b63a639caac5998d12612942ab7fa31b7b7abe45d680",
+      "coefficients": [
+        -0.6157138699,
+        0.1869722298,
+        0.1606142713,
+        -0.299038361,
+        0.4676960599,
+        -0.2410860826,
+        0.6718508398,
+        -0.2946799422,
+        0.2886264178
+      ],
+      "feature_names": [
+        "league_total_mean",
+        "away_scored_5",
+        "away_scored_10",
+        "away_allowed_5",
+        "away_allowed_10",
+        "home_scored_5",
+        "home_scored_10",
+        "home_allowed_5",
+        "home_allowed_10"
+      ],
+      "intercept": 52.3511852878,
+      "locked_holdout": {
+        "baseline_mae": 11.70698,
+        "baseline_rmse": 14.388175,
+        "beats_baseline_mae": true,
+        "mae": 11.203117,
+        "mae_gain_95pct_interval": [
+          -0.068442,
+          1.050856
+        ],
+        "mae_gain_vs_rolling_league_mean": 0.503863,
+        "mean_error": 0.331449,
+        "rmse": 13.901586,
+        "statistically_clear_mae_gain": false
+      },
+      "market_qualification": {
+        "eligible": false,
+        "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
+        "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+      },
+      "method": "ridge_regression",
+      "model_version": "nfl-total-score-ridge-v1",
+      "schema_version": "1",
+      "sport": "nfl",
+      "status": "research_score_model_candidate",
+      "training": {
+        "holdout_end": "2026-02-08",
+        "holdout_rows": 101,
+        "point_in_time": true,
+        "total_games": 670,
+        "train_end": "2025-10-12",
+        "train_rows": 303,
+        "usable_rows": 505,
+        "validation_end": "2025-11-30",
+        "validation_rows": 101
+      },
+      "validation_residual_sd": 13.287409
+    },
+    "wnba": {
+      "alpha": 10.0,
+      "artifact_hash": "fd300d8f2328d6c48c56c356b54ab6dde5a8fc65d452fc47c8e0f479407b44f3",
+      "coefficients": [
+        -2.6662523021,
+        -0.0995550285,
+        0.5799852462,
+        0.434929872,
+        0.1884727328,
+        -0.5542342395,
+        1.0098662786,
+        -0.2265120425,
+        1.092863291
+      ],
+      "feature_names": [
+        "league_total_mean",
+        "away_scored_5",
+        "away_scored_10",
+        "away_allowed_5",
+        "away_allowed_10",
+        "home_scored_5",
+        "home_scored_10",
+        "home_allowed_5",
+        "home_allowed_10"
+      ],
+      "intercept": 401.326206447,
+      "locked_holdout": {
+        "baseline_mae": 13.985642,
+        "baseline_rmse": 17.370425,
+        "beats_baseline_mae": true,
+        "mae": 13.732078,
+        "mae_gain_95pct_interval": [
+          -1.149854,
+          1.566496
+        ],
+        "mae_gain_vs_rolling_league_mean": 0.253564,
+        "mean_error": -3.129312,
+        "rmse": 16.994024,
+        "statistically_clear_mae_gain": false
+      },
+      "market_qualification": {
+        "eligible": false,
+        "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
+        "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+      },
+      "method": "ridge_regression",
+      "model_version": "wnba-total-score-ridge-v1",
+      "schema_version": "1",
+      "sport": "wnba",
+      "status": "research_score_model_candidate",
+      "training": {
+        "holdout_end": "2026-07-16",
+        "holdout_rows": 109,
+        "point_in_time": true,
+        "total_games": 630,
+        "train_end": "2025-07-05",
+        "train_rows": 325,
+        "usable_rows": 542,
+        "validation_end": "2025-08-19",
+        "validation_rows": 108
+      },
+      "validation_residual_sd": 18.208023
+    }
+  },
+  "status": "research_only"
+}

@@ -167,9 +167,10 @@ def test_historical_pitcher_audit_rejects_unversioned_retroactive_stats(tmp_path
     assert audit["decision"] == "REJECT_HISTORICAL_PITCHER_FEATURES_LEAKAGE_RISK"
 
 
-def test_basketball_multimarket_validation_requires_exact_lines(tmp_path) -> None:
-    readiness = multi_market_readiness(seed_games(tmp_path), "nba")
+def test_score_sports_multimarket_validation_requires_exact_lines(tmp_path) -> None:
+    for sport in ("nba", "wnba", "nfl"):
+        readiness = multi_market_readiness(seed_games(tmp_path), sport)
 
-    assert readiness["model_parameters_changed"] is False
-    assert readiness["spread"] == "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"
-    assert readiness["total"] == "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"
+        assert readiness["model_parameters_changed"] is False
+        assert readiness["spread"] == "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"
+        assert readiness["total"] == "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"

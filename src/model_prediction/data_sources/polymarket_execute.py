@@ -8,36 +8,39 @@ convention:
    sufficient, and AI assistants must never suggest or propose execution).
 2. The ``--execute`` flag was passed (``execute_flag=True`` here). Without it
    everything is a dry-run preview.
-3. ``POLYMARKET_PRIVATE_KEY`` is present in the environment.
+3. Polymarket US retail API credentials are present in the environment.
 4. An interactive Y/N confirmation shows the exact order (market, side, size,
    price, estimated cost) and receives "Y".
 5. Unit-engine caps were already applied to the pick being executed.
 6. The pick is a QUALIFIED_SHADOW_CALL — research observations are refused.
 7. Every submitted order is written to the append-only audit chain.
 
-Orders always price at the executable ask (buys) / bid (sells) — never the
-midpoint.
+Resting limits use the exact user-confirmed price and are post-only. Current
+BBO is context and a crossing order is refused; the midpoint is never silently
+substituted.
 
-Submission uses the Polymarket CLOB REST API. Order signing requires the
-wallet private key; if the optional ``py_clob_client`` package is not
-installed, the gate still runs end-to-end and refuses at the signing step with
-an actionable message instead of silently faking a fill.
+Submission uses the authenticated Polymarket US retail REST API. It does not
+use the international Polymarket CLOB or a wallet private key.
 """
 
 from __future__ import annotations
 
+import base64
 import os
-import uuid
+import time
 from dataclasses import dataclass
 from typing import Any, Callable
+
+import httpx
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from ..audit import AuditLog
 from ..domain import RecordType, iso_utc, utc_now
 
 
-PRIVATE_KEY_ENV = "POLYMARKET_PRIVATE_KEY"
-WALLET_ADDRESS_ENV = "POLYMARKET_WALLET_ADDRESS"
-CLOB_HOST = "https://clob.polymarket.us"
+KEY_ID_ENV = "POLYMARKET_KEY_ID"
+SECRET_KEY_ENV = "POLYMARKET_SECRET_KEY"
+API_HOST = "https://api.polymarket.us"
 
 
 class ExecutionGateError(RuntimeError):
@@ -50,7 +53,7 @@ class OrderTicket:
     token_side: str  # "long" | "short"
     action: str  # "buy" | "sell"
     order_type: str  # "limit_gtc" | "market"
-    price: float  # executable ask (buy) / bid (sell), probability units
+    price: float  # exact user-confirmed limit, in probability units
     size_shares: float
     pick_id: str
     estimated_cost_usd: float
@@ -101,11 +104,12 @@ class PolymarketExecutor:
                 "order": ticket.describe(),
                 "note": "No --execute flag: paper preview only. No order was placed.",
             }
-        # Gate 3: private key present.
-        if not self.environ.get(PRIVATE_KEY_ENV):
+        # Gate 3: Polymarket US retail API credentials present.
+        missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
+        if missing:
             raise ExecutionGateError(
-                f"REFUSED: {PRIVATE_KEY_ENV} is not set. Real-money execution is "
-                "impossible without the wallet key; nothing was submitted."
+                f"REFUSED: {', '.join(missing)} is not set. Real-money execution is "
+                "impossible without Polymarket US API credentials; nothing was submitted."
             )
         # Gate 6: qualified calls only.
         if pick_row.get("record_type") != RecordType.QUALIFIED_SHADOW_CALL.value:
@@ -118,6 +122,10 @@ class PolymarketExecutor:
         # Gate 5 is upstream (unit engine sized the pick); re-assert sanity.
         if ticket.size_shares <= 0 or not 0 < ticket.price < 1:
             raise ExecutionGateError("REFUSED: order size/price failed sanity checks.")
+        if ticket.order_type != "limit_gtc":
+            raise ExecutionGateError(
+                "REFUSED: the US dashboard supports post-only GTC limit orders only."
+            )
         # Gate 4: interactive confirmation with exact order details.
         answer = self.confirm(f"{ticket.describe()} Confirm? (Y/N): ").strip().casefold()
         if answer not in {"y", "yes"}:
@@ -149,43 +157,87 @@ class PolymarketExecutor:
 
     # ---------------------------------------------------------------- submit
 
-    def _submit(self, ticket: OrderTicket) -> dict[str, Any]:
-        """Sign and post the order to the CLOB. Requires py_clob_client."""
-        private_key = self.environ.get(PRIVATE_KEY_ENV, "")
+    def _auth_headers(self, method: str, path: str) -> dict[str, str]:
+        """Build the documented Polymarket US Ed25519 request headers."""
+        timestamp = str(int(time.time() * 1000))
         try:
-            from py_clob_client.client import ClobClient  # type: ignore[import-not-found]
-            from py_clob_client.clob_types import OrderArgs, OrderType  # type: ignore[import-not-found]
-        except ImportError as error:
+            decoded = base64.b64decode(self.environ[SECRET_KEY_ENV], validate=True)
+            private_key = ed25519.Ed25519PrivateKey.from_private_bytes(decoded[:32])
+        except (KeyError, ValueError) as error:
             raise ExecutionGateError(
-                "REFUSED at signing: py_clob_client is not installed, so the order "
-                "cannot be signed. Install it (pip install py-clob-client) and retry. "
-                "Nothing was submitted."
+                f"REFUSED: {SECRET_KEY_ENV} is not a valid base64 Ed25519 secret key."
             ) from error
-        client = ClobClient(
-            CLOB_HOST,
-            key=private_key,
-            chain_id=137,
-            funder=self.environ.get(WALLET_ADDRESS_ENV),
-        )
-        client.set_api_creds(client.create_or_derive_api_creds())
-        # Resolve the CLOB token ID from the market slug. The Polymarket
-        # CLOB REST API expects a numeric conditional-token ID, not a
-        # human-readable market slug. Passing the slug directly causes a
-        # 400/404 rejection.
-        resolved_token = client.get_token_id(ticket.market_slug)
-        order_args = OrderArgs(
-            token_id=resolved_token,
-            price=ticket.price,
-            size=ticket.size_shares,
-            side="BUY" if ticket.action == "buy" else "SELL",
-        )
-        signed = client.create_order(order_args)
-        order_type = OrderType.GTC if ticket.order_type == "limit_gtc" else OrderType.FOK
-        response = client.post_order(signed, order_type)
+        message = f"{timestamp}{method.upper()}{path}".encode()
+        signature = base64.b64encode(private_key.sign(message)).decode()
         return {
-            "order_id": response.get("orderID") or response.get("id") or uuid.uuid4().hex,
-            "transaction_hash": response.get("transactionsHashes")
-            or response.get("transactionHash"),
+            "X-PM-Access-Key": self.environ[KEY_ID_ENV],
+            "X-PM-Timestamp": timestamp,
+            "X-PM-Signature": signature,
+            "Content-Type": "application/json",
+        }
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            response = httpx.request(
+                method,
+                f"{API_HOST}{path}",
+                headers=self._auth_headers(method, path),
+                json=payload,
+                timeout=15,
+            )
+            response.raise_for_status()
+            output = response.json()
+        except httpx.HTTPStatusError as error:
+            detail = error.response.text[:500]
+            raise ExecutionGateError(
+                f"REFUSED by Polymarket US ({error.response.status_code}): {detail}"
+            ) from error
+        except (httpx.HTTPError, ValueError) as error:
+            raise ExecutionGateError(
+                f"REFUSED: Polymarket US order request failed ({type(error).__name__})."
+            ) from error
+        if not isinstance(output, dict):
+            raise ExecutionGateError("REFUSED: Polymarket US returned an invalid response.")
+        return output
+
+    def _submit(self, ticket: OrderTicket) -> dict[str, Any]:
+        """Submit a post-only GTC limit order to Polymarket US retail."""
+        intent = {
+            ("buy", "long"): "ORDER_INTENT_BUY_LONG",
+            ("buy", "short"): "ORDER_INTENT_BUY_SHORT",
+            ("sell", "long"): "ORDER_INTENT_SELL_LONG",
+            ("sell", "short"): "ORDER_INTENT_SELL_SHORT",
+        }.get((ticket.action, ticket.token_side))
+        if intent is None:
+            raise ExecutionGateError("REFUSED: unsupported order action/side.")
+        response = self._request(
+            "POST",
+            "/v1/orders",
+            {
+                "marketSlug": ticket.market_slug,
+                "intent": intent,
+                "type": "ORDER_TYPE_LIMIT",
+                "price": {"value": f"{ticket.price:.2f}", "currency": "USD"},
+                "quantity": ticket.size_shares,
+                "tif": "TIME_IN_FORCE_GOOD_TILL_CANCEL",
+                "participateDontInitiate": True,
+                "manualOrderIndicator": "MANUAL_ORDER_INDICATOR_MANUAL",
+                "synchronousExecution": False,
+            },
+        )
+        order_id = response.get("id") or (response.get("order") or {}).get("id")
+        if not order_id:
+            raise ExecutionGateError(
+                "REFUSED: Polymarket US did not return an order ID; no submitted state was recorded."
+            )
+        return {
+            "order_id": str(order_id),
+            "order_state": response.get("state") or (response.get("order") or {}).get("state"),
             "raw_response": response,
         }
 
@@ -194,14 +246,9 @@ class PolymarketExecutor:
     def cancel(self, order_id: str, user_command: bool) -> dict[str, Any]:
         if not user_command:
             raise ExecutionGateError("REFUSED: cancellation also requires an explicit user command.")
-        if not self.environ.get(PRIVATE_KEY_ENV):
-            raise ExecutionGateError(f"REFUSED: {PRIVATE_KEY_ENV} is not set.")
-        try:
-            from py_clob_client.client import ClobClient  # type: ignore[import-not-found]
-        except ImportError as error:
-            raise ExecutionGateError("REFUSED: py_clob_client is not installed.") from error
-        client = ClobClient(CLOB_HOST, key=self.environ[PRIVATE_KEY_ENV], chain_id=137)
-        client.set_api_creds(client.create_or_derive_api_creds())
-        response = client.cancel(order_id)
+        missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
+        if missing:
+            raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
+        response = self._request("POST", f"/v1/order/{order_id}/cancel", {})
         self.audit.append("order_cancelled", order_id, {"raw_response": str(response)[:500]})
         return {"status": "cancelled", "order_id": order_id}

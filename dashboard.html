@@ -95,6 +95,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span style="flex:1"></span>
   <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button onclick="bootstrapDialog()">Bootstrap</button>
+  <button onclick="confirmAction('refresh_prices','Scan every supported Polymarket US sport and save fresh executable prices?')">Scan Prices</button>
   <button class="primary" onclick="confirmAction('daily','Run the full daily loop (slate → forecast+log → settle → summary) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
 </div>
 
@@ -323,6 +324,12 @@ function renderMatrix(m){
       let cls="n",label="⬛";
       if(c.state==="qualified"){cls="q";label=`✅ ${pct(c.hit_rate)}<br><span class="dim small">${c.calls} calls · ${fmt(c.units,1)}U</span>`;}
       else if(c.state==="tested_not_qualified"){cls="t";label=`🔴 ${pct(c.hit_rate)}<br><span class="dim small">${c.calls} calls · below gate</span>`;}
+      else if(c.state==="research_total_candidate"){
+        cls="u";
+        const interval=Array.isArray(c.mae_gain_interval)?c.mae_gain_interval.map(v=>fmt(v,2)).join(" to "):"—";
+        label=`🧪 score MAE ${fmt(c.mae,2)}<br><span class="dim small">${c.holdout_rows??"—"} games · gain CI ${interval}<br>market betting blocked</span>`;
+      }
+      else if(c.state==="blocked"){cls="na";label=`⛔ blocked<br><span class="dim small">missing valid contract lines</span>`;}
       else if(c.state==="model_untested"){cls="u";label="🟡 untested";}
       else if(c.state==="not_applicable"){cls="na";label="—";}
       html+=`<td class="cell ${cls}" onclick='drill("${sport}","${mk}")'>${label}</td>`;
@@ -340,7 +347,8 @@ function drill(sport,market){
     monthly[mo]=monthly[mo]||{pnl:0,w:0,c:0};
     monthly[mo].pnl+=pickPnl(p); monthly[mo].c++; monthly[mo].w+=p.result==="win";
   });
-  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>
+  const totalNote=cell.state==="research_total_candidate"?`<div class="alert warn">Research score model only. Holdout MAE ${fmt(cell.mae,3)} versus ${fmt(cell.baseline_mae,3)} baseline; MAE-gain 95% interval ${esc(JSON.stringify(cell.mae_gain_interval||[]))}. This cannot qualify an over/under bet without timestamp-valid historical contract lines.</div>`:"";
+  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>${totalNote}
   <div class="kpis">
     <div class="k"><b>${pct(cell.hit_rate)}</b><span>holdout hit rate</span></div>
     <div class="k"><b>${cell.calls??"—"}</b><span>holdout calls</span></div>
@@ -405,7 +413,7 @@ function renderPicks(){
   const cols=[["created_at_utc","Date"],["league","Sport"],["market_type","Market"],["selection","Pick"],
     ["line","Line"],["model_probability","Conf"],["american_odds","Odds"],["units","U"],
     ["status","Status"],["result","Result"],["pnl_units","P&L"]];
-  let html=`<tr><th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>`+cols.map(([k,l])=>`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`).join("")+"<th>Matchup</th></tr>";
+  let html=`<tr><th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>`+cols.map(([k,l])=>`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`).join("")+"<th>Order</th><th>Matchup</th></tr>";
   rows.forEach(p=>{
     const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
     html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td>${String(p.created_at_utc||"").slice(0,16)}</td><td>${p.league||""}</td>
@@ -413,6 +421,7 @@ function renderPicks(){
       <td>${p.model_probability?pct(Math.max(p.model_probability,1-p.model_probability)):"—"}</td>
       <td>${p.american_odds??""}</td><td>${p.units??""}</td><td>${p.status||""}</td><td>${res}</td>
       <td class="${pickPnl(p)>=0?"green":"red"}">${fmt(pickPnl(p))}</td>
+      <td>${orderControl(p)}</td>
       <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;});
   $("#pickTable").innerHTML=html;
   window.updateSelCount?.();
@@ -595,7 +604,7 @@ async function renderToday(){
         · price ${p.american_odds>0?"+":""}${p.american_odds??"—"} <span class="dim">(${market?pct(market):"—"})</span>
         · edge <b class="${edge>0?"green":"red"}">${edge!=null?pct(edge):"—"}</b>
         ${sizing?("· "+sizing):""}
-        <span class="dim">· ${p.model_version||""}</span>
+        <span class="dim">· ${p.model_version||""}</span> · ${orderControl(p,true)}
         <div class="edgebar"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(48,Math.abs(edge||0)*400)}px;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`;
       d.onclick=()=>showModal(`<h2>${p.away_team} @ ${p.home_team}</h2><pre>${esc(JSON.stringify(p,null,1))}</pre>`);
       box.appendChild(d);
@@ -614,6 +623,57 @@ function pickLabel(p){
   if(p.market_type==="total")return `${sel.toUpperCase()} ${p.line??""}`.trim();
   return `${team||sel.toUpperCase()}${p.line?(" "+p.line):""}`;
 }
+function orderControl(p,compact=false){
+  const order=p.order||{};
+  if(order.status==="submitted")return `<span class="pill win" title="${escAttr(order.order_id||"")}">order placed</span>`;
+  const ask=p.quote?.ask;
+  const label=ask!=null?`Buy · ${Number(ask).toFixed(2)}`:"Buy";
+  const reason=p.buy_ready?"Set a post-only GTC limit price":(p.buy_block_reason||"order unavailable");
+  return `<button class="${p.buy_ready?"primary":""}" title="${escAttr(reason)}" onclick="event.stopPropagation();openBuy('${p.pick_id}')">${label}</button>`+
+    (!compact&&!p.buy_ready?`<div class="dim small">${esc(reason)}</div>`:"");
+}
+function openBuy(pickId){
+  const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
+  if(!p){showModal('<h2 class="red">Pick not found</h2>');return;}
+  if(p.order?.status==="submitted"){
+    showModal(`<h2>Order already placed</h2><pre>${esc(JSON.stringify(p.order,null,1))}</pre>`);return;
+  }
+  if(!p.buy_ready){
+    showModal(`<h2>Buy unavailable</h2><p class="red">${esc(p.buy_block_reason||"Blocked by the execution gate")}</p>
+      <p class="dim small">No order was created. Research-only and zero-unit picks remain non-executable.</p>
+      <button onclick="confirmAction('refresh_prices','Scan and save fresh executable prices now?')">Scan Prices</button>`);return;
+  }
+  const ask=Number(p.quote.ask);
+  const defaultPrice=Math.max(.01,Math.round((ask-.01)*100)/100).toFixed(2);
+  showModal(`<h2>Resting limit order</h2>
+    <p><b>${esc(pickLabel(p))}</b> · current executable ask <b>${ask.toFixed(2)}</b></p>
+    <p class="dim small">Post-only means your price must stay below the ask; it will rest instead of crossing immediately.</p>
+    <label>Limit price <input id="buyPrice" type="number" min="0.01" max="0.99" step="0.01" value="${defaultPrice}"></label><br><br>
+    <label>Shares <input id="buyShares" type="number" min="0.01" max="100000" step="0.01" value="1"></label><br><br>
+    <button class="primary" onclick="previewBuy('${p.pick_id}')">Review exact order</button>`);
+}
+async function previewBuy(pickId){
+  const price=Number($("#buyPrice").value),size_shares=Number($("#buyShares").value);
+  const response=await fetch("/api/order/preview",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({confirm:true,pick_id:pickId,price,size_shares})});
+  const preview=await response.json();
+  if(preview.status!=="preview"){
+    showModal(`<h2 class="red">Order blocked</h2><pre>${esc(preview.error||JSON.stringify(preview))}</pre>`);return;
+  }
+  const exact=`BUY ${preview.size_shares} shares of ${preview.market_slug} (${preview.side}) at ${Number(preview.price).toFixed(2)}. Maximum cost $${Number(preview.estimated_cost_usd).toFixed(2)}. This creates a real post-only GTC resting order.`;
+  if(!window.confirm(exact+"\n\nPlace this real-money order?"))return;
+  showModal("<h2>Submitting exact order…</h2>");
+  const submitResponse=await fetch("/api/order/submit",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({confirm:true,nonce:preview.nonce})});
+  const result=await submitResponse.json();
+  if(result.status!=="submitted"){
+    showModal(`<h2 class="red">Order not placed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;
+  }
+  await refreshAll();
+  showModal(`<h2 class="green">Resting order placed</h2><pre>${esc(JSON.stringify(result,null,1))}</pre>`);
+}
+const escAttr=s=>esc(s).replace(/"/g,"&quot;");
+window.openBuy=openBuy;window.previewBuy=previewBuy;
 const renderLive=renderToday; // legacy name used by refreshAll
 
 /* ---------- Portfolio tab ---------- */
@@ -635,10 +695,10 @@ async function renderFolio(){
       const pick=marker(p);
       const edgeCls=p.edge!=null&&p.edge>=0.02?"green":p.edge!=null&&p.edge>0?"yellow":"red";
       html+=`<tr>
-        <td>${p.league}</td><td class=\"dim\">${match}</td><td>${pick}</td>
+        <td>${p.league}</td><td class="dim">${match}</td><td>${pick}</td>
         <td>${fmt(p.model_probability,3)}</td><td>${fmt(p.market_implied_probability,3)}</td>
-        <td class=\"${edgeCls}\">${p.edge!=null?(p.edge>=0?"+":"")+fmt(p.edge,3):"—"}</td>
-        <td>${fmt(p.units,1)}</td><td><span class=\"pill ${p.record_type===\"QUALIFIED_SHADOW_CALL\"?\"win\":\"open\"}\">${p.record_type===\"QUALIFIED_SHADOW_CALL\"?\"qualified\":\"research\"}</span></td>
+        <td class="${edgeCls}">${p.edge!=null?(p.edge>=0?"+":"")+fmt(p.edge,3):"—"}</td>
+        <td>${fmt(p.units,1)}</td><td><span class="pill ${p.record_type==="QUALIFIED_SHADOW_CALL"?"win":"open"}">${p.record_type==="QUALIFIED_SHADOW_CALL"?"qualified":"research"}</span></td>
       </tr>`;});
     html+=`</table>`;
     $("#folioOpen").innerHTML=html;
@@ -650,7 +710,7 @@ async function renderFolio(){
     <div class="k"><b>${h.count}</b><span>settled (7d)</span></div>
     <div class="k"><b>${h.wins}-${h.losses}${h.pushes?`-${h.pushes}`:""}</b><span>W-L${h.pushes?"-P":""}</span></div>
     <div class="k"><b>${hr}</b><span>hit rate</span></div>
-    <div class="k"><b class=\"${h.total_pnl>=0?\"green\":\"red\"}\">${h.total_pnl>=0?\"+\":\"\"}${fmt(h.total_pnl,2)}</b><span>P&amp;L units</span></div>`;
+    <div class="k"><b class="${h.total_pnl>=0?"green":"red"}">${h.total_pnl>=0?"+":""}${fmt(h.total_pnl,2)}</b><span>P&amp;L units</span></div>`;
   if(!h.count){$("#folioHistory").innerHTML=`<p class="dim">No settled picks in the last 7 days.</p>`;}
   else {
     let html=`<table class="data"><tr>
@@ -660,11 +720,11 @@ async function renderFolio(){
       const pick=marker(p);
       const resCls=p.result==="win"?"win":p.result==="loss"?"loss":"push";
       html+=`<tr>
-        <td>${p.league}</td><td class=\"dim\">${match}</td><td>${pick}</td>
-        <td><span class=\"pill ${resCls}\">${p.result}</span></td>
-        <td class=\"dim\">${p.away_score||"—"}-${p.home_score||"—"}</td>
+        <td>${p.league}</td><td class="dim">${match}</td><td>${pick}</td>
+        <td><span class="pill ${resCls}">${p.result}</span></td>
+        <td class="dim">${p.away_score||"—"}-${p.home_score||"—"}</td>
         <td>${fmt(p.model_probability,3)}</td>
-        <td class=\"${p.pnl_units>=0?\"green\":\"red\"}\">${p.pnl_units>=0?\"+\":\"\"}${fmt(p.pnl_units,2)}</td>
+        <td class="${p.pnl_units>=0?"green":"red"}">${p.pnl_units>=0?"+":""}${fmt(p.pnl_units,2)}</td>
       </tr>`;});
     html+=`</table>`;
     $("#folioHistory").innerHTML=html;

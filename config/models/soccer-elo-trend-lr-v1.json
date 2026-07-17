@@ -1,0 +1,38 @@
+{
+  "artifact_hash": "72b05a354b62d088400bf2e87a3889e3d6ecb6f1cc8f370cfd8dff6240bbb1b7",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        2.5,
+        0.05
+      ],
+      "confidence_threshold": 0.6,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "intercept": -1.2,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "soccer-elo-trend-lr-v1",
+  "qualification": {
+    "calls": 0,
+    "failures": [
+      "insufficient data \u2014 need more bootstrapped games"
+    ],
+    "hit_rate": null,
+    "locked_holdout": true,
+    "note": "Baseline research model. Will auto-qualify when 50+ calls at 60%+ on locked holdout.",
+    "qualified": false
+  },
+  "schema_version": "1",
+  "sport": "soccer",
+  "training": {
+    "end": "2025-09-07",
+    "observations": 220,
+    "start": "2025-08-08",
+    "walk_forward_features": true
+  }
+}

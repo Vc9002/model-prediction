@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -80,3 +81,121 @@ def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
 
     assert "dashboard stopped" in capsys.readouterr().out
     server.server_close.assert_called_once_with()
+
+
+def test_matrix_labels_total_score_artifact_as_research_only(monkeypatch, tmp_path: Path) -> None:
+    output = tmp_path / "outputs"
+    output.mkdir()
+    (output / "total-score-validation.json").write_text(
+        json.dumps(
+            {
+                "sports": {
+                    "nfl": {
+                        "status": "research_score_model_candidate",
+                        "training": {"holdout_rows": 101},
+                        "locked_holdout": {
+                            "mae": 11.2,
+                            "baseline_mae": 11.7,
+                            "mae_gain_vs_rolling_league_mean": 0.5,
+                            "mae_gain_95pct_interval": [-0.2, 1.2],
+                        },
+                        "market_qualification": {"reason": "BLOCKED_MISSING_LINES"},
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output / "learned-model-validation-v2.json").write_text(
+        json.dumps(
+            {
+                "sports": {
+                    "nfl": {
+                        "multi_market_readiness": {
+                            "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+                            "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "OUTPUTS", output)
+
+    cell = dashboard_server.matrix()["grid"]["nfl"]["total"]
+
+    assert cell["state"] == "research_total_candidate"
+    assert cell["holdout_rows"] == 101
+    assert cell["qualification"] == "BLOCKED_MISSING_LINES"
+
+
+def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_path: Path) -> None:
+    pick = {
+        "pick_id": "qualified-1",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+    }
+    quote = {
+        "market_slug": "nfl-example",
+        "side": "long",
+        "ask": 0.60,
+        "fresh": True,
+        "market_state": "MARKET_STATE_OPEN",
+    }
+    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quote)
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0,
+            stdout=json.dumps({"status": "submitted", "order_id": "exchange-123", "order_state": "open"}),
+            stderr="",
+        ),
+    )
+
+    preview = dashboard_server.preview_order(
+        {"pick_id": "qualified-1", "price": 0.55, "size_shares": 10}
+    )
+    result = dashboard_server.submit_order({"nonce": preview["nonce"]})
+
+    assert preview["status"] == "preview"
+    assert result["status"] == "submitted"
+    saved = json.loads((tmp_path / "orders.json").read_text(encoding="utf-8"))["orders"]
+    assert saved[-1]["order_id"] == "exchange-123"
+    assert saved[-1]["price"] == 0.55
+
+
+def test_resting_order_refuses_crossing_the_current_ask(monkeypatch) -> None:
+    pick = {
+        "pick_id": "qualified-2",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_pick_quote",
+        lambda row: {
+            "market_slug": "nfl-example",
+            "side": "long",
+            "ask": 0.60,
+            "fresh": True,
+            "market_state": "MARKET_STATE_OPEN",
+        },
+    )
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+
+    result = dashboard_server.preview_order(
+        {"pick_id": "qualified-2", "price": 0.60, "size_shares": 10}
+    )
+
+    assert result["status"] == "refused"
+    assert "below the current ask" in result["error"]

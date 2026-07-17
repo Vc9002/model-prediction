@@ -38,6 +38,8 @@ LEARNED_ARTIFACT_VERSIONS = {
     "nba": "nba-elo-trend-lr-v3",
     "wnba": "wnba-elo-trend-lr-v3",
     "nfl": "nfl-elo-trend-lr-v3",
+    "soccer": "soccer-elo-trend-lr-v1",
+    "tennis": "tennis-elo-trend-lr-v1",
 }
 
 
@@ -55,11 +57,21 @@ class ValidationRow:
     elo_neutral_probability: float = 0.5
     trailing_home_win_rate_30d: float = 0.5
     trailing_home_games_30d: int = 0
+    defensive_gap: float = 0.0
+    consistency_gap: float = 0.0
+    hot_cold_gap: float = 0.0
 
 
 FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
     "elo_only": ("elo_probability",),
     "elo_trend": ("elo_probability", "trend_gap"),
+    "elo_trend_full": (
+        "elo_probability",
+        "trend_gap",
+        "defensive_gap",
+        "consistency_gap",
+        "hot_cold_gap",
+    ),
     "elo_trend_adaptive_hfa": (
         "elo_neutral_probability",
         "trend_gap",
@@ -302,7 +314,7 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
             first_five_outcomes += all(
                 set(range(1, 6)).issubset(values) for values in periods
             )
-    if key in {"nba", "wnba"}:
+    if key in {"nba", "wnba", "nfl"}:
         return {
             "events_scanned": events,
             "spread_lines": spread_lines,

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Read-only dashboard server for the model-prediction system.
+"""Local operations dashboard server for the model-prediction system.
 
 Serves dashboard.html plus a small JSON API computed from the project's data
-files. STRICTLY a viewer: it never writes to src/, config/, or data/. The only
-writes it can trigger are the whitelisted quick actions, each of which shells
-out to the existing `model-prediction` CLI (or pytest) after an explicit
-confirmation in the UI.
+files. View clearing and order status use local dashboard state. Real order
+submission remains behind the model-prediction CLI's hard gate and a separate,
+exact-ticket confirmation in the UI.
 
 Run:  python3 dashboard_server.py  [--port 8765]
 Then open http://127.0.0.1:8765/
@@ -15,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -38,6 +39,7 @@ DASH_DIR = ROOT / "dashboard"
 LOG_FILE = DASH_DIR / "server.log"
 JOBS_FILE = DASH_DIR / "jobs.json"
 ARCHIVE_FILE = DASH_DIR / "archive.json"
+ORDERS_FILE = DASH_DIR / "orders.json"
 
 
 def _log(message: str) -> None:
@@ -49,7 +51,7 @@ def _log(message: str) -> None:
     except OSError:
         pass
 EASTERN = ZoneInfo("America/New_York")
-SPORTS = ("mlb", "nba", "wnba", "nfl")
+SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis")
 GATEWAY = "https://gateway.polymarket.us"
 
 _CACHE: dict[str, tuple[float, object]] = {}
@@ -59,6 +61,8 @@ _LAST_ACTION: dict[str, object] = {}
 _JOBS: dict[str, dict] = {}
 _JOBS_LOCK = threading.Lock()
 _RUNNER: list[str] | None = None
+_ORDER_PREVIEWS: dict[str, dict] = {}
+_ORDER_LOCK = threading.Lock()
 
 
 def _resolve_runner() -> list[str]:
@@ -360,6 +364,8 @@ def matrix() -> dict:
     audits = sorted(OUTPUTS.glob("termination-audit-*.json"))
     audit = _read_json(audits[-1]) if audits else None
     validation = _read_json(OUTPUTS / "learned-model-validation-v2.json") or {}
+    total_validation = _read_json(OUTPUTS / "total-score-validation.json") or {}
+    total_results = total_validation.get("sports") or {}
     results = (audit or {}).get("results") or {}
     sports_meta = validation.get("sports") or {}
     markets = ["moneyline", "spread", "total", "f5_spread", "f5_total", "yrfi_nrfi"]
@@ -379,10 +385,31 @@ def matrix() -> dict:
         else:
             row["moneyline"] = {"state": "no_data"}
         readiness = (sports_meta.get(sport) or {}).get("multi_market_readiness") or {}
-        for market in ("spread", "total"):
-            row[market] = {
-                "state": "model_untested" if readiness else "no_data",
-                "readiness": readiness.get(market) if isinstance(readiness.get(market), (str, int, float)) else None,
+        spread_key = "full_game_spread" if sport == "mlb" else "spread"
+        total_key = "full_game_total" if sport == "mlb" else "total"
+        spread_readiness = readiness.get(spread_key)
+        row["spread"] = {
+            "state": "blocked" if spread_readiness else "no_data",
+            "readiness": spread_readiness,
+        }
+        score_model = total_results.get(sport) or {}
+        holdout = score_model.get("locked_holdout") or {}
+        if score_model.get("status") == "research_score_model_candidate":
+            row["total"] = {
+                "state": "research_total_candidate",
+                "mae": holdout.get("mae"),
+                "baseline_mae": holdout.get("baseline_mae"),
+                "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
+                "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
+                "holdout_rows": (score_model.get("training") or {}).get("holdout_rows"),
+                "readiness": readiness.get(total_key),
+                "qualification": (score_model.get("market_qualification") or {}).get("reason"),
+            }
+        else:
+            total_readiness = readiness.get(total_key)
+            row["total"] = {
+                "state": "blocked" if total_readiness else "no_data",
+                "readiness": total_readiness,
             }
         for market in ("f5_spread", "f5_total", "yrfi_nrfi"):
             row[market] = {"state": "not_applicable" if sport != "mlb" else "no_data"}
@@ -486,6 +513,262 @@ def market_snapshots(sport: str, day: str) -> dict:
     return {"sport": sport, "date": day, "markets": rows, "count": len(rows)}
 
 
+def _team_matches(team_name: str, side_description: str) -> bool:
+    team = " ".join(team_name.casefold().split())
+    description = " ".join(side_description.casefold().split())
+    if not team or not description:
+        return False
+    if team == description:
+        return True
+    shorter, longer = (
+        (description, team) if len(description) <= len(team) else (team, description)
+    )
+    return f" {shorter} " in f" {longer} "
+
+
+def _pick_quote(row: dict) -> dict | None:
+    """Latest exact stored executable side quote for a full-game moneyline pick."""
+    if row.get("market_type") != "moneyline":
+        return None
+    sport = str(row.get("league") or "").lower()
+    if sport not in SPORTS:
+        return None
+    try:
+        event_start = datetime.fromisoformat(
+            str(row.get("event_start_utc") or "").replace("Z", "+00:00")
+        )
+    except ValueError:
+        return None
+    day = event_start.astimezone(EASTERN).date().isoformat()
+    path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"
+    if not path.exists():
+        return None
+    latest: dict[str, dict] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                snapshot = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if snapshot.get("market_type") != "moneyline":
+                continue
+            slug = str(snapshot.get("market_slug") or "")
+            if not slug or any(
+                marker in slug.casefold()
+                for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")
+            ):
+                continue
+            long_description = str((snapshot.get("long") or {}).get("description") or "")
+            short_description = str((snapshot.get("short") or {}).get("description") or "")
+            away = str(row.get("away_team") or "")
+            home = str(row.get("home_team") or "")
+            if not (
+                (_team_matches(away, long_description) and _team_matches(home, short_description))
+                or (_team_matches(home, long_description) and _team_matches(away, short_description))
+            ):
+                continue
+            latest[slug] = snapshot
+    if not latest:
+        return None
+    snapshot = max(latest.values(), key=lambda item: str(item.get("observed_at_utc") or ""))
+    selected_team = (
+        str(row.get("home_team") or "")
+        if str(row.get("selection") or "").casefold() == "home"
+        else str(row.get("away_team") or "")
+    )
+    side_name = (
+        "long"
+        if _team_matches(selected_team, str((snapshot.get("long") or {}).get("description") or ""))
+        else "short"
+    )
+    side = snapshot.get(side_name) or {}
+    ask = _number(side.get("ask"), -1)
+    if not 0 < ask < 1:
+        return None
+    observed = str(snapshot.get("observed_at_utc") or "")
+    try:
+        observed_at = datetime.fromisoformat(observed.replace("Z", "+00:00"))
+        age_seconds = max(0, int((datetime.now(timezone.utc) - observed_at).total_seconds()))
+    except ValueError:
+        age_seconds = 10**9
+    return {
+        "market_slug": snapshot.get("market_slug"),
+        "side": side_name,
+        "description": side.get("description"),
+        "bid": side.get("bid"),
+        "ask": ask,
+        "ask_size": side.get("ask_size"),
+        "observed_at_utc": observed,
+        "age_seconds": age_seconds,
+        "fresh": age_seconds <= 300,
+        "market_state": snapshot.get("market_state"),
+    }
+
+
+def _load_orders() -> dict:
+    payload = _read_json(ORDERS_FILE) or {}
+    orders = payload.get("orders") if isinstance(payload, dict) else None
+    return {"orders": list(orders) if isinstance(orders, list) else []}
+
+
+def _save_orders(payload: dict) -> None:
+    DASH_DIR.mkdir(exist_ok=True)
+    temporary = ORDERS_FILE.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(payload, indent=2, default=str) + "\n", encoding="utf-8")
+    os.replace(temporary, ORDERS_FILE)
+
+
+def _latest_order_by_pick() -> dict[str, dict]:
+    output: dict[str, dict] = {}
+    for order in _load_orders()["orders"]:
+        pick_id = str(order.get("pick_id") or "")
+        if pick_id:
+            output[pick_id] = order
+    return output
+
+
+def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
+    if row.get("status") != "open":
+        return False, "pick is not open"
+    if row.get("record_type") != "QUALIFIED_SHADOW_CALL":
+        return False, "research-only pick; real orders are blocked"
+    if float(row.get("units") or 0) <= 0:
+        return False, "zero-unit pick; real orders are blocked"
+    if quote is None:
+        return False, "no exact executable Polymarket US market mapping"
+    if not quote.get("fresh"):
+        return False, "market quote is older than 5 minutes; scan prices first"
+    if quote.get("market_state") != "MARKET_STATE_OPEN":
+        return False, "market is not open"
+    missing = [
+        name
+        for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY")
+        if not os.environ.get(name)
+    ]
+    if missing:
+        return False, f"missing {' and '.join(missing)}"
+    return True, "ready"
+
+
+def _decorate_pick(row: dict) -> dict:
+    quote = _pick_quote(row)
+    ready, reason = _order_readiness(row, quote)
+    order = _latest_order_by_pick().get(str(row.get("pick_id") or ""))
+    return {
+        **row,
+        "quote": quote,
+        "order": order,
+        "buy_ready": ready,
+        "buy_block_reason": reason,
+    }
+
+
+def preview_order(payload: dict) -> dict:
+    pick_id = str(payload.get("pick_id") or "")
+    row = next((item for item in read_picks() if str(item.get("pick_id")) == pick_id), None)
+    if row is None:
+        return {"status": "refused", "error": "unknown pick id"}
+    decorated = _decorate_pick(row)
+    if not decorated["buy_ready"]:
+        return {"status": "refused", "error": decorated["buy_block_reason"]}
+    try:
+        price = round(float(payload.get("price")), 2)
+        size_shares = float(payload.get("size_shares"))
+    except (TypeError, ValueError):
+        return {"status": "refused", "error": "price and shares must be numeric"}
+    quote = decorated["quote"]
+    if not 0.01 <= price <= 0.99 or abs(price * 100 - round(price * 100)) > 1e-8:
+        return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
+    if not 0 < size_shares <= 100000:
+        return {"status": "refused", "error": "shares must be greater than 0 and at most 100,000"}
+    if price >= float(quote["ask"]):
+        return {
+            "status": "refused",
+            "error": (
+                f"resting order price must be below the current ask {float(quote['ask']):.2f}; "
+                "crossing orders are blocked"
+            ),
+        }
+    nonce = secrets.token_urlsafe(24)
+    ticket = {
+        "nonce": nonce,
+        "pick_id": pick_id,
+        "market_slug": quote["market_slug"],
+        "side": quote["side"],
+        "price": price,
+        "size_shares": size_shares,
+        "estimated_cost_usd": round(price * size_shares, 2),
+        "created_at": time.time(),
+        "expires_at": time.time() + 300,
+    }
+    with _ORDER_LOCK:
+        _ORDER_PREVIEWS[nonce] = ticket
+    return {"status": "preview", **ticket}
+
+
+def submit_order(payload: dict) -> dict:
+    nonce = str(payload.get("nonce") or "")
+    with _ORDER_LOCK:
+        ticket = _ORDER_PREVIEWS.pop(nonce, None)
+    if ticket is None or time.time() > float(ticket["expires_at"]):
+        return {"status": "refused", "error": "order preview expired; preview it again"}
+    row = next(
+        (item for item in read_picks() if str(item.get("pick_id")) == ticket["pick_id"]),
+        None,
+    )
+    if row is None:
+        return {"status": "refused", "error": "pick disappeared before submission"}
+    quote = _pick_quote(row)
+    ready, reason = _order_readiness(row, quote)
+    if not ready:
+        return {"status": "refused", "error": reason}
+    if quote["market_slug"] != ticket["market_slug"] or ticket["price"] >= float(quote["ask"]):
+        return {"status": "refused", "error": "market or ask changed; preview the order again"}
+    command = _resolve_runner() + [
+        "execute",
+        "--pick-id", ticket["pick_id"],
+        "--size-shares", str(ticket["size_shares"]),
+        "--price", str(ticket["price"]),
+        "--side", ticket["side"],
+        "--action", "buy",
+        "--order-type", "limit_gtc",
+        "--market-slug", ticket["market_slug"],
+        "--execute",
+    ]
+    process = subprocess.run(
+        command,
+        cwd=ROOT,
+        input="Y\n",
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env=_runner_env(),
+    )
+    raw = process.stdout if process.returncode == 0 else process.stderr
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        result = {"status": "refused", "error": raw[-1000:] or "order command failed"}
+    record = {
+        **ticket,
+        "nonce": None,
+        "status": result.get("status", "refused"),
+        "order_id": result.get("order_id"),
+        "order_state": result.get("order_state"),
+        "submitted_at_utc": datetime.now(timezone.utc).isoformat(),
+        "error": result.get("error"),
+    }
+    with _ORDER_LOCK:
+        orders = _load_orders()
+        orders["orders"].append(record)
+        _save_orders(orders)
+    with _CACHE_LOCK:
+        _CACHE.clear()
+    return {**result, "pick_id": ticket["pick_id"]}
+
+
 def live_gateway_slate(sport: str, day: str) -> dict:
     """Read-only live discovery quotes from the public gateway (indicative)."""
     league = {"mlb": "mlb", "nba": "nba", "wnba": "wnba", "nfl": "nfl"}.get(sport)
@@ -537,6 +820,8 @@ def _action_command(name: str, payload: dict) -> list[str]:
     cli = runner if len(runner) > 1 else runner  # module or console-script form
     if name == "daily":
         return cli + ["daily", "--date", str(payload.get("date") or _today())]
+    if name == "refresh_prices":
+        return cli + ["polymarket-slate", "--all", "--date", str(payload.get("date") or _today())]
     if name == "settle":
         return cli + ["settle", "--all-unsettled"]
     if name == "bootstrap":
@@ -722,7 +1007,8 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/picks":
                 def _picks_with_archive():
                     archived = set(_load_archive()["pick_ids"])
-                    return [{**row, "archived": str(row.get("pick_id")) in archived}
+                    return [{**_decorate_pick(row),
+                             "archived": str(row.get("pick_id")) in archived}
                             for row in read_picks()]
                 self._send(_cached("picks", 30, _picks_with_archive))
             elif route == "/api/performance":
@@ -766,6 +1052,8 @@ class Handler(BaseHTTPRequestHandler):
                                    lambda: history_picks(days, sport)))
             elif route == "/api/bets":
                 self._send(_cached("bets", 15, bets_view))
+            elif route == "/api/orders":
+                self._send(_load_orders())
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(timezone.utc).isoformat()[:19]})
             else:
@@ -790,6 +1078,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(archive_action(action, scope or []))
         elif parsed.path == "/api/action":
             self._send(start_action(str(payload.get("action")), payload))
+        elif parsed.path == "/api/order/preview":
+            self._send(preview_order(payload))
+        elif parsed.path == "/api/order/submit":
+            self._send(submit_order(payload))
         else:
             self._send({"error": "unknown route"}, code=404)
 
@@ -808,7 +1100,7 @@ def today_picks(day: str) -> dict:
         start_et = start_dt.astimezone(EASTERN)
         if start_et.date().isoformat() != day:
             continue
-        rows.append({**row, "start_et": start_et.strftime("%I:%M %p ET"),
+        rows.append({**_decorate_pick(row), "start_et": start_et.strftime("%I:%M %p ET"),
                      "start_sort": start_dt.isoformat(),
                      "suggested_paper_units": _suggested_units(row)})
     rows.sort(key=lambda r: (r["start_sort"], str(r.get("league")), str(r.get("market_type"))))

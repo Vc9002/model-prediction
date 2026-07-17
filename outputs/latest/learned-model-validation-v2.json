@@ -1838,7 +1838,12 @@
       "feature_decisions": [],
       "multi_market_readiness": {
         "events_scanned": 670,
-        "status": "not_requested"
+        "model_parameters_changed": false,
+        "reason": "A spread or total outcome is undefined without its exact pregame line; score-only history cannot validate the configured normal-CDF heads.",
+        "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+        "spread_lines": 0,
+        "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+        "total_lines": 0
       },
       "pitcher_feature_audit": null,
       "split": {

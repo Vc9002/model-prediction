@@ -1,4 +1,7 @@
-"""Unified WNBA model (shadow-qualified; versioned in config/git, not filenames)."""
+"""WNBA model — production uses the shared learned LR + confidence-gate pipeline
+(via learned_forward.py), not this file. This module is kept for the
+BasketballModel research/backtest interface.
+"""
 
 from __future__ import annotations
 

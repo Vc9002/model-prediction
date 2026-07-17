@@ -1,0 +1,63 @@
+{
+  "alpha": 10.0,
+  "artifact_hash": "fd300d8f2328d6c48c56c356b54ab6dde5a8fc65d452fc47c8e0f479407b44f3",
+  "coefficients": [
+    -2.6662523021,
+    -0.0995550285,
+    0.5799852462,
+    0.434929872,
+    0.1884727328,
+    -0.5542342395,
+    1.0098662786,
+    -0.2265120425,
+    1.092863291
+  ],
+  "feature_names": [
+    "league_total_mean",
+    "away_scored_5",
+    "away_scored_10",
+    "away_allowed_5",
+    "away_allowed_10",
+    "home_scored_5",
+    "home_scored_10",
+    "home_allowed_5",
+    "home_allowed_10"
+  ],
+  "intercept": 401.326206447,
+  "locked_holdout": {
+    "baseline_mae": 13.985642,
+    "baseline_rmse": 17.370425,
+    "beats_baseline_mae": true,
+    "mae": 13.732078,
+    "mae_gain_95pct_interval": [
+      -1.149854,
+      1.566496
+    ],
+    "mae_gain_vs_rolling_league_mean": 0.253564,
+    "mean_error": -3.129312,
+    "rmse": 16.994024,
+    "statistically_clear_mae_gain": false
+  },
+  "market_qualification": {
+    "eligible": false,
+    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
+    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+  },
+  "method": "ridge_regression",
+  "model_version": "wnba-total-score-ridge-v1",
+  "schema_version": "1",
+  "sport": "wnba",
+  "status": "research_score_model_candidate",
+  "training": {
+    "holdout_end": "2026-07-16",
+    "holdout_rows": 109,
+    "point_in_time": true,
+    "total_games": 630,
+    "train_end": "2025-07-05",
+    "train_rows": 325,
+    "usable_rows": 542,
+    "validation_end": "2025-08-19",
+    "validation_rows": 108
+  },
+  "validation_residual_sd": 18.208023
+}
