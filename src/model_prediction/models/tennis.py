@@ -1,0 +1,147 @@
+"""Unified tennis model: surface-aware Elo for flat-call match winners.
+
+Also home of ``TennisPlayerForm``, the record the Sackmann CSV loader builds.
+Research state until validated through the backtester.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Sequence
+
+from .base import GamePrediction
+
+
+TENNIS_MODEL_VERSION = "tennis-surface-elo-v1"
+DEFAULT_ELO = 1500.0
+K_FACTOR = 32.0
+
+
+@dataclass(frozen=True)
+class TennisPlayerForm:
+    """Point-in-time player form built by the Sackmann CSV loader.
+
+    Field shape is preserved from the original loader contract so cached
+    consumers keep working.
+    """
+
+    player_id: str
+    name: str
+    serve_points_won: float
+    serve_points: int
+    return_points_won: float
+    return_points: int
+    surface_elo: float
+    overall_elo: float
+    recent_serve_points_won: float | None = None
+    recent_serve_points: int = 0
+    recent_return_points_won: float | None = None
+    recent_return_points: int = 0
+    status: str = "available"
+
+
+@dataclass(frozen=True)
+class UpcomingMatch:
+    event_id: str
+    event_start_utc: str
+    player_one: str
+    player_two: str
+    surface: str = "Hard"
+    tour: str = "ATP"
+
+
+class TennisModel:
+    version = TENNIS_MODEL_VERSION
+    sport = "tennis"
+
+    def build_elo(
+        self, matches: Sequence[dict[str, Any]]
+    ) -> tuple[dict[str, float], dict[tuple[str, str], float]]:
+        """Chronological overall and per-surface Elo from match dicts.
+
+        Matches need keys: winner, loser, surface, match_date (sortable).
+        """
+        overall: dict[str, float] = {}
+        by_surface: dict[tuple[str, str], float] = {}
+        for match in sorted(matches, key=lambda item: str(item.get("match_date", ""))):
+            winner = str(match.get("winner", ""))
+            loser = str(match.get("loser", ""))
+            surface = str(match.get("surface", "Hard"))
+            if not winner or not loser:
+                continue
+            for book, key_w, key_l in (
+                (overall, winner, loser),
+                (by_surface, (winner, surface), (loser, surface)),
+            ):
+                rating_w = book.get(key_w, DEFAULT_ELO)  # type: ignore[arg-type]
+                rating_l = book.get(key_l, DEFAULT_ELO)  # type: ignore[arg-type]
+                expected = 1.0 / (1.0 + 10.0 ** (-(rating_w - rating_l) / 400.0))
+                book[key_w] = rating_w + K_FACTOR * (1 - expected)  # type: ignore[index]
+                book[key_l] = rating_l - K_FACTOR * (1 - expected)  # type: ignore[index]
+        return overall, by_surface
+
+    def match_probability(
+        self,
+        overall: dict[str, float],
+        by_surface: dict[tuple[str, str], float],
+        player_one: str,
+        player_two: str,
+        surface: str,
+        surface_weight: float = 0.6,
+    ) -> float:
+        blend_one = (
+            surface_weight * by_surface.get((player_one, surface), DEFAULT_ELO)
+            + (1 - surface_weight) * overall.get(player_one, DEFAULT_ELO)
+        )
+        blend_two = (
+            surface_weight * by_surface.get((player_two, surface), DEFAULT_ELO)
+            + (1 - surface_weight) * overall.get(player_two, DEFAULT_ELO)
+        )
+        return 1.0 / (1.0 + 10.0 ** (-(blend_one - blend_two) / 400.0))
+
+    def predict_matches(
+        self,
+        matches: Sequence[dict[str, Any]],
+        upcoming: Sequence[UpcomingMatch],
+    ) -> list[GamePrediction]:
+        overall, by_surface = self.build_elo(matches)
+        predictions = []
+        for match in upcoming:
+            p_one = self.match_probability(
+                overall, by_surface, match.player_one, match.player_two, match.surface
+            )
+            known_one = match.player_one in overall
+            known_two = match.player_two in overall
+            uncertainty = 0.05 if known_one and known_two else 0.20
+            predictions.append(
+                GamePrediction(
+                    event_id=match.event_id,
+                    event_start_utc=match.event_start_utc,
+                    league=match.tour,
+                    away_team=match.player_one,
+                    home_team=match.player_two,
+                    market_type="moneyline",
+                    line=None,
+                    probabilities={
+                        "away": round(p_one, 6),  # player_one mapped to "away" slot
+                        "home": round(1 - p_one, 6),
+                    },
+                    uncertainty=uncertainty,
+                    model_version=self.version,
+                    feature_basis={
+                        "surface": match.surface,
+                        "elo_p1_surface": round(by_surface.get((match.player_one, match.surface), DEFAULT_ELO), 1),
+                        "elo_p2_surface": round(by_surface.get((match.player_two, match.surface), DEFAULT_ELO), 1),
+                        "history_matches": len(matches),
+                    },
+                    rationale=(
+                        f"Surface-blended Elo on {match.surface}: "
+                        f"{match.player_one} p={p_one:.3f} vs {match.player_two}."
+                    ),
+                )
+            )
+        return predictions
+
+
+def tennis_model() -> TennisModel:
+    return TennisModel()

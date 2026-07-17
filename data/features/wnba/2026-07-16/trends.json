@@ -1,0 +1,302 @@
+{
+  "as_of_date": "2026-07-16",
+  "computation_hash": "b0d2bce936579fec4a082f4d222634251432a722dfa5f5bd43a8278d6382e491",
+  "feature": "trends",
+  "input_games": 27,
+  "payload": {
+    "half_lives": [
+      3.0,
+      10.0,
+      25.0
+    ],
+    "league_baseline": 86.12963,
+    "teams": {
+      "Atlanta Dream": {
+        "consistency": 0.138026,
+        "defense": {
+          "hl10": 86.764381,
+          "hl25": 86.748481,
+          "hl3": 86.816028
+        },
+        "defensive_momentum": -0.067547,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 87.274215,
+          "hl25": 87.266478,
+          "hl3": 87.308016
+        },
+        "offensive_momentum": 0.041538,
+        "team": "Atlanta Dream",
+        "win_rate_hl10": 0.666667
+      },
+      "Chicago Sky": {
+        "consistency": 0.114621,
+        "defense": {
+          "hl10": 86.535594,
+          "hl25": 86.469589,
+          "hl3": 86.773977
+        },
+        "defensive_momentum": -0.304388,
+        "games_played": 4,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 86.035385,
+          "hl25": 85.914628,
+          "hl3": 86.493852
+        },
+        "offensive_momentum": 0.579224,
+        "team": "Chicago Sky",
+        "win_rate_hl10": 0.5
+      },
+      "Connecticut Sun": {
+        "consistency": 0.075332,
+        "defense": {
+          "hl10": 85.676741,
+          "hl25": 85.658038,
+          "hl3": 85.742248
+        },
+        "defensive_momentum": -0.08421,
+        "games_played": 4,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 85.842783,
+          "hl25": 85.834893,
+          "hl3": 85.879787
+        },
+        "offensive_momentum": 0.044894,
+        "team": "Connecticut Sun",
+        "win_rate_hl10": 0.5
+      },
+      "Dallas Wings": {
+        "consistency": 0.090363,
+        "defense": {
+          "hl10": 86.880444,
+          "hl25": 86.851651,
+          "hl3": 86.979244
+        },
+        "defensive_momentum": -0.127593,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 87.639668,
+          "hl25": 87.614585,
+          "hl3": 87.725777
+        },
+        "offensive_momentum": 0.111192,
+        "team": "Dallas Wings",
+        "win_rate_hl10": 1.0
+      },
+      "Golden State Valkyries": {
+        "consistency": 0.082301,
+        "defense": {
+          "hl10": 82.759124,
+          "hl25": 82.737452,
+          "hl3": 82.831237
+        },
+        "defensive_momentum": -0.093785,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 84.770706,
+          "hl25": 84.768205,
+          "hl3": 84.780439
+        },
+        "offensive_momentum": 0.012234,
+        "team": "Golden State Valkyries",
+        "win_rate_hl10": 1.0
+      },
+      "Indiana Fever": {
+        "consistency": 0.092465,
+        "defense": {
+          "hl10": 86.849138,
+          "hl25": 86.930942,
+          "hl3": 86.526349
+        },
+        "defensive_momentum": 0.404593,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 87.976642,
+          "hl25": 87.898945,
+          "hl3": 88.287446
+        },
+        "offensive_momentum": 0.388501,
+        "team": "Indiana Fever",
+        "win_rate_hl10": 0.666667
+      },
+      "Las Vegas Aces": {
+        "consistency": 0.060361,
+        "defense": {
+          "hl10": 84.782404,
+          "hl25": 84.726987,
+          "hl3": 85.011838
+        },
+        "defensive_momentum": -0.284851,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 85.667398,
+          "hl25": 85.703493,
+          "hl3": 85.515359
+        },
+        "offensive_momentum": -0.188134,
+        "team": "Las Vegas Aces",
+        "win_rate_hl10": 0.666667
+      },
+      "Los Angeles Sparks": {
+        "consistency": 0.057148,
+        "defense": {
+          "hl10": 86.403785,
+          "hl25": 86.360661,
+          "hl3": 86.568658
+        },
+        "defensive_momentum": -0.207997,
+        "games_played": 5,
+        "hot_cold_score": -0.205107,
+        "offense": {
+          "hl10": 86.718061,
+          "hl25": 86.672693,
+          "hl3": 86.816045
+        },
+        "offensive_momentum": 0.143352,
+        "team": "Los Angeles Sparks",
+        "win_rate_hl10": 0.4
+      },
+      "Minnesota Lynx": {
+        "consistency": 0.122829,
+        "defense": {
+          "hl10": 87.895743,
+          "hl25": 87.897903,
+          "hl3": 87.869337
+        },
+        "defensive_momentum": 0.028566,
+        "games_played": 5,
+        "hot_cold_score": -0.80709,
+        "offense": {
+          "hl10": 87.15129,
+          "hl25": 87.130124,
+          "hl3": 87.236228
+        },
+        "offensive_momentum": 0.106104,
+        "team": "Minnesota Lynx",
+        "win_rate_hl10": 0.8
+      },
+      "New York Liberty": {
+        "consistency": 0.12463,
+        "defense": {
+          "hl10": 86.320348,
+          "hl25": 86.262549,
+          "hl3": 86.546159
+        },
+        "defensive_momentum": -0.28361,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 85.309383,
+          "hl25": 85.278522,
+          "hl3": 85.42695
+        },
+        "offensive_momentum": 0.148428,
+        "team": "New York Liberty",
+        "win_rate_hl10": 0.0
+      },
+      "Phoenix Mercury": {
+        "consistency": 0.048619,
+        "defense": {
+          "hl10": 86.964865,
+          "hl25": 86.859593,
+          "hl3": 87.354456
+        },
+        "defensive_momentum": -0.494863,
+        "games_played": 4,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 83.981588,
+          "hl25": 83.882097,
+          "hl3": 84.380678
+        },
+        "offensive_momentum": 0.498581,
+        "team": "Phoenix Mercury",
+        "win_rate_hl10": 0.0
+      },
+      "Portland Fire": {
+        "consistency": 0.081701,
+        "defense": {
+          "hl10": 86.590929,
+          "hl25": 86.559474,
+          "hl3": 86.716094
+        },
+        "defensive_momentum": -0.15662,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 86.820769,
+          "hl25": 86.810108,
+          "hl3": 86.853783
+        },
+        "offensive_momentum": 0.043675,
+        "team": "Portland Fire",
+        "win_rate_hl10": 0.333333
+      },
+      "Seattle Storm": {
+        "consistency": 0.155302,
+        "defense": {
+          "hl10": 86.007676,
+          "hl25": 85.858316,
+          "hl3": 86.547423
+        },
+        "defensive_momentum": -0.689107,
+        "games_played": 4,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 85.929974,
+          "hl25": 85.85618,
+          "hl3": 86.199399
+        },
+        "offensive_momentum": 0.343219,
+        "team": "Seattle Storm",
+        "win_rate_hl10": 0.25
+      },
+      "Toronto Tempo": {
+        "consistency": 0.059984,
+        "defense": {
+          "hl10": 88.379071,
+          "hl25": 88.379913,
+          "hl3": 88.379659
+        },
+        "defensive_momentum": 0.000254,
+        "games_played": 4,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 87.18057,
+          "hl25": 87.280641,
+          "hl3": 86.798265
+        },
+        "offensive_momentum": -0.482376,
+        "team": "Toronto Tempo",
+        "win_rate_hl10": 0.25
+      },
+      "Washington Mystics": {
+        "consistency": 0.050176,
+        "defense": {
+          "hl10": 83.539991,
+          "hl25": 83.557301,
+          "hl3": 83.463265
+        },
+        "defensive_momentum": 0.094036,
+        "games_played": 3,
+        "hot_cold_score": 0.0,
+        "offense": {
+          "hl10": 84.266284,
+          "hl25": 84.245415,
+          "hl3": 84.335181
+        },
+        "offensive_momentum": 0.089766,
+        "team": "Washington Mystics",
+        "win_rate_hl10": 0.666667
+      }
+    }
+  },
+  "sport": "wnba"
+}

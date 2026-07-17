@@ -1,0 +1,25 @@
+{
+ "pick_ids": [],
+ "history": [
+  {
+   "at": "2026-07-17T10:53:01",
+   "action": "clear:week",
+   "rows": 0
+  },
+  {
+   "at": "2026-07-17T10:53:01",
+   "action": "restore",
+   "rows": 0
+  },
+  {
+   "at": "2026-07-17T10:54:22",
+   "action": "clear_ids",
+   "rows": 1
+  },
+  {
+   "at": "2026-07-17T10:54:22",
+   "action": "restore",
+   "rows": 1
+  }
+ ]
+}

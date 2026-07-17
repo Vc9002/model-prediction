@@ -1,0 +1,11 @@
+{
+  "calibration_method": "platt",
+  "calibration_version": "platt-v1",
+  "base_model_version": "mlb-analyst-poisson-trend-v0.2",
+  "intercept": -0.5,
+  "slope": 1.2,
+  "training_window_start": "2026-07-07",
+  "training_window_end": "2026-07-10",
+  "sample_size": 115,
+  "artifact_hash": "ab0b24a4b6ee448d26c2597cf6c76c69407e2abd29d4cde5a2f4dda16390126f"
+}

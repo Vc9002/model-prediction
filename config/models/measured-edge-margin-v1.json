@@ -1,0 +1,10 @@
+{
+  "model_version": "measured-edge-margin-v1",
+  "base_score_model_version": "mlb-analyst-poisson-trend-v0.2",
+  "calibration_method": "flat_probability_shrinkage_toward_half",
+  "scale": 0.85,
+  "offset": 0.075,
+  "trained_on_games": 2430,
+  "trained_through_date": "2026-07-16",
+  "artifact_hash": "16dfbbeccdaaf591d67a698cab6894a48c4c5d2023cabd07b8adb51abb2efa43"
+}

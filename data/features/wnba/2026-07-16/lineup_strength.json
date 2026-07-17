@@ -1,0 +1,102 @@
+{
+  "as_of_date": "2026-07-16",
+  "computation_hash": "11cf3c09007a11427e33b08a83819fcfb0a22c8a00620e23b264c670c286c452",
+  "feature": "lineup_strength",
+  "input_games": 27,
+  "payload": {
+    "league_baseline": 86.12963,
+    "teams": {
+      "Atlanta Dream": {
+        "defensive_rating": 1.011265,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.018923
+      },
+      "Chicago Sky": {
+        "defensive_rating": 1.008465,
+        "games": 4,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.005424
+      },
+      "Connecticut Sun": {
+        "defensive_rating": 0.99714,
+        "games": 4,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 0.984772
+      },
+      "Dallas Wings": {
+        "defensive_rating": 1.004306,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.026425
+      },
+      "Golden State Valkyries": {
+        "defensive_rating": 0.946298,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 0.974278
+      },
+      "Indiana Fever": {
+        "defensive_rating": 1.007327,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.027712
+      },
+      "Las Vegas Aces": {
+        "defensive_rating": 0.992785,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.007486
+      },
+      "Los Angeles Sparks": {
+        "defensive_rating": 1.02041,
+        "games": 5,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.01525
+      },
+      "Minnesota Lynx": {
+        "defensive_rating": 1.008419,
+        "games": 5,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.024972
+      },
+      "New York Liberty": {
+        "defensive_rating": 1.01003,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 0.996578
+      },
+      "Phoenix Mercury": {
+        "defensive_rating": 1.027378,
+        "games": 4,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 0.978946
+      },
+      "Portland Fire": {
+        "defensive_rating": 1.009091,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 1.008566
+      },
+      "Seattle Storm": {
+        "defensive_rating": 0.993102,
+        "games": 4,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 0.989393
+      },
+      "Toronto Tempo": {
+        "defensive_rating": 1.011168,
+        "games": 4,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 0.984718
+      },
+      "Washington Mystics": {
+        "defensive_rating": 0.957106,
+        "games": 3,
+        "lineup_status": "unavailable_from_source",
+        "offensive_rating": 0.965677
+      }
+    }
+  },
+  "sport": "wnba"
+}

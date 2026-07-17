@@ -1,0 +1,33 @@
+away_field_run_factor: 1.0
+factor_bounds:
+  bullpen_fatigue:
+  - 0.0
+  - 1.0
+  park_factor:
+  - 0.8
+  - 1.3
+  temperature:
+  - 30.0
+  - 110.0
+  wind_speed:
+  - 0.0
+  - 30.0
+feature_schema_version: v3
+formula_version: mlb-analyst-poisson-trend-v0.2
+home_field_run_factor: 1.04
+league_runs_per_team_game: 4.5
+league_starter_era: 4.2
+league_strikeout_rate: 0.225
+league_walk_rate: 0.082
+recent_half_life_games: 10.0
+recent_prior_strength_games: 12.0
+simulation:
+  num_simulations: 10000
+  seed: 42
+starter_recent_weight: 0.7
+starter_season_weight: 0.3
+strikeout_weight: 0.15
+uncertainty:
+  market: 0.005
+  model: 0.01
+walk_weight: 0.1

@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Prediction — Dashboard</title>
+<style>
+:root{
+  --bg:#1a1a2e; --card:#16213e; --accent:#0f3460; --green:#00ff88;
+  --red:#ff4444; --yellow:#ffaa00; --text:#e8e8f0; --dim:#8890a8;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+[data-theme="light"]{--bg:#eef0f6;--card:#ffffff;--accent:#d7e0f2;--text:#15192b;--dim:#5a6178;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;padding-bottom:60px}
+a{color:var(--green)}
+h2{font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.wrap{max-width:1400px;margin:0 auto;padding:14px}
+.card{background:var(--card);border:1px solid var(--accent);border-radius:10px;padding:14px;margin-bottom:14px;animation:fadein .35s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,170,0,.5)}50%{box-shadow:0 0 0 6px rgba(255,170,0,0)}}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+@media(max-width:1000px){.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+.mono{font-family:var(--mono)}
+.dim{color:var(--dim)} .green{color:var(--green)} .red{color:var(--red)} .yellow{color:var(--yellow)}
+/* status bar */
+#statusbar{position:sticky;top:0;z-index:50;background:var(--card);border-bottom:1px solid var(--accent);
+  padding:8px 16px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12.5px}
+#statusbar .chip{display:flex;gap:6px;align-items:center;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.g{background:var(--green)} .dot.r{background:var(--red)} .dot.y{background:var(--yellow)} .dot.gray{background:#555}
+button{background:var(--accent);border:1px solid #2a4a80;color:var(--text);border-radius:6px;
+  padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:12px}
+button:hover{border-color:var(--green)}
+button.primary{background:#0d4f35;border-color:var(--green)}
+button:disabled{opacity:.45;cursor:not-allowed}
+/* matrix */
+table.matrix{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px}
+table.matrix th,table.matrix td{border:1px solid var(--accent);padding:8px 10px;text-align:center}
+table.matrix th{color:var(--dim);font-weight:600}
+td.cell{cursor:pointer;min-width:96px}
+td.cell.q{background:rgba(0,255,136,.12);border-color:rgba(0,255,136,.5)}
+td.cell.t{background:rgba(255,68,68,.10);border-color:rgba(255,68,68,.4)}
+td.cell.u{background:rgba(255,170,0,.10);border-color:rgba(255,170,0,.4)}
+td.cell.n{color:#556}
+td.cell.na{color:#445;background:rgba(255,255,255,.02)}
+/* tables */
+table.data{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
+table.data th{color:var(--dim);text-align:left;padding:6px 8px;border-bottom:1px solid var(--accent);cursor:pointer;white-space:nowrap}
+table.data td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap}
+table.data tr:hover td{background:rgba(255,255,255,.03)}
+.pill{padding:1px 8px;border-radius:10px;font-size:11px}
+.pill.win{background:rgba(0,255,136,.15);color:var(--green)}
+.pill.loss{background:rgba(255,68,68,.15);color:var(--red)}
+.pill.open{background:rgba(255,170,0,.15);color:var(--yellow)}
+.pill.push{background:rgba(255,255,255,.1);color:var(--dim)}
+input,select{background:var(--bg);color:var(--text);border:1px solid var(--accent);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+canvas{width:100%;height:180px;display:block}
+.kpis{display:flex;gap:22px;flex-wrap:wrap;font-family:var(--mono);margin-bottom:10px}
+.kpis .k{display:flex;flex-direction:column}
+.kpis .k b{font-size:19px}
+.kpis .k span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+/* live picks */
+.pick{border:1px solid var(--accent);border-left:4px solid transparent;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-family:var(--mono);font-size:12.5px}
+.pick.hi{border-left-color:var(--green)} .pick.med{border-left-color:var(--yellow)}
+.edgebar{height:8px;background:rgba(255,255,255,.07);border-radius:4px;position:relative;overflow:hidden;margin-top:4px}
+.edgebar i{position:absolute;top:0;bottom:0;left:50%}
+/* alerts */
+.alert{display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
+.alert.warn{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.4);animation:pulse 2.5s infinite}
+.alert.info{background:rgba(255,255,255,.04);border:1px solid var(--accent)}
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:100}
+#modal .box{background:var(--card);border:1px solid var(--accent);border-radius:12px;max-width:900px;width:92%;max-height:82vh;overflow:auto;padding:18px}
+pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px;border-radius:8px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 14px}
+.tabs button.on{border-color:var(--green);color:var(--green)}
+.secgrid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+@media(max-width:1100px){.secgrid{grid-template-columns:1fr}}
+.small{font-size:11.5px}
+</style>
+</head>
+<body>
+
+<div id="statusbar">
+  <span class="chip"><span class="dot gray" id="testDot"></span><span id="testTxt">Tests: not run</span></span>
+  <span class="chip"><span class="dot g"></span><span id="modelsTxt">Models: …</span></span>
+  <span class="chip mono dim" id="dataTxt">Data: …</span>
+  <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
+  <span class="chip dim" id="updatedTxt">Updated: —</span>
+  <span class="chip dim">refresh <span id="countdown" class="mono">—</span>s</span>
+  <span style="flex:1"></span>
+  <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
+  <button onclick="bootstrapDialog()">Bootstrap</button>
+  <button class="primary" onclick="confirmAction('daily','Run the full daily loop (slate → forecast+log → settle → summary) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
+</div>
+
+<div class="wrap">
+  <div class="tabs" id="tabs">
+    <button data-tab="matrix" class="on">Matrix</button>
+    <button data-tab="picks">Ledger</button>
+    <button data-tab="perf">Performance</button>
+    <button data-tab="today">Today</button>
+    <button data-tab="market">Market</button>
+    <button data-tab="research">Research</button>
+    <button data-tab="settings">Settings</button>
+  </div>
+
+  <section id="tab-matrix">
+    <div class="card">
+      <h2>Sports × Market Matrix</h2>
+      <div class="small dim" id="matrixGate" style="margin-bottom:8px"></div>
+      <table class="matrix" id="matrixTable"></table>
+      <div class="small dim" style="margin-top:8px">
+        🟢 qualified · 🔴 tested, below gate · 🟡 model exists, untested · ⬛ no data · gray = n/a — click a cell to drill down
+      </div>
+    </div>
+    <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
+  </section>
+
+  <section id="tab-picks" style="display:none">
+    <div class="card">
+      <h2>Pick Collection &amp; Ledger</h2>
+      <div class="kpis" id="pickKpis"></div>
+      <div class="filters">
+        <button onclick="preset('today')">Today</button>
+        <button onclick="preset('open')">Open</button>
+        <button onclick="preset('7d')">Last 7d</button>
+        <button onclick="preset('all')">All time</button>
+        <span style="width:10px"></span>
+        <span class="dim small">clear view:</span>
+        <button onclick="clearLedger('day')">Day</button>
+        <button onclick="clearLedger('week')">Week</button>
+        <button onclick="clearLedger('month')">Month</button>
+        <button onclick="clearLedger('all')">Everything</button>
+        <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
+        <label class="small dim"><input type="checkbox" id="fArchived" onchange="renderPicks()"> show cleared (<span id="archCount">0</span>)</label>
+        <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore all</button>
+        <span style="width:10px"></span>
+        <select id="fSport"><option value="">all sports</option></select>
+        <select id="fMarket"><option value="">all markets</option></select>
+        <select id="fStatus"><option value="">all status</option><option>settled</option><option>open</option></select>
+        <select id="fResult"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
+        <input id="fSearch" placeholder="search team / event id" size="22">
+        <input id="fFrom" type="date"><input id="fTo" type="date">
+        <button onclick="renderPicks()">Apply</button>
+        <button onclick="exportCsv()">Export CSV</button>
+      </div>
+      <div style="overflow:auto;max-height:520px"><table class="data" id="pickTable"></table></div>
+    </div>
+  </section>
+
+  <section id="tab-perf" style="display:none">
+    <div class="card"><h2>Cumulative P&amp;L (units)</h2><canvas id="cPnl" height="180"></canvas></div>
+    <div class="grid3">
+      <div class="card"><h2>Win rate by sport</h2><canvas id="cSport"></canvas></div>
+      <div class="card"><h2>Win rate by market</h2><canvas id="cMarket"></canvas></div>
+      <div class="card"><h2>Win rate by confidence</h2><canvas id="cConf"></canvas></div>
+    </div>
+    <div class="grid3">
+      <div class="card"><h2>Monthly P&amp;L</h2><canvas id="cMonth"></canvas></div>
+      <div class="card"><h2>Calibration</h2><canvas id="cCal"></canvas></div>
+      <div class="card"><h2>Streaks &amp; CLV</h2><div id="streaks" class="mono" style="padding-top:14px;line-height:2"></div></div>
+    </div>
+  </section>
+
+  <section id="tab-today" style="display:none">
+    <div class="card">
+      <h2>Today's Picks <span id="todayDate" class="dim"></span></h2>
+      <div class="kpis" id="todayKpis"></div>
+      <div class="small dim" style="margin-bottom:8px">Every ledger pick for today's games (ET). All picks are 0-unit paper research. <b>Only "+EV vs market" rows are tail candidates</b> — "no edge" means the market prices the same side higher than the model does; those are logged to measure the model against the market, not to bet. Sorted best edge first.</div>
+      <div id="todayPicks"></div>
+    </div>
+  </section>
+
+  <section id="tab-market" style="display:none">
+    <div class="card">
+      <h2>Polymarket — stored BBO snapshots</h2>
+      <div class="filters">
+        <select id="mSport"><option>mlb</option><option>nba</option><option>wnba</option><option>nfl</option></select>
+        <input id="mDate" type="date">
+        <button onclick="loadMarket()">Load</button>
+        <span class="dim small">decision prices = stored executable asks; midpoint is reference only</span>
+      </div>
+      <div style="overflow:auto;max-height:560px"><table class="data" id="marketTable"></table></div>
+    </div>
+  </section>
+
+  <section id="tab-research" style="display:none">
+    <div class="secgrid">
+      <div class="card">
+        <h2>Backtest &amp; validation history (outputs/latest)</h2>
+        <table class="data" id="btTable"></table>
+      </div>
+      <div>
+        <div class="card"><h2>Feature decisions</h2><div id="featureLog" class="small mono"></div></div>
+        <div class="card"><h2>Audit chain</h2><div id="auditBox" class="small mono"></div></div>
+        <div class="card"><h2>Data pipeline</h2><div id="pipelineBox" class="small mono"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-settings" style="display:none">
+    <div class="card" style="max-width:560px">
+      <h2>Settings</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+        <label>Refresh interval
+          <select id="sRefresh"><option value="60">1 min</option><option value="300" selected>5 min</option><option value="900">15 min</option><option value="0">manual</option></select>
+        </label>
+        <label>Theme
+          <select id="sTheme"><option value="dark" selected>dark</option><option value="light">light</option></select>
+        </label>
+        <label>Min confidence shown
+          <input id="sMinConf" type="number" step="0.01" min="0.5" max="0.9" value="0.50">
+        </label>
+        <label>Visible sports
+          <span>
+            <label><input type="checkbox" class="sSport" value="mlb" checked>MLB</label>
+            <label><input type="checkbox" class="sSport" value="nba" checked>NBA</label>
+            <label><input type="checkbox" class="sSport" value="wnba" checked>WNBA</label>
+            <label><input type="checkbox" class="sSport" value="nfl" checked>NFL</label>
+          </span>
+        </label>
+      </div>
+      <div style="margin-top:12px"><button onclick="saveSettings()">Save</button></div>
+      <div class="small dim" style="margin-top:10px">Dashboard is a read-only viewer. Quick actions shell out to the existing CLI after confirmation. It never edits model code, configs, or data files.</div>
+    </div>
+  </section>
+</div>
+
+<div id="modal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="box"><div id="modalBody"></div></div>
+</div>
+
+<script>
+"use strict";
+const $=q=>document.querySelector(q), $$=q=>[...document.querySelectorAll(q)];
+const state={picks:[],perf:null,matrix:null,status:null,settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
+const fmt=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
+const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
+
+/* ---------- tabs ---------- */
+$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
+  $("#tab-"+b.dataset.tab).style.display=""; });
+
+/* ---------- settings ---------- */
+function applySettings(){
+  const s=state.settings;
+  if(s.refresh!==undefined)$("#sRefresh").value=s.refresh;
+  if(s.theme){$("#sTheme").value=s.theme;document.documentElement.dataset.theme=s.theme;}
+  if(s.minConf)$("#sMinConf").value=s.minConf;
+  if(s.sports)$$(".sSport").forEach(c=>c.checked=s.sports.includes(c.value));
+}
+function saveSettings(){
+  state.settings={refresh:$("#sRefresh").value,theme:$("#sTheme").value,
+    minConf:parseFloat($("#sMinConf").value)||0.5,
+    sports:$$(".sSport").filter(c=>c.checked).map(c=>c.value)};
+  localStorage.setItem("dash-settings",JSON.stringify(state.settings));
+  document.documentElement.dataset.theme=state.settings.theme;
+  resetTimer(); refreshAll();
+}
+const visibleSports=()=>state.settings.sports||["mlb","nba","wnba","nfl"];
+
+/* ---------- fetch helpers ---------- */
+async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);return r.json();}
+
+/* ---------- status bar ---------- */
+function renderStatus(s){
+  state.status=s;
+  const t=s.tests||{};
+  const dot=$("#testDot"), txt=$("#testTxt");
+  if(t.status==="ok"){dot.className="dot g";txt.textContent="Tests: passing";}
+  else if(t.status==="failed"){dot.className="dot r";txt.textContent="Tests: FAILING";}
+  else {dot.className="dot gray";txt.textContent="Tests: not run";}
+  $("#modelsTxt").textContent=`Models: ${s.models_loaded} artifacts`;
+  $("#dataTxt").textContent="Data: "+Object.entries(s.data_counts).map(([k,v])=>`${k.toUpperCase()} ${v.toLocaleString()}`).join(" · ");
+  const n=(s.alerts||[]).length + (t.status==="failed"?1:0);
+  $("#alertTxt").textContent=`Alerts: ${n}`;
+  $("#alertDot").className="dot "+(n? (s.alerts.some(a=>a.level==="warn")?"y":"g"):"g");
+  $("#updatedTxt").textContent="Updated: "+new Date().toLocaleTimeString();
+  const box=$("#alerts"); box.innerHTML="";
+  const alerts=[...(s.alerts||[])];
+  if(t.status==="failed")alerts.unshift({level:"warn",kind:"tests_failed",text:"pytest has failing tests"});
+  if(!alerts.length)box.innerHTML='<div class="dim small">No active alerts.</div>';
+  alerts.forEach(a=>{const d=document.createElement("div");
+    d.className="alert "+(a.level==="warn"?"warn":"info");
+    d.innerHTML=`<span class="dot ${a.level==="warn"?"y":"gray"}"></span> ${a.text}`;
+    d.onclick=()=>{ if(a.kind==="tests_failed")showModal("<h2>pytest</h2><pre>"+esc((t.output_tail||""))+"</pre>");
+      else $$("#tabs button")[5].click(); };
+    box.appendChild(d);});
+}
+
+/* ---------- matrix ---------- */
+const MARKET_LABELS={moneyline:"ML",spread:"Spread",total:"Total",f5_spread:"F5 Spread",f5_total:"F5 Total",yrfi_nrfi:"YRFI/NRFI"};
+function renderMatrix(m){
+  state.matrix=m;
+  $("#matrixGate").textContent=m.gate?("Qualification gate: "+m.gate+"  ·  source: "+m.source):"";
+  const tbl=$("#matrixTable");
+  let html="<tr><th>Sport</th>"+m.markets.map(k=>`<th>${MARKET_LABELS[k]||k}</th>`).join("")+"</tr>";
+  for(const sport of Object.keys(m.grid)){
+    if(!visibleSports().includes(sport))continue;
+    html+=`<tr><th>${sport.toUpperCase()}</th>`;
+    for(const mk of m.markets){
+      const c=m.grid[sport][mk]||{state:"no_data"};
+      let cls="n",label="⬛";
+      if(c.state==="qualified"){cls="q";label=`✅ ${pct(c.hit_rate)}<br><span class="dim small">${c.calls} calls · ${fmt(c.units,1)}U</span>`;}
+      else if(c.state==="tested_not_qualified"){cls="t";label=`🔴 ${pct(c.hit_rate)}<br><span class="dim small">${c.calls} calls · below gate</span>`;}
+      else if(c.state==="model_untested"){cls="u";label="🟡 untested";}
+      else if(c.state==="not_applicable"){cls="na";label="—";}
+      html+=`<td class="cell ${cls}" onclick='drill("${sport}","${mk}")'>${label}</td>`;
+    }
+    html+="</tr>";
+  }
+  tbl.innerHTML=html;
+}
+function drill(sport,market){
+  const cell=(state.matrix.grid[sport]||{})[market]||{};
+  const picks=state.picks.filter(p=>String(p.league).toLowerCase()===sport&&String(p.market_type)===market.replace("moneyline","moneyline"));
+  const monthly={};
+  picks.filter(p=>p.status==="settled"&&(p.result==="win"||p.result==="loss")).forEach(p=>{
+    const mo=String(p.settled_at_utc||"").slice(0,7);
+    monthly[mo]=monthly[mo]||{pnl:0,w:0,c:0};
+    monthly[mo].pnl+=pickPnl(p); monthly[mo].c++; monthly[mo].w+=p.result==="win";
+  });
+  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>
+  <div class="kpis">
+    <div class="k"><b>${pct(cell.hit_rate)}</b><span>holdout hit rate</span></div>
+    <div class="k"><b>${cell.calls??"—"}</b><span>holdout calls</span></div>
+    <div class="k"><b>${fmt(cell.units,1)}</b><span>units @ -110</span></div>
+    <div class="k"><b>${fmt(cell.brier,3)}</b><span>brier</span></div>
+    <div class="k"><b>${fmt(cell.threshold,3)}</b><span>learned threshold</span></div>
+  </div><h2>Ledger months</h2><table class="data"><tr><th>Month</th><th>Calls</th><th>Wins</th><th>P&L</th><th></th></tr>`;
+  const months=Object.keys(monthly).sort();
+  if(!months.length)html+=`<tr><td colspan=5 class="dim">no settled ledger rows for this cell yet</td></tr>`;
+  const maxAbs=Math.max(0.1,...months.map(mo=>Math.abs(monthly[mo].pnl)));
+  months.forEach(mo=>{const e=monthly[mo];
+    const w=Math.round(60*Math.abs(e.pnl)/maxAbs);
+    html+=`<tr><td>${mo}</td><td>${e.c}</td><td>${e.w}</td>
+      <td class="${e.pnl>=0?"green":"red"}">${fmt(e.pnl)}</td>
+      <td><span style="display:inline-block;height:9px;width:${w}px;background:${e.pnl>=0?"var(--green)":"var(--red)"};border-radius:3px"></span></td></tr>`;});
+  html+="</table>";
+  showModal(html);
+}
+
+/* ---------- picks ---------- */
+const pickPnl=p=>{const u=Number(p.units)||0; if(u>0)return Number(p.pnl_units)||0;
+  return p.research_score_units?Number(p.research_pnl_units)||0:0;};
+function populateFilters(){
+  const sports=[...new Set(state.picks.map(p=>p.league))].sort();
+  const markets=[...new Set(state.picks.map(p=>p.market_type))].sort();
+  $("#fSport").innerHTML='<option value="">all sports</option>'+sports.map(s=>`<option>${s}</option>`).join("");
+  $("#fMarket").innerHTML='<option value="">all markets</option>'+markets.map(s=>`<option>${s}</option>`).join("");
+}
+function filteredPicks(){
+  const s=$("#fSport").value,m=$("#fMarket").value,st=$("#fStatus").value,r=$("#fResult").value,
+        q=$("#fSearch").value.trim().toLowerCase(),from=$("#fFrom").value,to=$("#fTo").value;
+  const showArchived=$("#fArchived").checked;
+  return state.picks.filter(p=>{
+    if(p.archived&&!showArchived)return false;
+    if(s&&p.league!==s)return false;
+    if(m&&p.market_type!==m)return false;
+    if(st&&p.status!==st)return false;
+    if(r&&p.result!==r)return false;
+    if(q&&!(String(p.away_team).toLowerCase().includes(q)||String(p.home_team).toLowerCase().includes(q)||String(p.event_id).includes(q)))return false;
+    // Date range filters on the GAME date, not when the pick was logged.
+    const d=String(p.event_start_utc||p.created_at_utc||"").slice(0,10);
+    if(from&&d<from)return false;
+    if(to&&d>to)return false;
+    return true;
+  });
+}
+let sortKey="created_at_utc",sortAsc=false;
+function renderPicks(){
+  const archivedCount=state.picks.filter(p=>p.archived).length;
+  $("#archCount").textContent=archivedCount;
+  $("#restoreBtn").style.display=archivedCount?"":"none";
+  const rows=filteredPicks().sort((a,b)=>{
+    const x=a[sortKey]??"",y=b[sortKey]??"";
+    return (x>y?1:x<y?-1:0)*(sortAsc?1:-1);});
+  const perf=state.perf||{};
+  $("#pickKpis").innerHTML=`
+    <div class="k"><b>${perf.total_picks??rows.length}</b><span>picks</span></div>
+    <div class="k"><b>${pct(perf.win_rate)}</b><span>win rate</span></div>
+    <div class="k"><b class="${(perf.total_pnl||0)>=0?"green":"red"}">${fmt(perf.total_pnl)}</b><span>total P&amp;L (U)</span></div>
+    <div class="k"><b>${pct(perf.roi)}</b><span>ROI</span></div>
+    <div class="k"><b>${perf.streaks?(perf.streaks.current>0?"W"+perf.streaks.current:perf.streaks.current<0?"L"+(-perf.streaks.current):"—"):"—"}</b><span>streak</span></div>`;
+  const cols=[["created_at_utc","Date"],["league","Sport"],["market_type","Market"],["selection","Pick"],
+    ["line","Line"],["model_probability","Conf"],["american_odds","Odds"],["units","U"],
+    ["status","Status"],["result","Result"],["pnl_units","P&L"]];
+  let html=`<tr><th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>`+cols.map(([k,l])=>`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`).join("")+"<th>Matchup</th></tr>";
+  rows.forEach(p=>{
+    const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
+    html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td>${String(p.created_at_utc||"").slice(0,16)}</td><td>${p.league||""}</td>
+      <td>${p.market_type||""}</td><td>${pickLabel(p)}</td><td>${p.line??""}</td>
+      <td>${p.model_probability?pct(Math.max(p.model_probability,1-p.model_probability)):"—"}</td>
+      <td>${p.american_odds??""}</td><td>${p.units??""}</td><td>${p.status||""}</td><td>${res}</td>
+      <td class="${pickPnl(p)>=0?"green":"red"}">${fmt(pickPnl(p))}</td>
+      <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;});
+  $("#pickTable").innerHTML=html;
+}
+window.setSort=k=>{if(sortKey===k)sortAsc=!sortAsc;else{sortKey=k;sortAsc=false;}renderPicks();};
+async function clearLedger(scope){
+  const label={day:"today's settled picks",week:"the last 7 days of settled picks",
+    month:"the last 30 days of settled picks",all:"ALL settled picks"}[scope];
+  if(!window.confirm(`Clear ${label} from the ledger VIEW?\n\nNothing is deleted — every row stays in picks.xlsx and keeps feeding performance, calibration, and research. Open picks are never cleared. Restorable anytime.`))return;
+  try{
+    const r=await fetch("/api/archive",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"clear",scope,confirm:true})});
+    const d=await r.json();
+    if(d.status!=="ok"){alert(d.error||"failed");return;}
+    await refreshAll();
+  }catch(e){alert("server unreachable: "+e.message);}
+}
+async function restoreLedger(){
+  if(!window.confirm("Restore every cleared row to the ledger view?"))return;
+  try{
+    await fetch("/api/archive",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"restore",confirm:true})});
+    await refreshAll();
+  }catch(e){alert("server unreachable: "+e.message);}
+}
+window.toggleAllRows=box=>{$$(".rowSel").forEach(c=>{c.checked=box.checked;});updateSelCount();};
+window.updateSelCount=()=>{
+  const n=$$(".rowSel").filter(c=>c.checked).length;
+  $("#selCount").textContent=n;
+  $("#clearSelBtn").style.display=n?"":"none";
+};
+async function clearSelected(){
+  const ids=$$(".rowSel").filter(c=>c.checked).map(c=>c.value);
+  if(!ids.length)return;
+  if(!window.confirm(`Clear ${ids.length} selected row(s) from the ledger VIEW?\n\nNothing is deleted — rows stay in picks.xlsx and keep feeding research. Restorable anytime.`))return;
+  try{
+    const r=await fetch("/api/archive",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"clear_ids",pick_ids:ids,confirm:true})});
+    const d=await r.json();
+    if(d.status!=="ok"){alert(d.error||"failed");return;}
+    if((d.blocked_open_staked||[]).length)alert("Skipped "+d.blocked_open_staked.length+" open staked pick(s) — live exposure stays visible.");
+    await refreshAll();
+  }catch(e){alert("server unreachable: "+e.message);}
+}
+window.clearSelected=clearSelected;
+window.clearLedger=clearLedger; window.restoreLedger=restoreLedger;
+window.preset=which=>{
+  const iso=d=>d.toISOString().slice(0,10);
+  const today=new Date();
+  $("#fStatus").value="";$("#fFrom").value="";$("#fTo").value="";$("#fResult").value="";
+  if(which==="today"){$("#fFrom").value=iso(today);$("#fTo").value=iso(today);}
+  else if(which==="open"){$("#fStatus").value="open";}
+  else if(which==="7d"){const from=new Date(today-6*864e5);$("#fFrom").value=iso(from);}
+  renderPicks();
+};
+function exportCsv(){
+  const rows=filteredPicks();
+  const cols=Object.keys(rows[0]||{});
+  const csv=[cols.join(",")].concat(rows.map(r=>cols.map(c=>{
+    let v=r[c]==null?"":String(r[c]).replace(/"/g,'""');
+    return /[,"\n]/.test(v)?`"${v}"`:v;}).join(","))).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="picks_export.csv"; a.click();
+}
+
+/* ---------- charts (vanilla canvas) ---------- */
+function canvasCtx(id){const c=$(id);const dpr=window.devicePixelRatio||1;
+  const w=c.clientWidth||600,h=c.clientHeight||180;
+  c.width=w*dpr;c.height=h*dpr;const ctx=c.getContext("2d");ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);return {ctx,w,h};}
+function lineChart(id,points,color){const {ctx,w,h}=canvasCtx(id);
+  if(!points.length){noData(ctx,w,h);return;}
+  const vals=points.map(p=>p.pnl??p.y);
+  const min=Math.min(0,...vals),max=Math.max(0,...vals),pad=24;
+  const X=i=>pad+(w-2*pad)*i/Math.max(1,points.length-1);
+  const Y=v=>h-pad-(h-2*pad)*((v-min)/((max-min)||1));
+  ctx.strokeStyle="rgba(255,255,255,.15)";ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(w-pad,Y(0));ctx.stroke();
+  ctx.beginPath();points.forEach((p,i)=>{const y=Y(vals[i]);i?ctx.lineTo(X(i),y):ctx.moveTo(X(0),y);});
+  ctx.strokeStyle=color||( vals[vals.length-1]>=0?"#00ff88":"#ff4444");ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle="#8890a8";ctx.font="10px monospace";
+  ctx.fillText(fmt(max),4,Y(max)+4);ctx.fillText(fmt(min),4,Y(min));
+  ctx.fillText(fmt(vals[vals.length-1]),w-pad-30,Y(vals[vals.length-1])-6);}
+function barChart(id,labels,values,opts={}){const {ctx,w,h}=canvasCtx(id);
+  if(!labels.length){noData(ctx,w,h);return;}
+  const pad=26,bh=Math.min(22,(h-2*pad)/labels.length-6);
+  const maxAbs=Math.max(0.001,...values.map(Math.abs), opts.max||0);
+  labels.forEach((lab,i)=>{
+    const y=pad+i*((h-2*pad)/labels.length);
+    const v=values[i];
+    const zero=opts.signed?w/2:90;
+    const len=(opts.signed?(w/2-40):(w-zero-40))*Math.abs(v)/maxAbs;
+    ctx.fillStyle=v>=0?(opts.color||"#00ff88"):"#ff4444";
+    ctx.fillRect(opts.signed&&v<0?zero-len:zero,y,Math.max(2,len),bh);
+    ctx.fillStyle="#e8e8f0";ctx.font="10.5px monospace";
+    ctx.fillText(lab,4,y+bh-3);
+    ctx.fillStyle="#8890a8";
+    ctx.fillText(opts.pct?pct(v):fmt(v),(opts.signed&&v<0?zero-len-42:zero+len+6),y+bh-3);});}
+function calChart(id,buckets){const {ctx,w,h}=canvasCtx(id);
+  if(!buckets.length){noData(ctx,w,h);return;}
+  const pad=26,X=v=>pad+(w-2*pad)*v,Y=v=>h-pad-(h-2*pad)*v;
+  ctx.strokeStyle="rgba(255,255,255,.2)";ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(X(0),Y(0));ctx.lineTo(X(1),Y(1));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle="#00ff88";
+  buckets.forEach(b=>{ctx.beginPath();ctx.arc(X(b.mean_p),Y(b.hit_rate),3+Math.min(6,b.count/4),0,7);ctx.fill();});
+  ctx.fillStyle="#8890a8";ctx.font="10px monospace";
+  ctx.fillText("predicted →",w/2-30,h-6);ctx.save();ctx.translate(10,h/2+24);ctx.rotate(-Math.PI/2);ctx.fillText("actual →",0,0);ctx.restore();}
+function noData(ctx,w,h){ctx.fillStyle="#556";ctx.font="12px monospace";ctx.fillText("No data",w/2-24,h/2);}
+
+function renderPerf(p){
+  state.perf=p;
+  lineChart("#cPnl",p.pnl_curve||[]);
+  const bs=Object.entries(p.by_sport||{});
+  barChart("#cSport",bs.map(([k])=>k),bs.map(([,v])=>v.calls?v.wins/v.calls:0),{pct:true,max:1});
+  const bm=Object.entries(p.by_market||{});
+  barChart("#cMarket",bm.map(([k])=>k),bm.map(([,v])=>v.calls?v.wins/v.calls:0),{pct:true,max:1});
+  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
+  const bc=order.filter(k=>(p.by_confidence||{})[k]);
+  barChart("#cConf",bc,bc.map(k=>{const v=p.by_confidence[k];return v.calls?v.wins/v.calls:0;}),{pct:true,max:1});
+  const mo=Object.entries(p.by_month||{});
+  barChart("#cMonth",mo.map(([k])=>k),mo.map(([,v])=>v.pnl),{signed:true});
+  calChart("#cCal",p.calibration||[]);
+  const s=p.streaks||{};
+  $("#streaks").innerHTML=`longest win streak <b class="green">${s.longest_win??"—"}</b><br>
+    longest losing streak <b class="red">${s.longest_loss??"—"}</b><br>
+    current <b>${s.current>0?"W"+s.current:s.current<0?"L"+(-s.current):"—"}</b><br>
+    mean probability CLV <b>${p.mean_clv??"—"}</b><br>
+    settled sample <b>${p.settled??0}</b>`;
+}
+
+/* ---------- Today tab ---------- */
+async function renderToday(){
+  let t;
+  try{t=await api("/api/today");}catch(e){$("#todayPicks").innerHTML='<div class="red small">server unreachable</div>';return;}
+  $("#todayDate").textContent="— "+t.date;
+  $("#todayKpis").innerHTML=`
+    <div class="k"><b>${t.count}</b><span>picks today</span></div>
+    <div class="k"><b class="yellow">${t.open}</b><span>open</span></div>
+    <div class="k"><b>${t.settled}</b><span>settled</span></div>`;
+  const box=$("#todayPicks");box.innerHTML="";
+  if(!t.count){
+    box.innerHTML='<div class="dim">No picks logged for today yet. Hit <b>Daily Forecast</b> above — when it finishes, the slate lands here.</div>';
+    return;
+  }
+  const pickEdge=p=>{
+    const market=Number(p.market_implied_probability);
+    return (p.model_probability!=null&&market)?(p.model_probability-market):null;
+  };
+  const bySport={};
+  t.picks.forEach(p=>{(bySport[p.league]=bySport[p.league]||[]).push(p);});
+  for(const [sport,rows] of Object.entries(bySport)){
+    // Positive-edge picks first — those are the only candidates worth tailing.
+    rows.sort((a,b)=>(pickEdge(b)??-9)-(pickEdge(a)??-9));
+    const h=document.createElement("h2");h.textContent=sport+" — "+rows.length+" picks";h.style.marginTop="12px";
+    box.appendChild(h);
+    rows.forEach(p=>{
+      const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
+      const market=Number(p.market_implied_probability);
+      const edge=pickEdge(p);
+      // Border reflects tailability: green only when the model DISAGREES with
+      // the market in our favor. High confidence with negative edge is the
+      // model being LESS sure than the market — research value, not a play.
+      const cls=(edge!=null&&edge<=0)?"":(conf>=0.65?"hi":conf>=0.60?"med":"");
+      const evBadge=edge==null?"":
+        edge>0.02?'<span class="pill win">+EV vs market</span>':
+        edge>0?'<span class="pill open">thin edge</span>':
+        '<span class="pill push">no edge — research only</span>';
+      const res=(p.result?`<span class="pill ${p.result}">${p.result}${p.pnl_units?(" "+Number(p.pnl_units).toFixed(2)+"U"):""}</span>`
+        :'<span class="pill open">'+(p.status||"open")+'</span>')+" "+evBadge;
+      const actualU=Number(p.units)||0;
+      const suggested=p.suggested_paper_units;
+      const sizing=actualU>0?`size <b class="green">${actualU.toFixed(2)}U</b>`:
+        suggested>0?`size <b class="${edge>0?"green":"dim"}">${Number(suggested).toFixed(2)}U</b> <span class="dim">(suggested paper)</span>`:"";
+      const d=document.createElement("div");d.className="pick "+cls;
+      d.innerHTML=`<b>${p.away_team} @ ${p.home_team}</b>
+        <span class="dim">· ${p.start_et} · ${p.market_type}</span> ${res}<br>
+        pick <b>${pickLabel(p)}</b>
+        · model <b>${conf?pct(conf):"—"}</b>
+        · price ${p.american_odds>0?"+":""}${p.american_odds??"—"} <span class="dim">(${market?pct(market):"—"})</span>
+        · edge <b class="${edge>0?"green":"red"}">${edge!=null?pct(edge):"—"}</b>
+        ${sizing?("· "+sizing):""}
+        <span class="dim">· ${p.model_version||""}</span>
+        <div class="edgebar"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(48,Math.abs(edge||0)*400)}px;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`;
+      d.onclick=()=>showModal(`<h2>${p.away_team} @ ${p.home_team}</h2><pre>${esc(JSON.stringify(p,null,1))}</pre>`);
+      box.appendChild(d);
+    });
+  }
+}
+function pickLabel(p){
+  const sel=String(p.selection||"").toLowerCase();
+  const team=sel==="home"?p.home_team:sel==="away"?p.away_team:null;
+  if(p.market_type==="moneyline")return team?`${team} ML`:sel.toUpperCase();
+  if(p.market_type==="spread"&&team!=null){
+    const line=Number(p.line);
+    const signed=isNaN(line)?"":(line>0?`+${line}`:`${line}`);
+    return `${team} ${signed}`.trim();
+  }
+  if(p.market_type==="total")return `${sel.toUpperCase()} ${p.line??""}`.trim();
+  return `${team||sel.toUpperCase()}${p.line?(" "+p.line):""}`;
+}
+const renderLive=renderToday; // legacy name used by refreshAll
+function gotoTab(name){const b=$$("#tabs button").find(x=>x.dataset.tab===name);if(b)b.click();}
+
+/* ---------- market ---------- */
+async function loadMarket(){
+  const sport=$("#mSport").value,day=$("#mDate").value||new Date().toISOString().slice(0,10);
+  const m=await api(`/api/market?sport=${sport}&date=${day}`);
+  let html=`<tr><th>Market</th><th>Type</th><th>Line</th><th>Side</th><th>Bid</th><th>Ask</th><th>Spread</th><th>Move</th><th>Depth</th><th>Seen</th></tr>`;
+  (m.markets||[]).forEach(r=>{
+    const arrow=r.move==null?"—":r.move>0?`<span class="green">▲ ${fmt(r.move,3)}</span>`:r.move<0?`<span class="red">▼ ${fmt(r.move,3)}</span>`:"→";
+    html+=`<tr><td class="dim">${r.market_slug}</td><td>${r.market_type||""}</td><td>${r.line??""}</td>
+      <td>${r.description||""}</td><td>${fmt(r.bid,3)}</td><td><b>${fmt(r.ask,3)}</b></td>
+      <td class="${r.spread>0.05?"yellow":""}">${fmt(r.spread,3)}</td><td>${arrow}</td>
+      <td class="dim">${fmt(r.bid_size,0)}/${fmt(r.ask_size,0)}</td>
+      <td class="dim">${String(r.observed_at_utc||"").slice(11,19)}</td></tr>`;});
+  if(!(m.markets||[]).length)html+=`<tr><td colspan=10 class="dim">No stored snapshots for ${sport} on ${day}.</td></tr>`;
+  $("#marketTable").innerHTML=html;
+}
+
+/* ---------- research ---------- */
+async function renderResearch(){
+  const bt=await api("/api/backtests");
+  let html="<tr><th>File</th><th>Modified</th><th>Status / sport</th><th>kB</th></tr>";
+  bt.forEach(b=>{html+=`<tr onclick="openBacktest('${b.file}')" style="cursor:pointer">
+    <td>${b.file}</td><td class="dim">${b.modified}</td>
+    <td class="dim">${b.status||b.sport||""}</td><td class="dim">${b.size_kb}</td></tr>`;});
+  $("#btTable").innerHTML=html;
+  try{
+    const v=await api("/api/backtest?file=termination-audit-2026-07-17.json");
+    const fi=v.feature_impact||{};
+    $("#featureLog").innerHTML=Object.entries(fi).map(([k,val])=>`<div style="margin-bottom:6px"><b>${k}</b><br><span class="dim">${val}</span></div>`).join("")||'<span class="dim">none</span>';
+  }catch(e){$("#featureLog").innerHTML='<span class="dim">no audit file</span>';}
+  const a=await api("/api/audit");
+  $("#auditBox").innerHTML=`total events <b>${a.total_events}</b><br>`+
+    (a.tail||[]).slice(0,10).map(e=>`<span class="dim">${e.at}</span> ${e.type}`).join("<br>");
+  const s=state.status||await api("/api/status");
+  $("#pipelineBox").innerHTML=Object.entries(s.data_counts).map(([k,v])=>
+    `${k.toUpperCase()}: <b>${v.toLocaleString()}</b> games <span class="dim">· last ingest ${s.last_ingest[k]||"never"}</span>`).join("<br>");
+}
+window.openBacktest=async f=>{const d=await api("/api/backtest?file="+encodeURIComponent(f));
+  showModal(`<h2>${f}</h2><pre>${esc(JSON.stringify(d,null,1)).slice(0,60000)}</pre>`);};
+
+/* ---------- actions (async jobs; long runs survive refreshes) ---------- */
+async function confirmAction(action,message,extra={}){
+  if(!window.confirm(message))return;
+  showModal(`<h2>${action}</h2><div class="dim">starting…</div>`);
+  let start;
+  try{
+    const r=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action,confirm:true,...extra})});
+    start=await r.json();
+  }catch(e){
+    showModal(`<h2>${action}</h2><pre class="red">Could not reach the dashboard server (${esc(String(e))}).
+Is dashboard_server.py still running? Start it with:
+  python3 dashboard_server.py</pre>`);
+    return;
+  }
+  if(start.status==="busy"&&start.job_id){pollJob(action,start.job_id);return;}
+  if(start.status!=="started"){
+    showModal(`<h2>${action} — ${start.status}</h2><pre>${esc(start.error||JSON.stringify(start))}</pre>`);
+    return;
+  }
+  pollJob(action,start.job_id);
+}
+async function pollJob(action,jobId){
+  let misses=0;
+  const tick=async()=>{
+    let d;
+    try{
+      d=await (await fetch("/api/job?id="+encodeURIComponent(jobId))).json();
+      misses=0;
+    }catch(e){
+      misses++;
+      if(misses<=5){ // server may be briefly busy or restarting — retry
+        showModal(`<h2>${action} <span class="yellow">⏳ reconnecting (${misses}/5)…</span></h2>
+          <div class="dim small">temporary loss of contact; retrying every 3s</div>`);
+        setTimeout(tick,3000);return;
+      }
+      showModal(`<h2>${action}</h2><pre class="red">Lost contact with the dashboard server after 5 retries (${esc(String(e))}).
+The server process has stopped. Restart it:
+  cd ~/"Documents/Poly & Kalshi/model prediction" && python3 dashboard_server.py
+(or install the auto-start service: bash install_dashboard_service.sh)
+Crash details, if any, are in dashboard/server.log</pre>`);
+      return;
+    }
+    const spin=d.status==="running"?` <span class="yellow">⏳ running · ${d.seconds||0}s</span>`:
+      d.status==="ok"?' <span class="green">✔ done</span>':` <span class="red">✖ ${d.status}</span>`;
+    showModal(`<h2>${action}${spin}</h2>
+      <div class="dim small">${d.command||""}</div>
+      <pre>${esc(d.output_tail||d.error||"(no output yet)")}</pre>`);
+    if(d.status==="running"){setTimeout(tick,2000);}
+    else{
+      refreshAll();
+      if(action==="daily"&&d.status==="ok"){
+        setTimeout(()=>{$("#modal").style.display="none";gotoTab("today");renderToday();},1200);
+      }
+    }
+  };
+  tick();
+}
+function bootstrapDialog(){
+  const sport=prompt("Bootstrap which sport? (mlb / nba / wnba / nfl / soccer / tennis)","mlb");
+  if(!sport)return;
+  const from=prompt("From date (YYYY-MM-DD)?","2026-06-01"); if(!from)return;
+  const to=prompt("To date (blank = today)?","")||null;
+  confirmAction("bootstrap",`Bootstrap ${sport} from ${from}${to?" to "+to:""}? Idempotent, rate-limited.`,{sport,from_date:from,to_date:to});
+}
+window.confirmAction=confirmAction; window.bootstrapDialog=bootstrapDialog;
+
+/* ---------- modal ---------- */
+function showModal(html){$("#modalBody").innerHTML=html;$("#modal").style.display="flex";}
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+/* ---------- refresh loop ---------- */
+let timer=null,remaining=0;
+function resetTimer(){
+  if(timer)clearInterval(timer);
+  const every=parseInt(state.settings.refresh??"300",10);
+  if(!every){$("#countdown").textContent="manual";return;}
+  remaining=every;
+  timer=setInterval(()=>{remaining--; $("#countdown").textContent=remaining;
+    if(remaining<=0){remaining=every;refreshAll();}},1000);
+}
+async function refreshAll(){
+  try{
+    const [s,m,p,perf]=await Promise.all([api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance")]);
+    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); populateFilters(); renderPicks(); renderLive(); renderResearch();
+  }catch(e){
+    $("#updatedTxt").innerHTML='<span class="red">Updated: SERVER UNREACHABLE — is dashboard_server.py running?</span>';
+  }
+}
+if(location.protocol==="file:"){
+  document.body.innerHTML='<div style="max-width:640px;margin:80px auto;font-family:monospace;color:#e8e8f0;background:#16213e;border:1px solid #ff4444;border-radius:12px;padding:24px">'+
+  '<h2 style="color:#ff4444">Opened as a file — the dashboard needs its server</h2>'+
+  '<p style="line-height:1.7;margin-top:10px">This page reads live data through a local server. Run:</p>'+
+  '<pre style="background:#1a1a2e;padding:12px;border-radius:8px">cd "~/Documents/Poly &amp; Kalshi/model prediction"\npython3 dashboard_server.py</pre>'+
+  '<p style="line-height:1.7">then open <a href="http://127.0.0.1:8765/" style="color:#00ff88">http://127.0.0.1:8765/</a></p></div>';
+  throw new Error("file:// mode");
+}
+applySettings();
+$("#mDate").value=new Date().toISOString().slice(0,10);
+refreshAll(); loadMarket(); resetTimer();
+</script>
+</body>
+</html>

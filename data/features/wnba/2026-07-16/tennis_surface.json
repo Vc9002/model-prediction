@@ -1,0 +1,11 @@
+{
+  "as_of_date": "2026-07-16",
+  "computation_hash": "38c7653b232cd64828634cd25a925c3cc109e1ff582c5f635f5a088877a0488a",
+  "feature": "tennis_surface",
+  "input_games": 27,
+  "payload": {
+    "matches": 0,
+    "players": {}
+  },
+  "sport": "wnba"
+}

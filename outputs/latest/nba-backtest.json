@@ -1,0 +1,320 @@
+{
+  "brier": 0.2657,
+  "by_trend_strength": [
+    {
+      "brier": 0.24457,
+      "cohort": "weak_trend",
+      "hit_rate": 0.584416,
+      "observations": 77
+    },
+    {
+      "brier": 0.284398,
+      "cohort": "medium_trend",
+      "hit_rate": 0.545455,
+      "observations": 77
+    },
+    {
+      "brier": 0.268102,
+      "cohort": "strong_trend",
+      "hit_rate": 0.589744,
+      "observations": 78
+    }
+  ],
+  "calibration": {
+    "brier_score": 0.26570018219137603,
+    "calibration_intercept": 0.022138421733361387,
+    "calibration_slope": 0.2636876449155608,
+    "expected_calibration_error": 0.12057380009054516,
+    "log_loss": 0.7584941735773916,
+    "reliability_buckets": [
+      {
+        "count": 6,
+        "hit_rate": 0.5,
+        "lower": 0.0,
+        "mean_p": 0.06280862836710407,
+        "upper": 0.1
+      },
+      {
+        "count": 3,
+        "hit_rate": 0.6666666666666666,
+        "lower": 0.1,
+        "mean_p": 0.15845749896308312,
+        "upper": 0.2
+      },
+      {
+        "count": 17,
+        "hit_rate": 0.4117647058823529,
+        "lower": 0.2,
+        "mean_p": 0.2439791771867896,
+        "upper": 0.3
+      },
+      {
+        "count": 25,
+        "hit_rate": 0.32,
+        "lower": 0.3,
+        "mean_p": 0.354262692355875,
+        "upper": 0.4
+      },
+      {
+        "count": 39,
+        "hit_rate": 0.5128205128205128,
+        "lower": 0.4,
+        "mean_p": 0.4535072821862958,
+        "upper": 0.5
+      },
+      {
+        "count": 46,
+        "hit_rate": 0.5434782608695652,
+        "lower": 0.5,
+        "mean_p": 0.5387583629136314,
+        "upper": 0.6
+      },
+      {
+        "count": 31,
+        "hit_rate": 0.5483870967741935,
+        "lower": 0.6,
+        "mean_p": 0.6420915528916304,
+        "upper": 0.7
+      },
+      {
+        "count": 20,
+        "hit_rate": 0.5,
+        "lower": 0.7,
+        "mean_p": 0.759392146067633,
+        "upper": 0.8
+      },
+      {
+        "count": 21,
+        "hit_rate": 0.6190476190476191,
+        "lower": 0.8,
+        "mean_p": 0.8496205162798971,
+        "upper": 0.9
+      },
+      {
+        "count": 24,
+        "hit_rate": 0.75,
+        "lower": 0.9,
+        "mean_p": 0.9438075578249351,
+        "upper": 1.0
+      }
+    ],
+    "sample_size": 232,
+    "status": "ok"
+  },
+  "cumulative_flat_pnl": 9.9543,
+  "daily_brier": [
+    {
+      "brier": 0.184492,
+      "date": "2025-12-01",
+      "games": 3
+    },
+    {
+      "brier": 0.352444,
+      "date": "2025-12-02",
+      "games": 9
+    },
+    {
+      "brier": 0.101603,
+      "date": "2025-12-03",
+      "games": 6
+    },
+    {
+      "brier": 0.341658,
+      "date": "2025-12-04",
+      "games": 9
+    },
+    {
+      "brier": 0.182758,
+      "date": "2025-12-05",
+      "games": 5
+    },
+    {
+      "brier": 0.21598,
+      "date": "2025-12-06",
+      "games": 13
+    },
+    {
+      "brier": 0.33622,
+      "date": "2025-12-07",
+      "games": 10
+    },
+    {
+      "brier": 0.163769,
+      "date": "2025-12-08",
+      "games": 3
+    },
+    {
+      "brier": 0.154339,
+      "date": "2025-12-09",
+      "games": 4
+    },
+    {
+      "brier": 0.229842,
+      "date": "2025-12-10",
+      "games": 1
+    },
+    {
+      "brier": 0.144154,
+      "date": "2025-12-11",
+      "games": 2
+    },
+    {
+      "brier": 0.282027,
+      "date": "2025-12-12",
+      "games": 4
+    },
+    {
+      "brier": 0.246191,
+      "date": "2025-12-13",
+      "games": 8
+    },
+    {
+      "brier": 0.464685,
+      "date": "2025-12-14",
+      "games": 5
+    },
+    {
+      "brier": 0.198799,
+      "date": "2025-12-15",
+      "games": 4
+    },
+    {
+      "brier": 0.257204,
+      "date": "2025-12-16",
+      "games": 5
+    },
+    {
+      "brier": 0.141285,
+      "date": "2025-12-17",
+      "games": 1
+    },
+    {
+      "brier": 0.432213,
+      "date": "2025-12-18",
+      "games": 2
+    },
+    {
+      "brier": 0.240818,
+      "date": "2025-12-19",
+      "games": 12
+    },
+    {
+      "brier": 0.41273,
+      "date": "2025-12-20",
+      "games": 6
+    },
+    {
+      "brier": 0.269311,
+      "date": "2025-12-21",
+      "games": 12
+    },
+    {
+      "brier": 0.216732,
+      "date": "2025-12-22",
+      "games": 3
+    },
+    {
+      "brier": 0.150243,
+      "date": "2025-12-23",
+      "games": 7
+    },
+    {
+      "brier": 0.306238,
+      "date": "2025-12-24",
+      "games": 14
+    },
+    {
+      "brier": 0.190091,
+      "date": "2025-12-25",
+      "games": 3
+    },
+    {
+      "brier": 0.172416,
+      "date": "2025-12-26",
+      "games": 2
+    },
+    {
+      "brier": 0.328365,
+      "date": "2025-12-27",
+      "games": 10
+    },
+    {
+      "brier": 0.31523,
+      "date": "2025-12-28",
+      "games": 12
+    },
+    {
+      "brier": 0.320668,
+      "date": "2025-12-29",
+      "games": 2
+    },
+    {
+      "brier": 0.247236,
+      "date": "2025-12-30",
+      "games": 11
+    },
+    {
+      "brier": 0.248366,
+      "date": "2025-12-31",
+      "games": 8
+    },
+    {
+      "brier": 0.188571,
+      "date": "2026-01-01",
+      "games": 6
+    },
+    {
+      "brier": 0.207595,
+      "date": "2026-01-02",
+      "games": 4
+    },
+    {
+      "brier": 0.252317,
+      "date": "2026-01-03",
+      "games": 11
+    },
+    {
+      "brier": 0.308043,
+      "date": "2026-01-04",
+      "games": 12
+    },
+    {
+      "brier": 0.221177,
+      "date": "2026-01-05",
+      "games": 3
+    }
+  ],
+  "flat_pnl_curve_tail": [
+    9.7522,
+    9.8761,
+    8.8761,
+    9.5339,
+    8.5339,
+    7.5339,
+    8.1712,
+    7.1712,
+    6.1712,
+    9.2807,
+    9.6612,
+    8.6612,
+    7.6612,
+    7.8028,
+    9.6674,
+    9.8815,
+    8.8815,
+    10.407,
+    9.407,
+    9.9543
+  ],
+  "note": "Flat P&L is graded at the model's own fair odds (no market prices in the backtest cache yet); it measures calibration, not beatable edge.",
+  "observations": 232,
+  "promotion_eligible": false,
+  "promotion_minimum": 500,
+  "sharpe_annualized_per_bet": 0.5551,
+  "sport": "nba",
+  "status": "ok",
+  "window": {
+    "end": "2026-01-05",
+    "start": "2025-12-01"
+  }
+}

@@ -1,0 +1,255 @@
+{
+  "brier": 0.246264,
+  "by_market": {
+    "moneyline": {
+      "baseline_brier": 0.24773,
+      "brier": 0.251033,
+      "calibration": {
+        "brier_score": 0.25103326931147224,
+        "calibration_intercept": -0.05038243626774749,
+        "calibration_slope": 0.44128408385338097,
+        "expected_calibration_error": 0.05452097008318828,
+        "log_loss": 0.6951894659507984,
+        "reliability_buckets": [
+          {
+            "count": 36,
+            "hit_rate": 0.5,
+            "lower": 0.4,
+            "mean_p": 0.4715573935663753,
+            "upper": 0.5
+          },
+          {
+            "count": 123,
+            "hit_rate": 0.4796747967479675,
+            "lower": 0.5,
+            "mean_p": 0.5369031601462693,
+            "upper": 0.6
+          },
+          {
+            "count": 11,
+            "hit_rate": 0.7272727272727273,
+            "lower": 0.6,
+            "mean_p": 0.617677965041782,
+            "upper": 0.7
+          }
+        ],
+        "sample_size": 170,
+        "status": "ok"
+      },
+      "hit_rate": 0.5,
+      "line_source": [
+        "synthetic_reference_line"
+      ],
+      "log_loss": 0.695189,
+      "market_economics": {
+        "clv": null,
+        "flat_pnl": null,
+        "roi": null,
+        "status": "unavailable_without_historical_two_sided_prices"
+      },
+      "observations": 170,
+      "pushes": 0
+    },
+    "spread": {
+      "baseline_brier": 0.235163,
+      "brier": 0.235368,
+      "calibration": {
+        "brier_score": 0.23536789021125729,
+        "calibration_intercept": -0.3313939188370218,
+        "calibration_slope": 0.29730180341044243,
+        "expected_calibration_error": 0.017666400029444848,
+        "log_loss": 0.6638439224485091,
+        "reliability_buckets": [
+          {
+            "count": 7,
+            "hit_rate": 0.5714285714285714,
+            "lower": 0.2,
+            "mean_p": 0.2911660072546178,
+            "upper": 0.3
+          },
+          {
+            "count": 147,
+            "hit_rate": 0.36054421768707484,
+            "lower": 0.3,
+            "mean_p": 0.35552765390600594,
+            "upper": 0.4
+          },
+          {
+            "count": 16,
+            "hit_rate": 0.4375,
+            "lower": 0.4,
+            "mean_p": 0.41849905125182374,
+            "upper": 0.5
+          }
+        ],
+        "sample_size": 170,
+        "status": "ok"
+      },
+      "hit_rate": 0.376471,
+      "line_source": [
+        "synthetic_reference_line"
+      ],
+      "log_loss": 0.663844,
+      "market_economics": {
+        "clv": null,
+        "flat_pnl": null,
+        "roi": null,
+        "status": "unavailable_without_historical_two_sided_prices"
+      },
+      "observations": 170,
+      "pushes": 0
+    },
+    "total": {
+      "baseline_brier": 0.249951,
+      "brier": 0.252391,
+      "calibration": {
+        "brier_score": 0.2523907007774934,
+        "calibration_intercept": 0.04236291234877212,
+        "calibration_slope": -1.1143035134967065,
+        "expected_calibration_error": 0.06926007366608566,
+        "log_loss": 0.6979458892333872,
+        "reliability_buckets": [
+          {
+            "count": 80,
+            "hit_rate": 0.55,
+            "lower": 0.4,
+            "mean_p": 0.486483286849967,
+            "upper": 0.5
+          },
+          {
+            "count": 90,
+            "hit_rate": 0.45555555555555555,
+            "lower": 0.5,
+            "mean_p": 0.5299208385692435,
+            "upper": 0.6
+          }
+        ],
+        "sample_size": 170,
+        "status": "ok"
+      },
+      "hit_rate": 0.5,
+      "line_source": [
+        "synthetic_reference_line"
+      ],
+      "log_loss": 0.697946,
+      "market_economics": {
+        "clv": null,
+        "flat_pnl": null,
+        "roi": null,
+        "status": "unavailable_without_historical_two_sided_prices"
+      },
+      "observations": 170,
+      "pushes": 0
+    }
+  },
+  "by_trend_strength": [
+    {
+      "brier": 0.239241,
+      "cohort": "weak_trend",
+      "hit_rate": 0.423529,
+      "mean_trend_strength": 0.089707,
+      "observations": 170
+    },
+    {
+      "brier": 0.253754,
+      "cohort": "medium_trend",
+      "hit_rate": 0.564706,
+      "mean_trend_strength": 0.337812,
+      "observations": 170
+    },
+    {
+      "brier": 0.245797,
+      "cohort": "strong_trend",
+      "hit_rate": 0.388235,
+      "mean_trend_strength": 0.753273,
+      "observations": 170
+    }
+  ],
+  "calibration": {
+    "brier_score": 0.24626395343340765,
+    "calibration_intercept": -0.07490632157761712,
+    "calibration_slope": 0.6445930653417525,
+    "expected_calibration_error": 0.04714914792623955,
+    "log_loss": 0.6856597592108982,
+    "reliability_buckets": [
+      {
+        "count": 7,
+        "hit_rate": 0.5714285714285714,
+        "lower": 0.2,
+        "mean_p": 0.2911660072546178,
+        "upper": 0.3
+      },
+      {
+        "count": 147,
+        "hit_rate": 0.36054421768707484,
+        "lower": 0.3,
+        "mean_p": 0.35552765390600594,
+        "upper": 0.4
+      },
+      {
+        "count": 132,
+        "hit_rate": 0.5227272727272727,
+        "lower": 0.4,
+        "mean_p": 0.4741720752758792,
+        "upper": 0.5
+      },
+      {
+        "count": 213,
+        "hit_rate": 0.4694835680751174,
+        "lower": 0.5,
+        "mean_p": 0.5339528834235823,
+        "upper": 0.6
+      },
+      {
+        "count": 11,
+        "hit_rate": 0.7272727272727273,
+        "lower": 0.6,
+        "mean_p": 0.617677965041782,
+        "upper": 0.7
+      }
+    ],
+    "sample_size": 510,
+    "status": "ok"
+  },
+  "games": 170,
+  "limitations": [
+    "No market ROI or CLV is claimed without stored two-sided pregame quotes.",
+    "Score-only history cannot reconstruct starters, lineups, bullpen availability, park, or weather.",
+    "This challenger remains zero-unit research until it beats declared baselines on a locked holdout."
+  ],
+  "market_economics": {
+    "clv": null,
+    "flat_pnl": null,
+    "roi": null,
+    "status": "unavailable_without_historical_two_sided_prices"
+  },
+  "model_version": "mlb-opponent-adjusted-trend-score-v2",
+  "observations": 510,
+  "point_in_time": {
+    "features": "strictly prior completed games",
+    "market_quotes": "missing_or_reconstructed",
+    "season_filter": "MLB preseason and All-Star games excluded"
+  },
+  "promotion_eligible": false,
+  "promotion_minimum": 500,
+  "sport": "mlb",
+  "status": "ok",
+  "trend_causality": {
+    "mean_absolute_probability_change": 0.014723,
+    "note": "Trend inputs alter expected runs before all three market probabilities are derived.",
+    "records_changed_vs_long_horizon_only": 507
+  },
+  "validation_decision": {
+    "action": "REJECT_CHALLENGER",
+    "failures": [
+      "moneyline: model Brier does not beat structural baseline",
+      "spread: model Brier does not beat structural baseline",
+      "total: model Brier does not beat structural baseline"
+    ],
+    "note": "Rejection does not freeze iteration; the next version must be independently tested."
+  },
+  "window": {
+    "end": "2026-07-16",
+    "start": "2026-07-01"
+  }
+}

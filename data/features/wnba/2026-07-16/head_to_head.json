@@ -1,0 +1,271 @@
+{
+  "as_of_date": "2026-07-16",
+  "computation_hash": "13ae80e3794bc8dfbffc2dae195d09c2af9262a6f5f02e143aaec2070992b356",
+  "feature": "head_to_head",
+  "input_games": 27,
+  "payload": {
+    "pairs": {
+      "Atlanta Dream vs Los Angeles Sparks": {
+        "average_total": 193.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-13T23:00Z",
+        "team_a": "Atlanta Dream",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Los Angeles Sparks",
+        "team_b_wins": 0
+      },
+      "Atlanta Dream vs Portland Fire": {
+        "average_total": 194.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-11T20:00Z",
+        "team_a": "Atlanta Dream",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Portland Fire",
+        "team_b_wins": 1
+      },
+      "Atlanta Dream vs Seattle Storm": {
+        "average_total": 167.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-10T00:00Z",
+        "team_a": "Atlanta Dream",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Seattle Storm",
+        "team_b_wins": 0
+      },
+      "Chicago Sky vs Dallas Wings": {
+        "average_total": 187.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-12T23:00Z",
+        "team_a": "Chicago Sky",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Dallas Wings",
+        "team_b_wins": 1
+      },
+      "Chicago Sky vs Los Angeles Sparks": {
+        "average_total": 189.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-11T02:00Z",
+        "team_a": "Chicago Sky",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Los Angeles Sparks",
+        "team_b_wins": 1
+      },
+      "Chicago Sky vs Phoenix Mercury": {
+        "average_total": 143.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-08T02:00Z",
+        "team_a": "Chicago Sky",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Phoenix Mercury",
+        "team_b_wins": 0
+      },
+      "Chicago Sky vs Seattle Storm": {
+        "average_total": 185.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-15T16:00Z",
+        "team_a": "Chicago Sky",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Seattle Storm",
+        "team_b_wins": 0
+      },
+      "Connecticut Sun vs Golden State Valkyries": {
+        "average_total": 143.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-10T23:30Z",
+        "team_a": "Connecticut Sun",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Golden State Valkyries",
+        "team_b_wins": 1
+      },
+      "Connecticut Sun vs Minnesota Lynx": {
+        "average_total": 172.5,
+        "games": 2,
+        "last_meeting_utc": "2026-07-08T23:30Z",
+        "team_a": "Connecticut Sun",
+        "team_a_win_rate": 0.5,
+        "team_a_wins": 1,
+        "team_b": "Minnesota Lynx",
+        "team_b_wins": 1
+      },
+      "Connecticut Sun vs Portland Fire": {
+        "average_total": 177.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-14T15:00Z",
+        "team_a": "Connecticut Sun",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Portland Fire",
+        "team_b_wins": 0
+      },
+      "Dallas Wings vs New York Liberty": {
+        "average_total": 165.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-08T00:00Z",
+        "team_a": "Dallas Wings",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "New York Liberty",
+        "team_b_wins": 0
+      },
+      "Dallas Wings vs Toronto Tempo": {
+        "average_total": 203.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-10T23:30Z",
+        "team_a": "Dallas Wings",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Toronto Tempo",
+        "team_b_wins": 0
+      },
+      "Golden State Valkyries vs Toronto Tempo": {
+        "average_total": 158.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-08T23:00Z",
+        "team_a": "Golden State Valkyries",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Toronto Tempo",
+        "team_b_wins": 0
+      },
+      "Golden State Valkyries vs Washington Mystics": {
+        "average_total": 111.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-06T23:30Z",
+        "team_a": "Golden State Valkyries",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Washington Mystics",
+        "team_b_wins": 0
+      },
+      "Indiana Fever vs Las Vegas Aces": {
+        "average_total": 184.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-13T01:00Z",
+        "team_a": "Indiana Fever",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Las Vegas Aces",
+        "team_b_wins": 0
+      },
+      "Indiana Fever vs Los Angeles Sparks": {
+        "average_total": 198.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-09T02:00Z",
+        "team_a": "Indiana Fever",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Los Angeles Sparks",
+        "team_b_wins": 1
+      },
+      "Indiana Fever vs Phoenix Mercury": {
+        "average_total": 181.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-10T02:00Z",
+        "team_a": "Indiana Fever",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Phoenix Mercury",
+        "team_b_wins": 0
+      },
+      "Las Vegas Aces vs Phoenix Mercury": {
+        "average_total": 164.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-11T22:00Z",
+        "team_a": "Las Vegas Aces",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Phoenix Mercury",
+        "team_b_wins": 0
+      },
+      "Las Vegas Aces vs Portland Fire": {
+        "average_total": 168.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-10T02:00Z",
+        "team_a": "Las Vegas Aces",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Portland Fire",
+        "team_b_wins": 0
+      },
+      "Los Angeles Sparks vs Minnesota Lynx": {
+        "average_total": 183.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-15T17:00Z",
+        "team_a": "Los Angeles Sparks",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Minnesota Lynx",
+        "team_b_wins": 1
+      },
+      "Los Angeles Sparks vs Seattle Storm": {
+        "average_total": 146.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-07T02:00Z",
+        "team_a": "Los Angeles Sparks",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Seattle Storm",
+        "team_b_wins": 1
+      },
+      "Minnesota Lynx vs New York Liberty": {
+        "average_total": 175.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-11T17:00Z",
+        "team_a": "Minnesota Lynx",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "New York Liberty",
+        "team_b_wins": 0
+      },
+      "Minnesota Lynx vs Phoenix Mercury": {
+        "average_total": 204.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-14T01:00Z",
+        "team_a": "Minnesota Lynx",
+        "team_a_win_rate": 1.0,
+        "team_a_wins": 1,
+        "team_b": "Phoenix Mercury",
+        "team_b_wins": 0
+      },
+      "New York Liberty vs Toronto Tempo": {
+        "average_total": 184.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-12T19:00Z",
+        "team_a": "New York Liberty",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Toronto Tempo",
+        "team_b_wins": 1
+      },
+      "Seattle Storm vs Washington Mystics": {
+        "average_total": 163.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-12T19:00Z",
+        "team_a": "Seattle Storm",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Washington Mystics",
+        "team_b_wins": 1
+      },
+      "Toronto Tempo vs Washington Mystics": {
+        "average_total": 141.0,
+        "games": 1,
+        "last_meeting_utc": "2026-07-14T23:00Z",
+        "team_a": "Toronto Tempo",
+        "team_a_win_rate": 0.0,
+        "team_a_wins": 0,
+        "team_b": "Washington Mystics",
+        "team_b_wins": 1
+      }
+    }
+  },
+  "sport": "wnba"
+}

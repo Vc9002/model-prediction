@@ -1,0 +1,36 @@
+# Changelog
+
+## 2026-07-17 (later — bug sweep + hardening)
+
+- Fixed audit hash serialization: wrote event hashes with compact `separators=(",", ":")` matching computation, so chain is verifiable from JSONL alone.
+- Fixed Polymarket executor: `token_id` now resolved from market slug via `client.get_token_id()` instead of passing the slug directly.
+- Fixed empty `observed_at_utc=""` crashing `parse_utc()` in eligibility staleness check — added `.strip()` guard.
+- Fixed `bans.py` `_entries()` catching `EntityResolutionError` so a stale ban config entry no longer blocks the entire CLI.
+- Fixed `FixedPlattCalibrator.transform()` accepting `[0, 1]` boundary values (was `(0, 1)` strict, now auto-clips like `TrainablePlattCalibrator`).
+- Fixed config drift: `maximum_data_age_hours` and `maximum_unreviewed_disagreement` now flow from `config/model.yaml` through the forecast path to `evaluate_eligibility`.
+- Fixed float comparison in `evaluate_locked_holdout`: added `1e-12` epsilon so exactly-60% models don't fail on rounding.
+- Fixed `normalize_no_vig` rejecting probabilities `>= 1` (was only checking `<= 0`).
+- Fixed CLI dispatch fallthrough: replaced `else:` with explicit `elif args.command == "review-loss":` and final `else: raise ValueError(...)`.
+- Added 256-entry LRU cap to `ESPNClient` and `ESPNMLBClient` `_get` response caches.
+- Added `handle.flush()` to `MarketOddsSnapshotStore.append()` for crash resilience.
+- Added Polymarket US odds summary to `daily` command output (`bbo_capture` metadata + per-sport snapshot counts).
+- Fixed 4 stale docstrings in model files (nba/wnba/nfl/basketball "research state" → shadow-qualified).
+- Fixed stale event count in TODO.md scan record (852 → 865).
+- Ledger cleared and re-initialized; backup preserved at `data/.backup_2026-07-17/`.
+- Removed redundant `input/INPUT.md` (content now in `input/TODO.md` + `input/PROMPT.md`).
+- Updated root `README.md` with qualified models table and accurate daily-flow description.
+- 120/120 tests pass, ruff clean.
+
+## 2026-07-17
+
+- Corrected monthly qualification: complete months with 10 or more called picks are binding; complete months below 10 calls are insufficient; an incomplete terminal month is provisional.
+- Added 9-call, 10-call, losing-complete-month, and incomplete-terminal-month regression tests.
+- Generated and activated hash-verified v2 artifacts for MLB, NBA, WNBA, and NFL while preserving all v1 files.
+- Requalified WNBA at 65.98%, 97 calls, +25.18U. July 2026 has 27 calls and is provisional because the month is incomplete—not because it is below 10.
+- Qualified NFL at the reproducible 60.55%, 109 calls, +17.00U. February has 2 calls and is non-binding.
+- Tested a learned trailing-30-day adaptive MLB home-field feature. It fell from 60.87%/92/+14.91U to 60.42%/96/+14.73U and was rejected.
+- Proved confidence-gap gating is exactly `2 * max_probability - 1`; it cannot change ordering or create away selections at an equivalent threshold and was rejected as redundant.
+- Audited MLB pitcher data: 4,325 of 4,785 raw events contain both starters and ERA, but retrospective caches are not point-in-time valid. Pitcher training was blocked to prevent leakage.
+- Added explicit multi-market readiness reporting. NBA/WNBA spreads and totals lack contract lines; MLB reconstructed full-game lines are timestamp-invalid; F5 and YRFI/NRFI lack required point-in-time inputs.
+- Corrected DEBUG checks for canonical audit-chain hash, active nested artifact schema, artifact-derived thresholds, intentional rollback references, and Eastern-time MLB season filtering.
+- Wrote the final evidence report to `outputs/latest/learned-model-validation-v2.json`.

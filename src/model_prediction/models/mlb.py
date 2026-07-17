@@ -1,0 +1,537 @@
+"""Unified MLB model: the Trend Engine score simulation plus the two
+Measured Edge heads (margin and totals).
+
+This file absorbs the former ``mlb_v02.py`` score engine and the Measured Edge
+heads. Model research is continuous: parameters are never frozen, but every
+change must be versioned and survive walk-forward ablation plus a locked
+holdout before promotion. Artifact hashes preserve exact reproducibility.
+
+Versioning happens in config and git tags, never in filenames.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import asdict, dataclass, replace
+from math import exp, log
+from pathlib import Path
+from typing import Any, Sequence
+
+import numpy as np
+import yaml
+
+from ..domain import MarketType
+from .base import ScoreSimulation
+
+
+ENGINE_VERSION = "mlb-analyst-poisson-trend-v0.2"
+MARGIN_MODEL_VERSION = "measured-edge-margin-v1"
+TOTALS_MODEL_VERSION = "measured-edge-totals-v1"
+
+# Backwards-compatible alias kept for artifact validation strings.
+MODEL_VERSION = ENGINE_VERSION
+
+
+# --------------------------------------------------------------------------
+# Trend Engine score model (formerly mlb_v02.py)
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FormulaSpec:
+    formula_version: str
+    feature_schema_version: str
+    league_runs_per_team_game: float
+    league_starter_era: float
+    league_strikeout_rate: float
+    league_walk_rate: float
+    recent_half_life_games: float
+    recent_prior_strength_games: float
+    starter_recent_weight: float
+    starter_season_weight: float
+    strikeout_weight: float
+    walk_weight: float
+    home_field_run_factor: float
+    away_field_run_factor: float
+    factor_bounds: dict[str, tuple[float, float]]
+    uncertainty: dict[str, float]
+    simulation: dict[str, Any]
+    seed_method: str
+    configuration_hash: str
+
+
+@dataclass(frozen=True)
+class TeamForm:
+    runs_scored: tuple[int, ...]
+    runs_allowed: tuple[int, ...]
+    wins: int
+    losses: int
+    status: str = "available"
+
+
+@dataclass(frozen=True)
+class PitcherForm:
+    player_id: str
+    name: str
+    throwing_hand: str | None
+    starts_before_game: int
+    season_innings: float
+    season_earned_runs: int
+    season_strikeouts: int
+    season_walks: int
+    season_batters_faced: int
+    last_five_innings: float
+    last_five_earned_runs: int
+    last_five_strikeouts: int
+    last_five_walks: int
+    last_five_batters_faced: int
+    xfip: float | None = None
+    xfip_status: str = "unavailable_from_source"
+    status: str = "available"
+
+    @property
+    def rookie_or_limited(self) -> bool:
+        return self.starts_before_game < 10
+
+
+@dataclass(frozen=True)
+class MLBGameFeatures:
+    event_id: str
+    event_start_utc: str
+    decision_timestamp_utc: str
+    away_team: str
+    home_team: str
+    away_form: TeamForm
+    home_form: TeamForm
+    away_starter: PitcherForm
+    home_starter: PitcherForm
+    away_bullpen_weakness: float = 1.0
+    home_bullpen_weakness: float = 1.0
+    away_bullpen_status: str = "unavailable_from_source"
+    home_bullpen_status: str = "unavailable_from_source"
+    park_factor: float = 1.0
+    park_factor_status: str = "unavailable_from_source"
+    weather_factor: float = 1.0
+    weather_status: str = "unavailable_from_source"
+    lineup_status: str = "unavailable_from_source"
+    wrc_plus_status: str = "unavailable_from_source"
+    source_snapshot_ids: tuple[str, ...] = ()
+    feature_snapshot_hash: str = ""
+    market_snapshot_hash: str = ""
+    starter_confirmed: bool = False
+    starter_status: str = "probable"
+
+
+@dataclass(frozen=True)
+class RunEstimate:
+    away_expected_runs: float
+    home_expected_runs: float
+    factors: dict[str, float]
+    uncertainty: float
+    uncertainty_components: dict[str, float]
+    formula_version: str
+    feature_schema_version: str
+    configuration_hash: str
+
+
+@dataclass(frozen=True)
+class MarketDistribution:
+    first_selection: str
+    first_win_probability: float
+    second_selection: str
+    second_win_probability: float
+    push_probability: float
+
+
+def load_formula_spec(path: str | Path) -> FormulaSpec:
+    path = Path(path)
+    raw_bytes = path.read_bytes()
+    raw = yaml.safe_load(raw_bytes)
+    if raw["formula_version"] != ENGINE_VERSION:
+        raise ValueError("formula file version does not match the Trend Engine code")
+    required = {
+        "seed_method", "factor_bounds", "uncertainty", "simulation",
+        "league_runs_per_team_game", "league_starter_era",
+    }
+    missing = sorted(required - set(raw))
+    engine_sim_fields = {"simulations", "shared_environment_variance", "team_specific_variance"}
+    if missing or not engine_sim_fields.issubset(set(raw.get("simulation") or {})):
+        raise ValueError(
+            "legacy measured-edge rollback is unavailable: the frozen v0.2 formula "
+            f"spec at {path.name} was rewritten (2026-07-17) and no longer carries the "
+            f"original engine fields (missing: {missing or sorted(engine_sim_fields)}). "
+            "The learned LR path (--model learned, the default) is the production forecast."
+        )
+    bounds = {name: tuple(values) for name, values in raw["factor_bounds"].items()}
+    return FormulaSpec(
+        formula_version=raw["formula_version"],
+        feature_schema_version=raw["feature_schema_version"],
+        league_runs_per_team_game=float(raw["league_runs_per_team_game"]),
+        league_starter_era=float(raw["league_starter_era"]),
+        league_strikeout_rate=float(raw["league_strikeout_rate"]),
+        league_walk_rate=float(raw["league_walk_rate"]),
+        recent_half_life_games=float(raw["recent_half_life_games"]),
+        recent_prior_strength_games=float(raw["recent_prior_strength_games"]),
+        starter_recent_weight=float(raw["starter_recent_weight"]),
+        starter_season_weight=float(raw["starter_season_weight"]),
+        strikeout_weight=float(raw["strikeout_weight"]),
+        walk_weight=float(raw["walk_weight"]),
+        home_field_run_factor=float(raw["home_field_run_factor"]),
+        away_field_run_factor=float(raw["away_field_run_factor"]),
+        factor_bounds=bounds,
+        uncertainty={key: float(value) for key, value in raw["uncertainty"].items()},
+        simulation=raw["simulation"],
+        seed_method=raw["seed_method"],
+        configuration_hash=hashlib.sha256(raw_bytes).hexdigest(),
+    )
+
+
+def estimate_runs(features: MLBGameFeatures, spec: FormulaSpec) -> RunEstimate:
+    away_offense = _offense_index(features.away_form, spec)
+    home_offense = _offense_index(features.home_form, spec)
+    away_starter_weakness = _starter_weakness(features.away_starter, spec)
+    home_starter_weakness = _starter_weakness(features.home_starter, spec)
+    away_bullpen = _clip(features.away_bullpen_weakness, spec.factor_bounds["bullpen_weakness"])
+    home_bullpen = _clip(features.home_bullpen_weakness, spec.factor_bounds["bullpen_weakness"])
+    park = _clip(features.park_factor, spec.factor_bounds["park"])
+    weather = _clip(features.weather_factor, spec.factor_bounds["weather"])
+    away_expected = (
+        spec.league_runs_per_team_game
+        * away_offense
+        * home_starter_weakness
+        * home_bullpen
+        * park
+        * weather
+        * spec.away_field_run_factor
+    )
+    home_expected = (
+        spec.league_runs_per_team_game
+        * home_offense
+        * away_starter_weakness
+        * away_bullpen
+        * park
+        * weather
+        * spec.home_field_run_factor
+    )
+    components = _uncertainty_components(features, spec)
+    total_uncertainty = min(
+        spec.uncertainty["maximum"],
+        max(
+            spec.uncertainty["minimum"],
+            sum(value * value for value in components.values()) ** 0.5,
+        ),
+    )
+    return RunEstimate(
+        round(away_expected, 6),
+        round(home_expected, 6),
+        {
+            "away_offense_index": away_offense,
+            "home_offense_index": home_offense,
+            "away_starter_weakness_index": away_starter_weakness,
+            "home_starter_weakness_index": home_starter_weakness,
+            "away_bullpen_weakness_index": away_bullpen,
+            "home_bullpen_weakness_index": home_bullpen,
+            "park_factor": park,
+            "weather_factor": weather,
+            "away_field_run_factor": spec.away_field_run_factor,
+            "home_field_run_factor": spec.home_field_run_factor,
+        },
+        round(total_uncertainty, 6),
+        components,
+        spec.formula_version,
+        spec.feature_schema_version,
+        spec.configuration_hash,
+    )
+
+
+def simulate_game(
+    features: MLBGameFeatures,
+    estimate: RunEstimate,
+    spec: FormulaSpec,
+    simulations: int | None = None,
+    seed_namespace: str = "",
+) -> ScoreSimulation:
+    count = simulations or int(spec.simulation["simulations"])
+    if count <= 0:
+        raise ValueError("simulation count must be positive")
+    seed = stable_seed(
+        features.event_id,
+        spec.formula_version,
+        features.decision_timestamp_utc,
+        features.market_snapshot_hash,
+        features.feature_snapshot_hash,
+        seed_namespace,
+    )
+    rng = np.random.default_rng(seed)
+    shared_variance = float(spec.simulation["shared_environment_variance"])
+    team_variance = float(spec.simulation["team_specific_variance"])
+    shared = rng.gamma(1 / shared_variance, shared_variance, count)
+    away_specific = rng.gamma(1 / team_variance, team_variance, count)
+    home_specific = rng.gamma(1 / team_variance, team_variance, count)
+    away = rng.poisson(estimate.away_expected_runs * shared * away_specific)
+    home = rng.poisson(estimate.home_expected_runs * shared * home_specific)
+    ties = away == home
+    if ties.any():
+        lower, upper = spec.simulation["extra_inning_home_probability_bounds"]
+        home_probability = _clip(
+            estimate.home_expected_runs / (estimate.home_expected_runs + estimate.away_expected_runs),
+            (float(lower), float(upper)),
+        )
+        home_wins = rng.random(int(ties.sum())) < home_probability
+        tie_indices = np.flatnonzero(ties)
+        home[tie_indices[home_wins]] += 1
+        away[tie_indices[~home_wins]] += 1
+    return ScoreSimulation(away.tolist(), home.tolist(), estimate.uncertainty, spec.formula_version)
+
+
+def derive_market_distribution(
+    simulation: ScoreSimulation, market_type: MarketType, line: float | None = None
+) -> MarketDistribution:
+    away = np.asarray(simulation.away_scores)
+    home = np.asarray(simulation.home_scores)
+    if market_type is MarketType.MONEYLINE:
+        first_margin = away - home
+        first, second = "away", "home"
+    elif market_type is MarketType.SPREAD:
+        if line is None:
+            raise ValueError("spread requires the away selection-relative line")
+        first_margin = away - home + line
+        first, second = "away", "home"
+    else:
+        if line is None:
+            raise ValueError("total requires a line")
+        first_margin = away + home - line
+        first, second = "over", "under"
+    first_wins = float(np.mean(first_margin > 0))
+    second_wins = float(np.mean(first_margin < 0))
+    pushes = float(np.mean(first_margin == 0))
+    return MarketDistribution(first, first_wins, second, second_wins, pushes)
+
+
+def stable_seed(*parts: str) -> int:
+    encoded = json.dumps(parts, separators=(",", ":"), ensure_ascii=True).encode()
+    return int.from_bytes(hashlib.sha256(encoded).digest()[:8], "big", signed=False)
+
+
+def feature_hash(features: MLBGameFeatures) -> str:
+    return hashlib.sha256(
+        json.dumps(asdict(features), sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def _offense_index(form: TeamForm, spec: FormulaSpec) -> float:
+    if not form.runs_scored:
+        return 1.0
+    decay = exp(-log(2) / spec.recent_half_life_games)
+    weights = [decay ** (len(form.runs_scored) - 1 - index) for index in range(len(form.runs_scored))]
+    ewm = sum(weight * value for weight, value in zip(weights, form.runs_scored, strict=True)) / sum(weights)
+    n = len(form.runs_scored)
+    shrinkage = n / (n + spec.recent_prior_strength_games)
+    shrunk_runs = shrinkage * ewm + (1 - shrinkage) * spec.league_runs_per_team_game
+    return _clip(shrunk_runs / spec.league_runs_per_team_game, spec.factor_bounds["offense"])
+
+
+def _starter_weakness(pitcher: PitcherForm, spec: FormulaSpec) -> float:
+    season_era = _era(pitcher.season_earned_runs, pitcher.season_innings, spec.league_starter_era)
+    recent_era = _era(pitcher.last_five_earned_runs, pitcher.last_five_innings, spec.league_starter_era)
+    blended_era = spec.starter_season_weight * season_era + spec.starter_recent_weight * recent_era
+    k_rate = _rate(
+        pitcher.last_five_strikeouts,
+        pitcher.last_five_batters_faced,
+        spec.league_strikeout_rate,
+    )
+    bb_rate = _rate(pitcher.last_five_walks, pitcher.last_five_batters_faced, spec.league_walk_rate)
+    discipline = (
+        1
+        - spec.strikeout_weight * (k_rate - spec.league_strikeout_rate)
+        + spec.walk_weight * (bb_rate - spec.league_walk_rate)
+    )
+    raw = blended_era / spec.league_starter_era * discipline
+    return _clip(raw, spec.factor_bounds["starter_weakness"])
+
+
+def _uncertainty_components(features: MLBGameFeatures, spec: FormulaSpec) -> dict[str, float]:
+    u = spec.uncertainty
+    components = {"base": u["base"], "model_form": u["model_form"]}
+    components["pitcher"] = u["pitcher"]
+    if features.away_starter.rookie_or_limited or features.home_starter.rookie_or_limited:
+        components["rookie_starter"] = u["rookie_starter"]
+    if "unavailable" in features.away_bullpen_status or "unavailable" in features.home_bullpen_status:
+        components["bullpen"] = u["bullpen_unavailable"]
+    if "unavailable" in features.weather_status:
+        components["weather"] = u["weather_unavailable"]
+    if features.lineup_status == "projected":
+        components["lineup"] = u["lineup_projected"]
+    elif "unavailable" in features.lineup_status:
+        components["lineup"] = u["lineup_unavailable"]
+    if not features.starter_confirmed or features.starter_status != "confirmed":
+        components["starter_confirmation"] = u["lineup_projected"]
+    if features.away_starter.xfip_status != "available" or features.home_starter.xfip_status != "available":
+        components["missing_xfip"] = u["missing_xfip"]
+    if features.wrc_plus_status != "available":
+        components["missing_wrc_plus"] = u["missing_wrc_plus"]
+    return components
+
+
+def _era(earned_runs: int, innings: float, fallback: float) -> float:
+    return fallback if innings <= 0 else 9 * earned_runs / innings
+
+
+def _rate(numerator: int, denominator: int, fallback: float) -> float:
+    return fallback if denominator <= 0 else numerator / denominator
+
+
+def _clip(value: float, bounds: Sequence[float]) -> float:
+    return max(float(bounds[0]), min(float(bounds[1]), float(value)))
+
+
+# --------------------------------------------------------------------------
+# Measured Edge heads (formerly measured_edge_margin.py / measured_edge_totals.py)
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MarginModelOutput:
+    run_estimate: RunEstimate
+    simulation: ScoreSimulation
+    moneyline: MarketDistribution
+    spread: MarketDistribution | None
+    away_spread_line: float | None
+    model_version: str
+    model_artifact_hash: str
+    calibration_version: str
+
+
+class MeasuredEdgeMarginModel:
+    """Trend Engine margin simulation plus versioned Measured Edge calibration."""
+
+    def __init__(self, model_path: str | Path, formula_spec: FormulaSpec) -> None:
+        self.raw = _load_artifact(model_path, MARGIN_MODEL_VERSION)
+        if formula_spec.formula_version != ENGINE_VERSION:
+            raise ValueError("margin model must use the configured Trend Engine score model")
+        scale, offset = float(self.raw["scale"]), float(self.raw["offset"])
+        if not 0 < scale <= 1.5 or not -0.25 <= offset <= 0.25:
+            raise ValueError("margin calibration scale/offset outside governance bounds")
+        self.formula_spec = formula_spec
+
+    def predict(
+        self,
+        features: MLBGameFeatures,
+        away_spread_line: float | None = None,
+    ) -> MarginModelOutput:
+        estimate = estimate_runs(features, self.formula_spec)
+        simulation = simulate_game(features, estimate, self.formula_spec)
+        return MarginModelOutput(
+            run_estimate=estimate,
+            simulation=simulation,
+            moneyline=derive_market_distribution(simulation, MarketType.MONEYLINE),
+            spread=(
+                None
+                if away_spread_line is None
+                else derive_market_distribution(
+                    simulation,
+                    MarketType.SPREAD,
+                    away_spread_line,
+                )
+            ),
+            away_spread_line=away_spread_line,
+            model_version=MARGIN_MODEL_VERSION,
+            model_artifact_hash=self.raw["artifact_hash"],
+            calibration_version=self.raw["calibration_version"],
+        )
+
+    def calibrate_selected_side(self, raw_probability: float) -> float:
+        if not 0 < raw_probability < 1:
+            raise ValueError("raw probability must be between 0 and 1")
+        return float(self.raw["scale"]) * raw_probability + float(self.raw["offset"])
+
+
+_TOTALS_OVERRIDE_FIELDS = {
+    "away_bullpen_weakness",
+    "home_bullpen_weakness",
+    "park_factor",
+    "weather_factor",
+}
+
+
+@dataclass(frozen=True)
+class TotalsModelOutput:
+    run_estimate: RunEstimate
+    simulation: ScoreSimulation
+    total: MarketDistribution
+    total_line: float
+    model_version: str
+    model_artifact_hash: str
+    calibration_version: str
+
+
+class MeasuredEdgeTotalsModel:
+    """Separate totals simulation with independent, versioned calibration."""
+
+    def __init__(self, model_path: str | Path, formula_spec: FormulaSpec) -> None:
+        self.raw = _load_artifact(model_path, TOTALS_MODEL_VERSION)
+        if formula_spec.formula_version != ENGINE_VERSION:
+            raise ValueError("totals model must use the configured Trend Engine score model")
+        self.formula_spec = formula_spec
+
+    def predict(
+        self,
+        features: MLBGameFeatures,
+        total_line: float,
+        feature_overrides: dict[str, float] | None = None,
+    ) -> TotalsModelOutput:
+        totals_features = self._apply_feature_overrides(features, feature_overrides)
+        estimate = estimate_runs(totals_features, self.formula_spec)
+        simulation = simulate_game(
+            totals_features,
+            estimate,
+            self.formula_spec,
+            seed_namespace="totals",
+        )
+        return TotalsModelOutput(
+            run_estimate=estimate,
+            simulation=simulation,
+            total=derive_market_distribution(simulation, MarketType.TOTAL, total_line),
+            total_line=total_line,
+            model_version=TOTALS_MODEL_VERSION,
+            model_artifact_hash=self.raw["artifact_hash"],
+            calibration_version=self.raw["calibration_version"],
+        )
+
+    def calibrate_selected_side(self, raw_probability: float) -> float:
+        if not 0 < raw_probability < 1:
+            raise ValueError("raw probability must be between 0 and 1")
+        return float(self.raw["scale"]) * raw_probability + float(self.raw["offset"])
+
+    @staticmethod
+    def _apply_feature_overrides(
+        features: MLBGameFeatures,
+        feature_overrides: dict[str, float] | None,
+    ) -> MLBGameFeatures:
+        """Pass future bullpen, park, and weather inputs into Trend Engine fields."""
+        if not feature_overrides:
+            return features
+        unsupported = set(feature_overrides) - _TOTALS_OVERRIDE_FIELDS
+        if unsupported:
+            raise ValueError(f"unsupported totals feature overrides: {sorted(unsupported)}")
+        return replace(features, **feature_overrides)
+
+
+def _load_artifact(path: str | Path, expected_version: str) -> dict[str, object]:
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    canonical = {key: value for key, value in raw.items() if key != "artifact_hash"}
+    actual_hash = hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if actual_hash != raw.get("artifact_hash"):
+        raise ValueError("Measured Edge artifact hash mismatch")
+    if raw.get("model_version") != expected_version:
+        raise ValueError("Measured Edge model version mismatch")
+    if raw.get("base_score_model_version") != ENGINE_VERSION:
+        raise ValueError("Measured Edge must use the configured Trend Engine score model")
+    if raw.get("calibration_method") != "flat_probability_shrinkage_toward_half":
+        raise ValueError("Measured Edge calibration method mismatch")
+    if "scale" not in raw or "offset" not in raw:
+        raise ValueError("Measured Edge config is missing required scale or offset field")
+    return raw

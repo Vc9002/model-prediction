@@ -1,0 +1,1052 @@
+{
+  "primary_qualification": {
+    "minimum_hit_rate": 0.65,
+    "minimum_locked_holdout_calls": 50
+  },
+  "schema_version": "1",
+  "secondary_reporting": [
+    "brier_score",
+    "calibration"
+  ],
+  "sports": {
+    "mlb": {
+      "cross_model_agreement": {
+        "diagnostic_60": {
+          "holdout_agreement_rows": 597,
+          "learned_threshold": 0.54187125,
+          "locked_holdout": {
+            "brier_score": 0.246547,
+            "calibration": {
+              "brier_score": 0.2465469068797375,
+              "calibration_intercept": -0.7364491122611416,
+              "calibration_slope": 4.311762858051,
+              "expected_calibration_error": 0.0030331154039403563,
+              "log_loss": 0.6862171823834652,
+              "reliability_buckets": [
+                {
+                  "count": 194,
+                  "hit_rate": 0.5515463917525774,
+                  "lower": 0.5,
+                  "mean_p": 0.5545795071565177,
+                  "upper": 0.6
+                }
+              ],
+              "sample_size": 194,
+              "status": "ok"
+            },
+            "called_rate": 0.324958,
+            "calls": 194,
+            "failures": [
+              "selective hit rate 55.15% below required 65.00%"
+            ],
+            "hit_rate": 0.551546,
+            "hits": 107,
+            "locked_holdout": true,
+            "minimum_calls": 50,
+            "minimum_hit_rate": 0.65,
+            "price_diagnostics": null,
+            "qualified": false,
+            "roi": null,
+            "secondary_reporting_complete": true,
+            "selectivity": 0.324958,
+            "total_predictions": 597,
+            "units_at_minus_110": 10.272727
+          },
+          "status": "evaluated",
+          "validation": {
+            "agreement_rows": 443,
+            "minimum_calls": 50,
+            "selectivity": 0.282167,
+            "target_hit_rate": 0.6,
+            "validation_calls": 125,
+            "validation_hit_rate": 0.6
+          }
+        },
+        "primary_65": {
+          "holdout_agreement_rows": 597,
+          "learned_threshold": 0.55548645,
+          "locked_holdout": {
+            "brier_score": 0.239982,
+            "calibration": {
+              "brier_score": 0.2399818250883381,
+              "calibration_intercept": 1.50695254251516,
+              "calibration_slope": -4.0097548414573,
+              "expected_calibration_error": 0.050049825539263626,
+              "log_loss": 0.6730392480775221,
+              "reliability_buckets": [
+                {
+                  "count": 83,
+                  "hit_rate": 0.6144578313253012,
+                  "lower": 0.5,
+                  "mean_p": 0.5644080057860376,
+                  "upper": 0.6
+                }
+              ],
+              "sample_size": 83,
+              "status": "ok"
+            },
+            "called_rate": 0.139028,
+            "calls": 83,
+            "failures": [
+              "selective hit rate 61.45% below required 65.00%"
+            ],
+            "hit_rate": 0.614458,
+            "hits": 51,
+            "locked_holdout": true,
+            "minimum_calls": 50,
+            "minimum_hit_rate": 0.65,
+            "price_diagnostics": null,
+            "qualified": false,
+            "roi": null,
+            "secondary_reporting_complete": true,
+            "selectivity": 0.139028,
+            "total_predictions": 597,
+            "units_at_minus_110": 14.363636
+          },
+          "status": "evaluated",
+          "validation": {
+            "agreement_rows": 443,
+            "minimum_calls": 50,
+            "selectivity": 0.124153,
+            "target_hit_rate": 0.65,
+            "validation_calls": 55,
+            "validation_hit_rate": 0.654545
+          }
+        },
+        "rule": "Elo and trend predict the same side; minimum of both confidences clears learned threshold"
+      },
+      "feature_coverage": {
+        "park": 0.999461,
+        "weather": 0.0
+      },
+      "feature_decisions": [
+        {
+          "action": "RETAIN",
+          "baseline": {
+            "calls": 147,
+            "hit_rate": 0.510204,
+            "tier": "diagnostic_60",
+            "units_at_minus_110": -3.818182
+          },
+          "candidate": {
+            "calls": 90,
+            "hit_rate": 0.6,
+            "tier": "primary_65",
+            "units_at_minus_110": 13.090909
+          },
+          "feature": "trend_gap",
+          "reason": "improved selective locked-holdout hit rate"
+        },
+        {
+          "action": "DIAGNOSTIC_ONLY",
+          "baseline": {
+            "calls": 90,
+            "hit_rate": 0.6,
+            "tier": "primary_65",
+            "units_at_minus_110": 13.090909
+          },
+          "candidate": {
+            "calls": 89,
+            "hit_rate": 0.606742,
+            "tier": "primary_65",
+            "units_at_minus_110": 14.090909
+          },
+          "feature": "park_factor",
+          "reason": "current static park table is not archived point-in-time for the historical window"
+        },
+        {
+          "action": "REJECT_UNAVAILABLE",
+          "baseline": {
+            "calls": 89,
+            "hit_rate": 0.606742,
+            "tier": "primary_65",
+            "units_at_minus_110": 14.090909
+          },
+          "candidate": {
+            "calls": 89,
+            "hit_rate": 0.606742,
+            "tier": "primary_65",
+            "units_at_minus_110": 14.090909
+          },
+          "feature": "weather_factor",
+          "reason": "zero point-in-time weather coverage and zero feature variance"
+        }
+      ],
+      "split": {
+        "locked_holdout": {
+          "end": "2026-07-15",
+          "observations": 821,
+          "start": "2026-05-13"
+        },
+        "method": "complete_date_60_20_20",
+        "train": {
+          "end": "2025-10-07",
+          "observations": 2310,
+          "start": "2025-04-06"
+        },
+        "validation": {
+          "end": "2026-05-12",
+          "observations": 578,
+          "start": "2025-10-08"
+        }
+      },
+      "sport": "mlb",
+      "threshold_source": "later validation cohort; never locked holdout",
+      "variants": {
+        "elo_only": {
+          "coefficients": {
+            "elo_probability": 2.7332839021
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.58523223,
+            "locked_holdout": {
+              "brier_score": 0.256084,
+              "calibration": {
+                "brier_score": 0.25608408202659316,
+                "calibration_intercept": -1.607557339356544,
+                "calibration_slope": 3.6314429071198306,
+                "expected_calibration_error": 0.10157713198782033,
+                "log_loss": 0.7054130011358092,
+                "reliability_buckets": [
+                  {
+                    "count": 65,
+                    "hit_rate": 0.4,
+                    "lower": 0.5,
+                    "mean_p": 0.5915020371450315,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 82,
+                    "hit_rate": 0.5975609756097561,
+                    "lower": 0.6,
+                    "mean_p": 0.6278561705827139,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 147,
+                "status": "ok"
+              },
+              "called_rate": 0.17905,
+              "calls": 147,
+              "failures": [
+                "selective hit rate 51.02% below required 65.00%"
+              ],
+              "hit_rate": 0.510204,
+              "hits": 75,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.17905,
+              "total_predictions": 821,
+              "units_at_minus_110": -3.818182
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.181661,
+              "target_hit_rate": 0.6,
+              "validation_calls": 105,
+              "validation_hit_rate": 0.6
+            }
+          },
+          "features": [
+            "elo_probability"
+          ],
+          "intercept": -1.2974724085,
+          "primary_65": {
+            "minimum_calls": 50,
+            "reason": "no confidence threshold reaches 65.0% with 50+ calls",
+            "status": "no_validation_threshold",
+            "target_hit_rate": 0.65
+          }
+        },
+        "elo_trend": {
+          "coefficients": {
+            "elo_probability": 2.7153436879,
+            "trend_gap": 0.0762545313
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.59690901,
+            "locked_holdout": {
+              "brier_score": 0.241756,
+              "calibration": {
+                "brier_score": 0.2417559319393706,
+                "calibration_intercept": -0.11693535649277177,
+                "calibration_slope": 0.9743456324861628,
+                "expected_calibration_error": 0.0455071600137278,
+                "log_loss": 0.6764384470401477,
+                "reliability_buckets": [
+                  {
+                    "count": 14,
+                    "hit_rate": 0.5,
+                    "lower": 0.5,
+                    "mean_p": 0.5984475678516221,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 96,
+                    "hit_rate": 0.59375,
+                    "lower": 0.6,
+                    "mean_p": 0.6243310062904212,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 3,
+                    "hit_rate": 1.0,
+                    "lower": 0.7,
+                    "mean_p": 0.7239111574172995,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 113,
+                "status": "ok"
+              },
+              "called_rate": 0.137637,
+              "calls": 113,
+              "failures": [
+                "selective hit rate 59.29% below required 65.00%"
+              ],
+              "hit_rate": 0.59292,
+              "hits": 67,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.137637,
+              "total_predictions": 821,
+              "units_at_minus_110": 14.909091
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.155709,
+              "target_hit_rate": 0.6,
+              "validation_calls": 90,
+              "validation_hit_rate": 0.6
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap"
+          ],
+          "intercept": -1.2885063542,
+          "primary_65": {
+            "learned_threshold": 0.60304393,
+            "locked_holdout": {
+              "brier_score": 0.240525,
+              "calibration": {
+                "brier_score": 0.2405251972906486,
+                "calibration_intercept": -0.053598495668119514,
+                "calibration_slope": 0.8621026953427423,
+                "expected_calibration_error": 0.04834333980093164,
+                "log_loss": 0.6739148008074671,
+                "reliability_buckets": [
+                  {
+                    "count": 87,
+                    "hit_rate": 0.5862068965517241,
+                    "lower": 0.6,
+                    "mean_p": 0.6266969431532844,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 3,
+                    "hit_rate": 1.0,
+                    "lower": 0.7,
+                    "mean_p": 0.7239111574172995,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 90,
+                "status": "ok"
+              },
+              "called_rate": 0.109622,
+              "calls": 90,
+              "failures": [
+                "selective hit rate 60.00% below required 65.00%"
+              ],
+              "hit_rate": 0.6,
+              "hits": 54,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.109622,
+              "total_predictions": 821,
+              "units_at_minus_110": 13.090909
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.136678,
+              "target_hit_rate": 0.65,
+              "validation_calls": 79,
+              "validation_hit_rate": 0.658228
+            }
+          }
+        },
+        "elo_trend_park": {
+          "coefficients": {
+            "elo_probability": 2.5726445024,
+            "park_factor": -1.0694983065,
+            "trend_gap": 0.0759953712
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.5976596,
+            "locked_holdout": {
+              "brier_score": 0.251377,
+              "calibration": {
+                "brier_score": 0.2513765280965278,
+                "calibration_intercept": -1.9833447539617934,
+                "calibration_slope": 4.255379932157655,
+                "expected_calibration_error": 0.09874527597386,
+                "log_loss": 0.6958518806267954,
+                "reliability_buckets": [
+                  {
+                    "count": 9,
+                    "hit_rate": 0.4444444444444444,
+                    "lower": 0.5,
+                    "mean_p": 0.5986341689815641,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 99,
+                    "hit_rate": 0.5353535353535354,
+                    "lower": 0.6,
+                    "mean_p": 0.6235234322309741,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 3,
+                    "hit_rate": 1.0,
+                    "lower": 0.7,
+                    "mean_p": 0.7186005595340159,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 111,
+                "status": "ok"
+              },
+              "called_rate": 0.135201,
+              "calls": 111,
+              "failures": [
+                "selective hit rate 54.05% below required 65.00%"
+              ],
+              "hit_rate": 0.540541,
+              "hits": 60,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.135201,
+              "total_predictions": 821,
+              "units_at_minus_110": 3.545455
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.16782,
+              "target_hit_rate": 0.6,
+              "validation_calls": 97,
+              "validation_hit_rate": 0.608247
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor"
+          ],
+          "intercept": -0.1445805829,
+          "primary_65": {
+            "learned_threshold": 0.60423312,
+            "locked_holdout": {
+              "brier_score": 0.237868,
+              "calibration": {
+                "brier_score": 0.2378682137370875,
+                "calibration_intercept": -0.5186470145266008,
+                "calibration_slope": 1.7936430458785733,
+                "expected_calibration_error": 0.042140959523052184,
+                "log_loss": 0.668402345762375,
+                "reliability_buckets": [
+                  {
+                    "count": 86,
+                    "hit_rate": 0.5930232558139535,
+                    "lower": 0.6,
+                    "mean_p": 0.6268179892576011,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 3,
+                    "hit_rate": 1.0,
+                    "lower": 0.7,
+                    "mean_p": 0.7186005595340159,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 89,
+                "status": "ok"
+              },
+              "called_rate": 0.108404,
+              "calls": 89,
+              "failures": [
+                "selective hit rate 60.67% below required 65.00%"
+              ],
+              "hit_rate": 0.606742,
+              "hits": 54,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.108404,
+              "total_predictions": 821,
+              "units_at_minus_110": 14.090909
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.129758,
+              "target_hit_rate": 0.65,
+              "validation_calls": 75,
+              "validation_hit_rate": 0.653333
+            }
+          }
+        },
+        "elo_trend_park_weather": {
+          "coefficients": {
+            "elo_probability": 2.5945873687,
+            "park_factor": -1.0199194014,
+            "trend_gap": 0.0762923174,
+            "weather_factor": -0.1045711998
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.59750075,
+            "locked_holdout": {
+              "brier_score": 0.2487,
+              "calibration": {
+                "brier_score": 0.24869988889325598,
+                "calibration_intercept": -1.547772310442182,
+                "calibration_slope": 3.4821553735287454,
+                "expected_calibration_error": 0.08544729674057078,
+                "log_loss": 0.6904301523822374,
+                "reliability_buckets": [
+                  {
+                    "count": 7,
+                    "hit_rate": 0.5714285714285714,
+                    "lower": 0.5,
+                    "mean_p": 0.5989341261800506,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 100,
+                    "hit_rate": 0.54,
+                    "lower": 0.6,
+                    "mean_p": 0.6236571363603916,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 3,
+                    "hit_rate": 1.0,
+                    "lower": 0.7,
+                    "mean_p": 0.7196832926122401,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 110,
+                "status": "ok"
+              },
+              "called_rate": 0.133983,
+              "calls": 110,
+              "failures": [
+                "selective hit rate 55.45% below required 65.00%"
+              ],
+              "hit_rate": 0.554545,
+              "hits": 61,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.133983,
+              "total_predictions": 821,
+              "units_at_minus_110": 6.454545
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.16782,
+              "target_hit_rate": 0.6,
+              "validation_calls": 97,
+              "validation_hit_rate": 0.608247
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor",
+            "weather_factor"
+          ],
+          "intercept": -0.1013515012,
+          "primary_65": {
+            "learned_threshold": 0.60421331,
+            "locked_holdout": {
+              "brier_score": 0.237916,
+              "calibration": {
+                "brier_score": 0.23791555066899636,
+                "calibration_intercept": -0.4962280244727968,
+                "calibration_slope": 1.7450916206240026,
+                "expected_calibration_error": 0.042502451146944606,
+                "log_loss": 0.6685003313818596,
+                "reliability_buckets": [
+                  {
+                    "count": 86,
+                    "hit_rate": 0.5930232558139535,
+                    "lower": 0.6,
+                    "mean_p": 0.6272298608129627,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 3,
+                    "hit_rate": 1.0,
+                    "lower": 0.7,
+                    "mean_p": 0.7196832926122401,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 89,
+                "status": "ok"
+              },
+              "called_rate": 0.108404,
+              "calls": 89,
+              "failures": [
+                "selective hit rate 60.67% below required 65.00%"
+              ],
+              "hit_rate": 0.606742,
+              "hits": 54,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.108404,
+              "total_predictions": 821,
+              "units_at_minus_110": 14.090909
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.129758,
+              "target_hit_rate": 0.65,
+              "validation_calls": 75,
+              "validation_hit_rate": 0.653333
+            }
+          }
+        }
+      },
+      "walk_forward": true
+    },
+    "nba": {
+      "cross_model_agreement": {
+        "diagnostic_60": {
+          "holdout_agreement_rows": 243,
+          "learned_threshold": 0.50230609,
+          "locked_holdout": {
+            "brier_score": 0.225529,
+            "calibration": {
+              "brier_score": 0.22552888819622108,
+              "calibration_intercept": 0.1506666463624337,
+              "calibration_slope": 2.1103826852914103,
+              "expected_calibration_error": 0.10100135931262434,
+              "log_loss": 0.6431148731382776,
+              "reliability_buckets": [
+                {
+                  "count": 183,
+                  "hit_rate": 0.639344262295082,
+                  "lower": 0.5,
+                  "mean_p": 0.54787748664271,
+                  "upper": 0.6
+                },
+                {
+                  "count": 50,
+                  "hit_rate": 0.76,
+                  "lower": 0.6,
+                  "mean_p": 0.6343267172521285,
+                  "upper": 0.7
+                },
+                {
+                  "count": 3,
+                  "hit_rate": 1.0,
+                  "lower": 0.7,
+                  "mean_p": 0.7285877613327713,
+                  "upper": 0.8
+                }
+              ],
+              "sample_size": 236,
+              "status": "ok"
+            },
+            "called_rate": 0.971193,
+            "calls": 236,
+            "failures": [],
+            "hit_rate": 0.669492,
+            "hits": 158,
+            "locked_holdout": true,
+            "minimum_calls": 50,
+            "minimum_hit_rate": 0.65,
+            "price_diagnostics": null,
+            "qualified": true,
+            "roi": null,
+            "secondary_reporting_complete": true,
+            "selectivity": 0.971193,
+            "total_predictions": 243,
+            "units_at_minus_110": 65.636364
+          },
+          "status": "evaluated",
+          "validation": {
+            "agreement_rows": 95,
+            "minimum_calls": 50,
+            "selectivity": 0.978947,
+            "target_hit_rate": 0.6,
+            "validation_calls": 93,
+            "validation_hit_rate": 0.602151
+          }
+        },
+        "primary_65": {
+          "minimum_calls": 50,
+          "reason": "no confidence threshold reaches 65.0% with 50+ calls",
+          "status": "no_validation_threshold",
+          "target_hit_rate": 0.65
+        },
+        "rule": "Elo and trend predict the same side; minimum of both confidences clears learned threshold"
+      },
+      "feature_coverage": {
+        "park": 0.0,
+        "weather": 0.0
+      },
+      "feature_decisions": [],
+      "split": {
+        "locked_holdout": {
+          "end": "2026-01-05",
+          "observations": 437,
+          "start": "2025-11-03"
+        },
+        "method": "complete_date_60_20_20",
+        "train": {
+          "end": "2025-05-03",
+          "observations": 1305,
+          "start": "2024-10-16"
+        },
+        "validation": {
+          "end": "2025-11-02",
+          "observations": 204,
+          "start": "2025-05-04"
+        }
+      },
+      "sport": "nba",
+      "threshold_source": "later validation cohort; never locked holdout",
+      "variants": {
+        "elo_only": {
+          "coefficients": {
+            "elo_probability": 3.5865930116
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.50652992,
+            "locked_holdout": {
+              "brier_score": 0.222742,
+              "calibration": {
+                "brier_score": 0.2227415696416107,
+                "calibration_intercept": -0.347706516076408,
+                "calibration_slope": 1.1954279579205378,
+                "expected_calibration_error": 0.045519203111229214,
+                "log_loss": 0.6352021584787568,
+                "reliability_buckets": [
+                  {
+                    "count": 123,
+                    "hit_rate": 0.5121951219512195,
+                    "lower": 0.5,
+                    "mean_p": 0.5565317654289441,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 124,
+                    "hit_rate": 0.5725806451612904,
+                    "lower": 0.6,
+                    "mean_p": 0.6539553283900902,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 152,
+                    "hit_rate": 0.7302631578947368,
+                    "lower": 0.7,
+                    "mean_p": 0.7545276702321645,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 35,
+                    "hit_rate": 0.8,
+                    "lower": 0.8,
+                    "mean_p": 0.8149502973386622,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 434,
+                "status": "ok"
+              },
+              "called_rate": 0.993135,
+              "calls": 434,
+              "failures": [
+                "selective hit rate 62.90% below required 65.00%"
+              ],
+              "hit_rate": 0.629032,
+              "hits": 273,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.993135,
+              "total_predictions": 437,
+              "units_at_minus_110": 87.181818
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.985294,
+              "target_hit_rate": 0.6,
+              "validation_calls": 201,
+              "validation_hit_rate": 0.60199
+            }
+          },
+          "features": [
+            "elo_probability"
+          ],
+          "intercept": -1.8920684509,
+          "primary_65": {
+            "learned_threshold": 0.60681235,
+            "locked_holdout": {
+              "brier_score": 0.212333,
+              "calibration": {
+                "brier_score": 0.2123325127751604,
+                "calibration_intercept": -1.123590415625369,
+                "calibration_slope": 1.9145198605459468,
+                "expected_calibration_error": 0.054372309495760184,
+                "log_loss": 0.612905044587294,
+                "reliability_buckets": [
+                  {
+                    "count": 116,
+                    "hit_rate": 0.5517241379310345,
+                    "lower": 0.6,
+                    "mean_p": 0.6574426163368375,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 152,
+                    "hit_rate": 0.7302631578947368,
+                    "lower": 0.7,
+                    "mean_p": 0.7545276702321645,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 35,
+                    "hit_rate": 0.8,
+                    "lower": 0.8,
+                    "mean_p": 0.8149502973386622,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 303,
+                "status": "ok"
+              },
+              "called_rate": 0.693364,
+              "calls": 303,
+              "failures": [],
+              "hit_rate": 0.669967,
+              "hits": 203,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.693364,
+              "total_predictions": 437,
+              "units_at_minus_110": 84.545455
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.676471,
+              "target_hit_rate": 0.65,
+              "validation_calls": 138,
+              "validation_hit_rate": 0.652174
+            }
+          }
+        },
+        "elo_trend": {
+          "coefficients": {
+            "elo_probability": 3.5512456023,
+            "trend_gap": 0.0091630726
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.50762351,
+            "locked_holdout": {
+              "brier_score": 0.221956,
+              "calibration": {
+                "brier_score": 0.22195600877877195,
+                "calibration_intercept": -0.37733993119707737,
+                "calibration_slope": 1.236333197132512,
+                "expected_calibration_error": 0.05712028943758325,
+                "log_loss": 0.6331705970301642,
+                "reliability_buckets": [
+                  {
+                    "count": 122,
+                    "hit_rate": 0.5327868852459017,
+                    "lower": 0.5,
+                    "mean_p": 0.5583595051578246,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 129,
+                    "hit_rate": 0.5658914728682171,
+                    "lower": 0.6,
+                    "mean_p": 0.6571579427819616,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 144,
+                    "hit_rate": 0.7083333333333334,
+                    "lower": 0.7,
+                    "mean_p": 0.7579916867464086,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 35,
+                    "hit_rate": 0.8857142857142857,
+                    "lower": 0.8,
+                    "mean_p": 0.8137803623271337,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 430,
+                "status": "ok"
+              },
+              "called_rate": 0.983982,
+              "calls": 430,
+              "failures": [
+                "selective hit rate 63.02% below required 65.00%"
+              ],
+              "hit_rate": 0.630233,
+              "hits": 271,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.983982,
+              "total_predictions": 437,
+              "units_at_minus_110": 87.363636
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.980392,
+              "target_hit_rate": 0.6,
+              "validation_calls": 200,
+              "validation_hit_rate": 0.6
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap"
+          ],
+          "intercept": -1.8711316961,
+          "primary_65": {
+            "learned_threshold": 0.61121706,
+            "locked_holdout": {
+              "brier_score": 0.209988,
+              "calibration": {
+                "brier_score": 0.20998841326356102,
+                "calibration_intercept": -1.3910186673877587,
+                "calibration_slope": 2.1811224323923546,
+                "expected_calibration_error": 0.07135657404463795,
+                "log_loss": 0.6074186523893336,
+                "reliability_buckets": [
+                  {
+                    "count": 115,
+                    "hit_rate": 0.5652173913043478,
+                    "lower": 0.6,
+                    "mean_p": 0.6635681961660035,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 144,
+                    "hit_rate": 0.7083333333333334,
+                    "lower": 0.7,
+                    "mean_p": 0.7579916867464086,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 35,
+                    "hit_rate": 0.8857142857142857,
+                    "lower": 0.8,
+                    "mean_p": 0.8137803623271337,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 294,
+                "status": "ok"
+              },
+              "called_rate": 0.672769,
+              "calls": 294,
+              "failures": [],
+              "hit_rate": 0.673469,
+              "hits": 198,
+              "locked_holdout": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.65,
+              "price_diagnostics": null,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.672769,
+              "total_predictions": 437,
+              "units_at_minus_110": 84.0
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.647059,
+              "target_hit_rate": 0.65,
+              "validation_calls": 132,
+              "validation_hit_rate": 0.651515
+            }
+          }
+        }
+      },
+      "walk_forward": true
+    }
+  },
+  "unit_pnl": "diagnostic flat one-unit staking at -110"
+}
