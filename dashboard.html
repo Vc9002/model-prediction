@@ -677,10 +677,8 @@ function orderControl(p,compact=false){
   const reason=p.buy_ready?"Set a post-only GTC limit price":(p.buy_block_reason||"order unavailable");
   const auth=p.order_authorization==="manual_research_override"?"manual":"model";
   const blocked=reason.includes("older")?"scan prices":reason.includes("POLYMARKET_")?"API key needed":"blocked";
-  const hasQuote=p.quote&&p.quote.market_slug;
-  return `<span class="order-wrap" title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
+  return `<span class="order-wrap${compact?" compact":""}" title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
     `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
-    (hasQuote?`<button class="sell" onclick="event.stopPropagation();openSell('${p.pick_id}')" title="Place a resting SELL limit to exit">Sell</button>`:"")+
     `<span class="order-note">${ask!=null?cents(ask)+" ask · ":""}${p.buy_ready?auth:blocked}</span></span>`;
 }
 function openSell(pickId){
@@ -758,7 +756,7 @@ async function manualRefresh(btn){
   if(btn){btn.disabled=false;btn.textContent=label;}
 }
 window.manualRefresh=manualRefresh;
-function openBuy(pickId,initialPrice){
+async function openBuy(pickId,initialPrice){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
   if(!p){showModal('<h2 class="red">Pick not found</h2>');return;}
   if(p.order?.status==="submitted"){
@@ -771,21 +769,12 @@ function openBuy(pickId,initialPrice){
   }
   const ask=Number(p.quote.ask);
   const typed=Number(initialPrice);
-  const defaultPrice=(typed>0&&typed<1?typed:Math.max(1,Math.ceil(ask*100-1e-9)-1)/100).toFixed(2);
-  const unitValue=Number(p.unit_value_usd||state.status?.unit_value_usd||7.5);
-  const maxUnits=Number(p.units)||Number(p.suggested_paper_units)||0;
-  const model=Number(p.model_probability),market=marketPrice(p),edge=model-market;
-  showModal(`<h2>Resting limit order</h2>
-    <p><b>${esc(pickLabel(p))}</b> · model <b>${pct(model)}</b> · market <b>${cents(market)} (${pct(market)})</b> · edge <b class="green">+${(edge*100).toFixed(1)}pp</b></p>
-    <p>Current ask <b>${cents(ask)}</b> · authorization <b>${p.order_authorization==="manual_research_override"?"manual override":"qualified model"}</b></p>
-    <p class="dim small">Post-only means your price must stay below the ask; it will rest instead of crossing immediately.</p>
-    <label>Limit price <input id="buyPrice" type="number" min="0.01" max="0.99" step="0.01" value="${defaultPrice}"></label><br><br>
-    <label>Units <input id="buyUnits" type="number" min="0.25" max="${maxUnits}" step="0.25" value="${maxUnits}"></label>
-    <span class="dim small"> · 1U = $${unitValue.toFixed(2)} · max ${maxUnits.toFixed(2)}U / $${(maxUnits*unitValue).toFixed(2)}</span><br><br>
-    <button class="primary" onclick="previewBuy('${p.pick_id}')">Review exact order</button>`);
+  const price=typed>0&&typed<1?typed:Math.max(1,Math.ceil(ask*100-1e-9)-1)/100;
+  const units=Number(p.units)||Number(p.suggested_paper_units)||0;
+  await previewBuy(pickId,price,units);
 }
-async function previewBuy(pickId){
-  const price=Number($("#buyPrice").value),units=Number($("#buyUnits").value);
+async function previewBuy(pickId,price,units){
+  price=Number(price);units=Number(units);
   const unitValue=Number(state.status?.unit_value_usd||7.5);
   const size_shares=Math.floor((units*unitValue/price)*100)/100;
   const response=await fetch("/api/order/preview",{method:"POST",headers:{"Content-Type":"application/json"},
