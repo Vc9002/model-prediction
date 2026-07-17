@@ -108,6 +108,10 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("exposure")
     commands.add_parser("models")
     commands.add_parser("summary")
+    commands.add_parser(
+        "live-portfolio",
+        help="read authenticated exchange positions, activities, and balances",
+    )
 
     slate = commands.add_parser(
         "polymarket-slate", help="read dated sports slates from the public Polymarket US API"
@@ -879,6 +883,8 @@ def main(argv: list[str] | None = None) -> None:
             output = {league.value: asdict(spec) for league, spec in MODEL_SPECS.items()}
         elif args.command == "summary":
             output = _summary(config, ledger)
+        elif args.command == "live-portfolio":
+            output = PolymarketExecutor(audit).portfolio_snapshot()
         elif args.command == "polymarket-slate":
             output = _polymarket_slate(args, config)
         elif args.command == "polymarket-snapshot":
@@ -1181,9 +1187,12 @@ def main(argv: list[str] | None = None) -> None:
                     and edge <= 0
                 ):
                     raise ExecutionGateError("REFUSED: manual research order has no positive edge.")
-                if args.price >= model_probability:
+                # The "limit below model probability" rule is a BUY guard (do not
+                # pay more than fair value). A SELL is an exit at a target price
+                # and is exempt.
+                if args.action == "buy" and args.price >= model_probability:
                     raise ExecutionGateError(
-                        "REFUSED: manual limit must remain below the model probability."
+                        "REFUSED: manual buy limit must remain below the model probability."
                     )
                 for team_key in ("away_team", "home_team"):
                     _, banned = bans.check(league, row[team_key])
@@ -1201,7 +1210,9 @@ def main(argv: list[str] | None = None) -> None:
                 )
             else:
                 maximum_units = float(row.get("units") or 0)
-            maximum_cost = round(maximum_units * policy.unit_value_usd, 2)
+            # A SELL is an exit — it returns capital, so no dollar cost cap
+            # applies. Buys keep the unit cap.
+            maximum_cost = None if args.action == "sell" else round(maximum_units * policy.unit_value_usd, 2)
             ticket = OrderTicket(
                 market_slug=args.market_slug,
                 token_side=args.side,

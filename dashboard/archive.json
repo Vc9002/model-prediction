@@ -1,35 +1,24 @@
 {
- "pick_ids": [
-  "103bf81cbfea407b",
-  "1784b306a2764ca0",
-  "69b8edc361c5483f",
-  "c6927110c2754085",
-  "ec5e7cc40c1a4c2b"
- ],
+ "pick_ids": [],
  "history": [
   {
-   "at": "2026-07-17T10:53:01",
-   "action": "clear:week",
-   "rows": 0
-  },
-  {
-   "at": "2026-07-17T10:53:01",
-   "action": "restore",
-   "rows": 0
-  },
-  {
-   "at": "2026-07-17T10:54:22",
+   "at": "2026-07-17T15:04:39",
    "action": "clear_ids",
    "rows": 1
   },
   {
-   "at": "2026-07-17T10:54:22",
+   "at": "2026-07-17T15:04:39",
    "action": "restore",
    "rows": 1
   },
   {
-   "at": "2026-07-17T14:01:37",
-   "action": "clear:all",
+   "at": "2026-07-17T15:05:57",
+   "action": "clear_ids",
+   "rows": 5
+  },
+  {
+   "at": "2026-07-17T15:11:51",
+   "action": "restore",
    "rows": 5
   }
  ]

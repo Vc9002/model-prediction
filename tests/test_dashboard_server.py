@@ -373,3 +373,148 @@ def test_scan_prices_targets_only_unique_open_visible_today_contracts(monkeypatc
         "wnba=wnba-game-1",
     ]
     assert "--all" not in command
+
+
+def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
+    monkeypatch, tmp_path: Path
+) -> None:
+    history_file = tmp_path / "portfolio_history.json"
+    monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", history_file)
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_live_model_links",
+        lambda: {
+            ("market-1", "long"): {
+                "pick_id": "model-pick-1",
+                "model_version": "wnba-v3",
+            }
+        },
+    )
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+    raw = {
+        "status": "live",
+        "source": "polymarket_us_authenticated_portfolio",
+        "observed_at_utc": "2026-07-17T15:00:00Z",
+        "positions": {
+            "market-1": {
+                "netPositionDecimal": "3.5",
+                "cost": {"value": "1.75", "currency": "USD"},
+                "cashValue": {"value": "2.10", "currency": "USD"},
+                "realized": {"value": "0.20", "currency": "USD"},
+                "updateTime": "2026-07-17T14:59:00Z",
+                "marketMetadata": {"title": "Away at Home", "outcome": "Away"},
+            },
+            "closed-market": {"netPositionDecimal": "0"},
+        },
+        "activities": [
+            {
+                "trade": {
+                    "id": "trade-1",
+                    "marketSlug": "market-1",
+                    "price": {"value": "0.50", "currency": "USD"},
+                    "qtyDecimal": "3.5",
+                    "costBasis": {"value": "1.75", "currency": "USD"},
+                    "realizedPnl": {"value": "0.00", "currency": "USD"},
+                    "updateTime": "2026-07-17T14:58:00Z",
+                }
+            },
+            {
+                "positionResolution": {
+                    "marketSlug": "old-market",
+                    "tradeId": "resolution-1",
+                    "side": "POSITION_RESOLUTION_SIDE_LONG",
+                    "updateTime": "2026-07-17T14:00:00Z",
+                    "beforePosition": {"netPositionDecimal": "2"},
+                    "afterPosition": {
+                        "netPositionDecimal": "0",
+                        "realized": {"value": "1.00", "currency": "USD"},
+                    },
+                }
+            },
+        ],
+        "balances": [{"currency": "USD", "buyingPower": 25.0}],
+    }
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout=json.dumps(raw), stderr=""
+        ),
+    )
+
+    result = dashboard_server.live_portfolio_view()
+
+    assert result["status"] == "live"
+    assert result["open"]["count"] == 1
+    assert result["open"]["positions"][0]["market_slug"] == "market-1"
+    assert result["open"]["positions"][0]["model_pick"]["pick_id"] == "model-pick-1"
+    assert result["recent_history"]["trade_count"] == 1
+    assert result["recent_history"]["settlement_count"] == 1
+    assert result["history_start_date"] == "2026-07-17"
+    assert history_file.exists()
+
+
+def test_portfolio_history_ignores_everything_before_fixed_start_date(
+    monkeypatch, tmp_path: Path
+) -> None:
+    history_file = tmp_path / "portfolio_history.json"
+    history_file.write_text(
+        json.dumps(
+            {
+                "history_start_date": "2026-07-17",
+                "activities": [
+                    {
+                        "activity_id": "trade:old",
+                        "type": "trade",
+                        "occurred_at_utc": "2026-07-17T03:59:59Z",
+                    },
+                    {
+                        "activity_id": "trade:new",
+                        "type": "trade",
+                        "occurred_at_utc": "2026-07-17T04:00:00Z",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", history_file)
+
+    result = dashboard_server._load_portfolio_history()
+
+    assert result["history_start_date"] == "2026-07-17"
+    assert [item["activity_id"] for item in result["activities"]] == ["trade:new"]
+
+
+def test_portfolio_never_falls_back_to_model_picks_when_authentication_fails(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        dashboard_server, "PORTFOLIO_HISTORY_FILE", tmp_path / "portfolio_history.json"
+    )
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "invalid-secret")
+    monkeypatch.setattr(
+        dashboard_server,
+        "read_picks",
+        lambda: [{"pick_id": "research-row", "status": "open"}],
+    )
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0],
+            returncode=3,
+            stdout="",
+            stderr=json.dumps({"status": "refused", "error": "invalid API secret"}),
+        ),
+    )
+
+    result = dashboard_server.live_portfolio_view()
+
+    assert result["status"] == "unavailable"
+    assert result["open"]["count"] == 0
+    assert result["open"]["positions"] == []

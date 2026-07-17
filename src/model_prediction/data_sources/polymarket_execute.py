@@ -259,6 +259,29 @@ class PolymarketExecutor:
             "raw_response": response,
         }
 
+    # --------------------------------------------------------- portfolio read
+
+    def portfolio_snapshot(self) -> dict[str, Any]:
+        """Read the authenticated live account without inferring fills.
+
+        Submitted orders are deliberately not treated as positions. The
+        exchange positions and activity endpoints are the source of truth for
+        filled exposure, trades, and market resolutions.
+        """
+        positions = self._request("GET", "/v1/portfolio/positions")
+        activities = self._request("GET", "/v1/portfolio/activities")
+        balances = self._request("GET", "/v1/account/balances")
+        return {
+            "status": "live",
+            "source": "polymarket_us_authenticated_portfolio",
+            "positions": positions.get("positions") or {},
+            "activities": activities.get("activities") or [],
+            "balances": balances.get("balances") or [],
+            "positions_eof": positions.get("eof"),
+            "activities_eof": activities.get("eof"),
+            "observed_at_utc": iso_utc(utc_now()),
+        }
+
     # ---------------------------------------------------------------- cancel
 
     def cancel(self, order_id: str, user_command: bool) -> dict[str, Any]:

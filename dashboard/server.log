@@ -8,3 +8,7 @@
 2026-07-17T14:51:40 job finished: refresh_prices-1784299867 :: ok in 33.1s
 2026-07-17T14:56:37 job started: refresh_prices-1784300197 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli polymarket-slate --all --date 2026-07-17
 2026-07-17T14:57:19 job finished: refresh_prices-1784300197 :: ok in 41.8s
+2026-07-17T15:06:02 job started: daily-1784300762 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-17
+2026-07-17T15:06:46 job finished: daily-1784300762 :: ok in 44.3s
+2026-07-17T15:15:20 job started: refresh_prices-1784301320 :: --contract wnba=aec-wnba-la-chi-2026-07-17 --contract mlb=aec-mlb-mia-mil-2026-07-17 --contract mlb=aec-mlb-min-chc-2026-07-17 --contract wnba=aec-wnba-conn-phx-2026-07-17
+2026-07-17T15:15:25 job finished: refresh_prices-1784301320 :: ok in 5.2s

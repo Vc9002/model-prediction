@@ -35,6 +35,8 @@ button{background:var(--accent);border:1px solid #2a4a80;color:var(--text);borde
   padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:12px}
 button:hover{border-color:var(--green)}
 button.primary{background:#0d4f35;border-color:var(--green)}
+button.sell{background:#4a1f2a;border-color:#c0506a;color:#ffd7de;margin-left:4px}
+button.sell:hover{border-color:#ff4466}
 button:disabled{opacity:.45;cursor:not-allowed}
 input.order-price{width:62px;padding:5px 6px;font-family:var(--mono);font-size:12px}
 .order-wrap{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
@@ -133,7 +135,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <section id="tab-picks" style="display:none">
     <div class="card">
-      <h2>Pick Collection &amp; Ledger</h2>
+      <h2>Model Picks Ledger</h2>
+      <div class="small dim" style="margin-bottom:8px">Model forecasts and research results only. These rows are not live portfolio positions unless a separate exchange fill appears below.</div>
       <div class="kpis" id="pickKpis"></div>
       <div class="filters">
         <button onclick="preset('today')">Today</button>
@@ -161,6 +164,12 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       </div>
       <div style="overflow:auto;max-height:520px"><table class="data" id="pickTable"></table></div>
     </div>
+    <div class="card">
+      <h2>Live Portfolio History</h2>
+      <div class="small dim" id="ledgerLiveStatus" style="margin-bottom:8px">Exchange-confirmed trades and settlements only.</div>
+      <div class="kpis" id="ledgerLiveKpis"></div>
+      <div id="ledgerLiveHistory"></div>
+    </div>
   </section>
 
   <section id="tab-perf" style="display:none">
@@ -179,12 +188,13 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <section id="tab-folio" style="display:none">
     <div class="card">
-      <h2>Portfolio — Open Positions</h2>
+      <h2>Live Portfolio — Exchange Positions</h2>
+      <div class="small dim" id="folioStatus" style="margin-bottom:8px"></div>
       <div class="kpis" id="folioOpenKpis"></div>
       <div id="folioOpen"></div>
     </div>
     <div class="card">
-      <h2>Recent History <span class="dim" style="font-size:12px">(last 7 days)</span></h2>
+      <h2>Trade &amp; Settlement History</h2>
       <div class="kpis" id="folioHistKpis"></div>
       <div id="folioHistory"></div>
     </div>
@@ -657,10 +667,47 @@ function orderControl(p,compact=false){
   const reason=p.buy_ready?"Set a post-only GTC limit price":(p.buy_block_reason||"order unavailable");
   const auth=p.order_authorization==="manual_research_override"?"manual":"model";
   const blocked=reason.includes("older")?"scan prices":reason.includes("POLYMARKET_")?"API key needed":"blocked";
+  const hasQuote=p.quote&&p.quote.market_slug;
   return `<span class="order-wrap" title="${escAttr(reason)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
     `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
+    (hasQuote?`<button class="sell" onclick="event.stopPropagation();openSell('${p.pick_id}')" title="Place a resting SELL limit to exit">Sell</button>`:"")+
     `<span class="order-note">${ask!=null?cents(ask)+" ask · ":""}${p.buy_ready?auth:blocked}</span></span>`;
 }
+function openSell(pickId){
+  const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
+  if(!p||!p.quote){showModal('<h2 class="red">No quote for this contract</h2>');return;}
+  const bid=Number(p.quote.bid),ask=Number(p.quote.ask);
+  // Default sell target one tick above the bid (rests, doesn't cross).
+  const defaultPrice=(bid>0?Math.min(0.99,Math.floor(bid*100+1)/100):(ask||0.5)).toFixed(2);
+  showModal(`<h2>Resting SELL limit — exit a position</h2>
+    <p><b>${esc(pickLabel(p))}</b> · side <b>${p.quote.side}</b> · ${esc(p.quote.market_slug)}</p>
+    <p>Current bid <b>${bid?cents(bid):"—"}</b> · ask <b>${ask?cents(ask):"—"}</b></p>
+    <p class="dim small">A resting sell rests <b>at or above the bid</b> so it does not cross. It closes shares you already hold — the dashboard cannot see your live position, so enter the share count you actually own.</p>
+    <label>Sell limit price <input id="sellPrice" type="number" min="0.01" max="0.99" step="0.01" value="${defaultPrice}"></label><br><br>
+    <label>Shares to sell <input id="sellShares" type="number" min="1" step="1" value="10"></label><br><br>
+    <button class="primary" onclick="previewSell('${p.pick_id}')">Review exact sell order</button>`);
+}
+async function previewSell(pickId){
+  const price=Number($("#sellPrice").value),size_shares=Number($("#sellShares").value);
+  const response=await fetch("/api/order/preview",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({confirm:true,action:"sell",pick_id:pickId,price,size_shares})});
+  const preview=await response.json();
+  if(preview.status!=="preview"){
+    showModal(`<h2 class="red">Sell blocked</h2><pre>${esc(preview.error||JSON.stringify(preview))}</pre>`);return;
+  }
+  const exact=`SELL ${preview.size_shares} shares of ${preview.market_slug} (${preview.side}) at ${Number(preview.price).toFixed(2)}. Estimated proceeds $${Number(preview.estimated_proceeds_usd||preview.estimated_cost_usd).toFixed(2)}. This creates a real post-only GTC resting SELL order.`;
+  if(!window.confirm(exact+"\n\nPlace this real-money sell order?"))return;
+  showModal("<h2>Submitting exact sell order…</h2>");
+  const submitResponse=await fetch("/api/order/submit",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({confirm:true,nonce:preview.nonce})});
+  const result=await submitResponse.json();
+  if(result.status!=="submitted"){
+    showModal(`<h2 class="red">Sell not placed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;
+  }
+  await refreshAll();
+  showModal(`<h2 class="green">Resting sell order placed</h2><pre>${esc(JSON.stringify(result,null,1))}</pre>`);
+}
+window.openSell=openSell; window.previewSell=previewSell;
 function openBuy(pickId,initialPrice){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
   if(!p){showModal('<h2 class="red">Pick not found</h2>');return;}
@@ -716,56 +763,73 @@ const renderLive=renderToday; // legacy name used by refreshAll
 /* ---------- Portfolio tab ---------- */
 async function renderFolio(){
   const b=await api("/api/bets");
-  // --- open positions ---
-  const o=b.open;
+  state.livePortfolio=b;
+  const live=b.status==="live";
+  const historyStart=b.history_start_date||"today";
+  $("#folioStatus").innerHTML=live
+    ?`<span class="green">● Connected to authenticated Polymarket US portfolio</span> · ${esc(shortDate(b.observed_at_utc))}`
+    :`<span class="red">● Live account unavailable</span> · ${esc(b.error||"authentication required")} · model picks are not shown here`;
+  const o=b.open||{};
+  const openCount=live?(Number(o.count)||0):0;
   $("#folioOpenKpis").innerHTML=`
-    <div class="k"><b>${o.count}</b><span>open picks</span></div>
-    <div class="k"><b>${o.qualified_count}</b><span>qualified</span></div>
-    <div class="k"><b>${o.research_count}</b><span>research</span></div>
-    <div class="k"><b>${fmt(o.total_units,1)}</b><span>total units</span></div>`;
-  if(!o.count){$("#folioOpen").innerHTML=`<p class="dim">No open positions.</p>`;}
+    <div class="k"><b>${openCount}</b><span>live positions</span></div>
+    <div class="k"><b>${o.cost_basis_usd==null?"—":"$"+fmt(o.cost_basis_usd,2)}</b><span>cost basis</span></div>
+    <div class="k"><b>${o.cash_value_usd==null?"—":"$"+fmt(o.cash_value_usd,2)}</b><span>cash value</span></div>
+    <div class="k"><b>${b.balance?.buying_power_usd==null?"—":"$"+fmt(b.balance.buying_power_usd,2)}</b><span>buying power</span></div>`;
+  if(!live){$("#folioOpen").innerHTML=`<p class="red">Cannot verify live positions until the API secret is valid. No model rows are substituted.</p>`;}
+  else if(!openCount){$("#folioOpen").innerHTML=`<p class="dim">The exchange reports no open positions.</p>`;}
   else {
     let html=`<table class="data"><tr>
-      <th>League</th><th>Matchup</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Units</th><th>Type</th></tr>`;
-    o.open.forEach(p=>{
-      const match=`${p.away_team} @ ${p.home_team}`;
-      const pick=marker(p);
-      const edgeCls=p.edge!=null&&p.edge>=0.02?"green":p.edge!=null&&p.edge>0?"yellow":"red";
+      <th>Market</th><th>Outcome</th><th>Side</th><th>Shares</th><th>Cost</th><th>Value</th><th>Unrealized</th><th>Model link</th><th>Updated</th></tr>`;
+    (o.positions||[]).forEach(p=>{
+      const linked=p.model_pick;
       html+=`<tr>
-        <td>${p.league}</td><td class="dim">${match}</td><td>${pick}</td>
-        <td>${fmt(p.model_probability,3)}</td><td>${fmt(p.market_implied_probability,3)}</td>
-        <td class="${edgeCls}">${p.edge!=null?(p.edge>=0?"+":"")+fmt(p.edge,3):"—"}</td>
-        <td>${fmt(p.units,1)}</td><td><span class="pill ${p.record_type==="QUALIFIED_SHADOW_CALL"?"win":"open"}">${p.record_type==="QUALIFIED_SHADOW_CALL"?"qualified":"research"}</span></td>
+        <td>${esc(p.title||p.market_slug)}</td><td>${esc(p.outcome||"—")}</td><td>${p.side==="long"?"YES":"NO"}</td>
+        <td>${fmt(p.quantity,2)}</td><td>${p.cost_basis_usd==null?"—":"$"+fmt(p.cost_basis_usd,2)}</td>
+        <td>${p.cash_value_usd==null?"—":"$"+fmt(p.cash_value_usd,2)}</td>
+        <td class="${Number(p.unrealized_pnl_usd)>=0?"green":"red"}">${p.unrealized_pnl_usd==null?"—":(p.unrealized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.unrealized_pnl_usd),2)}</td>
+        <td>${linked?`<span class="pill win">${esc(linked.model_version)}</span>`:"—"}</td><td class="dim">${shortDate(p.updated_at_utc)}</td>
       </tr>`;});
     html+=`</table>`;
     $("#folioOpen").innerHTML=html;
   }
-  // --- recent history ---
-  const h=b.recent_history;
-  const hr=h.hit_rate!=null?`${fmt(h.hit_rate*100,1)}%`:"—";
+  const h=b.recent_history||{};
+  const activityCount=Number(h.count)||0,tradeCount=Number(h.trade_count)||0,
+        settlementCount=Number(h.settlement_count)||0,realized=Number(h.realized_pnl_usd)||0;
   $("#folioHistKpis").innerHTML=`
-    <div class="k"><b>${h.count}</b><span>settled (7d)</span></div>
-    <div class="k"><b>${h.wins}-${h.losses}${h.pushes?`-${h.pushes}`:""}</b><span>W-L${h.pushes?"-P":""}</span></div>
-    <div class="k"><b>${hr}</b><span>hit rate</span></div>
-    <div class="k"><b class="${h.total_pnl>=0?"green":"red"}">${h.total_pnl>=0?"+":""}${fmt(h.total_pnl,2)}</b><span>P&amp;L units</span></div>`;
-  if(!h.count){$("#folioHistory").innerHTML=`<p class="dim">No settled picks in the last 7 days.</p>`;}
+    <div class="k"><b>${activityCount}</b><span>activities since ${esc(historyStart)}</span></div>
+    <div class="k"><b>${tradeCount}</b><span>filled trades</span></div>
+    <div class="k"><b>${settlementCount}</b><span>settlements</span></div>
+    <div class="k"><b class="${realized>=0?"green":"red"}">${realized>=0?"+$":"-$"}${fmt(Math.abs(realized),2)}</b><span>reported realized P&amp;L</span></div>`;
+  if(!activityCount){$("#folioHistory").innerHTML=`<p class="dim">No exchange trade or settlement history has been synced since ${esc(historyStart)}.</p>`;}
   else {
     let html=`<table class="data"><tr>
-      <th>League</th><th>Matchup</th><th>Pick</th><th>Result</th><th>Score</th><th>Model</th><th>P&amp;L</th></tr>`;
-    h.history.forEach(p=>{
-      const match=`${p.away_team} @ ${p.home_team}`;
-      const pick=marker(p);
-      const resCls=p.result==="win"?"win":p.result==="loss"?"loss":"push";
+      <th>Date</th><th>Type</th><th>Market</th><th>Price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Model link</th></tr>`;
+    (h.activities||[]).forEach(p=>{
       html+=`<tr>
-        <td>${p.league}</td><td class="dim">${match}</td><td>${pick}</td>
-        <td><span class="pill ${resCls}">${p.result}</span></td>
-        <td class="dim">${p.away_score||"—"}-${p.home_score||"—"}</td>
-        <td>${fmt(p.model_probability,3)}</td>
-        <td class="${p.pnl_units>=0?"green":"red"}">${p.pnl_units>=0?"+":""}${fmt(p.pnl_units,2)}</td>
+        <td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">${p.type}</span></td>
+        <td>${esc(p.title||p.market_slug)}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td>
+        <td class="${Number(p.realized_pnl_usd)>=0?"green":"red"}">${p.realized_pnl_usd==null?"—":(p.realized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.realized_pnl_usd),2)}</td>
+        <td>${p.model_pick?esc(p.model_pick.model_version):"—"}</td>
       </tr>`;});
     html+=`</table>`;
     $("#folioHistory").innerHTML=html;
   }
+  renderLedgerLiveHistory(b);
+}
+function renderLedgerLiveHistory(b){
+  const h=b.recent_history||{activities:[],count:0,trade_count:0,settlement_count:0,realized_pnl_usd:0};
+  const activityCount=Number(h.count)||0,tradeCount=Number(h.trade_count)||0,
+        settlementCount=Number(h.settlement_count)||0;
+  const historyStart=b.history_start_date||"today";
+  $("#ledgerLiveStatus").innerHTML=b.status==="live"
+    ?`<span class="green">Exchange synced</span> · tracking began ${esc(historyStart)} ET; earlier activity is ignored and model statistics remain separate.`
+    :`<span class="red">Live sync unavailable</span> · ${esc(b.error||"authentication required")} · showing persisted exchange history since ${esc(historyStart)} only.`;
+  $("#ledgerLiveKpis").innerHTML=`<div class="k"><b>${activityCount}</b><span>portfolio events</span></div><div class="k"><b>${tradeCount}</b><span>trades</span></div><div class="k"><b>${settlementCount}</b><span>settlements</span></div>`;
+  if(!activityCount){$("#ledgerLiveHistory").innerHTML=`<p class="dim">No confirmed exchange activity has been synced since ${esc(historyStart)}.</p>`;return;}
+  let html=`<table class="data"><tr><th>Date</th><th>Source</th><th>Market</th><th>Price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Related model pick</th></tr>`;
+  (h.activities||[]).forEach(p=>{html+=`<tr><td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">live ${p.type}</span></td><td>${esc(p.title||p.market_slug)}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td><td>${p.realized_pnl_usd==null?"—":"$"+fmt(p.realized_pnl_usd,2)}</td><td>${p.model_pick?esc(p.model_pick.pick_id):"—"}</td></tr>`;});
+  $("#ledgerLiveHistory").innerHTML=html+`</table>`;
 }
 function marker(p){
   const sel=String(p.selection||"").toLowerCase();

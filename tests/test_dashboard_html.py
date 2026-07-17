@@ -45,3 +45,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert '"Odds"' not in html
     assert "shortDate" in html
     assert "order-wrap" in html
+    assert "Live Portfolio — Exchange Positions" in html
+    assert "Model Picks Ledger" in html
+    assert "Live Portfolio History" in html
+    assert "model picks are not shown here" in html

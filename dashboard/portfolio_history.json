@@ -1,0 +1,20 @@
+{
+  "history_start_date": "2026-07-17",
+  "last_synced_at_utc": "2026-07-17T15:17:53.987791Z",
+  "activities": [
+    {
+      "activity_id": "trade:BA29PX8G86AH",
+      "type": "trade",
+      "market_slug": "astatc-mlb-lad-nyy-2026-07-17-hrr-kyltuc-gte1",
+      "title": "astatc-mlb-lad-nyy-2026-07-17-hrr-kyltuc-gte1",
+      "occurred_at_utc": "2026-07-17T11:02:28.119967117Z",
+      "price": 0.5,
+      "quantity": 18.0,
+      "cost_basis_usd": null,
+      "realized_pnl_usd": null,
+      "state": "TRADE_STATE_NEW",
+      "is_aggressor": false,
+      "model_pick": null
+    }
+  ]
+}

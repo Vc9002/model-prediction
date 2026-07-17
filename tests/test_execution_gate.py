@@ -133,3 +133,32 @@ def test_confirmed_order_records_real_exchange_id(tmp_path, monkeypatch) -> None
     assert result["status"] == "submitted"
     assert result["order_id"] == "us-order-123"
     assert result["order_state"] == "ORDER_STATE_NEW"
+
+
+def test_portfolio_snapshot_uses_exchange_positions_and_activity_endpoints(
+    tmp_path, monkeypatch
+) -> None:
+    client = executor(tmp_path, env=US_CREDS)
+    responses = {
+        "/v1/portfolio/positions": {"positions": {"market-1": {"netPositionDecimal": "2"}}},
+        "/v1/portfolio/activities": {"activities": [{"trade": {"id": "trade-1"}}]},
+        "/v1/account/balances": {"balances": [{"currency": "USD", "buyingPower": 20}]},
+    }
+    called = []
+
+    def fake_request(method, path, payload=None):
+        called.append((method, path, payload))
+        return responses[path]
+
+    monkeypatch.setattr(client, "_request", fake_request)
+
+    result = client.portfolio_snapshot()
+
+    assert result["status"] == "live"
+    assert result["positions"]["market-1"]["netPositionDecimal"] == "2"
+    assert result["activities"][0]["trade"]["id"] == "trade-1"
+    assert called == [
+        ("GET", "/v1/portfolio/positions", None),
+        ("GET", "/v1/portfolio/activities", None),
+        ("GET", "/v1/account/balances", None),
+    ]

@@ -54,6 +54,7 @@ LOG_FILE = DASH_DIR / "server.log"
 JOBS_FILE = DASH_DIR / "jobs.json"
 ARCHIVE_FILE = DASH_DIR / "archive.json"
 ORDERS_FILE = DASH_DIR / "orders.json"
+PORTFOLIO_HISTORY_FILE = DASH_DIR / "portfolio_history.json"
 CONFIG_FILE = ROOT / "config" / "model.yaml"
 
 
@@ -853,55 +854,81 @@ def dashboard_picks() -> list[dict]:
 
 
 def preview_order(payload: dict) -> dict:
+    action = str(payload.get("action") or "buy").lower()
+    if action not in ("buy", "sell"):
+        return {"status": "refused", "error": "action must be buy or sell"}
     pick_id = str(payload.get("pick_id") or "")
     row = next((item for item in read_picks() if str(item.get("pick_id")) == pick_id), None)
     if row is None:
         return {"status": "refused", "error": "unknown pick id"}
     decorated = _decorate_pick(row)
-    if not decorated["buy_ready"]:
+    quote = decorated["quote"]
+    if quote is None:
+        return {"status": "refused", "error": "no executable quote for this contract"}
+    # Buys require the buy-readiness gate. Sells are exits and only require an
+    # executable quote (you can always try to close a position you hold).
+    if action == "buy" and not decorated["buy_ready"]:
         return {"status": "refused", "error": decorated["buy_block_reason"]}
     try:
         price = round(float(payload.get("price")), 2)
         size_shares = float(payload.get("size_shares"))
     except (TypeError, ValueError):
         return {"status": "refused", "error": "price and shares must be numeric"}
-    quote = decorated["quote"]
     if not 0.01 <= price <= 0.99 or abs(price * 100 - round(price * 100)) > 1e-8:
         return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
     if not 0 < size_shares <= 100000:
         return {"status": "refused", "error": "shares must be greater than 0 and at most 100,000"}
     estimated_cost = round(price * size_shares, 2)
     manual = row.get("record_type") == "RESEARCH_OBSERVATION"
-    if manual and price >= float(row.get("model_probability") or 0):
-        return {
-            "status": "refused",
-            "error": (
-                f"manual limit {price:.2f} must stay below the model probability "
-                f"{float(row.get('model_probability') or 0):.2f}"
-            ),
-        }
-    authorized_units = _suggested_units(row) if manual else float(row.get("units") or 0)
-    maximum_cost = round(float(authorized_units or 0) * _unit_value_usd(), 2)
-    if estimated_cost > maximum_cost + 0.005:
-        return {
-            "status": "refused",
-            "error": (
-                f"order cost ${estimated_cost:.2f} exceeds this pick's "
-                f"{float(row.get('units') or 0):g}U cap (${maximum_cost:.2f})"
-            ),
-        }
-    if price >= float(quote["ask"]):
-        return {
-            "status": "refused",
-            "error": (
-                f"resting order price must be below the current ask {float(quote['ask']):.2f}; "
-                "crossing orders are blocked"
-            ),
-        }
+
+    if action == "sell":
+        # A resting SELL limit must sit AT OR ABOVE the current bid (post-only:
+        # do not cross into the bid). No dollar cost cap — a sell returns
+        # capital. Proceeds are informational.
+        bid = quote.get("bid")
+        if bid is not None and price <= float(bid):
+            return {
+                "status": "refused",
+                "error": (
+                    f"resting sell price must be above the current bid {float(bid):.2f}; "
+                    "crossing orders are blocked"
+                ),
+            }
+        maximum_cost = None
+    else:
+        # Buy path (unchanged): limit below model prob for manual, cost <= unit cap,
+        # rest below the ask.
+        if manual and price >= float(row.get("model_probability") or 0):
+            return {
+                "status": "refused",
+                "error": (
+                    f"manual buy limit {price:.2f} must stay below the model probability "
+                    f"{float(row.get('model_probability') or 0):.2f}"
+                ),
+            }
+        authorized_units = _suggested_units(row) if manual else float(row.get("units") or 0)
+        maximum_cost = round(float(authorized_units or 0) * _unit_value_usd(), 2)
+        if estimated_cost > maximum_cost + 0.005:
+            return {
+                "status": "refused",
+                "error": (
+                    f"order cost ${estimated_cost:.2f} exceeds this pick's "
+                    f"{float(row.get('units') or 0):g}U cap (${maximum_cost:.2f})"
+                ),
+            }
+        if price >= float(quote["ask"]):
+            return {
+                "status": "refused",
+                "error": (
+                    f"resting buy price must be below the current ask {float(quote['ask']):.2f}; "
+                    "crossing orders are blocked"
+                ),
+            }
     nonce = secrets.token_urlsafe(24)
     ticket = {
         "nonce": nonce,
         "pick_id": pick_id,
+        "action": action,
         "market_slug": quote["market_slug"],
         "side": quote["side"],
         "price": price,
@@ -909,6 +936,7 @@ def preview_order(payload: dict) -> dict:
         "units": round(estimated_cost / _unit_value_usd(), 4),
         "unit_value_usd": _unit_value_usd(),
         "estimated_cost_usd": estimated_cost,
+        "estimated_proceeds_usd": estimated_cost if action == "sell" else None,
         "maximum_cost_usd": maximum_cost,
         "manual_research_order": manual,
         "created_at": time.time(),
@@ -932,18 +960,26 @@ def submit_order(payload: dict) -> dict:
     if row is None:
         return {"status": "refused", "error": "pick disappeared before submission"}
     quote = _pick_quote(row)
-    ready, reason = _order_readiness(row, quote)
-    if not ready:
-        return {"status": "refused", "error": reason}
-    if quote["market_slug"] != ticket["market_slug"] or ticket["price"] >= float(quote["ask"]):
-        return {"status": "refused", "error": "market or ask changed; preview the order again"}
+    if quote is None or quote["market_slug"] != ticket["market_slug"]:
+        return {"status": "refused", "error": "market changed; preview the order again"}
+    action = ticket.get("action", "buy")
+    if action == "sell":
+        bid = quote.get("bid")
+        if bid is not None and ticket["price"] <= float(bid):
+            return {"status": "refused", "error": "bid moved above your limit; preview the sell again"}
+    else:
+        ready, reason = _order_readiness(row, quote)
+        if not ready:
+            return {"status": "refused", "error": reason}
+        if ticket["price"] >= float(quote["ask"]):
+            return {"status": "refused", "error": "ask changed; preview the order again"}
     command = _resolve_runner() + [
         "execute",
         "--pick-id", ticket["pick_id"],
         "--size-shares", str(ticket["size_shares"]),
         "--price", str(ticket["price"]),
         "--side", ticket["side"],
-        "--action", "buy",
+        "--action", action,
         "--order-type", "limit_gtc",
         "--market-slug", ticket["market_slug"],
         "--execute",
@@ -1298,6 +1334,8 @@ class Handler(BaseHTTPRequestHandler):
             action = str(payload.get("action"))
             scope = payload.get("pick_ids") if action == "clear_ids" else str(payload.get("scope", ""))
             self._send(archive_action(action, scope or []))
+        elif parsed.path == "/api/dedupe":
+            self._send(dedupe_ledger())
         elif parsed.path == "/api/action":
             self._send(start_action(str(payload.get("action")), payload))
         elif parsed.path == "/api/order/preview":
@@ -1433,12 +1471,367 @@ def history_picks(days: int = 30, sport: str | None = None) -> dict:
     }
 
 
-def bets_view() -> dict:
-    """Unified view: open picks first, then last 7 days settled."""
+def _amount_value(value) -> float | None:
+    if isinstance(value, dict):
+        value = value.get("value")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _live_model_links() -> dict[tuple[str, str], dict]:
+    """Connect exchange contracts to model rows without treating picks as positions."""
+    links: dict[tuple[str, str], dict] = {}
+    for row in _dedupe_picks(read_picks()):
+        quote = _pick_quote(row)
+        if quote is None:
+            continue
+        links[(str(quote["market_slug"]), str(quote["side"]))] = {
+            "pick_id": str(row.get("pick_id") or ""),
+            "league": str(row.get("league") or ""),
+            "away_team": str(row.get("away_team") or ""),
+            "home_team": str(row.get("home_team") or ""),
+            "selection": str(row.get("selection") or ""),
+            "market_type": str(row.get("market_type") or ""),
+            "model_probability": _number(row.get("model_probability"), None),
+            "model_version": str(row.get("model_version") or ""),
+        }
+    return links
+
+
+def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> dict | None:
+    trade = item.get("trade") if isinstance(item.get("trade"), dict) else None
+    resolution = (
+        item.get("positionResolution")
+        if isinstance(item.get("positionResolution"), dict)
+        else None
+    )
+    if trade:
+        slug = str(trade.get("marketSlug") or "")
+        occurred = str(trade.get("updateTime") or trade.get("createTime") or "")
+        linked = next((value for (market, _), value in links.items() if market == slug), None)
+        return {
+            "activity_id": f"trade:{trade.get('id') or slug + ':' + occurred}",
+            "type": "trade",
+            "market_slug": slug,
+            "title": str((trade.get("marketMetadata") or {}).get("title") or slug),
+            "occurred_at_utc": occurred,
+            "price": _amount_value(trade.get("price")),
+            "quantity": _number(trade.get("qtyDecimal") or trade.get("qty"), None),
+            "cost_basis_usd": _amount_value(trade.get("costBasis")),
+            "realized_pnl_usd": _amount_value(trade.get("realizedPnl")),
+            "state": str(trade.get("state") or ""),
+            "is_aggressor": trade.get("isAggressor"),
+            "model_pick": linked,
+        }
+    if resolution:
+        slug = str(resolution.get("marketSlug") or "")
+        occurred = str(resolution.get("updateTime") or "")
+        before = resolution.get("beforePosition") or {}
+        after = resolution.get("afterPosition") or {}
+        metadata = after.get("marketMetadata") or before.get("marketMetadata") or {}
+        linked = next((value for (market, _), value in links.items() if market == slug), None)
+        return {
+            "activity_id": f"settlement:{resolution.get('tradeId') or slug + ':' + occurred}",
+            "type": "settlement",
+            "market_slug": slug,
+            "title": str(metadata.get("title") or slug),
+            "outcome": str(metadata.get("outcome") or ""),
+            "occurred_at_utc": occurred,
+            "resolution_side": str(resolution.get("side") or "").removeprefix(
+                "POSITION_RESOLUTION_SIDE_"
+            ),
+            "before_quantity": _number(
+                before.get("netPositionDecimal") or before.get("netPosition"), None
+            ),
+            "after_quantity": _number(
+                after.get("netPositionDecimal") or after.get("netPosition"), None
+            ),
+            "realized_pnl_usd": _amount_value(after.get("realized")),
+            "model_pick": linked,
+        }
+    return None
+
+
+def _load_portfolio_history() -> dict:
+    payload = _read_json(PORTFOLIO_HISTORY_FILE) or {}
+    activities = payload.get("activities") if isinstance(payload, dict) else None
+    history_start = (
+        str(payload.get("history_start_date") or _today())
+        if isinstance(payload, dict)
+        else _today()
+    )
+    rows = [
+        item
+        for item in (list(activities) if isinstance(activities, list) else [])
+        if _activity_on_or_after(item, history_start)
+    ]
     return {
-        "open": open_picks(),
-        "recent_history": history_picks(days=7),
+        "activities": rows,
+        "last_synced_at_utc": payload.get("last_synced_at_utc") if isinstance(payload, dict) else None,
+        "history_start_date": history_start,
     }
+
+
+def _activity_on_or_after(item: dict, history_start: str) -> bool:
+    try:
+        occurred = datetime.fromisoformat(
+            str(item.get("occurred_at_utc") or "").replace("Z", "+00:00")
+        )
+        return occurred.astimezone(EASTERN).date().isoformat() >= history_start
+    except ValueError:
+        return False
+
+
+def _save_portfolio_history(activities: list[dict], observed_at: str) -> list[dict]:
+    existing = _load_portfolio_history()
+    prior = existing["activities"]
+    history_start = existing["history_start_date"]
+    merged = {
+        str(item.get("activity_id")): item
+        for item in [*prior, *activities]
+        if item.get("activity_id") and _activity_on_or_after(item, history_start)
+    }
+    rows = sorted(
+        merged.values(), key=lambda item: str(item.get("occurred_at_utc") or ""), reverse=True
+    )[:2000]
+    DASH_DIR.mkdir(exist_ok=True)
+    temporary = PORTFOLIO_HISTORY_FILE.with_suffix(".json.tmp")
+    temporary.write_text(
+        json.dumps(
+            {
+                "history_start_date": history_start,
+                "last_synced_at_utc": observed_at,
+                "activities": rows,
+            },
+            indent=2,
+            default=str,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, PORTFOLIO_HISTORY_FILE)
+    return rows
+
+
+def _portfolio_history_summary(activities: list[dict], source: str) -> dict:
+    trades = [item for item in activities if item.get("type") == "trade"]
+    settlements = [item for item in activities if item.get("type") == "settlement"]
+    realized = sum(
+        value
+        for item in activities
+        if (value := _number(item.get("realized_pnl_usd"), None)) is not None
+    )
+    return {
+        "activities": activities,
+        "count": len(activities),
+        "trade_count": len(trades),
+        "settlement_count": len(settlements),
+        "realized_pnl_usd": round(realized, 2),
+        "source": source,
+    }
+
+
+def live_portfolio_view() -> dict:
+    """Exchange-confirmed positions and activity; model picks never count as exposure."""
+    cached = _load_portfolio_history()
+    empty_open = {
+        "positions": [],
+        "count": 0,
+        "cost_basis_usd": 0.0,
+        "cash_value_usd": 0.0,
+        "realized_pnl_usd": 0.0,
+    }
+    missing = [
+        name
+        for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY")
+        if not os.environ.get(name)
+    ]
+    if missing:
+        return {
+            "status": "unavailable",
+            "error": f"missing {' and '.join(missing)}",
+            "open": empty_open,
+            "recent_history": _portfolio_history_summary(cached["activities"], "cached"),
+            "last_synced_at_utc": cached["last_synced_at_utc"],
+            "history_start_date": cached["history_start_date"],
+        }
+    try:
+        process = subprocess.run(
+            _resolve_runner() + ["live-portfolio"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=_runner_env(),
+        )
+        raw_text = process.stdout if process.returncode == 0 else process.stderr
+        raw = json.loads(raw_text)
+        if process.returncode != 0 or raw.get("status") != "live":
+            raise RuntimeError(str(raw.get("error") or "authenticated portfolio request failed"))
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError, RuntimeError) as error:
+        return {
+            "status": "unavailable",
+            "error": str(error)[:300],
+            "open": empty_open,
+            "recent_history": _portfolio_history_summary(cached["activities"], "cached"),
+            "last_synced_at_utc": cached["last_synced_at_utc"],
+            "history_start_date": cached["history_start_date"],
+        }
+
+    links = _live_model_links()
+    positions = []
+    for slug, item in (raw.get("positions") or {}).items():
+        net = _number(item.get("netPositionDecimal") or item.get("netPosition"), 0.0)
+        if abs(net) < 1e-9:
+            continue
+        side = "long" if net > 0 else "short"
+        metadata = item.get("marketMetadata") or {}
+        cost = _amount_value(item.get("cost"))
+        cash_value = _amount_value(item.get("cashValue"))
+        positions.append(
+            {
+                "market_slug": str(slug),
+                "title": str(metadata.get("title") or slug),
+                "outcome": str(metadata.get("outcome") or ""),
+                "side": side,
+                "quantity": abs(net),
+                "available_quantity": abs(
+                    _number(item.get("qtyAvailableDecimal") or item.get("qtyAvailable"), 0.0)
+                ),
+                "cost_basis_usd": cost,
+                "cash_value_usd": cash_value,
+                "realized_pnl_usd": _amount_value(item.get("realized")),
+                "unrealized_pnl_usd": (
+                    round(cash_value - cost, 2)
+                    if cash_value is not None and cost is not None
+                    else None
+                ),
+                "expired": bool(item.get("expired")),
+                "updated_at_utc": str(item.get("updateTime") or ""),
+                "model_pick": links.get((str(slug), side)),
+            }
+        )
+    positions.sort(key=lambda item: item["updated_at_utc"], reverse=True)
+    normalized = [
+        activity
+        for item in (raw.get("activities") or [])
+        if (activity := _normalize_live_activity(item, links)) is not None
+    ]
+    history = _save_portfolio_history(normalized, str(raw.get("observed_at_utc") or ""))
+    balances = raw.get("balances") or []
+    usd = next((item for item in balances if item.get("currency") == "USD"), None)
+    return {
+        "status": "live",
+        "source": raw.get("source"),
+        "observed_at_utc": raw.get("observed_at_utc"),
+        "history_start_date": _load_portfolio_history()["history_start_date"],
+        "open": {
+            "positions": positions,
+            "count": len(positions),
+            "cost_basis_usd": round(
+                sum(_number(item.get("cost_basis_usd")) for item in positions), 2
+            ),
+            "cash_value_usd": round(
+                sum(_number(item.get("cash_value_usd")) for item in positions), 2
+            ),
+            "realized_pnl_usd": round(
+                sum(_number(item.get("realized_pnl_usd")) for item in positions), 2
+            ),
+        },
+        "recent_history": _portfolio_history_summary(history, "exchange_and_persisted"),
+        "balance": {
+            "current_usd": _number((usd or {}).get("currentBalance"), None),
+            "buying_power_usd": _number((usd or {}).get("buyingPower"), None),
+            "open_orders_usd": _number((usd or {}).get("openOrders"), None),
+            "unsettled_funds_usd": _number((usd or {}).get("unsettledFunds"), None),
+        },
+    }
+
+
+def bets_view() -> dict:
+    """Backward-compatible route name for the authenticated live portfolio."""
+    return live_portfolio_view()
+
+
+def _model_version_rank(row: dict) -> tuple:
+    """Sort key for choosing which duplicate to KEEP. Higher = keep.
+
+    Prefers the numerically-newest model version (v3 > v2), then the most
+    recently created row. Production models always outrank older ones.
+    """
+    version = str(row.get("model_version") or "")
+    digits = "".join(ch for ch in version.split("-")[-1] if ch.isdigit())
+    version_number = int(digits) if digits else 0
+    return (version_number, str(row.get("created_at_utc") or ""))
+
+
+def dedupe_ledger() -> dict:
+    """Physically remove duplicate ledger rows from picks.xlsx.
+
+    A duplicate = same contract identity (league/event/market/selection/line)
+    logged under more than one model version or run. Keeps exactly one row per
+    identity — the newest model version — and DELETES the rest from the file.
+    picks.xlsx is backed up first (picks.xlsx.dedupe-bak-<ts>). Rows carrying
+    real units are never deleted. Archived-hidden ids are pruned to match.
+    """
+    from model_prediction.ledger import FIELDNAMES  # local: heavy import
+    from model_prediction.xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
+
+    path = DATA / "picks.xlsx"
+    if not path.exists():
+        return {"status": "refused", "error": "picks.xlsx not found"}
+    headers, rows = read_xlsx_rows(path)
+    if headers != FIELDNAMES:
+        return {"status": "refused",
+                "error": "picks.xlsx schema does not match this code version; not touching it"}
+    groups: dict[tuple, list[dict]] = {}
+    for row in rows:
+        groups.setdefault(_pick_identity(row), []).append(row)
+    keep: list[dict] = []
+    removed = 0
+    removed_ids: list[str] = []
+    for members in groups.values():
+        if len(members) == 1:
+            keep.append(members[0])
+            continue
+        # Never delete a row with real staked units; keep every staked row.
+        staked = [m for m in members if _number(m.get("units")) > 0]
+        unstaked = [m for m in members if _number(m.get("units")) <= 0]
+        survivors = list(staked)
+        if unstaked:
+            survivors.append(max(unstaked, key=_model_version_rank))
+        keep_ids = {id(m) for m in survivors}
+        for member in members:
+            if id(member) in keep_ids:
+                keep.append(member)
+            else:
+                removed += 1
+                removed_ids.append(str(member.get("pick_id") or ""))
+    if removed == 0:
+        return {"status": "ok", "removed": 0, "kept": len(keep),
+                "note": "No duplicate contracts found."}
+    backup = path.with_suffix(f".xlsx.dedupe-bak-{int(time.time())}")
+    import shutil
+
+    shutil.copy2(path, backup)
+    keep.sort(key=lambda r: str(r.get("created_at_utc") or ""))
+    write_xlsx_rows_atomic(path, FIELDNAMES, keep)
+    # Prune archived ids that no longer exist so the counter stays honest.
+    archive = _load_archive()
+    surviving = {str(r.get("pick_id")) for r in keep}
+    archive["pick_ids"] = sorted(pid for pid in archive["pick_ids"] if pid in surviving)
+    archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
+                               "action": "dedupe", "rows": removed})
+    _save_archive(archive)
+    with _CACHE_LOCK:
+        _CACHE.clear()
+    _PICKS_CACHE["mtime"] = None
+    _log(f"dedupe: removed {removed} duplicate rows, backup {backup.name}")
+    return {"status": "ok", "removed": removed, "kept": len(keep),
+            "backup": backup.name, "removed_pick_ids": removed_ids[:50],
+            "note": f"Physically removed {removed} duplicate rows. Original backed up to {backup.name}."}
 
 
 def _load_archive() -> dict:
