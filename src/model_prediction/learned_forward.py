@@ -94,12 +94,27 @@ def build_learned_moneyline_slate(
                 "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
                 "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
             }
-            # Add park_factor if the artifact expects it (MLB only)
+            # Dynamic features based on artifact requirements
             feature_names = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
             if "park_factor" in feature_names:
                 from model_prediction.features.park_factors import park_factor
                 pf = park_factor(home_team)
                 features["park_factor"] = float(pf.get("park_factor", 1.0))
+            if "weather_factor" in feature_names:
+                from model_prediction.features.weather import live_weather
+                w = live_weather(home_team)
+                features["weather_factor"] = float(w.get("weather_run_factor", 1.0))
+            if "pitcher_era_gap" in feature_names:
+                # Rolling runs-allowed gap (no API, from cached games)
+                import json as _json
+                from pathlib import Path as _Path
+                hist_path = _Path("data/historical/mlb_games_all.jsonl")
+                all_g = [_json.loads(l) for l in hist_path.read_text().strip().split("\n") if l.strip()] if hist_path.exists() else []
+                def _ra(team, n=5):
+                    tg = sorted([g for g in all_g if (g.get("home_team")==team or g.get("away_team")==team) and g.get("home_score") is not None], key=lambda g: g.get("event_start_utc",""))[-n:]
+                    return sum(g["away_score"] if g["home_team"]==team else g["home_score"] for g in tg)/n if len(tg)>=n else None
+                hra=_ra(home_team); ara=_ra(away_team)
+                features["pitcher_era_gap"] = round(hra-ara,4) if hra and ara else 0.0
             decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
             if not decision.call:

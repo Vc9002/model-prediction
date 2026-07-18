@@ -57,6 +57,7 @@ class ValidationRow:
     trailing_home_win_rate_30d: float = 0.5
     trailing_home_games_30d: int = 0
     defensive_trend_gap: float = 0.0
+    pitcher_era_gap: float = 0.0
     consistency_gap: float = 0.0
     hot_cold_gap: float = 0.0
     outcome_3way: int = 0  # 2=home, 1=draw, 0=away — used for soccer 3-way
@@ -84,6 +85,19 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "trend_gap",
         "park_factor",
         "weather_factor",
+    ),
+    "elo_trend_park_pitcher": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "pitcher_era_gap",
+    ),
+    "elo_trend_park_weather_pitcher": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "pitcher_era_gap",
     ),
     "soccer_3way": ("elo_probability", "trend_gap"),
 }
@@ -115,6 +129,15 @@ def build_walk_forward_rows(
                     continue
                 home_trend = trends.team_trend(game.home_team)
                 away_trend = trends.team_trend(game.away_team)
+                
+                # Rolling pitching quality: runs allowed per game (last 5)
+                home_ra = _rolling_runs_allowed(history, game.home_team, 5)
+                away_ra = _rolling_runs_allowed(history, game.away_team, 5)
+                pitcher_gap = round(home_ra - away_ra, 4) if home_ra and away_ra else 0.0
+                
+                # Historical weather from Open-Meteo DB
+                weather = _lookup_weather(game.home_team, game.start.date().isoformat())
+                
                 park = (
                     park_factor(game.home_team)
                     if sport.lower() == "mlb"
@@ -139,9 +162,10 @@ def build_walk_forward_rows(
                         trend_gap=home_trend.offensive_momentum - away_trend.offensive_momentum,
                         defensive_trend_gap=home_trend.defensive_momentum - away_trend.defensive_momentum,
                         park_factor=float(park["park_factor"]),
-                        weather_factor=1.0,
+                        weather_factor=float(weather.get("run_factor", 1.0)),
+                        pitcher_era_gap=pitcher_gap,
                         park_available=park["status"] == "available",
-                        weather_available=False,
+                        weather_available=weather.get("available", False),
                         elo_neutral_probability=elo.expected_neutral_win(
                             game.home_team, game.away_team
                         ),
@@ -197,9 +221,10 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
     if sport.lower() in ("nba", "wnba"):
         variants_to_run.append("elo_trend_defense")
     if sport.lower() == "mlb":
-        variants_to_run.extend(
-            ["elo_trend_adaptive_hfa", "elo_trend_park", "elo_trend_park_weather"]
-        )
+        variants_to_run.extend([
+            "elo_trend_adaptive_hfa", "elo_trend_park", "elo_trend_park_weather",
+            "elo_trend_park_pitcher", "elo_trend_park_weather_pitcher",
+        ])
     if sport.lower() == "soccer":
         variants_to_run.append("soccer_3way")
     variants = {}
@@ -394,7 +419,7 @@ def build_production_artifact(sport_report: Mapping[str, Any]) -> dict[str, Any]
     if sport in ("nba", "wnba"):
         variant_name = "elo_trend_defense"
     elif sport == "mlb":
-        variant_name = "elo_trend_park"
+        variant_name = "elo_trend_park_weather_pitcher"
     else:
         variant_name = "elo_trend"
     variant = sport_report["variants"][variant_name]
@@ -1080,3 +1105,55 @@ def _cohort_metadata(rows: Sequence[ValidationRow]) -> dict[str, Any]:
         "end": rows[-1].date,
         "observations": len(rows),
     }
+
+
+# ── Rolling metrics for validation ────────────────────────────────────────
+
+def _rolling_runs_allowed(history: list, team: str, n: int = 5) -> float | None:
+    """Rolling runs allowed per game for a team from prior games only."""
+    team_games = [
+        g for g in history
+        if (g.home_team == team or g.away_team == team)
+        and g.home_score is not None and g.away_score is not None
+    ]
+    if len(team_games) < n:
+        return None
+    recent = team_games[-n:]
+    total = 0
+    for g in recent:
+        if g.home_team == team:
+            total += float(g.away_score)
+        else:
+            total += float(g.home_score)
+    return total / n
+
+
+_WEATHER_DB: dict | None = None
+
+
+def _lookup_weather(home_team: str, game_date: str) -> dict:
+    """Look up historical weather for a ballpark on a given date."""
+    global _WEATHER_DB
+    import json as _json
+    from pathlib import Path as _Path
+    
+    if _WEATHER_DB is None:
+        db_path = _Path("data/features/historical_weather.json")
+        if db_path.exists():
+            _WEATHER_DB = _json.loads(db_path.read_text())
+        else:
+            _WEATHER_DB = {}
+    
+    park_data = _WEATHER_DB.get(home_team, {})
+    if isinstance(park_data, dict) and park_data.get("dome"):
+        return {"run_factor": 1.0, "available": True}
+    
+    day_data = park_data.get(game_date) if isinstance(park_data, dict) else None
+    if day_data:
+        return {
+            "run_factor": day_data.get("run_factor", 1.0),
+            "temp": day_data.get("temp"),
+            "wind": day_data.get("wind"),
+            "available": True,
+        }
+    return {"run_factor": 1.0, "available": False}

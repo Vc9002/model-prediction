@@ -128,7 +128,7 @@
       },
       "feature_coverage": {
         "park": 0.99946,
-        "weather": 0.0
+        "weather": 0.965992
       },
       "feature_decisions": [
         {
@@ -191,10 +191,10 @@
             "units_at_minus_110": 13.909091
           },
           "candidate": {
-            "calls": 91,
-            "hit_rate": 0.593407,
+            "calls": 90,
+            "hit_rate": 0.611111,
             "tier": "primary_65",
-            "units_at_minus_110": 12.090909
+            "units_at_minus_110": 15.0
           },
           "feature": "weather_factor",
           "reason": "zero point-in-time weather coverage and zero feature variance"
@@ -1003,79 +1003,79 @@
             }
           }
         },
-        "elo_trend_park_weather": {
+        "elo_trend_park_pitcher": {
           "coefficients": {
-            "elo_probability": 2.5723726648,
-            "park_factor": -1.0167457176,
-            "trend_gap": 0.0772611191,
-            "weather_factor": -0.1031132012
+            "elo_probability": 2.3947394854,
+            "park_factor": -1.0509238558,
+            "pitcher_era_gap": -0.0178503253,
+            "trend_gap": 0.0681671945
           },
           "diagnostic_60": {
-            "learned_threshold": 0.57154672,
+            "learned_threshold": 0.56370817,
             "locked_holdout": {
-              "brier_score": 0.248961,
+              "brier_score": 0.250166,
               "calibration": {
-                "brier_score": 0.24896056983194723,
-                "calibration_intercept": -0.5148664246655017,
-                "calibration_slope": 1.7954794150313267,
-                "expected_calibration_error": 0.054631335693204254,
-                "log_loss": 0.6910616719829036,
+                "brier_score": 0.25016622376944614,
+                "calibration_intercept": -0.537222589255049,
+                "calibration_slope": 1.8440463020723532,
+                "expected_calibration_error": 0.06160869803248075,
+                "log_loss": 0.6934766124027418,
                 "reliability_buckets": [
                   {
-                    "count": 124,
-                    "hit_rate": 0.5,
+                    "count": 182,
+                    "hit_rate": 0.4945054945054945,
                     "lower": 0.5,
-                    "mean_p": 0.583471130152884,
+                    "mean_p": 0.57823411958599,
                     "upper": 0.6
                   },
                   {
-                    "count": 75,
-                    "hit_rate": 0.6266666666666667,
+                    "count": 79,
+                    "hit_rate": 0.6329113924050633,
                     "lower": 0.6,
-                    "mean_p": 0.6197171244801329,
+                    "mean_p": 0.6222625263059837,
                     "upper": 0.7
                   }
                 ],
-                "sample_size": 199,
+                "sample_size": 261,
                 "status": "ok"
               },
-              "called_rate": 0.242387,
-              "calls": 199,
+              "called_rate": 0.317905,
+              "calls": 261,
               "every_called_month_positive_at_minus_110": false,
               "every_qualifying_month_positive_at_minus_110": false,
               "failures": [
-                "selective hit rate 54.77% below required 60.00%"
+                "selective hit rate 53.64% below required 60.00%"
               ],
-              "hit_rate": 0.547739,
-              "hits": 109,
+              "hit_rate": 0.536398,
+              "hits": 140,
               "locked_holdout": true,
               "meets_primary_holdout_metrics": false,
               "minimum_calls": 50,
               "minimum_hit_rate": 0.6,
               "monthly_at_minus_110": [
                 {
-                  "calls": 54,
-                  "hit_rate": 0.611111,
-                  "hits": 33,
+                  "calls": 79,
+                  "hit_rate": 0.594937,
+                  "hits": 47,
                   "month": "2026-05",
                   "qualification_status": "qualifying",
-                  "units_at_minus_110": 9.0
+                  "units_at_minus_110": 10.727273
                 },
                 {
-                  "calls": 94,
-                  "hit_rate": 0.521277,
-                  "hits": 49,
+                  "calls": 122,
+                  "hit_rate": 0.491803,
+                  "hits": 60,
                   "month": "2026-06",
                   "qualification_status": "qualifying",
-                  "units_at_minus_110": -0.454545
+                  "units_at_minus_110": -7.454545
                 },
                 {
-                  "calls": 51,
-                  "hit_rate": 0.529412,
-                  "hits": 27,
+                  "calls": 60,
+                  "hit_rate": 0.55,
+                  "hits": 33,
                   "month": "2026-07",
                   "qualification_status": "partial_month",
-                  "units_at_minus_110": 0.545455
+                  "units_at_minus_110": 3.0
                 }
               ],
               "monthly_minimum_calls": 10,
@@ -1084,49 +1084,49 @@
               "qualified": false,
               "roi": null,
               "secondary_reporting_complete": true,
-              "selectivity": 0.242387,
+              "selectivity": 0.317905,
               "total_predictions": 821,
-              "units_at_minus_110": 9.090909
+              "units_at_minus_110": 6.272727
             },
             "status": "evaluated",
             "validation": {
               "minimum_calls": 50,
-              "selectivity": 0.219298,
+              "selectivity": 0.303509,
               "target_hit_rate": 0.6,
-              "validation_calls": 125,
-              "validation_hit_rate": 0.6
+              "validation_calls": 173,
+              "validation_hit_rate": 0.601156
             }
           },
           "features": [
             "elo_probability",
             "trend_gap",
             "park_factor",
-            "weather_factor"
+            "pitcher_era_gap"
           ],
-          "intercept": -0.0922393407,
+          "intercept": -0.0667463984,
           "primary_65": {
-            "learned_threshold": 0.59304278,
+            "learned_threshold": 0.59408305,
             "locked_holdout": {
-              "brier_score": 0.24072,
+              "brier_score": 0.235968,
               "calibration": {
-                "brier_score": 0.24071985213327382,
-                "calibration_intercept": -0.6442632649413539,
-                "calibration_slope": 2.1743872267348956,
-                "expected_calibration_error": 0.03365354117329836,
-                "log_loss": 0.6743350659198678,
+                "brier_score": 0.23596798837793284,
+                "calibration_intercept": -0.3162780805743029,
+                "calibration_slope": 1.6230232523441213,
+                "expected_calibration_error": 0.022025875419266656,
+                "log_loss": 0.6646714666592254,
                 "reliability_buckets": [
                   {
-                    "count": 16,
-                    "hit_rate": 0.4375,
+                    "count": 12,
+                    "hit_rate": 0.5,
                     "lower": 0.5,
-                    "mean_p": 0.5963285364237574,
+                    "mean_p": 0.5969245201104977,
                     "upper": 0.6
                   },
                   {
-                    "count": 75,
-                    "hit_rate": 0.6266666666666667,
+                    "count": 79,
+                    "hit_rate": 0.6329113924050633,
                     "lower": 0.6,
-                    "mean_p": 0.6197171244801329,
+                    "mean_p": 0.6222625263059837,
                     "upper": 0.7
                   }
                 ],
@@ -1137,23 +1137,208 @@
               "calls": 91,
               "every_called_month_positive_at_minus_110": true,
               "every_qualifying_month_positive_at_minus_110": true,
-              "failures": [
-                "selective hit rate 59.34% below required 60.00%"
+              "failures": [],
+              "hit_rate": 0.615385,
+              "hits": 56,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 27,
+                  "hit_rate": 0.740741,
+                  "hits": 20,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 11.181818
+                },
+                {
+                  "calls": 37,
+                  "hit_rate": 0.594595,
+                  "hits": 22,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 5.0
+                },
+                {
+                  "calls": 27,
+                  "hit_rate": 0.518519,
+                  "hits": 14,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": -0.272727
+                }
               ],
-              "hit_rate": 0.593407,
-              "hits": 54,
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.11084,
+              "total_predictions": 821,
+              "units_at_minus_110": 15.909091
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.110526,
+              "target_hit_rate": 0.65,
+              "validation_calls": 63,
+              "validation_hit_rate": 0.650794
+            }
+          }
+        },
+        "elo_trend_park_weather": {
+          "coefficients": {
+            "elo_probability": 2.601652667,
+            "park_factor": -0.9433842661,
+            "trend_gap": 0.0772155008,
+            "weather_factor": -0.2667985594
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.5860781,
+            "locked_holdout": {
+              "brier_score": 0.247783,
+              "calibration": {
+                "brier_score": 0.2477826193248026,
+                "calibration_intercept": -1.4060761746680426,
+                "calibration_slope": 3.6506123947838374,
+                "expected_calibration_error": 0.06357549234109738,
+                "log_loss": 0.688641437653598,
+                "reliability_buckets": [
+                  {
+                    "count": 44,
+                    "hit_rate": 0.4318181818181818,
+                    "lower": 0.5,
+                    "mean_p": 0.5924654853105902,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 75,
+                    "hit_rate": 0.6266666666666667,
+                    "lower": 0.6,
+                    "mean_p": 0.6200399702010051,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 119,
+                "status": "ok"
+              },
+              "called_rate": 0.144945,
+              "calls": 119,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 55.46% below required 60.00%"
+              ],
+              "hit_rate": 0.554622,
+              "hits": 66,
               "locked_holdout": true,
               "meets_primary_holdout_metrics": false,
               "minimum_calls": 50,
               "minimum_hit_rate": 0.6,
               "monthly_at_minus_110": [
                 {
-                  "calls": 26,
-                  "hit_rate": 0.692308,
-                  "hits": 18,
+                  "calls": 36,
+                  "hit_rate": 0.638889,
+                  "hits": 23,
                   "month": "2026-05",
                   "qualification_status": "qualifying",
-                  "units_at_minus_110": 8.363636
+                  "units_at_minus_110": 7.909091
+                },
+                {
+                  "calls": 52,
+                  "hit_rate": 0.5,
+                  "hits": 26,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -2.363636
+                },
+                {
+                  "calls": 31,
+                  "hit_rate": 0.548387,
+                  "hits": 17,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 1.454545
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.144945,
+              "total_predictions": 821,
+              "units_at_minus_110": 7.0
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.135088,
+              "target_hit_rate": 0.6,
+              "validation_calls": 77,
+              "validation_hit_rate": 0.61039
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor",
+            "weather_factor"
+          ],
+          "intercept": -0.0160307823,
+          "primary_65": {
+            "learned_threshold": 0.59310557,
+            "locked_holdout": {
+              "brier_score": 0.237425,
+              "calibration": {
+                "brier_score": 0.23742542520502158,
+                "calibration_intercept": 0.0001958198763880914,
+                "calibration_slope": 0.954387774173469,
+                "expected_calibration_error": 0.01610141709996097,
+                "log_loss": 0.6676608371425409,
+                "reliability_buckets": [
+                  {
+                    "count": 15,
+                    "hit_rate": 0.5333333333333333,
+                    "lower": 0.5,
+                    "mean_p": 0.5968083536047911,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 75,
+                    "hit_rate": 0.6266666666666667,
+                    "lower": 0.6,
+                    "mean_p": 0.6200399702010051,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 90,
+                "status": "ok"
+              },
+              "called_rate": 0.109622,
+              "calls": 90,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.611111,
+              "hits": 55,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 27,
+                  "hit_rate": 0.703704,
+                  "hits": 19,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 9.272727
                 },
                 {
                   "calls": 40,
@@ -1164,31 +1349,220 @@
                   "units_at_minus_110": 0.090909
                 },
                 {
-                  "calls": 25,
-                  "hit_rate": 0.6,
+                  "calls": 23,
+                  "hit_rate": 0.652174,
                   "hits": 15,
                   "month": "2026-07",
                   "qualification_status": "partial_month",
-                  "units_at_minus_110": 3.636364
+                  "units_at_minus_110": 5.636364
                 }
               ],
               "monthly_minimum_calls": 10,
               "price_diagnostics": null,
               "qualification_eligible": true,
-              "qualified": false,
+              "qualified": true,
               "roi": null,
               "secondary_reporting_complete": true,
-              "selectivity": 0.11084,
+              "selectivity": 0.109622,
               "total_predictions": 821,
-              "units_at_minus_110": 12.090909
+              "units_at_minus_110": 15.0
             },
             "status": "evaluated",
             "validation": {
               "minimum_calls": 50,
-              "selectivity": 0.110526,
+              "selectivity": 0.112281,
               "target_hit_rate": 0.65,
-              "validation_calls": 63,
-              "validation_hit_rate": 0.650794
+              "validation_calls": 64,
+              "validation_hit_rate": 0.65625
+            }
+          }
+        },
+        "elo_trend_park_weather_pitcher": {
+          "coefficients": {
+            "elo_probability": 2.4405692165,
+            "park_factor": -0.9429854002,
+            "pitcher_era_gap": -0.0173431942,
+            "trend_gap": 0.0684356778,
+            "weather_factor": -0.2294068193
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.56363962,
+            "locked_holdout": {
+              "brier_score": 0.249048,
+              "calibration": {
+                "brier_score": 0.2490480432424343,
+                "calibration_intercept": -0.3738562595751886,
+                "calibration_slope": 1.485382383222088,
+                "expected_calibration_error": 0.04886564491047425,
+                "log_loss": 0.6912243297914574,
+                "reliability_buckets": [
+                  {
+                    "count": 175,
+                    "hit_rate": 0.5085714285714286,
+                    "lower": 0.5,
+                    "mean_p": 0.5785386652855267,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 80,
+                    "hit_rate": 0.625,
+                    "lower": 0.6,
+                    "mean_p": 0.6222940871599529,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 255,
+                "status": "ok"
+              },
+              "called_rate": 0.310597,
+              "calls": 255,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 54.51% below required 60.00%"
+              ],
+              "hit_rate": 0.545098,
+              "hits": 139,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 79,
+                  "hit_rate": 0.620253,
+                  "hits": 49,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 14.545455
+                },
+                {
+                  "calls": 117,
+                  "hit_rate": 0.495726,
+                  "hits": 58,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -6.272727
+                },
+                {
+                  "calls": 59,
+                  "hit_rate": 0.542373,
+                  "hits": 32,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 2.090909
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.310597,
+              "total_predictions": 821,
+              "units_at_minus_110": 10.363636
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.307018,
+              "target_hit_rate": 0.6,
+              "validation_calls": 175,
+              "validation_hit_rate": 0.6
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor",
+            "weather_factor",
+            "pitcher_era_gap"
+          ],
+          "intercept": 0.0317570525,
+          "primary_65": {
+            "learned_threshold": 0.59412006,
+            "locked_holdout": {
+              "brier_score": 0.235157,
+              "calibration": {
+                "brier_score": 0.23515740799006773,
+                "calibration_intercept": -0.15882496981821342,
+                "calibration_slope": 1.3337242956112867,
+                "expected_calibration_error": 0.00408302141053409,
+                "log_loss": 0.6630250240116421,
+                "reliability_buckets": [
+                  {
+                    "count": 12,
+                    "hit_rate": 0.5833333333333334,
+                    "lower": 0.5,
+                    "mean_p": 0.5965970785471143,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 80,
+                    "hit_rate": 0.625,
+                    "lower": 0.6,
+                    "mean_p": 0.6222940871599529,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 92,
+                "status": "ok"
+              },
+              "called_rate": 0.112058,
+              "calls": 92,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.619565,
+              "hits": 57,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 27,
+                  "hit_rate": 0.740741,
+                  "hits": 20,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 11.181818
+                },
+                {
+                  "calls": 38,
+                  "hit_rate": 0.578947,
+                  "hits": 22,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 4.0
+                },
+                {
+                  "calls": 27,
+                  "hit_rate": 0.555556,
+                  "hits": 15,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 1.636364
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.112058,
+              "total_predictions": 821,
+              "units_at_minus_110": 16.818182
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.114035,
+              "target_hit_rate": 0.65,
+              "validation_calls": 65,
+              "validation_hit_rate": 0.661538
             }
           }
         }
