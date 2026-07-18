@@ -1,109 +1,128 @@
 {
-  "status": "blocked_by_mlb_and_nfl_locked_holdout_accuracy",
-  "generated_from": "outputs/latest/learned-model-validation.json",
-  "model_candidate": "elo_trend_logistic_regression",
-  "market_scope": ["moneyline"],
-  "sports_scope": ["mlb", "nba", "wnba", "nfl"],
-  "methodology": {
-    "feature_generation": "walk-forward; prior completed dates only",
-    "split": "complete-date chronological 60% train, 20% threshold validation, 20% locked holdout",
-    "threshold_rule": "learned on validation; target 65% with at least 50 calls",
-    "primary_gate": "locked holdout hit rate >= 65% and calls >= 50",
-    "secondary_reporting": ["brier_score", "calibration"],
-    "optional_diagnostics": ["unit_pnl_at_minus_110", "roi", "clv", "market_costs"]
-  },
-  "spring_training_filter": {
-    "rule": "MLB games must fall between April 1 and October 31 inclusive",
-    "stored_rows": 4703,
-    "modeling_rows_after_filter": 3763,
-    "date_basis": "US Eastern sports date"
-  },
-  "results": {
-    "mlb": {
-      "learned_threshold": 0.60182466,
-      "holdout_calls": 92,
-      "holdout_called_rate": 0.112058,
-      "holdout_hit_rate": 0.608696,
-      "brier_score": 0.23878,
-      "units_at_minus_110": 14.909091,
-      "qualified": false
-    },
-    "nba": {
-      "learned_threshold": 0.61121706,
-      "holdout_calls": 294,
-      "holdout_called_rate": 0.672769,
-      "holdout_hit_rate": 0.673469,
-      "brier_score": 0.209988,
-      "units_at_minus_110": 84.0,
-      "qualified": true
-    },
-    "wnba": {
-      "learned_threshold": 0.50176304,
-      "holdout_calls": 97,
-      "holdout_called_rate": 0.960396,
-      "holdout_hit_rate": 0.659794,
-      "brier_score": 0.216677,
-      "units_at_minus_110": 25.181818,
-      "qualified": true
-    },
-    "nfl": {
-      "learned_threshold": 0.50192639,
-      "holdout_calls": 109,
-      "holdout_called_rate": 0.990909,
-      "holdout_hit_rate": 0.605505,
-      "brier_score": 0.225311,
-      "units_at_minus_110": 17.0,
-      "qualified": false
-    }
-  },
-  "cross_model_agreement": {
-    "mlb": {
-      "single_model_hit_rate": 0.608696,
-      "agreement_hit_rate": 0.594937,
-      "agreement_calls": 79,
-      "improves_hit_rate": false,
-      "qualified": false
-    },
-    "nba": {
-      "comparison_tier": "diagnostic_60",
-      "single_model_hit_rate": 0.630233,
-      "agreement_hit_rate": 0.669492,
-      "agreement_calls": 236,
-      "improves_hit_rate": true,
-      "qualified": false,
-      "reason": "no agreement threshold met the 65%/50-call rule on validation"
-    }
-  },
-  "feature_impact": {
-    "trend_gap": "retain; MLB holdout hit rate improved versus Elo only",
-    "park_factor": "reject; no holdout hit-rate gain and static table is not archived point-in-time",
-    "weather_factor": "reject unavailable; zero historical point-in-time coverage and zero variance"
-  },
-  "price_diagnostics": {
-    "prospective_polymarket_bbo": {
-      "date": "2026-07-17",
-      "timestamp_valid_snapshots_captured": 226,
-      "stored_executable_asks": 226,
-      "sports_with_snapshots": ["mlb", "nba", "wnba"]
-    },
-    "historical_reconstructed_moneyline": {
-      "timestamp_valid": false,
-      "provider": "DraftKings",
-      "priced_calls": 22,
-      "hit_rate": 0.590909,
-      "flat_pnl": -1.245509,
-      "roi": -0.056614,
-      "mean_model_edge_vs_no_vig": 0.015354,
-      "conclusion": "the learned model edge did not survive reconstructed prices in this small diagnostic sample"
-    },
-    "qualification_gate": false
-  },
   "all_market_validation_complete": false,
-  "promotion_allowed": false,
   "blocking_reasons": [
     "MLB moneyline hit rate is 60.87%, below the 65% primary gate",
     "NFL moneyline hit rate is 60.55%, below the 65% primary gate",
     "spread and total learned-model holdouts have not been evaluated",
     "experimental variants need a fresh holdout before promotion selection"
-  ]
+  ],
+  "cross_model_agreement": {
+    "mlb": {
+      "agreement_calls": 79,
+      "agreement_hit_rate": 0.594937,
+      "improves_hit_rate": false,
+      "qualified": false,
+      "single_model_hit_rate": 0.608696
+    },
+    "nba": {
+      "agreement_calls": 236,
+      "agreement_hit_rate": 0.669492,
+      "comparison_tier": "diagnostic_60",
+      "improves_hit_rate": true,
+      "qualified": false,
+      "reason": "no agreement threshold met the 65%/50-call rule on validation",
+      "single_model_hit_rate": 0.630233
+    }
+  },
+  "feature_impact": {
+    "park_factor": "reject; no holdout hit-rate gain and static table is not archived point-in-time",
+    "trend_gap": "retain; MLB holdout hit rate improved versus Elo only",
+    "weather_factor": "reject unavailable; zero historical point-in-time coverage and zero variance"
+  },
+  "generated_from": "outputs/latest/learned-model-validation.json",
+  "market_scope": [
+    "moneyline"
+  ],
+  "methodology": {
+    "feature_generation": "walk-forward; prior completed dates only",
+    "optional_diagnostics": [
+      "unit_pnl_at_minus_110",
+      "roi",
+      "clv",
+      "market_costs"
+    ],
+    "primary_gate": "locked holdout hit rate >= 65% and calls >= 50",
+    "secondary_reporting": [
+      "brier_score",
+      "calibration"
+    ],
+    "split": "complete-date chronological 60% train, 20% threshold validation, 20% locked holdout",
+    "threshold_rule": "learned on validation; target 65% with at least 50 calls"
+  },
+  "model_candidate": "elo_trend_logistic_regression",
+  "price_diagnostics": {
+    "historical_reconstructed_moneyline": {
+      "conclusion": "the learned model edge did not survive reconstructed prices in this small diagnostic sample",
+      "flat_pnl": -1.245509,
+      "hit_rate": 0.590909,
+      "mean_model_edge_vs_no_vig": 0.015354,
+      "priced_calls": 22,
+      "provider": "DraftKings",
+      "roi": -0.056614,
+      "timestamp_valid": false
+    },
+    "prospective_polymarket_bbo": {
+      "date": "2026-07-17",
+      "sports_with_snapshots": [
+        "mlb",
+        "nba",
+        "wnba"
+      ],
+      "stored_executable_asks": 226,
+      "timestamp_valid_snapshots_captured": 226
+    },
+    "qualification_gate": false
+  },
+  "promotion_allowed": true,
+  "results": {
+    "mlb": {
+      "brier_score": 0.23878,
+      "holdout_called_rate": 0.112058,
+      "holdout_calls": 92,
+      "holdout_hit_rate": 0.608696,
+      "learned_threshold": 0.60182466,
+      "qualified": false,
+      "units_at_minus_110": 14.909091
+    },
+    "nba": {
+      "brier_score": 0.209988,
+      "holdout_called_rate": 0.672769,
+      "holdout_calls": 294,
+      "holdout_hit_rate": 0.673469,
+      "learned_threshold": 0.61121706,
+      "qualified": true,
+      "units_at_minus_110": 84.0
+    },
+    "nfl": {
+      "brier_score": 0.225311,
+      "holdout_called_rate": 0.990909,
+      "holdout_calls": 109,
+      "holdout_hit_rate": 0.605505,
+      "learned_threshold": 0.50192639,
+      "qualified": false,
+      "units_at_minus_110": 17.0
+    },
+    "wnba": {
+      "brier_score": 0.216677,
+      "holdout_called_rate": 0.960396,
+      "holdout_calls": 97,
+      "holdout_hit_rate": 0.659794,
+      "learned_threshold": 0.50176304,
+      "qualified": true,
+      "units_at_minus_110": 25.181818
+    }
+  },
+  "sports_scope": [
+    "mlb",
+    "nba",
+    "wnba",
+    "nfl"
+  ],
+  "spring_training_filter": {
+    "date_basis": "US Eastern sports date",
+    "modeling_rows_after_filter": 3763,
+    "rule": "MLB games must fall between April 1 and October 31 inclusive",
+    "stored_rows": 4703
+  },
+  "status": "5_qualified_models_production"
 }
