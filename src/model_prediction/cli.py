@@ -60,9 +60,21 @@ from .domain import (
 )
 from .eligibility import evaluate_eligibility
 from .entities import EntityRegistry, EntityResolutionError
+from .esports import (
+    TITLE_SPECS,
+    backfill_esports,
+    forecast_esports_slate,
+    validate_all_esports_baselines,
+)
 from .features.base import FeatureStore
 from .forward import build_mlb_slate
 from .ingest import Ingestor
+from .international_baseball import (
+    LEAGUE_SPECS as INTERNATIONAL_BASEBALL_LEAGUE_SPECS,
+    backfill_international_baseball,
+    forecast_international_baseball_slate,
+    validate_all_international_baseball_baselines,
+)
 from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError, PickLedger
 from .learned_forward import build_learned_moneyline_slate, match_executable_quote
 from .models import MODEL_SPECS
@@ -206,6 +218,71 @@ def parser() -> argparse.ArgumentParser:
     bootstrap.add_argument("--all", action="store_true")
     bootstrap.add_argument("--from", dest="from_date", required=True)
     bootstrap.add_argument("--to", dest="to_date")
+
+    esports_backfill = commands.add_parser(
+        "esports-backfill",
+        help="backfill no-key series-level results for isolated LoL and CS2 research models",
+    )
+    esports_backfill.add_argument("--title", choices=tuple(TITLE_SPECS))
+    esports_backfill.add_argument("--all", action="store_true")
+    esports_backfill.add_argument("--from", dest="from_date", required=True)
+    esports_backfill.add_argument("--to", dest="to_date")
+
+    esports_validate = commands.add_parser(
+        "validate-esports",
+        help="select separate LoL/CS2 Elo baselines and grade chronological locked tests",
+    )
+    esports_validate.add_argument(
+        "--titles", nargs="+", choices=tuple(TITLE_SPECS), default=tuple(TITLE_SPECS)
+    )
+    esports_validate.add_argument(
+        "--output", default="outputs/latest/esports-baseline-validation.json"
+    )
+    esports_validate.add_argument("--write-artifacts", action="store_true")
+
+    esports_forecast = commands.add_parser(
+        "esports-forecast",
+        help="zero-unit exact-identity LoL/CS2 prices for Polymarket US match-winner contracts",
+    )
+    esports_forecast.add_argument("--title", required=True, choices=tuple(TITLE_SPECS))
+    esports_forecast.add_argument("--date", required=True)
+    esports_forecast.add_argument("--timezone", default="America/New_York")
+
+    international_backfill = commands.add_parser(
+        "international-baseball-backfill",
+        help="backfill official no-key KBO and NPB regular-season results",
+    )
+    international_backfill.add_argument(
+        "--league", choices=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS)
+    )
+    international_backfill.add_argument("--all", action="store_true")
+    international_backfill.add_argument("--from", dest="from_date", required=True)
+    international_backfill.add_argument("--to", dest="to_date")
+
+    international_validate = commands.add_parser(
+        "validate-international-baseball",
+        help="select separate tie-aware KBO/NPB Elo baselines and grade locked tests",
+    )
+    international_validate.add_argument(
+        "--leagues",
+        nargs="+",
+        choices=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS),
+        default=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS),
+    )
+    international_validate.add_argument(
+        "--output", default="outputs/latest/international-baseball-baseline-validation.json"
+    )
+    international_validate.add_argument("--write-artifacts", action="store_true")
+
+    international_forecast = commands.add_parser(
+        "international-baseball-forecast",
+        help="zero-unit tie-aware KBO/NPB fair values using exact Polymarket US BBOs",
+    )
+    international_forecast.add_argument(
+        "--league", required=True, choices=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS)
+    )
+    international_forecast.add_argument("--date", required=True)
+    international_forecast.add_argument("--timezone")
 
     entities = commands.add_parser("bootstrap-entities", help="merge ESPN team lists into the registry")
     entities.add_argument("--league", required=True)
@@ -822,11 +899,38 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
     return None
 
 
+def _clear_today_open(ledger, date_str: str) -> None:
+    """Remove all open picks created on the given date before re-forecasting."""
+    rows = ledger.rows()
+    to_remove = []
+    for row in rows:
+        if row.get("status") != "open":
+            continue
+        created = str(row.get("created_at_utc", "") or "")
+        if created.startswith(date_str):
+            to_remove.append(row["pick_id"])
+    if to_remove:
+        # Use openpyxl directly since ledger has no remove method
+        import openpyxl as _xl
+        wb = _xl.load_workbook(ledger._path)
+        ws = wb[wb.sheetnames[0] if wb.sheetnames else "Picks"]
+        headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+        pid_col = headers.index("pick_id") + 1 if "pick_id" in headers else 1
+        rows_to_delete = []
+        for r in range(2, ws.max_row + 1):
+            if str(ws.cell(r, pid_col).value or "") in to_remove:
+                rows_to_delete.append(r)
+        for r in reversed(rows_to_delete):
+            ws.delete_rows(r)
+        wb.save(ledger._path)
+
+
 def _drift_check(settled_qualified: list, config: dict) -> dict:
     """Compare live settled hit rate against model holdout for each sport."""
-    import json, math
-    from pathlib import Path as _Path
     from collections import defaultdict
+    import json
+    import math
+    from pathlib import Path as _Path
 
     by_sport = defaultdict(lambda: {"wins": 0, "losses": 0})
     for row in settled_qualified:
@@ -1085,6 +1189,7 @@ def main(argv: list[str] | None = None) -> None:
                 no_snapshot_bbo=False,
             )
             slate = _polymarket_slate(slate_args, config)
+            _clear_today_open(ledger, args.date)
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             soccer_collection = collect_soccer_scores(days_from=3)
             forecast_result = {
@@ -1156,6 +1261,72 @@ def main(argv: list[str] | None = None) -> None:
                 output = ingestor.bootstrap(args.sport, args.from_date, args.to_date)
             else:
                 raise ValueError("provide --sport or --all")
+        elif args.command == "esports-backfill":
+            if args.all:
+                titles = tuple(TITLE_SPECS)
+            elif args.title:
+                titles = (args.title,)
+            else:
+                raise ValueError("provide --title or --all")
+            output = {
+                title: backfill_esports(data_root, title, args.from_date, args.to_date)
+                for title in titles
+            }
+        elif args.command == "validate-esports":
+            output = validate_all_esports_baselines(
+                data_root,
+                args.titles,
+                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+            )
+            destination = PROJECT_ROOT / args.output
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(
+                json.dumps(output, indent=2, sort_keys=True, default=str) + "\n",
+                encoding="utf-8",
+            )
+            output["report_path"] = str(destination)
+        elif args.command == "esports-forecast":
+            output = forecast_esports_slate(
+                data_root,
+                PROJECT_ROOT / "config/models",
+                args.title,
+                args.date,
+                args.timezone,
+            )
+        elif args.command == "international-baseball-backfill":
+            if args.all:
+                leagues = tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS)
+            elif args.league:
+                leagues = (args.league,)
+            else:
+                raise ValueError("provide --league or --all")
+            output = {
+                league: backfill_international_baseball(
+                    data_root, league, args.from_date, args.to_date
+                )
+                for league in leagues
+            }
+        elif args.command == "validate-international-baseball":
+            output = validate_all_international_baseball_baselines(
+                data_root,
+                args.leagues,
+                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+            )
+            destination = PROJECT_ROOT / args.output
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(
+                json.dumps(output, indent=2, sort_keys=True, default=str) + "\n",
+                encoding="utf-8",
+            )
+            output["report_path"] = str(destination)
+        elif args.command == "international-baseball-forecast":
+            output = forecast_international_baseball_slate(
+                data_root,
+                PROJECT_ROOT / "config/models",
+                args.league,
+                args.date,
+                args.timezone,
+            )
         elif args.command == "bootstrap-entities":
             output = Ingestor(data_root, audit=audit).bootstrap_entities(
                 args.league, entity_registry_path(config)
