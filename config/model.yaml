@@ -69,11 +69,6 @@ data_sources:
 execution:
   status: hard_gated
   allow_manual_research_orders: true
-  # Both relaxed by Vincent 2026-07-17: full manual control over any open
-  # research pick. You see model prob, market price, and edge (negative in red)
-  # and choose to buy anyway. HARD safeguards still apply and are NOT config-
-  # toggleable: interactive confirmation of exact order, unit/dollar cap, team
-  # ban check, and Polymarket credentials.
   manual_research_require_active_model: false
   manual_research_require_positive_edge: false
   requirements:
@@ -81,7 +76,8 @@ execution:
   - --execute CLI flag
   - POLYMARKET_KEY_ID and POLYMARKET_SECRET_KEY environment variables
   - interactive Y/N confirmation of exact order details
-  - qualified calls, or an explicit manual override on an active-model positive-edge research row
+  - qualified calls, or an explicit manual override on an active-model positive-edge
+    research row
   - unit engine caps still apply
   - audit chain entry for every order
 model_iteration_policy:
@@ -117,8 +113,8 @@ models:
     origin: statistical_model
     active_production_version: mlb-elo-trend-lr-v3
     production_artifact: config/models/mlb-elo-trend-lr-v3.json
-    active_research_version: measured-edge-margin-v1 + measured-edge-totals-v1
-    active_research_name: Measured Edge Paired Models
+    active_research_version: spread-baseline-v1
+    active_research_name: Spread & Total Baseline
     legacy_research_rollback: legacy-measured-edge
     iteration_policy:
       status: continuous
@@ -139,6 +135,8 @@ models:
         compare_against:
         - measured-edge-v1
         - no_vig_market_probability
+    spread_research_artifact: config/models/mlb-spread-baseline-v1.json
+    total_research_artifact: config/models/mlb-spread-baseline-v1.json
   NBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
@@ -149,6 +147,10 @@ models:
     - nba-elo-trend-v1
     - nba-elo-trend-lr-v1
     - nba-elo-trend-lr-v3
+    active_research_version: spread-baseline-v1
+    active_research_name: Spread & Total Baseline
+    spread_research_artifact: config/models/nba-spread-baseline-v1.json
+    total_research_artifact: config/models/nba-spread-baseline-v1.json
   WNBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
@@ -159,6 +161,10 @@ models:
     - wnba-elo-trend-v1
     - wnba-elo-trend-lr-v1
     - wnba-elo-trend-lr-v3
+    active_research_version: spread-baseline-v1
+    active_research_name: Spread & Total Baseline
+    spread_research_artifact: config/models/wnba-spread-baseline-v1.json
+    total_research_artifact: config/models/wnba-spread-baseline-v1.json
   SOCCER:
     family: elo_trend_logistic_regression
     status: shadow_qualified
@@ -174,13 +180,18 @@ models:
     - MLS
     - UCL
     - WORLD_CUP
-    markets: [moneyline]
+    markets:
+    - moneyline
   NFL:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
     active_production_version: nfl-elo-trend-lr-v3
     production_artifact: config/models/nfl-elo-trend-lr-v3.json
+    active_research_version: spread-baseline-v1
+    active_research_name: Spread & Total Baseline
+    spread_research_artifact: config/models/nfl-spread-baseline-v1.json
+    total_research_artifact: config/models/nfl-spread-baseline-v1.json
   TENNIS:
     family: elo_trend_logistic_regression
     status: deferred

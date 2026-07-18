@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "beeca4eab332b9d555d874a21b5ddc9b1a6e922fd808eac4eba2323b86aaa3e2",
+  "artifact_hash": "bef2a6bb2c2414968a9fb16d09a307d4ec65f71bf55197974c0e831d36ceefb1",
   "market_models": {
     "spread": {
       "coefficients": [
@@ -34,7 +34,19 @@
     "market_type": "spread_and_total",
     "note": "Baseline spread/total model. Spread = Elo expected margin. Total = league average. Will improve as Polymarket snapshots accumulate.",
     "qualified": false,
-    "status": "research_baseline"
+    "spread": {
+      "calls": 0,
+      "hit_rate": 0,
+      "hits": 0,
+      "units": 0
+    },
+    "status": "active_research",
+    "total": {
+      "calls": 0,
+      "hit_rate": 0,
+      "hits": 0,
+      "units": 0
+    }
   },
   "schema_version": "1",
   "sport": "mlb"

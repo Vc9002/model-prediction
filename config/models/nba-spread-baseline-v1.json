@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "8c0cef107d2289a7d57d38c2a55700f96da08a56b259f9361df16de288f1aef2",
+  "artifact_hash": "688c103b2ba06f3e0c9d87efd1573638b455d19b28b6a9646816e3b90402b7fd",
   "market_models": {
     "spread": {
       "coefficients": [
@@ -34,7 +34,17 @@
     "market_type": "spread_and_total",
     "note": "Baseline spread/total model. Spread = Elo expected margin. Total = league average. Will improve as Polymarket snapshots accumulate.",
     "qualified": false,
-    "status": "research_baseline"
+    "spread": {
+      "note": "Outcome matching pending \u2014 event ID mapping needed",
+      "snapshots": 0,
+      "status": "research_active"
+    },
+    "status": "active_research",
+    "total": {
+      "note": "Outcome matching pending",
+      "snapshots": 0,
+      "status": "research_active"
+    }
   },
   "schema_version": "1",
   "sport": "nba"

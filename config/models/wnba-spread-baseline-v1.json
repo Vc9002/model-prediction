@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "4f340b80cd3645dae98bcf94e9ff7fb2831ba432507db89db5ede0ffd9ad99aa",
+  "artifact_hash": "e1874457960b7bbc124a8f4709722d756866da821846a4f93b12d532245f857f",
   "market_models": {
     "spread": {
       "coefficients": [
@@ -27,14 +27,26 @@
   "method": "baseline_heuristic",
   "model_version": "wnba-spread-baseline-v1",
   "qualification": {
-    "calls": 0,
+    "calls": 727,
     "framework": "baseline_research",
-    "hit_rate": 0.0,
-    "hits": 0,
+    "hit_rate": 0.570839,
+    "hits": 415,
     "market_type": "spread_and_total",
     "note": "Baseline spread/total model. Spread = Elo expected margin. Total = league average. Will improve as Polymarket snapshots accumulate.",
     "qualified": false,
-    "status": "research_baseline"
+    "spread": {
+      "calls": 340,
+      "hit_rate": 0.329412,
+      "hits": 112,
+      "units": -126.181818
+    },
+    "status": "active_research",
+    "total": {
+      "calls": 387,
+      "hit_rate": 0.782946,
+      "hits": 303,
+      "units": 191.454545
+    }
   },
   "schema_version": "1",
   "sport": "wnba"

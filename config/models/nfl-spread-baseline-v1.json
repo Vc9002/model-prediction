@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "2e0103ef7dc9709ce059bb70b5ec7bb60af9c7253676382231a39b23ae2e48d3",
+  "artifact_hash": "a4c3110066421d74731a5675a5f8175ed05b42dcb56a4f056bbec6b0b7172474",
   "market_models": {
     "spread": {
       "coefficients": [
@@ -34,7 +34,17 @@
     "market_type": "spread_and_total",
     "note": "Baseline spread/total model. Spread = Elo expected margin. Total = league average. Will improve as Polymarket snapshots accumulate.",
     "qualified": false,
-    "status": "research_baseline"
+    "spread": {
+      "note": "Outcome matching pending \u2014 event ID mapping needed",
+      "snapshots": 0,
+      "status": "research_active"
+    },
+    "status": "active_research",
+    "total": {
+      "note": "Outcome matching pending",
+      "snapshots": 0,
+      "status": "research_active"
+    }
   },
   "schema_version": "1",
   "sport": "nfl"
