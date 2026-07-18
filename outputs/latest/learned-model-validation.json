@@ -57,7 +57,7 @@
               "selectivity": 0.163127
             },
             "locked_holdout": {
-              "qualified": true,
+              "qualified": false,
               "locked_holdout": true,
               "calls": 209,
               "hits": 118,
@@ -66,7 +66,9 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.154472,
-              "failures": [],
+              "failures": [
+                "below qualification gate"
+              ],
               "brier_score": 0.24903,
               "calibration": {
                 "status": "ok",
@@ -96,7 +98,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": true,
+              "meets_primary_holdout_metrics": false,
               "qualification_eligible": true,
               "called_rate": 0.154472,
               "units_at_minus_110": 16.272727,
@@ -263,7 +265,7 @@
               "selectivity": 0.121622
             },
             "locked_holdout": {
-              "qualified": true,
+              "qualified": false,
               "locked_holdout": true,
               "calls": 158,
               "hits": 90,
@@ -272,7 +274,9 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.116778,
-              "failures": [],
+              "failures": [
+                "below qualification gate"
+              ],
               "brier_score": 0.249446,
               "calibration": {
                 "status": "ok",
@@ -302,7 +306,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": true,
+              "meets_primary_holdout_metrics": false,
               "qualification_eligible": true,
               "called_rate": 0.116778,
               "units_at_minus_110": 13.818182,
@@ -471,7 +475,7 @@
               "selectivity": 0.128378
             },
             "locked_holdout": {
-              "qualified": true,
+              "qualified": false,
               "locked_holdout": true,
               "calls": 163,
               "hits": 94,
@@ -480,7 +484,9 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.120473,
-              "failures": [],
+              "failures": [
+                "below qualification gate"
+              ],
               "brier_score": 0.248059,
               "calibration": {
                 "status": "ok",
@@ -510,7 +516,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": true,
+              "meets_primary_holdout_metrics": false,
               "qualification_eligible": true,
               "called_rate": 0.120473,
               "units_at_minus_110": 16.454545,
@@ -679,7 +685,7 @@
               "selectivity": 0.141892
             },
             "locked_holdout": {
-              "qualified": true,
+              "qualified": false,
               "locked_holdout": true,
               "calls": 198,
               "hits": 115,
@@ -688,7 +694,9 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.146341,
-              "failures": [],
+              "failures": [
+                "below qualification gate"
+              ],
               "brier_score": 0.246885,
               "calibration": {
                 "status": "ok",
@@ -718,7 +726,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": true,
+              "meets_primary_holdout_metrics": false,
               "qualification_eligible": true,
               "called_rate": 0.146341,
               "units_at_minus_110": 21.545455,
@@ -889,7 +897,7 @@
               "selectivity": 0.140927
             },
             "locked_holdout": {
-              "qualified": true,
+              "qualified": false,
               "locked_holdout": true,
               "calls": 202,
               "hits": 116,
@@ -898,7 +906,9 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.149298,
-              "failures": [],
+              "failures": [
+                "below qualification gate"
+              ],
               "brier_score": 0.248276,
               "calibration": {
                 "status": "ok",
@@ -928,7 +938,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": true,
+              "meets_primary_holdout_metrics": false,
               "qualification_eligible": true,
               "called_rate": 0.149298,
               "units_at_minus_110": 19.454545,
@@ -1099,7 +1109,7 @@
               "selectivity": 0.173745
             },
             "locked_holdout": {
-              "qualified": true,
+              "qualified": false,
               "locked_holdout": true,
               "calls": 249,
               "hits": 142,
@@ -1108,7 +1118,9 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.184035,
-              "failures": [],
+              "failures": [
+                "below qualification gate"
+              ],
               "brier_score": 0.249329,
               "calibration": {
                 "status": "ok",
@@ -1138,7 +1150,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": true,
+              "meets_primary_holdout_metrics": false,
               "qualification_eligible": true,
               "called_rate": 0.184035,
               "units_at_minus_110": 22.090909,
@@ -1311,7 +1323,7 @@
               "selectivity": 0.176641
             },
             "locked_holdout": {
-              "qualified": true,
+              "qualified": false,
               "locked_holdout": true,
               "calls": 244,
               "hits": 142,
@@ -1320,7 +1332,9 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.18034,
-              "failures": [],
+              "failures": [
+                "below qualification gate"
+              ],
               "brier_score": 0.246884,
               "calibration": {
                 "status": "ok",
@@ -1350,7 +1364,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": true,
+              "meets_primary_holdout_metrics": false,
               "qualification_eligible": true,
               "called_rate": 0.18034,
               "units_at_minus_110": 27.090909,

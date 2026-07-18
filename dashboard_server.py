@@ -1108,6 +1108,14 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
         return False, "market quote is older than 5 minutes; scan prices first"
     if quote.get("market_state") != "MARKET_STATE_OPEN":
         return False, "market is not open"
+    # Block orders on past games
+    event_start = str(row.get("event_start_utc") or "")
+    try:
+        game_time = datetime.fromisoformat(event_start.replace("Z", "+00:00"))
+        if game_time < datetime.now(timezone.utc):
+            return False, "game has already started"
+    except (ValueError, TypeError):
+        pass
     missing = [
         name
         for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY")
