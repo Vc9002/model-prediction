@@ -1785,6 +1785,19 @@ class Handler(BaseHTTPRequestHandler):
                 day = query.get("date") or _today()
                 self._send(_cached(f"live:{sport}:{day}", 120,
                                    lambda: live_gateway_slate(sport, day)))
+            elif route == "/api/scan":
+                try:
+                    from model_prediction.data_sources.polymarket_us import capture_snapshots
+                    sport = query.get("sport", "").strip()
+                    sports = [sport] if sport in ("mlb","nba","wnba","nfl") else ["mlb","nba","wnba"]
+                    results = {}
+                    for s in sports:
+                        results[s] = capture_snapshots(s, _today())
+                    _CACHE.pop("matrix", None)
+                    _CACHE.pop("market", None)
+                    self._send({"status": "ok", "captured": results})
+                except Exception as e:
+                    self._send({"status": "error", "error": str(e)}, code=500)
             elif route == "/api/audit":
                 self._send(_cached("audit", 60, _audit_tail))
             elif route == "/api/job":
