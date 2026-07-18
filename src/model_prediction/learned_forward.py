@@ -92,6 +92,7 @@ def build_learned_moneyline_slate(
             features = {
                 "elo_probability": elo.expected_home_win(home_team, away_team),
                 "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
+                "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
             }
             decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
@@ -104,6 +105,7 @@ def build_learned_moneyline_slate(
             basis: dict[str, float | int] = {
                 "elo_probability": round(features["elo_probability"], 10),
                 "trend_gap": round(features["trend_gap"], 10),
+                "defensive_trend_gap": round(features["defensive_trend_gap"], 10),
                 "history_games": len(history),
                 "home_history_games": home_trend.games_played,
                 "away_history_games": away_trend.games_played,

@@ -6,6 +6,7 @@ Computed chronologically from cached completed games only — zero look-ahead.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from math import log
 from typing import Any, Iterable
 
@@ -59,12 +60,61 @@ class EloBook:
         self.ratings[game.away_team] = self.rating(game.away_team) - delta
 
 
-def build_elo(games: Iterable[GameRecord], sport: str) -> EloBook:
+def build_elo(games: Iterable[GameRecord], sport: str,
+              offseason_regression: float = 0.5,
+              offseason_gap_days: int = 90) -> EloBook:
+    """Build chronological Elo ratings with offseason regression.
+
+    When more than ``offseason_gap_days`` pass between consecutive games for
+    the same sport (or when a new season is detected), all team ratings are
+    regressed ``offseason_regression`` fraction toward DEFAULT_ELO before the
+    next game is processed.
+
+    Args:
+        games: game records sorted chronologically by start time
+        sport: sport key for config lookup
+        offseason_regression: fraction to pull toward DEFAULT_ELO (0.0=none, 1.0=full reset)
+        offseason_gap_days: consecutive-day gap that triggers regression
+    """
     config = ELO_CONFIG.get(sport.lower(), ELO_CONFIG["generic"])
     book = EloBook(ratings={}, k=config["k"], home_advantage=config["home_advantage"])
-    for game in sorted(games, key=lambda item: item.start):
+    sorted_games = sorted(games, key=lambda item: item.start)
+    if not sorted_games:
+        return book
+
+    last_game_date: datetime | None = None
+    for game in sorted_games:
+        game_date = _parse_game_date(game)
+        if game_date is not None and last_game_date is not None:
+            gap = (game_date - last_game_date).days
+            if gap > offseason_gap_days:
+                _apply_offseason_regression(book, offseason_regression)
+
         book.update(game)
+
+        if game_date is not None:
+            last_game_date = game_date
+
     return book
+
+
+def _parse_game_date(game: GameRecord) -> datetime | None:
+    """Parse a game's start time as a date for gap detection."""
+    try:
+        ts = str(game.start).replace("Z", "+00:00")
+        return datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return None
+
+
+def _apply_offseason_regression(book: EloBook, regression: float) -> None:
+    """Regress all team ratings toward DEFAULT_ELO by the given fraction."""
+    if regression <= 0 or not book.ratings:
+        return
+    target = DEFAULT_ELO
+    factor = 1.0 - regression
+    for team in list(book.ratings.keys()):
+        book.ratings[team] = target * regression + book.ratings[team] * factor
 
 
 @register_feature("ratings")

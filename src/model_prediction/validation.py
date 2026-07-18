@@ -56,7 +56,7 @@ class ValidationRow:
     elo_neutral_probability: float = 0.5
     trailing_home_win_rate_30d: float = 0.5
     trailing_home_games_30d: int = 0
-    defensive_gap: float = 0.0
+    defensive_trend_gap: float = 0.0
     consistency_gap: float = 0.0
     hot_cold_gap: float = 0.0
     outcome_3way: int = 0  # 2=home, 1=draw, 0=away — used for soccer 3-way
@@ -64,11 +64,11 @@ class ValidationRow:
 
 FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
     "elo_only": ("elo_probability",),
-    "elo_trend": ("elo_probability", "trend_gap"),
+    "elo_trend": ("elo_probability", "trend_gap", "defensive_trend_gap"),
     "elo_trend_full": (
         "elo_probability",
         "trend_gap",
-        "defensive_gap",
+        "defensive_trend_gap",
         "consistency_gap",
         "hot_cold_gap",
     ),
@@ -136,6 +136,7 @@ def build_walk_forward_rows(
                         outcome=int(game.home_score > game.away_score),
                         elo_probability=elo.expected_home_win(game.home_team, game.away_team),
                         trend_gap=home_trend.offensive_momentum - away_trend.offensive_momentum,
+                        defensive_trend_gap=home_trend.defensive_momentum - away_trend.defensive_momentum,
                         park_factor=float(park["park_factor"]),
                         weather_factor=1.0,
                         park_available=park["status"] == "available",
