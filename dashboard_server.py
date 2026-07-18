@@ -651,45 +651,52 @@ def matrix() -> dict:
         row = {}
         meta = sports_meta.get(sport) or {}
         row["moneyline"] = _ml_cell(meta, _production_artifact(validation, sport))
-        readiness = meta.get("multi_market_readiness") or {}
-        spread_key = "full_game_spread" if sport == "mlb" else "spread"
-        total_key = "full_game_total" if sport == "mlb" else "total"
-        spread_readiness = readiness.get(spread_key)
-        row["spread"] = {
-            "state": "blocked" if spread_readiness else "no_data",
-            "readiness": spread_readiness,
-        }
-        score_model = total_results.get(sport) or {}
-        holdout = score_model.get("locked_holdout") or {}
-        if score_model.get("status") == "research_score_model_candidate":
-            qual = (score_model.get("market_qualification") or {}).get("reason", "")
-            state = "qualified" if qual == "qualified" else "research_total_candidate"
-            called_holdout = score_model.get("holdout") or {}
-            row["total"] = {
-                "state": state,
-                "mae": holdout.get("mae"),
-                "baseline_mae": holdout.get("baseline_mae"),
-                "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
-                "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
-                "holdout_rows": score_model.get("holdout_observations")
-                or (score_model.get("training") or {}).get("holdout_rows"),
-                "train_rows": score_model.get("train_observations"),
-                "validation_rows": score_model.get("validation_observations"),
-                "readiness": readiness.get(total_key),
-                "qualification": qual,
-                "calls": called_holdout.get("calls"),
-                "hit_rate": called_holdout.get("hit_rate"),
-                "brier": called_holdout.get("brier"),
-                "reference_line": score_model.get("reference_line"),
-                "threshold": score_model.get("threshold"),
-                "model": score_model.get("model"),
-            }
-        else:
-            total_readiness = readiness.get(total_key)
-            row["total"] = {
-                "state": "blocked" if total_readiness else "no_data",
-                "readiness": total_readiness,
-            }
+         readiness = meta.get("multi_market_readiness") or {}
+         spread_key = "full_game_spread" if sport == "mlb" else "spread"
+         total_key = "full_game_total" if sport == "mlb" else "total"
+         spread_readiness = readiness.get(spread_key) or readiness.get("spread")
+         if isinstance(spread_readiness, dict) and spread_readiness.get("state"):
+             row["spread"] = spread_readiness
+         else:
+             row["spread"] = {
+                 "state": "blocked" if spread_readiness else "no_data",
+                 "readiness": spread_readiness,
+             }
+         total_readiness = readiness.get(total_key) or readiness.get("total")
+         # Check if research data exists in readiness
+         if isinstance(total_readiness, dict) and total_readiness.get("state") == "research_active":
+             row["total"] = total_readiness
+         else:
+             score_model = total_results.get(sport) or {}
+             holdout = score_model.get("locked_holdout") or {}
+             if score_model.get("status") == "research_score_model_candidate":
+                 qual = (score_model.get("market_qualification") or {}).get("reason", "")
+                 state = "qualified" if qual == "qualified" else "research_total_candidate"
+                 called_holdout = score_model.get("holdout") or {}
+                 row["total"] = {
+                     "state": state,
+                     "mae": holdout.get("mae"),
+                     "baseline_mae": holdout.get("baseline_mae"),
+                     "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
+                     "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
+                     "holdout_rows": score_model.get("holdout_observations")
+                     or (score_model.get("training") or {}).get("holdout_rows"),
+                     "train_rows": score_model.get("train_observations"),
+                     "validation_rows": score_model.get("validation_observations"),
+                     "readiness": total_readiness,
+                     "qualification": qual,
+                     "calls": called_holdout.get("calls"),
+                     "hit_rate": called_holdout.get("hit_rate"),
+                     "brier": called_holdout.get("brier"),
+                     "reference_line": score_model.get("reference_line"),
+                     "threshold": score_model.get("threshold"),
+                     "model": score_model.get("model"),
+                 }
+             else:
+                 row["total"] = {
+                     "state": "blocked" if total_readiness else "no_data",
+                     "readiness": total_readiness,
+                 }
         mlb_special_readiness = {
             "f5_spread": readiness.get("first_five_spread"),
             "f5_total": readiness.get("first_five_total"),

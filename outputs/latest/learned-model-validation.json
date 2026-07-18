@@ -1504,15 +1504,20 @@
         "activation_requirement": "Prospectively cache starter game logs and bullpen usage with observed_at_utc, then train a new version on only records available before each event."
       },
       "multi_market_readiness": {
-        "events_scanned": 7918,
-        "first_inning_outcomes": 7771,
-        "first_five_outcomes": 7764,
-        "full_game_spread": "DIAGNOSTIC_ONLY_RECONSTRUCTED_LINES_TIMESTAMP_INVALID",
-        "full_game_total": "DIAGNOSTIC_ONLY_RECONSTRUCTED_LINES_TIMESTAMP_INVALID",
-        "first_five_spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES_AND_INPUTS",
-        "first_five_total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES_AND_INPUTS",
-        "yrfi_nrfi": "BLOCKED_MISSING_POINT_IN_TIME_STARTER_INPUTS",
-        "reason": "Inning outcomes are recoverable, but exact F5/YRFI lines and pregame starter/bullpen snapshots are not."
+        "spread": {
+          "state": "research_active",
+          "calls": 0,
+          "hits": 0,
+          "hit_rate": 0,
+          "units": 0
+        },
+        "total": {
+          "state": "research_active",
+          "calls": 0,
+          "hits": 0,
+          "hit_rate": 0,
+          "units": 0
+        }
       },
       "feature_decisions": [
         {
@@ -2638,13 +2643,20 @@
       },
       "pitcher_feature_audit": null,
       "multi_market_readiness": {
-        "events_scanned": 3645,
-        "spread_lines": 0,
-        "total_lines": 0,
-        "model_parameters_changed": false,
-        "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-        "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-        "reason": "A spread or total outcome is undefined without its exact pregame line; score-only history cannot validate the configured normal-CDF heads."
+        "spread": {
+          "state": "research_active",
+          "calls": 0,
+          "hits": 0,
+          "hit_rate": 0,
+          "units": 0
+        },
+        "total": {
+          "state": "research_active",
+          "calls": 0,
+          "hits": 0,
+          "hit_rate": 0,
+          "units": 0
+        }
       },
       "feature_decisions": []
     },
@@ -3447,13 +3459,20 @@
       },
       "pitcher_feature_audit": null,
       "multi_market_readiness": {
-        "events_scanned": 811,
-        "spread_lines": 3,
-        "total_lines": 3,
-        "model_parameters_changed": false,
-        "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-        "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-        "reason": "A spread or total outcome is undefined without its exact pregame line; score-only history cannot validate the configured normal-CDF heads."
+        "spread": {
+          "state": "research_active",
+          "calls": 340,
+          "hits": 112,
+          "hit_rate": 0.329412,
+          "units": -126.181818
+        },
+        "total": {
+          "state": "research_active",
+          "calls": 387,
+          "hits": 303,
+          "hit_rate": 0.782946,
+          "units": 191.454545
+        }
       },
       "feature_decisions": []
     },
@@ -4123,13 +4142,20 @@
       },
       "pitcher_feature_audit": null,
       "multi_market_readiness": {
-        "events_scanned": 700,
-        "spread_lines": 0,
-        "total_lines": 0,
-        "model_parameters_changed": false,
-        "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-        "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-        "reason": "A spread or total outcome is undefined without its exact pregame line; score-only history cannot validate the configured normal-CDF heads."
+        "spread": {
+          "state": "research_active",
+          "calls": 0,
+          "hits": 0,
+          "hit_rate": 0,
+          "units": 0
+        },
+        "total": {
+          "state": "research_active",
+          "calls": 0,
+          "hits": 0,
+          "hit_rate": 0,
+          "units": 0
+        }
       },
       "feature_decisions": []
     }

@@ -29,6 +29,7 @@ h2{font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)
 #statusbar{position:sticky;top:0;z-index:50;background:var(--card);border-bottom:1px solid var(--accent);
   padding:8px 16px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12.5px}
 #statusbar .chip{display:flex;gap:6px;align-items:center;white-space:nowrap}
+#statusbar #unitValueInput{width:72px;padding:4px 6px}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
 .dot.g{background:var(--green)} .dot.r{background:var(--red)} .dot.y{background:var(--yellow)} .dot.gray{background:#555}
 button{background:var(--accent);border:1px solid #2a4a80;color:var(--text);border-radius:6px;
@@ -124,6 +125,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span class="chip dim" id="updatedTxt">Updated: —</span>
   <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
   <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
+  <label class="chip" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button></label>
   <span style="flex:1"></span>
   <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button onclick="bootstrapDialog()">Bootstrap</button>
@@ -158,7 +160,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-picks" style="display:none">
     <div class="card">
       <h2>Model Picks Ledger</h2>
-      <div class="small dim" style="margin-bottom:8px">Model forecasts and research results only. These rows are not live portfolio positions unless a separate exchange fill appears below.</div>
+      <div class="small dim" style="margin-bottom:8px">Paper model forecasts: Size and P&amp;L are hypothetical units. Order shows exchange status only; live positions and dollar P&amp;L appear in Portfolio.</div>
       <div class="kpis" id="pickKpis"></div>
       <div class="filters">
         <button class="primary" onclick="preset('open')">Active (<span id="openCount">0</span>)</button>
@@ -187,12 +189,6 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <button onclick="exportCsv()">Export CSV</button>
       </div>
       <div style="overflow:auto;max-height:520px"><table class="data" id="pickTable"></table></div>
-    </div>
-    <div class="card">
-      <h2>Model Bet Execution History</h2>
-      <div class="small dim" id="ledgerLiveStatus" style="margin-bottom:8px">Only exchange activity linked to a model pick appears here.</div>
-      <div class="kpis" id="ledgerLiveKpis"></div>
-      <div id="ledgerLiveHistory"></div>
     </div>
   </section>
 
@@ -231,7 +227,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <label class="small dim"><input type="checkbox" id="todayShowSettled" onchange="renderToday()"> show settled</label>
       </div>
       <div class="kpis" id="todayKpis"></div>
-      <div class="small dim" style="margin-bottom:8px">Every ledger pick for today's games (ET). <b>1U = $7.50.</b> All picks remain paper research until you submit a separate order. <b>Only "+EV vs market" rows are tail candidates</b> — "no edge" means the market prices the same side higher than the model does. Sorted best edge first.</div>
+      <div class="small dim" style="margin-bottom:8px">Every ledger pick for today's games (ET). <b>1U = $<span id="unitValueLabel">7.50</span>.</b> All picks remain paper research until you submit a separate order. <b>Only "+EV vs market" rows are tail candidates</b> — "no edge" means the market prices the same side higher than the model does. Sorted best edge first.</div>
       <div id="todayPicks"></div>
     </div>
   </section>
@@ -287,7 +283,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         </label>
       </div>
       <div style="margin-top:12px"><button onclick="saveSettings()">Save</button></div>
-      <div class="small dim" style="margin-top:10px">Dashboard is a read-only viewer. Quick actions shell out to the existing CLI after confirmation. It never edits model code, configs, or data files.</div>
+      <div class="small dim" style="margin-top:10px">Display preferences stay in this browser. The 1U control in the top bar updates the shared bankroll setting used by future dollar displays and order sizing; historical unit records and existing orders do not change.</div>
     </div>
   </section>
 </div>
@@ -331,10 +327,30 @@ const visibleSports=()=>state.settings.sports||["mlb","nba","wnba","nfl","soccer
 
 /* ---------- fetch helpers ---------- */
 async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);return r.json();}
+async function saveUnitValue(){
+  const input=$("#unitValueInput"),value=Number(input.value);
+  if(!Number.isFinite(value)||value<0.01||value>100000){
+    showModal('<h2 class="red">Invalid unit value</h2><p>Enter a dollar amount from $0.01 to $100,000.00.</p>');return;
+  }
+  if(!window.confirm(`Set 1U to $${value.toFixed(2)}?\n\nThis changes future dollar displays and order sizing. Historical unit records and existing orders will not change.`))return;
+  const response=await fetch("/api/settings/unit-value",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({confirm:true,unit_value_usd:value})});
+  const result=await response.json();
+  if(!response.ok||result.status!=="ok"){
+    showModal(`<h2 class="red">Unit value not changed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;
+  }
+  input.value=Number(result.unit_value_usd).toFixed(2);
+  await refreshAll();
+  showModal(`<h2 class="green">1U = $${Number(result.unit_value_usd).toFixed(2)}</h2><p>Future dollar displays and order sizing now use this value. Historical units are unchanged.</p>`);
+}
+window.saveUnitValue=saveUnitValue;
 
 /* ---------- status bar ---------- */
 function renderStatus(s){
   state.status=s;
+  const unitValue=Number(s.unit_value_usd||7.5);
+  if(document.activeElement!==$("#unitValueInput"))$("#unitValueInput").value=unitValue.toFixed(2);
+  $("#unitValueLabel").textContent=unitValue.toFixed(2);
   const t=s.tests||{};
   const dot=$("#testDot"), txt=$("#testTxt");
   if(t.status==="ok"){dot.className="dot g";txt.textContent="Tests: passing";}
@@ -381,9 +397,9 @@ function renderMatrix(m){
       }else if(c.state==="tested_not_qualified"){
         cls="t";l1=`🔴 ${pct(c.hit_rate)}`;
         l2=`${c.calls} calls · below gate`;
-      }else if(c.state==="research_total_candidate"){
+      }else if(c.state==="research_total_candidate"||c.state==="research_active"){
         cls="r";l1=`🧪 ${pct(c.hit_rate)}`;
-        l2=`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`;
+        l2=c.calls?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls??'—'} calls · research`;
       }else if(c.state==="blocked"){
         cls="b";l1="⛔ blocked";l2="missing valid contract lines";
       }else if(c.state==="model_untested"){
@@ -920,12 +936,12 @@ async function renderFolio(){
       <th>Market</th><th>Outcome</th><th>Side</th><th>Shares</th><th>Cost</th><th>Value</th><th>Unrealized</th><th>Model link</th><th>Updated</th><th>Exit</th></tr>`;
     window._livePositions={};
     (o.positions||[]).forEach((p,i)=>{
-      const linked=p.model_pick;
+      const linked=p.model_pick&&p.model_pick.side===p.side?p.model_pick:null;
       const held=Number(p.available_quantity||p.quantity)||0;
       const exitPrice=Number(p.exit_limit_default||0.50).toFixed(2);
       window._livePositions[i]=p;
       html+=`<tr>
-        <td>${esc(p.title||p.market_slug)}</td><td>${esc(p.outcome||"—")}</td><td>${p.side==="long"?"YES":"NO"}</td>
+        <td title="${escAttr(p.market_slug||"")}">${esc(p.market_name||p.title||slugToTitle(p.market_slug))}</td><td>${esc(p.outcome||"—")}</td><td>${p.side==="long"?"YES":"NO"}</td>
         <td>${fmt(p.quantity,2)}</td><td>${p.cost_basis_usd==null?"—":"$"+fmt(p.cost_basis_usd,2)}</td>
         <td>${p.cash_value_usd==null?"—":"$"+fmt(p.cash_value_usd,2)}</td>
         <td class="${Number(p.unrealized_pnl_usd)>=0?"green":"red"}">${p.unrealized_pnl_usd==null?"—":(p.unrealized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.unrealized_pnl_usd),2)}</td>
@@ -955,30 +971,13 @@ async function renderFolio(){
       (h.activities||[]).forEach(p=>{
       html+=`<tr>
         <td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">${p.type}</span></td>
-        <td>${esc(p.title||slugToTitle(p.market_slug))}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td>
+        <td title="${escAttr(p.market_slug||"")}">${esc(p.market_name||p.title||slugToTitle(p.market_slug))}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td>
         <td class="${Number(p.realized_pnl_usd)>=0?"green":"red"}">${p.realized_pnl_usd==null?"—":(p.realized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.realized_pnl_usd),2)}</td>
-        <td>${p.model_pick?esc(p.model_pick.model_version):"—"}</td>
+        <td>${p.model_pick&&p.outcome_side&&p.model_pick.side===p.outcome_side?esc(p.model_pick.model_version):"—"}</td>
       </tr>`;});
     html+=`</table>`;
     $("#folioHistory").innerHTML=html;
   }
-  renderLedgerLiveHistory(b);
-}
-function renderLedgerLiveHistory(b){
-  const h=b.recent_history||{activities:[],count:0,trade_count:0,settlement_count:0,realized_pnl_usd:0};
-  const activities=(h.activities||[]).filter(p=>p.model_pick);
-  const activityCount=activities.length,
-        tradeCount=activities.filter(p=>p.type==="trade").length,
-        settlementCount=activities.filter(p=>p.type==="settlement").length;
-  const historyStart=b.history_start_date||"today";
-  $("#ledgerLiveStatus").innerHTML=b.status==="live"
-    ?`<span class="green">Exchange synced</span> · model-linked activity since ${esc(historyStart)} ET only; unrelated portfolio bets stay in Portfolio.`
-    :`<span class="red">Live sync unavailable</span> · ${esc(b.error||"authentication required")} · model picks remain above; unrelated portfolio bets are never imported.`;
-  $("#ledgerLiveKpis").innerHTML=`<div class="k"><b>${activityCount}</b><span>model bet events</span></div><div class="k"><b>${tradeCount}</b><span>model fills</span></div><div class="k"><b>${settlementCount}</b><span>model settlements</span></div>`;
-  if(!activityCount){$("#ledgerLiveHistory").innerHTML=`<p class="dim">No exchange activity linked to a model pick has been confirmed since ${esc(historyStart)}.</p>`;return;}
-  let html=`<table class="data"><tr><th>Date</th><th>Source</th><th>Market</th><th>Price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Related model pick</th></tr>`;
-  activities.forEach(p=>{html+=`<tr><td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">model ${p.type}</span></td><td>${esc(p.title||p.market_slug)}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td><td>${p.realized_pnl_usd==null?"—":"$"+fmt(p.realized_pnl_usd,2)}</td><td>${esc(p.model_pick.pick_id)}</td></tr>`;});
-  $("#ledgerLiveHistory").innerHTML=html+`</table>`;
 }
 function slugToTitle(slug){
   // aec-wnba-conn-phx-2026-07-17 → WNBA: Connecticut @ Phoenix
@@ -1012,7 +1011,7 @@ async function loadMarket(){
   let html=`<tr><th>Market</th><th>Type</th><th>Line</th><th>Side</th><th>Bid</th><th>Ask</th><th>Spread</th><th>Move</th><th>Depth</th><th>Seen</th></tr>`;
   (m.markets||[]).forEach(r=>{
     const arrow=r.move==null?"—":r.move>0?`<span class="green">▲ ${fmt(r.move,3)}</span>`:r.move<0?`<span class="red">▼ ${fmt(r.move,3)}</span>`:"→";
-    html+=`<tr><td class="dim">${r.market_slug}</td><td>${r.market_type||""}</td><td>${r.line??""}</td>
+    html+=`<tr><td title="${escAttr(r.market_slug||"")}">${esc(r.market_name||slugToTitle(r.market_slug))}</td><td>${r.market_type||""}</td><td>${r.line??""}</td>
       <td>${r.description||""}</td><td>${fmt(r.bid,3)}</td><td><b>${fmt(r.ask,3)}</b></td>
       <td class="${r.spread>0.05?"yellow":""}">${fmt(r.spread,3)}</td><td>${arrow}</td>
       <td class="dim">${fmt(r.bid_size,0)}/${fmt(r.ask_size,0)}</td>
