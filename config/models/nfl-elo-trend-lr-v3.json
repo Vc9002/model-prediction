@@ -1,64 +1,66 @@
 {
-  "artifact_hash": "27c60a7263f7a87c9b8fc1811f65ddca80fc3793dd0bdad55e99c760336ad780",
+  "artifact_hash": "33feb67448bc72062ebe9ff50a89f83be00f3776fd9b520e3fcc2356a257d0c4",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        2.553613978,
-        0.0224218766
+        2.6967030053,
+        0.0044097478,
+        0.0372841864
       ],
-      "confidence_threshold": 0.50192639,
+      "confidence_threshold": 0.52762118,
       "feature_names": [
         "elo_probability",
-        "trend_gap"
+        "trend_gap",
+        "defensive_trend_gap"
       ],
-      "intercept": -1.2787050039,
+      "intercept": -1.3617412224,
       "positive_class": "home"
     }
   },
   "method": "logistic_regression",
   "model_version": "nfl-elo-trend-lr-v3",
   "qualification": {
-    "brier_score": 0.225311,
+    "brier_score": 0.212736,
     "calibration": {
-      "brier_score": 0.2253105904055314,
-      "calibration_intercept": -0.348535590839328,
-      "calibration_slope": 1.7852900303148154,
-      "expected_calibration_error": 0.021840585967205516,
-      "log_loss": 0.6413787535391268,
+      "brier_score": 0.2127359476353237,
+      "calibration_intercept": -0.021093248165106545,
+      "calibration_slope": 1.465200690185362,
+      "expected_calibration_error": 0.0625686138067286,
+      "log_loss": 0.6151352929468769,
       "reliability_buckets": [
         {
-          "count": 53,
-          "hit_rate": 0.5283018867924528,
+          "count": 34,
+          "hit_rate": 0.6470588235294118,
           "lower": 0.5,
-          "mean_p": 0.5421285245496776,
+          "mean_p": 0.5572897129094541,
           "upper": 0.6
         },
         {
-          "count": 38,
-          "hit_rate": 0.631578947368421,
+          "count": 41,
+          "hit_rate": 0.6341463414634146,
           "lower": 0.6,
-          "mean_p": 0.6492055914228946,
+          "mean_p": 0.6509258376830495,
           "upper": 0.7
         },
         {
-          "count": 18,
-          "hit_rate": 0.7777777777777778,
+          "count": 15,
+          "hit_rate": 0.8666666666666667,
           "lower": 0.7,
-          "mean_p": 0.7234444669320839,
+          "mean_p": 0.7405955908985344,
           "upper": 0.8
         }
       ],
-      "sample_size": 109,
+      "sample_size": 90,
       "status": "ok"
     },
-    "called_rate": 0.990909,
-    "calls": 109,
+    "called_rate": 0.818182,
+    "calls": 90,
     "every_called_month_positive_at_minus_110": true,
     "every_qualifying_month_positive_at_minus_110": true,
     "failures": [],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.605505,
-    "hits": 66,
+    "hit_rate": 0.677778,
+    "hits": 61,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": true,
@@ -66,36 +68,36 @@
     "minimum_hit_rate": 0.6,
     "monthly_at_minus_110": [
       {
-        "calls": 16,
-        "hit_rate": 0.5625,
-        "hits": 9,
+        "calls": 13,
+        "hit_rate": 0.615385,
+        "hits": 8,
         "month": "2025-11",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 1.181818
+        "units_at_minus_110": 2.272727
       },
       {
-        "calls": 63,
-        "hit_rate": 0.603175,
-        "hits": 38,
+        "calls": 51,
+        "hit_rate": 0.686275,
+        "hits": 35,
         "month": "2025-12",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 9.545455
+        "units_at_minus_110": 15.818182
       },
       {
-        "calls": 28,
-        "hit_rate": 0.642857,
+        "calls": 24,
+        "hit_rate": 0.75,
         "hits": 18,
         "month": "2026-01",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 6.363636
+        "units_at_minus_110": 10.363636
       },
       {
         "calls": 2,
-        "hit_rate": 0.5,
-        "hits": 1,
+        "hit_rate": 0.0,
+        "hits": 0,
         "month": "2026-02",
         "qualification_status": "partial_month",
-        "units_at_minus_110": -0.090909
+        "units_at_minus_110": -2.0
       }
     ],
     "monthly_minimum_calls": 10,
@@ -104,9 +106,9 @@
     "qualified": true,
     "roi": null,
     "secondary_reporting_complete": true,
-    "selectivity": 0.990909,
+    "selectivity": 0.818182,
     "total_predictions": 110,
-    "units_at_minus_110": 17.0
+    "units_at_minus_110": 26.454545
   },
   "schema_version": "1",
   "sport": "nfl",

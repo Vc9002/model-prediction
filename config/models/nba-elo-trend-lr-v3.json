@@ -1,64 +1,66 @@
 {
-  "artifact_hash": "d1f9e82cec8d10c760bebbc2c0f5c468a64e811089ab44d220142b8b5b28b813",
+  "artifact_hash": "4d387684c487beb4deaca420b89e20323d2e2de7c6a7d7ec573d0c1d1637c542",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        3.5512456023,
-        0.0091630726
+        3.556511637,
+        0.0089073501,
+        -0.0016465249
       ],
-      "confidence_threshold": 0.61121706,
+      "confidence_threshold": 0.62024475,
       "feature_names": [
         "elo_probability",
-        "trend_gap"
+        "trend_gap",
+        "defensive_trend_gap"
       ],
-      "intercept": -1.8711316961,
+      "intercept": -1.8740583102,
       "positive_class": "home"
     }
   },
   "method": "logistic_regression",
   "model_version": "nba-elo-trend-lr-v3",
   "qualification": {
-    "brier_score": 0.209988,
+    "brier_score": 0.20234,
     "calibration": {
-      "brier_score": 0.20998841326356102,
-      "calibration_intercept": -1.3910186673877587,
-      "calibration_slope": 2.1811224323923546,
-      "expected_calibration_error": 0.07135657404463795,
-      "log_loss": 0.6074186523893336,
+      "brier_score": 0.20233955264001136,
+      "calibration_intercept": -1.1523322119844017,
+      "calibration_slope": 2.1367243744639497,
+      "expected_calibration_error": 0.046976762047876805,
+      "log_loss": 0.5915526755037657,
       "reliability_buckets": [
         {
-          "count": 115,
-          "hit_rate": 0.5652173913043478,
+          "count": 105,
+          "hit_rate": 0.5714285714285714,
           "lower": 0.6,
-          "mean_p": 0.6635681961660035,
+          "mean_p": 0.6610224543646054,
           "upper": 0.7
         },
         {
-          "count": 144,
-          "hit_rate": 0.7083333333333334,
+          "count": 147,
+          "hit_rate": 0.7619047619047619,
           "lower": 0.7,
-          "mean_p": 0.7579916867464086,
+          "mean_p": 0.7520334930055631,
           "upper": 0.8
         },
         {
-          "count": 35,
-          "hit_rate": 0.8857142857142857,
+          "count": 14,
+          "hit_rate": 0.9285714285714286,
           "lower": 0.8,
-          "mean_p": 0.8137803623271337,
+          "mean_p": 0.8116153951236111,
           "upper": 0.9
         }
       ],
-      "sample_size": 294,
+      "sample_size": 266,
       "status": "ok"
     },
-    "called_rate": 0.672769,
-    "calls": 294,
+    "called_rate": 0.608696,
+    "calls": 266,
     "every_called_month_positive_at_minus_110": true,
     "every_qualifying_month_positive_at_minus_110": true,
     "failures": [],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.673469,
-    "hits": 198,
+    "hit_rate": 0.695489,
+    "hits": 185,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": true,
@@ -66,28 +68,28 @@
     "minimum_hit_rate": 0.6,
     "monthly_at_minus_110": [
       {
-        "calls": 142,
-        "hit_rate": 0.767606,
-        "hits": 109,
+        "calls": 122,
+        "hit_rate": 0.811475,
+        "hits": 99,
         "month": "2025-11",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 66.090909
+        "units_at_minus_110": 67.0
       },
       {
-        "calls": 132,
-        "hit_rate": 0.583333,
-        "hits": 77,
+        "calls": 125,
+        "hit_rate": 0.6,
+        "hits": 75,
         "month": "2025-12",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 15.0
+        "units_at_minus_110": 18.181818
       },
       {
-        "calls": 20,
-        "hit_rate": 0.6,
-        "hits": 12,
+        "calls": 19,
+        "hit_rate": 0.578947,
+        "hits": 11,
         "month": "2026-01",
         "qualification_status": "partial_month",
-        "units_at_minus_110": 2.909091
+        "units_at_minus_110": 2.0
       }
     ],
     "monthly_minimum_calls": 10,
@@ -96,9 +98,9 @@
     "qualified": true,
     "roi": null,
     "secondary_reporting_complete": true,
-    "selectivity": 0.672769,
+    "selectivity": 0.608696,
     "total_predictions": 437,
-    "units_at_minus_110": 84.0
+    "units_at_minus_110": 87.181818
   },
   "schema_version": "1",
   "sport": "nba",

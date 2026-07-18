@@ -5,6 +5,9 @@
     "minimum_locked_holdout_calls": 50
   },
   "production_artifacts": {
+    "mlb": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-elo-trend-lr-v3.json",
+    "nba": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-elo-trend-lr-v3.json",
+    "nfl": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-elo-trend-lr-v3.json",
     "wnba": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json"
   },
   "schema_version": "1",
@@ -13,6 +16,2434 @@
     "calibration"
   ],
   "sports": {
+    "mlb": {
+      "agreement_comparison": {
+        "agreement": {
+          "calls": 201,
+          "hit_rate": 0.547264
+        },
+        "improves_hit_rate": false,
+        "qualifies": false,
+        "single_model": {
+          "calls": 127,
+          "hit_rate": 0.566929
+        },
+        "tier": "diagnostic_60"
+      },
+      "confidence_gap_audit": {
+        "changes_selection_order": false,
+        "confidence_threshold": 0.58538407,
+        "decision": "REJECT_AS_REDUNDANT_GATE",
+        "equivalent_gap_threshold": 0.17076814,
+        "identity": "abs(P(home)-P(away)) = 2*max(P(home),P(away))-1",
+        "status": "mathematically_equivalent"
+      },
+      "cross_model_agreement": {
+        "diagnostic_60": {
+          "holdout_agreement_rows": 634,
+          "learned_threshold": 0.54214342,
+          "locked_holdout": {
+            "brier_score": 0.246728,
+            "calibration": {
+              "brier_score": 0.24672771602493634,
+              "calibration_intercept": -1.1050276038655702,
+              "calibration_slope": 5.891356728392319,
+              "expected_calibration_error": 0.007592044482426008,
+              "log_loss": 0.6865674973647238,
+              "reliability_buckets": [
+                {
+                  "count": 201,
+                  "hit_rate": 0.5472636815920398,
+                  "lower": 0.5,
+                  "mean_p": 0.5548557260744658,
+                  "upper": 0.6
+                }
+              ],
+              "sample_size": 201,
+              "status": "ok"
+            },
+            "called_rate": 0.317035,
+            "calls": 201,
+            "every_called_month_positive_at_minus_110": false,
+            "every_qualifying_month_positive_at_minus_110": false,
+            "failures": [
+              "selective hit rate 54.73% below required 60.00%"
+            ],
+            "hit_rate": 0.547264,
+            "hits": 110,
+            "locked_holdout": true,
+            "meets_primary_holdout_metrics": false,
+            "minimum_calls": 50,
+            "minimum_hit_rate": 0.6,
+            "monthly_at_minus_110": [
+              {
+                "calls": 64,
+                "hit_rate": 0.640625,
+                "hits": 41,
+                "month": "2026-05",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 14.272727
+              },
+              {
+                "calls": 93,
+                "hit_rate": 0.483871,
+                "hits": 45,
+                "month": "2026-06",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": -7.090909
+              },
+              {
+                "calls": 44,
+                "hit_rate": 0.545455,
+                "hits": 24,
+                "month": "2026-07",
+                "qualification_status": "partial_month",
+                "units_at_minus_110": 1.818182
+              }
+            ],
+            "monthly_minimum_calls": 10,
+            "price_diagnostics": null,
+            "qualification_eligible": false,
+            "qualified": false,
+            "roi": null,
+            "secondary_reporting_complete": true,
+            "selectivity": 0.317035,
+            "total_predictions": 634,
+            "units_at_minus_110": 9.0
+          },
+          "status": "evaluated",
+          "validation": {
+            "agreement_rows": 499,
+            "minimum_calls": 50,
+            "selectivity": 0.262525,
+            "target_hit_rate": 0.6,
+            "validation_calls": 131,
+            "validation_hit_rate": 0.603053
+          }
+        },
+        "primary_65": {
+          "minimum_calls": 50,
+          "reason": "no confidence threshold reaches 65.0% with 50+ calls",
+          "status": "no_validation_threshold",
+          "target_hit_rate": 0.65
+        },
+        "rule": "Elo and trend predict the same side; minimum of both confidences clears learned threshold"
+      },
+      "feature_coverage": {
+        "park": 0.99946,
+        "weather": 0.0
+      },
+      "feature_decisions": [
+        {
+          "action": "REJECT_NO_HIT_RATE_GAIN",
+          "baseline": {
+            "calls": 127,
+            "hit_rate": 0.582677,
+            "tier": "primary_65",
+            "units_at_minus_110": 14.272727
+          },
+          "candidate": {
+            "calls": 113,
+            "hit_rate": 0.566372,
+            "tier": "primary_65",
+            "units_at_minus_110": 9.181818
+          },
+          "feature": "trend_gap",
+          "reason": "did not improve selective locked-holdout hit rate"
+        },
+        {
+          "action": "RESEARCH_ONLY_FRESH_HOLDOUT_REQUIRED",
+          "baseline": {
+            "calls": 113,
+            "hit_rate": 0.566372,
+            "tier": "primary_65",
+            "units_at_minus_110": 9.181818
+          },
+          "candidate": {
+            "calls": 114,
+            "hit_rate": 0.570175,
+            "tier": "primary_65",
+            "units_at_minus_110": 10.090909
+          },
+          "feature": "adaptive_hfa",
+          "reason": "improved the already-opened holdout; promotion requires new outcomes"
+        },
+        {
+          "action": "DIAGNOSTIC_ONLY",
+          "baseline": {
+            "calls": 113,
+            "hit_rate": 0.566372,
+            "tier": "primary_65",
+            "units_at_minus_110": 9.181818
+          },
+          "candidate": {
+            "calls": 93,
+            "hit_rate": 0.602151,
+            "tier": "primary_65",
+            "units_at_minus_110": 13.909091
+          },
+          "feature": "park_factor",
+          "reason": "improved hit rate, but static table is not archived point-in-time"
+        },
+        {
+          "action": "REJECT_UNAVAILABLE",
+          "baseline": {
+            "calls": 93,
+            "hit_rate": 0.602151,
+            "tier": "primary_65",
+            "units_at_minus_110": 13.909091
+          },
+          "candidate": {
+            "calls": 91,
+            "hit_rate": 0.593407,
+            "tier": "primary_65",
+            "units_at_minus_110": 12.090909
+          },
+          "feature": "weather_factor",
+          "reason": "zero point-in-time weather coverage and zero feature variance"
+        }
+      ],
+      "historical_price_diagnostic": {
+        "flat_pnl_at_reconstructed_odds": -2.279845,
+        "holdout_calls": 113,
+        "learned_threshold": 0.58538407,
+        "limitation": "Postgame-retrieved sportsbook openings are not Polymarket executable asks and cannot establish trade profitability.",
+        "mean_model_minus_no_vig_market_probability": 0.014478,
+        "model": "elo_trend_logistic_regression",
+        "priced_calls": 28,
+        "priced_hit_rate": 0.571429,
+        "providers": [
+          "DraftKings"
+        ],
+        "qualification_gate": false,
+        "roi_at_reconstructed_odds": -0.081423,
+        "status": "diagnostic_only",
+        "timestamp_valid_values": [
+          false
+        ]
+      },
+      "multi_market_readiness": {
+        "events_scanned": 4785,
+        "first_five_outcomes": 4708,
+        "first_five_spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES_AND_INPUTS",
+        "first_five_total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES_AND_INPUTS",
+        "first_inning_outcomes": 4710,
+        "full_game_spread": "DIAGNOSTIC_ONLY_RECONSTRUCTED_LINES_TIMESTAMP_INVALID",
+        "full_game_total": "DIAGNOSTIC_ONLY_RECONSTRUCTED_LINES_TIMESTAMP_INVALID",
+        "reason": "Inning outcomes are recoverable, but exact F5/YRFI lines and pregame starter/bullpen snapshots are not.",
+        "yrfi_nrfi": "BLOCKED_MISSING_POINT_IN_TIME_STARTER_INPUTS"
+      },
+      "pitcher_feature_audit": {
+        "activation_requirement": "Prospectively cache starter game logs and bullpen usage with observed_at_utc, then train a new version on only records available before each event.",
+        "both_probable_starters": 4325,
+        "both_starter_era_values": 4325,
+        "decision": "REJECT_HISTORICAL_PITCHER_FEATURES_LEAKAGE_RISK",
+        "events_scanned": 4785,
+        "point_in_time_valid": false,
+        "raw_coverage": 0.903866,
+        "reason": "Scoreboard caches were retrieved retrospectively and do not pin an observed-at timestamp before first pitch; displayed season records can include future games."
+      },
+      "split": {
+        "locked_holdout": {
+          "end": "2026-07-15",
+          "observations": 821,
+          "start": "2026-05-13"
+        },
+        "method": "complete_date_60_20_20",
+        "train": {
+          "end": "2025-10-08",
+          "observations": 2314,
+          "start": "2025-04-06"
+        },
+        "validation": {
+          "end": "2026-05-12",
+          "observations": 570,
+          "start": "2025-10-09"
+        }
+      },
+      "sport": "mlb",
+      "threshold_source": "later validation cohort; never locked holdout",
+      "variants": {
+        "elo_only": {
+          "coefficients": {
+            "elo_probability": 2.7273282669
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.57097735,
+            "locked_holdout": {
+              "brier_score": 0.248301,
+              "calibration": {
+                "brier_score": 0.2483013022292551,
+                "calibration_intercept": -0.20413184212680108,
+                "calibration_slope": 1.1035881302309494,
+                "expected_calibration_error": 0.040290349917365714,
+                "log_loss": 0.6897648094986502,
+                "reliability_buckets": [
+                  {
+                    "count": 120,
+                    "hit_rate": 0.5583333333333333,
+                    "lower": 0.5,
+                    "mean_p": 0.5820342217188308,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 50,
+                    "hit_rate": 0.54,
+                    "lower": 0.6,
+                    "mean_p": 0.6201050575938496,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 170,
+                "status": "ok"
+              },
+              "called_rate": 0.207065,
+              "calls": 170,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 55.29% below required 60.00%"
+              ],
+              "hit_rate": 0.552941,
+              "hits": 94,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 44,
+                  "hit_rate": 0.636364,
+                  "hits": 28,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 9.454545
+                },
+                {
+                  "calls": 84,
+                  "hit_rate": 0.488095,
+                  "hits": 41,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -5.727273
+                },
+                {
+                  "calls": 42,
+                  "hit_rate": 0.595238,
+                  "hits": 25,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 5.727273
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.207065,
+              "total_predictions": 821,
+              "units_at_minus_110": 9.454545
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.17193,
+              "target_hit_rate": 0.6,
+              "validation_calls": 98,
+              "validation_hit_rate": 0.602041
+            }
+          },
+          "features": [
+            "elo_probability"
+          ],
+          "intercept": -1.2923852349,
+          "primary_65": {
+            "learned_threshold": 0.5775246,
+            "locked_holdout": {
+              "brier_score": 0.243963,
+              "calibration": {
+                "brier_score": 0.24396298467773012,
+                "calibration_intercept": 0.3657966212817593,
+                "calibration_slope": -0.0790396997956105,
+                "expected_calibration_error": 0.0460221030667378,
+                "log_loss": 0.6810189250354105,
+                "reliability_buckets": [
+                  {
+                    "count": 77,
+                    "hit_rate": 0.6103896103896104,
+                    "lower": 0.5,
+                    "mean_p": 0.5864992959768413,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 50,
+                    "hit_rate": 0.54,
+                    "lower": 0.6,
+                    "mean_p": 0.6201050575938496,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 127,
+                "status": "ok"
+              },
+              "called_rate": 0.154689,
+              "calls": 127,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [
+                "selective hit rate 58.27% below required 60.00%"
+              ],
+              "hit_rate": 0.582677,
+              "hits": 74,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 38,
+                  "hit_rate": 0.631579,
+                  "hits": 24,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 7.818182
+                },
+                {
+                  "calls": 59,
+                  "hit_rate": 0.559322,
+                  "hits": 33,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 4.0
+                },
+                {
+                  "calls": 30,
+                  "hit_rate": 0.566667,
+                  "hits": 17,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 2.454545
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.154689,
+              "total_predictions": 821,
+              "units_at_minus_110": 14.272727
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.122807,
+              "target_hit_rate": 0.65,
+              "validation_calls": 70,
+              "validation_hit_rate": 0.657143
+            }
+          }
+        },
+        "elo_trend": {
+          "coefficients": {
+            "defensive_trend_gap": 0.0060924355,
+            "elo_probability": 2.6890596508,
+            "trend_gap": 0.0750249462
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.58197,
+            "locked_holdout": {
+              "brier_score": 0.246204,
+              "calibration": {
+                "brier_score": 0.24620420140597088,
+                "calibration_intercept": -0.4164978250576293,
+                "calibration_slope": 1.573736118977676,
+                "expected_calibration_error": 0.04035404799179388,
+                "log_loss": 0.6854987448033935,
+                "reliability_buckets": [
+                  {
+                    "count": 54,
+                    "hit_rate": 0.5,
+                    "lower": 0.5,
+                    "mean_p": 0.5890271457368902,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 73,
+                    "hit_rate": 0.6164383561643836,
+                    "lower": 0.6,
+                    "mean_p": 0.6207876469200788,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 127,
+                "status": "ok"
+              },
+              "called_rate": 0.154689,
+              "calls": 127,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 56.69% below required 60.00%"
+              ],
+              "hit_rate": 0.566929,
+              "hits": 72,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 37,
+                  "hit_rate": 0.675676,
+                  "hits": 25,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 10.727273
+                },
+                {
+                  "calls": 60,
+                  "hit_rate": 0.483333,
+                  "hits": 29,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -4.636364
+                },
+                {
+                  "calls": 30,
+                  "hit_rate": 0.6,
+                  "hits": 18,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 4.363636
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.154689,
+              "total_predictions": 821,
+              "units_at_minus_110": 10.454545
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.140351,
+              "target_hit_rate": 0.6,
+              "validation_calls": 80,
+              "validation_hit_rate": 0.6
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "defensive_trend_gap"
+          ],
+          "intercept": -1.2726661736,
+          "primary_65": {
+            "learned_threshold": 0.58538407,
+            "locked_holdout": {
+              "brier_score": 0.246317,
+              "calibration": {
+                "brier_score": 0.24631737409623414,
+                "calibration_intercept": -0.6001760518982733,
+                "calibration_slope": 1.936665500988282,
+                "expected_calibration_error": 0.043828700036328216,
+                "log_loss": 0.6857196963118116,
+                "reliability_buckets": [
+                  {
+                    "count": 40,
+                    "hit_rate": 0.475,
+                    "lower": 0.5,
+                    "mean_p": 0.5908786219734834,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 73,
+                    "hit_rate": 0.6164383561643836,
+                    "lower": 0.6,
+                    "mean_p": 0.6207876469200788,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 113,
+                "status": "ok"
+              },
+              "called_rate": 0.137637,
+              "calls": 113,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 56.64% below required 60.00%",
+                "non-positive qualifying months at -110: 2026-06"
+              ],
+              "hit_rate": 0.566372,
+              "hits": 64,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 32,
+                  "hit_rate": 0.6875,
+                  "hits": 22,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 10.0
+                },
+                {
+                  "calls": 52,
+                  "hit_rate": 0.480769,
+                  "hits": 25,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -4.272727
+                },
+                {
+                  "calls": 29,
+                  "hit_rate": 0.586207,
+                  "hits": 17,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 3.454545
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.137637,
+              "total_predictions": 821,
+              "units_at_minus_110": 9.181818
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.121053,
+              "target_hit_rate": 0.65,
+              "validation_calls": 69,
+              "validation_hit_rate": 0.652174
+            }
+          }
+        },
+        "elo_trend_adaptive_hfa": {
+          "coefficients": {
+            "elo_neutral_probability": 2.6827976702,
+            "trailing_home_win_rate_30d": 0.0007968617,
+            "trend_gap": 0.0772283576
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.58150324,
+            "locked_holdout": {
+              "brier_score": 0.248337,
+              "calibration": {
+                "brier_score": 0.24833748453638727,
+                "calibration_intercept": -0.6794218184707006,
+                "calibration_slope": 2.0646867684795067,
+                "expected_calibration_error": 0.052564478051787905,
+                "log_loss": 0.6898097250293138,
+                "reliability_buckets": [
+                  {
+                    "count": 55,
+                    "hit_rate": 0.4727272727272727,
+                    "lower": 0.5,
+                    "mean_p": 0.5888774633195859,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 73,
+                    "hit_rate": 0.6164383561643836,
+                    "lower": 0.6,
+                    "mean_p": 0.6210957905212552,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 128,
+                "status": "ok"
+              },
+              "called_rate": 0.155907,
+              "calls": 128,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 55.47% below required 60.00%"
+              ],
+              "hit_rate": 0.554688,
+              "hits": 71,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 37,
+                  "hit_rate": 0.648649,
+                  "hits": 24,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 8.818182
+                },
+                {
+                  "calls": 59,
+                  "hit_rate": 0.491525,
+                  "hits": 29,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -3.636364
+                },
+                {
+                  "calls": 32,
+                  "hit_rate": 0.5625,
+                  "hits": 18,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 2.363636
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.155907,
+              "total_predictions": 821,
+              "units_at_minus_110": 7.545455
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.140351,
+              "target_hit_rate": 0.6,
+              "validation_calls": 80,
+              "validation_hit_rate": 0.6
+            }
+          },
+          "features": [
+            "elo_neutral_probability",
+            "trend_gap",
+            "trailing_home_win_rate_30d"
+          ],
+          "intercept": -1.1787770426,
+          "primary_65": {
+            "learned_threshold": 0.58464839,
+            "locked_holdout": {
+              "brier_score": 0.245846,
+              "calibration": {
+                "brier_score": 0.24584649804249975,
+                "calibration_intercept": -0.38279144129122683,
+                "calibration_slope": 1.4840991215172668,
+                "expected_calibration_error": 0.04008012999939492,
+                "log_loss": 0.6847761046439725,
+                "reliability_buckets": [
+                  {
+                    "count": 41,
+                    "hit_rate": 0.4878048780487805,
+                    "lower": 0.5,
+                    "mean_p": 0.590954685655595,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 73,
+                    "hit_rate": 0.6164383561643836,
+                    "lower": 0.6,
+                    "mean_p": 0.6210957905212552,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 114,
+                "status": "ok"
+              },
+              "called_rate": 0.138855,
+              "calls": 114,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 57.02% below required 60.00%",
+                "non-positive qualifying months at -110: 2026-06"
+              ],
+              "hit_rate": 0.570175,
+              "hits": 65,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 33,
+                  "hit_rate": 0.666667,
+                  "hits": 22,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 9.0
+                },
+                {
+                  "calls": 52,
+                  "hit_rate": 0.480769,
+                  "hits": 25,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -4.272727
+                },
+                {
+                  "calls": 29,
+                  "hit_rate": 0.62069,
+                  "hits": 18,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 5.363636
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.138855,
+              "total_predictions": 821,
+              "units_at_minus_110": 10.090909
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.121053,
+              "target_hit_rate": 0.65,
+              "validation_calls": 69,
+              "validation_hit_rate": 0.652174
+            }
+          }
+        },
+        "elo_trend_park": {
+          "coefficients": {
+            "elo_probability": 2.5566430381,
+            "park_factor": -1.0698704335,
+            "trend_gap": 0.0772265752
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.57153413,
+            "locked_holdout": {
+              "brier_score": 0.248883,
+              "calibration": {
+                "brier_score": 0.24888343356733067,
+                "calibration_intercept": -0.5239325234861947,
+                "calibration_slope": 1.8194542498722768,
+                "expected_calibration_error": 0.05456153411786068,
+                "log_loss": 0.6909050968843542,
+                "reliability_buckets": [
+                  {
+                    "count": 122,
+                    "hit_rate": 0.5,
+                    "lower": 0.5,
+                    "mean_p": 0.5837124418819015,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 75,
+                    "hit_rate": 0.6266666666666667,
+                    "lower": 0.6,
+                    "mean_p": 0.6195239425116458,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 197,
+                "status": "ok"
+              },
+              "called_rate": 0.239951,
+              "calls": 197,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [
+                "selective hit rate 54.82% below required 60.00%"
+              ],
+              "hit_rate": 0.548223,
+              "hits": 108,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 54,
+                  "hit_rate": 0.611111,
+                  "hits": 33,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 9.0
+                },
+                {
+                  "calls": 93,
+                  "hit_rate": 0.526882,
+                  "hits": 49,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 0.545455
+                },
+                {
+                  "calls": 50,
+                  "hit_rate": 0.52,
+                  "hits": 26,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": -0.363636
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.239951,
+              "total_predictions": 821,
+              "units_at_minus_110": 9.181818
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.221053,
+              "target_hit_rate": 0.6,
+              "validation_calls": 126,
+              "validation_hit_rate": 0.603175
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor"
+          ],
+          "intercept": -0.1339606345,
+          "primary_65": {
+            "learned_threshold": 0.59275688,
+            "locked_holdout": {
+              "brier_score": 0.239068,
+              "calibration": {
+                "brier_score": 0.23906847347107926,
+                "calibration_intercept": -0.3235022190133057,
+                "calibration_slope": 1.5768858274394473,
+                "expected_calibration_error": 0.02436138325810334,
+                "log_loss": 0.6709939845487802,
+                "reliability_buckets": [
+                  {
+                    "count": 18,
+                    "hit_rate": 0.5,
+                    "lower": 0.5,
+                    "mean_p": 0.5961057961876134,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 75,
+                    "hit_rate": 0.6266666666666667,
+                    "lower": 0.6,
+                    "mean_p": 0.6195239425116458,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 93,
+                "status": "ok"
+              },
+              "called_rate": 0.113276,
+              "calls": 93,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.602151,
+              "hits": 56,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 27,
+                  "hit_rate": 0.703704,
+                  "hits": 19,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 9.272727
+                },
+                {
+                  "calls": 41,
+                  "hit_rate": 0.536585,
+                  "hits": 22,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 1.0
+                },
+                {
+                  "calls": 25,
+                  "hit_rate": 0.6,
+                  "hits": 15,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 3.636364
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.113276,
+              "total_predictions": 821,
+              "units_at_minus_110": 13.909091
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.110526,
+              "target_hit_rate": 0.65,
+              "validation_calls": 63,
+              "validation_hit_rate": 0.650794
+            }
+          }
+        },
+        "elo_trend_park_weather": {
+          "coefficients": {
+            "elo_probability": 2.5723726648,
+            "park_factor": -1.0167457176,
+            "trend_gap": 0.0772611191,
+            "weather_factor": -0.1031132012
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.57154672,
+            "locked_holdout": {
+              "brier_score": 0.248961,
+              "calibration": {
+                "brier_score": 0.24896056983194723,
+                "calibration_intercept": -0.5148664246655017,
+                "calibration_slope": 1.7954794150313267,
+                "expected_calibration_error": 0.054631335693204254,
+                "log_loss": 0.6910616719829036,
+                "reliability_buckets": [
+                  {
+                    "count": 124,
+                    "hit_rate": 0.5,
+                    "lower": 0.5,
+                    "mean_p": 0.583471130152884,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 75,
+                    "hit_rate": 0.6266666666666667,
+                    "lower": 0.6,
+                    "mean_p": 0.6197171244801329,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 199,
+                "status": "ok"
+              },
+              "called_rate": 0.242387,
+              "calls": 199,
+              "every_called_month_positive_at_minus_110": false,
+              "every_qualifying_month_positive_at_minus_110": false,
+              "failures": [
+                "selective hit rate 54.77% below required 60.00%"
+              ],
+              "hit_rate": 0.547739,
+              "hits": 109,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 54,
+                  "hit_rate": 0.611111,
+                  "hits": 33,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 9.0
+                },
+                {
+                  "calls": 94,
+                  "hit_rate": 0.521277,
+                  "hits": 49,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": -0.454545
+                },
+                {
+                  "calls": 51,
+                  "hit_rate": 0.529412,
+                  "hits": 27,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 0.545455
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.242387,
+              "total_predictions": 821,
+              "units_at_minus_110": 9.090909
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.219298,
+              "target_hit_rate": 0.6,
+              "validation_calls": 125,
+              "validation_hit_rate": 0.6
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor",
+            "weather_factor"
+          ],
+          "intercept": -0.0922393407,
+          "primary_65": {
+            "learned_threshold": 0.59304278,
+            "locked_holdout": {
+              "brier_score": 0.24072,
+              "calibration": {
+                "brier_score": 0.24071985213327382,
+                "calibration_intercept": -0.6442632649413539,
+                "calibration_slope": 2.1743872267348956,
+                "expected_calibration_error": 0.03365354117329836,
+                "log_loss": 0.6743350659198678,
+                "reliability_buckets": [
+                  {
+                    "count": 16,
+                    "hit_rate": 0.4375,
+                    "lower": 0.5,
+                    "mean_p": 0.5963285364237574,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 75,
+                    "hit_rate": 0.6266666666666667,
+                    "lower": 0.6,
+                    "mean_p": 0.6197171244801329,
+                    "upper": 0.7
+                  }
+                ],
+                "sample_size": 91,
+                "status": "ok"
+              },
+              "called_rate": 0.11084,
+              "calls": 91,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [
+                "selective hit rate 59.34% below required 60.00%"
+              ],
+              "hit_rate": 0.593407,
+              "hits": 54,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": false,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 26,
+                  "hit_rate": 0.692308,
+                  "hits": 18,
+                  "month": "2026-05",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 8.363636
+                },
+                {
+                  "calls": 40,
+                  "hit_rate": 0.525,
+                  "hits": 21,
+                  "month": "2026-06",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 0.090909
+                },
+                {
+                  "calls": 25,
+                  "hit_rate": 0.6,
+                  "hits": 15,
+                  "month": "2026-07",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 3.636364
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.11084,
+              "total_predictions": 821,
+              "units_at_minus_110": 12.090909
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.110526,
+              "target_hit_rate": 0.65,
+              "validation_calls": 63,
+              "validation_hit_rate": 0.650794
+            }
+          }
+        }
+      },
+      "walk_forward": true
+    },
+    "nba": {
+      "agreement_comparison": {
+        "agreement": {
+          "calls": 235,
+          "hit_rate": 0.680851
+        },
+        "improves_hit_rate": true,
+        "qualifies": false,
+        "single_model": {
+          "calls": 426,
+          "hit_rate": 0.638498
+        },
+        "tier": "diagnostic_60"
+      },
+      "confidence_gap_audit": {
+        "changes_selection_order": false,
+        "confidence_threshold": 0.62024475,
+        "decision": "REJECT_AS_REDUNDANT_GATE",
+        "equivalent_gap_threshold": 0.2404895,
+        "identity": "abs(P(home)-P(away)) = 2*max(P(home),P(away))-1",
+        "status": "mathematically_equivalent"
+      },
+      "cross_model_agreement": {
+        "diagnostic_60": {
+          "holdout_agreement_rows": 247,
+          "learned_threshold": 0.50363559,
+          "locked_holdout": {
+            "brier_score": 0.225398,
+            "calibration": {
+              "brier_score": 0.22539816495476417,
+              "calibration_intercept": 0.3005223579520786,
+              "calibration_slope": 1.6912228118465749,
+              "expected_calibration_error": 0.11123717473970325,
+              "log_loss": 0.6428571212605904,
+              "reliability_buckets": [
+                {
+                  "count": 179,
+                  "hit_rate": 0.659217877094972,
+                  "lower": 0.5,
+                  "mean_p": 0.5480885406861304,
+                  "upper": 0.6
+                },
+                {
+                  "count": 53,
+                  "hit_rate": 0.7358490566037735,
+                  "lower": 0.6,
+                  "mean_p": 0.6332403381121805,
+                  "upper": 0.7
+                },
+                {
+                  "count": 3,
+                  "hit_rate": 1.0,
+                  "lower": 0.7,
+                  "mean_p": 0.7298924111356033,
+                  "upper": 0.8
+                }
+              ],
+              "sample_size": 235,
+              "status": "ok"
+            },
+            "called_rate": 0.951417,
+            "calls": 235,
+            "every_called_month_positive_at_minus_110": true,
+            "every_qualifying_month_positive_at_minus_110": true,
+            "failures": [],
+            "hit_rate": 0.680851,
+            "hits": 160,
+            "locked_holdout": true,
+            "meets_primary_holdout_metrics": true,
+            "minimum_calls": 50,
+            "minimum_hit_rate": 0.6,
+            "monthly_at_minus_110": [
+              {
+                "calls": 113,
+                "hit_rate": 0.761062,
+                "hits": 86,
+                "month": "2025-11",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 51.181818
+              },
+              {
+                "calls": 109,
+                "hit_rate": 0.59633,
+                "hits": 65,
+                "month": "2025-12",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 15.090909
+              },
+              {
+                "calls": 13,
+                "hit_rate": 0.692308,
+                "hits": 9,
+                "month": "2026-01",
+                "qualification_status": "partial_month",
+                "units_at_minus_110": 4.181818
+              }
+            ],
+            "monthly_minimum_calls": 10,
+            "price_diagnostics": null,
+            "qualification_eligible": false,
+            "qualified": false,
+            "roi": null,
+            "secondary_reporting_complete": true,
+            "selectivity": 0.951417,
+            "total_predictions": 247,
+            "units_at_minus_110": 70.454545
+          },
+          "status": "evaluated",
+          "validation": {
+            "agreement_rows": 103,
+            "minimum_calls": 50,
+            "selectivity": 0.970874,
+            "target_hit_rate": 0.6,
+            "validation_calls": 100,
+            "validation_hit_rate": 0.6
+          }
+        },
+        "primary_65": {
+          "minimum_calls": 50,
+          "reason": "no confidence threshold reaches 65.0% with 50+ calls",
+          "status": "no_validation_threshold",
+          "target_hit_rate": 0.65
+        },
+        "rule": "Elo and trend predict the same side; minimum of both confidences clears learned threshold"
+      },
+      "feature_coverage": {
+        "park": 0.0,
+        "weather": 0.0
+      },
+      "feature_decisions": [],
+      "multi_market_readiness": {
+        "events_scanned": 2010,
+        "model_parameters_changed": false,
+        "reason": "A spread or total outcome is undefined without its exact pregame line; score-only history cannot validate the configured normal-CDF heads.",
+        "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+        "spread_lines": 0,
+        "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+        "total_lines": 0
+      },
+      "pitcher_feature_audit": null,
+      "split": {
+        "locked_holdout": {
+          "end": "2026-01-05",
+          "observations": 437,
+          "start": "2025-11-03"
+        },
+        "method": "complete_date_60_20_20",
+        "train": {
+          "end": "2025-05-03",
+          "observations": 1305,
+          "start": "2024-10-16"
+        },
+        "validation": {
+          "end": "2025-11-02",
+          "observations": 204,
+          "start": "2025-05-04"
+        }
+      },
+      "sport": "nba",
+      "threshold_source": "later validation cohort; never locked holdout",
+      "variants": {
+        "elo_only": {
+          "coefficients": {
+            "elo_probability": 3.5865930116
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.50193583,
+            "locked_holdout": {
+              "brier_score": 0.220765,
+              "calibration": {
+                "brier_score": 0.22076504836736432,
+                "calibration_intercept": -0.20112790029796654,
+                "calibration_slope": 1.1661026392753666,
+                "expected_calibration_error": 0.03895471677341713,
+                "log_loss": 0.6311256463227175,
+                "reliability_buckets": [
+                  {
+                    "count": 138,
+                    "hit_rate": 0.5652173913043478,
+                    "lower": 0.5,
+                    "mean_p": 0.5539399612056695,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 125,
+                    "hit_rate": 0.544,
+                    "lower": 0.6,
+                    "mean_p": 0.647392821711918,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 150,
+                    "hit_rate": 0.76,
+                    "lower": 0.7,
+                    "mean_p": 0.7475683184212701,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 18,
+                    "hit_rate": 0.8333333333333334,
+                    "lower": 0.8,
+                    "mean_p": 0.8086476319485586,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 431,
+                "status": "ok"
+              },
+              "called_rate": 0.98627,
+              "calls": 431,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.638051,
+              "hits": 275,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 202,
+                  "hit_rate": 0.707921,
+                  "hits": 143,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 71.0
+                },
+                {
+                  "calls": 193,
+                  "hit_rate": 0.564767,
+                  "hits": 109,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 15.090909
+                },
+                {
+                  "calls": 36,
+                  "hit_rate": 0.638889,
+                  "hits": 23,
+                  "month": "2026-01",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 7.909091
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.98627,
+              "total_predictions": 437,
+              "units_at_minus_110": 94.0
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.995098,
+              "target_hit_rate": 0.6,
+              "validation_calls": 203,
+              "validation_hit_rate": 0.600985
+            }
+          },
+          "features": [
+            "elo_probability"
+          ],
+          "intercept": -1.8920684509,
+          "primary_65": {
+            "learned_threshold": 0.61627078,
+            "locked_holdout": {
+              "brier_score": 0.203049,
+              "calibration": {
+                "brier_score": 0.2030485765877837,
+                "calibration_intercept": -1.0478583264382006,
+                "calibration_slope": 2.0246332285791526,
+                "expected_calibration_error": 0.04063892230558872,
+                "log_loss": 0.5934439827834708,
+                "reliability_buckets": [
+                  {
+                    "count": 98,
+                    "hit_rate": 0.5714285714285714,
+                    "lower": 0.6,
+                    "mean_p": 0.6581720252199099,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 150,
+                    "hit_rate": 0.76,
+                    "lower": 0.7,
+                    "mean_p": 0.7475683184212701,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 18,
+                    "hit_rate": 0.8333333333333334,
+                    "lower": 0.8,
+                    "mean_p": 0.8086476319485586,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 266,
+                "status": "ok"
+              },
+              "called_rate": 0.608696,
+              "calls": 266,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.695489,
+              "hits": 185,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 122,
+                  "hit_rate": 0.811475,
+                  "hits": 99,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 67.0
+                },
+                {
+                  "calls": 125,
+                  "hit_rate": 0.6,
+                  "hits": 75,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 18.181818
+                },
+                {
+                  "calls": 19,
+                  "hit_rate": 0.578947,
+                  "hits": 11,
+                  "month": "2026-01",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 2.0
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.608696,
+              "total_predictions": 437,
+              "units_at_minus_110": 87.181818
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.465686,
+              "target_hit_rate": 0.65,
+              "validation_calls": 95,
+              "validation_hit_rate": 0.652632
+            }
+          }
+        },
+        "elo_trend": {
+          "coefficients": {
+            "defensive_trend_gap": -0.0016465249,
+            "elo_probability": 3.556511637,
+            "trend_gap": 0.0089073501
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.50752074,
+            "locked_holdout": {
+              "brier_score": 0.220168,
+              "calibration": {
+                "brier_score": 0.22016758157003738,
+                "calibration_intercept": -0.2367173331143791,
+                "calibration_slope": 1.209443235044806,
+                "expected_calibration_error": 0.03692366398432206,
+                "log_loss": 0.6295979618038442,
+                "reliability_buckets": [
+                  {
+                    "count": 131,
+                    "hit_rate": 0.5419847328244275,
+                    "lower": 0.5,
+                    "mean_p": 0.5541417431737875,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 134,
+                    "hit_rate": 0.5671641791044776,
+                    "lower": 0.6,
+                    "mean_p": 0.6496153097395774,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 147,
+                    "hit_rate": 0.7619047619047619,
+                    "lower": 0.7,
+                    "mean_p": 0.7520334930055631,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 14,
+                    "hit_rate": 0.9285714285714286,
+                    "lower": 0.8,
+                    "mean_p": 0.8116153951236111,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 426,
+                "status": "ok"
+              },
+              "called_rate": 0.974828,
+              "calls": 426,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.638498,
+              "hits": 272,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 199,
+                  "hit_rate": 0.713568,
+                  "hits": 142,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 72.090909
+                },
+                {
+                  "calls": 192,
+                  "hit_rate": 0.5625,
+                  "hits": 108,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 14.181818
+                },
+                {
+                  "calls": 35,
+                  "hit_rate": 0.628571,
+                  "hits": 22,
+                  "month": "2026-01",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 7.0
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.974828,
+              "total_predictions": 437,
+              "units_at_minus_110": 93.272727
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.970588,
+              "target_hit_rate": 0.6,
+              "validation_calls": 198,
+              "validation_hit_rate": 0.60101
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "defensive_trend_gap"
+          ],
+          "intercept": -1.8740583102,
+          "primary_65": {
+            "learned_threshold": 0.62024475,
+            "locked_holdout": {
+              "brier_score": 0.20234,
+              "calibration": {
+                "brier_score": 0.20233955264001136,
+                "calibration_intercept": -1.1523322119844017,
+                "calibration_slope": 2.1367243744639497,
+                "expected_calibration_error": 0.046976762047876805,
+                "log_loss": 0.5915526755037657,
+                "reliability_buckets": [
+                  {
+                    "count": 105,
+                    "hit_rate": 0.5714285714285714,
+                    "lower": 0.6,
+                    "mean_p": 0.6610224543646054,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 147,
+                    "hit_rate": 0.7619047619047619,
+                    "lower": 0.7,
+                    "mean_p": 0.7520334930055631,
+                    "upper": 0.8
+                  },
+                  {
+                    "count": 14,
+                    "hit_rate": 0.9285714285714286,
+                    "lower": 0.8,
+                    "mean_p": 0.8116153951236111,
+                    "upper": 0.9
+                  }
+                ],
+                "sample_size": 266,
+                "status": "ok"
+              },
+              "called_rate": 0.608696,
+              "calls": 266,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.695489,
+              "hits": 185,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 122,
+                  "hit_rate": 0.811475,
+                  "hits": 99,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 67.0
+                },
+                {
+                  "calls": 125,
+                  "hit_rate": 0.6,
+                  "hits": 75,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 18.181818
+                },
+                {
+                  "calls": 19,
+                  "hit_rate": 0.578947,
+                  "hits": 11,
+                  "month": "2026-01",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": 2.0
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.608696,
+              "total_predictions": 437,
+              "units_at_minus_110": 87.181818
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.426471,
+              "target_hit_rate": 0.65,
+              "validation_calls": 87,
+              "validation_hit_rate": 0.655172
+            }
+          }
+        }
+      },
+      "walk_forward": true
+    },
+    "nfl": {
+      "agreement_comparison": {
+        "agreement": {
+          "calls": 69,
+          "hit_rate": 0.637681
+        },
+        "improves_hit_rate": false,
+        "qualifies": true,
+        "single_model": {
+          "calls": 90,
+          "hit_rate": 0.677778
+        },
+        "tier": "primary_65"
+      },
+      "confidence_gap_audit": {
+        "changes_selection_order": false,
+        "confidence_threshold": 0.52762118,
+        "decision": "REJECT_AS_REDUNDANT_GATE",
+        "equivalent_gap_threshold": 0.05524236,
+        "identity": "abs(P(home)-P(away)) = 2*max(P(home),P(away))-1",
+        "status": "mathematically_equivalent"
+      },
+      "cross_model_agreement": {
+        "diagnostic_60": {
+          "holdout_agreement_rows": 73,
+          "learned_threshold": 0.50022094,
+          "locked_holdout": {
+            "brier_score": 0.232963,
+            "calibration": {
+              "brier_score": 0.23296314044224953,
+              "calibration_intercept": 0.23627508254716267,
+              "calibration_slope": 1.87896237816344,
+              "expected_calibration_error": 0.09888484959882793,
+              "log_loss": 0.6585040035134295,
+              "reliability_buckets": [
+                {
+                  "count": 61,
+                  "hit_rate": 0.6229508196721312,
+                  "lower": 0.5,
+                  "mean_p": 0.5416115854044938,
+                  "upper": 0.6
+                },
+                {
+                  "count": 11,
+                  "hit_rate": 0.8181818181818182,
+                  "lower": 0.6,
+                  "mean_p": 0.6219985562918425,
+                  "upper": 0.7
+                }
+              ],
+              "sample_size": 72,
+              "status": "ok"
+            },
+            "called_rate": 0.986301,
+            "calls": 72,
+            "every_called_month_positive_at_minus_110": true,
+            "every_qualifying_month_positive_at_minus_110": true,
+            "failures": [],
+            "hit_rate": 0.652778,
+            "hits": 47,
+            "locked_holdout": true,
+            "meets_primary_holdout_metrics": true,
+            "minimum_calls": 50,
+            "minimum_hit_rate": 0.6,
+            "monthly_at_minus_110": [
+              {
+                "calls": 13,
+                "hit_rate": 0.615385,
+                "hits": 8,
+                "month": "2025-11",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 2.272727
+              },
+              {
+                "calls": 37,
+                "hit_rate": 0.621622,
+                "hits": 23,
+                "month": "2025-12",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 6.909091
+              },
+              {
+                "calls": 20,
+                "hit_rate": 0.8,
+                "hits": 16,
+                "month": "2026-01",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 10.545455
+              },
+              {
+                "calls": 2,
+                "hit_rate": 0.0,
+                "hits": 0,
+                "month": "2026-02",
+                "qualification_status": "partial_month",
+                "units_at_minus_110": -2.0
+              }
+            ],
+            "monthly_minimum_calls": 10,
+            "price_diagnostics": null,
+            "qualification_eligible": false,
+            "qualified": false,
+            "roi": null,
+            "secondary_reporting_complete": true,
+            "selectivity": 0.986301,
+            "total_predictions": 73,
+            "units_at_minus_110": 17.727273
+          },
+          "status": "evaluated",
+          "validation": {
+            "agreement_rows": 82,
+            "minimum_calls": 50,
+            "selectivity": 1.0,
+            "target_hit_rate": 0.6,
+            "validation_calls": 82,
+            "validation_hit_rate": 0.621951
+          }
+        },
+        "primary_65": {
+          "holdout_agreement_rows": 73,
+          "learned_threshold": 0.50502792,
+          "locked_holdout": {
+            "brier_score": 0.232296,
+            "calibration": {
+              "brier_score": 0.23229578278113558,
+              "calibration_intercept": -0.013560240407607603,
+              "calibration_slope": 2.663655409171697,
+              "expected_calibration_error": 0.08151862891671488,
+              "log_loss": 0.6571445307862148,
+              "reliability_buckets": [
+                {
+                  "count": 58,
+                  "hit_rate": 0.603448275862069,
+                  "lower": 0.5,
+                  "mean_p": 0.5436763876816622,
+                  "upper": 0.6
+                },
+                {
+                  "count": 11,
+                  "hit_rate": 0.8181818181818182,
+                  "lower": 0.6,
+                  "mean_p": 0.6219985562918425,
+                  "upper": 0.7
+                }
+              ],
+              "sample_size": 69,
+              "status": "ok"
+            },
+            "called_rate": 0.945205,
+            "calls": 69,
+            "every_called_month_positive_at_minus_110": true,
+            "every_qualifying_month_positive_at_minus_110": true,
+            "failures": [],
+            "hit_rate": 0.637681,
+            "hits": 44,
+            "locked_holdout": true,
+            "meets_primary_holdout_metrics": true,
+            "minimum_calls": 50,
+            "minimum_hit_rate": 0.6,
+            "monthly_at_minus_110": [
+              {
+                "calls": 12,
+                "hit_rate": 0.583333,
+                "hits": 7,
+                "month": "2025-11",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 1.363636
+              },
+              {
+                "calls": 36,
+                "hit_rate": 0.611111,
+                "hits": 22,
+                "month": "2025-12",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 6.0
+              },
+              {
+                "calls": 19,
+                "hit_rate": 0.789474,
+                "hits": 15,
+                "month": "2026-01",
+                "qualification_status": "qualifying",
+                "units_at_minus_110": 9.636364
+              },
+              {
+                "calls": 2,
+                "hit_rate": 0.0,
+                "hits": 0,
+                "month": "2026-02",
+                "qualification_status": "partial_month",
+                "units_at_minus_110": -2.0
+              }
+            ],
+            "monthly_minimum_calls": 10,
+            "price_diagnostics": null,
+            "qualification_eligible": true,
+            "qualified": true,
+            "roi": null,
+            "secondary_reporting_complete": true,
+            "selectivity": 0.945205,
+            "total_predictions": 73,
+            "units_at_minus_110": 15.0
+          },
+          "status": "evaluated",
+          "validation": {
+            "agreement_rows": 82,
+            "minimum_calls": 50,
+            "selectivity": 0.914634,
+            "target_hit_rate": 0.65,
+            "validation_calls": 75,
+            "validation_hit_rate": 0.653333
+          }
+        },
+        "rule": "Elo and trend predict the same side; minimum of both confidences clears learned threshold"
+      },
+      "feature_coverage": {
+        "park": 0.0,
+        "weather": 0.0
+      },
+      "feature_decisions": [],
+      "multi_market_readiness": {
+        "events_scanned": 670,
+        "model_parameters_changed": false,
+        "reason": "A spread or total outcome is undefined without its exact pregame line; score-only history cannot validate the configured normal-CDF heads.",
+        "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+        "spread_lines": 0,
+        "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+        "total_lines": 0
+      },
+      "pitcher_feature_audit": null,
+      "split": {
+        "locked_holdout": {
+          "end": "2026-02-08",
+          "observations": 110,
+          "start": "2025-11-24"
+        },
+        "method": "complete_date_60_20_20",
+        "train": {
+          "end": "2025-09-21",
+          "observations": 377,
+          "start": "2024-09-07"
+        },
+        "validation": {
+          "end": "2025-11-23",
+          "observations": 129,
+          "start": "2025-09-22"
+        }
+      },
+      "sport": "nfl",
+      "threshold_source": "later validation cohort; never locked holdout",
+      "variants": {
+        "elo_only": {
+          "coefficients": {
+            "elo_probability": 2.7500095409
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.50049119,
+            "locked_holdout": {
+              "brier_score": 0.224128,
+              "calibration": {
+                "brier_score": 0.22412847263771524,
+                "calibration_intercept": -0.05918148550260608,
+                "calibration_slope": 1.4721611557916787,
+                "expected_calibration_error": 0.03664142143075956,
+                "log_loss": 0.6392686364093326,
+                "reliability_buckets": [
+                  {
+                    "count": 56,
+                    "hit_rate": 0.5892857142857143,
+                    "lower": 0.5,
+                    "mean_p": 0.5427902210844063,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 42,
+                    "hit_rate": 0.6428571428571429,
+                    "lower": 0.6,
+                    "mean_p": 0.6519885100903322,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 11,
+                    "hit_rate": 0.8181818181818182,
+                    "lower": 0.7,
+                    "mean_p": 0.726668191555855,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 109,
+                "status": "ok"
+              },
+              "called_rate": 0.990909,
+              "calls": 109,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.633028,
+              "hits": 69,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 16,
+                  "hit_rate": 0.5625,
+                  "hits": 9,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 1.181818
+                },
+                {
+                  "calls": 63,
+                  "hit_rate": 0.634921,
+                  "hits": 40,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 13.363636
+                },
+                {
+                  "calls": 28,
+                  "hit_rate": 0.714286,
+                  "hits": 20,
+                  "month": "2026-01",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 10.181818
+                },
+                {
+                  "calls": 2,
+                  "hit_rate": 0.0,
+                  "hits": 0,
+                  "month": "2026-02",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": -2.0
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.990909,
+              "total_predictions": 110,
+              "units_at_minus_110": 22.727273
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 1.0,
+              "target_hit_rate": 0.6,
+              "validation_calls": 129,
+              "validation_hit_rate": 0.620155
+            }
+          },
+          "features": [
+            "elo_probability"
+          ],
+          "intercept": -1.3962887458,
+          "primary_65": {
+            "learned_threshold": 0.51387075,
+            "locked_holdout": {
+              "brier_score": 0.220326,
+              "calibration": {
+                "brier_score": 0.22032556154444902,
+                "calibration_intercept": -0.33717490913348025,
+                "calibration_slope": 1.91477944700614,
+                "expected_calibration_error": 0.027551005215960805,
+                "log_loss": 0.6313221613537701,
+                "reliability_buckets": [
+                  {
+                    "count": 41,
+                    "hit_rate": 0.5853658536585366,
+                    "lower": 0.5,
+                    "mean_p": 0.5561066543019324,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 42,
+                    "hit_rate": 0.6428571428571429,
+                    "lower": 0.6,
+                    "mean_p": 0.6519885100903322,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 11,
+                    "hit_rate": 0.8181818181818182,
+                    "lower": 0.7,
+                    "mean_p": 0.726668191555855,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 94,
+                "status": "ok"
+              },
+              "called_rate": 0.854545,
+              "calls": 94,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.638298,
+              "hits": 60,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 16,
+                  "hit_rate": 0.5625,
+                  "hits": 9,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 1.181818
+                },
+                {
+                  "calls": 52,
+                  "hit_rate": 0.653846,
+                  "hits": 34,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 12.909091
+                },
+                {
+                  "calls": 25,
+                  "hit_rate": 0.68,
+                  "hits": 17,
+                  "month": "2026-01",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 7.454545
+                },
+                {
+                  "calls": 1,
+                  "hit_rate": 0.0,
+                  "hits": 0,
+                  "month": "2026-02",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": -1.0
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.854545,
+              "total_predictions": 110,
+              "units_at_minus_110": 20.545455
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.899225,
+              "target_hit_rate": 0.65,
+              "validation_calls": 116,
+              "validation_hit_rate": 0.655172
+            }
+          }
+        },
+        "elo_trend": {
+          "coefficients": {
+            "defensive_trend_gap": 0.0372841864,
+            "elo_probability": 2.6967030053,
+            "trend_gap": 0.0044097478
+          },
+          "diagnostic_60": {
+            "learned_threshold": 0.500258,
+            "locked_holdout": {
+              "brier_score": 0.219779,
+              "calibration": {
+                "brier_score": 0.21977874251588192,
+                "calibration_intercept": -0.1530584009518824,
+                "calibration_slope": 1.6581556219828109,
+                "expected_calibration_error": 0.03959525734612981,
+                "log_loss": 0.6298543388051819,
+                "reliability_buckets": [
+                  {
+                    "count": 54,
+                    "hit_rate": 0.5740740740740741,
+                    "lower": 0.5,
+                    "mean_p": 0.5411767995083839,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 41,
+                    "hit_rate": 0.6341463414634146,
+                    "lower": 0.6,
+                    "mean_p": 0.6509258376830495,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 15,
+                    "hit_rate": 0.8666666666666667,
+                    "lower": 0.7,
+                    "mean_p": 0.7405955908985344,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 110,
+                "status": "ok"
+              },
+              "called_rate": 1.0,
+              "calls": 110,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.636364,
+              "hits": 70,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 16,
+                  "hit_rate": 0.5625,
+                  "hits": 9,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 1.181818
+                },
+                {
+                  "calls": 64,
+                  "hit_rate": 0.65625,
+                  "hits": 42,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 16.181818
+                },
+                {
+                  "calls": 28,
+                  "hit_rate": 0.678571,
+                  "hits": 19,
+                  "month": "2026-01",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 8.272727
+                },
+                {
+                  "calls": 2,
+                  "hit_rate": 0.0,
+                  "hits": 0,
+                  "month": "2026-02",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": -2.0
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": false,
+              "qualified": false,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 1.0,
+              "total_predictions": 110,
+              "units_at_minus_110": 23.636364
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 1.0,
+              "target_hit_rate": 0.6,
+              "validation_calls": 129,
+              "validation_hit_rate": 0.612403
+            }
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "defensive_trend_gap"
+          ],
+          "intercept": -1.3617412224,
+          "primary_65": {
+            "learned_threshold": 0.52762118,
+            "locked_holdout": {
+              "brier_score": 0.212736,
+              "calibration": {
+                "brier_score": 0.2127359476353237,
+                "calibration_intercept": -0.021093248165106545,
+                "calibration_slope": 1.465200690185362,
+                "expected_calibration_error": 0.0625686138067286,
+                "log_loss": 0.6151352929468769,
+                "reliability_buckets": [
+                  {
+                    "count": 34,
+                    "hit_rate": 0.6470588235294118,
+                    "lower": 0.5,
+                    "mean_p": 0.5572897129094541,
+                    "upper": 0.6
+                  },
+                  {
+                    "count": 41,
+                    "hit_rate": 0.6341463414634146,
+                    "lower": 0.6,
+                    "mean_p": 0.6509258376830495,
+                    "upper": 0.7
+                  },
+                  {
+                    "count": 15,
+                    "hit_rate": 0.8666666666666667,
+                    "lower": 0.7,
+                    "mean_p": 0.7405955908985344,
+                    "upper": 0.8
+                  }
+                ],
+                "sample_size": 90,
+                "status": "ok"
+              },
+              "called_rate": 0.818182,
+              "calls": 90,
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "failures": [],
+              "hit_rate": 0.677778,
+              "hits": 61,
+              "locked_holdout": true,
+              "meets_primary_holdout_metrics": true,
+              "minimum_calls": 50,
+              "minimum_hit_rate": 0.6,
+              "monthly_at_minus_110": [
+                {
+                  "calls": 13,
+                  "hit_rate": 0.615385,
+                  "hits": 8,
+                  "month": "2025-11",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 2.272727
+                },
+                {
+                  "calls": 51,
+                  "hit_rate": 0.686275,
+                  "hits": 35,
+                  "month": "2025-12",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 15.818182
+                },
+                {
+                  "calls": 24,
+                  "hit_rate": 0.75,
+                  "hits": 18,
+                  "month": "2026-01",
+                  "qualification_status": "qualifying",
+                  "units_at_minus_110": 10.363636
+                },
+                {
+                  "calls": 2,
+                  "hit_rate": 0.0,
+                  "hits": 0,
+                  "month": "2026-02",
+                  "qualification_status": "partial_month",
+                  "units_at_minus_110": -2.0
+                }
+              ],
+              "monthly_minimum_calls": 10,
+              "price_diagnostics": null,
+              "qualification_eligible": true,
+              "qualified": true,
+              "roi": null,
+              "secondary_reporting_complete": true,
+              "selectivity": 0.818182,
+              "total_predictions": 110,
+              "units_at_minus_110": 26.454545
+            },
+            "status": "evaluated",
+            "validation": {
+              "minimum_calls": 50,
+              "selectivity": 0.775194,
+              "target_hit_rate": 0.65,
+              "validation_calls": 100,
+              "validation_hit_rate": 0.65
+            }
+          }
+        }
+      },
+      "walk_forward": true
+    },
     "wnba": {
       "agreement_comparison": {
         "agreement": {

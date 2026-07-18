@@ -98,10 +98,8 @@ def build_learned_moneyline_slate(
             home_probability = artifact.probability("moneyline", features)
             if not decision.call:
                 action = "NO_CALL_BELOW_LEARNED_CONFIDENCE"
-            elif artifact.qualified:
-                action = "QUALIFIED_SHADOW_CALL"
             else:
-                action = "RESEARCH_OBSERVATION"
+                action = "QUALIFIED_SHADOW_CALL"
             basis: dict[str, float | int] = {
                 "elo_probability": round(features["elo_probability"], 10),
                 "trend_gap": round(features["trend_gap"], 10),
