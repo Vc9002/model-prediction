@@ -1,12 +1,12 @@
 {
-  "artifact_hash": "05998c5d7daa14024f5cb8cc9f2a3d5415797e58e4c76a9b6c95e6bee90da91c",
+  "artifact_hash": "ae8f0b3afd558746a730ede77ba427c282eb383215d7851b12f51cd71e9faaba",
   "market_models": {
     "moneyline": {
       "coefficients": [
         2.7214626305,
         0.0348450788
       ],
-      "confidence_threshold": 0.50012402,
+      "confidence_threshold": 0.5,
       "feature_names": [
         "elo_probability",
         "trend_gap"
