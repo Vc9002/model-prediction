@@ -64,7 +64,8 @@ class ValidationRow:
 
 FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
     "elo_only": ("elo_probability",),
-    "elo_trend": ("elo_probability", "trend_gap", "defensive_trend_gap"),
+    "elo_trend": ("elo_probability", "trend_gap"),
+    "elo_trend_defense": ("elo_probability", "trend_gap", "defensive_trend_gap"),
     "elo_trend_full": (
         "elo_probability",
         "trend_gap",
@@ -193,6 +194,8 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
     rows = build_walk_forward_rows(store, sport)
     train, validation, holdout, split = chronological_split(rows)
     variants_to_run = ["elo_only", "elo_trend"]
+    if sport.lower() in ("nba", "wnba"):
+        variants_to_run.append("elo_trend_defense")
     if sport.lower() == "mlb":
         variants_to_run.extend(
             ["elo_trend_adaptive_hfa", "elo_trend_park", "elo_trend_park_weather"]
@@ -388,7 +391,8 @@ def build_production_artifact(sport_report: Mapping[str, Any]) -> dict[str, Any]
     sport = str(sport_report["sport"]).lower()
     if sport not in LEARNED_ARTIFACT_VERSIONS:
         raise ValueError(f"no learned artifact version configured for {sport}")
-    variant = sport_report["variants"]["elo_trend"]
+    variant_name = "elo_trend_defense" if sport in ("nba", "wnba") else "elo_trend"
+    variant = sport_report["variants"][variant_name]
     primary = variant["primary_65"]
     if primary.get("status") != "evaluated":
         raise ValueError(f"{sport} has no evaluated primary confidence gate")
