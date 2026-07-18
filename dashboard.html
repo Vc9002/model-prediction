@@ -71,6 +71,15 @@ table.data tr:hover td{background:rgba(255,255,255,.03)}
 .pill.push{background:rgba(255,255,255,.1);color:var(--dim)}
 input,select{background:var(--bg);color:var(--text);border:1px solid var(--accent);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.view-tools{position:relative}
+.view-tools summary{list-style:none;background:var(--accent);border:1px solid #2a4a80;border-radius:6px;
+  padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:12px}
+.view-tools summary::-webkit-details-marker{display:none}
+.view-tools[open] summary{border-color:var(--green)}
+.view-tools .menu{position:absolute;z-index:20;top:34px;left:0;min-width:430px;display:flex;gap:7px;
+  flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--accent);border-radius:8px;
+  padding:10px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+@media(max-width:650px){.view-tools .menu{position:fixed;left:12px;right:12px;top:auto;min-width:0}}
 canvas{width:100%;height:180px;display:block}
 .kpis{display:flex;gap:22px;flex-wrap:wrap;font-family:var(--mono);margin-bottom:10px}
 .kpis .k{display:flex;flex-direction:column}
@@ -152,25 +161,27 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small dim" style="margin-bottom:8px">Model forecasts and research results only. These rows are not live portfolio positions unless a separate exchange fill appears below.</div>
       <div class="kpis" id="pickKpis"></div>
       <div class="filters">
-        <button onclick="preset('today')">Today</button>
-        <button onclick="preset('open')">Open</button>
-        <button onclick="preset('7d')">Last 7d</button>
-        <button onclick="preset('all')">All time</button>
-        <span style="width:10px"></span>
-        <span class="dim small">clear view:</span>
-        <button onclick="clearLedger('day')">Day</button>
-        <button onclick="clearLedger('week')">Week</button>
-        <button onclick="clearLedger('month')">Month</button>
-        <button onclick="clearLedger('all')">Everything</button>
+        <button class="primary" onclick="preset('open')">Active (<span id="openCount">0</span>)</button>
+        <button onclick="preset('settled')">Settled (<span id="settledCount">0</span>)</button>
+        <button onclick="preset('today')">Today active</button>
+        <button onclick="preset('7d')">Active 7d</button>
+        <button onclick="preset('all')">All picks</button>
         <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
-        <label class="small dim"><input type="checkbox" id="fArchived" onchange="renderPicks()"> show cleared (<span id="archCount">0</span>)</label>
-        <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore all</button>
+        <details class="view-tools"><summary>Manage hidden rows</summary><div class="menu">
+          <span class="dim small">Hide from this dashboard:</span>
+          <button onclick="clearLedger('day')">Today</button>
+          <button onclick="clearLedger('week')">7 days</button>
+          <button onclick="clearLedger('month')">30 days</button>
+          <button onclick="clearLedger('all')">Everything</button>
+          <label class="small dim"><input type="checkbox" id="fArchived" onchange="renderPicks()"> show hidden (<span id="archCount">0</span>)</label>
+          <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore hidden</button>
+        </div></details>
         <span style="width:10px"></span>
-        <select id="fSport"><option value="">all sports</option></select>
-        <select id="fMarket"><option value="">all markets</option></select>
-        <select id="fStatus"><option value="">all status</option><option>settled</option><option>open</option></select>
-        <select id="fResult"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
-        <input id="fSearch" placeholder="search team / event id" size="22">
+        <select id="fSport" onchange="renderPicks()"><option value="">all sports</option></select>
+        <select id="fMarket" onchange="renderPicks()"><option value="">all markets</option></select>
+        <select id="fStatus" onchange="renderPicks()"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
+        <select id="fResult" onchange="renderPicks()"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
+        <input id="fSearch" placeholder="search team / event id" size="22" oninput="renderPicks()">
         <input id="fFrom" type="date"><input id="fTo" type="date">
         <button onclick="renderPicks()">Apply</button>
         <button onclick="exportCsv()">Export CSV</button>
@@ -215,7 +226,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <section id="tab-today" style="display:none">
     <div class="card">
-      <h2>Today's Picks <span id="todayDate" class="dim"></span></h2>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+        <h2>Today's Picks <span id="todayDate" class="dim"></span></h2>
+        <label class="small dim"><input type="checkbox" id="todayShowSettled" onchange="renderToday()"> show settled</label>
+      </div>
       <div class="kpis" id="todayKpis"></div>
       <div class="small dim" style="margin-bottom:8px">Every ledger pick for today's games (ET). <b>1U = $7.50.</b> All picks remain paper research until you submit a separate order. <b>Only "+EV vs market" rows are tail candidates</b> — "no edge" means the market prices the same side higher than the model does. Sorted best edge first.</div>
       <div id="todayPicks"></div>
@@ -501,7 +515,11 @@ function filteredPicks(){
 let sortKey="event_start_utc",sortAsc=false;
 function renderPicks(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
+  const openCount=state.picks.filter(p=>!p.archived&&p.status==="open").length;
+  const settledCount=state.picks.filter(p=>!p.archived&&p.status==="settled").length;
   $("#archCount").textContent=archivedCount;
+  $("#openCount").textContent=openCount;
+  $("#settledCount").textContent=settledCount;
   $("#restoreBtn").style.display=archivedCount?"":"none";
   const rows=filteredPicks().sort((a,b)=>{
     const x=a[sortKey]??"",y=b[sortKey]??"";
@@ -577,9 +595,10 @@ window.clearSelected=clearSelected;
 window.clearLedger=clearLedger; window.restoreLedger=restoreLedger;
 window.preset=which=>{
   const today=todayET();
-  $("#fStatus").value="";$("#fFrom").value="";$("#fTo").value="";$("#fResult").value="";
+  $("#fStatus").value="open";$("#fFrom").value="";$("#fTo").value="";$("#fResult").value="";
   if(which==="today"){$("#fFrom").value=today;$("#fTo").value=today;}
-  else if(which==="open"){$("#fStatus").value="open";}
+  else if(which==="settled"){$("#fStatus").value="settled";}
+  else if(which==="all"){$("#fStatus").value="";}
   else if(which==="7d"){
     const [year,month,day]=today.split("-").map(Number);
     $("#fFrom").value=new Date(Date.UTC(year,month-1,day-6)).toISOString().slice(0,10);
@@ -675,9 +694,15 @@ async function renderToday(){
     box.innerHTML='<div class="dim">No picks logged for today yet. Hit <b>Daily Forecast</b> above — when it finishes, the slate lands here.</div>';
     return;
   }
+  const showSettled=$("#todayShowSettled").checked;
+  const visiblePicks=t.picks.filter(p=>p.status==="open"||showSettled);
+  if(!visiblePicks.length){
+    box.innerHTML='<div class="dim">No active picks remain today. Turn on <b>show settled</b> to review completed results.</div>';
+    return;
+  }
   const pickEdge=p=>edgePoints(p);
   const bySport={};
-  t.picks.forEach(p=>{(bySport[p.league]=bySport[p.league]||[]).push(p);});
+  visiblePicks.forEach(p=>{(bySport[p.league]=bySport[p.league]||[]).push(p);});
   for(const [sport,rows] of Object.entries(bySport)){
     // Positive-edge picks first — those are the only candidates worth tailing.
     rows.sort((a,b)=>(pickEdge(b)??-9)-(pickEdge(a)??-9));
@@ -732,6 +757,15 @@ function pickLabel(p){
 function orderControl(p,compact=false){
   const order=p.order||{};
   const exchangeState=String(order.order_state||"").replace("ORDER_STATE_","").toLowerCase();
+  if(p.status!=="open"){
+    if(order.status==="submitted"){
+      const label=exchangeState==="pending_cancel"?"cancel pending":exchangeState==="partially_filled"?"partially filled":"order placed";
+      return `<span class="pill ${exchangeState==="pending_cancel"?"open":"win"}" title="${escAttr((order.order_id||"")+(exchangeState?" · "+exchangeState:""))}">${label}</span>`;
+    }
+    if(order.status==="filled")return `<span class="pill win" title="${escAttr(order.order_id||"")}">filled</span>`;
+    const terminalLabel={canceled:"canceled",rejected:"rejected",expired:"expired",replaced:"replaced"}[order.status];
+    return terminalLabel?`<span class="pill push" title="${escAttr(order.order_id||"")}">${terminalLabel}</span>`:'<span class="dim">—</span>';
+  }
   if(order.status==="submitted"){
     const label=exchangeState==="pending_cancel"?"cancel pending":exchangeState==="partially_filled"?"partially filled":"order placed";
     return `<span class="pill ${exchangeState==="pending_cancel"?"open":"win"}" title="${escAttr((order.order_id||"")+(exchangeState?" · "+exchangeState:""))}">${label}</span>`;

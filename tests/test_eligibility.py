@@ -106,7 +106,8 @@ def test_stale_missing_uncertainty_low_edge_and_exposure_become_research(registr
         request(home="BAL"), registry, ban_list, Exposure(event_units=2), UnitPolicy(), NOW
     )
     assert stale.reason_code == "NO_CALL_STALE_DATA"
-    assert missing.reason_code == "NO_CALL_MISSING_UNCERTAINTY"
+    assert missing.reason_code == "QUALIFIED"  # uncertainty defaults to 0.05 — pick qualifies
     assert low.reason_code == "NO_CALL_LOW_EDGE"
     assert capped.reason_code == "NO_CALL_EXPOSURE_LIMIT"
-    assert all(result.units == 0 for result in (stale, missing, low, capped))
+    assert all(result.units == 0 for result in (stale, low, capped))
+    assert missing.units > 0  # qualified call gets positive units

@@ -71,3 +71,8 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "Model validation details" in html
     assert "Current ask buys immediately" in html
     assert "immediate-or-cancel buy" in html
+    assert 'value="open" selected>active only' in html
+    assert "Settled (<span id=\"settledCount\">0</span>)" in html
+    assert "No active picks remain today" in html
+    assert 'id="todayShowSettled"' in html
+    assert 'if(p.status!=="open")' in html

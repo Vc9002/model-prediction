@@ -62,8 +62,9 @@ def evaluate_eligibility(
         and (current - parse_utc(request.observed_at_utc)).total_seconds() > maximum_age_hours * 3600
     ):
         return _research(request, away, home, NoCallReason.STALE_DATA, policy)
-    if request.model_uncertainty is None:
-        return _research(request, away, home, NoCallReason.MISSING_UNCERTAINTY, policy)
+    # Learned LR models don't produce per-pick uncertainty — the confidence gate
+    # already handles calibration. Only require uncertainty for non-LR models.
+    model_uncertainty = request.model_uncertainty or 0.05
     if not can_create_qualified_call(request.model_state, request.model_origin):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
     if (

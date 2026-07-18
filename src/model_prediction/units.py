@@ -70,6 +70,8 @@ def recommend_units(
     decimal_odds = american_to_decimal(american_odds)
     market_probability = implied_probability(american_odds)
     edge = model_probability - market_probability
+    if model_uncertainty is None:
+        model_uncertainty = 0.05  # default for learned LR models
     adjusted_probability = max(0.001, model_probability - model_uncertainty)
     adjusted_edge = adjusted_probability - market_probability
     confidence = max(0, min(100, round(50 + 500 * adjusted_edge - 100 * model_uncertainty)))

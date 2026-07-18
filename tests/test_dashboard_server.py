@@ -782,6 +782,7 @@ def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
 ) -> None:
     history_file = tmp_path / "portfolio_history.json"
     monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", history_file)
+    monkeypatch.setattr(dashboard_server, "_today", lambda: "2026-07-17")
     monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
     monkeypatch.setattr(
         dashboard_server,
