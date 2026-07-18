@@ -4211,7 +4211,7 @@
           ],
           "primary_65": {
             "status": "evaluated",
-            "learned_threshold": 0.0,
+            "learned_threshold": 0.03,
             "locked_holdout": {
               "qualified": true,
               "calls": 7577,
