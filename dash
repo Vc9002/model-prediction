@@ -12,8 +12,8 @@ sleep 2
 
 # Verify it started
 if curl -s http://localhost:8765/api/status > /dev/null 2>&1; then
-    open "http://127.0.0.1:8765/"
-    echo "Dashboard running on http://127.0.0.1:8765/"
+    open "http://localhost:8765/"
+    echo "Dashboard running on http://localhost:8765/"
 else
     echo "Dashboard failed to start — check logs"
     exit 1

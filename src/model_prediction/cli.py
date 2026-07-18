@@ -31,7 +31,7 @@ from .config import (
     polymarket_snapshot_path,
     unit_policy,
 )
-from .data_sources.espn import ESPNClient, ESPNMLBClient
+from .data_sources.espn import ESPNClient, ESPNMLBClient, SPORT_LEAGUES
 from .data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
 from .data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
 from .data_sources.polymarket_execute import (
@@ -86,6 +86,7 @@ from .validation import run_validation_audit, write_production_artifacts
 
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
+ESPN_SPORTS = tuple(SPORT_LEAGUES)
 LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
 EASTERN = ZoneInfo("America/New_York")
 
@@ -210,11 +211,11 @@ def parser() -> argparse.ArgumentParser:
     daily.add_argument("--date", required=True)
 
     ingest = commands.add_parser("ingest", help="cache one date of ESPN scores locally")
-    ingest.add_argument("--sport", required=True, choices=SPORTS)
+    ingest.add_argument("--sport", required=True, choices=ESPN_SPORTS)
     ingest.add_argument("--date", required=True)
 
     bootstrap = commands.add_parser("bootstrap", help="idempotent historical backfill from ESPN")
-    bootstrap.add_argument("--sport", choices=SPORTS)
+    bootstrap.add_argument("--sport", choices=ESPN_SPORTS)
     bootstrap.add_argument("--all", action="store_true")
     bootstrap.add_argument("--from", dest="from_date", required=True)
     bootstrap.add_argument("--to", dest="to_date")
@@ -912,7 +913,7 @@ def _clear_today_open(ledger, date_str: str) -> None:
     if to_remove:
         # Use openpyxl directly since ledger has no remove method
         import openpyxl as _xl
-        wb = _xl.load_workbook(ledger._path)
+        wb = _xl.load_workbook(ledger.path)
         ws = wb[wb.sheetnames[0] if wb.sheetnames else "Picks"]
         headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
         pid_col = headers.index("pick_id") + 1 if "pick_id" in headers else 1
@@ -922,7 +923,7 @@ def _clear_today_open(ledger, date_str: str) -> None:
                 rows_to_delete.append(r)
         for r in reversed(rows_to_delete):
             ws.delete_rows(r)
-        wb.save(ledger._path)
+        wb.save(ledger.path)
 
 
 def _drift_check(settled_qualified: list, config: dict) -> dict:
@@ -1256,7 +1257,10 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "bootstrap":
             ingestor = Ingestor(data_root, audit=audit)
             if args.all:
-                output = {sport: ingestor.bootstrap(sport, args.from_date, args.to_date) for sport in SPORTS}
+                output = {
+                    sport: ingestor.bootstrap(sport, args.from_date, args.to_date)
+                    for sport in ESPN_SPORTS
+                }
             elif args.sport:
                 output = ingestor.bootstrap(args.sport, args.from_date, args.to_date)
             else:
