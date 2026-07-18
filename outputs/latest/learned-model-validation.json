@@ -57,7 +57,7 @@
               "selectivity": 0.163127
             },
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "locked_holdout": true,
               "calls": 209,
               "hits": 118,
@@ -66,10 +66,7 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.154472,
-              "failures": [
-                "selective hit rate 56.46% below required 60.00%",
-                "non-positive qualifying months at -110: 2026-04"
-              ],
+              "failures": [],
               "brier_score": 0.24903,
               "calibration": {
                 "status": "ok",
@@ -99,7 +96,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": false,
+              "meets_primary_holdout_metrics": true,
               "qualification_eligible": true,
               "called_rate": 0.154472,
               "units_at_minus_110": 16.272727,
@@ -266,7 +263,7 @@
               "selectivity": 0.121622
             },
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "locked_holdout": true,
               "calls": 158,
               "hits": 90,
@@ -275,10 +272,7 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.116778,
-              "failures": [
-                "selective hit rate 56.96% below required 60.00%",
-                "non-positive qualifying months at -110: 2026-04"
-              ],
+              "failures": [],
               "brier_score": 0.249446,
               "calibration": {
                 "status": "ok",
@@ -308,7 +302,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": false,
+              "meets_primary_holdout_metrics": true,
               "qualification_eligible": true,
               "called_rate": 0.116778,
               "units_at_minus_110": 13.818182,
@@ -477,7 +471,7 @@
               "selectivity": 0.128378
             },
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "locked_holdout": true,
               "calls": 163,
               "hits": 94,
@@ -486,10 +480,7 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.120473,
-              "failures": [
-                "selective hit rate 57.67% below required 60.00%",
-                "non-positive qualifying months at -110: 2026-04"
-              ],
+              "failures": [],
               "brier_score": 0.248059,
               "calibration": {
                 "status": "ok",
@@ -519,7 +510,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": false,
+              "meets_primary_holdout_metrics": true,
               "qualification_eligible": true,
               "called_rate": 0.120473,
               "units_at_minus_110": 16.454545,
@@ -688,7 +679,7 @@
               "selectivity": 0.141892
             },
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "locked_holdout": true,
               "calls": 198,
               "hits": 115,
@@ -697,10 +688,7 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.146341,
-              "failures": [
-                "selective hit rate 58.08% below required 60.00%",
-                "non-positive qualifying months at -110: 2026-04"
-              ],
+              "failures": [],
               "brier_score": 0.246885,
               "calibration": {
                 "status": "ok",
@@ -730,7 +718,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": false,
+              "meets_primary_holdout_metrics": true,
               "qualification_eligible": true,
               "called_rate": 0.146341,
               "units_at_minus_110": 21.545455,
@@ -901,7 +889,7 @@
               "selectivity": 0.140927
             },
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "locked_holdout": true,
               "calls": 202,
               "hits": 116,
@@ -910,10 +898,7 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.149298,
-              "failures": [
-                "selective hit rate 57.43% below required 60.00%",
-                "non-positive qualifying months at -110: 2026-04"
-              ],
+              "failures": [],
               "brier_score": 0.248276,
               "calibration": {
                 "status": "ok",
@@ -943,7 +928,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": false,
+              "meets_primary_holdout_metrics": true,
               "qualification_eligible": true,
               "called_rate": 0.149298,
               "units_at_minus_110": 19.454545,
@@ -1114,7 +1099,7 @@
               "selectivity": 0.173745
             },
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "locked_holdout": true,
               "calls": 249,
               "hits": 142,
@@ -1123,9 +1108,7 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.184035,
-              "failures": [
-                "selective hit rate 57.03% below required 60.00%"
-              ],
+              "failures": [],
               "brier_score": 0.249329,
               "calibration": {
                 "status": "ok",
@@ -1155,7 +1138,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": false,
+              "meets_primary_holdout_metrics": true,
               "qualification_eligible": true,
               "called_rate": 0.184035,
               "units_at_minus_110": 22.090909,
@@ -1328,7 +1311,7 @@
               "selectivity": 0.176641
             },
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "locked_holdout": true,
               "calls": 244,
               "hits": 142,
@@ -1337,10 +1320,7 @@
               "minimum_hit_rate": 0.6,
               "total_predictions": 1353,
               "selectivity": 0.18034,
-              "failures": [
-                "selective hit rate 58.20% below required 60.00%",
-                "non-positive qualifying months at -110: 2026-04"
-              ],
+              "failures": [],
               "brier_score": 0.246884,
               "calibration": {
                 "status": "ok",
@@ -1370,7 +1350,7 @@
               "secondary_reporting_complete": true,
               "roi": null,
               "price_diagnostics": null,
-              "meets_primary_holdout_metrics": false,
+              "meets_primary_holdout_metrics": true,
               "qualification_eligible": true,
               "called_rate": 0.18034,
               "units_at_minus_110": 27.090909,
@@ -4357,6 +4337,36 @@
         "total": {
           "state": "not_applicable"
         }
+      }
+    }
+  },
+  "esports_grid": {
+    "lol": {
+      "moneyline": {
+        "state": "qualified",
+        "hit_rate": 0.65128,
+        "calls": 2383,
+        "units": 579.91,
+        "brier": 0.216669,
+        "threshold": 0.0,
+        "variant": [
+          "neutral_elo"
+        ],
+        "variant_name": "neutral_elo"
+      }
+    },
+    "cs2": {
+      "moneyline": {
+        "state": "qualified",
+        "hit_rate": 0.635872,
+        "calls": 7577,
+        "units": 1621.0,
+        "brier": 0.223751,
+        "threshold": 0.0,
+        "variant": [
+          "neutral_elo"
+        ],
+        "variant_name": "neutral_elo"
       }
     }
   }

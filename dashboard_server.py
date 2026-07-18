@@ -748,7 +748,8 @@ def matrix() -> dict:
     gate = validation and (
         "locked holdout hit rate >= 65% target (learned threshold), >= 60% floor, >= 50 calls"
     )
-    return {"markets": markets, "grid": grid, "source": source, "gate": gate}
+    esports = validation.get("esports_grid") or {}
+    return {"markets": markets, "grid": grid, "esports": esports, "source": source, "gate": gate}
 # ── SECTION: Backtests & Odds ───────────────────────────────────────
 
 

@@ -154,6 +154,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         ✅ qualified · 🔴 tested, below gate · 🧪 research score model (shadow only) · ⛔ blocked, no valid contract lines · 🟡 untested · ⬛ no data · — n/a — click a cell to drill down
       </div>
     </div>
+    <div class="card" id="esportsCard" style="display:none">
+      <h2>Esports</h2>
+      <table class="matrix" id="esportsTable"></table>
+    </div>
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
   </section>
 
@@ -412,6 +416,24 @@ function renderMatrix(m){
     html+="</tr>";
   }
   tbl.innerHTML=html;
+  // Render esports table (ML only)
+  if(m.esports&&Object.keys(m.esports).length){
+    const et=$("#esportsTable"), ec=$("#esportsCard");
+    ec.style.display="";
+    let ehtml="<tr><th>Sport</th><th>ML</th></tr>";
+    for(const sport of Object.keys(m.esports)){
+      const c=m.esports[sport].moneyline||{state:"no_data"};
+      let cls="n",l1="⬛ no data",l2="—";
+      if(c.state==="qualified"){
+        cls="q";l1=`✅ ${pct(c.hit_rate)}`;
+        l2=c.units!=null?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls} calls`;
+      }else if(c.state==="tested_not_qualified"){
+        cls="t";l1=`🔴 ${pct(c.hit_rate)}`;l2=`${c.calls} calls · below gate`;
+      }
+      ehtml+=`<tr><th>${sport.toUpperCase()}</th><td class="cell ${cls}" onclick='drill(\"${sport}\",\"moneyline\")'><div class="c1">${l1}</div><div class="c2">${l2}</div></td></tr>`;
+    }
+    et.innerHTML=ehtml;
+  }
 }
 function drill(sport,market){
   const cell=(state.matrix.grid[sport]||{})[market]||{};
