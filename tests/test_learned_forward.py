@@ -2,6 +2,8 @@ import json
 from datetime import datetime, timezone
 
 from model_prediction.features.base import FeatureStore
+from model_prediction import learned_forward
+from model_prediction.data_sources import espn_probables
 from model_prediction.learned_forward import build_learned_moneyline_slate
 from model_prediction.models.learned_market import build_artifact
 
@@ -112,3 +114,48 @@ def test_unqualified_artifact_can_only_create_research_observation(tmp_path) -> 
     )
 
     assert candidates[0].action == "QUALIFIED_SHADOW_CALL"  # All calls treated equally; user decides
+
+
+def test_missing_mlb_starters_skips_event_instead_of_using_team_proxy(
+    tmp_path, monkeypatch
+) -> None:
+    _write_history(tmp_path)
+    artifact_path = tmp_path / "artifact.json"
+    artifact = build_artifact(
+        sport="mlb",
+        model_version="mlb-starter-required-test",
+        market_models={
+            "moneyline": {
+                "feature_names": ["pitcher_era_gap"],
+                "coefficients": [-1.0],
+                "intercept": 3.0,
+                "confidence_threshold": 0.8,
+                "positive_class": "home",
+            }
+        },
+        training={"market_inputs_used": False},
+        qualification={"qualified": False},
+    )
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+
+    def missing_starters(*args, **kwargs) -> float:
+        raise ValueError("NO_CALL_STARTERS_UNAVAILABLE: test")
+
+    monkeypatch.setattr(espn_probables, "espn_pitcher_era_gap", missing_starters)
+    learned_forward._FEATURE_PROVIDERS.clear()
+
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="mlb",
+        game_date="2026-07-17",
+        store=FeatureStore(tmp_path),
+        client=FakeESPN(),
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+    )
+
+    learned_forward._FEATURE_PROVIDERS.clear()
+    assert scheduled == 1
+    assert candidates == []
+    assert skipped == [
+        {"event_id": "future-1", "reason": "NO_CALL_STARTERS_UNAVAILABLE: test"}
+    ]

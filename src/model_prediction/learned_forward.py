@@ -63,32 +63,9 @@ def _init_providers() -> None:
     _FEATURE_PROVIDERS["weather_factor"] = lambda h, a, eid, gd: float(live_weather(h).get("weather_run_factor", 1.0))
 
     def _pitcher_gap(home_team, away_team, event_id, game_date):
-        try:
-            from .data_sources.espn_probables import espn_pitcher_era_gap
-            return espn_pitcher_era_gap(event_id, home_team, away_team, game_date)
-        except Exception:
-            return _fallback_pitcher_gap(home_team, away_team, game_date)
+        from .data_sources.espn_probables import espn_pitcher_era_gap
+        return espn_pitcher_era_gap(event_id, home_team, away_team, game_date)
     _FEATURE_PROVIDERS["pitcher_era_gap"] = _pitcher_gap
-
-
-def _fallback_pitcher_gap(home_team: str, away_team: str, game_date: str = "") -> float:
-    hist_path = Path("data/historical/mlb_games_all.jsonl")
-    if not hist_path.exists():
-        return 0.0
-    all_g = [json.loads(l) for l in hist_path.read_text().strip().split("\n") if l.strip()]
-    # Exclude games on or after game_date (point-in-time safety)
-    if game_date:
-        all_g = [g for g in all_g if str(g.get("event_start_utc", ""))[:10] < game_date]
-    def _ra(team: str, n: int = 5) -> float | None:
-        tg = sorted(
-            [g for g in all_g if (g.get("home_team") == team or g.get("away_team") == team) and g.get("home_score") is not None],
-            key=lambda g: g.get("event_start_utc", ""),
-        )[-n:]
-        if len(tg) < n:
-            return None
-        return sum(g["away_score"] if g["home_team"] == team else g["home_score"] for g in tg) / n
-    hra, ara = _ra(home_team), _ra(away_team)
-    return round(hra - ara, 4) if hra and ara else 0.0
 
 
 def _build_basis(features: dict[str, float], home_trend: Any, away_trend: Any, history_games: int) -> dict[str, float | int]:
