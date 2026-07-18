@@ -24,10 +24,9 @@ ARTIFACTS = {
 
 FILTERS = [
     "baseline (frozen model, no filter)",
-    "+b2b (suppress if home on back-to-back)",
-    "+rest (suppress if rest_disparity ≤ -3)",
-    "+rest (suppress if rest_disparity ≤ -2)",
-    "+b2b+rest (suppress if b2b OR rest≤-2)",
+    "+rest home-picks only (suppress if picking home AND home ≤ -3 rest)",
+    "+rest away-picks only (suppress if picking away AND away ≤ -3 rest)",
+    "+rest both sides (suppress if picked team has 3+ fewer rest days)",
 ]
 
 # ── helpers ─────────────────────────────────────────────────────────
@@ -105,6 +104,7 @@ def build_holdout(store: FeatureStore, sport: str, artifact_path: str):
                     "rest_disparity": (hr - ar) if (hr is not None and ar is not None) else 0.0,
                     "home_b2b": 1 if (hr is not None and hr <= 1) else 0,
                     "frozen_prob": prob,
+                    "frozen_side": "home" if prob >= 0.5 else "away",
                     "frozen_call": max(prob, 1 - prob) >= threshold,
                 })
         history.extend(day_games)
@@ -121,15 +121,21 @@ def apply(extra, rows, threshold, fname):
         if max(prob, 1 - prob) < threshold:
             continue
         keep = True
-        if "+b2b" in fname and "+rest" not in fname:
-            if ext["home_b2b"]:
+        disp = ext["rest_disparity"]
+        side = ext["frozen_side"]
+
+        if "home-picks only" in fname:
+            if side == "home" and disp <= -3:
                 keep = False
-        elif "+rest" in fname and "+b2b" not in fname:
-            limit = -3 if "≤ -3" in fname else -2
-            if ext["rest_disparity"] <= limit:
+
+        elif "away-picks only" in fname:
+            if side == "away" and disp >= 3:
                 keep = False
-        elif "+b2b+rest" in fname:
-            if ext["home_b2b"] or ext["rest_disparity"] <= -2:
+
+        elif "both sides" in fname:
+            if side == "home" and disp <= -3:
+                keep = False
+            elif side == "away" and disp >= 3:
                 keep = False
         if keep:
             outcome = row.outcome if prob >= 0.5 else 1 - row.outcome
@@ -163,13 +169,13 @@ def print_table(results):
         r = results[sport]
         base = r["filters"][FILTERS[0]]
         print(f"\n── {sport.upper()} (frozen model, {r['baseline_calls']} baseline calls) ──")
-        print(f"  {'Filter':<55} {'Calls':>6} {'Hit%':>7} {'Units':>8} {'ΔU':>8} {'Suppr':>6}")
-        print(f"  {'─'*92}")
+        print(f"  {'Filter':<68} {'Calls':>6} {'Hit%':>7} {'Units':>8} {'ΔU':>8} {'Suppr':>6}")
+        print(f"  {'─'*105}")
         for fn in FILTERS:
             f = r["filters"][fn]
             d = f["units"] - base["units"]
             mark = " ← baseline" if fn == FILTERS[0] else ""
-            print(f"  {fn:<55} {f['calls']:>6} {f['hit_rate']:>6.1%} {f['units']:>+8.2f} {d:>+8.2f} {f['suppressed']:>6}{mark}")
+            print(f"  {fn:<68} {f['calls']:>6} {f['hit_rate']:>6.1%} {f['units']:>+8.2f} {d:>+8.2f} {f['suppressed']:>6}{mark}")
 
 
 if __name__ == "__main__":
