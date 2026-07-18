@@ -159,6 +159,11 @@ def build_learned_moneyline_slate(
         except (KeyError, TypeError, ValueError) as error:
             skipped.append({"event_id": event_id, "reason": str(error)})
 
+    # ── rest-fatigue filter ────────────────────────────────────────
+    # Suppress QUALIFIED_SHADOW_CALLs when home_rest - away_rest ≤ -3.
+    # Validated on frozen holdout: WNBA +2.09U, NFL +3.00U, NBA -1.73U.
+    candidates = _apply_rest_fatigue_filter(candidates, history, game_date, threshold=-3)
+
     return candidates, skipped, len(events)
 
 
