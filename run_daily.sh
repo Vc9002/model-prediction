@@ -9,11 +9,7 @@ RUN_DATE=$(TZ=America/New_York date +%Y-%m-%d)
 LOG="data/logs/daily_${RUN_DATE}.log"
 mkdir -p data/logs
 
-# Skip if already ran today
-if [ -f "$LOG" ]; then
-    exit 0
-fi
-
+# Always re-run — replaces today's picks with fresh forecast
 set -a; [ -f .env ] && source .env; set +a
 
 echo "=== model-prediction daily $RUN_DATE (America/New_York) ===" >> "$LOG"

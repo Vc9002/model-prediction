@@ -71,7 +71,7 @@ def _log(message: str) -> None:
     except OSError:
         pass
 EASTERN = ZoneInfo("America/New_York")
-SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
+SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2")
 GATEWAY = "https://gateway.polymarket.us"
 
 _CACHE: dict[str, tuple[float, object]] = {}
@@ -527,7 +527,7 @@ def status() -> dict:
     }
 
 
-MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
+MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2")
 # ── SECTION: Validation & Matrix ────────────────────────────────────
 
 
@@ -557,6 +557,20 @@ def _newest_validation() -> tuple[dict, str]:
         merged["sports"].update(soccer["sports"])
         merged["production_artifacts"].update(soccer.get("production_artifacts") or {})
         sources.append(path.name)
+
+    # Merge esports validation
+    esports_path = OUTPUTS / "esports-baseline-validation.json"
+    if esports_path.exists():
+        esports = _read_json(esports_path) or {}
+        for title_key, title_data in (esports.get("titles") or {}).items():
+            merged["sports"][title_key] = {
+                "sport": title_key,
+                "walk_forward": True,
+                "production_artifact": title_data.get("artifact"),
+            }
+            merged["production_artifacts"][title_key] = title_data.get("artifact")
+        sources.append("esports-baseline-validation.json")
+
     return merged, " + ".join(sources)
 
 
@@ -574,6 +588,19 @@ def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
     """Moneyline cell pinned to the active artifact's exact validated variant."""
     variants = sport_meta.get("variants") or {}
     artifact = artifact or {}
+
+    # Esports: flat Elo artifact without market_models wrapper
+    if "k" in artifact and "ratings" in artifact:
+        qual = artifact.get("qualified_for_betting", False)
+        return {
+            "state": "qualified" if qual else "research_only",
+            "hit_rate": None,
+            "calls": len(artifact.get("ratings", {})),
+            "variant": ["elo_neutral"],
+            "variant_name": "elo_neutral_series",
+            "model_version": artifact.get("model_version"),
+        }
+
     market_model = (artifact.get("market_models") or {}).get("moneyline") or {}
     artifact_features = tuple(market_model.get("feature_names") or ())
     artifact_qualification = artifact.get("qualification") or {}

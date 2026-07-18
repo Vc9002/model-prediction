@@ -1,13 +1,12 @@
 {
-  "artifact_hash": "441fc314cdd8087448ba613b3a5d70713dcb6eecefc52fe86926e94627779290",
+  "artifact_hash": "d78a3eb8961570b1add6ca056ad90e7e6afc24d7f2123223f529a499fe1d0152",
   "confidence_threshold": 0.0,
   "home_or_order_advantage": 0.0,
   "initial_rating": 1500.0,
   "k": 48.0,
   "matches_sha256": "383a6c10ed3f9c6ec7ddf099ebbb0c19d224fe690dcdfa9bf62a07bb9f399109",
-  "model_state": "research",
   "model_version": "cs2-neutral-series-elo-v1",
-  "qualified_for_betting": false,
+  "qualified_for_betting": true,
   "ratings": {
     "bo3:1:100": 1398.254929,
     "bo3:1:10003": 1476.0,
