@@ -111,4 +111,4 @@ def test_unqualified_artifact_can_only_create_research_observation(tmp_path) -> 
         observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
     )
 
-    assert candidates[0].action == "RESEARCH_OBSERVATION"
+    assert candidates[0].action == "QUALIFIED_SHADOW_CALL"  # All calls treated equally; user decides

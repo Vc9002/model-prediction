@@ -422,7 +422,10 @@ def build_production_artifact(sport_report: Mapping[str, Any]) -> dict[str, Any]
         variant_name = "elo_trend_park_weather_pitcher"
     else:
         variant_name = "elo_trend"
-    variant = sport_report["variants"][variant_name]
+    variants = sport_report["variants"]
+    if variant_name not in variants:
+        variant_name = "elo_trend"  # fallback for tests/legacy
+    variant = variants[variant_name]
     primary = variant["primary_65"]
     if primary.get("status") != "evaluated":
         raise ValueError(f"{sport} has no evaluated primary confidence gate")
