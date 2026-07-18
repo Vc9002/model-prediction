@@ -159,10 +159,12 @@ def build_learned_moneyline_slate(
         except (KeyError, TypeError, ValueError) as error:
             skipped.append({"event_id": event_id, "reason": str(error)})
 
-    # ── rest-fatigue filter ────────────────────────────────────────
-    # Suppress QUALIFIED_SHADOW_CALLs when home_rest - away_rest ≤ -3.
-    # Validated on frozen holdout: WNBA +2.09U, NFL +3.00U, NBA -1.73U.
-    candidates = _apply_rest_fatigue_filter(candidates, history, game_date, threshold=-3)
+    # ── rest-fatigue flip filter ───────────────────────────────────
+    # Flip to the rested side when the selected team has 3+ fewer rest
+    # days. WNBA +5.73U, NFL +3.82U, MLB harmless. Skipped for NBA
+    # (-3.82U) and soccer (-3.82U).
+    if key not in ("nba", "soccer"):
+        candidates = _apply_rest_fatigue_filter(candidates, history, game_date, threshold=-3)
 
     return candidates, skipped, len(events)
 
@@ -331,27 +333,35 @@ def _apply_rest_fatigue_filter(
             away_rest = _rest(c.away_team)
             if home_rest is not None and away_rest is not None:
                 disparity = home_rest - away_rest
-                if disparity <= threshold:
+                # Symmetric: flip to the rested side when the selected team is tired
+                tired = (
+                    (c.selection == "home" and disparity <= threshold)
+                    or (c.selection == "away" and disparity >= -threshold)
+                )
+                if tired:
+                    flipped_side = "away" if c.selection == "home" else "home"
+                    flipped_prob = round(1 - c.model_probability, 6)
                     filtered.append(LearnedForwardCandidate(
                         event_id=c.event_id,
                         event_start_utc=c.event_start_utc,
                         away_team=c.away_team,
                         home_team=c.home_team,
                         market_type=c.market_type,
-                        selection=c.selection,
-                        model_probability=c.model_probability,
+                        selection=flipped_side,
+                        model_probability=flipped_prob,
                         home_probability=c.home_probability,
                         confidence_threshold=c.confidence_threshold,
-                        call=False,
-                        action="NO_CALL_REST_FATIGUE_FILTER",
-                        reason=f"home_rest={home_rest}d away_rest={away_rest}d disparity={disparity}",
+                        call=True,
+                        action="QUALIFIED_SHADOW_CALL_REST_FLIP",
+                        reason=f"flipped {c.selection}→{flipped_side}: home_rest={home_rest}d away_rest={away_rest}d",
                         model_version=c.model_version,
                         model_artifact_hash=c.model_artifact_hash,
                         model_qualified=c.model_qualified,
                         feature_basis={**c.feature_basis,
                             "home_rest_days": home_rest,
                             "away_rest_days": away_rest,
-                            "rest_disparity": disparity},
+                            "rest_disparity": disparity,
+                            "original_selection": c.selection},
                         feature_snapshot_hash=c.feature_snapshot_hash,
                     ))
                     continue
