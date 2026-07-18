@@ -527,7 +527,7 @@ def status() -> dict:
     }
 
 
-MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2")
+MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "kbo", "npb")
 # ── SECTION: Validation & Matrix ────────────────────────────────────
 
 

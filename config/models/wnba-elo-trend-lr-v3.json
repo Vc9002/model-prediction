@@ -1,11 +1,11 @@
 {
-  "artifact_hash": "fded4e1bc56503a354649e0d5b5c64b453b86832ffaff0c5291e9a5db1d7d73f",
+  "artifact_hash": "b14bafbcfb26ab586748339db4fa71985d19d3bb93afca8bf45de42c80e3080a",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        3.1799535897,
-        -0.0167941353,
-        0.0071183227
+        3.1372112172,
+        -0.0154698977,
+        0.0089977272
       ],
       "confidence_threshold": 0.5,
       "feature_names": [
@@ -13,54 +13,54 @@
         "trend_gap",
         "defensive_trend_gap"
       ],
-      "intercept": -1.5842027695,
+      "intercept": -1.5583205662,
       "positive_class": "home"
     }
   },
   "method": "logistic_regression",
   "model_version": "wnba-elo-trend-lr-v3",
   "qualification": {
-    "brier_score": 0.22078,
+    "brier_score": 0.220355,
     "calibration": {
-      "brier_score": 0.22077992520682538,
-      "calibration_intercept": 0.5664824146421356,
-      "calibration_slope": 0.39616625292834845,
-      "expected_calibration_error": 0.07673610513220838,
-      "log_loss": 0.6332815225136879,
+      "brier_score": 0.22035545053402317,
+      "calibration_intercept": 0.5212685375761014,
+      "calibration_slope": 0.4584835509085501,
+      "expected_calibration_error": 0.07092928263955647,
+      "log_loss": 0.6323973063634757,
       "reliability_buckets": [
         {
           "count": 58,
-          "hit_rate": 0.6551724137931034,
+          "hit_rate": 0.6379310344827587,
           "lower": 0.5,
-          "mean_p": 0.5446993212758469,
+          "mean_p": 0.54584415963567,
           "upper": 0.6
         },
         {
-          "count": 85,
-          "hit_rate": 0.7058823529411765,
+          "count": 80,
+          "hit_rate": 0.7125,
           "lower": 0.6,
-          "mean_p": 0.645768535045331,
+          "mean_p": 0.6467160527623997,
           "upper": 0.7
         },
         {
-          "count": 28,
-          "hit_rate": 0.6785714285714286,
+          "count": 32,
+          "hit_rate": 0.6875,
           "lower": 0.7,
-          "mean_p": 0.735884288944996,
+          "mean_p": 0.7329444852682948,
           "upper": 0.8
         }
       ],
-      "sample_size": 171,
+      "sample_size": 170,
       "status": "ok"
     },
-    "called_rate": 0.994186,
-    "calls": 171,
+    "called_rate": 0.988372,
+    "calls": 170,
     "every_called_month_positive_at_minus_110": true,
     "every_qualifying_month_positive_at_minus_110": true,
     "failures": [],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.684211,
-    "hits": 117,
+    "hit_rate": 0.682353,
+    "hits": 116,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": true,
@@ -76,12 +76,12 @@
         "units_at_minus_110": 5.454545
       },
       {
-        "calls": 81,
-        "hit_rate": 0.765432,
-        "hits": 62,
+        "calls": 80,
+        "hit_rate": 0.7625,
+        "hits": 61,
         "month": "2026-06",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 37.363636
+        "units_at_minus_110": 36.454545
       },
       {
         "calls": 42,
@@ -98,9 +98,9 @@
     "qualified": true,
     "roi": null,
     "secondary_reporting_complete": true,
-    "selectivity": 0.994186,
+    "selectivity": 0.988372,
     "total_predictions": 172,
-    "units_at_minus_110": 52.363636
+    "units_at_minus_110": 51.454545
   },
   "schema_version": "1",
   "sport": "wnba",

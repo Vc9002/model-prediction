@@ -1,0 +1,30 @@
+{
+  "artifact_hash": "c83e12bf5e834073969ca0718b3fd7cab65a771c8a34c0298755754707f7f068",
+  "games_sha256": "ad274c0a7b679c244772fb23d6d1625bbe1c4a76359fd2444d798f9516c5ed59",
+  "home_advantage": 20.0,
+  "initial_rating": 1500.0,
+  "k": 8.0,
+  "league": "kbo",
+  "model_state": "research",
+  "model_version": "kbo-tie-aware-elo-v1",
+  "qualified_for_betting": false,
+  "ratings": {
+    "DOOSAN": 1508.132407,
+    "HANWHA": 1501.136688,
+    "KIA": 1512.336349,
+    "KIWOOM": 1409.49741,
+    "KT": 1537.98107,
+    "LG": 1550.225109,
+    "LOTTE": 1475.157792,
+    "NC": 1494.113011,
+    "SAMSUNG": 1568.809076,
+    "SSG": 1442.61109
+  },
+  "schema_version": "international-baseball-tie-aware-elo-v1",
+  "source_manifest_sha256": "f27cd4a38423e93f8e35e3616f2181d8cb8ace96ffa35c816ab883cfd00cdc02",
+  "target": "expected moneyline settlement where a tie pays 0.50",
+  "tie_probability": 0.01928873,
+  "trained_through_date": "2026-07-18",
+  "training_observations": 3318,
+  "units": 0
+}
