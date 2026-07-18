@@ -323,7 +323,7 @@ function saveSettings(){
   document.documentElement.dataset.theme=state.settings.theme;
   resetTimer(); refreshAll();
 }
-const visibleSports=()=>state.settings.sports||["mlb","nba","wnba","nfl","soccer"];
+const visibleSports=()=>state.settings.sports||["mlb","nba","wnba","nfl","soccer","lol","cs2"];
 
 /* ---------- fetch helpers ---------- */
 async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);return r.json();}
@@ -986,7 +986,7 @@ function slugToTitle(slug){
   if(parts.length<5)return slug||"—";
   const prefix=parts[0]; // aec, tsc, astatc
   let sport=parts[1]?.toUpperCase()||"";
-  const markets={"mlb":"MLB","wnba":"WNBA","nba":"NBA","nfl":"NFL","soccer":"SOC"};
+  const markets={"mlb":"MLB","wnba":"WNBA","nba":"NBA","nfl":"NFL","soccer":"SOC","lol":"LoL","cs2":"CS2"};
   sport=markets[sport?.toLowerCase()]||sport;
   const away=parts[2]?.toUpperCase()||"";
   const home=parts[3]?.toUpperCase()||"";
@@ -1102,7 +1102,7 @@ Crash details, if any, are in dashboard/server.log</pre>`);
   tick();
 }
 function bootstrapDialog(){
-  const sport=prompt("Bootstrap which sport? (mlb / nba / wnba / nfl / soccer / tennis)","mlb");
+  const sport=prompt("Bootstrap which sport? (mlb / nba / wnba / nfl / soccer / tennis / lol / cs2)","mlb");
   if(!sport)return;
   const from=prompt("From date (YYYY-MM-DD)?","2026-06-01"); if(!from)return;
   const to=prompt("To date (blank = today)?","")||null;
