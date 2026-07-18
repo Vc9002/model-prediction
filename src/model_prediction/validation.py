@@ -391,7 +391,12 @@ def build_production_artifact(sport_report: Mapping[str, Any]) -> dict[str, Any]
     sport = str(sport_report["sport"]).lower()
     if sport not in LEARNED_ARTIFACT_VERSIONS:
         raise ValueError(f"no learned artifact version configured for {sport}")
-    variant_name = "elo_trend_defense" if sport in ("nba", "wnba") else "elo_trend"
+    if sport in ("nba", "wnba"):
+        variant_name = "elo_trend_defense"
+    elif sport == "mlb":
+        variant_name = "elo_trend_park"
+    else:
+        variant_name = "elo_trend"
     variant = sport_report["variants"][variant_name]
     primary = variant["primary_65"]
     if primary.get("status") != "evaluated":

@@ -89,11 +89,17 @@ def build_learned_moneyline_slate(
                     f"{home_team}={home_trend.games_played}, "
                     f"required={minimum_team_history_games}"
                 )
-            features = {
+            features: dict[str, float] = {
                 "elo_probability": elo.expected_home_win(home_team, away_team),
                 "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
                 "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
             }
+            # Add park_factor if the artifact expects it (MLB only)
+            feature_names = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
+            if "park_factor" in feature_names:
+                from model_prediction.features.park_factors import park_factor
+                pf = park_factor(home_team)
+                features["park_factor"] = float(pf.get("park_factor", 1.0))
             decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
             if not decision.call:
@@ -103,11 +109,13 @@ def build_learned_moneyline_slate(
             basis: dict[str, float | int] = {
                 "elo_probability": round(features["elo_probability"], 10),
                 "trend_gap": round(features["trend_gap"], 10),
-                "defensive_trend_gap": round(features["defensive_trend_gap"], 10),
+                "defensive_trend_gap": round(features.get("defensive_trend_gap", 0), 10),
                 "history_games": len(history),
                 "home_history_games": home_trend.games_played,
                 "away_history_games": away_trend.games_played,
             }
+            if "park_factor" in features:
+                basis["park_factor"] = round(features["park_factor"], 10)
             candidates.append(
                 LearnedForwardCandidate(
                     event_id=event_id,
