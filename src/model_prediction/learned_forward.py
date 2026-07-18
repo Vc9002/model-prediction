@@ -16,6 +16,89 @@ from .features.trends import TrendEngine
 from .models.learned_market import LearnedMarketArtifact
 
 
+# ── Feature registry ──────────────────────────────────────────────────────
+# Each provider is a callable (home_team, away_team, event_id, game_date)
+# returning a float. Registered features are only computed when the artifact
+# requires them.
+
+_FEATURE_PROVIDERS: dict[str, Any] = {}
+_seen_hashes: set[str] = set()
+
+
+def _compute_features(
+    sport: str,
+    artifact: LearnedMarketArtifact,
+    home_team: str,
+    away_team: str,
+    event_id: str,
+    game_date: str,
+    elo: Any,
+    home_trend: Any,
+    away_trend: Any,
+) -> dict[str, float]:
+    features: dict[str, float] = {
+        "elo_probability": elo.expected_home_win(home_team, away_team),
+        "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
+        "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
+    }
+    wanted = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
+    _init_providers()
+    for name in wanted:
+        if name in features:
+            continue
+        provider = _FEATURE_PROVIDERS.get(name)
+        if provider:
+            features[name] = provider(home_team, away_team, event_id, game_date)
+    return features
+
+
+def _init_providers() -> None:
+    if _FEATURE_PROVIDERS:
+        return
+    # Lazy imports to avoid circular dependencies
+    from .features.park_factors import park_factor as _pf
+    _FEATURE_PROVIDERS["park_factor"] = lambda h, a, eid, gd: float(_pf(h).get("park_factor", 1.0))
+
+    from .features.weather import live_weather
+    _FEATURE_PROVIDERS["weather_factor"] = lambda h, a, eid, gd: float(live_weather(h).get("weather_run_factor", 1.0))
+
+    def _pitcher_gap(home_team, away_team, event_id, game_date):
+        try:
+            from .data_sources.espn_probables import espn_pitcher_era_gap
+            return espn_pitcher_era_gap(event_id, home_team, away_team, game_date)
+        except Exception:
+            return _fallback_pitcher_gap(home_team, away_team)
+    _FEATURE_PROVIDERS["pitcher_era_gap"] = _pitcher_gap
+
+
+def _fallback_pitcher_gap(home_team: str, away_team: str) -> float:
+    hist_path = Path("data/historical/mlb_games_all.jsonl")
+    if not hist_path.exists():
+        return 0.0
+    all_g = [json.loads(l) for l in hist_path.read_text().strip().split("\n") if l.strip()]
+    def _ra(team: str, n: int = 5) -> float | None:
+        tg = sorted(
+            [g for g in all_g if (g.get("home_team") == team or g.get("away_team") == team) and g.get("home_score") is not None],
+            key=lambda g: g.get("event_start_utc", ""),
+        )[-n:]
+        if len(tg) < n:
+            return None
+        return sum(g["away_score"] if g["home_team"] == team else g["home_score"] for g in tg) / n
+    hra, ara = _ra(home_team), _ra(away_team)
+    return round(hra - ara, 4) if hra and ara else 0.0
+
+
+def _build_basis(features: dict[str, float], home_trend: Any, away_trend: Any, history_games: int) -> dict[str, float | int]:
+    basis: dict[str, float | int] = {
+        "history_games": history_games,
+        "home_history_games": home_trend.games_played,
+        "away_history_games": away_trend.games_played,
+    }
+    for k, v in features.items():
+        basis[k] = round(v, 10)
+    return basis
+
+
 @dataclass(frozen=True)
 class LearnedForwardCandidate:
     event_id: str
@@ -73,6 +156,7 @@ def build_learned_moneyline_slate(
     trends = TrendEngine(history)
     candidates: list[LearnedForwardCandidate] = []
     skipped: list[dict[str, str]] = []
+    _seen_hashes.clear()  # reset per invocation
     for event in events:
         event_id = str(event.get("id", "unknown"))
         try:
@@ -89,52 +173,17 @@ def build_learned_moneyline_slate(
                     f"{home_team}={home_trend.games_played}, "
                     f"required={minimum_team_history_games}"
                 )
-            features: dict[str, float] = {
-                "elo_probability": elo.expected_home_win(home_team, away_team),
-                "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
-                "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
-            }
-            # Dynamic features based on artifact requirements
-            feature_names = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
-            if "park_factor" in feature_names:
-                from model_prediction.features.park_factors import park_factor
-                pf = park_factor(home_team)
-                features["park_factor"] = float(pf.get("park_factor", 1.0))
-            if "weather_factor" in feature_names:
-                from model_prediction.features.weather import live_weather
-                w = live_weather(home_team)
-                features["weather_factor"] = float(w.get("weather_run_factor", 1.0))
-            if "pitcher_era_gap" in feature_names:
-                try:
-                    from model_prediction.data_sources.espn_probables import espn_pitcher_era_gap
-                    features["pitcher_era_gap"] = espn_pitcher_era_gap(event_id, home_team, away_team, game_date)
-                except Exception:
-                    # Fallback: rolling runs-allowed from cached games
-                    import json as _json
-                    from pathlib import Path as _Path
-                    hist_path = _Path("data/historical/mlb_games_all.jsonl")
-                    all_g = [_json.loads(l) for l in hist_path.read_text().strip().split("\n") if l.strip()] if hist_path.exists() else []
-                    def _ra(team, n=5):
-                        tg = sorted([g for g in all_g if (g.get("home_team")==team or g.get("away_team")==team) and g.get("home_score") is not None], key=lambda g: g.get("event_start_utc",""))[-n:]
-                        return sum(g["away_score"] if g["home_team"]==team else g["home_score"] for g in tg)/n if len(tg)>=n else None
-                    hra=_ra(home_team); ara=_ra(away_team)
-                    features["pitcher_era_gap"] = round(hra-ara,4) if hra and ara else 0.0
+            features = _compute_features(key, artifact, home_team, away_team, event_id, game_date, elo, home_trend, away_trend)
             decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
-            if not decision.call:
-                action = "NO_CALL_BELOW_LEARNED_CONFIDENCE"
-            else:
-                action = "QUALIFIED_SHADOW_CALL"
-            basis: dict[str, float | int] = {
-                "elo_probability": round(features["elo_probability"], 10),
-                "trend_gap": round(features["trend_gap"], 10),
-                "defensive_trend_gap": round(features.get("defensive_trend_gap", 0), 10),
-                "history_games": len(history),
-                "home_history_games": home_trend.games_played,
-                "away_history_games": away_trend.games_played,
-            }
-            if "park_factor" in features:
-                basis["park_factor"] = round(features["park_factor"], 10)
+            action = "QUALIFIED_SHADOW_CALL" if decision.call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+            basis = _build_basis(features, home_trend, away_trend, len(history))
+            snap_hash = _feature_hash(key, game_date, event_id, basis)
+            
+            # Deduplication: skip if this exact feature snapshot was already logged
+            if snap_hash in _seen_hashes:
+                continue
+            _seen_hashes.add(snap_hash)
             candidates.append(
                 LearnedForwardCandidate(
                     event_id=event_id,

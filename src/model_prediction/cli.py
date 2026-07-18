@@ -822,6 +822,57 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
     return None
 
 
+def _drift_check(settled_qualified: list, config: dict) -> dict:
+    """Compare live settled hit rate against model holdout for each sport."""
+    import json, math
+    from pathlib import Path as _Path
+    from collections import defaultdict
+
+    by_sport = defaultdict(lambda: {"wins": 0, "losses": 0})
+    for row in settled_qualified:
+        sport = str((row.get("league") or row.get("sport") or "?")).upper()
+        if row.get("result") == "win":
+            by_sport[sport]["wins"] += 1
+        elif row.get("result") == "loss":
+            by_sport[sport]["losses"] += 1
+
+    drift = {}
+    for sport_name, counts in by_sport.items():
+        n = counts["wins"] + counts["losses"]
+        if n < 10:
+            drift[sport_name] = {"status": "insufficient_sample", "n": n}
+            continue
+
+        live_hr = counts["wins"] / n
+        holdout_hr = None
+        model_path = _Path(f"config/models/{sport_name.lower()}-elo-trend-lr-v3.json")
+        if model_path.exists():
+            try:
+                artifact = json.loads(model_path.read_text())
+                holdout_hr = artifact.get("qualification", {}).get("hit_rate")
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        if holdout_hr is None:
+            drift[sport_name] = {"status": "no_holdout_reference", "live_hr": round(live_hr, 4), "n": n}
+            continue
+
+        # 2-sigma check
+        se = math.sqrt(holdout_hr * (1 - holdout_hr) / n)
+        z = (live_hr - holdout_hr) / se if se > 0 else 0
+        status = "drifting" if z < -2.0 else ("excelling" if z > 2.0 else "on_track")
+
+        drift[sport_name] = {
+            "status": status,
+            "live_hr": round(live_hr, 4),
+            "holdout_hr": round(holdout_hr, 4),
+            "n": n,
+            "z_score": round(z, 2),
+        }
+
+    return drift
+
+
 def _summary(config, ledger) -> dict:
     rows = ledger.rows()
     today = utc_now().astimezone(EASTERN).date().isoformat()
@@ -862,6 +913,7 @@ def _summary(config, ledger) -> dict:
             "iteration_policy": "continuous_no_parameter_freezes",
             "promotion_requires": "versioned walk-forward ablation and locked holdout",
         },
+        "model_drift": _drift_check(settled_qualified, config),
         "note": "Shadow research accounting only; no real-money authorization.",
     }
 
@@ -880,6 +932,7 @@ def main(argv: list[str] | None = None) -> None:
         ledger_path(config),
         audit_path(config),
         research_score_units=research_score_units,
+        research_scoring_mode=str(research_scoring.get("sizing", "fixed")),
         research_scoring_note=research_scoring.get("note", "fixed-stake hypothetical research scoring"),
     )
     data_root = Path(ledger_path(config)).parent

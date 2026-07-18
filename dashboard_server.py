@@ -651,22 +651,21 @@ def matrix() -> dict:
         row = {}
         meta = sports_meta.get(sport) or {}
         row["moneyline"] = _ml_cell(meta, _production_artifact(validation, sport))
-         readiness = meta.get("multi_market_readiness") or {}
-         spread_key = "full_game_spread" if sport == "mlb" else "spread"
-         total_key = "full_game_total" if sport == "mlb" else "total"
-         spread_readiness = readiness.get(spread_key) or readiness.get("spread")
-         if isinstance(spread_readiness, dict) and spread_readiness.get("state"):
-             row["spread"] = spread_readiness
-         else:
-             row["spread"] = {
-                 "state": "blocked" if spread_readiness else "no_data",
-                 "readiness": spread_readiness,
-             }
-         total_readiness = readiness.get(total_key) or readiness.get("total")
-         # Check if research data exists in readiness
-         if isinstance(total_readiness, dict) and total_readiness.get("state") == "research_active":
-             row["total"] = total_readiness
-         else:
+        readiness = meta.get("multi_market_readiness") or {}
+        spread_key = "full_game_spread" if sport == "mlb" else "spread"
+        total_key = "full_game_total" if sport == "mlb" else "total"
+        spread_readiness = readiness.get(spread_key) or readiness.get("spread")
+        if isinstance(spread_readiness, dict) and spread_readiness.get("state"):
+            row["spread"] = spread_readiness
+        else:
+            row["spread"] = {
+                "state": "blocked" if spread_readiness else "no_data",
+                "readiness": spread_readiness,
+            }
+        total_readiness = readiness.get(total_key) or readiness.get("total")
+        if isinstance(total_readiness, dict) and total_readiness.get("state") == "research_active":
+            row["total"] = total_readiness
+        else:
              score_model = total_results.get(sport) or {}
              holdout = score_model.get("locked_holdout") or {}
              if score_model.get("status") == "research_score_model_candidate":
