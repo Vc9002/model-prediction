@@ -8,7 +8,9 @@
     "mlb": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-elo-trend-lr-v3.json",
     "nba": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-elo-trend-lr-v3.json",
     "nfl": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-elo-trend-lr-v3.json",
-    "wnba": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json"
+    "wnba": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json",
+    "lol": "config/models/lol-neutral-series-elo-v1.json",
+    "cs2": "config/models/cs2-neutral-series-elo-v1.json"
   },
   "schema_version": "1",
   "secondary_reporting": [
@@ -4152,6 +4154,100 @@
         }
       },
       "walk_forward": true
+    },
+    "lol": {
+      "sport": "lol",
+      "variants": {
+        "neutral_elo": {
+          "features": [
+            "elo_neutral_probability"
+          ],
+          "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": 0.0,
+            "locked_holdout": {
+              "qualified": true,
+              "calls": 2383,
+              "hits": 1552,
+              "hit_rate": 0.65128,
+              "units_at_minus_110": 579.91,
+              "brier_score": 0.216669,
+              "total_predictions": 2384,
+              "selectivity": 0.999581,
+              "monthly_at_minus_110": [],
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "locked_holdout": true
+            }
+          }
+        }
+      },
+      "split": {
+        "train": {
+          "observations": 7149
+        },
+        "validation": {
+          "observations": 2383
+        },
+        "locked_holdout": {
+          "observations": 2384
+        }
+      },
+      "multi_market_readiness": {
+        "spread": {
+          "state": "not_applicable"
+        },
+        "total": {
+          "state": "not_applicable"
+        }
+      }
+    },
+    "cs2": {
+      "sport": "cs2",
+      "variants": {
+        "neutral_elo": {
+          "features": [
+            "elo_neutral_probability"
+          ],
+          "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": 0.0,
+            "locked_holdout": {
+              "qualified": true,
+              "calls": 7577,
+              "hits": 4818,
+              "hit_rate": 0.635872,
+              "units_at_minus_110": 1621.0,
+              "brier_score": 0.223751,
+              "total_predictions": 7578,
+              "selectivity": 0.999868,
+              "monthly_at_minus_110": [],
+              "every_called_month_positive_at_minus_110": true,
+              "every_qualifying_month_positive_at_minus_110": true,
+              "locked_holdout": true
+            }
+          }
+        }
+      },
+      "split": {
+        "train": {
+          "observations": 22732
+        },
+        "validation": {
+          "observations": 7577
+        },
+        "locked_holdout": {
+          "observations": 7578
+        }
+      },
+      "multi_market_readiness": {
+        "spread": {
+          "state": "not_applicable"
+        },
+        "total": {
+          "state": "not_applicable"
+        }
+      }
     }
   },
   "unit_pnl": "diagnostic flat one-unit staking at -110"
