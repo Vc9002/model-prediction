@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -24,7 +26,7 @@ import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -72,6 +74,7 @@ GATEWAY = "https://gateway.polymarket.us"
 
 _CACHE: dict[str, tuple[float, object]] = {}
 _CACHE_LOCK = threading.Lock()
+_CONFIG_LOCK = threading.Lock()
 _ACTION_LOCK = threading.Lock()
 _LAST_ACTION: dict[str, object] = {}
 _JOBS: dict[str, dict] = {}
@@ -79,6 +82,8 @@ _JOBS_LOCK = threading.Lock()
 _RUNNER: list[str] | None = None
 _ORDER_PREVIEWS: dict[str, dict] = {}
 _ORDER_LOCK = threading.Lock()
+_MARKET_QUESTION_CACHE: dict[str, str | None] = {}
+_MARKET_QUESTION_LOCK = threading.Lock()
 
 
 def _resolve_runner() -> list[str]:
@@ -169,6 +174,63 @@ def _unit_value_usd() -> float:
     except (OSError, TypeError, ValueError, yaml.YAMLError):
         return 7.5
     return value if value > 0 else 7.5
+
+
+def _set_unit_value_usd(raw_value: object) -> dict:
+    """Atomically persist the one-unit dollar value used by UI and execution."""
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError) as error:
+        raise ValueError("1U must be a dollar amount") from error
+    if not math.isfinite(value) or not 0.01 <= value <= 100_000:
+        raise ValueError("1U must be between $0.01 and $100,000.00")
+
+    with _CONFIG_LOCK:
+        original = CONFIG_FILE.read_text(encoding="utf-8")
+        previous = _unit_value_usd()
+        updated, count = re.subn(
+            r"(?m)^(\s+unit_value_usd:\s*).*$",
+            rf"\g<1>{value:.2f}",
+            original,
+        )
+        if count != 1:
+            raise RuntimeError("expected exactly one bankroll.unit_value_usd setting")
+        parsed = yaml.safe_load(updated) or {}
+        persisted = float((parsed.get("bankroll") or {}).get("unit_value_usd"))
+        if not math.isclose(persisted, value, rel_tol=0, abs_tol=0.000001):
+            raise RuntimeError("unit value failed configuration validation")
+
+        temporary = CONFIG_FILE.with_name(
+            f".{CONFIG_FILE.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+        )
+        try:
+            with temporary.open("w", encoding="utf-8") as handle:
+                handle.write(updated)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, CONFIG_FILE.stat().st_mode)
+            os.replace(temporary, CONFIG_FILE)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    try:
+        from model_prediction.audit import AuditLog
+
+        AuditLog(DATA / "events.jsonl").append(
+            "unit_value_updated",
+            "bankroll.unit_value_usd",
+            {"previous_usd": previous, "unit_value_usd": value, "source": "dashboard"},
+        )
+    except (ImportError, OSError, ValueError) as error:
+        _log(f"unit value updated but audit append failed: {error}")
+    with _CACHE_LOCK:
+        _CACHE.clear()
+    return {
+        "status": "ok",
+        "previous_unit_value_usd": previous,
+        "unit_value_usd": value,
+        "note": "Applies to future dollar displays and order sizing; historical units are unchanged.",
+    }
 
 
 def _config_payload() -> dict:
@@ -525,7 +587,7 @@ def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
             break
 
     if variant is None and not artifact:
-        for name in ("elo_trend", "elo_only"):
+        for name in ("elo_trend", "elo_trend_defense", "elo_trend_park", "elo_only"):
             candidate = variants.get(name) or {}
             if ((candidate.get("primary_65") or {}).get("locked_holdout") or {}).get("qualified"):
                 variant_name, variant = name, candidate
@@ -728,6 +790,7 @@ def market_snapshots(sport: str, day: str) -> dict:
         ask, bid = long_side.get("ask"), long_side.get("bid")
         rows.append({
             "market_slug": slug,
+            "market_name": _human_market_name(str(slug)),
             "market_type": snap.get("market_type"),
             "line": snap.get("line"),
             "league": snap.get("league"),
@@ -1725,6 +1788,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send(submit_position_sell(payload))
         elif parsed.path == "/api/order/submit":
             self._send(submit_order(payload))
+        elif parsed.path == "/api/settings/unit-value":
+            try:
+                self._send(_set_unit_value_usd(payload.get("unit_value_usd")))
+            except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
         else:
             self._send({"error": "unknown route"}, code=404)
 
@@ -1869,7 +1937,7 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
     all_rows = read_picks()
     rows_by_id = {str(row.get("pick_id") or ""): row for row in all_rows}
 
-    def _link(row: dict) -> dict:
+    def _link(row: dict, side: str) -> dict:
         return {
             "pick_id": str(row.get("pick_id") or ""),
             "league": str(row.get("league") or ""),
@@ -1879,13 +1947,15 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
             "market_type": str(row.get("market_type") or ""),
             "model_probability": _number(row.get("model_probability"), None),
             "model_version": str(row.get("model_version") or ""),
+            "side": side,
         }
 
     for row in _dedupe_picks(all_rows):
         quote = _pick_quote(row)
         if quote is None:
             continue
-        links[(str(quote["market_slug"]), str(quote["side"]))] = _link(row)
+        side = str(quote["side"])
+        links[(str(quote["market_slug"]), side)] = _link(row, side)
     # An exchange-acknowledged dashboard order links later fills back to the
     # model pick, including a partial fill followed by cancellation.
     for order in _load_orders()["orders"]:
@@ -1895,8 +1965,24 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
         slug = str(order.get("market_slug") or "")
         side = str(order.get("side") or "")
         if row is not None and slug and side:
-            links[(slug, side)] = _link(row)
+            links[(slug, side)] = _link(row, side)
     return links
+
+
+def _activity_outcome_side(payload: dict) -> str | None:
+    """Return long/short only when an exchange activity states its outcome side."""
+    for raw in (
+        payload.get("outcomeSide"),
+        payload.get("positionSide"),
+        payload.get("intent"),
+        payload.get("side"),
+    ):
+        value = str(raw or "").upper()
+        if value.endswith("_SHORT") or value in {"SHORT", "NO"}:
+            return "short"
+        if value.endswith("_LONG") or value in {"LONG", "YES"}:
+            return "long"
+    return None
 
 
 def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> dict | None:
@@ -1909,7 +1995,8 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
     if trade:
         slug = str(trade.get("marketSlug") or "")
         occurred = str(trade.get("updateTime") or trade.get("createTime") or "")
-        linked = next((value for (market, _), value in links.items() if market == slug), None)
+        outcome_side = _activity_outcome_side(trade)
+        linked = links.get((slug, outcome_side)) if outcome_side else None
         return {
             "activity_id": f"trade:{trade.get('id') or slug + ':' + occurred}",
             "type": "trade",
@@ -1922,15 +2009,17 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
             "realized_pnl_usd": _amount_value(trade.get("realizedPnl")),
             "state": str(trade.get("state") or ""),
             "is_aggressor": trade.get("isAggressor"),
+            "outcome_side": outcome_side,
             "model_pick": linked,
         }
     if resolution:
         slug = str(resolution.get("marketSlug") or "")
         occurred = str(resolution.get("updateTime") or "")
+        outcome_side = _activity_outcome_side(resolution)
         before = resolution.get("beforePosition") or {}
         after = resolution.get("afterPosition") or {}
         metadata = after.get("marketMetadata") or before.get("marketMetadata") or {}
-        linked = next((value for (market, _), value in links.items() if market == slug), None)
+        linked = links.get((slug, outcome_side)) if outcome_side else None
         return {
             "activity_id": f"settlement:{resolution.get('tradeId') or slug + ':' + occurred}",
             "type": "settlement",
@@ -1941,6 +2030,7 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
             "resolution_side": str(resolution.get("side") or "").removeprefix(
                 "POSITION_RESOLUTION_SIDE_"
             ),
+            "outcome_side": outcome_side,
             "before_quantity": _number(
                 before.get("netPositionDecimal") or before.get("netPosition"), None
             ),
@@ -2014,17 +2104,118 @@ def _save_portfolio_history(activities: list[dict], observed_at: str) -> list[di
     return rows
 
 
+def _team_name_index() -> dict[tuple[str, str], str]:
+    def _build() -> dict[tuple[str, str], str]:
+        registry = _read_json(DATA / "entities" / "teams.json") or {}
+        index: dict[tuple[str, str], str] = {}
+        for team in registry.get("teams") or []:
+            league = str(team.get("league") or "").casefold()
+            name = str(team.get("canonical_name") or "").strip()
+            candidates = {
+                str(team.get("abbreviation") or ""),
+                str(team.get("canonical_team_id") or "").rsplit("-", 1)[-1],
+            }
+            for alias in team.get("aliases") or []:
+                alias_name = str(alias.get("source_name") or "").strip()
+                candidates.add(alias_name)
+                words = re.findall(r"[A-Za-z0-9]+", alias_name)
+                if len(words) > 1:
+                    candidates.add("".join(word[0] for word in words))
+            for candidate in candidates:
+                token = re.sub(r"[^a-z0-9]", "", candidate.casefold())
+                if token and name:
+                    index.setdefault((league, token), name)
+        return index
+
+    return _cached("team-name-index", 300, _build)
+
+
+def _public_market_question(slug: str) -> str | None:
+    with _MARKET_QUESTION_LOCK:
+        if slug in _MARKET_QUESTION_CACHE:
+            return _MARKET_QUESTION_CACHE[slug]
+    question: str | None = None
+    try:
+        request = urllib.request.Request(
+            f"{GATEWAY}/v1/market/slug/{quote(slug, safe='-')}",
+            headers={"User-Agent": "model-prediction-dashboard/2.0"},
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310
+            payload = json.loads(response.read())
+        question = str((payload.get("market") or {}).get("question") or "").strip() or None
+    except (OSError, TimeoutError, ValueError, json.JSONDecodeError):
+        question = None
+    with _MARKET_QUESTION_LOCK:
+        _MARKET_QUESTION_CACHE[slug] = question
+    return question
+
+
+def _human_market_name(slug: str, title: str = "") -> str:
+    """Turn an exchange identifier into a compact, readable market name."""
+    match = re.match(
+        r"^(?P<prefix>[a-z]+)-(?P<league>[a-z0-9]+)-(?P<away>[a-z0-9]+)-"
+        r"(?P<home>[a-z0-9]+)-(?P<date>\d{4}-\d{2}-\d{2})(?:-(?P<detail>.*))?$",
+        slug.casefold(),
+    )
+    if not match:
+        return title if title and title != slug and title != "None" else slug
+
+    league = match.group("league")
+    names = _team_name_index()
+    away = names.get((league, match.group("away")), match.group("away").upper())
+    home = names.get((league, match.group("home")), match.group("home").upper())
+    prefix = match.group("prefix")
+    detail = match.group("detail") or ""
+    league_label = league.upper()
+    matchup = f"{away} @ {home}"
+
+    if prefix == "aec":
+        market = "First 5 moneyline" if detail.startswith("f5") else "Moneyline"
+        return f"{league_label} · {matchup} · {market}"
+    if prefix in {"tsc", "asc"}:
+        line_match = re.search(r"(\d+)pt(\d+)", detail)
+        line = f"{line_match.group(1)}.{line_match.group(2)}" if line_match else ""
+        period = "First 5 " if "f5" in detail else ""
+        market = "Total" if prefix == "tsc" else "Spread"
+        suffix = f" {line}" if line else ""
+        return f"{league_label} · {matchup} · {period}{market}{suffix}"
+    if prefix == "astatc":
+        question = _public_market_question(slug)
+        if question:
+            clean = question.removesuffix("?")
+            clean = re.sub(
+                r"\s+in\s+[A-Z0-9 .'-]+\s+vs\.?\s+[A-Z0-9 .'-]+$", "", clean
+            )
+            hrr = re.fullmatch(
+                r"Will (.+?) record at least (\d+) hits \+ runs \+ RBIs", clean
+            )
+            if hrr:
+                clean = f"{hrr.group(1)} · {hrr.group(2)}+ hits + runs + RBIs"
+            return f"{clean} · {matchup}"
+        return f"{league_label} · {matchup} · Player prop"
+    return title if title and title != slug and title != "None" else f"{league_label} · {matchup}"
+
+
 def _portfolio_history_summary(activities: list[dict], source: str) -> dict:
-    trades = [item for item in activities if item.get("type") == "trade"]
-    settlements = [item for item in activities if item.get("type") == "settlement"]
+    decorated = [
+        {
+            **item,
+            "market_name": _human_market_name(
+                str(item.get("market_slug") or ""), str(item.get("title") or "")
+            ),
+        }
+        for item in activities
+    ]
+    trades = [item for item in decorated if item.get("type") == "trade"]
+    settlements = [item for item in decorated if item.get("type") == "settlement"]
     realized = sum(
         value
-        for item in activities
+        for item in decorated
         if (value := _number(item.get("realized_pnl_usd"), None)) is not None
     )
     return {
-        "activities": activities,
-        "count": len(activities),
+        "activities": decorated,
+        "count": len(decorated),
         "trade_count": len(trades),
         "settlement_count": len(settlements),
         "realized_pnl_usd": round(realized, 2),
@@ -2103,6 +2294,9 @@ def live_portfolio_view() -> dict:
             {
                 "market_slug": str(slug),
                 "title": str(metadata.get("title") or slug),
+                "market_name": _human_market_name(
+                    str(slug), str(metadata.get("title") or "")
+                ),
                 "outcome": str(metadata.get("outcome") or ""),
                 "side": side,
                 "quantity": abs(net),
@@ -2361,23 +2555,24 @@ def archive_action(action: str, scope: str) -> dict:
 
 
 def _suggested_units(row: dict) -> float | None:
-    """Edge-scaled paper stake, mirroring units.edge_scaled_units.
+    """Decision-time model size, reconstructed for both open and settled rows.
 
     (0.5U base + |p-0.5| * 10, capped at 2.0U, nearest 0.25U — the sizing that
-    beat flat staking +34.1U vs +13.3U on the MLB walk-forward.) Shown only for
-    open picks where the model has POSITIVE edge vs the market; every actual
-    ledger stake stays 0 until a model is promoted past research.
+    beat flat staking +34.1U vs +13.3U on the MLB walk-forward.) The immutable
+    decision probability lets the dashboard retain the same displayed size
+    after settlement. Every actual ledger stake stays 0 until a model is
+    promoted past research.
     """
     try:
         p = float(row.get("model_probability") or 0)
         market = float(row.get("market_implied_probability") or 0)
     except (TypeError, ValueError):
         return None
-    if row.get("status") != "open" or not (0 < p < 1) or not (0 < market < 1):
+    if not (0 < p < 1) or not (0 < market < 1):
         return None
-    # Edge-scaled from model confidence, computed for EVERY open pick —
-    # including negative-edge research rows — so the sizing the engine would
-    # use is always visible. The +EV badge carries the tail/no-tail context.
+    # Edge-scaled from model confidence, including negative-edge research rows,
+    # so the sizing shown before and after settlement remains identical. The
+    # +EV badge carries the tail/no-tail context.
     raw = 0.5 + abs(p - 0.5) * (2.0 - 0.5) / 0.15
     units = max(0.5, min(2.0, raw))
     return round(units / 0.25) * 0.25

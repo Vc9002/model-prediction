@@ -10,7 +10,7 @@ if pgrep -f "dashboard_server.py" > /dev/null 2>&1; then
 fi
 
 # Start server in background
-python3 dashboard_server.py &
+PYTHONPATH=src .venv/bin/python dashboard_server.py &
 sleep 1
 
 # Open browser

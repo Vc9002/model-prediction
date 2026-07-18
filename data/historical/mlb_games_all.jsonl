@@ -4701,3 +4701,18 @@
 {"away_score":5,"away_team":"Arizona Diamondbacks","away_team_id":"29","event_id":"401816138","event_start_utc":"2026-07-12T20:10Z","home_score":3,"home_team":"Los Angeles Dodgers","home_team_id":"19","league":"MLB","status":"completed"}
 {"away_score":4,"away_team":"Toronto Blue Jays","away_team_id":"14","event_id":"401816140","event_start_utc":"2026-07-12T20:10Z","home_score":5,"home_team":"San Diego Padres","home_team_id":"25","league":"MLB","status":"completed"}
 {"away_score":4,"away_team":"American All-Stars","away_team_id":"31","event_id":"401817370","event_start_utc":"2026-07-15T00:00Z","home_score":0,"home_team":"National All-Stars","home_team_id":"32","league":"MLB","status":"completed"}
+{"event_id": "401816143", "event_start_utc": "2026-07-16T22:00Z", "away_team": "New York Mets", "home_team": "Philadelphia Phillies", "away_score": 4, "home_score": 1, "home_winner": false}
+{"event_id": "401872178", "event_start_utc": "2026-07-17T17:35Z", "away_team": "Tampa Bay Rays", "home_team": "Boston Red Sox", "away_score": 0, "home_score": 10, "home_winner": true}
+{"event_id": "401816142", "event_start_utc": "2026-07-17T23:05Z", "away_team": "Los Angeles Dodgers", "home_team": "New York Yankees", "away_score": 2, "home_score": 1, "home_winner": false}
+{"event_id": "401816145", "event_start_utc": "2026-07-17T23:10Z", "away_team": "Tampa Bay Rays", "home_team": "Boston Red Sox", "away_score": 3, "home_score": 5, "home_winner": true}
+{"event_id": "401816141", "event_start_utc": "2026-07-17T23:15Z", "away_team": "Chicago White Sox", "home_team": "Toronto Blue Jays", "away_score": 12, "home_score": 4, "home_winner": false}
+{"event_id": "401816146", "event_start_utc": "2026-07-17T23:15Z", "away_team": "Texas Rangers", "home_team": "Atlanta Braves", "away_score": 1, "home_score": 15, "home_winner": true}
+{"event_id": "401816148", "event_start_utc": "2026-07-17T23:40Z", "away_team": "Miami Marlins", "home_team": "Milwaukee Brewers", "away_score": 1, "home_score": 2, "home_winner": true}
+{"event_id": "401816149", "event_start_utc": "2026-07-18T00:05Z", "away_team": "Minnesota Twins", "home_team": "Chicago Cubs", "away_score": 5, "home_score": 2, "home_winner": false}
+{"event_id": "401816147", "event_start_utc": "2026-07-18T00:10Z", "away_team": "Baltimore Orioles", "home_team": "Houston Astros", "away_score": 3, "home_score": 2, "home_winner": false}
+{"event_id": "401816150", "event_start_utc": "2026-07-18T00:10Z", "away_team": "San Diego Padres", "home_team": "Kansas City Royals", "away_score": 6, "home_score": 7, "home_winner": true}
+{"event_id": "401816151", "event_start_utc": "2026-07-18T00:40Z", "away_team": "Cincinnati Reds", "home_team": "Colorado Rockies", "away_score": 7, "home_score": 2, "home_winner": false}
+{"event_id": "401816152", "event_start_utc": "2026-07-18T01:38Z", "away_team": "Detroit Tigers", "home_team": "Los Angeles Angels", "away_score": 2, "home_score": 1, "home_winner": false}
+{"event_id": "401816154", "event_start_utc": "2026-07-18T01:40Z", "away_team": "St. Louis Cardinals", "home_team": "Arizona Diamondbacks", "away_score": 5, "home_score": 4, "home_winner": false}
+{"event_id": "401816155", "event_start_utc": "2026-07-18T01:40Z", "away_team": "Washington Nationals", "home_team": "Athletics", "away_score": 23, "home_score": 4, "home_winner": false}
+{"event_id": "401816153", "event_start_utc": "2026-07-18T02:10Z", "away_team": "San Francisco Giants", "home_team": "Seattle Mariners", "away_score": 7, "home_score": 0, "home_winner": false}

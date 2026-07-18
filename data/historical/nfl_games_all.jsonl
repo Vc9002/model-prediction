@@ -668,3 +668,403 @@
 {"away_score":27,"away_team":"Los Angeles Rams","away_team_id":"14","competition_type":"STD","event_id":"401772987","event_start_utc":"2026-01-25T23:30Z","home_score":31,"home_team":"Seattle Seahawks","home_team_id":"26","league":"NFL","season_type":"post-season","season_year":2025,"status":"completed"}
 {"away_score":66,"away_team":"NFC","away_team_id":"32","competition_type":"ALLSTAR","event_id":"401831718","event_start_utc":"2026-02-04T01:00Z","home_score":52,"home_team":"AFC","home_team_id":"31","league":"NFL","season_type":"post-season","season_year":2025,"status":"completed"}
 {"away_score":29,"away_team":"Seattle Seahawks","away_team_id":"26","competition_type":"STD","event_id":"401772988","event_start_utc":"2026-02-08T23:30Z","home_score":13,"home_team":"New England Patriots","home_team_id":"17","league":"NFL","season_type":"post-season","season_year":2025,"status":"completed"}
+{"event_id": "401131037", "event_start_utc": "2020-01-04T21:35Z", "away_team": "Buffalo Bills", "home_team": "Houston Texans", "away_score": 19, "home_score": 22, "home_winner": true}
+{"event_id": "401131036", "event_start_utc": "2020-01-05T01:25Z", "away_team": "Tennessee Titans", "home_team": "New England Patriots", "away_score": 20, "home_score": 13, "home_winner": false}
+{"event_id": "401131038", "event_start_utc": "2020-01-05T18:05Z", "away_team": "Minnesota Vikings", "home_team": "New Orleans Saints", "away_score": 26, "home_score": 20, "home_winner": false}
+{"event_id": "401131039", "event_start_utc": "2020-01-05T21:40Z", "away_team": "Seattle Seahawks", "home_team": "Philadelphia Eagles", "away_score": 17, "home_score": 9, "home_winner": false}
+{"event_id": "401131040", "event_start_utc": "2020-01-11T21:35Z", "away_team": "Minnesota Vikings", "home_team": "San Francisco 49ers", "away_score": 10, "home_score": 27, "home_winner": true}
+{"event_id": "401131041", "event_start_utc": "2020-01-12T01:15Z", "away_team": "Tennessee Titans", "home_team": "Baltimore Ravens", "away_score": 28, "home_score": 12, "home_winner": false}
+{"event_id": "401131043", "event_start_utc": "2020-01-12T20:05Z", "away_team": "Houston Texans", "home_team": "Kansas City Chiefs", "away_score": 31, "home_score": 51, "home_winner": true}
+{"event_id": "401131042", "event_start_utc": "2020-01-12T23:40Z", "away_team": "Seattle Seahawks", "home_team": "Green Bay Packers", "away_score": 23, "home_score": 28, "home_winner": true}
+{"event_id": "401131044", "event_start_utc": "2020-01-19T20:05Z", "away_team": "Tennessee Titans", "home_team": "Kansas City Chiefs", "away_score": 24, "home_score": 35, "home_winner": true}
+{"event_id": "401131045", "event_start_utc": "2020-01-19T23:40Z", "away_team": "Green Bay Packers", "home_team": "San Francisco 49ers", "away_score": 20, "home_score": 37, "home_winner": true}
+{"event_id": "401131046", "event_start_utc": "2020-01-26T20:00Z", "away_team": "NFC All-Stars", "home_team": "AFC All-Stars", "away_score": 33, "home_score": 38, "home_winner": true}
+{"event_id": "401131047", "event_start_utc": "2020-02-02T23:30Z", "away_team": "San Francisco 49ers", "home_team": "Kansas City Chiefs", "away_score": 20, "home_score": 31, "home_winner": true}
+{"event_id": "401220225", "event_start_utc": "2020-09-11T00:20Z", "away_team": "Houston Texans", "home_team": "Kansas City Chiefs", "away_score": 20, "home_score": 34, "home_winner": true}
+{"event_id": "401220313", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Seattle Seahawks", "home_team": "Atlanta Falcons", "away_score": 38, "home_score": 25, "home_winner": false}
+{"event_id": "401220116", "event_start_utc": "2020-09-13T17:00Z", "away_team": "New York Jets", "home_team": "Buffalo Bills", "away_score": 17, "home_score": 27, "home_winner": true}
+{"event_id": "401220282", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Chicago Bears", "home_team": "Detroit Lions", "away_score": 27, "home_score": 23, "home_winner": false}
+{"event_id": "401220300", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Green Bay Packers", "home_team": "Minnesota Vikings", "away_score": 43, "home_score": 34, "home_winner": false}
+{"event_id": "401220131", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Miami Dolphins", "home_team": "New England Patriots", "away_score": 11, "home_score": 21, "home_winner": true}
+{"event_id": "401220268", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Philadelphia Eagles", "home_team": "Washington", "away_score": 17, "home_score": 27, "home_winner": true}
+{"event_id": "401220370", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Las Vegas Raiders", "home_team": "Carolina Panthers", "away_score": 34, "home_score": 30, "home_winner": false}
+{"event_id": "401220195", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Indianapolis Colts", "home_team": "Jacksonville Jaguars", "away_score": 20, "home_score": 27, "home_winner": true}
+{"event_id": "401220147", "event_start_utc": "2020-09-13T17:00Z", "away_team": "Cleveland Browns", "home_team": "Baltimore Ravens", "away_score": 6, "home_score": 38, "home_winner": true}
+{"event_id": "401220161", "event_start_utc": "2020-09-13T20:05Z", "away_team": "Los Angeles Chargers", "home_team": "Cincinnati Bengals", "away_score": 16, "home_score": 13, "home_winner": false}
+{"event_id": "401220369", "event_start_utc": "2020-09-13T20:25Z", "away_team": "Tampa Bay Buccaneers", "home_team": "New Orleans Saints", "away_score": 23, "home_score": 34, "home_winner": true}
+{"event_id": "401220352", "event_start_utc": "2020-09-13T20:25Z", "away_team": "Arizona Cardinals", "home_team": "San Francisco 49ers", "away_score": 24, "home_score": 20, "home_winner": false}
+{"event_id": "401220347", "event_start_utc": "2020-09-14T00:20Z", "away_team": "Dallas Cowboys", "home_team": "Los Angeles Rams", "away_score": 17, "home_score": 20, "home_winner": true}
+{"event_id": "401220256", "event_start_utc": "2020-09-14T23:15Z", "away_team": "Pittsburgh Steelers", "home_team": "New York Giants", "away_score": 26, "home_score": 16, "home_winner": false}
+{"event_id": "401220217", "event_start_utc": "2020-09-15T02:10Z", "away_team": "Tennessee Titans", "home_team": "Denver Broncos", "away_score": 16, "home_score": 14, "home_winner": false}
+{"event_id": "401220163", "event_start_utc": "2020-09-18T00:20Z", "away_team": "Cincinnati Bengals", "home_team": "Cleveland Browns", "away_score": 30, "home_score": 35, "home_winner": true}
+{"event_id": "401220281", "event_start_utc": "2020-09-20T17:00Z", "away_team": "New York Giants", "home_team": "Chicago Bears", "away_score": 13, "home_score": 17, "home_winner": true}
+{"event_id": "401220249", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Atlanta Falcons", "home_team": "Dallas Cowboys", "away_score": 39, "home_score": 40, "home_winner": true}
+{"event_id": "401220291", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Detroit Lions", "home_team": "Green Bay Packers", "away_score": 21, "home_score": 42, "home_winner": true}
+{"event_id": "401220204", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Tennessee Titans", "away_score": 30, "home_score": 33, "home_winner": true}
+{"event_id": "401220192", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Minnesota Vikings", "home_team": "Indianapolis Colts", "away_score": 11, "home_score": 28, "home_winner": true}
+{"event_id": "401220122", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Buffalo Bills", "home_team": "Miami Dolphins", "away_score": 31, "home_score": 28, "home_winner": false}
+{"event_id": "401220144", "event_start_utc": "2020-09-20T17:00Z", "away_team": "San Francisco 49ers", "home_team": "New York Jets", "away_score": 31, "home_score": 13, "home_winner": false}
+{"event_id": "401220261", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Los Angeles Rams", "home_team": "Philadelphia Eagles", "away_score": 37, "home_score": 19, "home_winner": false}
+{"event_id": "401220177", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Denver Broncos", "home_team": "Pittsburgh Steelers", "away_score": 21, "home_score": 26, "home_winner": true}
+{"event_id": "401220329", "event_start_utc": "2020-09-20T17:00Z", "away_team": "Carolina Panthers", "home_team": "Tampa Bay Buccaneers", "away_score": 17, "home_score": 31, "home_winner": true}
+{"event_id": "401220340", "event_start_utc": "2020-09-20T20:05Z", "away_team": "Washington", "home_team": "Arizona Cardinals", "away_score": 15, "home_score": 30, "home_winner": true}
+{"event_id": "401220235", "event_start_utc": "2020-09-20T20:25Z", "away_team": "Kansas City Chiefs", "home_team": "Los Angeles Chargers", "away_score": 23, "home_score": 20, "home_winner": false}
+{"event_id": "401220181", "event_start_utc": "2020-09-20T20:25Z", "away_team": "Baltimore Ravens", "home_team": "Houston Texans", "away_score": 33, "home_score": 16, "home_winner": false}
+{"event_id": "401220365", "event_start_utc": "2020-09-21T00:20Z", "away_team": "New England Patriots", "home_team": "Seattle Seahawks", "away_score": 30, "home_score": 35, "home_winner": true}
+{"event_id": "401220231", "event_start_utc": "2020-09-22T00:15Z", "away_team": "New Orleans Saints", "home_team": "Las Vegas Raiders", "away_score": 24, "home_score": 34, "home_winner": true}
+{"event_id": "401220201", "event_start_utc": "2020-09-25T00:20Z", "away_team": "Miami Dolphins", "home_team": "Jacksonville Jaguars", "away_score": 31, "home_score": 13, "home_winner": false}
+{"event_id": "401220309", "event_start_utc": "2020-09-27T17:00Z", "away_team": "Chicago Bears", "home_team": "Atlanta Falcons", "away_score": 30, "home_score": 26, "home_winner": false}
+{"event_id": "401220119", "event_start_utc": "2020-09-27T17:00Z", "away_team": "Los Angeles Rams", "home_team": "Buffalo Bills", "away_score": 32, "home_score": 35, "home_winner": true}
+{"event_id": "401220168", "event_start_utc": "2020-09-27T17:00Z", "away_team": "Washington", "home_team": "Cleveland Browns", "away_score": 20, "home_score": 34, "home_winner": true}
+{"event_id": "401220304", "event_start_utc": "2020-09-27T17:00Z", "away_team": "Tennessee Titans", "home_team": "Minnesota Vikings", "away_score": 31, "home_score": 30, "home_winner": false}
+{"event_id": "401220134", "event_start_utc": "2020-09-27T17:00Z", "away_team": "Las Vegas Raiders", "home_team": "New England Patriots", "away_score": 20, "home_score": 36, "home_winner": true}
+{"event_id": "401220254", "event_start_utc": "2020-09-27T17:00Z", "away_team": "San Francisco 49ers", "home_team": "New York Giants", "away_score": 36, "home_score": 9, "home_winner": false}
+{"event_id": "401220264", "event_start_utc": "2020-09-27T17:00Z", "away_team": "Cincinnati Bengals", "home_team": "Philadelphia Eagles", "away_score": 23, "home_score": 23, "home_winner": false}
+{"event_id": "401220173", "event_start_utc": "2020-09-27T17:00Z", "away_team": "Houston Texans", "home_team": "Pittsburgh Steelers", "away_score": 21, "home_score": 28, "home_winner": true}
+{"event_id": "401220193", "event_start_utc": "2020-09-27T20:05Z", "away_team": "New York Jets", "home_team": "Indianapolis Colts", "away_score": 7, "home_score": 36, "home_winner": true}
+{"event_id": "401220240", "event_start_utc": "2020-09-27T20:05Z", "away_team": "Carolina Panthers", "home_team": "Los Angeles Chargers", "away_score": 21, "home_score": 16, "home_winner": false}
+{"event_id": "401220216", "event_start_utc": "2020-09-27T20:25Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Denver Broncos", "away_score": 28, "home_score": 10, "home_winner": false}
+{"event_id": "401220343", "event_start_utc": "2020-09-27T20:25Z", "away_team": "Detroit Lions", "home_team": "Arizona Cardinals", "away_score": 26, "home_score": 23, "home_winner": false}
+{"event_id": "401220363", "event_start_utc": "2020-09-27T20:25Z", "away_team": "Dallas Cowboys", "home_team": "Seattle Seahawks", "away_score": 31, "home_score": 38, "home_winner": true}
+{"event_id": "401220323", "event_start_utc": "2020-09-28T00:20Z", "away_team": "Green Bay Packers", "home_team": "New Orleans Saints", "away_score": 37, "home_score": 30, "home_winner": false}
+{"event_id": "401220153", "event_start_utc": "2020-09-29T00:15Z", "away_team": "Kansas City Chiefs", "home_team": "Baltimore Ravens", "away_score": 34, "home_score": 20, "home_winner": false}
+{"event_id": "401220141", "event_start_utc": "2020-10-02T00:20Z", "away_team": "Denver Broncos", "home_team": "New York Jets", "away_score": 37, "home_score": 28, "home_winner": false}
+{"event_id": "401220157", "event_start_utc": "2020-10-04T17:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Cincinnati Bengals", "away_score": 25, "home_score": 33, "home_winner": true}
+{"event_id": "401220247", "event_start_utc": "2020-10-04T17:00Z", "away_team": "Cleveland Browns", "home_team": "Dallas Cowboys", "away_score": 49, "home_score": 38, "home_winner": false}
+{"event_id": "401220285", "event_start_utc": "2020-10-04T17:00Z", "away_team": "New Orleans Saints", "home_team": "Detroit Lions", "away_score": 35, "home_score": 29, "home_winner": false}
+{"event_id": "401220128", "event_start_utc": "2020-10-04T17:00Z", "away_team": "Seattle Seahawks", "home_team": "Miami Dolphins", "away_score": 31, "home_score": 23, "home_winner": false}
+{"event_id": "401220334", "event_start_utc": "2020-10-04T17:00Z", "away_team": "Los Angeles Chargers", "home_team": "Tampa Bay Buccaneers", "away_score": 31, "home_score": 38, "home_winner": true}
+{"event_id": "401220271", "event_start_utc": "2020-10-04T17:00Z", "away_team": "Baltimore Ravens", "home_team": "Washington", "away_score": 31, "home_score": 17, "home_winner": false}
+{"event_id": "401220320", "event_start_utc": "2020-10-04T17:00Z", "away_team": "Arizona Cardinals", "home_team": "Carolina Panthers", "away_score": 21, "home_score": 31, "home_winner": true}
+{"event_id": "401220184", "event_start_utc": "2020-10-04T17:00Z", "away_team": "Minnesota Vikings", "home_team": "Houston Texans", "away_score": 31, "home_score": 23, "home_winner": false}
+{"event_id": "401220348", "event_start_utc": "2020-10-04T20:05Z", "away_team": "New York Giants", "home_team": "Los Angeles Rams", "away_score": 9, "home_score": 17, "home_winner": true}
+{"event_id": "401220280", "event_start_utc": "2020-10-04T20:25Z", "away_team": "Indianapolis Colts", "home_team": "Chicago Bears", "away_score": 19, "home_score": 11, "home_winner": false}
+{"event_id": "401220229", "event_start_utc": "2020-10-04T20:25Z", "away_team": "Buffalo Bills", "home_team": "Las Vegas Raiders", "away_score": 30, "home_score": 23, "home_winner": false}
+{"event_id": "401220355", "event_start_utc": "2020-10-05T00:20Z", "away_team": "Philadelphia Eagles", "home_team": "San Francisco 49ers", "away_score": 25, "home_score": 20, "home_winner": false}
+{"event_id": "401220221", "event_start_utc": "2020-10-05T23:05Z", "away_team": "New England Patriots", "home_team": "Kansas City Chiefs", "away_score": 10, "home_score": 26, "home_winner": true}
+{"event_id": "401220293", "event_start_utc": "2020-10-06T01:00Z", "away_team": "Atlanta Falcons", "home_team": "Green Bay Packers", "away_score": 16, "home_score": 30, "home_winner": true}
+{"event_id": "401220278", "event_start_utc": "2020-10-09T00:20Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Chicago Bears", "away_score": 19, "home_score": 20, "home_winner": true}
+{"event_id": "401220306", "event_start_utc": "2020-10-11T17:00Z", "away_team": "Carolina Panthers", "home_team": "Atlanta Falcons", "away_score": 23, "home_score": 16, "home_winner": false}
+{"event_id": "401220219", "event_start_utc": "2020-10-11T17:00Z", "away_team": "Las Vegas Raiders", "home_team": "Kansas City Chiefs", "away_score": 40, "home_score": 32, "home_winner": false}
+{"event_id": "401220143", "event_start_utc": "2020-10-11T17:00Z", "away_team": "Arizona Cardinals", "home_team": "New York Jets", "away_score": 30, "home_score": 10, "home_winner": false}
+{"event_id": "401220175", "event_start_utc": "2020-10-11T17:00Z", "away_team": "Philadelphia Eagles", "home_team": "Pittsburgh Steelers", "away_score": 29, "home_score": 38, "home_winner": true}
+{"event_id": "401220269", "event_start_utc": "2020-10-11T17:00Z", "away_team": "Los Angeles Rams", "home_team": "Washington", "away_score": 30, "home_score": 10, "home_winner": false}
+{"event_id": "401220146", "event_start_utc": "2020-10-11T17:00Z", "away_team": "Cincinnati Bengals", "home_team": "Baltimore Ravens", "away_score": 3, "home_score": 27, "home_winner": true}
+{"event_id": "401220179", "event_start_utc": "2020-10-11T17:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Houston Texans", "away_score": 14, "home_score": 30, "home_winner": true}
+{"event_id": "401220358", "event_start_utc": "2020-10-11T20:05Z", "away_team": "Miami Dolphins", "home_team": "San Francisco 49ers", "away_score": 43, "home_score": 17, "home_winner": false}
+{"event_id": "401220166", "event_start_utc": "2020-10-11T20:25Z", "away_team": "Indianapolis Colts", "home_team": "Cleveland Browns", "away_score": 23, "home_score": 32, "home_winner": true}
+{"event_id": "401220242", "event_start_utc": "2020-10-11T20:25Z", "away_team": "New York Giants", "home_team": "Dallas Cowboys", "away_score": 34, "home_score": 37, "home_winner": true}
+{"event_id": "401220367", "event_start_utc": "2020-10-12T00:20Z", "away_team": "Minnesota Vikings", "home_team": "Seattle Seahawks", "away_score": 26, "home_score": 27, "home_winner": true}
+{"event_id": "401220326", "event_start_utc": "2020-10-13T00:15Z", "away_team": "Los Angeles Chargers", "home_team": "New Orleans Saints", "away_score": 27, "home_score": 30, "home_winner": true}
+{"event_id": "401220209", "event_start_utc": "2020-10-13T23:00Z", "away_team": "Buffalo Bills", "home_team": "Tennessee Titans", "away_score": 16, "home_score": 42, "home_winner": true}
+{"event_id": "401220202", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Houston Texans", "home_team": "Tennessee Titans", "away_score": 36, "home_score": 42, "home_winner": true}
+{"event_id": "401220190", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Cincinnati Bengals", "home_team": "Indianapolis Colts", "away_score": 27, "home_score": 31, "home_winner": true}
+{"event_id": "401220301", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Atlanta Falcons", "home_team": "Minnesota Vikings", "away_score": 40, "home_score": 23, "home_winner": false}
+{"event_id": "401220133", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Denver Broncos", "home_team": "New England Patriots", "away_score": 18, "home_score": 12, "home_winner": false}
+{"event_id": "401220252", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Washington", "home_team": "New York Giants", "away_score": 19, "home_score": 20, "home_winner": true}
+{"event_id": "401220263", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Baltimore Ravens", "home_team": "Philadelphia Eagles", "away_score": 30, "home_score": 28, "home_winner": false}
+{"event_id": "401220172", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Cleveland Browns", "home_team": "Pittsburgh Steelers", "away_score": 7, "home_score": 38, "home_winner": true}
+{"event_id": "401220317", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Chicago Bears", "home_team": "Carolina Panthers", "away_score": 23, "home_score": 16, "home_winner": false}
+{"event_id": "401220200", "event_start_utc": "2020-10-18T17:00Z", "away_team": "Detroit Lions", "home_team": "Jacksonville Jaguars", "away_score": 34, "home_score": 16, "home_winner": false}
+{"event_id": "401220124", "event_start_utc": "2020-10-18T20:05Z", "away_team": "New York Jets", "home_team": "Miami Dolphins", "away_score": 0, "home_score": 24, "home_winner": true}
+{"event_id": "401220331", "event_start_utc": "2020-10-18T20:25Z", "away_team": "Green Bay Packers", "home_team": "Tampa Bay Buccaneers", "away_score": 10, "home_score": 38, "home_winner": true}
+{"event_id": "401220114", "event_start_utc": "2021-01-03T18:00Z", "away_team": "Miami Dolphins", "home_team": "Buffalo Bills", "away_score": 26, "home_score": 56, "home_winner": true}
+{"event_id": "401220154", "event_start_utc": "2021-01-03T18:00Z", "away_team": "Baltimore Ravens", "home_team": "Cincinnati Bengals", "away_score": 38, "home_score": 3, "home_winner": false}
+{"event_id": "401220164", "event_start_utc": "2021-01-03T18:00Z", "away_team": "Pittsburgh Steelers", "home_team": "Cleveland Browns", "away_score": 22, "home_score": 24, "home_winner": true}
+{"event_id": "401220284", "event_start_utc": "2021-01-03T18:00Z", "away_team": "Minnesota Vikings", "home_team": "Detroit Lions", "away_score": 37, "home_score": 35, "home_winner": false}
+{"event_id": "401220132", "event_start_utc": "2021-01-03T18:00Z", "away_team": "New York Jets", "home_team": "New England Patriots", "away_score": 14, "home_score": 28, "home_winner": true}
+{"event_id": "401220250", "event_start_utc": "2021-01-03T18:00Z", "away_team": "Dallas Cowboys", "home_team": "New York Giants", "away_score": 19, "home_score": 23, "home_winner": true}
+{"event_id": "401220328", "event_start_utc": "2021-01-03T18:00Z", "away_team": "Atlanta Falcons", "home_team": "Tampa Bay Buccaneers", "away_score": 27, "home_score": 44, "home_winner": true}
+{"event_id": "401220275", "event_start_utc": "2021-01-03T21:25Z", "away_team": "Green Bay Packers", "home_team": "Chicago Bears", "away_score": 35, "home_score": 16, "home_winner": false}
+{"event_id": "401220211", "event_start_utc": "2021-01-03T21:25Z", "away_team": "Las Vegas Raiders", "home_team": "Denver Broncos", "away_score": 32, "home_score": 31, "home_winner": false}
+{"event_id": "401220187", "event_start_utc": "2021-01-03T21:25Z", "away_team": "Jacksonville Jaguars", "home_team": "Indianapolis Colts", "away_score": 14, "home_score": 28, "home_winner": true}
+{"event_id": "401220220", "event_start_utc": "2021-01-03T21:25Z", "away_team": "Los Angeles Chargers", "home_team": "Kansas City Chiefs", "away_score": 38, "home_score": 21, "home_winner": false}
+{"event_id": "401220344", "event_start_utc": "2021-01-03T21:25Z", "away_team": "Arizona Cardinals", "home_team": "Los Angeles Rams", "away_score": 7, "home_score": 18, "home_winner": true}
+{"event_id": "401220354", "event_start_utc": "2021-01-03T21:25Z", "away_team": "Seattle Seahawks", "home_team": "San Francisco 49ers", "away_score": 26, "home_score": 23, "home_winner": false}
+{"event_id": "401220315", "event_start_utc": "2021-01-03T21:25Z", "away_team": "New Orleans Saints", "home_team": "Carolina Panthers", "away_score": 33, "home_score": 7, "home_winner": false}
+{"event_id": "401220180", "event_start_utc": "2021-01-03T21:25Z", "away_team": "Tennessee Titans", "home_team": "Houston Texans", "away_score": 41, "home_score": 38, "home_winner": false}
+{"event_id": "401220260", "event_start_utc": "2021-01-04T01:20Z", "away_team": "Washington", "home_team": "Philadelphia Eagles", "away_score": 20, "home_score": 14, "home_winner": false}
+{"event_id": "401220393", "event_start_utc": "2021-01-09T18:05Z", "away_team": "Indianapolis Colts", "home_team": "Buffalo Bills", "away_score": 24, "home_score": 27, "home_winner": true}
+{"event_id": "401220372", "event_start_utc": "2021-01-09T21:40Z", "away_team": "Los Angeles Rams", "home_team": "Seattle Seahawks", "away_score": 30, "home_score": 20, "home_winner": false}
+{"event_id": "401220371", "event_start_utc": "2021-01-10T01:15Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Washington", "away_score": 31, "home_score": 23, "home_winner": false}
+{"event_id": "401220396", "event_start_utc": "2021-01-10T18:05Z", "away_team": "Baltimore Ravens", "home_team": "Tennessee Titans", "away_score": 20, "home_score": 13, "home_winner": false}
+{"event_id": "401220395", "event_start_utc": "2021-01-10T21:40Z", "away_team": "Chicago Bears", "home_team": "New Orleans Saints", "away_score": 9, "home_score": 21, "home_winner": true}
+{"event_id": "401220394", "event_start_utc": "2021-01-11T01:15Z", "away_team": "Cleveland Browns", "home_team": "Pittsburgh Steelers", "away_score": 48, "home_score": 37, "home_winner": false}
+{"event_id": "401220398", "event_start_utc": "2021-01-16T21:35Z", "away_team": "Los Angeles Rams", "home_team": "Green Bay Packers", "away_score": 18, "home_score": 32, "home_winner": true}
+{"event_id": "401220397", "event_start_utc": "2021-01-17T01:15Z", "away_team": "Baltimore Ravens", "home_team": "Buffalo Bills", "away_score": 3, "home_score": 17, "home_winner": true}
+{"event_id": "401220400", "event_start_utc": "2021-01-17T20:05Z", "away_team": "Cleveland Browns", "home_team": "Kansas City Chiefs", "away_score": 17, "home_score": 22, "home_winner": true}
+{"event_id": "401220399", "event_start_utc": "2021-01-17T23:40Z", "away_team": "Tampa Bay Buccaneers", "home_team": "New Orleans Saints", "away_score": 30, "home_score": 20, "home_winner": false}
+{"event_id": "401220402", "event_start_utc": "2021-01-24T20:05Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Green Bay Packers", "away_score": 31, "home_score": 26, "home_winner": false}
+{"event_id": "401220401", "event_start_utc": "2021-01-24T23:40Z", "away_team": "Buffalo Bills", "home_team": "Kansas City Chiefs", "away_score": 24, "home_score": 38, "home_winner": true}
+{"event_id": "401220403", "event_start_utc": "2021-02-07T23:30Z", "away_team": "Kansas City Chiefs", "home_team": "Tampa Bay Buccaneers", "away_score": 9, "home_score": 31, "home_winner": true}
+{"event_id": "401326605", "event_start_utc": "2021-08-06T00:00Z", "away_team": "Dallas Cowboys", "home_team": "Pittsburgh Steelers", "away_score": 3, "home_score": 16, "home_winner": true}
+{"event_id": "401326352", "event_start_utc": "2021-08-12T23:30Z", "away_team": "Washington", "home_team": "New England Patriots", "away_score": 13, "home_score": 22, "home_winner": true}
+{"event_id": "401326606", "event_start_utc": "2021-08-12T23:30Z", "away_team": "Pittsburgh Steelers", "home_team": "Philadelphia Eagles", "away_score": 24, "home_score": 16, "home_winner": false}
+{"event_id": "401326621", "event_start_utc": "2021-08-13T23:00Z", "away_team": "Tennessee Titans", "home_team": "Atlanta Falcons", "away_score": 23, "home_score": 3, "home_winner": false}
+{"event_id": "401327515", "event_start_utc": "2021-08-13T23:00Z", "away_team": "Buffalo Bills", "home_team": "Detroit Lions", "away_score": 16, "home_score": 15, "home_winner": false}
+{"event_id": "401332403", "event_start_utc": "2021-08-14T02:00Z", "away_team": "Dallas Cowboys", "home_team": "Arizona Cardinals", "away_score": 16, "home_score": 19, "home_winner": true}
+{"event_id": "401326617", "event_start_utc": "2021-08-14T17:00Z", "away_team": "Miami Dolphins", "home_team": "Chicago Bears", "away_score": 13, "home_score": 20, "home_winner": true}
+{"event_id": "401333579", "event_start_utc": "2021-08-14T20:00Z", "away_team": "Denver Broncos", "home_team": "Minnesota Vikings", "away_score": 33, "home_score": 6, "home_winner": false}
+{"event_id": "401330875", "event_start_utc": "2021-08-14T23:00Z", "away_team": "Cleveland Browns", "home_team": "Jacksonville Jaguars", "away_score": 23, "home_score": 13, "home_winner": false}
+{"event_id": "401326921", "event_start_utc": "2021-08-14T23:00Z", "away_team": "New Orleans Saints", "home_team": "Baltimore Ravens", "away_score": 14, "home_score": 17, "home_winner": true}
+{"event_id": "401333568", "event_start_utc": "2021-08-14T23:30Z", "away_team": "New York Jets", "home_team": "New York Giants", "away_score": 12, "home_score": 7, "home_winner": false}
+{"event_id": "401326351", "event_start_utc": "2021-08-14T23:30Z", "away_team": "Cincinnati Bengals", "home_team": "Tampa Bay Buccaneers", "away_score": 19, "home_score": 14, "home_winner": false}
+{"event_id": "401326604", "event_start_utc": "2021-08-15T00:00Z", "away_team": "Houston Texans", "home_team": "Green Bay Packers", "away_score": 26, "home_score": 7, "home_winner": false}
+{"event_id": "401329166", "event_start_utc": "2021-08-15T00:30Z", "away_team": "Kansas City Chiefs", "home_team": "San Francisco 49ers", "away_score": 19, "home_score": 16, "home_winner": false}
+{"event_id": "401333584", "event_start_utc": "2021-08-15T01:00Z", "away_team": "Seattle Seahawks", "home_team": "Las Vegas Raiders", "away_score": 7, "home_score": 20, "home_winner": true}
+{"event_id": "401329163", "event_start_utc": "2021-08-15T02:00Z", "away_team": "Los Angeles Chargers", "home_team": "Los Angeles Rams", "away_score": 13, "home_score": 6, "home_winner": false}
+{"event_id": "401333578", "event_start_utc": "2021-08-15T17:00Z", "away_team": "Carolina Panthers", "home_team": "Indianapolis Colts", "away_score": 18, "home_score": 21, "home_winner": true}
+{"event_id": "401326613", "event_start_utc": "2021-08-19T23:30Z", "away_team": "New England Patriots", "home_team": "Philadelphia Eagles", "away_score": 35, "home_score": 0, "home_winner": false}
+{"event_id": "401326624", "event_start_utc": "2021-08-21T00:00Z", "away_team": "Kansas City Chiefs", "home_team": "Arizona Cardinals", "away_score": 17, "home_score": 10, "home_winner": false}
+{"event_id": "401326954", "event_start_utc": "2021-08-21T00:00Z", "away_team": "Cincinnati Bengals", "home_team": "Washington", "away_score": 13, "home_score": 17, "home_winner": true}
+{"event_id": "401326622", "event_start_utc": "2021-08-21T17:00Z", "away_team": "Buffalo Bills", "home_team": "Chicago Bears", "away_score": 41, "home_score": 15, "home_winner": false}
+{"event_id": "401326609", "event_start_utc": "2021-08-21T20:25Z", "away_team": "New York Jets", "home_team": "Green Bay Packers", "away_score": 23, "home_score": 14, "home_winner": false}
+{"event_id": "401326618", "event_start_utc": "2021-08-21T23:00Z", "away_team": "Atlanta Falcons", "home_team": "Miami Dolphins", "away_score": 17, "home_score": 37, "home_winner": true}
+{"event_id": "401326922", "event_start_utc": "2021-08-21T23:00Z", "away_team": "Baltimore Ravens", "home_team": "Carolina Panthers", "away_score": 20, "home_score": 3, "home_winner": false}
+{"event_id": "401326607", "event_start_utc": "2021-08-21T23:30Z", "away_team": "Detroit Lions", "home_team": "Pittsburgh Steelers", "away_score": 20, "home_score": 26, "home_winner": true}
+{"event_id": "401326614", "event_start_utc": "2021-08-21T23:30Z", "away_team": "Tennessee Titans", "home_team": "Tampa Bay Buccaneers", "away_score": 34, "home_score": 3, "home_winner": false}
+{"event_id": "401333536", "event_start_utc": "2021-08-22T00:00Z", "away_team": "Houston Texans", "home_team": "Dallas Cowboys", "away_score": 20, "home_score": 14, "home_winner": false}
+{"event_id": "401333582", "event_start_utc": "2021-08-22T00:00Z", "away_team": "Indianapolis Colts", "home_team": "Minnesota Vikings", "away_score": 12, "home_score": 10, "home_winner": false}
+{"event_id": "401329164", "event_start_utc": "2021-08-22T02:00Z", "away_team": "Las Vegas Raiders", "home_team": "Los Angeles Rams", "away_score": 17, "home_score": 16, "home_winner": false}
+{"event_id": "401333580", "event_start_utc": "2021-08-22T02:00Z", "away_team": "Denver Broncos", "home_team": "Seattle Seahawks", "away_score": 30, "home_score": 3, "home_winner": false}
+{"event_id": "401333560", "event_start_utc": "2021-08-22T17:00Z", "away_team": "New York Giants", "home_team": "Cleveland Browns", "away_score": 13, "home_score": 17, "home_winner": true}
+{"event_id": "401329167", "event_start_utc": "2021-08-22T23:30Z", "away_team": "San Francisco 49ers", "home_team": "Los Angeles Chargers", "away_score": 15, "home_score": 10, "home_winner": false}
+{"event_id": "401326620", "event_start_utc": "2021-08-24T00:00Z", "away_team": "Jacksonville Jaguars", "home_team": "New Orleans Saints", "away_score": 21, "home_score": 23, "home_winner": true}
+{"event_id": "401333581", "event_start_utc": "2021-08-27T23:00Z", "away_team": "Indianapolis Colts", "home_team": "Detroit Lions", "away_score": 27, "home_score": 17, "home_winner": false}
+{"event_id": "401333570", "event_start_utc": "2021-08-27T23:30Z", "away_team": "Philadelphia Eagles", "home_team": "New York Jets", "away_score": 31, "home_score": 31, "home_winner": false}
+{"event_id": "401326608", "event_start_utc": "2021-08-27T23:30Z", "away_team": "Pittsburgh Steelers", "home_team": "Carolina Panthers", "away_score": 9, "home_score": 34, "home_winner": true}
+{"event_id": "401333583", "event_start_utc": "2021-08-28T00:00Z", "away_team": "Minnesota Vikings", "home_team": "Kansas City Chiefs", "away_score": 25, "home_score": 28, "home_winner": true}
+{"event_id": "401326610", "event_start_utc": "2021-08-28T17:00Z", "away_team": "Green Bay Packers", "home_team": "Buffalo Bills", "away_score": 0, "home_score": 19, "home_winner": true}
+{"event_id": "401326923", "event_start_utc": "2021-08-28T22:00Z", "away_team": "Baltimore Ravens", "home_team": "Washington", "away_score": 37, "home_score": 3, "home_winner": false}
+{"event_id": "401326623", "event_start_utc": "2021-08-28T23:00Z", "away_team": "Chicago Bears", "home_team": "Tennessee Titans", "away_score": 27, "home_score": 24, "home_winner": false}
+{"event_id": "401326615", "event_start_utc": "2021-08-29T00:00Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Houston Texans", "away_score": 23, "home_score": 16, "home_winner": false}
+{"event_id": "401327826", "event_start_utc": "2021-08-29T01:05Z", "away_team": "Los Angeles Rams", "home_team": "Denver Broncos", "away_score": 12, "home_score": 17, "home_winner": true}
+{"event_id": "401333585", "event_start_utc": "2021-08-29T02:00Z", "away_team": "Los Angeles Chargers", "home_team": "Seattle Seahawks", "away_score": 0, "home_score": 27, "home_winner": true}
+{"event_id": "401330876", "event_start_utc": "2021-08-29T17:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Dallas Cowboys", "away_score": 34, "home_score": 14, "home_winner": false}
+{"event_id": "401326619", "event_start_utc": "2021-08-29T20:00Z", "away_team": "Miami Dolphins", "home_team": "Cincinnati Bengals", "away_score": 29, "home_score": 26, "home_winner": false}
+{"event_id": "401329168", "event_start_utc": "2021-08-29T20:00Z", "away_team": "Las Vegas Raiders", "home_team": "San Francisco 49ers", "away_score": 10, "home_score": 34, "home_winner": true}
+{"event_id": "401326616", "event_start_utc": "2021-08-29T22:00Z", "away_team": "New England Patriots", "home_team": "New York Giants", "away_score": 22, "home_score": 20, "home_winner": false}
+{"event_id": "401326603", "event_start_utc": "2021-08-30T00:00Z", "away_team": "Cleveland Browns", "home_team": "Atlanta Falcons", "away_score": 19, "home_score": 10, "home_winner": false}
+{"event_id": "401326322", "event_start_utc": "2021-09-10T00:20Z", "away_team": "Dallas Cowboys", "home_team": "Tampa Bay Buccaneers", "away_score": 29, "home_score": 31, "home_winner": true}
+{"event_id": "401326315", "event_start_utc": "2021-09-12T17:00Z", "away_team": "Philadelphia Eagles", "home_team": "Atlanta Falcons", "away_score": 32, "home_score": 6, "home_winner": false}
+{"event_id": "401326308", "event_start_utc": "2021-09-12T17:00Z", "away_team": "Pittsburgh Steelers", "home_team": "Buffalo Bills", "away_score": 23, "home_score": 16, "home_winner": false}
+{"event_id": "401326316", "event_start_utc": "2021-09-12T17:00Z", "away_team": "Minnesota Vikings", "home_team": "Cincinnati Bengals", "away_score": 24, "home_score": 27, "home_winner": true}
+{"event_id": "401326317", "event_start_utc": "2021-09-12T17:00Z", "away_team": "San Francisco 49ers", "home_team": "Detroit Lions", "away_score": 41, "home_score": 33, "home_winner": false}
+{"event_id": "401326311", "event_start_utc": "2021-09-12T17:00Z", "away_team": "Arizona Cardinals", "home_team": "Tennessee Titans", "away_score": 38, "home_score": 13, "home_winner": false}
+{"event_id": "401326318", "event_start_utc": "2021-09-12T17:00Z", "away_team": "Seattle Seahawks", "home_team": "Indianapolis Colts", "away_score": 28, "home_score": 16, "home_winner": false}
+{"event_id": "401326312", "event_start_utc": "2021-09-12T17:00Z", "away_team": "Los Angeles Chargers", "home_team": "Washington", "away_score": 20, "home_score": 16, "home_winner": false}
+{"event_id": "401326309", "event_start_utc": "2021-09-12T17:00Z", "away_team": "New York Jets", "home_team": "Carolina Panthers", "away_score": 14, "home_score": 19, "home_winner": true}
+{"event_id": "401326310", "event_start_utc": "2021-09-12T17:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Houston Texans", "away_score": 21, "home_score": 37, "home_winner": true}
+{"event_id": "401326314", "event_start_utc": "2021-09-12T20:25Z", "away_team": "Cleveland Browns", "home_team": "Kansas City Chiefs", "away_score": 29, "home_score": 33, "home_winner": true}
+{"event_id": "401326313", "event_start_utc": "2021-09-12T20:25Z", "away_team": "Miami Dolphins", "home_team": "New England Patriots", "away_score": 17, "home_score": 16, "home_winner": false}
+{"event_id": "401326319", "event_start_utc": "2021-09-12T20:25Z", "away_team": "Green Bay Packers", "home_team": "New Orleans Saints", "away_score": 3, "home_score": 38, "home_winner": true}
+{"event_id": "401326320", "event_start_utc": "2021-09-12T20:25Z", "away_team": "Denver Broncos", "home_team": "New York Giants", "away_score": 27, "home_score": 13, "home_winner": false}
+{"event_id": "401326323", "event_start_utc": "2021-09-13T00:20Z", "away_team": "Chicago Bears", "home_team": "Los Angeles Rams", "away_score": 14, "home_score": 34, "home_winner": true}
+{"event_id": "401326321", "event_start_utc": "2021-09-14T00:15Z", "away_team": "Baltimore Ravens", "home_team": "Las Vegas Raiders", "away_score": 27, "home_score": 33, "home_winner": true}
+{"event_id": "401326127", "event_start_utc": "2021-09-17T00:20Z", "away_team": "New York Giants", "home_team": "Washington", "away_score": 29, "home_score": 30, "home_winner": true}
+{"event_id": "401326129", "event_start_utc": "2021-09-19T17:00Z", "away_team": "Cincinnati Bengals", "home_team": "Chicago Bears", "away_score": 17, "home_score": 20, "home_winner": true}
+{"event_id": "401326130", "event_start_utc": "2021-09-19T17:00Z", "away_team": "Houston Texans", "home_team": "Cleveland Browns", "away_score": 21, "home_score": 31, "home_winner": true}
+{"event_id": "401326131", "event_start_utc": "2021-09-19T17:00Z", "away_team": "Los Angeles Rams", "home_team": "Indianapolis Colts", "away_score": 27, "home_score": 24, "home_winner": false}
+{"event_id": "401326353", "event_start_utc": "2021-09-19T17:00Z", "away_team": "Buffalo Bills", "home_team": "Miami Dolphins", "away_score": 35, "home_score": 0, "home_winner": false}
+{"event_id": "401326354", "event_start_utc": "2021-09-19T17:00Z", "away_team": "New England Patriots", "home_team": "New York Jets", "away_score": 25, "home_score": 6, "home_winner": false}
+{"event_id": "401326355", "event_start_utc": "2021-09-19T17:00Z", "away_team": "San Francisco 49ers", "home_team": "Philadelphia Eagles", "away_score": 17, "home_score": 11, "home_winner": false}
+{"event_id": "401326569", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Atlanta Falcons", "home_team": "Buffalo Bills", "away_score": 15, "home_score": 29, "home_winner": true}
+{"event_id": "401326570", "event_start_utc": "2022-01-02T18:00Z", "away_team": "New York Giants", "home_team": "Chicago Bears", "away_score": 3, "home_score": 29, "home_winner": true}
+{"event_id": "401326571", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Kansas City Chiefs", "home_team": "Cincinnati Bengals", "away_score": 31, "home_score": 34, "home_winner": true}
+{"event_id": "401326577", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Miami Dolphins", "home_team": "Tennessee Titans", "away_score": 3, "home_score": 34, "home_winner": true}
+{"event_id": "401326573", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Las Vegas Raiders", "home_team": "Indianapolis Colts", "away_score": 23, "home_score": 20, "home_winner": false}
+{"event_id": "401326574", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Jacksonville Jaguars", "home_team": "New England Patriots", "away_score": 10, "home_score": 50, "home_winner": true}
+{"event_id": "401326576", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Tampa Bay Buccaneers", "home_team": "New York Jets", "away_score": 28, "home_score": 24, "home_winner": false}
+{"event_id": "401326578", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Philadelphia Eagles", "home_team": "Washington", "away_score": 20, "home_score": 16, "home_winner": false}
+{"event_id": "401326581", "event_start_utc": "2022-01-02T18:00Z", "away_team": "Los Angeles Rams", "home_team": "Baltimore Ravens", "away_score": 20, "home_score": 19, "home_winner": false}
+{"event_id": "401326579", "event_start_utc": "2022-01-02T21:05Z", "away_team": "Denver Broncos", "home_team": "Los Angeles Chargers", "away_score": 13, "home_score": 34, "home_winner": true}
+{"event_id": "401326580", "event_start_utc": "2022-01-02T21:05Z", "away_team": "Houston Texans", "home_team": "San Francisco 49ers", "away_score": 7, "home_score": 23, "home_winner": true}
+{"event_id": "401326572", "event_start_utc": "2022-01-02T21:25Z", "away_team": "Arizona Cardinals", "home_team": "Dallas Cowboys", "away_score": 25, "home_score": 22, "home_winner": false}
+{"event_id": "401326575", "event_start_utc": "2022-01-02T21:25Z", "away_team": "Carolina Panthers", "home_team": "New Orleans Saints", "away_score": 10, "home_score": 18, "home_winner": true}
+{"event_id": "401326582", "event_start_utc": "2022-01-02T21:25Z", "away_team": "Detroit Lions", "home_team": "Seattle Seahawks", "away_score": 29, "home_score": 51, "home_winner": true}
+{"event_id": "401326583", "event_start_utc": "2022-01-03T01:20Z", "away_team": "Minnesota Vikings", "home_team": "Green Bay Packers", "away_score": 10, "home_score": 37, "home_winner": true}
+{"event_id": "401326584", "event_start_utc": "2022-01-04T01:15Z", "away_team": "Cleveland Browns", "home_team": "Pittsburgh Steelers", "away_score": 14, "home_score": 26, "home_winner": true}
+{"event_id": "401326598", "event_start_utc": "2022-01-08T21:30Z", "away_team": "Kansas City Chiefs", "home_team": "Denver Broncos", "away_score": 28, "home_score": 24, "home_winner": false}
+{"event_id": "401326595", "event_start_utc": "2022-01-09T01:15Z", "away_team": "Dallas Cowboys", "home_team": "Philadelphia Eagles", "away_score": 51, "home_score": 26, "home_winner": false}
+{"event_id": "401326588", "event_start_utc": "2022-01-09T18:00Z", "away_team": "Cincinnati Bengals", "home_team": "Cleveland Browns", "away_score": 16, "home_score": 21, "home_winner": true}
+{"event_id": "401326589", "event_start_utc": "2022-01-09T18:00Z", "away_team": "Green Bay Packers", "home_team": "Detroit Lions", "away_score": 30, "home_score": 37, "home_winner": true}
+{"event_id": "401326593", "event_start_utc": "2022-01-09T18:00Z", "away_team": "Chicago Bears", "home_team": "Minnesota Vikings", "away_score": 17, "home_score": 31, "home_winner": true}
+{"event_id": "401326594", "event_start_utc": "2022-01-09T18:00Z", "away_team": "Washington", "home_team": "New York Giants", "away_score": 22, "home_score": 7, "home_winner": false}
+{"event_id": "401326591", "event_start_utc": "2022-01-09T18:00Z", "away_team": "Indianapolis Colts", "home_team": "Jacksonville Jaguars", "away_score": 11, "home_score": 26, "home_winner": true}
+{"event_id": "401326586", "event_start_utc": "2022-01-09T18:00Z", "away_team": "Pittsburgh Steelers", "home_team": "Baltimore Ravens", "away_score": 16, "home_score": 13, "home_winner": false}
+{"event_id": "401326590", "event_start_utc": "2022-01-09T18:00Z", "away_team": "Tennessee Titans", "home_team": "Houston Texans", "away_score": 28, "home_score": 25, "home_winner": false}
+{"event_id": "401326585", "event_start_utc": "2022-01-09T21:25Z", "away_team": "New Orleans Saints", "home_team": "Atlanta Falcons", "away_score": 30, "home_score": 20, "home_winner": false}
+{"event_id": "401326587", "event_start_utc": "2022-01-09T21:25Z", "away_team": "New York Jets", "home_team": "Buffalo Bills", "away_score": 10, "home_score": 27, "home_winner": true}
+{"event_id": "401326599", "event_start_utc": "2022-01-09T21:25Z", "away_team": "San Francisco 49ers", "home_team": "Los Angeles Rams", "away_score": 27, "home_score": 24, "home_winner": false}
+{"event_id": "401326592", "event_start_utc": "2022-01-09T21:25Z", "away_team": "New England Patriots", "home_team": "Miami Dolphins", "away_score": 24, "home_score": 33, "home_winner": true}
+{"event_id": "401326597", "event_start_utc": "2022-01-09T21:25Z", "away_team": "Seattle Seahawks", "home_team": "Arizona Cardinals", "away_score": 38, "home_score": 30, "home_winner": false}
+{"event_id": "401326596", "event_start_utc": "2022-01-09T21:25Z", "away_team": "Carolina Panthers", "home_team": "Tampa Bay Buccaneers", "away_score": 17, "home_score": 41, "home_winner": true}
+{"event_id": "401326600", "event_start_utc": "2022-01-10T01:20Z", "away_team": "Los Angeles Chargers", "home_team": "Las Vegas Raiders", "away_score": 32, "home_score": 35, "home_winner": true}
+{"event_id": "401326627", "event_start_utc": "2022-01-15T21:30Z", "away_team": "Las Vegas Raiders", "home_team": "Cincinnati Bengals", "away_score": 19, "home_score": 26, "home_winner": true}
+{"event_id": "401326626", "event_start_utc": "2022-01-16T01:15Z", "away_team": "New England Patriots", "home_team": "Buffalo Bills", "away_score": 17, "home_score": 47, "home_winner": true}
+{"event_id": "401326630", "event_start_utc": "2022-01-16T18:00Z", "away_team": "Philadelphia Eagles", "home_team": "Tampa Bay Buccaneers", "away_score": 15, "home_score": 31, "home_winner": true}
+{"event_id": "401326629", "event_start_utc": "2022-01-16T21:30Z", "away_team": "San Francisco 49ers", "home_team": "Dallas Cowboys", "away_score": 23, "home_score": 17, "home_winner": false}
+{"event_id": "401326628", "event_start_utc": "2022-01-17T01:15Z", "away_team": "Pittsburgh Steelers", "home_team": "Kansas City Chiefs", "away_score": 21, "home_score": 42, "home_winner": true}
+{"event_id": "401326625", "event_start_utc": "2022-01-18T01:15Z", "away_team": "Arizona Cardinals", "home_team": "Los Angeles Rams", "away_score": 11, "home_score": 34, "home_winner": true}
+{"event_id": "401326632", "event_start_utc": "2022-01-22T21:30Z", "away_team": "Cincinnati Bengals", "home_team": "Tennessee Titans", "away_score": 19, "home_score": 16, "home_winner": false}
+{"event_id": "401326631", "event_start_utc": "2022-01-23T01:15Z", "away_team": "San Francisco 49ers", "home_team": "Green Bay Packers", "away_score": 13, "home_score": 10, "home_winner": false}
+{"event_id": "401326634", "event_start_utc": "2022-01-23T20:00Z", "away_team": "Los Angeles Rams", "home_team": "Tampa Bay Buccaneers", "away_score": 30, "home_score": 27, "home_winner": false}
+{"event_id": "401326633", "event_start_utc": "2022-01-23T23:30Z", "away_team": "Buffalo Bills", "home_team": "Kansas City Chiefs", "away_score": 36, "home_score": 42, "home_winner": true}
+{"event_id": "401326635", "event_start_utc": "2022-01-30T20:00Z", "away_team": "Cincinnati Bengals", "home_team": "Kansas City Chiefs", "away_score": 27, "home_score": 24, "home_winner": false}
+{"event_id": "401326636", "event_start_utc": "2022-01-30T23:30Z", "away_team": "San Francisco 49ers", "home_team": "Los Angeles Rams", "away_score": 17, "home_score": 20, "home_winner": true}
+{"event_id": "401326637", "event_start_utc": "2022-02-06T20:00Z", "away_team": "NFC", "home_team": "AFC", "away_score": 35, "home_score": 41, "home_winner": true}
+{"event_id": "401326638", "event_start_utc": "2022-02-13T23:30Z", "away_team": "Los Angeles Rams", "home_team": "Cincinnati Bengals", "away_score": 23, "home_score": 20, "home_winner": false}
+{"event_id": "401437964", "event_start_utc": "2022-08-05T00:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Las Vegas Raiders", "away_score": 11, "home_score": 27, "home_winner": true}
+{"event_id": "401439619", "event_start_utc": "2022-08-11T23:00Z", "away_team": "New York Giants", "home_team": "New England Patriots", "away_score": 23, "home_score": 21, "home_winner": false}
+{"event_id": "401437967", "event_start_utc": "2022-08-11T23:30Z", "away_team": "Tennessee Titans", "home_team": "Baltimore Ravens", "away_score": 10, "home_score": 23, "home_winner": true}
+{"event_id": "401441652", "event_start_utc": "2022-08-12T22:00Z", "away_team": "Atlanta Falcons", "home_team": "Detroit Lions", "away_score": 27, "home_score": 23, "home_winner": false}
+{"event_id": "401437965", "event_start_utc": "2022-08-12T23:00Z", "away_team": "Cleveland Browns", "home_team": "Jacksonville Jaguars", "away_score": 24, "home_score": 13, "home_winner": false}
+{"event_id": "401439661", "event_start_utc": "2022-08-12T23:30Z", "away_team": "Arizona Cardinals", "home_team": "Cincinnati Bengals", "away_score": 36, "home_score": 23, "home_winner": false}
+{"event_id": "401437970", "event_start_utc": "2022-08-12T23:30Z", "away_team": "New York Jets", "home_team": "Philadelphia Eagles", "away_score": 24, "home_score": 21, "home_winner": false}
+{"event_id": "401440370", "event_start_utc": "2022-08-13T00:30Z", "away_team": "Green Bay Packers", "home_team": "San Francisco 49ers", "away_score": 21, "home_score": 28, "home_winner": true}
+{"event_id": "401437979", "event_start_utc": "2022-08-13T17:00Z", "away_team": "Kansas City Chiefs", "home_team": "Chicago Bears", "away_score": 14, "home_score": 19, "home_winner": true}
+{"event_id": "401440372", "event_start_utc": "2022-08-13T17:00Z", "away_team": "Carolina Panthers", "home_team": "Washington Commanders", "away_score": 23, "home_score": 21, "home_winner": false}
+{"event_id": "401438010", "event_start_utc": "2022-08-13T20:00Z", "away_team": "Indianapolis Colts", "home_team": "Buffalo Bills", "away_score": 24, "home_score": 27, "home_winner": true}
+{"event_id": "401437997", "event_start_utc": "2022-08-13T23:00Z", "away_team": "Seattle Seahawks", "home_team": "Pittsburgh Steelers", "away_score": 25, "home_score": 32, "home_winner": true}
+{"event_id": "401438013", "event_start_utc": "2022-08-13T23:30Z", "away_team": "Miami Dolphins", "home_team": "Tampa Bay Buccaneers", "away_score": 26, "home_score": 24, "home_winner": false}
+{"event_id": "401438410", "event_start_utc": "2022-08-14T00:00Z", "away_team": "New Orleans Saints", "home_team": "Houston Texans", "away_score": 13, "home_score": 17, "home_winner": true}
+{"event_id": "401438174", "event_start_utc": "2022-08-14T01:00Z", "away_team": "Dallas Cowboys", "home_team": "Denver Broncos", "away_score": 7, "home_score": 17, "home_winner": true}
+{"event_id": "401438178", "event_start_utc": "2022-08-14T02:00Z", "away_team": "Los Angeles Rams", "home_team": "Los Angeles Chargers", "away_score": 29, "home_score": 22, "home_winner": false}
+{"event_id": "401439621", "event_start_utc": "2022-08-14T20:25Z", "away_team": "Minnesota Vikings", "home_team": "Las Vegas Raiders", "away_score": 20, "home_score": 26, "home_winner": true}
+{"event_id": "401437976", "event_start_utc": "2022-08-19T00:00Z", "away_team": "Chicago Bears", "home_team": "Seattle Seahawks", "away_score": 27, "home_score": 11, "home_winner": false}
+{"event_id": "401439620", "event_start_utc": "2022-08-19T23:00Z", "away_team": "Carolina Panthers", "home_team": "New England Patriots", "away_score": 10, "home_score": 20, "home_winner": true}
+{"event_id": "401441810", "event_start_utc": "2022-08-20T00:00Z", "away_team": "New Orleans Saints", "home_team": "Green Bay Packers", "away_score": 10, "home_score": 20, "home_winner": true}
+{"event_id": "401441653", "event_start_utc": "2022-08-20T02:00Z", "away_team": "Houston Texans", "home_team": "Los Angeles Rams", "away_score": 24, "home_score": 20, "home_winner": false}
+{"event_id": "401438411", "event_start_utc": "2022-08-20T17:00Z", "away_team": "Denver Broncos", "home_team": "Buffalo Bills", "away_score": 15, "home_score": 42, "home_winner": true}
+{"event_id": "401438011", "event_start_utc": "2022-08-20T17:00Z", "away_team": "Detroit Lions", "home_team": "Indianapolis Colts", "away_score": 27, "home_score": 26, "home_winner": false}
+{"event_id": "401441650", "event_start_utc": "2022-08-20T20:00Z", "away_team": "Washington Commanders", "home_team": "Kansas City Chiefs", "away_score": 14, "home_score": 24, "home_winner": true}
+{"event_id": "401439623", "event_start_utc": "2022-08-20T23:00Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Tennessee Titans", "away_score": 3, "home_score": 13, "home_winner": true}
+{"event_id": "401438014", "event_start_utc": "2022-08-20T23:00Z", "away_team": "Las Vegas Raiders", "home_team": "Miami Dolphins", "away_score": 15, "home_score": 13, "home_winner": false}
+{"event_id": "401441316", "event_start_utc": "2022-08-20T23:00Z", "away_team": "San Francisco 49ers", "home_team": "Minnesota Vikings", "away_score": 17, "home_score": 7, "home_winner": false}
+{"event_id": "401437966", "event_start_utc": "2022-08-20T23:00Z", "away_team": "Pittsburgh Steelers", "home_team": "Jacksonville Jaguars", "away_score": 16, "home_score": 15, "home_winner": false}
+{"event_id": "401438175", "event_start_utc": "2022-08-21T02:00Z", "away_team": "Dallas Cowboys", "home_team": "Los Angeles Chargers", "away_score": 32, "home_score": 18, "home_winner": false}
+{"event_id": "401437971", "event_start_utc": "2022-08-21T17:00Z", "away_team": "Philadelphia Eagles", "home_team": "Cleveland Browns", "away_score": 21, "home_score": 20, "home_winner": false}
+{"event_id": "401441317", "event_start_utc": "2022-08-21T23:00Z", "away_team": "Cincinnati Bengals", "home_team": "New York Giants", "away_score": 22, "home_score": 25, "home_winner": true}
+{"event_id": "401437968", "event_start_utc": "2022-08-22T00:00Z", "away_team": "Baltimore Ravens", "home_team": "Arizona Cardinals", "away_score": 24, "home_score": 17, "home_winner": false}
+{"event_id": "401437688", "event_start_utc": "2022-08-23T00:00Z", "away_team": "Atlanta Falcons", "home_team": "New York Jets", "away_score": 16, "home_score": 24, "home_winner": true}
+{"event_id": "401441651", "event_start_utc": "2022-08-26T00:00Z", "away_team": "Green Bay Packers", "home_team": "Kansas City Chiefs", "away_score": 10, "home_score": 17, "home_winner": true}
+{"event_id": "401437977", "event_start_utc": "2022-08-26T00:15Z", "away_team": "San Francisco 49ers", "home_team": "Houston Texans", "away_score": 0, "home_score": 17, "home_winner": true}
+{"event_id": "401439618", "event_start_utc": "2022-08-26T23:00Z", "away_team": "Buffalo Bills", "home_team": "Carolina Panthers", "away_score": 0, "home_score": 21, "home_winner": true}
+{"event_id": "401439230", "event_start_utc": "2022-08-27T00:00Z", "away_team": "Seattle Seahawks", "home_team": "Dallas Cowboys", "away_score": 26, "home_score": 27, "home_winner": true}
+{"event_id": "401441916", "event_start_utc": "2022-08-27T00:00Z", "away_team": "Los Angeles Chargers", "home_team": "New Orleans Saints", "away_score": 10, "home_score": 27, "home_winner": true}
+{"event_id": "401439622", "event_start_utc": "2022-08-27T00:15Z", "away_team": "New England Patriots", "home_team": "Las Vegas Raiders", "away_score": 6, "home_score": 23, "home_winner": true}
+{"event_id": "401439411", "event_start_utc": "2022-08-27T19:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Atlanta Falcons", "away_score": 12, "home_score": 28, "home_winner": true}
+{"event_id": "401440371", "event_start_utc": "2022-08-27T22:00Z", "away_team": "Los Angeles Rams", "home_team": "Cincinnati Bengals", "away_score": 7, "home_score": 16, "home_winner": true}
+{"event_id": "401437974", "event_start_utc": "2022-08-27T23:00Z", "away_team": "Chicago Bears", "home_team": "Cleveland Browns", "away_score": 21, "home_score": 20, "home_winner": false}
+{"event_id": "401439624", "event_start_utc": "2022-08-27T23:00Z", "away_team": "Arizona Cardinals", "home_team": "Tennessee Titans", "away_score": 23, "home_score": 26, "home_winner": true}
+{"event_id": "401437972", "event_start_utc": "2022-08-27T23:00Z", "away_team": "Philadelphia Eagles", "home_team": "Miami Dolphins", "away_score": 10, "home_score": 48, "home_winner": true}
+{"event_id": "401437969", "event_start_utc": "2022-08-27T23:00Z", "away_team": "Washington Commanders", "home_team": "Baltimore Ravens", "away_score": 15, "home_score": 17, "home_winner": true}
+{"event_id": "401438012", "event_start_utc": "2022-08-27T23:30Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Indianapolis Colts", "away_score": 10, "home_score": 27, "home_winner": true}
+{"event_id": "401438176", "event_start_utc": "2022-08-28T01:00Z", "away_team": "Minnesota Vikings", "home_team": "Denver Broncos", "away_score": 13, "home_score": 23, "home_winner": true}
+{"event_id": "401438179", "event_start_utc": "2022-08-28T17:00Z", "away_team": "New York Giants", "home_team": "New York Jets", "away_score": 27, "home_score": 31, "home_winner": true}
+{"event_id": "401437975", "event_start_utc": "2022-08-28T20:30Z", "away_team": "Detroit Lions", "home_team": "Pittsburgh Steelers", "away_score": 9, "home_score": 19, "home_winner": true}
+{"event_id": "401437654", "event_start_utc": "2022-09-09T00:20Z", "away_team": "Buffalo Bills", "home_team": "Los Angeles Rams", "away_score": 31, "home_score": 10, "home_winner": false}
+{"event_id": "401437650", "event_start_utc": "2022-09-11T17:00Z", "away_team": "New Orleans Saints", "home_team": "Atlanta Falcons", "away_score": 27, "home_score": 26, "home_winner": false}
+{"event_id": "401437647", "event_start_utc": "2022-09-11T17:00Z", "away_team": "San Francisco 49ers", "home_team": "Chicago Bears", "away_score": 10, "home_score": 19, "home_winner": true}
+{"event_id": "401437634", "event_start_utc": "2022-09-11T17:00Z", "away_team": "Pittsburgh Steelers", "home_team": "Cincinnati Bengals", "away_score": 23, "home_score": 20, "home_winner": false}
+{"event_id": "401437648", "event_start_utc": "2022-09-11T17:00Z", "away_team": "Philadelphia Eagles", "home_team": "Detroit Lions", "away_score": 38, "home_score": 35, "home_winner": false}
+{"event_id": "401437933", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Arizona Cardinals", "home_team": "Atlanta Falcons", "away_score": 19, "home_score": 20, "home_winner": true}
+{"event_id": "401437935", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Chicago Bears", "home_team": "Detroit Lions", "away_score": 10, "home_score": 41, "home_winner": true}
+{"event_id": "401437937", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Denver Broncos", "home_team": "Kansas City Chiefs", "away_score": 24, "home_score": 27, "home_winner": true}
+{"event_id": "401437938", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Miami Dolphins", "home_team": "New England Patriots", "away_score": 21, "home_score": 23, "home_winner": true}
+{"event_id": "401437939", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Indianapolis Colts", "home_team": "New York Giants", "away_score": 10, "home_score": 38, "home_winner": true}
+{"event_id": "401437940", "event_start_utc": "2023-01-01T18:00Z", "away_team": "New Orleans Saints", "home_team": "Philadelphia Eagles", "away_score": 20, "home_score": 10, "home_winner": false}
+{"event_id": "401437941", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Carolina Panthers", "home_team": "Tampa Bay Buccaneers", "away_score": 24, "home_score": 30, "home_winner": true}
+{"event_id": "401437942", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Cleveland Browns", "home_team": "Washington Commanders", "away_score": 24, "home_score": 10, "home_winner": false}
+{"event_id": "401437936", "event_start_utc": "2023-01-01T18:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Houston Texans", "away_score": 31, "home_score": 3, "home_winner": false}
+{"event_id": "401437943", "event_start_utc": "2023-01-01T21:05Z", "away_team": "San Francisco 49ers", "home_team": "Las Vegas Raiders", "away_score": 37, "home_score": 34, "home_winner": false}
+{"event_id": "401437944", "event_start_utc": "2023-01-01T21:05Z", "away_team": "New York Jets", "home_team": "Seattle Seahawks", "away_score": 6, "home_score": 23, "home_winner": true}
+{"event_id": "401437945", "event_start_utc": "2023-01-01T21:25Z", "away_team": "Minnesota Vikings", "home_team": "Green Bay Packers", "away_score": 17, "home_score": 41, "home_winner": true}
+{"event_id": "401437946", "event_start_utc": "2023-01-01T21:25Z", "away_team": "Los Angeles Rams", "home_team": "Los Angeles Chargers", "away_score": 10, "home_score": 31, "home_winner": true}
+{"event_id": "401437934", "event_start_utc": "2023-01-02T01:20Z", "away_team": "Pittsburgh Steelers", "home_team": "Baltimore Ravens", "away_score": 16, "home_score": 13, "home_winner": false}
+{"event_id": "401437961", "event_start_utc": "2023-01-07T21:30Z", "away_team": "Kansas City Chiefs", "home_team": "Las Vegas Raiders", "away_score": 31, "home_score": 13, "home_winner": false}
+{"event_id": "401437954", "event_start_utc": "2023-01-08T01:15Z", "away_team": "Tennessee Titans", "home_team": "Jacksonville Jaguars", "away_score": 16, "home_score": 20, "home_winner": true}
+{"event_id": "401437948", "event_start_utc": "2023-01-08T18:00Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Atlanta Falcons", "away_score": 17, "home_score": 30, "home_winner": true}
+{"event_id": "401437949", "event_start_utc": "2023-01-08T18:00Z", "away_team": "New England Patriots", "home_team": "Buffalo Bills", "away_score": 23, "home_score": 35, "home_winner": true}
+{"event_id": "401437950", "event_start_utc": "2023-01-08T18:00Z", "away_team": "Minnesota Vikings", "home_team": "Chicago Bears", "away_score": 29, "home_score": 13, "home_winner": false}
+{"event_id": "401437951", "event_start_utc": "2023-01-08T18:00Z", "away_team": "Baltimore Ravens", "home_team": "Cincinnati Bengals", "away_score": 16, "home_score": 27, "home_winner": true}
+{"event_id": "401437953", "event_start_utc": "2023-01-08T18:00Z", "away_team": "Houston Texans", "home_team": "Indianapolis Colts", "away_score": 32, "home_score": 31, "home_winner": false}
+{"event_id": "401437955", "event_start_utc": "2023-01-08T18:00Z", "away_team": "New York Jets", "home_team": "Miami Dolphins", "away_score": 6, "home_score": 11, "home_winner": true}
+{"event_id": "401437956", "event_start_utc": "2023-01-08T18:00Z", "away_team": "Carolina Panthers", "home_team": "New Orleans Saints", "away_score": 10, "home_score": 7, "home_winner": false}
+{"event_id": "401437958", "event_start_utc": "2023-01-08T18:00Z", "away_team": "Cleveland Browns", "home_team": "Pittsburgh Steelers", "away_score": 14, "home_score": 28, "home_winner": true}
+{"event_id": "401437960", "event_start_utc": "2023-01-08T21:25Z", "away_team": "Los Angeles Chargers", "home_team": "Denver Broncos", "away_score": 28, "home_score": 31, "home_winner": true}
+{"event_id": "401437957", "event_start_utc": "2023-01-08T21:25Z", "away_team": "New York Giants", "home_team": "Philadelphia Eagles", "away_score": 16, "home_score": 22, "home_winner": true}
+{"event_id": "401437962", "event_start_utc": "2023-01-08T21:25Z", "away_team": "Arizona Cardinals", "home_team": "San Francisco 49ers", "away_score": 13, "home_score": 38, "home_winner": true}
+{"event_id": "401437963", "event_start_utc": "2023-01-08T21:25Z", "away_team": "Los Angeles Rams", "home_team": "Seattle Seahawks", "away_score": 16, "home_score": 19, "home_winner": true}
+{"event_id": "401437959", "event_start_utc": "2023-01-08T21:25Z", "away_team": "Dallas Cowboys", "home_team": "Washington Commanders", "away_score": 6, "home_score": 26, "home_winner": true}
+{"event_id": "401437952", "event_start_utc": "2023-01-09T01:20Z", "away_team": "Detroit Lions", "home_team": "Green Bay Packers", "away_score": 20, "home_score": 16, "home_winner": false}
+{"event_id": "401438000", "event_start_utc": "2023-01-14T21:30Z", "away_team": "Seattle Seahawks", "home_team": "San Francisco 49ers", "away_score": 23, "home_score": 41, "home_winner": true}
+{"event_id": "401437998", "event_start_utc": "2023-01-15T01:15Z", "away_team": "Los Angeles Chargers", "home_team": "Jacksonville Jaguars", "away_score": 30, "home_score": 31, "home_winner": true}
+{"event_id": "401438002", "event_start_utc": "2023-01-15T18:00Z", "away_team": "Miami Dolphins", "home_team": "Buffalo Bills", "away_score": 31, "home_score": 34, "home_winner": true}
+{"event_id": "401438001", "event_start_utc": "2023-01-15T21:50Z", "away_team": "New York Giants", "home_team": "Minnesota Vikings", "away_score": 31, "home_score": 24, "home_winner": false}
+{"event_id": "401437999", "event_start_utc": "2023-01-16T01:15Z", "away_team": "Baltimore Ravens", "home_team": "Cincinnati Bengals", "away_score": 17, "home_score": 24, "home_winner": true}
+{"event_id": "401438003", "event_start_utc": "2023-01-17T01:15Z", "away_team": "Dallas Cowboys", "home_team": "Tampa Bay Buccaneers", "away_score": 31, "home_score": 14, "home_winner": false}
+{"event_id": "401438005", "event_start_utc": "2023-01-21T21:30Z", "away_team": "Jacksonville Jaguars", "home_team": "Kansas City Chiefs", "away_score": 20, "home_score": 27, "home_winner": true}
+{"event_id": "401438004", "event_start_utc": "2023-01-22T01:15Z", "away_team": "New York Giants", "home_team": "Philadelphia Eagles", "away_score": 7, "home_score": 38, "home_winner": true}
+{"event_id": "401438007", "event_start_utc": "2023-01-22T20:00Z", "away_team": "Cincinnati Bengals", "home_team": "Buffalo Bills", "away_score": 27, "home_score": 10, "home_winner": false}
+{"event_id": "401438006", "event_start_utc": "2023-01-22T23:30Z", "away_team": "Dallas Cowboys", "home_team": "San Francisco 49ers", "away_score": 12, "home_score": 19, "home_winner": true}
+{"event_id": "401438009", "event_start_utc": "2023-01-29T20:00Z", "away_team": "San Francisco 49ers", "home_team": "Philadelphia Eagles", "away_score": 7, "home_score": 31, "home_winner": true}
+{"event_id": "401438008", "event_start_utc": "2023-01-29T23:30Z", "away_team": "Cincinnati Bengals", "home_team": "Kansas City Chiefs", "away_score": 20, "home_score": 23, "home_winner": true}
+{"event_id": "401492629", "event_start_utc": "2023-02-05T20:00Z", "away_team": "AFC", "home_team": "NFC", "away_score": 33, "home_score": 35, "home_winner": true}
+{"event_id": "401438030", "event_start_utc": "2023-02-12T23:30Z", "away_team": "Kansas City Chiefs", "home_team": "Philadelphia Eagles", "away_score": 38, "home_score": 35, "home_winner": false}
+{"event_id": "401547654", "event_start_utc": "2023-08-04T00:00Z", "away_team": "New York Jets", "home_team": "Cleveland Browns", "away_score": 16, "home_score": 21, "home_winner": true}
+{"event_id": "401548631", "event_start_utc": "2023-08-10T23:00Z", "away_team": "Houston Texans", "home_team": "New England Patriots", "away_score": 20, "home_score": 9, "home_winner": false}
+{"event_id": "401550740", "event_start_utc": "2023-08-11T02:00Z", "away_team": "Minnesota Vikings", "home_team": "Seattle Seahawks", "away_score": 13, "home_score": 24, "home_winner": true}
+{"event_id": "401548624", "event_start_utc": "2023-08-11T23:00Z", "away_team": "Green Bay Packers", "home_team": "Cincinnati Bengals", "away_score": 36, "home_score": 19, "home_winner": false}
+{"event_id": "401550739", "event_start_utc": "2023-08-11T23:00Z", "away_team": "New York Giants", "home_team": "Detroit Lions", "away_score": 16, "home_score": 21, "home_winner": true}
+{"event_id": "401548626", "event_start_utc": "2023-08-11T23:00Z", "away_team": "Atlanta Falcons", "home_team": "Miami Dolphins", "away_score": 19, "home_score": 3, "home_winner": false}
+{"event_id": "401550178", "event_start_utc": "2023-08-11T23:00Z", "away_team": "Pittsburgh Steelers", "home_team": "Tampa Bay Buccaneers", "away_score": 27, "home_score": 17, "home_winner": false}
+{"event_id": "401549309", "event_start_utc": "2023-08-11T23:30Z", "away_team": "Washington Commanders", "home_team": "Cleveland Browns", "away_score": 17, "home_score": 15, "home_winner": false}
+{"event_id": "401548496", "event_start_utc": "2023-08-12T02:00Z", "away_team": "Denver Broncos", "home_team": "Arizona Cardinals", "away_score": 17, "home_score": 18, "home_winner": true}
+{"event_id": "401547663", "event_start_utc": "2023-08-12T17:00Z", "away_team": "Indianapolis Colts", "home_team": "Buffalo Bills", "away_score": 19, "home_score": 23, "home_winner": true}
+{"event_id": "401548411", "event_start_utc": "2023-08-12T17:00Z", "away_team": "Tennessee Titans", "home_team": "Chicago Bears", "away_score": 17, "home_score": 23, "home_winner": true}
+{"event_id": "401550833", "event_start_utc": "2023-08-12T20:00Z", "away_team": "New York Jets", "home_team": "Carolina Panthers", "away_score": 27, "home_score": 0, "home_winner": false}
+{"event_id": "401548620", "event_start_utc": "2023-08-12T21:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Dallas Cowboys", "away_score": 28, "home_score": 23, "home_winner": false}
+{"event_id": "401547659", "event_start_utc": "2023-08-12T23:00Z", "away_team": "Philadelphia Eagles", "home_team": "Baltimore Ravens", "away_score": 19, "home_score": 20, "home_winner": true}
+{"event_id": "401547666", "event_start_utc": "2023-08-13T01:00Z", "away_team": "Los Angeles Chargers", "home_team": "Los Angeles Rams", "away_score": 34, "home_score": 17, "home_winner": false}
+{"event_id": "401548628", "event_start_utc": "2023-08-13T17:00Z", "away_team": "Kansas City Chiefs", "home_team": "New Orleans Saints", "away_score": 24, "home_score": 26, "home_winner": true}
+{"event_id": "401550918", "event_start_utc": "2023-08-13T20:00Z", "away_team": "San Francisco 49ers", "home_team": "Las Vegas Raiders", "away_score": 7, "home_score": 34, "home_winner": true}
+{"event_id": "401547661", "event_start_utc": "2023-08-17T23:30Z", "away_team": "Cleveland Browns", "home_team": "Philadelphia Eagles", "away_score": 18, "home_score": 18, "home_winner": false}
+{"event_id": "401550834", "event_start_utc": "2023-08-18T23:00Z", "away_team": "Carolina Panthers", "home_team": "New York Giants", "away_score": 19, "home_score": 21, "home_winner": true}
+{"event_id": "401548625", "event_start_utc": "2023-08-18T23:30Z", "away_team": "Cincinnati Bengals", "home_team": "Atlanta Falcons", "away_score": 13, "home_score": 13, "home_winner": false}
+{"event_id": "401548621", "event_start_utc": "2023-08-19T17:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Detroit Lions", "away_score": 25, "home_score": 7, "home_winner": false}
+{"event_id": "401547665", "event_start_utc": "2023-08-19T20:00Z", "away_team": "Miami Dolphins", "home_team": "Houston Texans", "away_score": 28, "home_score": 3, "home_winner": false}
+{"event_id": "401547662", "event_start_utc": "2023-08-19T22:30Z", "away_team": "Buffalo Bills", "home_team": "Pittsburgh Steelers", "away_score": 15, "home_score": 27, "home_winner": true}
+{"event_id": "401547664", "event_start_utc": "2023-08-19T23:00Z", "away_team": "Chicago Bears", "home_team": "Indianapolis Colts", "away_score": 17, "home_score": 24, "home_winner": true}
+{"event_id": "401550836", "event_start_utc": "2023-08-19T23:30Z", "away_team": "Tampa Bay Buccaneers", "home_team": "New York Jets", "away_score": 13, "home_score": 6, "home_winner": false}
+{"event_id": "401549211", "event_start_utc": "2023-08-20T00:00Z", "away_team": "New England Patriots", "home_team": "Green Bay Packers", "away_score": 21, "home_score": 17, "home_winner": false}
+{"event_id": "401548507", "event_start_utc": "2023-08-20T00:00Z", "away_team": "Tennessee Titans", "home_team": "Minnesota Vikings", "away_score": 24, "home_score": 16, "home_winner": false}
+{"event_id": "401548497", "event_start_utc": "2023-08-20T00:00Z", "away_team": "Kansas City Chiefs", "home_team": "Arizona Cardinals", "away_score": 38, "home_score": 10, "home_winner": false}
+{"event_id": "401548509", "event_start_utc": "2023-08-20T00:30Z", "away_team": "Denver Broncos", "home_team": "San Francisco 49ers", "away_score": 20, "home_score": 21, "home_winner": true}
+{"event_id": "401547668", "event_start_utc": "2023-08-20T01:00Z", "away_team": "Las Vegas Raiders", "home_team": "Los Angeles Rams", "away_score": 34, "home_score": 17, "home_winner": false}
+{"event_id": "401550161", "event_start_utc": "2023-08-20T02:00Z", "away_team": "Dallas Cowboys", "home_team": "Seattle Seahawks", "away_score": 14, "home_score": 22, "home_winner": true}
+{"event_id": "401547667", "event_start_utc": "2023-08-20T23:05Z", "away_team": "New Orleans Saints", "home_team": "Los Angeles Chargers", "away_score": 22, "home_score": 17, "home_winner": false}
+{"event_id": "401547655", "event_start_utc": "2023-08-22T00:00Z", "away_team": "Baltimore Ravens", "home_team": "Washington Commanders", "away_score": 28, "home_score": 29, "home_winner": true}
+{"event_id": "401548627", "event_start_utc": "2023-08-24T23:30Z", "away_team": "Pittsburgh Steelers", "home_team": "Atlanta Falcons", "away_score": 24, "home_score": 0, "home_winner": false}
+{"event_id": "401547656", "event_start_utc": "2023-08-25T00:00Z", "away_team": "Indianapolis Colts", "home_team": "Philadelphia Eagles", "away_score": 27, "home_score": 13, "home_winner": false}
+{"event_id": "401547657", "event_start_utc": "2023-08-26T00:00Z", "away_team": "Detroit Lions", "home_team": "Carolina Panthers", "away_score": 26, "home_score": 17, "home_winner": false}
+{"event_id": "401548508", "event_start_utc": "2023-08-26T00:15Z", "away_team": "New England Patriots", "home_team": "Tennessee Titans", "away_score": 7, "home_score": 23, "home_winner": true}
+{"event_id": "401548510", "event_start_utc": "2023-08-26T02:00Z", "away_team": "Los Angeles Chargers", "home_team": "San Francisco 49ers", "away_score": 23, "home_score": 12, "home_winner": false}
+{"event_id": "401548412", "event_start_utc": "2023-08-26T17:00Z", "away_team": "Buffalo Bills", "home_team": "Chicago Bears", "away_score": 24, "home_score": 21, "home_winner": false}
+{"event_id": "401549212", "event_start_utc": "2023-08-26T17:00Z", "away_team": "Seattle Seahawks", "home_team": "Green Bay Packers", "away_score": 15, "home_score": 19, "home_winner": true}
+{"event_id": "401548629", "event_start_utc": "2023-08-26T17:00Z", "away_team": "Cleveland Browns", "home_team": "Kansas City Chiefs", "away_score": 32, "home_score": 33, "home_winner": true}
+{"event_id": "401548498", "event_start_utc": "2023-08-26T17:00Z", "away_team": "Arizona Cardinals", "home_team": "Minnesota Vikings", "away_score": 18, "home_score": 17, "home_winner": false}
+{"event_id": "401550835", "event_start_utc": "2023-08-26T22:00Z", "away_team": "New York Jets", "home_team": "New York Giants", "away_score": 32, "home_score": 24, "home_winner": false}
+{"event_id": "401548623", "event_start_utc": "2023-08-26T22:05Z", "away_team": "Cincinnati Bengals", "home_team": "Washington Commanders", "away_score": 19, "home_score": 21, "home_winner": true}
+{"event_id": "401547660", "event_start_utc": "2023-08-26T23:00Z", "away_team": "Baltimore Ravens", "home_team": "Tampa Bay Buccaneers", "away_score": 20, "home_score": 26, "home_winner": true}
+{"event_id": "401548622", "event_start_utc": "2023-08-26T23:00Z", "away_team": "Miami Dolphins", "home_team": "Jacksonville Jaguars", "away_score": 18, "home_score": 31, "home_winner": true}
+{"event_id": "401550167", "event_start_utc": "2023-08-27T00:00Z", "away_team": "Las Vegas Raiders", "home_team": "Dallas Cowboys", "away_score": 16, "home_score": 31, "home_winner": true}
+{"event_id": "401547669", "event_start_utc": "2023-08-27T01:00Z", "away_team": "Los Angeles Rams", "home_team": "Denver Broncos", "away_score": 0, "home_score": 41, "home_winner": true}
+{"event_id": "401547658", "event_start_utc": "2023-08-28T00:00Z", "away_team": "Houston Texans", "home_team": "New Orleans Saints", "away_score": 17, "home_score": 13, "home_winner": false}
+{"event_id": "401547353", "event_start_utc": "2023-09-08T00:20Z", "away_team": "Detroit Lions", "home_team": "Kansas City Chiefs", "away_score": 21, "home_score": 20, "home_winner": false}
+{"event_id": "401547403", "event_start_utc": "2023-09-10T17:00Z", "away_team": "Carolina Panthers", "home_team": "Atlanta Falcons", "away_score": 10, "home_score": 24, "home_winner": true}
+{"event_id": "401547397", "event_start_utc": "2023-09-10T17:00Z", "away_team": "Cincinnati Bengals", "home_team": "Cleveland Browns", "away_score": 3, "home_score": 24, "home_winner": true}
+{"event_id": "401547404", "event_start_utc": "2023-09-10T17:00Z", "away_team": "Jacksonville Jaguars", "home_team": "Indianapolis Colts", "away_score": 31, "home_score": 21, "home_winner": false}
+{"event_id": "401547398", "event_start_utc": "2023-09-10T17:00Z", "away_team": "Tampa Bay Buccaneers", "home_team": "Minnesota Vikings", "away_score": 20, "home_score": 17, "home_winner": false}
+{"event_id": "401547399", "event_start_utc": "2023-09-10T17:00Z", "away_team": "Tennessee Titans", "home_team": "New Orleans Saints", "away_score": 15, "home_score": 16, "home_winner": true}
+{"event_id": "401547405", "event_start_utc": "2023-09-10T17:00Z", "away_team": "San Francisco 49ers", "home_team": "Pittsburgh Steelers", "away_score": 30, "home_score": 7, "home_winner": false}

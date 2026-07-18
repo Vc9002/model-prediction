@@ -793,3 +793,395 @@
 {"event_id": "401857074", "event_start_utc": "2026-07-17T23:30Z", "away_team": "Atlanta Dream", "home_team": "Toronto Tempo", "away_score": 111, "home_score": 92, "home_winner": false}
 {"event_id": "401857075", "event_start_utc": "2026-07-17T23:30Z", "away_team": "Los Angeles Sparks", "home_team": "Chicago Sky", "away_score": 82, "home_score": 96, "home_winner": true}
 {"event_id": "401857076", "event_start_utc": "2026-07-18T02:00Z", "away_team": "Connecticut Sun", "home_team": "Phoenix Mercury", "away_score": 96, "home_score": 83, "home_winner": false}
+{"event_id": "401230733", "event_start_utc": "2020-07-25T16:00Z", "away_team": "Seattle Storm", "home_team": "New York Liberty", "away_score": 87, "home_score": 71, "home_winner": false}
+{"event_id": "401230734", "event_start_utc": "2020-07-25T19:00Z", "away_team": "Los Angeles Sparks", "home_team": "Phoenix Mercury", "away_score": 99, "home_score": 76, "home_winner": false}
+{"event_id": "401230735", "event_start_utc": "2020-07-25T21:00Z", "away_team": "Indiana Fever", "home_team": "Washington Mystics", "away_score": 76, "home_score": 101, "home_winner": true}
+{"event_id": "401230461", "event_start_utc": "2020-07-26T16:00Z", "away_team": "Connecticut Sun", "home_team": "Minnesota Lynx", "away_score": 69, "home_score": 77, "home_winner": true}
+{"event_id": "401230462", "event_start_utc": "2020-07-26T19:00Z", "away_team": "Chicago Sky", "home_team": "Las Vegas Aces", "away_score": 88, "home_score": 86, "home_winner": false}
+{"event_id": "401230463", "event_start_utc": "2020-07-26T21:00Z", "away_team": "Dallas Wings", "home_team": "Atlanta Dream", "away_score": 95, "home_score": 105, "home_winner": true}
+{"event_id": "401230464", "event_start_utc": "2020-07-28T23:00Z", "away_team": "Washington Mystics", "home_team": "Connecticut Sun", "away_score": 94, "home_score": 89, "home_winner": false}
+{"event_id": "401230465", "event_start_utc": "2020-07-29T01:00Z", "away_team": "Los Angeles Sparks", "home_team": "Chicago Sky", "away_score": 78, "home_score": 96, "home_winner": true}
+{"event_id": "401230466", "event_start_utc": "2020-07-29T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Seattle Storm", "away_score": 66, "home_score": 90, "home_winner": true}
+{"event_id": "401230467", "event_start_utc": "2020-07-29T23:00Z", "away_team": "Phoenix Mercury", "home_team": "Indiana Fever", "away_score": 100, "home_score": 106, "home_winner": true}
+{"event_id": "401230468", "event_start_utc": "2020-07-30T00:00Z", "away_team": "New York Liberty", "home_team": "Dallas Wings", "away_score": 80, "home_score": 93, "home_winner": true}
+{"event_id": "401230469", "event_start_utc": "2020-07-30T02:00Z", "away_team": "Atlanta Dream", "home_team": "Las Vegas Aces", "away_score": 70, "home_score": 100, "home_winner": true}
+{"event_id": "401230470", "event_start_utc": "2020-07-30T22:00Z", "away_team": "Seattle Storm", "home_team": "Washington Mystics", "away_score": 71, "home_score": 89, "home_winner": true}
+{"event_id": "401230471", "event_start_utc": "2020-07-31T00:00Z", "away_team": "Chicago Sky", "home_team": "Minnesota Lynx", "away_score": 81, "home_score": 83, "home_winner": true}
+{"event_id": "401230472", "event_start_utc": "2020-07-31T02:00Z", "away_team": "Connecticut Sun", "home_team": "Los Angeles Sparks", "away_score": 76, "home_score": 81, "home_winner": true}
+{"event_id": "401230753", "event_start_utc": "2020-07-31T23:00Z", "away_team": "New York Liberty", "home_team": "Atlanta Dream", "away_score": 78, "home_score": 84, "home_winner": true}
+{"event_id": "401230754", "event_start_utc": "2020-08-01T00:00Z", "away_team": "Indiana Fever", "home_team": "Dallas Wings", "away_score": 73, "home_score": 76, "home_winner": true}
+{"event_id": "401230755", "event_start_utc": "2020-08-01T02:00Z", "away_team": "Las Vegas Aces", "home_team": "Phoenix Mercury", "away_score": 95, "home_score": 102, "home_winner": true}
+{"event_id": "401230756", "event_start_utc": "2020-08-01T20:00Z", "away_team": "Minnesota Lynx", "home_team": "Connecticut Sun", "away_score": 78, "home_score": 69, "home_winner": false}
+{"event_id": "401230757", "event_start_utc": "2020-08-01T22:00Z", "away_team": "Washington Mystics", "home_team": "Chicago Sky", "away_score": 86, "home_score": 88, "home_winner": true}
+{"event_id": "401230758", "event_start_utc": "2020-08-02T00:00Z", "away_team": "Los Angeles Sparks", "home_team": "Seattle Storm", "away_score": 75, "home_score": 81, "home_winner": true}
+{"event_id": "401230759", "event_start_utc": "2020-08-02T17:00Z", "away_team": "Phoenix Mercury", "home_team": "New York Liberty", "away_score": 96, "home_score": 67, "home_winner": false}
+{"event_id": "401230760", "event_start_utc": "2020-08-02T19:30Z", "away_team": "Atlanta Dream", "home_team": "Indiana Fever", "away_score": 77, "home_score": 93, "home_winner": true}
+{"event_id": "401230761", "event_start_utc": "2020-08-02T22:00Z", "away_team": "Dallas Wings", "home_team": "Las Vegas Aces", "away_score": 70, "home_score": 79, "home_winner": true}
+{"event_id": "401230762", "event_start_utc": "2020-08-04T22:00Z", "away_team": "Dallas Wings", "home_team": "Chicago Sky", "away_score": 79, "home_score": 82, "home_winner": true}
+{"event_id": "401230763", "event_start_utc": "2020-08-04T23:00Z", "away_team": "Phoenix Mercury", "home_team": "Atlanta Dream", "away_score": 81, "home_score": 74, "home_winner": false}
+{"event_id": "401230764", "event_start_utc": "2020-08-05T01:00Z", "away_team": "Connecticut Sun", "home_team": "Seattle Storm", "away_score": 74, "home_score": 87, "home_winner": true}
+{"event_id": "401230765", "event_start_utc": "2020-08-05T23:00Z", "away_team": "Minnesota Lynx", "home_team": "New York Liberty", "away_score": 92, "home_score": 66, "home_winner": false}
+{"event_id": "401230766", "event_start_utc": "2020-08-06T00:00Z", "away_team": "Las Vegas Aces", "home_team": "Washington Mystics", "away_score": 83, "home_score": 77, "home_winner": false}
+{"event_id": "401230767", "event_start_utc": "2020-08-06T02:00Z", "away_team": "Indiana Fever", "home_team": "Los Angeles Sparks", "away_score": 75, "home_score": 86, "home_winner": true}
+{"event_id": "401230768", "event_start_utc": "2020-08-06T22:00Z", "away_team": "Seattle Storm", "home_team": "Atlanta Dream", "away_score": 93, "home_score": 92, "home_winner": false}
+{"event_id": "401230769", "event_start_utc": "2020-08-07T00:00Z", "away_team": "Connecticut Sun", "home_team": "Dallas Wings", "away_score": 91, "home_score": 68, "home_winner": false}
+{"event_id": "401230770", "event_start_utc": "2020-08-07T02:00Z", "away_team": "Chicago Sky", "home_team": "Phoenix Mercury", "away_score": 86, "home_score": 96, "home_winner": true}
+{"event_id": "401230771", "event_start_utc": "2020-08-07T22:00Z", "away_team": "Indiana Fever", "home_team": "Minnesota Lynx", "away_score": 80, "home_score": 87, "home_winner": true}
+{"event_id": "401230772", "event_start_utc": "2020-08-07T23:00Z", "away_team": "New York Liberty", "home_team": "Washington Mystics", "away_score": 74, "home_score": 66, "home_winner": false}
+{"event_id": "401230773", "event_start_utc": "2020-08-08T01:00Z", "away_team": "Los Angeles Sparks", "home_team": "Las Vegas Aces", "away_score": 82, "home_score": 86, "home_winner": true}
+{"event_id": "401230774", "event_start_utc": "2020-08-08T16:00Z", "away_team": "Atlanta Dream", "home_team": "Dallas Wings", "away_score": 75, "home_score": 85, "home_winner": true}
+{"event_id": "401230775", "event_start_utc": "2020-08-08T19:00Z", "away_team": "Phoenix Mercury", "home_team": "Seattle Storm", "away_score": 68, "home_score": 74, "home_winner": true}
+{"event_id": "401230776", "event_start_utc": "2020-08-08T21:00Z", "away_team": "Chicago Sky", "home_team": "Connecticut Sun", "away_score": 100, "home_score": 93, "home_winner": false}
+{"event_id": "401230779", "event_start_utc": "2020-08-09T19:00Z", "away_team": "Minnesota Lynx", "home_team": "Los Angeles Sparks", "away_score": 81, "home_score": 97, "home_winner": true}
+{"event_id": "401230777", "event_start_utc": "2020-08-09T21:00Z", "away_team": "Las Vegas Aces", "home_team": "New York Liberty", "away_score": 78, "home_score": 76, "home_winner": false}
+{"event_id": "401230778", "event_start_utc": "2020-08-09T23:00Z", "away_team": "Washington Mystics", "home_team": "Indiana Fever", "away_score": 84, "home_score": 91, "home_winner": true}
+{"event_id": "401230780", "event_start_utc": "2020-08-10T22:00Z", "away_team": "Connecticut Sun", "home_team": "Atlanta Dream", "away_score": 93, "home_score": 82, "home_winner": false}
+{"event_id": "401230781", "event_start_utc": "2020-08-10T23:00Z", "away_team": "Phoenix Mercury", "home_team": "Dallas Wings", "away_score": 91, "home_score": 79, "home_winner": false}
+{"event_id": "401230782", "event_start_utc": "2020-08-11T01:00Z", "away_team": "Chicago Sky", "home_team": "Seattle Storm", "away_score": 71, "home_score": 89, "home_winner": true}
+{"event_id": "401230784", "event_start_utc": "2020-08-11T23:00Z", "away_team": "Las Vegas Aces", "home_team": "Indiana Fever", "away_score": 98, "home_score": 79, "home_winner": false}
+{"event_id": "401230783", "event_start_utc": "2020-08-12T01:00Z", "away_team": "Washington Mystics", "home_team": "Minnesota Lynx", "away_score": 48, "home_score": 68, "home_winner": true}
+{"event_id": "401230785", "event_start_utc": "2020-08-12T02:00Z", "away_team": "New York Liberty", "home_team": "Los Angeles Sparks", "away_score": 78, "home_score": 93, "home_winner": true}
+{"event_id": "401230786", "event_start_utc": "2020-08-12T23:00Z", "away_team": "Dallas Wings", "home_team": "Connecticut Sun", "away_score": 66, "home_score": 70, "home_winner": true}
+{"event_id": "401230787", "event_start_utc": "2020-08-13T01:00Z", "away_team": "Phoenix Mercury", "home_team": "Chicago Sky", "away_score": 71, "home_score": 89, "home_winner": true}
+{"event_id": "401230788", "event_start_utc": "2020-08-13T02:00Z", "away_team": "Atlanta Dream", "home_team": "Seattle Storm", "away_score": 63, "home_score": 100, "home_winner": true}
+{"event_id": "401230789", "event_start_utc": "2020-08-13T22:00Z", "away_team": "Indiana Fever", "home_team": "New York Liberty", "away_score": 86, "home_score": 79, "home_winner": false}
+{"event_id": "401230790", "event_start_utc": "2020-08-13T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Washington Mystics", "away_score": 81, "home_score": 64, "home_winner": false}
+{"event_id": "401230791", "event_start_utc": "2020-08-14T01:00Z", "away_team": "Minnesota Lynx", "home_team": "Las Vegas Aces", "away_score": 77, "home_score": 87, "home_winner": true}
+{"event_id": "401230792", "event_start_utc": "2020-08-14T23:00Z", "away_team": "Connecticut Sun", "home_team": "Chicago Sky", "away_score": 77, "home_score": 74, "home_winner": false}
+{"event_id": "401230793", "event_start_utc": "2020-08-15T00:00Z", "away_team": "Seattle Storm", "home_team": "Dallas Wings", "away_score": 83, "home_score": 65, "home_winner": false}
+{"event_id": "401230794", "event_start_utc": "2020-08-15T02:00Z", "away_team": "Atlanta Dream", "home_team": "Phoenix Mercury", "away_score": 80, "home_score": 96, "home_winner": true}
+{"event_id": "401230797", "event_start_utc": "2020-08-15T16:00Z", "away_team": "Washington Mystics", "home_team": "Las Vegas Aces", "away_score": 73, "home_score": 88, "home_winner": true}
+{"event_id": "401230795", "event_start_utc": "2020-08-15T18:00Z", "away_team": "Los Angeles Sparks", "home_team": "Indiana Fever", "away_score": 90, "home_score": 76, "home_winner": false}
+{"event_id": "401230796", "event_start_utc": "2020-08-15T22:00Z", "away_team": "New York Liberty", "home_team": "Minnesota Lynx", "away_score": 64, "home_score": 94, "home_winner": true}
+{"event_id": "401230822", "event_start_utc": "2020-08-16T17:00Z", "away_team": "Dallas Wings", "home_team": "Phoenix Mercury", "away_score": 95, "home_score": 89, "home_winner": false}
+{"event_id": "401230821", "event_start_utc": "2020-08-16T19:00Z", "away_team": "Seattle Storm", "home_team": "Connecticut Sun", "away_score": 95, "home_score": 72, "home_winner": false}
+{"event_id": "401230820", "event_start_utc": "2020-08-16T20:00Z", "away_team": "Chicago Sky", "home_team": "Atlanta Dream", "away_score": 92, "home_score": 67, "home_winner": false}
+{"event_id": "401230823", "event_start_utc": "2020-08-18T23:00Z", "away_team": "Indiana Fever", "home_team": "Connecticut Sun", "away_score": 62, "home_score": 84, "home_winner": true}
+{"event_id": "401230824", "event_start_utc": "2020-08-19T01:00Z", "away_team": "Las Vegas Aces", "home_team": "Chicago Sky", "away_score": 82, "home_score": 84, "home_winner": true}
+{"event_id": "401230825", "event_start_utc": "2020-08-19T02:00Z", "away_team": "New York Liberty", "home_team": "Seattle Storm", "away_score": 64, "home_score": 105, "home_winner": true}
+{"event_id": "401230798", "event_start_utc": "2020-08-19T23:00Z", "away_team": "Atlanta Dream", "home_team": "Washington Mystics", "away_score": 91, "home_score": 98, "home_winner": true}
+{"event_id": "401230826", "event_start_utc": "2020-08-20T01:00Z", "away_team": "Dallas Wings", "home_team": "Minnesota Lynx", "away_score": 84, "home_score": 91, "home_winner": true}
+{"event_id": "401230827", "event_start_utc": "2020-08-20T02:00Z", "away_team": "Phoenix Mercury", "home_team": "Los Angeles Sparks", "away_score": 74, "home_score": 83, "home_winner": true}
+{"event_id": "401230799", "event_start_utc": "2020-08-20T23:00Z", "away_team": "Chicago Sky", "home_team": "New York Liberty", "away_score": 101, "home_score": 85, "home_winner": false}
+{"event_id": "401230828", "event_start_utc": "2020-08-21T00:00Z", "away_team": "Seattle Storm", "home_team": "Indiana Fever", "away_score": 84, "home_score": 90, "home_winner": true}
+{"event_id": "401230800", "event_start_utc": "2020-08-21T02:00Z", "away_team": "Connecticut Sun", "home_team": "Las Vegas Aces", "away_score": 78, "home_score": 99, "home_winner": true}
+{"event_id": "401230829", "event_start_utc": "2020-08-21T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Atlanta Dream", "away_score": 93, "home_score": 85, "home_winner": false}
+{"event_id": "401230830", "event_start_utc": "2020-08-22T00:00Z", "away_team": "Washington Mystics", "home_team": "Dallas Wings", "away_score": 92, "home_score": 101, "home_winner": true}
+{"event_id": "401230831", "event_start_utc": "2020-08-22T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Phoenix Mercury", "away_score": 90, "home_score": 80, "home_winner": false}
+{"event_id": "401230801", "event_start_utc": "2020-08-22T19:00Z", "away_team": "Seattle Storm", "home_team": "Las Vegas Aces", "away_score": 74, "home_score": 82, "home_winner": true}
+{"event_id": "401230832", "event_start_utc": "2020-08-22T21:00Z", "away_team": "Indiana Fever", "home_team": "Chicago Sky", "away_score": 76, "home_score": 87, "home_winner": true}
+{"event_id": "401230833", "event_start_utc": "2020-08-22T23:00Z", "away_team": "New York Liberty", "home_team": "Connecticut Sun", "away_score": 65, "home_score": 82, "home_winner": true}
+{"event_id": "401230834", "event_start_utc": "2020-08-23T20:00Z", "away_team": "Atlanta Dream", "home_team": "Minnesota Lynx", "away_score": 78, "home_score": 75, "home_winner": false}
+{"event_id": "401230835", "event_start_utc": "2020-08-23T22:00Z", "away_team": "Dallas Wings", "home_team": "Los Angeles Sparks", "away_score": 81, "home_score": 84, "home_winner": true}
+{"event_id": "401230836", "event_start_utc": "2020-08-24T00:00Z", "away_team": "Phoenix Mercury", "home_team": "Washington Mystics", "away_score": 88, "home_score": 87, "home_winner": false}
+{"event_id": "401230837", "event_start_utc": "2020-08-25T23:00Z", "away_team": "New York Liberty", "home_team": "Chicago Sky", "away_score": 101, "home_score": 99, "home_winner": false}
+{"event_id": "401230838", "event_start_utc": "2020-08-26T01:00Z", "away_team": "Las Vegas Aces", "home_team": "Dallas Wings", "away_score": 96, "home_score": 92, "home_winner": false}
+{"event_id": "401230839", "event_start_utc": "2020-08-26T02:00Z", "away_team": "Indiana Fever", "home_team": "Seattle Storm", "away_score": 74, "home_score": 87, "home_winner": true}
+{"event_id": "401230843", "event_start_utc": "2020-08-28T23:00Z", "away_team": "Minnesota Lynx", "home_team": "Atlanta Dream", "away_score": 88, "home_score": 79, "home_winner": false}
+{"event_id": "401230844", "event_start_utc": "2020-08-29T00:00Z", "away_team": "Los Angeles Sparks", "home_team": "Connecticut Sun", "away_score": 80, "home_score": 76, "home_winner": false}
+{"event_id": "401230845", "event_start_utc": "2020-08-29T02:00Z", "away_team": "Washington Mystics", "home_team": "Phoenix Mercury", "away_score": 72, "home_score": 94, "home_winner": true}
+{"event_id": "401230807", "event_start_utc": "2020-08-29T16:00Z", "away_team": "New York Liberty", "home_team": "Las Vegas Aces", "away_score": 63, "home_score": 80, "home_winner": true}
+{"event_id": "401230806", "event_start_utc": "2020-08-29T18:00Z", "away_team": "Seattle Storm", "home_team": "Chicago Sky", "away_score": 88, "home_score": 74, "home_winner": false}
+{"event_id": "401230805", "event_start_utc": "2020-08-29T20:00Z", "away_team": "Dallas Wings", "home_team": "Indiana Fever", "away_score": 82, "home_score": 78, "home_winner": false}
+{"event_id": "401230846", "event_start_utc": "2020-08-30T20:00Z", "away_team": "Connecticut Sun", "home_team": "Washington Mystics", "away_score": 76, "home_score": 63, "home_winner": false}
+{"event_id": "401230847", "event_start_utc": "2020-08-30T22:00Z", "away_team": "Phoenix Mercury", "home_team": "Minnesota Lynx", "away_score": 83, "home_score": 79, "home_winner": false}
+{"event_id": "401230808", "event_start_utc": "2020-08-31T00:00Z", "away_team": "Atlanta Dream", "home_team": "Los Angeles Sparks", "away_score": 79, "home_score": 84, "home_winner": true}
+{"event_id": "401241306", "event_start_utc": "2020-08-31T22:00Z", "away_team": "Chicago Sky", "home_team": "Indiana Fever", "away_score": 100, "home_score": 77, "home_winner": false}
+{"event_id": "401322870", "event_start_utc": "2021-05-05T23:00Z", "away_team": "Atlanta Dream", "home_team": "Washington Mystics", "away_score": 87, "home_score": 80, "home_winner": false}
+{"event_id": "401323518", "event_start_utc": "2021-05-08T17:00Z", "away_team": "Connecticut Sun", "home_team": "Dallas Wings", "away_score": 89, "home_score": 76, "home_winner": false}
+{"event_id": "401322871", "event_start_utc": "2021-05-08T18:00Z", "away_team": "Washington Mystics", "home_team": "Minnesota Lynx", "away_score": 68, "home_score": 79, "home_winner": true}
+{"event_id": "401323519", "event_start_utc": "2021-05-08T20:00Z", "away_team": "Las Vegas Aces", "home_team": "Los Angeles Sparks", "away_score": 85, "home_score": 85, "home_winner": false}
+{"event_id": "401323520", "event_start_utc": "2021-05-08T22:00Z", "away_team": "Seattle Storm", "home_team": "Phoenix Mercury", "away_score": 88, "home_score": 71, "home_winner": false}
+{"event_id": "401323454", "event_start_utc": "2021-05-09T17:00Z", "away_team": "Chicago Sky", "home_team": "Indiana Fever", "away_score": 65, "home_score": 82, "home_winner": true}
+{"event_id": "401323455", "event_start_utc": "2021-05-11T20:30Z", "away_team": "Indiana Fever", "home_team": "Chicago Sky", "away_score": 70, "home_score": 83, "home_winner": true}
+{"event_id": "401320565", "event_start_utc": "2021-05-14T23:00Z", "away_team": "Indiana Fever", "home_team": "New York Liberty", "away_score": 87, "home_score": 90, "home_winner": true}
+{"event_id": "401320566", "event_start_utc": "2021-05-14T23:30Z", "away_team": "Connecticut Sun", "home_team": "Atlanta Dream", "away_score": 78, "home_score": 67, "home_winner": false}
+{"event_id": "401320567", "event_start_utc": "2021-05-15T01:00Z", "away_team": "Phoenix Mercury", "home_team": "Minnesota Lynx", "away_score": 77, "home_score": 75, "home_winner": false}
+{"event_id": "401320568", "event_start_utc": "2021-05-15T02:30Z", "away_team": "Dallas Wings", "home_team": "Los Angeles Sparks", "away_score": 94, "home_score": 71, "home_winner": false}
+{"event_id": "401320569", "event_start_utc": "2021-05-15T17:00Z", "away_team": "Chicago Sky", "home_team": "Washington Mystics", "away_score": 70, "home_score": 56, "home_winner": false}
+{"event_id": "401320570", "event_start_utc": "2021-05-15T19:00Z", "away_team": "Las Vegas Aces", "home_team": "Seattle Storm", "away_score": 83, "home_score": 97, "home_winner": true}
+{"event_id": "401320571", "event_start_utc": "2021-05-16T18:00Z", "away_team": "New York Liberty", "home_team": "Indiana Fever", "away_score": 73, "home_score": 65, "home_winner": false}
+{"event_id": "401320572", "event_start_utc": "2021-05-16T23:00Z", "away_team": "Phoenix Mercury", "home_team": "Connecticut Sun", "away_score": 78, "home_score": 86, "home_winner": true}
+{"event_id": "401320573", "event_start_utc": "2021-05-18T23:00Z", "away_team": "Minnesota Lynx", "home_team": "New York Liberty", "away_score": 75, "home_score": 86, "home_winner": true}
+{"event_id": "401320574", "event_start_utc": "2021-05-19T00:00Z", "away_team": "Phoenix Mercury", "home_team": "Washington Mystics", "away_score": 91, "home_score": 70, "home_winner": false}
+{"event_id": "401320575", "event_start_utc": "2021-05-19T02:00Z", "away_team": "Las Vegas Aces", "home_team": "Seattle Storm", "away_score": 96, "home_score": 80, "home_winner": false}
+{"event_id": "401320576", "event_start_utc": "2021-05-19T23:00Z", "away_team": "Chicago Sky", "home_team": "Atlanta Dream", "away_score": 85, "home_score": 77, "home_winner": false}
+{"event_id": "401320577", "event_start_utc": "2021-05-19T23:00Z", "away_team": "Indiana Fever", "home_team": "Connecticut Sun", "away_score": 67, "home_score": 88, "home_winner": true}
+{"event_id": "401320578", "event_start_utc": "2021-05-21T00:00Z", "away_team": "Seattle Storm", "home_team": "Minnesota Lynx", "away_score": 90, "home_score": 78, "home_winner": false}
+{"event_id": "401320579", "event_start_utc": "2021-05-21T23:00Z", "away_team": "Atlanta Dream", "home_team": "Indiana Fever", "away_score": 83, "home_score": 79, "home_winner": false}
+{"event_id": "401320580", "event_start_utc": "2021-05-21T23:00Z", "away_team": "New York Liberty", "home_team": "Washington Mystics", "away_score": 72, "home_score": 101, "home_winner": true}
+{"event_id": "401320581", "event_start_utc": "2021-05-22T02:00Z", "away_team": "Connecticut Sun", "home_team": "Phoenix Mercury", "away_score": 84, "home_score": 67, "home_winner": false}
+{"event_id": "401320582", "event_start_utc": "2021-05-22T02:30Z", "away_team": "Los Angeles Sparks", "home_team": "Las Vegas Aces", "away_score": 69, "home_score": 97, "home_winner": true}
+{"event_id": "401320583", "event_start_utc": "2021-05-23T00:00Z", "away_team": "Seattle Storm", "home_team": "Dallas Wings", "away_score": 100, "home_score": 97, "home_winner": false}
+{"event_id": "401320584", "event_start_utc": "2021-05-23T17:00Z", "away_team": "New York Liberty", "home_team": "Chicago Sky", "away_score": 93, "home_score": 85, "home_winner": false}
+{"event_id": "401320585", "event_start_utc": "2021-05-23T17:00Z", "away_team": "Washington Mystics", "home_team": "Indiana Fever", "away_score": 77, "home_score": 89, "home_winner": true}
+{"event_id": "401320586", "event_start_utc": "2021-05-23T22:00Z", "away_team": "Connecticut Sun", "home_team": "Las Vegas Aces", "away_score": 72, "home_score": 65, "home_winner": false}
+{"event_id": "401320588", "event_start_utc": "2021-05-24T23:00Z", "away_team": "Dallas Wings", "home_team": "New York Liberty", "away_score": 81, "home_score": 88, "home_winner": true}
+{"event_id": "401320587", "event_start_utc": "2021-05-25T23:00Z", "away_team": "Washington Mystics", "home_team": "Indiana Fever", "away_score": 85, "home_score": 69, "home_winner": false}
+{"event_id": "401320589", "event_start_utc": "2021-05-26T00:00Z", "away_team": "Atlanta Dream", "home_team": "Chicago Sky", "away_score": 90, "home_score": 83, "home_winner": false}
+{"event_id": "401320590", "event_start_utc": "2021-05-26T02:00Z", "away_team": "Connecticut Sun", "home_team": "Seattle Storm", "away_score": 87, "home_score": 90, "home_winner": true}
+{"event_id": "401320591", "event_start_utc": "2021-05-27T02:00Z", "away_team": "Las Vegas Aces", "home_team": "Phoenix Mercury", "away_score": 85, "home_score": 79, "home_winner": false}
+{"event_id": "401320592", "event_start_utc": "2021-05-27T23:00Z", "away_team": "Dallas Wings", "home_team": "Atlanta Dream", "away_score": 95, "home_score": 101, "home_winner": true}
+{"event_id": "401320593", "event_start_utc": "2021-05-28T23:00Z", "away_team": "Washington Mystics", "home_team": "Connecticut Sun", "away_score": 81, "home_score": 86, "home_winner": true}
+{"event_id": "401320594", "event_start_utc": "2021-05-29T00:00Z", "away_team": "Los Angeles Sparks", "home_team": "Chicago Sky", "away_score": 76, "home_score": 61, "home_winner": false}
+{"event_id": "401320595", "event_start_utc": "2021-05-29T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Seattle Storm", "away_score": 72, "home_score": 82, "home_winner": true}
+{"event_id": "401320596", "event_start_utc": "2021-05-29T02:30Z", "away_team": "Indiana Fever", "home_team": "Las Vegas Aces", "away_score": 77, "home_score": 113, "home_winner": true}
+{"event_id": "401320597", "event_start_utc": "2021-05-29T18:00Z", "away_team": "Atlanta Dream", "home_team": "New York Liberty", "away_score": 90, "home_score": 87, "home_winner": false}
+{"event_id": "401320598", "event_start_utc": "2021-05-30T00:00Z", "away_team": "Phoenix Mercury", "home_team": "Dallas Wings", "away_score": 89, "home_score": 85, "home_winner": false}
+{"event_id": "401320599", "event_start_utc": "2021-05-30T22:00Z", "away_team": "Los Angeles Sparks", "home_team": "Chicago Sky", "away_score": 82, "home_score": 79, "home_winner": false}
+{"event_id": "401320600", "event_start_utc": "2021-05-30T22:00Z", "away_team": "Indiana Fever", "home_team": "Las Vegas Aces", "away_score": 78, "home_score": 101, "home_winner": true}
+{"event_id": "401320601", "event_start_utc": "2021-05-30T23:00Z", "away_team": "Connecticut Sun", "home_team": "Minnesota Lynx", "away_score": 74, "home_score": 79, "home_winner": true}
+{"event_id": "401320602", "event_start_utc": "2021-06-01T23:00Z", "away_team": "Las Vegas Aces", "home_team": "Connecticut Sun", "away_score": 67, "home_score": 74, "home_winner": true}
+{"event_id": "401320604", "event_start_utc": "2021-06-02T00:00Z", "away_team": "Los Angeles Sparks", "home_team": "Dallas Wings", "away_score": 69, "home_score": 79, "home_winner": true}
+{"event_id": "401320603", "event_start_utc": "2021-06-02T00:30Z", "away_team": "Phoenix Mercury", "home_team": "Chicago Sky", "away_score": 84, "home_score": 83, "home_winner": false}
+{"event_id": "401320605", "event_start_utc": "2021-06-02T02:30Z", "away_team": "Indiana Fever", "home_team": "Seattle Storm", "away_score": 73, "home_score": 88, "home_winner": true}
+{"event_id": "401320606", "event_start_utc": "2021-06-03T23:00Z", "away_team": "Las Vegas Aces", "home_team": "New York Liberty", "away_score": 94, "home_score": 82, "home_winner": false}
+{"event_id": "401320607", "event_start_utc": "2021-06-04T02:00Z", "away_team": "Chicago Sky", "home_team": "Phoenix Mercury", "away_score": 74, "home_score": 77, "home_winner": true}
+{"event_id": "401320608", "event_start_utc": "2021-06-04T02:30Z", "away_team": "Indiana Fever", "home_team": "Los Angeles Sparks", "away_score": 63, "home_score": 98, "home_winner": true}
+{"event_id": "401320609", "event_start_utc": "2021-06-05T00:00Z", "away_team": "Atlanta Dream", "home_team": "Minnesota Lynx", "away_score": 84, "home_score": 86, "home_winner": true}
+{"event_id": "401320610", "event_start_utc": "2021-06-05T02:00Z", "away_team": "Dallas Wings", "home_team": "Seattle Storm", "away_score": 102, "home_score": 105, "home_winner": true}
+{"event_id": "401320611", "event_start_utc": "2021-06-05T17:00Z", "away_team": "Las Vegas Aces", "home_team": "Washington Mystics", "away_score": 96, "home_score": 93, "home_winner": false}
+{"event_id": "401320612", "event_start_utc": "2021-06-05T19:00Z", "away_team": "Chicago Sky", "home_team": "Los Angeles Sparks", "away_score": 63, "home_score": 68, "home_winner": true}
+{"event_id": "401320613", "event_start_utc": "2021-06-05T23:00Z", "away_team": "New York Liberty", "home_team": "Connecticut Sun", "away_score": 64, "home_score": 85, "home_winner": true}
+{"event_id": "401320614", "event_start_utc": "2021-06-06T23:00Z", "away_team": "Atlanta Dream", "home_team": "Minnesota Lynx", "away_score": 80, "home_score": 100, "home_winner": true}
+{"event_id": "401320615", "event_start_utc": "2021-06-06T23:00Z", "away_team": "Dallas Wings", "home_team": "Seattle Storm", "away_score": 68, "home_score": 67, "home_winner": false}
+{"event_id": "401320616", "event_start_utc": "2021-06-08T23:00Z", "away_team": "Minnesota Lynx", "home_team": "Washington Mystics", "away_score": 81, "home_score": 85, "home_winner": true}
+{"event_id": "401320619", "event_start_utc": "2021-06-09T02:00Z", "away_team": "Dallas Wings", "home_team": "Phoenix Mercury", "away_score": 85, "home_score": 81, "home_winner": false}
+{"event_id": "401320617", "event_start_utc": "2021-06-09T23:00Z", "away_team": "Seattle Storm", "home_team": "Atlanta Dream", "away_score": 95, "home_score": 71, "home_winner": false}
+{"event_id": "401320618", "event_start_utc": "2021-06-10T00:00Z", "away_team": "Indiana Fever", "home_team": "Chicago Sky", "away_score": 76, "home_score": 92, "home_winner": true}
+{"event_id": "401320620", "event_start_utc": "2021-06-10T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Washington Mystics", "away_score": 71, "home_score": 89, "home_winner": true}
+{"event_id": "401320621", "event_start_utc": "2021-06-12T00:00Z", "away_team": "Seattle Storm", "home_team": "Atlanta Dream", "away_score": 86, "home_score": 75, "home_winner": false}
+{"event_id": "401320622", "event_start_utc": "2021-06-12T02:00Z", "away_team": "Dallas Wings", "home_team": "Phoenix Mercury", "away_score": 77, "home_score": 59, "home_winner": false}
+{"event_id": "401320623", "event_start_utc": "2021-06-12T17:00Z", "away_team": "Chicago Sky", "home_team": "Indiana Fever", "away_score": 83, "home_score": 79, "home_winner": false}
+{"event_id": "401320624", "event_start_utc": "2021-06-13T00:00Z", "away_team": "Los Angeles Sparks", "home_team": "Minnesota Lynx", "away_score": 64, "home_score": 80, "home_winner": true}
+{"event_id": "401320625", "event_start_utc": "2021-06-13T18:00Z", "away_team": "Seattle Storm", "home_team": "Connecticut Sun", "away_score": 89, "home_score": 66, "home_winner": false}
+{"event_id": "401320626", "event_start_utc": "2021-06-13T19:30Z", "away_team": "Washington Mystics", "home_team": "Atlanta Dream", "away_score": 78, "home_score": 101, "home_winner": true}
+{"event_id": "401320627", "event_start_utc": "2021-06-13T22:00Z", "away_team": "Dallas Wings", "home_team": "Las Vegas Aces", "away_score": 78, "home_score": 85, "home_winner": true}
+{"event_id": "401320628", "event_start_utc": "2021-06-13T22:00Z", "away_team": "New York Liberty", "home_team": "Phoenix Mercury", "away_score": 85, "home_score": 83, "home_winner": false}
+{"event_id": "401320629", "event_start_utc": "2021-06-15T23:00Z", "away_team": "Seattle Storm", "home_team": "Indiana Fever", "away_score": 87, "home_score": 70, "home_winner": false}
+{"event_id": "401320630", "event_start_utc": "2021-06-16T01:00Z", "away_team": "Chicago Sky", "home_team": "Minnesota Lynx", "away_score": 105, "home_score": 89, "home_winner": false}
+{"event_id": "401320631", "event_start_utc": "2021-06-16T02:00Z", "away_team": "New York Liberty", "home_team": "Las Vegas Aces", "away_score": 78, "home_score": 100, "home_winner": true}
+{"event_id": "401320632", "event_start_utc": "2021-06-17T02:30Z", "away_team": "Phoenix Mercury", "home_team": "Los Angeles Sparks", "away_score": 80, "home_score": 85, "home_winner": true}
+{"event_id": "401320633", "event_start_utc": "2021-06-17T23:00Z", "away_team": "Seattle Storm", "home_team": "Indiana Fever", "away_score": 79, "home_score": 69, "home_winner": false}
+{"event_id": "401320634", "event_start_utc": "2021-06-17T23:00Z", "away_team": "Atlanta Dream", "home_team": "Washington Mystics", "away_score": 93, "home_score": 96, "home_winner": true}
+{"event_id": "401320635", "event_start_utc": "2021-06-18T00:00Z", "away_team": "Connecticut Sun", "home_team": "Chicago Sky", "away_score": 75, "home_score": 81, "home_winner": true}
+{"event_id": "401320636", "event_start_utc": "2021-06-18T00:00Z", "away_team": "Minnesota Lynx", "home_team": "Dallas Wings", "away_score": 85, "home_score": 73, "home_winner": false}
+{"event_id": "401320637", "event_start_utc": "2021-06-18T02:00Z", "away_team": "New York Liberty", "home_team": "Las Vegas Aces", "away_score": 76, "home_score": 103, "home_winner": true}
+{"event_id": "401320638", "event_start_utc": "2021-06-19T02:30Z", "away_team": "Phoenix Mercury", "home_team": "Los Angeles Sparks", "away_score": 80, "home_score": 66, "home_winner": false}
+{"event_id": "401320639", "event_start_utc": "2021-06-19T18:00Z", "away_team": "Connecticut Sun", "home_team": "Chicago Sky", "away_score": 81, "home_score": 91, "home_winner": true}
+{"event_id": "401320640", "event_start_utc": "2021-06-19T23:00Z", "away_team": "Indiana Fever", "home_team": "Washington Mystics", "away_score": 77, "home_score": 82, "home_winner": true}
+{"event_id": "401320641", "event_start_utc": "2021-06-20T00:00Z", "away_team": "Minnesota Lynx", "home_team": "Dallas Wings", "away_score": 77, "home_score": 95, "home_winner": true}
+{"event_id": "401320642", "event_start_utc": "2021-06-20T20:00Z", "away_team": "New York Liberty", "home_team": "Los Angeles Sparks", "away_score": 76, "home_score": 73, "home_winner": false}
+{"event_id": "401320643", "event_start_utc": "2021-06-22T23:00Z", "away_team": "Dallas Wings", "home_team": "Connecticut Sun", "away_score": 70, "home_score": 80, "home_winner": true}
+{"event_id": "401320644", "event_start_utc": "2021-06-22T23:00Z", "away_team": "Chicago Sky", "home_team": "New York Liberty", "away_score": 92, "home_score": 72, "home_winner": false}
+{"event_id": "401320645", "event_start_utc": "2021-06-23T02:00Z", "away_team": "Washington Mystics", "home_team": "Seattle Storm", "away_score": 87, "home_score": 83, "home_winner": false}
+{"event_id": "401320646", "event_start_utc": "2021-06-23T23:00Z", "away_team": "Minnesota Lynx", "home_team": "Atlanta Dream", "away_score": 87, "home_score": 85, "home_winner": false}
+{"event_id": "401320647", "event_start_utc": "2021-06-24T23:00Z", "away_team": "Dallas Wings", "home_team": "Indiana Fever", "away_score": 89, "home_score": 64, "home_winner": false}
+{"event_id": "401320648", "event_start_utc": "2021-06-24T23:00Z", "away_team": "Chicago Sky", "home_team": "New York Liberty", "away_score": 91, "home_score": 68, "home_winner": false}
+{"event_id": "401320649", "event_start_utc": "2021-06-25T02:30Z", "away_team": "Washington Mystics", "home_team": "Los Angeles Sparks", "away_score": 82, "home_score": 89, "home_winner": true}
+{"event_id": "401320650", "event_start_utc": "2021-06-26T00:00Z", "away_team": "Las Vegas Aces", "home_team": "Minnesota Lynx", "away_score": 89, "home_score": 90, "home_winner": true}
+{"event_id": "401320651", "event_start_utc": "2021-06-26T17:00Z", "away_team": "Washington Mystics", "home_team": "Dallas Wings", "away_score": 74, "home_score": 85, "home_winner": true}
+{"event_id": "401320652", "event_start_utc": "2021-06-26T23:00Z", "away_team": "New York Liberty", "home_team": "Atlanta Dream", "away_score": 101, "home_score": 78, "home_winner": false}
+{"event_id": "401320654", "event_start_utc": "2021-06-27T18:00Z", "away_team": "Chicago Sky", "home_team": "Connecticut Sun", "away_score": 58, "home_score": 74, "home_winner": true}
+{"event_id": "401320655", "event_start_utc": "2021-06-27T20:00Z", "away_team": "Seattle Storm", "home_team": "Las Vegas Aces", "away_score": 92, "home_score": 95, "home_winner": true}
+{"event_id": "401320653", "event_start_utc": "2021-06-27T22:00Z", "away_team": "Los Angeles Sparks", "home_team": "Phoenix Mercury", "away_score": 79, "home_score": 88, "home_winner": true}
+{"event_id": "401320656", "event_start_utc": "2021-06-29T23:00Z", "away_team": "New York Liberty", "home_team": "Atlanta Dream", "away_score": 69, "home_score": 73, "home_winner": true}
+{"event_id": "401320657", "event_start_utc": "2021-06-29T23:00Z", "away_team": "Connecticut Sun", "home_team": "Washington Mystics", "away_score": 90, "home_score": 71, "home_winner": false}
+{"event_id": "401430475", "event_start_utc": "2022-04-24T01:00Z", "away_team": "Los Angeles Sparks", "home_team": "Seattle Storm", "away_score": 68, "home_score": 81, "home_winner": true}
+{"event_id": "401430476", "event_start_utc": "2022-04-24T19:00Z", "away_team": "Washington Mystics", "home_team": "Atlanta Dream", "away_score": 69, "home_score": 88, "home_winner": true}
+{"event_id": "401430477", "event_start_utc": "2022-04-25T16:30Z", "away_team": "Dallas Wings", "home_team": "Chicago Sky", "away_score": 92, "home_score": 77, "home_winner": false}
+{"event_id": "401430478", "event_start_utc": "2022-04-27T15:30Z", "away_team": "Minnesota Lynx", "home_team": "Washington Mystics", "away_score": 66, "home_score": 78, "home_winner": true}
+{"event_id": "401430479", "event_start_utc": "2022-04-29T02:00Z", "away_team": "Seattle Storm", "home_team": "Phoenix Mercury", "away_score": 82, "home_score": 78, "home_winner": false}
+{"event_id": "401430481", "event_start_utc": "2022-04-30T19:00Z", "away_team": "Chicago Sky", "home_team": "Indiana Fever", "away_score": 75, "home_score": 79, "home_winner": true}
+{"event_id": "401430482", "event_start_utc": "2022-05-01T17:00Z", "away_team": "Atlanta Dream", "home_team": "Connecticut Sun", "away_score": 78, "home_score": 94, "home_winner": true}
+{"event_id": "401430483", "event_start_utc": "2022-05-01T18:00Z", "away_team": "Las Vegas Aces", "home_team": "Minnesota Lynx", "away_score": 86, "home_score": 89, "home_winner": true}
+{"event_id": "401430484", "event_start_utc": "2022-05-02T18:00Z", "away_team": "Indiana Fever", "home_team": "Dallas Wings", "away_score": 89, "home_score": 101, "home_winner": true}
+{"event_id": "401391650", "event_start_utc": "2022-05-06T23:00Z", "away_team": "Indiana Fever", "home_team": "Washington Mystics", "away_score": 70, "home_score": 84, "home_winner": true}
+{"event_id": "401391651", "event_start_utc": "2022-05-07T00:00Z", "away_team": "Los Angeles Sparks", "home_team": "Chicago Sky", "away_score": 98, "home_score": 91, "home_winner": false}
+{"event_id": "401391652", "event_start_utc": "2022-05-07T02:00Z", "away_team": "Las Vegas Aces", "home_team": "Phoenix Mercury", "away_score": 106, "home_score": 88, "home_winner": false}
+{"event_id": "401391653", "event_start_utc": "2022-05-07T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Seattle Storm", "away_score": 74, "home_score": 97, "home_winner": true}
+{"event_id": "401391654", "event_start_utc": "2022-05-07T22:00Z", "away_team": "Connecticut Sun", "home_team": "New York Liberty", "away_score": 79, "home_score": 81, "home_winner": true}
+{"event_id": "401391655", "event_start_utc": "2022-05-08T00:00Z", "away_team": "Atlanta Dream", "home_team": "Dallas Wings", "away_score": 66, "home_score": 59, "home_winner": false}
+{"event_id": "401391656", "event_start_utc": "2022-05-08T19:00Z", "away_team": "Los Angeles Sparks", "home_team": "Indiana Fever", "away_score": 87, "home_score": 77, "home_winner": false}
+{"event_id": "401391658", "event_start_utc": "2022-05-09T00:00Z", "away_team": "Washington Mystics", "home_team": "Minnesota Lynx", "away_score": 78, "home_score": 66, "home_winner": false}
+{"event_id": "401391657", "event_start_utc": "2022-05-09T02:00Z", "away_team": "Seattle Storm", "home_team": "Las Vegas Aces", "away_score": 74, "home_score": 85, "home_winner": true}
+{"event_id": "401391659", "event_start_utc": "2022-05-10T23:00Z", "away_team": "Las Vegas Aces", "home_team": "Washington Mystics", "away_score": 76, "home_score": 89, "home_winner": true}
+{"event_id": "401391660", "event_start_utc": "2022-05-10T23:00Z", "away_team": "Minnesota Lynx", "home_team": "Indiana Fever", "away_score": 76, "home_score": 82, "home_winner": true}
+{"event_id": "401391661", "event_start_utc": "2022-05-11T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Atlanta Dream", "away_score": 75, "home_score": 77, "home_winner": true}
+{"event_id": "401391662", "event_start_utc": "2022-05-12T00:00Z", "away_team": "New York Liberty", "home_team": "Chicago Sky", "away_score": 50, "home_score": 83, "home_winner": true}
+{"event_id": "401391663", "event_start_utc": "2022-05-12T02:00Z", "away_team": "Seattle Storm", "home_team": "Phoenix Mercury", "away_score": 77, "home_score": 97, "home_winner": true}
+{"event_id": "401391664", "event_start_utc": "2022-05-13T23:00Z", "away_team": "Dallas Wings", "home_team": "Washington Mystics", "away_score": 94, "home_score": 86, "home_winner": false}
+{"event_id": "401391665", "event_start_utc": "2022-05-13T23:30Z", "away_team": "Las Vegas Aces", "home_team": "Atlanta Dream", "away_score": 96, "home_score": 73, "home_winner": false}
+{"event_id": "401391666", "event_start_utc": "2022-05-14T00:00Z", "away_team": "Indiana Fever", "home_team": "New York Liberty", "away_score": 92, "home_score": 86, "home_winner": false}
+{"event_id": "401391667", "event_start_utc": "2022-05-14T19:00Z", "away_team": "Phoenix Mercury", "home_team": "Seattle Storm", "away_score": 69, "home_score": 64, "home_winner": false}
+{"event_id": "401391668", "event_start_utc": "2022-05-14T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Connecticut Sun", "away_score": 60, "home_score": 77, "home_winner": true}
+{"event_id": "401391669", "event_start_utc": "2022-05-15T00:00Z", "away_team": "Chicago Sky", "home_team": "Minnesota Lynx", "away_score": 82, "home_score": 78, "home_winner": false}
+{"event_id": "401391670", "event_start_utc": "2022-05-15T18:00Z", "away_team": "Dallas Wings", "home_team": "New York Liberty", "away_score": 81, "home_score": 71, "home_winner": false}
+{"event_id": "401391671", "event_start_utc": "2022-05-15T19:00Z", "away_team": "Atlanta Dream", "home_team": "Indiana Fever", "away_score": 85, "home_score": 79, "home_winner": false}
+{"event_id": "401391672", "event_start_utc": "2022-05-17T23:00Z", "away_team": "Connecticut Sun", "home_team": "New York Liberty", "away_score": 92, "home_score": 65, "home_winner": false}
+{"event_id": "401391673", "event_start_utc": "2022-05-17T23:00Z", "away_team": "Atlanta Dream", "home_team": "Indiana Fever", "away_score": 101, "home_score": 79, "home_winner": false}
+{"event_id": "401391674", "event_start_utc": "2022-05-18T00:00Z", "away_team": "Washington Mystics", "home_team": "Dallas Wings", "away_score": 84, "home_score": 68, "home_winner": false}
+{"event_id": "401391675", "event_start_utc": "2022-05-18T02:00Z", "away_team": "Phoenix Mercury", "home_team": "Las Vegas Aces", "away_score": 74, "home_score": 86, "home_winner": true}
+{"event_id": "401391676", "event_start_utc": "2022-05-18T02:30Z", "away_team": "Minnesota Lynx", "home_team": "Los Angeles Sparks", "away_score": 87, "home_score": 84, "home_winner": false}
+{"event_id": "401391677", "event_start_utc": "2022-05-19T02:00Z", "away_team": "Chicago Sky", "home_team": "Seattle Storm", "away_score": 71, "home_score": 74, "home_winner": true}
+{"event_id": "401391678", "event_start_utc": "2022-05-20T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Las Vegas Aces", "away_score": 87, "home_score": 93, "home_winner": true}
+{"event_id": "401391679", "event_start_utc": "2022-05-20T02:00Z", "away_team": "Dallas Wings", "home_team": "Phoenix Mercury", "away_score": 94, "home_score": 84, "home_winner": false}
+{"event_id": "401391680", "event_start_utc": "2022-05-20T23:00Z", "away_team": "Indiana Fever", "home_team": "Connecticut Sun", "away_score": 85, "home_score": 94, "home_winner": true}
+{"event_id": "401391681", "event_start_utc": "2022-05-20T23:30Z", "away_team": "Washington Mystics", "home_team": "Atlanta Dream", "away_score": 78, "home_score": 73, "home_winner": false}
+{"event_id": "401391682", "event_start_utc": "2022-05-21T02:00Z", "away_team": "Los Angeles Sparks", "home_team": "Seattle Storm", "away_score": 80, "home_score": 83, "home_winner": true}
+{"event_id": "401391683", "event_start_utc": "2022-05-21T19:00Z", "away_team": "Phoenix Mercury", "home_team": "Las Vegas Aces", "away_score": 80, "home_score": 100, "home_winner": true}
+{"event_id": "401391684", "event_start_utc": "2022-05-22T00:00Z", "away_team": "Minnesota Lynx", "home_team": "Dallas Wings", "away_score": 78, "home_score": 94, "home_winner": true}
+{"event_id": "401391685", "event_start_utc": "2022-05-22T18:00Z", "away_team": "Connecticut Sun", "home_team": "Indiana Fever", "away_score": 92, "home_score": 70, "home_winner": false}
+{"event_id": "401391686", "event_start_utc": "2022-05-22T19:00Z", "away_team": "Chicago Sky", "home_team": "Washington Mystics", "away_score": 82, "home_score": 73, "home_winner": false}
+{"event_id": "401391687", "event_start_utc": "2022-05-24T02:00Z", "away_team": "Los Angeles Sparks", "home_team": "Las Vegas Aces", "away_score": 76, "home_score": 104, "home_winner": true}
+{"event_id": "401391688", "event_start_utc": "2022-05-24T23:00Z", "away_team": "Dallas Wings", "home_team": "Connecticut Sun", "away_score": 85, "home_score": 77, "home_winner": false}
+{"event_id": "401391689", "event_start_utc": "2022-05-24T23:00Z", "away_team": "Atlanta Dream", "home_team": "Washington Mystics", "away_score": 50, "home_score": 70, "home_winner": true}
+{"event_id": "401391690", "event_start_utc": "2022-05-25T00:00Z", "away_team": "Indiana Fever", "home_team": "Chicago Sky", "away_score": 90, "home_score": 95, "home_winner": true}
+{"event_id": "401391691", "event_start_utc": "2022-05-25T00:00Z", "away_team": "New York Liberty", "home_team": "Minnesota Lynx", "away_score": 78, "home_score": 84, "home_winner": true}
+{"event_id": "401391692", "event_start_utc": "2022-05-26T02:30Z", "away_team": "Phoenix Mercury", "home_team": "Los Angeles Sparks", "away_score": 94, "home_score": 99, "home_winner": true}
+{"event_id": "401391693", "event_start_utc": "2022-05-26T23:00Z", "away_team": "Dallas Wings", "home_team": "Connecticut Sun", "away_score": 68, "home_score": 99, "home_winner": true}
+{"event_id": "401391694", "event_start_utc": "2022-05-27T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Indiana Fever", "away_score": 96, "home_score": 101, "home_winner": true}
+{"event_id": "401391695", "event_start_utc": "2022-05-28T02:00Z", "away_team": "New York Liberty", "home_team": "Seattle Storm", "away_score": 71, "home_score": 79, "home_winner": true}
+{"event_id": "401391696", "event_start_utc": "2022-05-28T19:00Z", "away_team": "Las Vegas Aces", "home_team": "Chicago Sky", "away_score": 83, "home_score": 76, "home_winner": false}
+{"event_id": "401391697", "event_start_utc": "2022-05-28T23:00Z", "away_team": "Washington Mystics", "home_team": "Connecticut Sun", "away_score": 71, "home_score": 79, "home_winner": true}
+{"event_id": "401391698", "event_start_utc": "2022-05-29T16:00Z", "away_team": "Phoenix Mercury", "home_team": "Atlanta Dream", "away_score": 54, "home_score": 81, "home_winner": true}
+{"event_id": "401391699", "event_start_utc": "2022-05-29T22:00Z", "away_team": "New York Liberty", "home_team": "Seattle Storm", "away_score": 61, "home_score": 92, "home_winner": true}
+{"event_id": "401391700", "event_start_utc": "2022-05-29T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Minnesota Lynx", "away_score": 85, "home_score": 83, "home_winner": false}
+{"event_id": "401391701", "event_start_utc": "2022-05-31T23:00Z", "away_team": "Washington Mystics", "home_team": "Indiana Fever", "away_score": 87, "home_score": 75, "home_winner": false}
+{"event_id": "401391702", "event_start_utc": "2022-05-31T23:00Z", "away_team": "Phoenix Mercury", "home_team": "Chicago Sky", "away_score": 70, "home_score": 73, "home_winner": true}
+{"event_id": "401391703", "event_start_utc": "2022-06-01T01:00Z", "away_team": "Connecticut Sun", "home_team": "Las Vegas Aces", "away_score": 81, "home_score": 89, "home_winner": true}
+{"event_id": "401391704", "event_start_utc": "2022-06-01T02:30Z", "away_team": "Dallas Wings", "home_team": "Los Angeles Sparks", "away_score": 91, "home_score": 93, "home_winner": true}
+{"event_id": "401391705", "event_start_utc": "2022-06-01T23:00Z", "away_team": "Minnesota Lynx", "home_team": "Atlanta Dream", "away_score": 76, "home_score": 84, "home_winner": true}
+{"event_id": "401391706", "event_start_utc": "2022-06-01T23:00Z", "away_team": "Indiana Fever", "home_team": "New York Liberty", "away_score": 74, "home_score": 87, "home_winner": true}
+{"event_id": "401391707", "event_start_utc": "2022-06-03T02:00Z", "away_team": "Connecticut Sun", "home_team": "Las Vegas Aces", "away_score": 97, "home_score": 90, "home_winner": false}
+{"event_id": "401391708", "event_start_utc": "2022-06-03T23:00Z", "away_team": "New York Liberty", "home_team": "Washington Mystics", "away_score": 74, "home_score": 70, "home_winner": false}
+{"event_id": "401391709", "event_start_utc": "2022-06-03T23:30Z", "away_team": "Chicago Sky", "home_team": "Atlanta Dream", "away_score": 73, "home_score": 65, "home_winner": false}
+{"event_id": "401391710", "event_start_utc": "2022-06-04T02:00Z", "away_team": "Connecticut Sun", "home_team": "Phoenix Mercury", "away_score": 92, "home_score": 88, "home_winner": false}
+{"event_id": "401391711", "event_start_utc": "2022-06-04T02:00Z", "away_team": "Dallas Wings", "home_team": "Seattle Storm", "away_score": 68, "home_score": 51, "home_winner": false}
+{"event_id": "401391712", "event_start_utc": "2022-06-05T18:00Z", "away_team": "Minnesota Lynx", "home_team": "New York Liberty", "away_score": 84, "home_score": 77, "home_winner": false}
+{"event_id": "401391713", "event_start_utc": "2022-06-05T19:00Z", "away_team": "Indiana Fever", "home_team": "Atlanta Dream", "away_score": 66, "home_score": 75, "home_winner": true}
+{"event_id": "401391714", "event_start_utc": "2022-06-05T22:00Z", "away_team": "Washington Mystics", "home_team": "Chicago Sky", "away_score": 82, "home_score": 91, "home_winner": true}
+{"event_id": "401391715", "event_start_utc": "2022-06-05T22:00Z", "away_team": "Dallas Wings", "home_team": "Las Vegas Aces", "away_score": 78, "home_score": 84, "home_winner": true}
+{"event_id": "401391716", "event_start_utc": "2022-06-05T22:00Z", "away_team": "Los Angeles Sparks", "home_team": "Phoenix Mercury", "away_score": 74, "home_score": 81, "home_winner": true}
+{"event_id": "401391717", "event_start_utc": "2022-06-05T22:00Z", "away_team": "Connecticut Sun", "home_team": "Seattle Storm", "away_score": 93, "home_score": 86, "home_winner": false}
+{"event_id": "401391718", "event_start_utc": "2022-06-08T00:00Z", "away_team": "Minnesota Lynx", "home_team": "New York Liberty", "away_score": 69, "home_score": 88, "home_winner": true}
+{"event_id": "401391719", "event_start_utc": "2022-06-08T02:00Z", "away_team": "Atlanta Dream", "home_team": "Seattle Storm", "away_score": 60, "home_score": 72, "home_winner": true}
+{"event_id": "401391720", "event_start_utc": "2022-06-08T23:00Z", "away_team": "Indiana Fever", "home_team": "Connecticut Sun", "away_score": 69, "home_score": 88, "home_winner": true}
+{"event_id": "401391721", "event_start_utc": "2022-06-09T00:00Z", "away_team": "Chicago Sky", "home_team": "Washington Mystics", "away_score": 82, "home_score": 84, "home_winner": true}
+{"event_id": "401391722", "event_start_utc": "2022-06-10T23:00Z", "away_team": "Chicago Sky", "home_team": "Connecticut Sun", "away_score": 83, "home_score": 79, "home_winner": false}
+{"event_id": "401391723", "event_start_utc": "2022-06-10T23:00Z", "away_team": "New York Liberty", "home_team": "Indiana Fever", "away_score": 97, "home_score": 83, "home_winner": false}
+{"event_id": "401391724", "event_start_utc": "2022-06-11T00:00Z", "away_team": "Seattle Storm", "home_team": "Dallas Wings", "away_score": 89, "home_score": 88, "home_winner": false}
+{"event_id": "401391725", "event_start_utc": "2022-06-11T00:00Z", "away_team": "Washington Mystics", "home_team": "Minnesota Lynx", "away_score": 76, "home_score": 59, "home_winner": false}
+{"event_id": "401391726", "event_start_utc": "2022-06-11T02:00Z", "away_team": "Atlanta Dream", "home_team": "Phoenix Mercury", "away_score": 88, "home_score": 90, "home_winner": true}
+{"event_id": "401391727", "event_start_utc": "2022-06-12T01:00Z", "away_team": "Las Vegas Aces", "home_team": "Los Angeles Sparks", "away_score": 89, "home_score": 72, "home_winner": false}
+{"event_id": "401391728", "event_start_utc": "2022-06-12T18:00Z", "away_team": "Chicago Sky", "home_team": "New York Liberty", "away_score": 88, "home_score": 86, "home_winner": false}
+{"event_id": "401391729", "event_start_utc": "2022-06-12T20:00Z", "away_team": "Seattle Storm", "home_team": "Dallas Wings", "away_score": 84, "home_score": 79, "home_winner": false}
+{"event_id": "401391730", "event_start_utc": "2022-06-12T22:00Z", "away_team": "Phoenix Mercury", "home_team": "Washington Mystics", "away_score": 99, "home_score": 90, "home_winner": false}
+{"event_id": "401391731", "event_start_utc": "2022-06-12T23:00Z", "away_team": "Indiana Fever", "home_team": "Minnesota Lynx", "away_score": 84, "home_score": 80, "home_winner": false}
+{"event_id": "401391732", "event_start_utc": "2022-06-14T23:00Z", "away_team": "Phoenix Mercury", "home_team": "Washington Mystics", "away_score": 65, "home_score": 83, "home_winner": true}
+{"event_id": "401391733", "event_start_utc": "2022-06-15T01:00Z", "away_team": "Seattle Storm", "home_team": "Minnesota Lynx", "away_score": 81, "home_score": 79, "home_winner": false}
+{"event_id": "401391734", "event_start_utc": "2022-06-15T17:00Z", "away_team": "Las Vegas Aces", "home_team": "Dallas Wings", "away_score": 92, "home_score": 84, "home_winner": false}
+{"event_id": "401391735", "event_start_utc": "2022-06-15T23:00Z", "away_team": "Atlanta Dream", "home_team": "Connecticut Sun", "away_score": 92, "home_score": 105, "home_winner": true}
+{"event_id": "401391736", "event_start_utc": "2022-06-15T23:00Z", "away_team": "Phoenix Mercury", "home_team": "Indiana Fever", "away_score": 93, "home_score": 80, "home_winner": false}
+{"event_id": "401391737", "event_start_utc": "2022-06-16T23:00Z", "away_team": "Washington Mystics", "home_team": "New York Liberty", "away_score": 65, "home_score": 77, "home_winner": true}
+{"event_id": "401391738", "event_start_utc": "2022-06-17T23:00Z", "away_team": "Seattle Storm", "home_team": "Connecticut Sun", "away_score": 71, "home_score": 82, "home_winner": true}
+{"event_id": "401391739", "event_start_utc": "2022-06-18T00:00Z", "away_team": "Phoenix Mercury", "home_team": "Dallas Wings", "away_score": 88, "home_score": 93, "home_winner": true}
+{"event_id": "401537457", "event_start_utc": "2023-05-06T00:00Z", "away_team": "Washington Mystics", "home_team": "Minnesota Lynx", "away_score": 69, "home_score": 72, "home_winner": true}
+{"event_id": "401537458", "event_start_utc": "2023-05-06T00:00Z", "away_team": "Chicago Sky", "home_team": "Dallas Wings", "away_score": 70, "home_score": 75, "home_winner": true}
+{"event_id": "401537459", "event_start_utc": "2023-05-07T22:00Z", "away_team": "Indiana Fever", "home_team": "Chicago Sky", "away_score": 56, "home_score": 81, "home_winner": true}
+{"event_id": "401535138", "event_start_utc": "2023-05-09T02:00Z", "away_team": "Phoenix Mercury", "home_team": "Seattle Storm", "away_score": 77, "home_score": 71, "home_winner": false}
+{"event_id": "401537460", "event_start_utc": "2023-05-10T15:00Z", "away_team": "New York Liberty", "home_team": "Connecticut Sun", "away_score": 57, "home_score": 63, "home_winner": true}
+{"event_id": "401537461", "event_start_utc": "2023-05-10T15:30Z", "away_team": "Atlanta Dream", "home_team": "Washington Mystics", "away_score": 76, "home_score": 88, "home_winner": true}
+{"event_id": "401535139", "event_start_utc": "2023-05-13T02:00Z", "away_team": "Los Angeles Sparks", "home_team": "Phoenix Mercury", "away_score": 90, "home_score": 71, "home_winner": false}
+{"event_id": "401537462", "event_start_utc": "2023-05-13T17:00Z", "away_team": "Dallas Wings", "home_team": "Indiana Fever", "away_score": 83, "home_score": 90, "home_winner": true}
+{"event_id": "401525954", "event_start_utc": "2023-05-13T20:00Z", "away_team": "Chicago Sky", "home_team": "Minnesota Lynx", "away_score": 82, "home_score": 74, "home_winner": false}
+{"event_id": "401545052", "event_start_utc": "2023-05-13T21:00Z", "away_team": "New York Liberty", "home_team": "Las Vegas Aces", "away_score": 77, "home_score": 84, "home_winner": true}
+{"event_id": "401537464", "event_start_utc": "2023-05-14T19:00Z", "away_team": "Connecticut Sun", "home_team": "Atlanta Dream", "away_score": 85, "home_score": 68, "home_winner": false}
+{"event_id": "401507130", "event_start_utc": "2023-05-19T23:00Z", "away_team": "Connecticut Sun", "home_team": "Indiana Fever", "away_score": 70, "home_score": 61, "home_winner": false}
+{"event_id": "401507131", "event_start_utc": "2023-05-19T23:00Z", "away_team": "New York Liberty", "home_team": "Washington Mystics", "away_score": 64, "home_score": 80, "home_winner": true}
+{"event_id": "401507132", "event_start_utc": "2023-05-20T00:00Z", "away_team": "Chicago Sky", "home_team": "Minnesota Lynx", "away_score": 77, "home_score": 66, "home_winner": false}
+{"event_id": "401507133", "event_start_utc": "2023-05-20T03:00Z", "away_team": "Phoenix Mercury", "home_team": "Los Angeles Sparks", "away_score": 71, "home_score": 94, "home_winner": true}
+{"event_id": "401507135", "event_start_utc": "2023-05-20T17:00Z", "away_team": "Atlanta Dream", "home_team": "Dallas Wings", "away_score": 78, "home_score": 85, "home_winner": true}
+{"event_id": "401507134", "event_start_utc": "2023-05-20T19:00Z", "away_team": "Las Vegas Aces", "home_team": "Seattle Storm", "away_score": 105, "home_score": 64, "home_winner": false}
+{"event_id": "401507136", "event_start_utc": "2023-05-21T17:00Z", "away_team": "Washington Mystics", "home_team": "Connecticut Sun", "away_score": 74, "home_score": 80, "home_winner": true}
+{"event_id": "401507137", "event_start_utc": "2023-05-21T18:00Z", "away_team": "Indiana Fever", "home_team": "New York Liberty", "away_score": 73, "home_score": 90, "home_winner": true}
+{"event_id": "401507138", "event_start_utc": "2023-05-21T20:00Z", "away_team": "Chicago Sky", "home_team": "Phoenix Mercury", "away_score": 75, "home_score": 69, "home_winner": false}
+{"event_id": "401507139", "event_start_utc": "2023-05-23T23:00Z", "away_team": "Connecticut Sun", "home_team": "Washington Mystics", "away_score": 88, "home_score": 81, "home_winner": false}
+{"event_id": "401507140", "event_start_utc": "2023-05-24T00:00Z", "away_team": "Atlanta Dream", "home_team": "Minnesota Lynx", "away_score": 83, "home_score": 77, "home_winner": false}
+{"event_id": "401507141", "event_start_utc": "2023-05-26T02:00Z", "away_team": "Las Vegas Aces", "home_team": "Los Angeles Sparks", "away_score": 94, "home_score": 85, "home_winner": false}
+{"event_id": "401507142", "event_start_utc": "2023-05-26T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Phoenix Mercury", "away_score": 81, "home_score": 90, "home_winner": true}
+{"event_id": "401507143", "event_start_utc": "2023-05-27T00:00Z", "away_team": "Washington Mystics", "home_team": "Chicago Sky", "away_score": 71, "home_score": 69, "home_winner": false}
+{"event_id": "401507144", "event_start_utc": "2023-05-27T02:00Z", "away_team": "Dallas Wings", "home_team": "Seattle Storm", "away_score": 95, "home_score": 91, "home_winner": false}
+{"event_id": "401507145", "event_start_utc": "2023-05-27T17:00Z", "away_team": "Connecticut Sun", "home_team": "New York Liberty", "away_score": 65, "home_score": 81, "home_winner": true}
+{"event_id": "401507146", "event_start_utc": "2023-05-28T01:00Z", "away_team": "Los Angeles Sparks", "home_team": "Las Vegas Aces", "away_score": 65, "home_score": 93, "home_winner": true}
+{"event_id": "401507147", "event_start_utc": "2023-05-28T19:00Z", "away_team": "Indiana Fever", "home_team": "Atlanta Dream", "away_score": 90, "home_score": 87, "home_winner": false}
+{"event_id": "401507148", "event_start_utc": "2023-05-28T22:00Z", "away_team": "Dallas Wings", "home_team": "Chicago Sky", "away_score": 88, "home_score": 94, "home_winner": true}
+{"event_id": "401507149", "event_start_utc": "2023-05-29T01:00Z", "away_team": "Minnesota Lynx", "home_team": "Las Vegas Aces", "away_score": 73, "home_score": 94, "home_winner": true}
+{"event_id": "401507150", "event_start_utc": "2023-05-30T23:00Z", "away_team": "Chicago Sky", "home_team": "Atlanta Dream", "away_score": 65, "home_score": 83, "home_winner": true}
+{"event_id": "401507151", "event_start_utc": "2023-05-30T23:00Z", "away_team": "Indiana Fever", "home_team": "Connecticut Sun", "away_score": 78, "home_score": 81, "home_winner": true}
+{"event_id": "401507152", "event_start_utc": "2023-05-31T00:00Z", "away_team": "Minnesota Lynx", "home_team": "Dallas Wings", "away_score": 89, "home_score": 94, "home_winner": true}
+{"event_id": "401507153", "event_start_utc": "2023-05-31T01:00Z", "away_team": "New York Liberty", "home_team": "Seattle Storm", "away_score": 86, "home_score": 78, "home_winner": false}
+{"event_id": "401507154", "event_start_utc": "2023-06-02T00:00Z", "away_team": "Connecticut Sun", "home_team": "Minnesota Lynx", "away_score": 89, "home_score": 84, "home_winner": false}
+{"event_id": "401507157", "event_start_utc": "2023-06-02T22:00Z", "away_team": "New York Liberty", "home_team": "Chicago Sky", "away_score": 77, "home_score": 76, "home_winner": false}
+{"event_id": "401507155", "event_start_utc": "2023-06-02T23:00Z", "away_team": "Dallas Wings", "home_team": "Washington Mystics", "away_score": 74, "home_score": 75, "home_winner": true}
+{"event_id": "401507156", "event_start_utc": "2023-06-03T00:00Z", "away_team": "Las Vegas Aces", "home_team": "Atlanta Dream", "away_score": 92, "home_score": 87, "home_winner": false}
+{"event_id": "401507158", "event_start_utc": "2023-06-03T02:00Z", "away_team": "Los Angeles Sparks", "home_team": "Phoenix Mercury", "away_score": 99, "home_score": 93, "home_winner": false}
+{"event_id": "401507159", "event_start_utc": "2023-06-03T23:00Z", "away_team": "Minnesota Lynx", "home_team": "Washington Mystics", "away_score": 80, "home_score": 78, "home_winner": false}
+{"event_id": "401507160", "event_start_utc": "2023-06-04T02:00Z", "away_team": "Seattle Storm", "home_team": "Los Angeles Sparks", "away_score": 85, "home_score": 92, "home_winner": true}
+{"event_id": "401507161", "event_start_utc": "2023-06-04T17:00Z", "away_team": "Dallas Wings", "home_team": "Connecticut Sun", "away_score": 74, "home_score": 80, "home_winner": true}
+{"event_id": "401507162", "event_start_utc": "2023-06-04T18:00Z", "away_team": "Chicago Sky", "home_team": "New York Liberty", "away_score": 86, "home_score": 82, "home_winner": false}
+{"event_id": "401507163", "event_start_utc": "2023-06-04T20:00Z", "away_team": "Las Vegas Aces", "home_team": "Indiana Fever", "away_score": 84, "home_score": 80, "home_winner": false}
+{"event_id": "401507164", "event_start_utc": "2023-06-06T23:00Z", "away_team": "Las Vegas Aces", "home_team": "Connecticut Sun", "away_score": 90, "home_score": 84, "home_winner": false}
+{"event_id": "401507165", "event_start_utc": "2023-06-07T00:00Z", "away_team": "Indiana Fever", "home_team": "Chicago Sky", "away_score": 103, "home_score": 108, "home_winner": true}
+{"event_id": "401507166", "event_start_utc": "2023-06-07T02:00Z", "away_team": "Los Angeles Sparks", "home_team": "Seattle Storm", "away_score": 63, "home_score": 66, "home_winner": true}
+{"event_id": "401507168", "event_start_utc": "2023-06-08T00:00Z", "away_team": "Phoenix Mercury", "home_team": "Dallas Wings", "away_score": 79, "home_score": 84, "home_winner": true}
+{"event_id": "401507169", "event_start_utc": "2023-06-08T23:00Z", "away_team": "Las Vegas Aces", "home_team": "Connecticut Sun", "away_score": 77, "home_score": 94, "home_winner": true}
+{"event_id": "401507170", "event_start_utc": "2023-06-09T23:30Z", "away_team": "New York Liberty", "home_team": "Atlanta Dream", "away_score": 106, "home_score": 83, "home_winner": false}
+{"event_id": "401507171", "event_start_utc": "2023-06-10T00:00Z", "away_team": "Phoenix Mercury", "home_team": "Dallas Wings", "away_score": 77, "home_score": 90, "home_winner": true}
+{"event_id": "401507172", "event_start_utc": "2023-06-10T00:00Z", "away_team": "Indiana Fever", "home_team": "Minnesota Lynx", "away_score": 71, "home_score": 69, "home_winner": false}
+{"event_id": "401507173", "event_start_utc": "2023-06-10T02:00Z", "away_team": "Chicago Sky", "home_team": "Los Angeles Sparks", "away_score": 62, "home_score": 77, "home_winner": true}
+{"event_id": "401507174", "event_start_utc": "2023-06-10T02:00Z", "away_team": "Washington Mystics", "home_team": "Seattle Storm", "away_score": 73, "home_score": 66, "home_winner": false}
+{"event_id": "401507175", "event_start_utc": "2023-06-11T17:00Z", "away_team": "Dallas Wings", "home_team": "New York Liberty", "away_score": 93, "home_score": 102, "home_winner": true}
+{"event_id": "401507176", "event_start_utc": "2023-06-11T19:00Z", "away_team": "Chicago Sky", "home_team": "Las Vegas Aces", "away_score": 80, "home_score": 93, "home_winner": true}
+{"event_id": "401507179", "event_start_utc": "2023-06-11T19:00Z", "away_team": "Washington Mystics", "home_team": "Seattle Storm", "away_score": 71, "home_score": 65, "home_winner": false}
+{"event_id": "401507177", "event_start_utc": "2023-06-11T20:00Z", "away_team": "Connecticut Sun", "home_team": "Atlanta Dream", "away_score": 89, "home_score": 77, "home_winner": false}
+{"event_id": "401507178", "event_start_utc": "2023-06-11T21:00Z", "away_team": "Phoenix Mercury", "home_team": "Indiana Fever", "away_score": 85, "home_score": 82, "home_winner": false}
+{"event_id": "401507180", "event_start_utc": "2023-06-11T23:00Z", "away_team": "Los Angeles Sparks", "home_team": "Minnesota Lynx", "away_score": 86, "home_score": 91, "home_winner": true}
+{"event_id": "401507181", "event_start_utc": "2023-06-13T23:00Z", "away_team": "Washington Mystics", "home_team": "Indiana Fever", "away_score": 66, "home_score": 87, "home_winner": true}
+{"event_id": "401507182", "event_start_utc": "2023-06-14T00:00Z", "away_team": "Atlanta Dream", "home_team": "New York Liberty", "away_score": 86, "home_score": 79, "home_winner": false}
+{"event_id": "401507183", "event_start_utc": "2023-06-14T02:00Z", "away_team": "Seattle Storm", "home_team": "Phoenix Mercury", "away_score": 83, "home_score": 69, "home_winner": false}
+{"event_id": "401507184", "event_start_utc": "2023-06-14T17:00Z", "away_team": "Los Angeles Sparks", "home_team": "Dallas Wings", "away_score": 79, "home_score": 61, "home_winner": false}
+{"event_id": "401507185", "event_start_utc": "2023-06-15T23:00Z", "away_team": "Atlanta Dream", "home_team": "Connecticut Sun", "away_score": 92, "home_score": 88, "home_winner": false}
+{"event_id": "401507186", "event_start_utc": "2023-06-16T00:00Z", "away_team": "Indiana Fever", "home_team": "Chicago Sky", "away_score": 92, "home_score": 90, "home_winner": false}
+{"event_id": "401507187", "event_start_utc": "2023-06-16T02:00Z", "away_team": "Seattle Storm", "home_team": "Las Vegas Aces", "away_score": 63, "home_score": 96, "home_winner": true}
+{"event_id": "401507188", "event_start_utc": "2023-06-17T00:00Z", "away_team": "Phoenix Mercury", "home_team": "Washington Mystics", "away_score": 69, "home_score": 88, "home_winner": true}
+{"event_id": "401507189", "event_start_utc": "2023-06-17T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Los Angeles Sparks", "away_score": 77, "home_score": 72, "home_winner": false}
+{"event_id": "401507190", "event_start_utc": "2023-06-17T18:00Z", "away_team": "Seattle Storm", "home_team": "Dallas Wings", "away_score": 109, "home_score": 103, "home_winner": false}
+{"event_id": "401507191", "event_start_utc": "2023-06-18T16:00Z", "away_team": "Phoenix Mercury", "home_team": "New York Liberty", "away_score": 71, "home_score": 89, "home_winner": true}
+{"event_id": "401507192", "event_start_utc": "2023-06-18T19:00Z", "away_team": "Chicago Sky", "home_team": "Washington Mystics", "away_score": 69, "home_score": 77, "home_winner": true}
+{"event_id": "401507193", "event_start_utc": "2023-06-18T20:00Z", "away_team": "Atlanta Dream", "home_team": "Indiana Fever", "away_score": 100, "home_score": 94, "home_winner": false}
+{"event_id": "401507194", "event_start_utc": "2023-06-18T23:30Z", "away_team": "Connecticut Sun", "home_team": "Los Angeles Sparks", "away_score": 83, "home_score": 74, "home_winner": false}
+{"event_id": "401507195", "event_start_utc": "2023-06-19T01:00Z", "away_team": "Minnesota Lynx", "home_team": "Las Vegas Aces", "away_score": 62, "home_score": 93, "home_winner": true}
+{"event_id": "401507196", "event_start_utc": "2023-06-21T00:00Z", "away_team": "Atlanta Dream", "home_team": "Dallas Wings", "away_score": 73, "home_score": 85, "home_winner": true}
+{"event_id": "401507197", "event_start_utc": "2023-06-21T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Los Angeles Sparks", "away_score": 67, "home_score": 61, "home_winner": false}
+{"event_id": "401507198", "event_start_utc": "2023-06-21T02:00Z", "away_team": "Connecticut Sun", "home_team": "Seattle Storm", "away_score": 85, "home_score": 79, "home_winner": false}
+{"event_id": "401507199", "event_start_utc": "2023-06-21T19:30Z", "away_team": "Las Vegas Aces", "home_team": "Phoenix Mercury", "away_score": 99, "home_score": 79, "home_winner": false}
+{"event_id": "401507200", "event_start_utc": "2023-06-23T00:00Z", "away_team": "Washington Mystics", "home_team": "Chicago Sky", "away_score": 80, "home_score": 59, "home_winner": false}
+{"event_id": "401507201", "event_start_utc": "2023-06-23T00:00Z", "away_team": "Connecticut Sun", "home_team": "Minnesota Lynx", "away_score": 89, "home_score": 68, "home_winner": false}
+{"event_id": "401507202", "event_start_utc": "2023-06-23T02:00Z", "away_team": "Indiana Fever", "home_team": "Seattle Storm", "away_score": 80, "home_score": 68, "home_winner": false}
+{"event_id": "401507203", "event_start_utc": "2023-06-23T23:30Z", "away_team": "New York Liberty", "home_team": "Atlanta Dream", "away_score": 110, "home_score": 80, "home_winner": false}
+{"event_id": "401507204", "event_start_utc": "2023-06-24T02:00Z", "away_team": "Dallas Wings", "home_team": "Los Angeles Sparks", "away_score": 74, "home_score": 76, "home_winner": true}
+{"event_id": "401507205", "event_start_utc": "2023-06-25T01:00Z", "away_team": "Indiana Fever", "home_team": "Las Vegas Aces", "away_score": 88, "home_score": 101, "home_winner": true}
+{"event_id": "401507206", "event_start_utc": "2023-06-25T01:00Z", "away_team": "Phoenix Mercury", "home_team": "Seattle Storm", "away_score": 74, "home_score": 97, "home_winner": true}
+{"event_id": "401507207", "event_start_utc": "2023-06-25T17:00Z", "away_team": "Chicago Sky", "home_team": "Connecticut Sun", "away_score": 72, "home_score": 96, "home_winner": true}
+{"event_id": "401507208", "event_start_utc": "2023-06-25T17:00Z", "away_team": "Washington Mystics", "home_team": "New York Liberty", "away_score": 88, "home_score": 89, "home_winner": true}
+{"event_id": "401507209", "event_start_utc": "2023-06-25T19:00Z", "away_team": "Dallas Wings", "home_team": "Los Angeles Sparks", "away_score": 83, "home_score": 93, "home_winner": true}
+{"event_id": "401507210", "event_start_utc": "2023-06-27T02:00Z", "away_team": "Indiana Fever", "home_team": "Las Vegas Aces", "away_score": 80, "home_score": 88, "home_winner": true}
+{"event_id": "401507211", "event_start_utc": "2023-06-27T23:00Z", "away_team": "New York Liberty", "home_team": "Connecticut Sun", "away_score": 89, "home_score": 81, "home_winner": false}
+{"event_id": "401507212", "event_start_utc": "2023-06-28T00:00Z", "away_team": "Seattle Storm", "home_team": "Minnesota Lynx", "away_score": 93, "home_score": 104, "home_winner": true}
+{"event_id": "401507213", "event_start_utc": "2023-06-28T02:00Z", "away_team": "Dallas Wings", "home_team": "Phoenix Mercury", "away_score": 77, "home_score": 62, "home_winner": false}
+{"event_id": "401507214", "event_start_utc": "2023-06-28T16:00Z", "away_team": "Los Angeles Sparks", "home_team": "Chicago Sky", "away_score": 63, "home_score": 80, "home_winner": true}
+{"event_id": "401507215", "event_start_utc": "2023-06-28T23:00Z", "away_team": "Atlanta Dream", "home_team": "Washington Mystics", "away_score": 86, "home_score": 109, "home_winner": true}
+{"event_id": "401507216", "event_start_utc": "2023-06-30T02:00Z", "away_team": "New York Liberty", "home_team": "Las Vegas Aces", "away_score": 81, "home_score": 98, "home_winner": true}
+{"event_id": "401507217", "event_start_utc": "2023-06-30T02:00Z", "away_team": "Indiana Fever", "home_team": "Phoenix Mercury", "away_score": 63, "home_score": 85, "home_winner": true}
+{"event_id": "401507218", "event_start_utc": "2023-06-30T02:00Z", "away_team": "Minnesota Lynx", "home_team": "Seattle Storm", "away_score": 99, "home_score": 97, "home_winner": false}
