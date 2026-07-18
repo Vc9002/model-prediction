@@ -17,13 +17,13 @@ DEFAULT_ELO = 1500.0
 
 # Per-sport tuning; falls back to the generic row.
 ELO_CONFIG: dict[str, dict[str, float]] = {
-    "mlb": {"k": 4.0, "home_advantage": 24.0},
-    "nba": {"k": 20.0, "home_advantage": 70.0},
-    "wnba": {"k": 20.0, "home_advantage": 60.0},
-    "nfl": {"k": 20.0, "home_advantage": 55.0},
-    "soccer": {"k": 20.0, "home_advantage": 60.0},
-    "tennis": {"k": 32.0, "home_advantage": 0.0},
-    "generic": {"k": 20.0, "home_advantage": 50.0},
+    "mlb":     {"k": 4.0,  "home_advantage": 24.0, "offseason_regression": 0.00},
+    "nba":     {"k": 20.0, "home_advantage": 70.0, "offseason_regression": 0.35},
+    "wnba":    {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.40},
+    "nfl":     {"k": 20.0, "home_advantage": 55.0, "offseason_regression": 0.50},
+    "soccer":  {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
+    "tennis":  {"k": 32.0, "home_advantage": 0.0,  "offseason_regression": 0.50},
+    "generic": {"k": 20.0, "home_advantage": 50.0, "offseason_regression": 0.50},
 }
 
 
@@ -61,7 +61,7 @@ class EloBook:
 
 
 def build_elo(games: Iterable[GameRecord], sport: str,
-              offseason_regression: float = 0.5,
+              offseason_regression: float | None = None,
               offseason_gap_days: int = 90) -> EloBook:
     """Build chronological Elo ratings with offseason regression.
 
@@ -77,6 +77,8 @@ def build_elo(games: Iterable[GameRecord], sport: str,
         offseason_gap_days: consecutive-day gap that triggers regression
     """
     config = ELO_CONFIG.get(sport.lower(), ELO_CONFIG["generic"])
+    if offseason_regression is None:
+        offseason_regression = float(config.get("offseason_regression", 0.5))
     book = EloBook(ratings={}, k=config["k"], home_advantage=config["home_advantage"])
     sorted_games = sorted(games, key=lambda item: item.start)
     if not sorted_games:
