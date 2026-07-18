@@ -105,16 +105,20 @@ def build_learned_moneyline_slate(
                 w = live_weather(home_team)
                 features["weather_factor"] = float(w.get("weather_run_factor", 1.0))
             if "pitcher_era_gap" in feature_names:
-                # Rolling runs-allowed gap (no API, from cached games)
-                import json as _json
-                from pathlib import Path as _Path
-                hist_path = _Path("data/historical/mlb_games_all.jsonl")
-                all_g = [_json.loads(l) for l in hist_path.read_text().strip().split("\n") if l.strip()] if hist_path.exists() else []
-                def _ra(team, n=5):
-                    tg = sorted([g for g in all_g if (g.get("home_team")==team or g.get("away_team")==team) and g.get("home_score") is not None], key=lambda g: g.get("event_start_utc",""))[-n:]
-                    return sum(g["away_score"] if g["home_team"]==team else g["home_score"] for g in tg)/n if len(tg)>=n else None
-                hra=_ra(home_team); ara=_ra(away_team)
-                features["pitcher_era_gap"] = round(hra-ara,4) if hra and ara else 0.0
+                try:
+                    from model_prediction.data_sources.espn_probables import espn_pitcher_era_gap
+                    features["pitcher_era_gap"] = espn_pitcher_era_gap(event_id, home_team, away_team, game_date)
+                except Exception:
+                    # Fallback: rolling runs-allowed from cached games
+                    import json as _json
+                    from pathlib import Path as _Path
+                    hist_path = _Path("data/historical/mlb_games_all.jsonl")
+                    all_g = [_json.loads(l) for l in hist_path.read_text().strip().split("\n") if l.strip()] if hist_path.exists() else []
+                    def _ra(team, n=5):
+                        tg = sorted([g for g in all_g if (g.get("home_team")==team or g.get("away_team")==team) and g.get("home_score") is not None], key=lambda g: g.get("event_start_utc",""))[-n:]
+                        return sum(g["away_score"] if g["home_team"]==team else g["home_score"] for g in tg)/n if len(tg)>=n else None
+                    hra=_ra(home_team); ara=_ra(away_team)
+                    features["pitcher_era_gap"] = round(hra-ara,4) if hra and ara else 0.0
             decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
             if not decision.call:
@@ -154,6 +158,7 @@ def build_learned_moneyline_slate(
             )
         except (KeyError, TypeError, ValueError) as error:
             skipped.append({"event_id": event_id, "reason": str(error)})
+
     return candidates, skipped, len(events)
 
 
@@ -271,3 +276,80 @@ def _teams(event: Mapping[str, Any]) -> tuple[str, str]:
     competitors = event["competitions"][0]["competitors"]
     by_side = {item["homeAway"]: item["team"]["displayName"] for item in competitors}
     return str(by_side["away"]), str(by_side["home"])
+
+
+def _apply_rest_fatigue_filter(
+    candidates: list[LearnedForwardCandidate],
+    history: list[Any],
+    game_date: str,
+    threshold: int = -3,
+) -> list[LearnedForwardCandidate]:
+    """Suppress qualified calls when the home team has significantly fewer rest days.
+
+    Computes days-since-last-game for both teams from the pre-game-date history.
+    Only suppresses QUALIFIED_SHADOW_CALL rows; already-NO_CALL rows pass through.
+
+    Args:
+        threshold: maximum allowed rest disparity before suppression (e.g. -3
+                   means suppress when home_rest - away_rest ≤ -3)
+    """
+    from datetime import date as _date
+
+    # Build team → sorted game dates from history
+    team_dates: dict[str, list[_date]] = {}
+    for game in history:
+        try:
+            if hasattr(game, 'start'):
+                dt = game.start.date()
+            else:
+                dt = _date.fromisoformat(str(game.get("event_start_utc", ""))[:10])
+        except (ValueError, TypeError):
+            continue
+        for team in (getattr(game, "home_team", None) or game.get("home_team", ""),
+                     getattr(game, "away_team", None) or game.get("away_team", "")):
+            if team:
+                team_dates.setdefault(str(team), []).append(dt)
+
+    cutoff = _date.fromisoformat(game_date)
+
+    def _rest(team: str) -> int | None:
+        dates = sorted(team_dates.get(team, []))
+        prior = [d for d in dates if d < cutoff]
+        if not prior:
+            return None
+        return (cutoff - max(prior)).days
+
+    filtered: list[LearnedForwardCandidate] = []
+    for c in candidates:
+        if c.call and c.action == "QUALIFIED_SHADOW_CALL":
+            home_rest = _rest(c.home_team)
+            away_rest = _rest(c.away_team)
+            if home_rest is not None and away_rest is not None:
+                disparity = home_rest - away_rest
+                if disparity <= threshold:
+                    filtered.append(LearnedForwardCandidate(
+                        event_id=c.event_id,
+                        event_start_utc=c.event_start_utc,
+                        away_team=c.away_team,
+                        home_team=c.home_team,
+                        market_type=c.market_type,
+                        selection=c.selection,
+                        model_probability=c.model_probability,
+                        home_probability=c.home_probability,
+                        confidence_threshold=c.confidence_threshold,
+                        call=False,
+                        action="NO_CALL_REST_FATIGUE_FILTER",
+                        reason=f"home_rest={home_rest}d away_rest={away_rest}d disparity={disparity}",
+                        model_version=c.model_version,
+                        model_artifact_hash=c.model_artifact_hash,
+                        model_qualified=c.model_qualified,
+                        feature_basis={**c.feature_basis,
+                            "home_rest_days": home_rest,
+                            "away_rest_days": away_rest,
+                            "rest_disparity": disparity},
+                        feature_snapshot_hash=c.feature_snapshot_hash,
+                    ))
+                    continue
+        filtered.append(c)
+
+    return filtered
