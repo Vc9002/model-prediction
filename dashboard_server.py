@@ -36,6 +36,8 @@ try:
 except ImportError:  # pragma: no cover
     load_workbook = None
 
+# ── SECTION: Paths & Constants ───────────────────────────────────────────
+
 ROOT = Path(__file__).resolve().parent
 
 # Load .env file so subprocess CLI commands inherit Polymarket keys
@@ -134,6 +136,7 @@ def _runner_env() -> dict[str, str]:
     src = str(ROOT / "src")
     env["PYTHONPATH"] = src + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     return env
+# ── SECTION: Cache Layer ────────────────────────────────────────────
 
 
 def _cached(key: str, ttl: float, builder):
@@ -238,6 +241,7 @@ def _config_payload() -> dict:
         payload = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         return {}
+# ── SECTION: Configuration ──────────────────────────────────────────
     return payload if isinstance(payload, dict) else {}
 
 
@@ -293,6 +297,7 @@ def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
 
 
 _PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+# ── SECTION: Picks & Performance ────────────────────────────────────
 
 
 def read_picks() -> list[dict]:
@@ -449,6 +454,7 @@ def performance(picks: list[dict]) -> dict:
         "streaks": {"longest_win": longest_w, "longest_loss": longest_l, "current": current},
         "mean_clv": round(sum(clv) / len(clv), 6) if clv else None,
     }
+# ── SECTION: Status & Health ────────────────────────────────────────
 
 
 def status() -> dict:
@@ -522,6 +528,7 @@ def status() -> dict:
 
 
 MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
+# ── SECTION: Validation & Matrix ────────────────────────────────────
 
 
 def _newest_validation() -> tuple[dict, str]:
@@ -715,6 +722,7 @@ def matrix() -> dict:
         "locked holdout hit rate >= 65% target (learned threshold), >= 60% floor, >= 50 calls"
     )
     return {"markets": markets, "grid": grid, "source": source, "gate": gate}
+# ── SECTION: Backtests & Odds ───────────────────────────────────────
 
 
 def backtests() -> list[dict]:
@@ -904,6 +912,7 @@ def _pick_quote(row: dict) -> dict | None:
         "fresh": age_seconds <= 300,
         "market_state": snapshot.get("market_state"),
     }
+# ── SECTION: Orders & Execution ─────────────────────────────────────
 
 
 def _load_orders() -> dict:
@@ -1554,6 +1563,7 @@ def _safe_sport(value) -> str:
     if value not in SPORTS:
         raise ValueError(f"unsupported sport: {value}")
     return str(value)
+# ── SECTION: Jobs & Actions ─────────────────────────────────────────
 
 
 def start_action(name: str, payload: dict) -> dict:
@@ -1695,6 +1705,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
+# ── SECTION: HTTP Server ────────────────────────────────────────────
         self.wfile.write(body)
 
     def log_message(self, fmt, *args):  # quiet
@@ -2600,6 +2611,7 @@ def _audit_tail() -> dict:
                 continue
         return {"total_events": len(lines), "tail": list(reversed(events))}
     return {"total_events": 0, "tail": []}
+# ── SECTION: Main Entry Point ───────────────────────────────────────
 
 
 def main() -> None:
@@ -2622,3 +2634,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
