@@ -436,7 +436,8 @@ function renderMatrix(m){
   }
 }
 function drill(sport,market){
-  const cell=(state.matrix.grid[sport]||{})[market]||{};
+  const esportsCell=(state.matrix.esports||{})[sport]||{};
+  const cell=esportsCell[market]||(state.matrix.grid[sport]||{})[market]||{};
   if(market==="total"&&(cell.state==="qualified"||cell.state==="research_total_candidate")){
     const calls=Number(cell.calls)||0,hits=calls&&cell.hit_rate!=null?Math.round(calls*Number(cell.hit_rate)):null;
     const reason=String(cell.qualification||"not reported").replaceAll("_"," ");
