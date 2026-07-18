@@ -906,19 +906,22 @@ async function renderFolio(){
   const h=b.recent_history||{};
   const activityCount=Number(h.count)||0,tradeCount=Number(h.trade_count)||0,
         settlementCount=Number(h.settlement_count)||0,realized=Number(h.realized_pnl_usd)||0;
+  const settledCount=Number(h.settled_count)||0,winCount=Number(h.win_count)||0,
+        lossCount=Number(h.loss_count)||0,winRate=settledCount>0?fmt(100*winCount/settledCount,1)+"%":"—";
   $("#folioHistKpis").innerHTML=`
     <div class="k"><b>${activityCount}</b><span>activities since ${esc(historyStart)}</span></div>
     <div class="k"><b>${tradeCount}</b><span>filled trades</span></div>
     <div class="k"><b>${settlementCount}</b><span>settlements</span></div>
+    <div class="k"><b>${winRate}</b><span>win rate (${winCount}W-${lossCount}L)</span></div>
     <div class="k"><b class="${realized>=0?"green":"red"}">${realized>=0?"+$":"-$"}${fmt(Math.abs(realized),2)}</b><span>reported realized P&amp;L</span></div>`;
   if(!activityCount){$("#folioHistory").innerHTML=`<p class="dim">No exchange trade or settlement history has been synced since ${esc(historyStart)}.</p>`;}
   else {
     let html=`<table class="data"><tr>
       <th>Date</th><th>Type</th><th>Market</th><th>Price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Model link</th></tr>`;
-    (h.activities||[]).forEach(p=>{
+      (h.activities||[]).forEach(p=>{
       html+=`<tr>
         <td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">${p.type}</span></td>
-        <td>${esc(p.title||p.market_slug)}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td>
+        <td>${esc(p.title||slugToTitle(p.market_slug))}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td>
         <td class="${Number(p.realized_pnl_usd)>=0?"green":"red"}">${p.realized_pnl_usd==null?"—":(p.realized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.realized_pnl_usd),2)}</td>
         <td>${p.model_pick?esc(p.model_pick.model_version):"—"}</td>
       </tr>`;});
@@ -943,6 +946,22 @@ function renderLedgerLiveHistory(b){
   activities.forEach(p=>{html+=`<tr><td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">model ${p.type}</span></td><td>${esc(p.title||p.market_slug)}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td><td>${p.realized_pnl_usd==null?"—":"$"+fmt(p.realized_pnl_usd,2)}</td><td>${esc(p.model_pick.pick_id)}</td></tr>`;});
   $("#ledgerLiveHistory").innerHTML=html+`</table>`;
 }
+function slugToTitle(slug){
+  // aec-wnba-conn-phx-2026-07-17 → WNBA: Connecticut @ Phoenix
+  // tsc-mlb-sd-kc-2026-07-17-9pt5 → MLB: SD @ KC (o/u 9.5)
+  const parts=(slug||"").split("-");
+  if(parts.length<5)return slug||"—";
+  const prefix=parts[0]; // aec, tsc, astatc
+  let sport=parts[1]?.toUpperCase()||"";
+  const markets={"mlb":"MLB","wnba":"WNBA","nba":"NBA","nfl":"NFL","soccer":"SOC"};
+  sport=markets[sport?.toLowerCase()]||sport;
+  const away=parts[2]?.toUpperCase()||"";
+  const home=parts[3]?.toUpperCase()||"";
+  const extra=parts.slice(5).join(" ");
+  const line=extra.match(/(\d+pt\d+)/)?` (o/u ${extra.match(/(\d+)pt/)[1]})`:"";
+  return `${sport}: ${away} @ ${home}${line}`;
+}
+
 function marker(p){
   const sel=String(p.selection||"").toLowerCase();
   const t=sel==="home"?p.home_team:sel==="away"?p.away_team:null;
