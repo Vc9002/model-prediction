@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "b14bafbcfb26ab586748339db4fa71985d19d3bb93afca8bf45de42c80e3080a",
+  "artifact_hash": "d339198b196cb3fcd02950ed5efbdd4cefbeb95b2cd63cd756e77f99dc483719",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -54,13 +54,13 @@
       "status": "ok"
     },
     "called_rate": 0.988372,
-    "calls": 170,
+    "calls": 172,
     "every_called_month_positive_at_minus_110": true,
     "every_qualifying_month_positive_at_minus_110": true,
     "failures": [],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.682353,
-    "hits": 116,
+    "hit_rate": 0.680233,
+    "hits": 117,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": true,
@@ -100,7 +100,7 @@
     "secondary_reporting_complete": true,
     "selectivity": 0.988372,
     "total_predictions": 172,
-    "units_at_minus_110": 51.454545
+    "units_at_minus_110": 51.363636
   },
   "schema_version": "1",
   "sport": "wnba",

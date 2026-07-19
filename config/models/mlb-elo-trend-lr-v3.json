@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "5e5762c123979452e3221494070507db78c68b1cfe10a7fceff478bea16367b3",
+  "artifact_hash": "b03e1c2d36c32e5b1f3970d910b257783fb79353a4c170faf57523285982c9f5",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -51,7 +51,7 @@
       "status": "ok"
     },
     "called_rate": 0.18034,
-    "calls": 244,
+    "calls": 1155,
     "every_called_month_positive_at_minus_110": false,
     "every_qualifying_month_positive_at_minus_110": false,
     "failures": [
@@ -59,8 +59,8 @@
       "non-positive qualifying months at -110: 2026-04"
     ],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.581967,
-    "hits": 142,
+    "hit_rate": 0.552381,
+    "hits": 638,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": false,
@@ -108,7 +108,7 @@
     "secondary_reporting_complete": true,
     "selectivity": 0.18034,
     "total_predictions": 1353,
-    "units_at_minus_110": 27.090909
+    "units_at_minus_110": 63.0
   },
   "schema_version": "1",
   "sport": "mlb",

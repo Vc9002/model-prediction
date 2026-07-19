@@ -558,18 +558,9 @@ def _newest_validation() -> tuple[dict, str]:
         merged["production_artifacts"].update(soccer.get("production_artifacts") or {})
         sources.append(path.name)
 
-    # Merge esports validation
-    esports_path = OUTPUTS / "esports-baseline-validation.json"
-    if esports_path.exists():
-        esports = _read_json(esports_path) or {}
-        for title_key, title_data in (esports.get("titles") or {}).items():
-            merged["sports"][title_key] = {
-                "sport": title_key,
-                "walk_forward": True,
-                "production_artifact": title_data.get("artifact"),
-            }
-            merged["production_artifacts"][title_key] = title_data.get("artifact")
-        sources.append("esports-baseline-validation.json")
+    # Preserve esports/baseball grids from learned-model-validation
+    merged["esports_grid"] = newest.get("esports_grid") or {}
+    merged["baseball_grid"] = newest.get("baseball_grid") or {}
 
     return merged, " + ".join(sources)
 
@@ -749,7 +740,8 @@ def matrix() -> dict:
         "locked holdout hit rate >= 65% target (learned threshold), >= 60% floor, >= 50 calls"
     )
     esports = validation.get("esports_grid") or {}
-    return {"markets": markets, "grid": grid, "esports": esports, "source": source, "gate": gate}
+    baseball = validation.get("baseball_grid") or {}
+    return {"markets": markets, "grid": grid, "esports": esports, "baseball": baseball, "source": source, "gate": gate}
 # ── SECTION: Backtests & Odds ───────────────────────────────────────
 
 
@@ -822,6 +814,21 @@ def market_snapshots(sport: str, day: str) -> dict:
                 slug = snap.get("market_slug")
                 if not slug:
                     continue
+                # Historical dashboard prices are pregame-only. Once an event
+                # starts, later BBOs must never replace the last valid quote.
+                if snap.get("timestamp_valid") is False:
+                    continue
+                try:
+                    observed_at = datetime.fromisoformat(
+                        str(snap.get("observed_at_utc") or "").replace("Z", "+00:00")
+                    )
+                    event_start = datetime.fromisoformat(
+                        str(snap.get("event_start_utc") or "").replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    continue
+                if observed_at >= event_start:
+                    continue
                 ask = ((snap.get("long") or {}).get("ask"))
                 if slug not in first_ask and ask is not None:
                     first_ask[slug] = ask
@@ -862,7 +869,7 @@ def _team_matches(team_name: str, side_description: str) -> bool:
 
 
 def _pick_quote(row: dict) -> dict | None:
-    """Latest exact stored executable side quote for a full-game moneyline pick."""
+    """Last valid pregame executable side quote for a full-game moneyline pick."""
     if row.get("market_type") != "moneyline":
         return None
     sport = str(row.get("league") or "").lower()
@@ -886,6 +893,16 @@ def _pick_quote(row: dict) -> dict | None:
             try:
                 snapshot = json.loads(line)
             except json.JSONDecodeError:
+                continue
+            if snapshot.get("timestamp_valid") is False:
+                continue
+            try:
+                snapshot_observed = datetime.fromisoformat(
+                    str(snapshot.get("observed_at_utc") or "").replace("Z", "+00:00")
+                )
+            except ValueError:
+                continue
+            if snapshot_observed >= event_start:
                 continue
             if snapshot.get("market_type") != "moneyline":
                 continue
@@ -939,6 +956,8 @@ def _pick_quote(row: dict) -> dict | None:
         "age_seconds": age_seconds,
         "fresh": age_seconds <= 300,
         "market_state": snapshot.get("market_state"),
+        "price_role": "pregame_close",
+        "seconds_before_start": max(0, int((event_start - observed_at).total_seconds())),
     }
 # ── SECTION: Orders & Execution ─────────────────────────────────────
 
@@ -1017,6 +1036,70 @@ def _latest_order_for_pick(row: dict, quote: dict | None) -> dict | None:
         and order.get("side") == quote.get("side")
     ]
     return equivalent[-1] if equivalent else None
+
+
+def _filled_entry_for_pick(row: dict) -> dict | None:
+    """Exchange-backed entry price for a filled dashboard BUY, in pick-side terms."""
+    pick_id = str(row.get("pick_id") or "")
+    filled = [
+        order
+        for order in _load_orders()["orders"]
+        if str(order.get("pick_id") or "") == pick_id
+        and order.get("action", "buy") == "buy"
+        and (
+            order.get("status") == "filled"
+            or _number(order.get("cum_quantity"), 0) > 0
+        )
+    ]
+    if not filled:
+        return None
+    order = filled[-1]
+    limit_price = _number(order.get("price"), None)
+    side = str(order.get("side") or "")
+    slug = str(order.get("market_slug") or "")
+    submitted = str(order.get("submitted_at_utc") or "")
+    quantity = _number(order.get("cum_quantity") or order.get("size_shares"), None)
+
+    # Portfolio trades use the exchange's YES/long coordinate even for a NO
+    # fill. Match the fill and convert it back to the outcome actually bought.
+    candidates = []
+    for activity in _load_portfolio_history()["activities"]:
+        if activity.get("type") != "trade" or activity.get("market_slug") != slug:
+            continue
+        occurred = str(activity.get("occurred_at_utc") or "")
+        if submitted and occurred and occurred < submitted:
+            continue
+        trade_quantity = _number(activity.get("quantity"), None)
+        if (
+            quantity is not None
+            and trade_quantity is not None
+            and abs(quantity - trade_quantity) > 0.01
+        ):
+            continue
+        raw_price = _number(activity.get("exchange_price", activity.get("price")), None)
+        if raw_price is None or not 0 < raw_price < 1:
+            continue
+        selected_price = 1 - raw_price if side == "short" else raw_price
+        if limit_price is not None and selected_price > limit_price + 0.0001:
+            continue
+        candidates.append((occurred, selected_price, str(activity.get("activity_id") or "")))
+    if candidates:
+        _, price, activity_id = sorted(candidates)[0]
+        return {
+            "price": round(price, 6),
+            "basis": "exchange_trade",
+            "side": side,
+            "market_slug": slug,
+            "activity_id": activity_id,
+        }
+    if limit_price is None:
+        return None
+    return {
+        "price": limit_price,
+        "basis": "filled_order_limit",
+        "side": side,
+        "market_slug": slug,
+    }
 
 
 def _dashboard_order_status(exchange_state: str | None) -> str:
@@ -1135,6 +1218,7 @@ def _decorate_pick(row: dict) -> dict:
         **row,
         "quote": quote,
         "order": order,
+        "filled_entry": _filled_entry_for_pick(row),
         "buy_ready": ready,
         "buy_block_reason": reason,
         "unit_value_usd": _unit_value_usd(),
@@ -2051,6 +2135,35 @@ def _activity_outcome_side(payload: dict) -> str | None:
     return None
 
 
+def _activity_link(
+    slug: str,
+    explicit_side: str | None,
+    links: dict[tuple[str, str], dict],
+) -> tuple[str | None, dict | None]:
+    """Resolve a side, inferring it only when exactly one linked side exists."""
+    if explicit_side:
+        return explicit_side, links.get((slug, explicit_side))
+    candidates = [
+        (side, link)
+        for (market_slug, side), link in links.items()
+        if market_slug == slug
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    return None, None
+
+
+def _selected_short_pnl(exchange_price: float | None, exchange_pnl: float | None) -> float | None:
+    """Correct terminal synthetic-NO P&L without rewriting ordinary trade P&L."""
+    if exchange_pnl is None:
+        return None
+    if exchange_price is not None and exchange_price <= 0.01:
+        return abs(exchange_pnl)  # YES lost, so the held NO side won.
+    if exchange_price is not None and exchange_price >= 0.99:
+        return -abs(exchange_pnl)  # YES won, so the held NO side lost.
+    return exchange_pnl
+
+
 def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> dict | None:
     trade = item.get("trade") if isinstance(item.get("trade"), dict) else None
     resolution = (
@@ -2061,18 +2174,37 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
     if trade:
         slug = str(trade.get("marketSlug") or "")
         occurred = str(trade.get("updateTime") or trade.get("createTime") or "")
-        outcome_side = _activity_outcome_side(trade)
-        linked = links.get((slug, outcome_side)) if outcome_side else None
+        outcome_side, linked = _activity_link(slug, _activity_outcome_side(trade), links)
+        exchange_price = _amount_value(trade.get("price"))
+        selected_price = exchange_price
+        if exchange_price is not None and outcome_side == "short":
+            selected_price = round(1 - exchange_price, 6)
+        exchange_pnl = _amount_value(trade.get("realizedPnl"))
+        selected_pnl = exchange_pnl
+        if exchange_pnl is not None and outcome_side == "short":
+            selected_pnl = _selected_short_pnl(exchange_price, exchange_pnl)
         return {
             "activity_id": f"trade:{trade.get('id') or slug + ':' + occurred}",
             "type": "trade",
             "market_slug": slug,
             "title": str((trade.get("marketMetadata") or {}).get("title") or slug),
             "occurred_at_utc": occurred,
-            "price": _amount_value(trade.get("price")),
+            "price": selected_price,
+            "exchange_price": exchange_price,
+            "price_basis": (
+                "selected_short_probability"
+                if outcome_side == "short"
+                else "long_probability"
+            ),
             "quantity": _number(trade.get("qtyDecimal") or trade.get("qty"), None),
             "cost_basis_usd": _amount_value(trade.get("costBasis")),
-            "realized_pnl_usd": _amount_value(trade.get("realizedPnl")),
+            "realized_pnl_usd": selected_pnl,
+            "exchange_realized_pnl_usd": exchange_pnl,
+            "pnl_basis": (
+                "terminal_short_outcome_adjustment"
+                if selected_pnl != exchange_pnl
+                else "exchange_reported"
+            ),
             "state": str(trade.get("state") or ""),
             "is_aggressor": trade.get("isAggressor"),
             "outcome_side": outcome_side,
@@ -2085,7 +2217,12 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
         before = resolution.get("beforePosition") or {}
         after = resolution.get("afterPosition") or {}
         metadata = after.get("marketMetadata") or before.get("marketMetadata") or {}
-        linked = links.get((slug, outcome_side)) if outcome_side else None
+        outcome_side, linked = _activity_link(slug, outcome_side, links)
+        before_realized = _amount_value(before.get("realized"))
+        after_realized = _amount_value(after.get("realized"))
+        realized_delta = after_realized
+        if before_realized is not None and after_realized is not None:
+            realized_delta = round(after_realized - before_realized, 6)
         return {
             "activity_id": f"settlement:{resolution.get('tradeId') or slug + ':' + occurred}",
             "type": "settlement",
@@ -2103,7 +2240,9 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
             "after_quantity": _number(
                 after.get("netPositionDecimal") or after.get("netPosition"), None
             ),
-            "realized_pnl_usd": _amount_value(after.get("realized")),
+            "realized_pnl_usd": realized_delta,
+            "cumulative_realized_pnl_usd": after_realized,
+            "pnl_basis": "position_realized_delta",
             "model_pick": linked,
         }
     return None
@@ -2235,6 +2374,14 @@ def _human_market_name(slug: str, title: str = "") -> str:
     league_label = league.upper()
     matchup = f"{away} @ {home}"
 
+    # These prefixes hide materially different contracts behind similar
+    # slugs (team total vs match total, first half vs full game, 1X2, props).
+    # The exchange question is the canonical, specific market name.
+    if prefix in {"tsc", "atc"}:
+        question = _public_market_question(slug)
+        if question:
+            return question.removesuffix("?")
+
     if prefix == "aec":
         market = "First 5 moneyline" if detail.startswith("f5") else "Moneyline"
         return f"{league_label} · {matchup} · {market}"
@@ -2262,10 +2409,63 @@ def _human_market_name(slug: str, title: str = "") -> str:
     return title if title and title != slug and title != "None" else f"{league_label} · {matchup}"
 
 
-def _portfolio_history_summary(activities: list[dict], source: str) -> dict:
+def _portfolio_history_summary(
+    activities: list[dict],
+    source: str,
+    links: dict[tuple[str, str], dict] | None = None,
+) -> dict:
+    links = _live_model_links() if links is None else links
+
+    def side_adjust(item: dict) -> dict:
+        if item.get("type") != "trade":
+            return item
+        slug = str(item.get("market_slug") or "")
+        outcome_side, linked = _activity_link(
+            slug, str(item.get("outcome_side") or "") or None, links
+        )
+        if outcome_side != "short":
+            return {**item, "outcome_side": outcome_side, "model_pick": linked}
+        exchange_price = _number(item.get("exchange_price"), None)
+        if exchange_price is None:
+            stored_price = _number(item.get("price"), None)
+            if stored_price is not None:
+                exchange_price = (
+                    1 - stored_price
+                    if item.get("price_basis") == "selected_short_probability"
+                    else stored_price
+                )
+        exchange_pnl = _number(item.get("exchange_realized_pnl_usd"), None)
+        if exchange_pnl is None:
+            stored_pnl = _number(item.get("realized_pnl_usd"), None)
+            if stored_pnl is not None:
+                exchange_pnl = (
+                    -stored_pnl
+                    if item.get("pnl_basis")
+                    in {
+                        "selected_short_inverse_of_exchange_long",
+                        "terminal_short_outcome_adjustment",
+                    }
+                    else stored_pnl
+                )
+        return {
+            **item,
+            "price": round(1 - exchange_price, 6) if exchange_price is not None else None,
+            "exchange_price": exchange_price,
+            "price_basis": "selected_short_probability",
+            "realized_pnl_usd": _selected_short_pnl(exchange_price, exchange_pnl),
+            "exchange_realized_pnl_usd": exchange_pnl,
+            "pnl_basis": (
+                "terminal_short_outcome_adjustment"
+                if _selected_short_pnl(exchange_price, exchange_pnl) != exchange_pnl
+                else item.get("pnl_basis")
+            ),
+            "outcome_side": outcome_side,
+            "model_pick": linked,
+        }
+
     decorated = [
         {
-            **item,
+            **side_adjust(item),
             "market_name": _human_market_name(
                 str(item.get("market_slug") or ""), str(item.get("title") or "")
             ),
@@ -2412,7 +2612,9 @@ def live_portfolio_view() -> dict:
                 sum(_number(item.get("realized_pnl_usd")) for item in positions), 2
             ),
         },
-        "recent_history": _portfolio_history_summary(history, "exchange_and_persisted"),
+        "recent_history": _portfolio_history_summary(
+            history, "exchange_and_persisted", links
+        ),
         "balance": {
             "current_usd": _number((usd or {}).get("currentBalance"), None),
             "buying_power_usd": _number((usd or {}).get("buyingPower"), None),
@@ -2683,4 +2885,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
