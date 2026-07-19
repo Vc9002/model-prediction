@@ -704,8 +704,15 @@ def _forecast_learned_sport(
                          "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f}"}
                     )
                     continue
+            # Convert UTC event time to Eastern for consistent ledger display
+            from datetime import datetime as _dt
+            from zoneinfo import ZoneInfo as _ZI
+            try:
+                event_et = _dt.fromisoformat(candidate.event_start_utc.replace('Z','+00:00')).astimezone(_ZI('America/New_York')).strftime('%Y-%m-%dT%H:%M:%S%z')
+            except (ValueError, TypeError):
+                event_et = candidate.event_start_utc
             request = PickRequest(
-                event_start_utc=candidate.event_start_utc,
+                event_start_utc=event_et,
                 event_id=candidate.event_id,
                 league=League(sport.upper()),
                 away_team=candidate.away_team,
