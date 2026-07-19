@@ -928,7 +928,16 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
                 away["team"].get("displayName", "").casefold() in away_names
                 and home["team"].get("displayName", "").casefold() in home_names
             )
-            if not (id_match or name_match):
+            # Prefer exact event_id match; name_match is a fallback only for
+            # legacy/research rows with fake event_ids. Never use name_match
+            # for rows with real (numeric) ESPN event IDs — it can mis-score
+            # doubleheaders where both games share the same team names.
+            row_eid = str(row.get("event_id", "") or "").strip()
+            if id_match:
+                pass  # exact match — always use this
+            elif name_match and not row_eid.isdigit():
+                pass  # fallback for legacy rows with fake event IDs
+            else:
                 continue
             record = {
                 "status_name": status.get("name", ""),
