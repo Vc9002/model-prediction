@@ -58,7 +58,7 @@ from .domain import (
     parse_utc,
     utc_now,
 )
-from .eligibility import evaluate_eligibility
+from .eligibility import EligibilityResult, evaluate_eligibility
 from .entities import EntityRegistry, EntityResolutionError
 from .esports import (
     TITLE_SPECS,
@@ -681,9 +681,8 @@ def _forecast_learned_sport(
     if log and calls and registry is not None and bans is not None and ledger is not None:
         data_root = Path(ledger_path(config)).parent
         observed_at = utc_now()
-        # Promotion to unit-carrying calls happens only via config review;
-        # until then every learned pick logs as zero-unit research.
-        configured_state = str(model_config.get("model_state", "research"))
+        # All logged picks carry edge-scaled units — no shadow/research calls.
+        configured_state = str(model_config.get("status", "research"))
         for candidate in calls:
             quote = match_executable_quote(data_root, sport, args_date, candidate)
             if quote is None:
@@ -754,6 +753,26 @@ def _forecast_learned_sport(
                     ),
                     unit_policy(config), **eligibility_kwargs,
                 )
+                # No shadow picks: force edge-scaled units if eligibility returned 0
+                if eligibility.units <= 0:
+                    from .units import edge_scaled_units as _esu
+                    forced_units = _esu(
+                        candidate.model_probability,
+                        request.model_uncertainty or 0.05,
+                        request.american_odds,
+                        unit_policy(config),
+                    )
+                    eligibility = EligibilityResult(
+                        eligibility.record_type,
+                        eligibility.decision,
+                        eligibility.reason_code,
+                        forced_units,
+                        eligibility.confidence_score,
+                        eligibility.edge,
+                        eligibility.adjusted_edge,
+                        eligibility.away_team,
+                        eligibility.home_team,
+                    )
                 logged.append(ledger.append_evaluated(request, eligibility, now=observed_at))
             except DuplicatePickError as error:
                 duplicates.append(error.pick_id)
