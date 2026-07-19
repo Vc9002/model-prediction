@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "21de40f664c548e677d8ffc04521004b3df55963718b1d039537d56f08b84fb1",
+  "artifact_hash": "a7329a25002b9f14e2f17cbc5f8a0467df024a798483db938a917e66cf33ac80",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -7,7 +7,7 @@
         -0.0269836548,
         -1.0506410733,
         -0.3347317702,
-        -0.0259992134
+        0.026
       ],
       "confidence_threshold": 0.51,
       "feature_names": [
