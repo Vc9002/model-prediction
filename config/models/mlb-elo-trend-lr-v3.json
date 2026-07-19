@@ -1,15 +1,15 @@
 {
-  "artifact_hash": "298e6dc77b219dd702fb39be7c6e2b5562b2205ff877ee03c281de8ce83baca2",
+  "artifact_hash": "3b6b49fd884856c6fce742de14a93741251e51b9d0becfc3e4cfba48aa767745",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        3.3424
+        3.2290115103
       ],
       "confidence_threshold": 0.51,
       "feature_names": [
         "elo_probability"
       ],
-      "intercept": -0.2661,
+      "intercept": -1.5888008061,
       "positive_class": "home"
     }
   },
