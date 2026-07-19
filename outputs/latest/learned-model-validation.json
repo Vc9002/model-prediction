@@ -4352,6 +4352,80 @@
           "state": "not_applicable"
         }
       }
+    },
+    "kbo": {
+      "sport": "kbo",
+      "variants": {
+        "tie_aware_elo": {
+          "features": [
+            "elo_probability"
+          ],
+          "coefficients": {
+            "elo_probability": 1.0
+          },
+          "intercept": 0.0,
+          "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": 0.0,
+            "locked_holdout": {
+              "qualified": false,
+              "calls": 0,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "units_at_minus_110": 0.0,
+              "total_predictions": 0,
+              "selectivity": 0,
+              "monthly_at_minus_110": [],
+              "locked_holdout": true
+            }
+          }
+        }
+      },
+      "multi_market_readiness": {
+        "spread": {
+          "state": "not_applicable"
+        },
+        "total": {
+          "state": "not_applicable"
+        }
+      }
+    },
+    "npb": {
+      "sport": "npb",
+      "variants": {
+        "tie_aware_elo": {
+          "features": [
+            "elo_probability"
+          ],
+          "coefficients": {
+            "elo_probability": 1.0
+          },
+          "intercept": 0.0,
+          "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": 0.0,
+            "locked_holdout": {
+              "qualified": false,
+              "calls": 0,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "units_at_minus_110": 0.0,
+              "total_predictions": 0,
+              "selectivity": 0,
+              "monthly_at_minus_110": [],
+              "locked_holdout": true
+            }
+          }
+        }
+      },
+      "multi_market_readiness": {
+        "spread": {
+          "state": "not_applicable"
+        },
+        "total": {
+          "state": "not_applicable"
+        }
+      }
     }
   },
   "esports_grid": {
