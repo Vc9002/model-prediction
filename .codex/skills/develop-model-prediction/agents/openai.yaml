@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop Model Prediction"
+  short_description: "Build and validate model improvements safely"
+  default_prompt: "Use $develop-model-prediction to improve a model using point-in-time data and locked validation."

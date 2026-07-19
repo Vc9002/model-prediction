@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-20 — documentation truth reset
+
+- Added `docs/PROJECT_STATUS.md` as the current source-of-truth entry point.
+- Removed stale production tables and replaced them with verified report-level status plus explicit release blockers.
+- Recorded the current test, Ruff, artifact-hash, audit-chain, packaging, and working-tree results without claiming a clean release. The suite moved from one failure to green during review because another writer changed the MLB expectation; the artifact inconsistency remains documented.
+- Standardized examples on `env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli` while the installed console entry point is broken.
+- Reframed model accuracy, diagnostic `-110` units, and executable profitability as separate claims.
+- Documented the real-money CLI/dashboard surfaces and retained shadow/zero-unit defaults.
+- Replaced the old final-status TODO with an integrity-first repair queue.
+
 ## 2026-07-17 (later — bug sweep + hardening)
 
 - Fixed audit hash serialization: wrote event hashes with compact `separators=(",", ":")` matching computation, so chain is verifiable from JSONL alone.

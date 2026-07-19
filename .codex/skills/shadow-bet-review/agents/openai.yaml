@@ -1,4 +1,0 @@
-interface:
-  display_name: "Shadow Bet Review"
-  short_description: "Log, settle, and diagnose shadow sports picks"
-  default_prompt: "Use $shadow-bet-review to record or update a shadow sports pick."

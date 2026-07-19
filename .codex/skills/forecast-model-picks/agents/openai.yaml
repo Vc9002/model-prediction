@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forecast Model Picks"
+  short_description: "Forecast, log, settle, and diagnose picks"
+  default_prompt: "Use $forecast-model-picks to forecast today's slate and explain every call or no-call."

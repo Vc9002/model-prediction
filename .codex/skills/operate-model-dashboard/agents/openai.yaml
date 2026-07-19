@@ -1,0 +1,4 @@
+interface:
+  display_name: "Operate Model Dashboard"
+  short_description: "Run and troubleshoot the local model dashboard"
+  default_prompt: "Use $operate-model-dashboard to inspect or repair the local prediction dashboard."

@@ -1,42 +1,40 @@
-# model-prediction
+# model-prediction internal entry point
 
-Shadow-first, point-in-time sports prediction using Elo+Trend logistic regression and a learned confidence gate.
+Read `docs/PROJECT_STATUS.md` first. It contains the verified current health,
+model table, source-of-truth hierarchy, and repair order. Historical numbers in
+this folder are retained as evidence, not current qualification claims.
 
-## Current qualified moneyline artifacts
+## Verify the current checkout
 
-| Sport | Hit rate | Calls | Flat P&L at -110 |
-|---|---:|---:|---:|
-| MLB | 60.87% | 92 | +14.91U |
-| NBA | 67.35% | 294 | +84.00U |
-| WNBA | 65.98% | 97 | +25.18U |
-| NFL | 60.55% | 109 | +17.00U |
-
-These are model-accuracy results, not claims of executable betting profit. The system still needs contemporaneous executable prices to establish trade EV.
-
-## Verify
-
-```bash
-PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
+```sh
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q
 .venv/bin/ruff check src/ tests/
-PYTHONPATH=src .venv/bin/python -m model_prediction.cli validate-models \
-  --output outputs/latest/learned-model-validation-v2.json
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli validate-models \
+  --output outputs/latest/learned-model-validation.json
 ```
 
-Run the ten checks in `DEBUG.md` for chain, artifact, data, import, feature, configuration, and season-filter integrity.
+Do not add `--write-artifacts` until the tests are green, the checkout is stable,
+and the output is intended to become a new versioned release. Run `DEBUG.md` and
+preserve every failure in the status documentation.
 
-## Daily shadow loop
+## Safe inspection loop
 
-```bash
-model-prediction polymarket-slate --all --date YYYY-MM-DD
-model-prediction forecast --sport mlb --date YYYY-MM-DD
-model-prediction settle --all-unsettled
-model-prediction summary
+```sh
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli polymarket-slate --all --date YYYY-MM-DD
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli forecast --sport mlb --date YYYY-MM-DD
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli summary
 ```
 
-Do not add `--log` or `--execute` merely to inspect a forecast. Execution remains hard-gated and outside this validation run.
+`daily`, `--log`, settlement, bans, archive POSTs, and artifact-writing commands
+mutate state. `execute`, `sell-position`, cancellation paths, and dashboard
+order-submit routes are real-money surfaces and require a separate explicit
+request and confirmation.
 
-## Evidence
+## Evidence locations
 
-- Validation audit: `outputs/latest/learned-model-validation-v2.json`
+- Current status: `docs/PROJECT_STATUS.md`
 - Active configuration: `config/model.yaml`
-- Versioned artifacts: `config/models/*-elo-trend-lr-v2.json`
+- Versioned artifacts: `config/models/`
+- Current validation report: `outputs/latest/learned-model-validation.json`
+- Point-in-time market snapshots: `data/odds/<sport>/<date>/`
+- Ledger and audit state: `data/picks.xlsx` and `data/events.jsonl`

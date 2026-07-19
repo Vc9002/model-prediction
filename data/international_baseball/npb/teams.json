@@ -1,0 +1,90 @@
+{
+  "B": {
+    "aliases": [
+      "B",
+      "ORIX Buffaloes"
+    ],
+    "name": "Orix Buffaloes",
+    "team_id": "B"
+  },
+  "C": {
+    "aliases": [
+      "C",
+      "Hiroshima Toyo Carp"
+    ],
+    "name": "Hiroshima Carp",
+    "team_id": "C"
+  },
+  "D": {
+    "aliases": [
+      "D"
+    ],
+    "name": "Chunichi Dragons",
+    "team_id": "D"
+  },
+  "DB": {
+    "aliases": [
+      "DB",
+      "Yokohama DeNA BayStars"
+    ],
+    "name": "Yokohama BayStars",
+    "team_id": "DB"
+  },
+  "E": {
+    "aliases": [
+      "E"
+    ],
+    "name": "Tohoku Rakuten Golden Eagles",
+    "team_id": "E"
+  },
+  "F": {
+    "aliases": [
+      "F",
+      "Hokkaido Nippon-Ham Fighters"
+    ],
+    "name": "Nippon Ham Fighters",
+    "team_id": "F"
+  },
+  "G": {
+    "aliases": [
+      "G"
+    ],
+    "name": "Yomiuri Giants",
+    "team_id": "G"
+  },
+  "H": {
+    "aliases": [
+      "H"
+    ],
+    "name": "Fukuoka SoftBank Hawks",
+    "team_id": "H"
+  },
+  "L": {
+    "aliases": [
+      "L"
+    ],
+    "name": "Saitama Seibu Lions",
+    "team_id": "L"
+  },
+  "M": {
+    "aliases": [
+      "M"
+    ],
+    "name": "Chiba Lotte Marines",
+    "team_id": "M"
+  },
+  "S": {
+    "aliases": [
+      "S"
+    ],
+    "name": "Tokyo Yakult Swallows",
+    "team_id": "S"
+  },
+  "T": {
+    "aliases": [
+      "T"
+    ],
+    "name": "Hanshin Tigers",
+    "team_id": "T"
+  }
+}

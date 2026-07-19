@@ -1,27 +1,22 @@
-# model-prediction — v3.0
+# model-prediction
 
-Shadow-first multi-sport prediction engine with Polymarket US integration.
-5 production moneyline models, 1 post-hoc filter, 4 research spread/total baselines.
+Shadow-first multi-sport prediction, research, ledger, and local dashboard
+system with Polymarket US market-data integration.
 
-## Production Models
+## Read this first
 
-| League | Features | Gate | Holdout | Calls | Hit% | Units | Rest Flip |
-|--------|----------|------|---------|-------|------|-------|-----------|
-| MLB | elo, trend, park, weather, pitcher | 60.0% | 1,353 | 100 | 66.0% | +26.00 | — |
-| WNBA | elo, trend, defense | 50.0% | 172 | 172 | 64.5% | +39.91 | ✅ +10 |
-| NBA | elo, trend, defense | 62.0% | 662 | 414 | 78.7% | +208.36 | — |
-| NFL | elo, trend | 50.0% | 110 | 110 | 67.3% | +31.27 | ✅ +3 |
-| **Combined** | | | | | | **+305.54U** | |
+The current checkout is **not release-ready**. Tests, artifact qualification,
+the audit chain, packaging, and documentation had drifted apart. Do not use old
+README tables or flat `-110` units as proof of a live betting edge.
 
-All models use logistic regression with walk-forward 60/20/20 chronological validation. Confidence gates are calibration-supported, not holdout-mined.
+See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the verified health
+snapshot, current model evidence, architecture, safety boundaries, and repair
+order. That document supersedes historical metrics elsewhere when they conflict.
 
-## Rest-Fatigue Flip Filter
-
-Active for WNBA, NFL, and MLB. When the model picks a team that has 3+ fewer rest days than the opponent, the pick is flipped to the rested side. Skipped for NBA (model already prices rest correctly) and MLB (no regular-season rest gaps trigger).
-
-```
-WNBA: +10 flips, NFL: +3 flips, MLB: 0 flips
-```
+The project uses complete-date chronological 60/20/20 validation. Model
+accuracy, calibration, diagnostic units, and executable profitability are
+separate claims. A model is operationally eligible only when its config,
+artifact, current report, tests, and point-in-time evidence agree.
 
 ## Research Models
 
@@ -31,8 +26,14 @@ WNBA: +10 flips, NFL: +3 flips, MLB: 0 flips
 | NBA | spread-baseline-v1 | Research |
 | WNBA | spread-baseline-v1 | Research |
 | NFL | spread-baseline-v1 | Research |
+| LoL | neutral-series-elo-v1 | Research — no market-profitability claim |
+| CS2 | neutral-series-elo-v1 | Research — legacy CS:GO excluded |
+| KBO | tie-aware-elo-v1 | Research — ties valued at 50¢; no profitability claim |
+| NPB | tie-aware-elo-v1 | Research — ties valued at 50¢; October omitted to prevent postseason leakage |
 
-Spread uses Elo expected margin. Total uses league average. Will train real models when 60+ days of Polymarket snapshots are available (currently 2 days).
+Spread, total, F5, and other derivative models remain research-only unless exact
+historical contract lines and decision-horizon inputs exist. Never infer
+readiness from a hardcoded snapshot-count target.
 
 ## Data Sources
 
@@ -41,6 +42,9 @@ Spread uses Elo expected margin. Total uses league average. Will train real mode
 | ESPN Public API | MLB, NBA, WNBA, NFL scores | Free |
 | Polymarket US Gateway | Live odds, BBO snapshots, event discovery | Free |
 | The Odds API | Soccer scores (3-day lookback) | Free tier |
+| BO3 public website data | LoL and CS2 best-of match history | Free, no signup/key |
+| Official KBO schedule/results | KBO regular-season scores and stable game/team IDs | Free, no signup/key |
+| Official NPB English calendar | NPB regular-season scores and stable game links/team codes | Free, no signup/key |
 
 ## Quick Start
 
@@ -50,28 +54,44 @@ cd "model prediction"
 python3 -m venv .venv
 .venv/bin/pip install -e .
 
-# Dashboard
-python3 dashboard_server.py
-# Open http://127.0.0.1:8765
+# Dashboard (open and verify in Dia)
+env PYTHONPATH=src:. .venv/bin/python dashboard_server.py --port 8765
 
-# Daily pipeline (or let launchd handle it)
-model-prediction daily --date $(TZ=America/New_York date +%Y-%m-%d)
+# The installed console entry point is currently stale. Use the module form.
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli summary
+
+# Daily pipeline; this logs and settles rows, so inspect before running
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli daily --date YYYY-MM-DD
 
 # Bootstrap historical data
-model-prediction bootstrap --all --from 2024-01-01 --to $(date +%Y-%m-%d)
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli bootstrap --all --from 2024-01-01 --to YYYY-MM-DD
 
-# Validate all models
-model-prediction validate-models
+# Validate without writing artifacts
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli validate-models
+
+# Backfill and validate isolated esports baselines
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli esports-backfill --all --from 2024-01-01
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli validate-esports --titles lol cs2
+
+# Discover all current Polymarket US esports titles and capture research BBOs
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli polymarket-slate --sport esports --date YYYY-MM-DD
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli esports-forecast --title lol --date YYYY-MM-DD
+
+# Backfill, validate, discover, and price separate KBO/NPB research baselines
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli international-baseball-backfill --all --from 2022-01-01
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli validate-international-baseball --leagues kbo npb
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli polymarket-slate --sport npb --date YYYY-MM-DD --timezone Asia/Tokyo
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli international-baseball-forecast --league npb --date YYYY-MM-DD
 
 # Tests
-PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
+PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q
 ```
 
 ## Infrastructure
 
-- **Daily snapshots:** launchd job every 3 hours (`com.modelprediction.daily`)
-- **Dashboard:** `com.modelprediction.dashboard` launchd job
-- **Backfill:** `model-prediction bootstrap --all` — currently 6,141 MLB / 3,583 NBA / 754 WNBA / 700 NFL games
+- **Daily snapshots:** scheduled-job configuration exists; verify the live job rather than assuming it is loaded
+- **Dashboard:** run `dashboard_server.py` with the project venv and verify `/api/health`
+- **Backfill:** counts are derived from the current caches; do not hardcode them in docs
 - **Polymarket snapshots:** captured during daily runs, stored in `data/odds/{sport}/{date}/`
 
 ## Configuration
@@ -102,6 +122,8 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 │   ├── historical/             # Processed game records
 │   ├── raw/                    # Cached ESPN scoreboards
 │   ├── odds/                   # Polymarket BBO snapshots
+│   ├── esports/                # Versioned LoL/CS2 series backfills and identities
+│   ├── international_baseball/ # Official KBO/NPB results, identities, and manifests
 │   └── events.jsonl            # Audit chain
 ├── dashboard.html              # Single-page dashboard
 ├── dashboard_server.py         # Dashboard HTTP server
@@ -110,13 +132,10 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 
 ## Audit & Integrity
 
-- **Artifact hashes:** every model artifact is SHA-256 verified (`config/models/*.json`)
-- **Audit chain:** `data/events.jsonl` — cryptographically linked event log
+- **Artifact hashes:** JSON artifacts carry SHA-256 hashes; hash integrity does not prove current qualification
+- **Audit chain:** `data/events.jsonl` is intended to be linked but is currently broken; see project status
 - **Validation:** `outputs/latest/learned-model-validation.json`
 
-Run full integrity check:
-```bash
-PYTHONPATH=src .venv/bin/python -c "
-# See DEBUG.md for complete 10-step audit protocol
-"
-```
+Run the checks in `DEBUG.md`. Record failures as failures; never rewrite the
+documentation to say the scan passed until tests, Ruff, hashes, the chain, config,
+artifacts, and the generated report all agree.

@@ -1,0 +1,29 @@
+{
+  "effective_window": {
+    "from": "2022-01-01",
+    "to": "2026-07-18"
+  },
+  "extracted_at_utc": "2026-07-18T16:56:13.736513Z",
+  "game_count": 3318,
+  "games_sha256": "ad274c0a7b679c244772fb23d6d1625bbe1c4a76359fd2444d798f9516c5ed59",
+  "league": "kbo",
+  "league_name": "Korea Baseball Organization",
+  "limitations": [
+    "Official pages do not provide a versioned bulk-data contract; cache and hashes preserve each extraction.",
+    "The baseline excludes postseason and exhibition games."
+  ],
+  "request_count": 45,
+  "requested_window": {
+    "from": "2022-01-01",
+    "to": "2026-07-18"
+  },
+  "requires_api_key": false,
+  "requires_signup": false,
+  "schema_version": "international-baseball-games-v1",
+  "source": "official league regular-season schedule/results",
+  "source_urls": [
+    "https://www.koreabaseball.com/Schedule/Schedule.aspx"
+  ],
+  "teams_sha256": "9833c7acb3326904a45e1a6d77d2626e2210815a6252d2196a6b37e0a3b31f82",
+  "tie_count": 64
+}

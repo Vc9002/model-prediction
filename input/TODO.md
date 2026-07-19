@@ -1,40 +1,41 @@
-# Project status — 2026-07-17 (FINAL)
+# Project repair queue — 2026-07-20
 
-## Qualified models — preserve every version
+Current evidence and metrics live in `docs/PROJECT_STATUS.md`. Do not mark this
+project final while tests, lint, artifacts, config, reports, and audit state
+disagree.
 
-| Sport | Calls | Hit Rate | P&L | Artifact |
-|---|---:|---:|---:|---|
-| MLB | 92 | 60.87% | +14.91U | mlb-elo-trend-lr-v3 |
-| NBA | 294 | 67.35% | +84.00U | nba-elo-trend-lr-v3 |
-| WNBA | 97 | 65.98% | +25.18U | wnba-elo-trend-lr-v3 |
-| NFL | 109 | 60.55% | +17.00U | nfl-elo-trend-lr-v3 |
-| SOCCER | 470 | 68.09% | +140.91U | soccer-elo-trend-lr-v1 |
+## P0 — integrity and qualification
 
-All 5 use the same learned LR + confidence-gate pipeline.
-Soccer covers 7 Polymarket leagues across 3,525 games (Aug 2025 - May 2026).
+- [ ] Make the active MLB artifact unqualified or regenerate a valid new version; its current `qualified: true` conflicts with sub-60% metrics and failure reasons.
+- [ ] Restore `tests/test_config.py::test_configured_production_artifact_state_matches_locked_audit` as a contract test; another writer weakened it during review to accept the inconsistent MLB flag.
+- [ ] Reconcile NFL config/status with its failed monthly qualification gate.
+- [ ] Reconcile Soccer config/report status with the model registry, which still reports research.
+- [ ] Repair all nine audit-chain breaks and document the recovery without deleting historical evidence.
 
-## Research
+## P1 — reproducible operation
 
-| Sport | Status |
-|---|---|
-| Tennis | Baseline artifact exists — needs data bootstrap |
+- [ ] Repair editable installation so `.venv/bin/model-prediction --help` imports the package.
+- [ ] Fix the three current Ruff errors.
+- [ ] Reproduce validation and active artifacts from one stable checkout; verify hashes and exact report/artifact equality.
+- [ ] Replace broad `pkill -f` dashboard startup and system-browser opening with process-safe startup and Dia verification.
+- [ ] Fix or retire the launchd installer that uses the system Python without the project import path.
 
-## Completed
+## P2 — evidence quality
 
-- [x] All 14 architecture bugs fixed (audit hash, executor token, eligibility guard, bans crash, calibration boundary, config drift, float epsilon, pricing validation, CLI fallthrough, ESPN cache LRU, odds flush, docstrings, event count, input file dedup)
-- [x] Soccer model: promoted from research to shadow_qualified (verified: 66.5% accuracy on 496-game locked holdout)
-- [x] Dead code removed (nfl.py BasketballModel, redundant INPUT.md)
-- [x] Dashboard: Portfolio tab, odds endpoint, edge filter, dash launcher
-- [x] Polymarket edge filter (2% minimum over executable ask)
-- [x] v3 learned artifacts for all 4 original sports
-- [x] Architecture: nba/wnba/nfl clarified as learned LR production, not BasketballModel
+- [ ] Continue prospective executable BBO and closing-snapshot capture.
+- [ ] Add decision-time starters, lineups, bullpen usage, weather, and availability records with observed/effective timestamps.
+- [ ] Keep MLB/NBA/WNBA/NFL spreads and totals research-only until exact historical contract lines exist.
+- [ ] Keep F5, YRFI/NRFI, LoL, CS2, KBO, NPB, Tennis, and World Cup fail-closed or zero-unit until their declared gates pass.
 
-## Scan record
+## Verified scan record
 
-Full audit completed 2026-07-17. All 10 DEBUG checks pass: 739-event chain intact, 21 JSON artifacts with 0 broken hashes, 128 tests, ruff clean. Data: MLB 4,703g · NBA 1,996g · WNBA 630g · NFL 670g · Soccer 3,525g — all 0 dupes, 0 no-score.
+2026-07-20 current working tree: 190 passed after another writer changed the
+MLB test expectation; Ruff 3 errors; 28 JSON artifact hashes with 0 mismatches;
+6,712 audit lines with 9 breaks;
+installed console entry point broken; working tree five commits ahead of
+`origin/main` with extensive additional changes.
 
-## Revert
+## Historical rollback
 
-```
-git checkout v1.0.0
-```
+Use Git history and versioned artifacts deliberately. Do not run a broad
+checkout or reset in a dirty working tree.

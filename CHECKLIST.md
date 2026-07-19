@@ -1,5 +1,7 @@
 # Project Maintenance Checklist
 
+Current status and blockers: `docs/PROJECT_STATUS.md`.
+
 Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Daily
@@ -7,19 +9,19 @@ Run these checks regularly. Pinned to the repo root for discovery.
 - [ ] **Dashboard alive** — `http://127.0.0.1:8765` loads, matrix shows all 4 sports
 - [ ] **Daily pipeline ran** — check `data/logs/daily_$(date +%Y-%m-%d).log` exists
 - [ ] **Polymarket snapshots captured** — `ls data/odds/{mlb,nba,wnba}/$(date +%Y-%m-%d)/`
-- [ ] **launchd jobs running** — `launchctl list | grep modelprediction` shows both jobs
+- [ ] **scheduled jobs verified** — inspect the actual loaded launchd labels; do not assume documented labels are current
 
 ## Weekly
 
-- [ ] **Data backfill** — `model-prediction bootstrap --all --from $(date -v-7d +%Y-%m-%d) --to $(date +%Y-%m-%d)` to catch missed days
-- [ ] **Artifact hash integrity** — all 20 artifacts in `config/models/` pass SHA-256 verification (see DEBUG.md check 2)
+- [ ] **Data backfill** — use `env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli bootstrap ...` after inspecting the requested date range
+- [ ] **Artifact hash integrity** — every JSON artifact in `config/models/` passes SHA-256 verification (see DEBUG.md check 2)
 - [ ] **Audit chain intact** — `data/events.jsonl` chain unbroken (see DEBUG.md check 1)
 - [ ] **Game count growth** — MLB should gain ~90 games/week in season, NBA ~50, WNBA ~20
 - [ ] **Polymarket snapshot count** — `data/odds/` directories growing daily (target: 60+ days for spread/total training)
 
 ## Monthly / Per-Season
 
-- [ ] **Revalidate all models** — `model-prediction validate-models` and compare to baseline
+- [ ] **Revalidate all models** — run the module CLI without `--write-artifacts`, then compare to the active release
 - [ ] **Regenerate dashboard matrix** — `PYTHONPATH=src .venv/bin/python -c "..."` (then restore calibration gates)
 - [ ] **Check spread/total snapshot accumulation** — when 60+ days available, train real spread/total models
 - [ ] **Elo regression rates** — verify sport-specific: MLB 0%, NBA 35%, WNBA 40%, NFL 50% still optimal
@@ -33,10 +35,10 @@ Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Debug (when things look wrong)
 
-- [ ] **Pre-flight** — `PYTHONPATH=src .venv/bin/python -m pytest tests/ -q` (expect 159 pass)
+- [ ] **Pre-flight** — `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` (expect zero failures; do not hardcode a test count)
 - [ ] **Ruff lint** — `.venv/bin/ruff check src/ tests/`
 - [ ] **Full DEBUG.md 10-step audit** — see `DEBUG.md`
-- [ ] **Module imports** — all 47 modules import cleanly (DEBUG.md check 3)
+- [ ] **Module imports** — every current package module imports cleanly (DEBUG.md check 3)
 - [ ] **Data integrity** — 0 no-score games, 0 duplicates (DEBUG.md check 4)
 - [ ] **Config consistency** — `config/model.yaml` maps to existing artifact files
 - [ ] **Dashboard server logs** — `data/logs/dashboard.err` for runtime errors
@@ -47,5 +49,7 @@ Run these checks regularly. Pinned to the repo root for discovery.
 - [ ] MLB ingest pipeline sometimes misses completed games (ESPN API returns data but Ingestor doesn't process)
 - [ ] NBA/NFL spread/total: 0 snapshots (offseason — will resolve when seasons start)
 - [ ] WNBA total baseline 78.3% suspiciously high — needs investigation with more data
-- [ ] Audit chain broken at event 4 — needs repair
-- [ ] 6 pytest failures (dashboard server + validation — pre-existing from Codex refactor)
+- [ ] Audit chain has 9 verified breaks; first failures are lines 5, 33, 922, 927, and 928
+- [ ] Tests are green only because the MLB qualification expectation was changed to accept the inconsistent artifact flag
+- [ ] Ruff reports 3 errors
+- [ ] Installed `.venv/bin/model-prediction` entry point cannot import the package

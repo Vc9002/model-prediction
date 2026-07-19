@@ -1,0 +1,33 @@
+{
+  "effective_window": {
+    "from": "2024-01-01",
+    "to": "2026-07-19"
+  },
+  "extracted_at_utc": "2026-07-18T16:33:00.968376Z",
+  "limitations": [
+    "BO3 does not publish a stable public API contract; schema availability may change.",
+    "Historical corrections after extraction require a new versioned backfill.",
+    "Team IDs do not encode point-in-time rosters or substitutions."
+  ],
+  "match_count": 37887,
+  "matches_sha256": "383a6c10ed3f9c6ec7ddf099ebbb0c19d224fe690dcdfa9bf62a07bb9f399109",
+  "request_pages": {
+    "matches": 389,
+    "teams": 83
+  },
+  "requested_window": {
+    "from": "2024-01-01",
+    "to": "2026-07-19"
+  },
+  "requires_api_key": false,
+  "requires_signup": false,
+  "schema_version": "esports-series-v1",
+  "source": "bo3.gg public website data endpoint",
+  "source_attribution_url": "https://bo3.gg/",
+  "source_base_url": "https://api.bo3.gg/api/v1",
+  "source_terms_url": "https://bo3.gg/wiki/use-of-services",
+  "team_count": 2016,
+  "teams_sha256": "ee0805e60289ddec1a2ac567a34dd1c6d837954a6361611f427bdd467c3e4a4f",
+  "title": "cs2",
+  "title_name": "Counter-Strike 2"
+}

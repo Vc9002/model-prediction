@@ -1,12 +1,13 @@
 {
-  "artifact_hash": "4c777fe84e78871e7690ac498c2b71312d078be35dd9ce72864ff330b10812e1",
+  "artifact_hash": "ff401a2a0c6810d1e883ad29e80a93e5fa651b5f52df6252ee32b88e13a2cc7d",
   "confidence_threshold": 0.0,
   "home_or_order_advantage": 0.0,
   "initial_rating": 1500.0,
   "k": 48.0,
   "matches_sha256": "c4f16d0c8b9420ace0d33ef315ddabfd83b6c91aa752a204d637a02a5e4e96e6",
+  "model_state": "research",
   "model_version": "lol-neutral-series-elo-v1",
-  "qualified_for_betting": true,
+  "qualified_for_betting": false,
   "ratings": {
     "bo3:3:16778": 1411.824932,
     "bo3:3:16780": 1573.356468,

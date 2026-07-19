@@ -3,13 +3,16 @@
 > **Run ALL checks in order. Fix every failure. Update input/TODO.md after each fix.**
 > **Tests + ruff must pass before and after every change.**
 
+Current verified failures are tracked in `docs/PROJECT_STATUS.md`. This protocol
+must expose them; a clean exit caused by a weak check is itself a failure.
+
 ---
 
 ## PRE-FLIGHT
 
 ```bash
 cd /Users/vincentc9002/Documents/Poly\ \&\ Kalshi/model\ prediction
-PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
+PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q
 .venv/bin/ruff check src/ tests/
 ```
 FAIL if: any test fails or ruff reports errors. Fix before proceeding.
@@ -20,36 +23,42 @@ FAIL if: any test fails or ruff reports errors. Fix before proceeding.
 
 ### 1. AUDIT CHAIN INTEGRITY
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 import json, hashlib
 from pathlib import Path
-events = [json.loads(l) for l in Path('data/events.jsonl').read_text().strip().split('\n') if l.strip()]
+events = [json.loads(line) for line in Path('data/events.jsonl').read_text().splitlines() if line.strip()]
 previous = '0' * 64
+broken = []
 for i, event in enumerate(events):
     payload = {key: value for key, value in event.items() if key != 'event_hash'}
     expected_hash = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
     ).hexdigest()
     if event.get('previous_hash') != previous or event.get('event_hash') != expected_hash:
-        print(f'CHAIN BROKEN at event {i}')
-        break
+        broken.append(i + 1)
     previous = event['event_hash']
+if broken:
+    print(f'CHAIN BROKEN: {len(broken)}; first lines={broken[:10]}')
 else:
     print(f'CHAIN INTACT: {len(events)} events')
+raise SystemExit(1 if broken else 0)
 "
 ```
 **PASS:** "CHAIN INTACT" printed. **FAIL:** Any break. If broken, trace to source.
 
 ### 2. ARTIFACT HASH VERIFICATION
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 import json, hashlib
 from pathlib import Path
 broken = []
 for f in sorted(Path('config/models').glob('*.json')):
     data = json.loads(f.read_text())
     ah = data.pop('artifact_hash', None)
-    if not ah: print(f'  NO HASH: {f.name}'); continue
+    if not ah:
+        print(f'  NO HASH: {f.name}')
+        broken.append(f.name)
+        continue
     canonical = json.dumps(data, sort_keys=True, separators=(',',':'))
     expected = hashlib.sha256(canonical.encode()).hexdigest()
     status = 'OK' if ah == expected else 'BROKEN'
@@ -63,20 +72,27 @@ raise SystemExit(1 if broken else 0)
 
 ### 3. MODULE IMPORT CHECK
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
-import model_prediction
-from model_prediction.models import mlb, nba, wnba, basketball, soccer, tennis, market_residual
-from model_prediction.features import confidence_gate, trends, park_factors, weather, bullpen
-from model_prediction.data_sources import polymarket_us, espn
-from model_prediction import learned_forward, validation, backtester, forward
-print('ALL IMPORTS OK')
+PYTHONPATH=src:. .venv/bin/python -c "
+import importlib, pkgutil, model_prediction
+failures = []
+modules = list(pkgutil.walk_packages(model_prediction.__path__, model_prediction.__name__ + '.'))
+for module in modules:
+    try:
+        importlib.import_module(module.name)
+    except Exception as error:
+        failures.append((module.name, type(error).__name__, str(error)))
+for failure in failures:
+    print('IMPORT FAILED:', failure)
+status_text = 'OK' if not failures else 'FAILED'
+print(f'IMPORTS: {status_text}; modules={len(modules)}')
+raise SystemExit(1 if failures else 0)
 "
 ```
-**PASS:** "ALL IMPORTS OK". **FAIL:** Any ImportError.
+**PASS:** `IMPORTS: OK`. **FAIL:** Any import failure.
 
 ### 4. DATA INTEGRITY
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 import json
 from pathlib import Path
 for sport in ['mlb','nba','wnba','nfl']:
@@ -108,7 +124,7 @@ rg -n "legacy-measured-edge" src/model_prediction/cli.py config/model.yaml
 
 ### 6. MODEL ARTIFACT VALIDATION
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 import json
 from pathlib import Path
 configs = list(Path('config/models').glob('*.json'))
@@ -126,7 +142,7 @@ for f in configs:
 
 ### 7. FEATURE PIPELINE HEALTH
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 import yaml
 from pathlib import Path
 from model_prediction.models.learned_market import LearnedMarketArtifact
@@ -152,7 +168,7 @@ print('FEATURE PIPELINE: OK')
 
 ### 8. LEARNED ARTIFACT LOADING
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 import yaml
 from pathlib import Path
 from model_prediction.models.learned_market import LearnedMarketArtifact
@@ -168,7 +184,7 @@ for sport in ['mlb','nba','wnba','nfl']:
 
 ### 9. CONFIG CONSISTENCY
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 import yaml
 from pathlib import Path
 cfg = yaml.safe_load(Path('config/model.yaml').read_text())
@@ -183,7 +199,7 @@ print('CONFIG: OK')
 
 ### 10. SPRING TRAINING FILTER
 ```bash
-PYTHONPATH=src .venv/bin/python -c "
+PYTHONPATH=src:. .venv/bin/python -c "
 from zoneinfo import ZoneInfo
 from model_prediction.domain import parse_utc
 from model_prediction.features.base import FeatureStore
@@ -201,10 +217,10 @@ assert not off_season, 'Spring Training or off-season game reached FeatureStore 
 
 ## POST-SCAN DOCUMENTATION UPDATE
 
-After every scan, update `input/TODO.md`:
+After every scan, update `docs/PROJECT_STATUS.md` and `input/TODO.md`:
 1. Add any new failures found
 2. Mark any fixed items as ✅ DONE
-3. Update the qualified models table with current metrics
+3. Update model metrics only from a report reproduced by the current checkout
 4. Record scan timestamp in the "Scan record" section
 5. Update `input/CHANGELOG.md` with a dated entry for meaningful changes
 
@@ -230,7 +246,7 @@ Do not append an unverified issue count.
 ## POST-CHECKS
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
+PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q
 .venv/bin/ruff check src/ tests/
 ```
 Both must pass after every fix.

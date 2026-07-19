@@ -1,0 +1,862 @@
+{
+  "generated_at_utc": "2026-07-19T11:11:06.071726Z",
+  "leagues": {
+    "kbo": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/kbo-tie-aware-elo-v1.json",
+      "artifact_hash": "c83e12bf5e834073969ca0718b3fd7cab65a771c8a34c0298755754707f7f068",
+      "chosen": {
+        "home_advantage": 20.0,
+        "k": 8.0
+      },
+      "chronological_split": {
+        "locked_test": {
+          "from_date": "2025-08-02",
+          "n": 658,
+          "through_date": "2026-07-18"
+        },
+        "train": {
+          "n": 1993,
+          "through_date": "2024-08-14"
+        },
+        "validation": {
+          "from_date": "2024-08-15",
+          "n": 667,
+          "through_date": "2025-08-01"
+        }
+      },
+      "league": "kbo",
+      "limitations": [
+        "No point-in-time starting pitcher, lineup, bullpen, park, weather, travel, or roster features yet.",
+        "Tie probability is a league-wide historical baseline, not a game-specific model.",
+        "No historical executable BBO archive exists for this sample.",
+        "Locked-test metrics are diagnostic; v1 remains unqualified and zero-unit."
+      ],
+      "locked_test": {
+        "accuracy_decisive": 0.551938,
+        "brier_settlement": 0.242601,
+        "mae_settlement": 0.480563,
+        "observations": 658,
+        "ties": 13
+      },
+      "model_state": "research",
+      "model_version": "kbo-tie-aware-elo-v1",
+      "observations": 3318,
+      "parameter_selection_on_validation": [
+        {
+          "accuracy_decisive": 0.550077,
+          "brier_settlement": 0.23824,
+          "home_advantage": 0.0,
+          "k": 8.0,
+          "mae_settlement": 0.476744,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.579353,
+          "brier_settlement": 0.238106,
+          "home_advantage": 20.0,
+          "k": 8.0,
+          "mae_settlement": 0.475652,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.559322,
+          "brier_settlement": 0.239011,
+          "home_advantage": 35.0,
+          "k": 8.0,
+          "mae_settlement": 0.474988,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.543914,
+          "brier_settlement": 0.240757,
+          "home_advantage": 50.0,
+          "k": 8.0,
+          "mae_settlement": 0.47454,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.546995,
+          "brier_settlement": 0.243309,
+          "home_advantage": 65.0,
+          "k": 8.0,
+          "mae_settlement": 0.474163,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.539291,
+          "brier_settlement": 0.246626,
+          "home_advantage": 80.0,
+          "k": 8.0,
+          "mae_settlement": 0.473855,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.562404,
+          "brier_settlement": 0.239131,
+          "home_advantage": 0.0,
+          "k": 12.0,
+          "mae_settlement": 0.475865,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.576271,
+          "brier_settlement": 0.238983,
+          "home_advantage": 20.0,
+          "k": 12.0,
+          "mae_settlement": 0.474794,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.567026,
+          "brier_settlement": 0.239858,
+          "home_advantage": 35.0,
+          "k": 12.0,
+          "mae_settlement": 0.474127,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.553159,
+          "brier_settlement": 0.241559,
+          "home_advantage": 50.0,
+          "k": 12.0,
+          "mae_settlement": 0.473593,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.539291,
+          "brier_settlement": 0.244051,
+          "home_advantage": 65.0,
+          "k": 12.0,
+          "mae_settlement": 0.473215,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.543914,
+          "brier_settlement": 0.247291,
+          "home_advantage": 80.0,
+          "k": 12.0,
+          "mae_settlement": 0.472852,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.5547,
+          "brier_settlement": 0.240389,
+          "home_advantage": 0.0,
+          "k": 16.0,
+          "mae_settlement": 0.475575,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.568567,
+          "brier_settlement": 0.240235,
+          "home_advantage": 20.0,
+          "k": 16.0,
+          "mae_settlement": 0.474502,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.559322,
+          "brier_settlement": 0.24109,
+          "home_advantage": 35.0,
+          "k": 16.0,
+          "mae_settlement": 0.473847,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.548536,
+          "brier_settlement": 0.242756,
+          "home_advantage": 50.0,
+          "k": 16.0,
+          "mae_settlement": 0.47324,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.540832,
+          "brier_settlement": 0.245201,
+          "home_advantage": 65.0,
+          "k": 16.0,
+          "mae_settlement": 0.472797,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.543914,
+          "brier_settlement": 0.24838,
+          "home_advantage": 80.0,
+          "k": 16.0,
+          "mae_settlement": 0.472438,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.563945,
+          "brier_settlement": 0.241748,
+          "home_advantage": 0.0,
+          "k": 20.0,
+          "mae_settlement": 0.475557,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.55624,
+          "brier_settlement": 0.241592,
+          "home_advantage": 20.0,
+          "k": 20.0,
+          "mae_settlement": 0.474399,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.542373,
+          "brier_settlement": 0.242431,
+          "home_advantage": 35.0,
+          "k": 20.0,
+          "mae_settlement": 0.473728,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.543914,
+          "brier_settlement": 0.24407,
+          "home_advantage": 50.0,
+          "k": 20.0,
+          "mae_settlement": 0.473123,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.542373,
+          "brier_settlement": 0.246474,
+          "home_advantage": 65.0,
+          "k": 20.0,
+          "mae_settlement": 0.472584,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.542373,
+          "brier_settlement": 0.2496,
+          "home_advantage": 80.0,
+          "k": 20.0,
+          "mae_settlement": 0.4722,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.557781,
+          "brier_settlement": 0.243119,
+          "home_advantage": 0.0,
+          "k": 24.0,
+          "mae_settlement": 0.475584,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.546995,
+          "brier_settlement": 0.242961,
+          "home_advantage": 20.0,
+          "k": 24.0,
+          "mae_settlement": 0.474447,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.53775,
+          "brier_settlement": 0.243787,
+          "home_advantage": 35.0,
+          "k": 24.0,
+          "mae_settlement": 0.473676,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.548536,
+          "brier_settlement": 0.2454,
+          "home_advantage": 50.0,
+          "k": 24.0,
+          "mae_settlement": 0.473034,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.53775,
+          "brier_settlement": 0.247768,
+          "home_advantage": 65.0,
+          "k": 24.0,
+          "mae_settlement": 0.472503,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.546995,
+          "brier_settlement": 0.250845,
+          "home_advantage": 80.0,
+          "k": 24.0,
+          "mae_settlement": 0.472028,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.5547,
+          "brier_settlement": 0.245798,
+          "home_advantage": 0.0,
+          "k": 32.0,
+          "mae_settlement": 0.475575,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.53775,
+          "brier_settlement": 0.245633,
+          "home_advantage": 20.0,
+          "k": 32.0,
+          "mae_settlement": 0.474465,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.530046,
+          "brier_settlement": 0.24643,
+          "home_advantage": 35.0,
+          "k": 32.0,
+          "mae_settlement": 0.473663,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.543914,
+          "brier_settlement": 0.247994,
+          "home_advantage": 50.0,
+          "k": 32.0,
+          "mae_settlement": 0.472947,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.534669,
+          "brier_settlement": 0.250292,
+          "home_advantage": 65.0,
+          "k": 32.0,
+          "mae_settlement": 0.472322,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.531587,
+          "brier_settlement": 0.25328,
+          "home_advantage": 80.0,
+          "k": 32.0,
+          "mae_settlement": 0.471779,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.553159,
+          "brier_settlement": 0.248371,
+          "home_advantage": 0.0,
+          "k": 40.0,
+          "mae_settlement": 0.47546,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.53775,
+          "brier_settlement": 0.248192,
+          "home_advantage": 20.0,
+          "k": 40.0,
+          "mae_settlement": 0.474327,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.53775,
+          "brier_settlement": 0.248956,
+          "home_advantage": 35.0,
+          "k": 40.0,
+          "mae_settlement": 0.473518,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.53775,
+          "brier_settlement": 0.250468,
+          "home_advantage": 50.0,
+          "k": 40.0,
+          "mae_settlement": 0.472741,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.534669,
+          "brier_settlement": 0.252696,
+          "home_advantage": 65.0,
+          "k": 40.0,
+          "mae_settlement": 0.472126,
+          "observations": 667,
+          "ties": 18
+        },
+        {
+          "accuracy_decisive": 0.528505,
+          "brier_settlement": 0.255596,
+          "home_advantage": 80.0,
+          "k": 40.0,
+          "mae_settlement": 0.471558,
+          "observations": 667,
+          "ties": 18
+        }
+      ],
+      "point_in_time": "all games on one local date are predicted before that date updates ratings",
+      "profitability": "not_established_no_point_in_time_market_prices",
+      "promotion_eligible": false,
+      "status": "ok",
+      "tie_rate": 0.019289,
+      "units": 0
+    },
+    "npb": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/npb-tie-aware-elo-v1.json",
+      "artifact_hash": "d48ad0982508462e5ecf012da808db8bfb26a68544e4ec4d1be1d29bef4fff51",
+      "chosen": {
+        "home_advantage": 35.0,
+        "k": 8.0
+      },
+      "chronological_split": {
+        "locked_test": {
+          "from_date": "2025-08-07",
+          "n": 766,
+          "through_date": "2026-07-17"
+        },
+        "train": {
+          "n": 2340,
+          "through_date": "2024-08-20"
+        },
+        "validation": {
+          "from_date": "2024-08-21",
+          "n": 771,
+          "through_date": "2025-08-06"
+        }
+      },
+      "league": "npb",
+      "limitations": [
+        "No point-in-time starting pitcher, lineup, bullpen, park, weather, travel, or roster features yet.",
+        "Tie probability is a league-wide historical baseline, not a game-specific model.",
+        "No historical executable BBO archive exists for this sample.",
+        "Locked-test metrics are diagnostic; v1 remains unqualified and zero-unit."
+      ],
+      "locked_test": {
+        "accuracy_decisive": 0.571238,
+        "brier_settlement": 0.241767,
+        "mae_settlement": 0.478061,
+        "observations": 766,
+        "ties": 15
+      },
+      "model_state": "research",
+      "model_version": "npb-tie-aware-elo-v1",
+      "observations": 3877,
+      "parameter_selection_on_validation": [
+        {
+          "accuracy_decisive": 0.549333,
+          "brier_settlement": 0.240686,
+          "home_advantage": 0.0,
+          "k": 8.0,
+          "mae_settlement": 0.479596,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.544,
+          "brier_settlement": 0.239223,
+          "home_advantage": 20.0,
+          "k": 8.0,
+          "mae_settlement": 0.477619,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.548,
+          "brier_settlement": 0.239118,
+          "home_advantage": 35.0,
+          "k": 8.0,
+          "mae_settlement": 0.476357,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.552,
+          "brier_settlement": 0.239846,
+          "home_advantage": 50.0,
+          "k": 8.0,
+          "mae_settlement": 0.475227,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.538667,
+          "brier_settlement": 0.241378,
+          "home_advantage": 65.0,
+          "k": 8.0,
+          "mae_settlement": 0.47419,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.54,
+          "brier_settlement": 0.243673,
+          "home_advantage": 80.0,
+          "k": 8.0,
+          "mae_settlement": 0.473265,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.546667,
+          "brier_settlement": 0.241719,
+          "home_advantage": 0.0,
+          "k": 12.0,
+          "mae_settlement": 0.479387,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.552,
+          "brier_settlement": 0.240245,
+          "home_advantage": 20.0,
+          "k": 12.0,
+          "mae_settlement": 0.477489,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.553333,
+          "brier_settlement": 0.240123,
+          "home_advantage": 35.0,
+          "k": 12.0,
+          "mae_settlement": 0.476164,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.549333,
+          "brier_settlement": 0.240828,
+          "home_advantage": 50.0,
+          "k": 12.0,
+          "mae_settlement": 0.47504,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.538667,
+          "brier_settlement": 0.24233,
+          "home_advantage": 65.0,
+          "k": 12.0,
+          "mae_settlement": 0.474024,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.544,
+          "brier_settlement": 0.244588,
+          "home_advantage": 80.0,
+          "k": 12.0,
+          "mae_settlement": 0.473086,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.545333,
+          "brier_settlement": 0.242746,
+          "home_advantage": 0.0,
+          "k": 16.0,
+          "mae_settlement": 0.479271,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.56,
+          "brier_settlement": 0.241266,
+          "home_advantage": 20.0,
+          "k": 16.0,
+          "mae_settlement": 0.477404,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.54,
+          "brier_settlement": 0.241134,
+          "home_advantage": 35.0,
+          "k": 16.0,
+          "mae_settlement": 0.476091,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.553333,
+          "brier_settlement": 0.241822,
+          "home_advantage": 50.0,
+          "k": 16.0,
+          "mae_settlement": 0.475004,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.541333,
+          "brier_settlement": 0.243303,
+          "home_advantage": 65.0,
+          "k": 16.0,
+          "mae_settlement": 0.474006,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.544,
+          "brier_settlement": 0.245533,
+          "home_advantage": 80.0,
+          "k": 16.0,
+          "mae_settlement": 0.473082,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.550667,
+          "brier_settlement": 0.243776,
+          "home_advantage": 0.0,
+          "k": 20.0,
+          "mae_settlement": 0.479157,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.554667,
+          "brier_settlement": 0.242294,
+          "home_advantage": 20.0,
+          "k": 20.0,
+          "mae_settlement": 0.477307,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.545333,
+          "brier_settlement": 0.242153,
+          "home_advantage": 35.0,
+          "k": 20.0,
+          "mae_settlement": 0.476038,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.553333,
+          "brier_settlement": 0.242826,
+          "home_advantage": 50.0,
+          "k": 20.0,
+          "mae_settlement": 0.474997,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.537333,
+          "brier_settlement": 0.244285,
+          "home_advantage": 65.0,
+          "k": 20.0,
+          "mae_settlement": 0.474022,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.54,
+          "brier_settlement": 0.246489,
+          "home_advantage": 80.0,
+          "k": 20.0,
+          "mae_settlement": 0.473144,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.545333,
+          "brier_settlement": 0.244831,
+          "home_advantage": 0.0,
+          "k": 24.0,
+          "mae_settlement": 0.479068,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.549333,
+          "brier_settlement": 0.24335,
+          "home_advantage": 20.0,
+          "k": 24.0,
+          "mae_settlement": 0.477215,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.549333,
+          "brier_settlement": 0.243199,
+          "home_advantage": 35.0,
+          "k": 24.0,
+          "mae_settlement": 0.476002,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.548,
+          "brier_settlement": 0.243857,
+          "home_advantage": 50.0,
+          "k": 24.0,
+          "mae_settlement": 0.475001,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.542667,
+          "brier_settlement": 0.245293,
+          "home_advantage": 65.0,
+          "k": 24.0,
+          "mae_settlement": 0.474055,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.541333,
+          "brier_settlement": 0.247468,
+          "home_advantage": 80.0,
+          "k": 24.0,
+          "mae_settlement": 0.473225,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.537333,
+          "brier_settlement": 0.24704,
+          "home_advantage": 0.0,
+          "k": 32.0,
+          "mae_settlement": 0.478981,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.544,
+          "brier_settlement": 0.245562,
+          "home_advantage": 20.0,
+          "k": 32.0,
+          "mae_settlement": 0.477114,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.552,
+          "brier_settlement": 0.245394,
+          "home_advantage": 35.0,
+          "k": 32.0,
+          "mae_settlement": 0.475982,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.544,
+          "brier_settlement": 0.246017,
+          "home_advantage": 50.0,
+          "k": 32.0,
+          "mae_settlement": 0.475021,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.550667,
+          "brier_settlement": 0.247402,
+          "home_advantage": 65.0,
+          "k": 32.0,
+          "mae_settlement": 0.474173,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.544,
+          "brier_settlement": 0.24951,
+          "home_advantage": 80.0,
+          "k": 32.0,
+          "mae_settlement": 0.473407,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.538667,
+          "brier_settlement": 0.249355,
+          "home_advantage": 0.0,
+          "k": 40.0,
+          "mae_settlement": 0.478891,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.538667,
+          "brier_settlement": 0.247885,
+          "home_advantage": 20.0,
+          "k": 40.0,
+          "mae_settlement": 0.477079,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.538667,
+          "brier_settlement": 0.247699,
+          "home_advantage": 35.0,
+          "k": 40.0,
+          "mae_settlement": 0.476008,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.542667,
+          "brier_settlement": 0.248285,
+          "home_advantage": 50.0,
+          "k": 40.0,
+          "mae_settlement": 0.475061,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.546667,
+          "brier_settlement": 0.249614,
+          "home_advantage": 65.0,
+          "k": 40.0,
+          "mae_settlement": 0.474284,
+          "observations": 771,
+          "ties": 21
+        },
+        {
+          "accuracy_decisive": 0.552,
+          "brier_settlement": 0.251649,
+          "home_advantage": 80.0,
+          "k": 40.0,
+          "mae_settlement": 0.473578,
+          "observations": 771,
+          "ties": 21
+        }
+      ],
+      "point_in_time": "all games on one local date are predicted before that date updates ratings",
+      "profitability": "not_established_no_point_in_time_market_prices",
+      "promotion_eligible": false,
+      "status": "ok",
+      "tie_rate": 0.024761,
+      "units": 0
+    }
+  },
+  "promotion_eligible": false,
+  "scope": "research-only separate-league tie-aware moneyline baselines",
+  "units": 0
+}

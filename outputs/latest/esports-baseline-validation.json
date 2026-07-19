@@ -1,0 +1,366 @@
+{
+  "generated_at_utc": "2026-07-19T11:10:53.844027Z",
+  "promotion_eligible": false,
+  "scope": "research-only separate-title series-winner baselines",
+  "titles": {
+    "cs2": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/cs2-neutral-series-elo-v1.json",
+      "artifact_hash": "441fc314cdd8087448ba613b3a5d70713dcb6eecefc52fe86926e94627779290",
+      "chosen": {
+        "confidence_threshold": 0.0,
+        "k": 48.0
+      },
+      "chronological_split": {
+        "locked_test": {
+          "from_utc": "2026-01-22T16:14:33Z",
+          "n": 7578,
+          "through_utc": "2026-07-18T15:00:00Z"
+        },
+        "train": {
+          "n": 22732,
+          "through_utc": "2025-06-25T22:00:00Z"
+        },
+        "validation": {
+          "from_utc": "2025-06-25T23:45:00Z",
+          "n": 7577,
+          "through_utc": "2026-01-22T16:12:53Z"
+        }
+      },
+      "confidence_selection_on_validation": [
+        {
+          "accuracy": 0.635872,
+          "brier": 0.223751,
+          "ece_10_bin": 0.028531,
+          "log_loss": 0.638648,
+          "observations": 7577,
+          "threshold": 0.0
+        },
+        {
+          "accuracy": 0.654704,
+          "brier": 0.220081,
+          "ece_10_bin": 0.029183,
+          "log_loss": 0.631022,
+          "observations": 6632,
+          "threshold": 0.03
+        },
+        {
+          "accuracy": 0.664897,
+          "brier": 0.217354,
+          "ece_10_bin": 0.032386,
+          "log_loss": 0.62534,
+          "observations": 6028,
+          "threshold": 0.05
+        },
+        {
+          "accuracy": 0.679969,
+          "brier": 0.212888,
+          "ece_10_bin": 0.035546,
+          "log_loss": 0.615995,
+          "observations": 5162,
+          "threshold": 0.08
+        },
+        {
+          "accuracy": 0.688865,
+          "brier": 0.209799,
+          "ece_10_bin": 0.036724,
+          "log_loss": 0.609494,
+          "observations": 4625,
+          "threshold": 0.1
+        },
+        {
+          "accuracy": 0.704938,
+          "brier": 0.204941,
+          "ece_10_bin": 0.038015,
+          "log_loss": 0.599351,
+          "observations": 4111,
+          "threshold": 0.12
+        },
+        {
+          "accuracy": 0.720119,
+          "brier": 0.198977,
+          "ece_10_bin": 0.039626,
+          "log_loss": 0.586695,
+          "observations": 3355,
+          "threshold": 0.15
+        }
+      ],
+      "k_selection_on_validation": [
+        {
+          "accuracy": 0.608552,
+          "brier": 0.234713,
+          "ece_10_bin": 0.047457,
+          "k": 8.0,
+          "log_loss": 0.66194,
+          "observations": 7577
+        },
+        {
+          "accuracy": 0.617659,
+          "brier": 0.231067,
+          "ece_10_bin": 0.043473,
+          "k": 12.0,
+          "log_loss": 0.654188,
+          "observations": 7577
+        },
+        {
+          "accuracy": 0.621618,
+          "brier": 0.228594,
+          "ece_10_bin": 0.039343,
+          "k": 16.0,
+          "log_loss": 0.648833,
+          "observations": 7577
+        },
+        {
+          "accuracy": 0.624786,
+          "brier": 0.226879,
+          "ece_10_bin": 0.032998,
+          "k": 20.0,
+          "log_loss": 0.64507,
+          "observations": 7577
+        },
+        {
+          "accuracy": 0.629141,
+          "brier": 0.22568,
+          "ece_10_bin": 0.028346,
+          "k": 24.0,
+          "log_loss": 0.642422,
+          "observations": 7577
+        },
+        {
+          "accuracy": 0.632572,
+          "brier": 0.224289,
+          "ece_10_bin": 0.0233,
+          "k": 32.0,
+          "log_loss": 0.639379,
+          "observations": 7577
+        },
+        {
+          "accuracy": 0.63508,
+          "brier": 0.223752,
+          "ece_10_bin": 0.02223,
+          "k": 40.0,
+          "log_loss": 0.638342,
+          "observations": 7577
+        },
+        {
+          "accuracy": 0.635872,
+          "brier": 0.223751,
+          "ece_10_bin": 0.028531,
+          "k": 48.0,
+          "log_loss": 0.638648,
+          "observations": 7577
+        }
+      ],
+      "limitations": [
+        "No point-in-time rosters, substitutions, patch/map pool, travel, or format covariates yet.",
+        "No pre-match executable price archive exists for this historical sample.",
+        "BO3 is a replaceable research source without a published stable API contract.",
+        "Locked-test metrics are diagnostic; this v1 baseline remains unqualified and zero-unit."
+      ],
+      "locked_test": {
+        "all_matches": {
+          "accuracy": 0.641198,
+          "brier": 0.220148,
+          "ece_10_bin": 0.018129,
+          "log_loss": 0.630003,
+          "observations": 7578
+        },
+        "selected_matches": {
+          "accuracy": 0.641198,
+          "brier": 0.220148,
+          "ece_10_bin": 0.018129,
+          "log_loss": 0.630003,
+          "observations": 7578
+        }
+      },
+      "model_state": "research",
+      "model_version": "cs2-neutral-series-elo-v1",
+      "observations": 37887,
+      "point_in_time": "ratings use completed matches strictly before each prediction",
+      "profitability": "not_established_no_point_in_time_market_prices",
+      "promotion_eligible": false,
+      "status": "ok",
+      "title": "cs2",
+      "units": 0
+    },
+    "lol": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/lol-neutral-series-elo-v1.json",
+      "artifact_hash": "ff401a2a0c6810d1e883ad29e80a93e5fa651b5f52df6252ee32b88e13a2cc7d",
+      "chosen": {
+        "confidence_threshold": 0.0,
+        "k": 48.0
+      },
+      "chronological_split": {
+        "locked_test": {
+          "from_utc": "2026-01-21T16:00:00Z",
+          "n": 2384,
+          "through_utc": "2026-07-18T14:00:00Z"
+        },
+        "train": {
+          "n": 7149,
+          "through_utc": "2025-05-03T09:40:00Z"
+        },
+        "validation": {
+          "from_utc": "2025-05-03T10:00:00Z",
+          "n": 2383,
+          "through_utc": "2026-01-21T16:00:00Z"
+        }
+      },
+      "confidence_selection_on_validation": [
+        {
+          "accuracy": 0.65128,
+          "brier": 0.216669,
+          "ece_10_bin": 0.027573,
+          "log_loss": 0.624171,
+          "observations": 2383,
+          "threshold": 0.0
+        },
+        {
+          "accuracy": 0.667461,
+          "brier": 0.212204,
+          "ece_10_bin": 0.031432,
+          "log_loss": 0.614929,
+          "observations": 2099,
+          "threshold": 0.03
+        },
+        {
+          "accuracy": 0.680391,
+          "brier": 0.209107,
+          "ece_10_bin": 0.031329,
+          "log_loss": 0.608524,
+          "observations": 1943,
+          "threshold": 0.05
+        },
+        {
+          "accuracy": 0.701413,
+          "brier": 0.203311,
+          "ece_10_bin": 0.031544,
+          "log_loss": 0.596519,
+          "observations": 1698,
+          "threshold": 0.08
+        },
+        {
+          "accuracy": 0.713736,
+          "brier": 0.199384,
+          "ece_10_bin": 0.032104,
+          "log_loss": 0.588371,
+          "observations": 1558,
+          "threshold": 0.1
+        },
+        {
+          "accuracy": 0.726233,
+          "brier": 0.194788,
+          "ece_10_bin": 0.035028,
+          "log_loss": 0.578786,
+          "observations": 1399,
+          "threshold": 0.12
+        },
+        {
+          "accuracy": 0.746622,
+          "brier": 0.187045,
+          "ece_10_bin": 0.039931,
+          "log_loss": 0.562617,
+          "observations": 1184,
+          "threshold": 0.15
+        }
+      ],
+      "k_selection_on_validation": [
+        {
+          "accuracy": 0.630298,
+          "brier": 0.229907,
+          "ece_10_bin": 0.060803,
+          "k": 8.0,
+          "log_loss": 0.651861,
+          "observations": 2383
+        },
+        {
+          "accuracy": 0.631557,
+          "brier": 0.225953,
+          "ece_10_bin": 0.042641,
+          "k": 12.0,
+          "log_loss": 0.643226,
+          "observations": 2383
+        },
+        {
+          "accuracy": 0.631977,
+          "brier": 0.223316,
+          "ece_10_bin": 0.042624,
+          "k": 16.0,
+          "log_loss": 0.637384,
+          "observations": 2383
+        },
+        {
+          "accuracy": 0.636593,
+          "brier": 0.221435,
+          "ece_10_bin": 0.049571,
+          "k": 20.0,
+          "log_loss": 0.633221,
+          "observations": 2383
+        },
+        {
+          "accuracy": 0.642048,
+          "brier": 0.220045,
+          "ece_10_bin": 0.037371,
+          "k": 24.0,
+          "log_loss": 0.630189,
+          "observations": 2383
+        },
+        {
+          "accuracy": 0.641628,
+          "brier": 0.218211,
+          "ece_10_bin": 0.035206,
+          "k": 32.0,
+          "log_loss": 0.626392,
+          "observations": 2383
+        },
+        {
+          "accuracy": 0.644566,
+          "brier": 0.217182,
+          "ece_10_bin": 0.028876,
+          "k": 40.0,
+          "log_loss": 0.624611,
+          "observations": 2383
+        },
+        {
+          "accuracy": 0.65128,
+          "brier": 0.216669,
+          "ece_10_bin": 0.027573,
+          "k": 48.0,
+          "log_loss": 0.624171,
+          "observations": 2383
+        }
+      ],
+      "limitations": [
+        "No point-in-time rosters, substitutions, patch/map pool, travel, or format covariates yet.",
+        "No pre-match executable price archive exists for this historical sample.",
+        "BO3 is a replaceable research source without a published stable API contract.",
+        "Locked-test metrics are diagnostic; this v1 baseline remains unqualified and zero-unit."
+      ],
+      "locked_test": {
+        "all_matches": {
+          "accuracy": 0.661074,
+          "brier": 0.213101,
+          "ece_10_bin": 0.024868,
+          "log_loss": 0.614652,
+          "observations": 2384
+        },
+        "selected_matches": {
+          "accuracy": 0.661074,
+          "brier": 0.213101,
+          "ece_10_bin": 0.024868,
+          "log_loss": 0.614652,
+          "observations": 2384
+        }
+      },
+      "model_state": "research",
+      "model_version": "lol-neutral-series-elo-v1",
+      "observations": 11916,
+      "point_in_time": "ratings use completed matches strictly before each prediction",
+      "profitability": "not_established_no_point_in_time_market_prices",
+      "promotion_eligible": false,
+      "status": "ok",
+      "title": "lol",
+      "units": 0
+    }
+  },
+  "units": 0
+}

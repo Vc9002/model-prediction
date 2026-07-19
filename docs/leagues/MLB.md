@@ -13,6 +13,15 @@ Market prices do not enter the independent score model. A timestamp-valid
 decision price may enter a clearly labeled residual or decision layer. Closing
 prices are labels. Postgame-retrieved prices are diagnostic only.
 
+## Current active learned path
+
+The newest validation report grades the selected
+`elo_trend_park_weather_pitcher` variant at 58.20% on 244 locked calls, below the
+60% qualification minimum. The active v3 artifact nevertheless contains an
+inconsistent qualified flag and fails the config/artifact test. Operationally,
+MLB is unqualified until a new aligned artifact is reproduced. Do not let the
+YAML `shadow_qualified` label authorize a call.
+
 ## Current model families
 
 - **First Read v0.1:** four manual analyst estimates retained as legacy evidence.
@@ -49,9 +58,10 @@ Decision: reject `mlb-opponent-adjusted-trend-score-v2` and continue iterating.
 
 The intended model uses pitcher quality and platoon matchups, projected lineups,
 bullpen workload, park, weather, travel, and rest. Score-only history cannot
-reconstruct those inputs point-in-time. Missing values use explicit neutral
-fallbacks only to keep calculations executable; a neutral value is not evidence
-that the feature was observed.
+reconstruct those inputs point-in-time. Missing two-sided probable starters must
+skip the forecast; never substitute team runs allowed for starter ERA. Other
+neutral research fallbacks must remain explicit missingness states and cannot
+support a qualified call.
 
 The highest-priority data work is prospective capture of two-sided executable
 prices, confirmed starters and lineups, bullpen availability, park/weather, and

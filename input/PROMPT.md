@@ -1,24 +1,29 @@
 # Execution protocol
 
-The 2026-07-17 request has been executed. Future agents should not repeat rejected experiments without new point-in-time data.
+Read `docs/PROJECT_STATUS.md` before acting. Do not trust this file, a prior
+prompt, or a README table over current source, tests, config, artifact, and
+generated evidence.
 
-## Current production contract
+## Durable contract
 
-- Use the v2 hash-verified moneyline artifact pinned in `config/model.yaml`.
-- Walk forward by complete dates; learn weights on train, threshold on validation, and grade once on locked holdout.
-- Qualification requires at least 50 calls, at least 60% accuracy, positive flat P&L at -110, and positive P&L in every complete month with at least 10 calls.
-- Report incomplete terminal months as provisional and complete months below 10 calls as insufficient.
-- Remain shadow-only unless the user separately requests and confirms an operational action.
+- Walk forward by complete dates; fit on train, select on validation, and grade a declared candidate once on locked holdout.
+- Require point-in-time inputs and exact market semantics.
+- Keep outcome modeling independent from market price.
+- Keep model accuracy separate from executable EV and profitability.
+- Preserve failed gates, rejected experiments, and rollback artifacts.
+- Remain shadow or zero-unit unless Vincent separately requests a real-money action and confirms the exact order.
 
-## Do not implement from the old prompt
+## Current blockers
 
-- Do not claim WNBA July was below 10 calls; it had 27 and was incomplete.
-- Do not publish NFL 68%/166 calls; the current pipeline reproduces 60.55%/109 calls.
-- Do not substitute confidence gap for max probability; the two gates are algebraically equivalent.
-- Do not add adaptive HFA based on the existing audit; its holdout hit rate was worse.
-- Do not train on retrospectively cached starter ERA.
-- Do not validate spread/total/F5/YRFI contracts without exact timestamp-valid pregame lines and inputs.
+- MLB and NFL do not clear the current locked qualification contract.
+- The active MLB artifact is internally inconsistent and fails the config test.
+- Soccer report/config/registry status is inconsistent.
+- The audit chain is broken, the installed CLI entry point is stale, and Ruff is not clean.
+- Spread, total, F5, YRFI/NRFI, and research-league economics remain blocked without exact point-in-time inputs and executable prices.
 
 ## Required next evidence
 
-Prospectively collect observed-at snapshots for executable market lines, confirmed starters, pitcher game logs, and bullpen state. After enough settlements, create a new artifact version and rerun the full DEBUG, test, lint, and locked-holdout process.
+Repair release alignment first. Then prospectively collect observed-at source
+records, executable BBOs, confirmed starters/lineups, pitcher and bullpen state,
+and closing snapshots. Promote only a new version reproduced from a stable,
+green checkout.

@@ -1,7 +1,12 @@
 # Model Improvement and Feature Research Roadmap
 
+Current checkout status and blockers are maintained in
+`docs/PROJECT_STATUS.md`. This roadmap describes candidate research; it does not
+grant production or execution status. Re-verify external API access, schemas,
+terms, and licensing at implementation time.
+
 This document is the research and promotion contract for the NBA, WNBA, MLB,
-and NFL models. Its purpose is not to maximize the number of features. Its
+NFL, League of Legends, and Counter-Strike 2 models. Its purpose is not to maximize the number of features. Its
 purpose is to add information that remains available point-in-time, survives a
 fresh out-of-sample test, improves probability quality, and can create positive
 expected value at an executable price after costs.
@@ -14,7 +19,7 @@ timestamps, a versioned source, a missingness policy, and an ablation result.
 
 ## 1. Current-state audit: fix this before trusting new lift
 
-The current active artifacts are narrow models:
+The currently configured candidate inputs are narrow:
 
 | League | Active v3 moneyline inputs |
 |---|---|
@@ -23,8 +28,10 @@ The current active artifacts are narrow models:
 | MLB | Elo probability, trend gap, park factor, weather factor, `pitcher_era_gap` |
 | NFL | Elo probability, trend gap |
 
-The narrowness is not the main problem. The immediate problem is that some
-reported evidence is not yet safe to interpret as forward model lift.
+The narrowness is not the main problem. The active artifacts and newest report
+are not one reproduced release, and the current test suite rejects the MLB
+qualification state. Reported evidence is therefore not yet safe to interpret
+as forward model lift or operational readiness.
 
 ### P0 blockers
 
@@ -186,6 +193,8 @@ because a paid credential is absent.
 | Baseball Savant through `pybaseball` or direct CSV | None | MLB pitch-level Statcast, batted-ball quality, pitcher/batter, fielding, and catcher inputs | Scraping endpoint is not a contractual API; cache and throttle it |
 | nflverse GitHub releases | None | NFL play-by-play from 1999, EPA/success fields, rosters, depth charts, injuries, officials, and aggregated NGS tables where available | Dataset-specific licences/attribution and in-season release lag |
 | Local schedule-derived features | None | Rest, back-to-backs, short weeks, travel distance, time zones, local start time | Requires a versioned venue/coordinate table and correct relocations |
+| BO3 public website data endpoint | None | Series-level LoL and CS2 match IDs, timestamps, source team IDs, scores, best-of format, tier, and tournament ID | No published stable API contract; cache, hash, attribute, and keep replaceable |
+| Oracle's Elixir public downloads | None | LoL game, player, draft, champion, patch, and team performance detail | Game-level rows require leak-free series grouping; use as enrichment after the series baseline |
 
 ### League assignment
 
@@ -195,6 +204,8 @@ because a paid credential is absent.
 | WNBA | Existing ESPN client + SportsDataverse `wehoop` releases + official WNBA injury reports + local schedule/venue features + Polymarket US gateway |
 | MLB | Existing ESPN/MLB StatsAPI path + Baseball Savant via cached `pybaseball` pulls + Open-Meteo + local park/venue table + Polymarket US gateway |
 | NFL | Existing ESPN client + nflverse release files + official public injury status where available + Open-Meteo + local venue table + Polymarket US gateway |
+| LoL | BO3 series results baseline + Oracle's Elixir enrichment + Polymarket US gateway |
+| CS2 | BO3 series/map history baseline + public Valve ranking snapshots when reproducibly archived + Polymarket US gateway |
 
 ### Deliberately excluded from the default build
 
@@ -206,6 +217,11 @@ because a paid credential is absent.
   available;
 - social-media, beat-reporter, or account-gated injury data as deterministic
   features.
+- Riot's developer API as a default dependency because it requires an account
+  and key;
+- Liquipedia APIs for this project: its published free-use policy excludes
+  betting-related projects, even though its MediaWiki API can be queried
+  without an authenticated session.
 
 If a high-priority feature cannot be built from this stack, mark it
 `OPTIONAL_PAID_SOURCE_BLOCKED` or use it only as a qualitative risk flag. Do not
@@ -401,7 +417,123 @@ line states.
 
 ---
 
-## 10. Experiment design
+## 10. Esports feature roadmap
+
+“Esports” is a market category, not a sport. LoL and CS2 must have separate
+models, feature schemas, calibration, holdouts, and artifacts. Call of Duty,
+Valorant, Dota 2, Rocket League, Overwatch, and Rainbow Six are discoverable on
+the Polymarket US gateway, but remain `MARKET_DISCOVERY_ONLY` until each title
+has its own source contract and validation.
+
+### Baseline already supported
+
+The v1 baseline uses completed best-of matches/series, stable source team IDs,
+neutral-site Elo, a validation-selected K factor, and a strictly chronological
+60/20/20 split. It intentionally has no home advantage, no pooled title data,
+no historical market ROI, and zero units. This baseline is a control model, not
+evidence that esports is beatable.
+
+| Rank | Shared feature group | Construction | Why it can help | Main failure mode |
+|---|---|---|---|---|
+| 1 | Point-in-time roster continuity | Starting five, substitutes, join/leave timestamps, days together, prior matches together, player-level rating aggregation | Organization/team IDs survive major roster changes that invalidate old team strength | Retrospectively corrected rosters leak future knowledge |
+| 2 | Tournament and format context | Best-of length, stage, elimination status, online/LAN, tier, region, prize/qualification stakes, days since last match | Upset rates and preparation differ sharply by format and event quality | Tier labels and stage names drift across providers |
+| 3 | Recency and inactivity | Multi-horizon opponent-adjusted form, time decay, inactivity regression, matches/maps in last 7/30 days | Esports team strength changes faster than major-league team strength | Tuning decay on the final test overfits regime changes |
+| 4 | Patch/version regime | Game patch, days since patch, team/player experience on patch, feature missingness for new patches | Patches alter champion/map balance and invalidate stale history | Patch assignment by match date can be wrong near rollout boundaries |
+| 5 | Market identity and liquidity | Exact team alias mapping, executable asks both sides, spread, depth, price age, first-to-close movement | Required to test whether probability lift is tradeable after costs | Fuzzy name matching can attach a forecast to the wrong organization |
+
+### League of Legends priorities
+
+1. Player/roster-strength priors by role with effective-dated roster snapshots.
+2. Region- and tournament-strength partial pooling so academy/minor-league form
+   is not treated as interchangeable with LCK/LPL/LEC competition.
+3. Patch-aware champion draft strength: blue/red side, champion priority,
+   bans, role flexibility, and composition interactions using only the draft
+   known at the model's declared decision horizon.
+4. Pre-match team style: gold/xp differential at 15, objective control, lane
+   strength, tempo, and comeback/throw rates, opponent adjusted and shrunk.
+5. Series conversion from map/game probabilities, explicitly modeling side
+   selection and between-game information; never train a series market directly
+   on later games from that same series.
+
+Draft features belong to an in-series or post-draft model, not a day-ahead
+series model. Mixing those horizons is look-ahead, not better modelling.
+
+### Counter-Strike 2 priorities
+
+1. Effective-dated five-player lineup, stand-ins, coach changes, roster tenure,
+   and player-level form with team-context shrinkage.
+2. Map-pool strength and veto simulation: per-map opponent-adjusted ratings,
+   pick/ban order, side-start effects, and best-of-series conversion.
+3. LAN/online, region, travel, event tier, stage, and schedule density.
+4. Patch/map-pool era, especially map additions/removals and economy changes;
+   legacy CS:GO (`game_version=1`) must never enter the CS2 baseline.
+5. Round-level style only after the core path works: pistol/anti-eco conversion,
+   T/CT splits, opening-duel conversion, clutch dependence, and economy-state
+   performance with heavy shrinkage.
+
+Raw player rating, head-to-head, and recent win percentage are weak shortcuts:
+they entangle opponent quality, roster regimes, maps, and event tier. They may
+be diagnostics, but should not displace roster and map-pool construction.
+
+### Esports implementation order
+
+1. Maintain the series-level LoL and CS2 backfill and its hashes.
+2. Start prospective Polymarket US BBO snapshots now; historical profitability
+   cannot be reconstructed honestly later.
+3. Build a fail-closed Polymarket-to-source identity map with explicit aliases
+   and validity dates.
+4. Add effective-dated rosters and roster-aware ratings.
+5. Add LoL patch/region/draft enrichment and CS2 map/veto/LAN enrichment in
+   separate ablations.
+6. Reserve a new prospective cohort after feature selection; do not promote
+   from the v1 diagnostic holdout.
+
+---
+
+## 10B. KBO and NPB feature roadmap
+
+KBO and NPB need separate artifacts and calibration. They also require a
+different target from MLB: the current Polymarket US contracts settle a tied
+game to `$0.50`, so the correct side value is `P(win) + 0.5 × P(tie)`. Dropping
+ties or labeling them as losses manufactures target error.
+
+The implemented v1 controls use official league regular-season results, stable
+team identities, same-day-frozen home-field Elo, an independently measured
+league tie rate, validation-selected parameters, and a locked chronological
+test. Both remain research-only and zero-unit.
+
+| Rank | Feature group | Point-in-time construction | Why it should help | Failure mode |
+|---|---|---|---|---|
+| 1 | Starting pitcher | Announced/confirmed identity, handedness, days rest, recent workload, component performance, change flag | Baseball moneylines are starter-sensitive; team Elo averages away the largest game-specific input | Postgame box-score starter leaks into a pregame horizon |
+| 2 | Bullpen availability | Reliever pitches/innings and leverage over 1/3/7 days, consecutive use, closer/setup availability | The same bullpen talent has different value when its best arms are unavailable | Season ERA masquerades as current availability |
+| 3 | Confirmed lineup and roster | Effective-dated batting order, absences, platoon matchup, foreign-player/active-roster status, player-strength aggregation | Organization identity survives sharp player-strength changes | Retrospectively corrected rosters leak future knowledge |
+| 4 | Park and weather | Venue factors plus forecast issue time, temperature, humidity, wind, rain, roof | Run environment affects both win variance and tie likelihood | Realized weather is substituted for the forecast known pregame |
+| 5 | Rest/travel/schedule | Distance, home/away sequence, days off, makeup/doubleheader, series game, extra innings prior day | Fatigue is concentrated in relievers and travel transitions | Local dates are converted incorrectly across Korea/Japan/UTC |
+| 6 | League/rules regime | Central/Pacific or KBO context, interleague/DH, ball/rule/park changes, monthly scoring baseline | Ratings trained across regimes otherwise become stale | Regime labels are inferred after the fact |
+| 7 | Game-specific tie probability | Expected runs, starter/bullpen strength, park, rules, and regulation/extra-inning environment | Contract settlement explicitly pays half on a tie | A binary model silently assumes `P(tie)=0` |
+| 8 | Executable market state | Exact identity, BBO, spread, depth, price age, first/closing pregame observations, fees | Required to distinguish probability quality from tradeable edge | Indicative quote or future price is treated as executable evidence |
+
+### International baseball implementation order
+
+1. Maintain official KBO/NPB backfills, manifests, hashes, and canceled-game
+   filters; keep postseason out of the regular-season model.
+2. Capture every current Polymarket US KBO/NPB contract BBO prospectively.
+3. Add official probable/confirmed starters with an `observed_at_utc` and an
+   explicit late-change path.
+4. Build pitcher and bullpen workload tables from only prior game logs.
+5. Add effective-dated rosters and two forecast horizons: day-ahead and
+   confirmed-lineup/starter.
+6. Add park and archived point-in-time weather, then travel/rest.
+7. Promote nothing until a new prospective cohort shows calibration and net
+   value against executable asks after spread and fees.
+
+The score-only locked tests are roughly 55% KBO and 57% NPB decisive accuracy.
+That is a baseline, not a moat. Tuning more Elo constants is lower value than
+acquiring reliable starter, bullpen, and lineup state.
+
+---
+
+## 11. Experiment design
 
 ### Development and final test
 
@@ -447,7 +579,7 @@ the noisiest metric.
 
 ---
 
-## 11. Ruthless implementation order
+## 12. Ruthless implementation order
 
 The highest-value work is data provenance, not a more complex algorithm.
 
@@ -482,7 +614,7 @@ What should not be prioritized now:
 
 ---
 
-## 12. Verification checklist
+## 13. Verification checklist
 
 Before presenting a feature recommendation:
 
@@ -514,7 +646,7 @@ commit a promotion until Vincent explicitly approves the named candidate.
 
 ---
 
-## 13. Research basis and data-source notes
+## 14. Research basis and data-source notes
 
 These sources establish feature meaning or empirical motivation. They do not
 guarantee that a feature will improve this repository's model.
@@ -602,6 +734,46 @@ production dependency.
 Public Next Gen Stats pages do not imply that complete play-level tracking data
 is freely downloadable. Treat tracking-dependent features as licensed/P2 until
 the actual reproducible source is secured.
+
+### Esports
+
+- [BO3 CS2 match history](https://bo3.gg/matches/finished) and its public
+  website data endpoints provide series IDs, timestamps, team IDs, scores,
+  best-of format, tier, tournament, and game-version fields without signup.
+  BO3 permits reproduction with attribution in its
+  [Use of Services](https://bo3.gg/wiki/use-of-services), but does not publish a
+  stable API guarantee; normalized snapshots therefore remain replaceable.
+- [Oracle's Elixir downloads](https://oracleselixir.com/tools/downloads) provide
+  yearly public LoL CSVs. They are richer than the series baseline but are
+  game-level, so a market-aligned series pipeline must prevent games later in a
+  series from entering an earlier prediction.
+- Polymarket US's live `/v2/sports` taxonomy currently exposes LoL, CS2, Call of
+  Duty, Valorant, Dota 2, Rocket League, Overwatch, and Rainbow Six. The public
+  [Sports API](https://docs.polymarket.us/api-reference/sports/overview) supports
+  league and sport event discovery without a trading credential.
+- Liquipedia's [API terms](https://liquipedia.net/api-terms-of-use) require
+  attribution and throttling, while its published free-plan policy rejects
+  betting-related projects. It is deliberately excluded rather than treated as
+  a convenient no-key loophole.
+
+### KBO and NPB
+
+- The official [KBO regular-season schedule](https://www.koreabaseball.com/Schedule/Schedule.aspx)
+  provides monthly final scores and stable game/team identifiers without a key.
+  The underlying website endpoint is not a promised bulk API, so extractions
+  are cached and hashed.
+- The official [NPB English calendar](https://npb.jp/bis/eng/2025/calendar/)
+  provides stable game links, team codes, canceled-game markers, scores, and
+  ties without signup. October is excluded in v1 because its calendar mixes
+  regular season and postseason without a safe competition field.
+- Official [NPB statistics](https://npb.jp/bis/eng/2025/stats/) and
+  [player register](https://npb.jp/bis/eng/players/) are the first enrichment
+  targets. Effective dates and decision-time availability must be retained.
+- Open-Meteo's no-key archived forecast sources can support park/weather
+  ablations only when forecast issue time and lead time are fixed.
+- Polymarket US public league discovery currently exposes `kbo` and `npb`; the
+  public Sports API provides event discovery and BBO access without a trading
+  credential. Current contract text specifies 50-cent settlement on a tie.
 
 ### Keyless weather and market data
 
