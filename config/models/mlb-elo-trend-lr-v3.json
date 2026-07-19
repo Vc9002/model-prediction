@@ -1,23 +1,15 @@
 {
-  "artifact_hash": "a7329a25002b9f14e2f17cbc5f8a0467df024a798483db938a917e66cf33ac80",
+  "artifact_hash": "298e6dc77b219dd702fb39be7c6e2b5562b2205ff877ee03c281de8ce83baca2",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        3.3424123257,
-        -0.0269836548,
-        -1.0506410733,
-        -0.3347317702,
-        0.026
+        3.3424
       ],
       "confidence_threshold": 0.51,
       "feature_names": [
-        "elo_probability",
-        "trend_gap",
-        "park_factor",
-        "weather_factor",
-        "pitcher_era_gap"
+        "elo_probability"
       ],
-      "intercept": -0.2660957805,
+      "intercept": -0.2661,
       "positive_class": "home"
     }
   },
