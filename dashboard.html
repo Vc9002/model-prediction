@@ -452,7 +452,10 @@ function matrixCell(c,sport,mk,heatRange){
     cls="r";l1=pct(c.hit_rate);
     l2=c.calls?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls??'—'} calls · research`;
   }else if(c.state==="blocked"){
-    cls="b";l1="blocked";l2="missing valid contract lines";
+    cls="b";l1="blocked";
+    l2=c.readiness&&typeof c.readiness==="string"
+      ?c.readiness.toLowerCase().replaceAll("_"," ")
+      :"missing valid contract lines";
   }else if(c.state==="model_untested"){
     cls="u";l1="untested";l2="model exists · no holdout";
   }else if(c.state==="not_applicable"){
@@ -577,8 +580,12 @@ function drill(sport,market){
 }
 
 /* ---------- picks ---------- */
-const pickPnl=p=>{const u=Number(p.units)||0; if(u>0)return Number(p.pnl_units)||0;
-  return p.research_score_units?Number(p.research_pnl_units)||0:0;};
+// null means "not settled yet" -- distinct from a real 0.00 push/break-even
+// result. Callers must render null as "--" (fmt() already does), never as 0.
+const pickPnl=p=>{const u=Number(p.units)||0;
+  if(u>0)return p.pnl_units==null?null:Number(p.pnl_units);
+  return (p.research_score_units==null||p.research_pnl_units==null)?null:Number(p.research_pnl_units);};
+const pnlClass=v=>v==null?"":(v>=0?"green":"red");
 const ET_ZONE="America/New_York";
 const etParts=value=>{
   const d=new Date(String(value||""));
@@ -669,7 +676,7 @@ function renderPicks(){
       <td title="${escAttr(p.filled_entry?.basis==="exchange_trade"?"Exchange-confirmed fill in the selected outcome coordinate":p.filled_entry?"Filled order limit; exact execution price unavailable":"No filled exchange buy")}">${cents(entry)}</td>
       <td class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</td>
       <td>${size?size.toFixed(2)+"U":"—"}</td><td>${res}</td>
-      <td class="${pickPnl(p)>=0?"green":"red"}">${fmt(pickPnl(p))}</td>
+      <td class="${pnlClass(pickPnl(p))}">${fmt(pickPnl(p))}</td>
       <td>${orderControl(p)}</td>
       <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;});
   $("#pickTable").innerHTML=html;
@@ -814,7 +821,7 @@ async function renderFlat(){
         <td>${Number(p.market_implied_probability||p['Pregame close'])?pct(Number(p.market_implied_probability||p['Pregame close'])):'—'}</td>
         <td class=\"${edge>=0?'green':'red'}\">${edge?(edge>=0?'+':'')+(edge*100).toFixed(1)+'pp':'—'}</td>
         <td>${size?size.toFixed(2)+'U':'—'}</td>
-        <td>${resPill}</td><td class=\"${pickPnl(p)>=0?'green':'red'}\">${fmt(pickPnl(p))}</td>
+        <td>${resPill}</td><td class=\"${pnlClass(pickPnl(p))}\">${fmt(pickPnl(p))}</td>
         <td class=\"dim\">${p.away_team||p.Away||''} @ ${p.home_team||p.Home||''}</td></tr>`;
     });
     document.getElementById('flatTable').innerHTML=html;
@@ -1174,7 +1181,11 @@ async function renderResearch(){
     <td class="dim">${b.status||b.sport||""}</td><td class="dim">${b.size_kb}</td></tr>`;});
   $("#btTable").innerHTML=html;
   try{
-    const v=await api("/api/backtest?file=termination-audit-2026-07-17.json");
+    // Pick the newest termination-audit file instead of a hardcoded date --
+    // "modified" is an ISO timestamp string, so lexical sort works.
+    const audits=bt.filter(b=>b.file.startsWith("termination-audit-")).sort((a,b)=>a.modified<b.modified?1:-1);
+    if(!audits.length)throw new Error("no termination-audit file present");
+    const v=await api("/api/backtest?file="+encodeURIComponent(audits[0].file));
     const fi=v.feature_impact||{};
     $("#featureLog").innerHTML=Object.entries(fi).map(([k,val])=>`<div style="margin-bottom:6px"><b>${k}</b><br><span class="dim">${val}</span></div>`).join("")||'<span class="dim">none</span>';
   }catch(e){$("#featureLog").innerHTML='<span class="dim">no audit file</span>';}

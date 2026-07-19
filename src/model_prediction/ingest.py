@@ -22,6 +22,7 @@ import httpx
 
 from .audit import AuditLog
 from .data_sources.espn import ESPNClient, SPORT_LEAGUES, parse_pregame_and_closing_markets
+from .domain import eastern_today
 
 
 SPORTS = tuple(SPORT_LEAGUES)
@@ -144,7 +145,7 @@ class Ingestor:
     def bootstrap(self, sport: str, from_date: str, to_date: str | None = None) -> dict[str, Any]:
         """Idempotent, rate-limited historical backfill from ESPN."""
         start = date.fromisoformat(from_date)
-        end = date.fromisoformat(to_date) if to_date else date.today()
+        end = date.fromisoformat(to_date) if to_date else eastern_today()
         if start > end:
             raise ValueError("from date must not be after to date")
         days = 0

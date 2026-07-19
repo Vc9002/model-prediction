@@ -7,13 +7,13 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
-from zoneinfo import ZoneInfo
 
 import fcntl
 
 from .audit import AuditLog
 from .calibration import calibration_metrics
 from .domain import (
+    EASTERN,
     LOSS_CLASSIFICATIONS,
     MarketType,
     ModelOrigin,
@@ -27,13 +27,13 @@ from .domain import (
 )
 from .eligibility import EligibilityResult
 from .pricing import american_to_decimal, grade_pick, implied_probability, profit_units
-from .units import Exposure
+from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
 
 
 # Exposure "day" boundaries follow US Eastern time, not UTC. A 10pm ET slate
 # would otherwise straddle two UTC cap windows and reset caps mid-slate.
-EXPOSURE_TIMEZONE = ZoneInfo("America/New_York")
+EXPOSURE_TIMEZONE = EASTERN
 
 LEDGER_SCHEMA_VERSION = "3"
 LEGACY_FIELDNAMES = [
@@ -198,6 +198,7 @@ class PickLedger:
         path: str | Path,
         audit_path: str | Path | None = None,
         research_score_units: float | None = None,
+        research_scoring_mode: str = "fixed",
         research_scoring_note: str = "fixed-stake hypothetical research scoring",
     ) -> None:
         self.path = Path(path)
@@ -205,9 +206,12 @@ class PickLedger:
             raise ValueError("the active picks ledger must be an .xlsx workbook")
         if research_score_units is not None and research_score_units <= 0:
             raise ValueError("research scoring units must be positive")
+        if research_scoring_mode not in {"fixed", "model_recommended"}:
+            raise ValueError("research scoring mode must be fixed or model_recommended")
         self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
         self.audit = AuditLog(audit_path or self.path.with_name("events.jsonl"))
         self.research_score_units = research_score_units
+        self.research_scoring_mode = research_scoring_mode
         self.research_scoring_note = research_scoring_note
 
     @contextmanager
@@ -492,11 +496,25 @@ class PickLedger:
                 closing_probability = implied_probability(closing_american_odds)
             units = float(row["units"] or 0)
             pnl = profit_units(result, units, float(row["decision_decimal_odds"] or row["decimal_odds"]))
-            research_units = (
-                self.research_score_units
-                if row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
-                else None
-            )
+            research_units = None
+            if (
+                row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
+                and self.research_score_units is not None
+            ):
+                research_units = self.research_score_units
+                if self.research_scoring_mode == "model_recommended":
+                    raw_uncertainty = row["model_uncertainty"]
+                    if raw_uncertainty in (None, ""):
+                        # Uncertainty was never recorded for this row (e.g. a
+                        # pre-model_uncertainty record); scoring it as 0 would
+                        # manufacture false confidence, so leave it unscored.
+                        research_units = None
+                    else:
+                        research_units = edge_scaled_units(
+                            float(row["model_probability"]),
+                            float(raw_uncertainty),
+                            int(row["decision_american_odds"] or row["american_odds"]),
+                        )
             research_pnl = (
                 profit_units(
                     result,

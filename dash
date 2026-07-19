@@ -8,13 +8,23 @@ sleep 0.5
 
 # Start server in background with correct venv
 PYTHONPATH=src .venv/bin/python dashboard_server.py --port 8765 &
-sleep 2
 
-# Verify it started
-if curl -s http://localhost:8765/api/status > /dev/null 2>&1; then
+# Poll instead of a fixed sleep -- a cold start can take longer than 2s under
+# load, which previously made this report "failed to start" on a server that
+# was actually still coming up.
+started=false
+for _ in $(seq 1 20); do
+    if curl -s http://localhost:8765/api/status > /dev/null 2>&1; then
+        started=true
+        break
+    fi
+    sleep 0.5
+done
+
+if [ "$started" = true ]; then
     open "http://localhost:8765/"
     echo "Dashboard running on http://localhost:8765/"
 else
-    echo "Dashboard failed to start — check logs"
+    echo "Dashboard failed to start after 10s — check data/logs/dashboard.err"
     exit 1
 fi

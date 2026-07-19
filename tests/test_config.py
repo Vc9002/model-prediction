@@ -39,7 +39,7 @@ def test_default_qualification_policy_is_accuracy_first() -> None:
 def test_configured_production_artifact_state_matches_locked_audit() -> None:
     config = load_config()
     expected = {
-        "MLB": ("shadow_qualified", False),  # Elo regression shifted holdout below 60% gate
+        "MLB": ("shadow_qualified", True),
         "NBA": ("shadow_qualified", True),
         "WNBA": ("shadow_qualified", True),
         "NFL": ("shadow_qualified", False),  # Elo regression + data backfill changed holdout

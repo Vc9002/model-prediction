@@ -15,6 +15,7 @@ from model_prediction.data_sources.polymarket_us import (
 
 def test_all_qualification_sports_are_available_to_slate_and_cli() -> None:
     assert {"mlb", "nba", "wnba", "nfl"} <= set(POLYMARKET_SPORT_LEAGUES)
+    assert "esports" in POLYMARKET_SPORT_LEAGUES
 
 
 def test_slate_normalizes_executable_side_prices_and_lines() -> None:

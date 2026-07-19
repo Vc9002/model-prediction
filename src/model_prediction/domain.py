@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import StrEnum
 from typing import Any
+from zoneinfo import ZoneInfo
+
+# This is a US sports-market project: "today" for forecasting, searching, and
+# backfill defaults must always mean the US-Eastern calendar day, never the
+# host machine's local timezone or a UTC calendar day (which drifts a day
+# off during US evening games). Hardcoded here as the single source of truth
+# -- other modules should import EASTERN/eastern_today from here rather than
+# redefining ZoneInfo("America/New_York") themselves.
+EASTERN = ZoneInfo("America/New_York")
 
 
 class League(StrEnum):
@@ -14,6 +23,10 @@ class League(StrEnum):
     TENNIS = "TENNIS"
     SOCCER = "SOCCER"
     WORLD_CUP = "WORLD_CUP"
+    LOL = "LOL"
+    CS2 = "CS2"
+    KBO = "KBO"
+    NPB = "NPB"
 
 
 class MarketType(StrEnum):
@@ -89,6 +102,11 @@ LOSS_CLASSIFICATIONS = {
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def eastern_today() -> date:
+    """Today's date in US-Eastern local time -- the canonical "today" for this project."""
+    return datetime.now(timezone.utc).astimezone(EASTERN).date()
 
 
 def parse_utc(value: str) -> datetime:

@@ -1,0 +1,683 @@
+"""Research-only KBO/NPB backfill and tie-aware Elo baselines.
+
+Polymarket US settles a KBO/NPB moneyline to 0.50 when the game ends in a
+tie.  The model therefore forecasts a decisive-result probability and an
+independently estimated tie probability, then values a side as::
+
+    P(side wins) + 0.5 * P(tie)
+
+The module never authorizes execution.  Forecasts are zero-unit research
+observations and require exact team identity plus a current executable ask.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import html
+import json
+import re
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable, Sequence
+
+import httpx
+
+from .domain import eastern_today
+from .research_io import atomic_write as _atomic_write
+from .research_io import canonical_json as _canonical_json
+from .research_io import identity_key as _identity_key
+from .research_io import sha256_file as _sha256
+from .research_io import utc_now as _utc_now
+
+
+KBO_SCHEDULE_PAGE = "https://www.koreabaseball.com/Schedule/Schedule.aspx"
+KBO_RESULTS_ENDPOINT = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList"
+NPB_CALENDAR_TEMPLATE = "https://npb.jp/bis/eng/{year}/calendar/index_{month:02d}.html"
+
+KBO_TEAMS = {
+    "KIA": {"name": "Kia Tigers", "source_names": ("KIA",)},
+    "DOOSAN": {"name": "Doosan Bears", "source_names": ("두산",)},
+    "HANWHA": {"name": "Hanwha Eagles", "source_names": ("한화",)},
+    "KIWOOM": {"name": "Kiwoom Heroes", "source_names": ("키움",)},
+    "KT": {"name": "KT Wiz", "source_names": ("KT",)},
+    "LG": {"name": "LG Twins", "source_names": ("LG",)},
+    "LOTTE": {"name": "Lotte Giants", "source_names": ("롯데",)},
+    "NC": {"name": "NC Dinos", "source_names": ("NC",)},
+    "SAMSUNG": {"name": "Samsung Lions", "source_names": ("삼성",)},
+    "SSG": {"name": "SSG Landers", "source_names": ("SSG",)},
+}
+
+NPB_TEAMS = {
+    "B": {"name": "Orix Buffaloes", "aliases": ("ORIX Buffaloes",)},
+    "C": {"name": "Hiroshima Carp", "aliases": ("Hiroshima Toyo Carp",)},
+    "D": {"name": "Chunichi Dragons", "aliases": ()},
+    "DB": {"name": "Yokohama BayStars", "aliases": ("Yokohama DeNA BayStars",)},
+    "E": {"name": "Tohoku Rakuten Golden Eagles", "aliases": ()},
+    "F": {"name": "Nippon Ham Fighters", "aliases": ("Hokkaido Nippon-Ham Fighters",)},
+    "G": {"name": "Yomiuri Giants", "aliases": ()},
+    "H": {"name": "Fukuoka SoftBank Hawks", "aliases": ()},
+    "L": {"name": "Saitama Seibu Lions", "aliases": ()},
+    "M": {"name": "Chiba Lotte Marines", "aliases": ()},
+    "S": {"name": "Tokyo Yakult Swallows", "aliases": ()},
+    "T": {"name": "Hanshin Tigers", "aliases": ()},
+}
+
+LEAGUE_SPECS: dict[str, dict[str, Any]] = {
+    "kbo": {
+        "name": "Korea Baseball Organization",
+        "polymarket_league": "KBO",
+        "timezone": "Asia/Seoul",
+        "teams": KBO_TEAMS,
+        "minimum_year": 2015,
+    },
+    "npb": {
+        "name": "Nippon Professional Baseball",
+        "polymarket_league": "NPB",
+        "timezone": "Asia/Tokyo",
+        "teams": NPB_TEAMS,
+        "minimum_year": 2015,
+    },
+}
+
+K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0)
+HOME_ADVANTAGE_CANDIDATES = (0.0, 20.0, 35.0, 50.0, 65.0, 80.0)
+_TAG_RE = re.compile(r"<[^>]+>")
+_KBO_DATE_RE = re.compile(r"(?P<month>\d{2})\.(?P<day>\d{2})")
+_KBO_GAME_ID_RE = re.compile(r"gameId=(?P<id>[A-Za-z0-9]+)")
+_NPB_GAME_RE = re.compile(
+    r'href="(?P<href>/bis/eng/(?P<year>\d{4})/games/s(?P<game_id>\d+)\.html)"[^>]*>'
+    r"\s*(?P<away>[A-Z]+)\s+(?P<away_score>\d+|\*)\s+-\s+"
+    r"(?P<home_score>\d+|\*)\s+(?P<home>[A-Z]+)\s*</a>",
+    re.IGNORECASE,
+)
+
+
+def _plain_text(value: str) -> str:
+    return " ".join(html.unescape(_TAG_RE.sub(" ", value)).split())
+
+
+def _team_lookup(league: str) -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for team_id, team in LEAGUE_SPECS[league]["teams"].items():
+        lookup[team_id] = team_id
+        lookup[str(team["name"])] = team_id
+        for alias in team.get("aliases", ()):
+            lookup[str(alias)] = team_id
+        for source_name in team.get("source_names", ()):
+            lookup[str(source_name)] = team_id
+    return lookup
+
+
+def parse_kbo_rows(payload: dict[str, Any], year: int) -> list[dict[str, Any]]:
+    """Normalize one official KBO regular-season monthly response."""
+    lookup = _team_lookup("kbo")
+    current_date: date | None = None
+    output: list[dict[str, Any]] = []
+    for entry in payload.get("rows", []):
+        cells = entry.get("row") or []
+        if not cells:
+            continue
+        date_cell = next((cell for cell in cells if cell.get("Class") == "day"), None)
+        if date_cell:
+            match = _KBO_DATE_RE.search(_plain_text(str(date_cell.get("Text") or "")))
+            if match:
+                current_date = date(year, int(match.group("month")), int(match.group("day")))
+        play_cell = next((cell for cell in cells if cell.get("Class") == "play"), None)
+        if current_date is None or not play_cell:
+            continue
+        spans = re.findall(r"<span(?:\s+class=\"[^\"]*\")?>(.*?)</span>", str(play_cell["Text"]))
+        values = [_plain_text(value) for value in spans]
+        if "vs" not in values:
+            continue
+        vs_index = values.index("vs")
+        if vs_index < 2 or vs_index + 2 >= len(values):
+            continue
+        away_name, home_name = values[0], values[-1]
+        try:
+            away_score, home_score = int(values[vs_index - 1]), int(values[vs_index + 1])
+            away_id, home_id = lookup[away_name], lookup[home_name]
+        except (KeyError, ValueError):
+            continue
+        relay = next((str(cell.get("Text") or "") for cell in cells if cell.get("Class") == "relay"), "")
+        game_match = _KBO_GAME_ID_RE.search(relay)
+        game_id = game_match.group("id") if game_match else f"{current_date:%Y%m%d}:{away_id}:{home_id}"
+        time_cell = next((cell for cell in cells if cell.get("Class") == "time"), None)
+        local_time = _plain_text(str(time_cell.get("Text") or "")) if time_cell else None
+        output.append(
+            {
+                "game_id": f"kbo:{game_id}",
+                "league": "kbo",
+                "season": year,
+                "game_date": current_date.isoformat(),
+                "scheduled_local_time": local_time,
+                "away_team_id": away_id,
+                "home_team_id": home_id,
+                "away_team_name": KBO_TEAMS[away_id]["name"],
+                "home_team_name": KBO_TEAMS[home_id]["name"],
+                "away_score": away_score,
+                "home_score": home_score,
+                "tie": away_score == home_score,
+                "source_url": f"{KBO_SCHEDULE_PAGE}?gameDate={current_date:%Y%m%d}&gameId={game_id}",
+            }
+        )
+    return output
+
+
+def parse_npb_calendar(page: str) -> list[dict[str, Any]]:
+    """Normalize final regular-season rows from one official NPB calendar."""
+    output: list[dict[str, Any]] = []
+    for match in _NPB_GAME_RE.finditer(page):
+        if "*" in {match.group("away_score"), match.group("home_score")}:
+            continue
+        # NPB calendar shorthand is HOME score - score VISITOR.  Individual
+        # game line scores confirm the second calendar team bats first.
+        home_id, away_id = match.group("away").upper(), match.group("home").upper()
+        if away_id not in NPB_TEAMS or home_id not in NPB_TEAMS:
+            continue
+        game_id = match.group("game_id")
+        game_date = date.fromisoformat(f"{game_id[:4]}-{game_id[4:6]}-{game_id[6:8]}")
+        home_score, away_score = int(match.group("away_score")), int(match.group("home_score"))
+        output.append(
+            {
+                "game_id": f"npb:{game_id}",
+                "league": "npb",
+                "season": int(match.group("year")),
+                "game_date": game_date.isoformat(),
+                "scheduled_local_time": None,
+                "away_team_id": away_id,
+                "home_team_id": home_id,
+                "away_team_name": NPB_TEAMS[away_id]["name"],
+                "home_team_name": NPB_TEAMS[home_id]["name"],
+                "away_score": away_score,
+                "home_score": home_score,
+                "tie": away_score == home_score,
+                "source_url": f"https://npb.jp{match.group('href')}",
+            }
+        )
+    return output
+
+
+class OfficialInternationalBaseballClient:
+    """Read-only client for official KBO and NPB public schedule pages."""
+
+    def __init__(self, client: httpx.Client | None = None) -> None:
+        self.client = client or httpx.Client(
+            timeout=45,
+            follow_redirects=True,
+            headers={"User-Agent": "model-prediction-research/1.0"},
+        )
+
+    def kbo_year(self, year: int) -> tuple[list[dict[str, Any]], int]:
+        self.client.get(KBO_SCHEDULE_PAGE).raise_for_status()
+        rows: list[dict[str, Any]] = []
+        requests = 1
+        for month in range(3, 11):
+            response = self.client.post(
+                KBO_RESULTS_ENDPOINT,
+                data={
+                    "leId": "1",
+                    "srIdList": "0,9,6",
+                    "seasonId": str(year),
+                    "gameMonth": f"{month:02d}",
+                    "teamId": "",
+                },
+                headers={"Referer": KBO_SCHEDULE_PAGE, "X-Requested-With": "XMLHttpRequest"},
+            )
+            response.raise_for_status()
+            rows.extend(parse_kbo_rows(response.json(), year))
+            requests += 1
+        return rows, requests
+
+    def npb_year(self, year: int) -> tuple[list[dict[str, Any]], int]:
+        rows: list[dict[str, Any]] = []
+        # The official October calendar mixes late regular-season games with
+        # Climax/Japan Series games without a machine-readable competition
+        # field.  Exclude it rather than contaminate the regular-season model.
+        for month in range(4, 10):
+            response = self.client.get(NPB_CALENDAR_TEMPLATE.format(year=year, month=month))
+            response.raise_for_status()
+            rows.extend(parse_npb_calendar(response.text))
+        return rows, 6
+
+
+def backfill_international_baseball(
+    data_root: str | Path,
+    league: str,
+    from_date: str,
+    to_date: str | None = None,
+    client: OfficialInternationalBaseballClient | None = None,
+) -> dict[str, Any]:
+    """Backfill official regular-season results with hashes and provenance."""
+    league = league.lower()
+    if league not in LEAGUE_SPECS:
+        raise ValueError(f"unsupported international baseball league: {league}")
+    start = date.fromisoformat(from_date)
+    end = date.fromisoformat(to_date) if to_date else eastern_today()
+    minimum = date(int(LEAGUE_SPECS[league]["minimum_year"]), 1, 1)
+    start = max(start, minimum)
+    if start > end:
+        raise ValueError("from_date must not be after to_date")
+    source = client or OfficialInternationalBaseballClient()
+    games: list[dict[str, Any]] = []
+    request_count = 0
+    for year in range(start.year, end.year + 1):
+        yearly, requests = source.kbo_year(year) if league == "kbo" else source.npb_year(year)
+        games.extend(row for row in yearly if start <= date.fromisoformat(row["game_date"]) <= end)
+        request_count += requests
+    games = sorted(
+        {row["game_id"]: row for row in games}.values(),
+        key=lambda row: (row["game_date"], row["game_id"]),
+    )
+    directory = Path(data_root) / "international_baseball" / league
+    games_path = directory / "games.jsonl"
+    teams_path = directory / "teams.json"
+    manifest_path = directory / "manifest.json"
+    teams = {
+        team_id: {
+            "team_id": team_id,
+            "name": team["name"],
+            "aliases": sorted(
+                set(team.get("aliases", ())) | set(team.get("source_names", ())) | {team_id}
+            ),
+        }
+        for team_id, team in LEAGUE_SPECS[league]["teams"].items()
+    }
+    _atomic_write(games_path, "".join(_canonical_json(row) + "\n" for row in games))
+    _atomic_write(teams_path, json.dumps(teams, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+    manifest = {
+        "schema_version": "international-baseball-games-v1",
+        "league": league,
+        "league_name": LEAGUE_SPECS[league]["name"],
+        "source": "official league regular-season schedule/results",
+        "source_urls": [KBO_SCHEDULE_PAGE] if league == "kbo" else ["https://npb.jp/bis/eng/"],
+        "requires_api_key": False,
+        "requires_signup": False,
+        "extracted_at_utc": _utc_now(),
+        "requested_window": {"from": from_date, "to": to_date or end.isoformat()},
+        "effective_window": {"from": start.isoformat(), "to": end.isoformat()},
+        "game_count": len(games),
+        "tie_count": sum(bool(row["tie"]) for row in games),
+        "request_count": request_count,
+        "games_sha256": _sha256(games_path),
+        "teams_sha256": _sha256(teams_path),
+        "limitations": [
+            "Official pages do not provide a versioned bulk-data contract; cache and hashes preserve each extraction.",
+            "The baseline excludes postseason and exhibition games.",
+            *(
+                [
+                    "NPB v1 ends on September 30 because the official October calendar mixes competitions.",
+                    "NPB calendar rows omit scheduled first-pitch time; same-day games are frozen as one rating batch.",
+                ]
+                if league == "npb"
+                else []
+            ),
+        ],
+    }
+    _atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return {
+        **manifest,
+        "paths": {"games": str(games_path), "teams": str(teams_path), "manifest": str(manifest_path)},
+    }
+
+
+@dataclass
+class HomeElo:
+    k: float
+    home_advantage: float
+    ratings: dict[str, float]
+
+    def decisive_home_probability(self, away_id: str, home_id: str) -> float:
+        away = self.ratings.get(away_id, 1500.0)
+        home = self.ratings.get(home_id, 1500.0) + self.home_advantage
+        return 1.0 / (1.0 + 10.0 ** ((away - home) / 400.0))
+
+    def update(self, row: dict[str, Any], probability: float | None = None) -> None:
+        probability = (
+            probability
+            if probability is not None
+            else self.decisive_home_probability(row["away_team_id"], row["home_team_id"])
+        )
+        if row["home_score"] == row["away_score"]:
+            outcome = 0.5
+        else:
+            outcome = 1.0 if row["home_score"] > row["away_score"] else 0.0
+        delta = self.k * (outcome - probability)
+        self.ratings[row["home_team_id"]] = self.ratings.get(row["home_team_id"], 1500.0) + delta
+        self.ratings[row["away_team_id"]] = self.ratings.get(row["away_team_id"], 1500.0) - delta
+
+
+def tie_aware_fair_values(decisive_home_probability: float, tie_probability: float) -> tuple[float, float]:
+    """Return away/home expected $1 contract settlements; values sum to one."""
+    home = (1.0 - tie_probability) * decisive_home_probability + 0.5 * tie_probability
+    return 1.0 - home, home
+
+
+def _load_games(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        raise FileNotFoundError(f"missing international baseball backfill: {path}")
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return sorted(rows, key=lambda row: (row["game_date"], row["game_id"]))
+
+
+def _batched_predictions(
+    book: HomeElo,
+    rows: Iterable[dict[str, Any]],
+    tie_probability: float,
+) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(str(row["game_date"]), []).append(row)
+    output: list[dict[str, Any]] = []
+    for game_date in sorted(groups):
+        pending: list[tuple[dict[str, Any], float]] = []
+        for row in groups[game_date]:
+            decisive_home = book.decisive_home_probability(row["away_team_id"], row["home_team_id"])
+            _, fair_home = tie_aware_fair_values(decisive_home, tie_probability)
+            outcome = 0.5 if row["tie"] else float(row["home_score"] > row["away_score"])
+            output.append({"probability": fair_home, "outcome": outcome, "tie": bool(row["tie"])})
+            pending.append((row, decisive_home))
+        for row, probability in pending:
+            book.update(row, probability)
+    return output
+
+
+def _tie_rate(rows: Sequence[dict[str, Any]]) -> float:
+    if not rows:
+        return 0.0
+    return sum(bool(row["tie"]) for row in rows) / len(rows)
+
+
+def _metrics(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    if not rows:
+        return {"observations": 0, "brier_settlement": None, "mae_settlement": None, "accuracy_decisive": None}
+    brier = sum((float(row["probability"]) - float(row["outcome"])) ** 2 for row in rows) / len(rows)
+    mae = sum(abs(float(row["probability"]) - float(row["outcome"])) for row in rows) / len(rows)
+    decisive = [row for row in rows if not row["tie"]]
+    accuracy = (
+        sum((float(row["probability"]) >= 0.5) == bool(row["outcome"]) for row in decisive)
+        / len(decisive)
+        if decisive
+        else None
+    )
+    return {
+        "observations": len(rows),
+        "brier_settlement": round(brier, 6),
+        "mae_settlement": round(mae, 6),
+        "accuracy_decisive": round(accuracy, 6) if accuracy is not None else None,
+        "ties": len(rows) - len(decisive),
+    }
+
+
+def _fit_and_score(
+    training: Sequence[dict[str, Any]],
+    evaluation: Sequence[dict[str, Any]],
+    k: float,
+    home_advantage: float,
+) -> tuple[HomeElo, list[dict[str, Any]]]:
+    book = HomeElo(k=k, home_advantage=home_advantage, ratings={})
+    tie_probability = _tie_rate(training)
+    _batched_predictions(book, training, tie_probability)
+    return book, _batched_predictions(book, evaluation, tie_probability)
+
+
+def _chronological_split(rows: Sequence[dict[str, Any]]) -> tuple[list[dict], list[dict], list[dict]]:
+    dates = sorted({str(row["game_date"]) for row in rows})
+    train_cut = dates[max(0, int(len(dates) * 0.60) - 1)]
+    validation_cut = dates[min(len(dates) - 1, max(1, int(len(dates) * 0.80) - 1))]
+    train = [row for row in rows if row["game_date"] <= train_cut]
+    validation = [row for row in rows if train_cut < row["game_date"] <= validation_cut]
+    test = [row for row in rows if row["game_date"] > validation_cut]
+    return train, validation, test
+
+
+def validate_international_baseball_baseline(
+    data_root: str | Path,
+    league: str,
+    artifact_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Select Elo parameters on validation, then grade one locked test."""
+    league = league.lower()
+    directory = Path(data_root) / "international_baseball" / league
+    games_path, manifest_path = directory / "games.jsonl", directory / "manifest.json"
+    rows = _load_games(games_path)
+    if len(rows) < 500:
+        return {
+            "status": "insufficient_history",
+            "league": league,
+            "observations": len(rows),
+            "minimum_required": 500,
+            "model_state": "research",
+            "promotion_eligible": False,
+        }
+    train, validation, test = _chronological_split(rows)
+    candidates = []
+    for k in K_CANDIDATES:
+        for home_advantage in HOME_ADVANTAGE_CANDIDATES:
+            _, predictions = _fit_and_score(train, validation, k, home_advantage)
+            candidates.append({"k": k, "home_advantage": home_advantage, **_metrics(predictions)})
+    chosen = min(
+        candidates,
+        key=lambda row: (float(row["brier_settlement"]), float(row["mae_settlement"])),
+    )
+    chosen_k, chosen_home = float(chosen["k"]), float(chosen["home_advantage"])
+    _, test_predictions = _fit_and_score([*train, *validation], test, chosen_k, chosen_home)
+    all_book = HomeElo(k=chosen_k, home_advantage=chosen_home, ratings={})
+    _batched_predictions(all_book, rows, _tie_rate(rows))
+    source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    artifact = {
+        "schema_version": "international-baseball-tie-aware-elo-v1",
+        "model_version": f"{league}-tie-aware-elo-v1",
+        "model_state": "research",
+        "league": league,
+        "target": "expected moneyline settlement where a tie pays 0.50",
+        "initial_rating": 1500.0,
+        "k": chosen_k,
+        "home_advantage": chosen_home,
+        "tie_probability": round(_tie_rate(rows), 8),
+        "training_observations": len(rows),
+        "trained_through_date": rows[-1]["game_date"],
+        "ratings": {team: round(rating, 6) for team, rating in sorted(all_book.ratings.items())},
+        "source_manifest_sha256": _sha256(manifest_path),
+        "games_sha256": source_manifest["games_sha256"],
+        "qualified_for_betting": False,
+        "units": 0,
+    }
+    artifact["artifact_hash"] = hashlib.sha256(_canonical_json(artifact).encode()).hexdigest()
+    artifact_path = None
+    if artifact_dir is not None:
+        artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v1.json"
+        _atomic_write(artifact_path, json.dumps(artifact, indent=2, sort_keys=True) + "\n")
+    return {
+        "status": "ok",
+        "league": league,
+        "model_version": artifact["model_version"],
+        "model_state": "research",
+        "promotion_eligible": False,
+        "observations": len(rows),
+        "tie_rate": round(_tie_rate(rows), 6),
+        "chronological_split": {
+            "train": {"n": len(train), "through_date": train[-1]["game_date"]},
+            "validation": {"n": len(validation), "from_date": validation[0]["game_date"], "through_date": validation[-1]["game_date"]},
+            "locked_test": {"n": len(test), "from_date": test[0]["game_date"], "through_date": test[-1]["game_date"]},
+        },
+        "parameter_selection_on_validation": candidates,
+        "chosen": {"k": chosen_k, "home_advantage": chosen_home},
+        "locked_test": _metrics(test_predictions),
+        "artifact": str(artifact_path) if artifact_path else None,
+        "artifact_hash": artifact["artifact_hash"],
+        "point_in_time": "all games on one local date are predicted before that date updates ratings",
+        "profitability": "not_established_no_point_in_time_market_prices",
+        "units": 0,
+        "limitations": [
+            "No point-in-time starting pitcher, lineup, bullpen, park, weather, travel, or roster features yet.",
+            "Tie probability is a league-wide historical baseline, not a game-specific model.",
+            "No historical executable BBO archive exists for this sample.",
+            "Locked-test metrics are diagnostic; v1 remains unqualified and zero-unit.",
+        ],
+    }
+
+
+def validate_all_international_baseball_baselines(
+    data_root: str | Path,
+    leagues: Sequence[str],
+    artifact_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    reports = {
+        league: validate_international_baseball_baseline(data_root, league, artifact_dir)
+        for league in leagues
+    }
+    return {
+        "generated_at_utc": _utc_now(),
+        "scope": "research-only separate-league tie-aware moneyline baselines",
+        "leagues": reports,
+        "promotion_eligible": False,
+        "units": 0,
+    }
+
+
+def _team_alias_index(teams: dict[str, dict[str, Any]]) -> dict[str, set[str]]:
+    index: dict[str, set[str]] = {}
+    for team_id, team in teams.items():
+        for alias in (team.get("name"), *(team.get("aliases") or [])):
+            if alias:
+                index.setdefault(_identity_key(str(alias)), set()).add(team_id)
+    return index
+
+
+def forecast_international_baseball_slate(
+    data_root: str | Path,
+    artifact_dir: str | Path,
+    league: str,
+    game_date: str,
+    timezone_name: str | None = None,
+    client: Any | None = None,
+) -> dict[str, Any]:
+    """Price exact KBO/NPB moneylines as zero-unit research observations."""
+    from .data_sources.polymarket_us import PolymarketUSClient
+    from .domain import parse_utc, utc_now
+
+    league = league.lower()
+    if league not in LEAGUE_SPECS:
+        raise ValueError(f"unsupported international baseball league: {league}")
+    timezone_name = timezone_name or str(LEAGUE_SPECS[league]["timezone"])
+    directory = Path(data_root) / "international_baseball" / league
+    artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v1.json"
+    if not artifact_path.exists():
+        raise FileNotFoundError(f"missing research artifact: {artifact_path}")
+    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    teams = json.loads((directory / "teams.json").read_text(encoding="utf-8"))
+    aliases = _team_alias_index(teams)
+    market_client = client or PolymarketUSClient()
+    events = market_client.slate(
+        str(LEAGUE_SPECS[league]["polymarket_league"]),
+        date.fromisoformat(game_date),
+        timezone_name,
+    )
+    ratings = {key: float(value) for key, value in artifact["ratings"].items()}
+    book = HomeElo(float(artifact["k"]), float(artifact["home_advantage"]), ratings)
+    tie_probability = float(artifact["tie_probability"])
+    trained_through = date.fromisoformat(str(artifact["trained_through_date"]))
+    observed_now = utc_now()
+    rows: list[dict[str, Any]] = []
+    no_calls: list[dict[str, Any]] = []
+    for event in events:
+        event_start = parse_utc(str(event["event_start_utc"]))
+        for market in event.get("markets", []):
+            if market.get("market_type") != "moneyline" or len(market.get("sides", [])) != 2:
+                continue
+            descriptions = [str(side.get("description") or "") for side in market["sides"]]
+            matches = [aliases.get(_identity_key(description), set()) for description in descriptions]
+            base = {
+                "event_id": event["event_id"],
+                "event_start_utc": event["event_start_utc"],
+                "market_slug": market["market_slug"],
+                "teams": descriptions,
+            }
+            if event_start <= observed_now:
+                no_calls.append({**base, "reason": "NO_CALL_EVENT_STARTED"})
+                continue
+            if event_start <= datetime.combine(trained_through, datetime.min.time(), tzinfo=timezone.utc):
+                no_calls.append({**base, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
+                continue
+            if any(len(candidates) != 1 for candidates in matches):
+                no_calls.append({**base, "reason": "NO_CALL_ENTITY_UNRESOLVED", "candidate_counts": [len(value) for value in matches]})
+                continue
+            team_ids = [next(iter(candidates)) for candidates in matches]
+            if team_ids[0] == team_ids[1]:
+                no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
+                continue
+            order_to_id = {
+                str(side.get("selection")): team_id
+                for side, team_id in zip(market["sides"], team_ids, strict=True)
+            }
+            away_id, home_id = order_to_id.get("away"), order_to_id.get("home")
+            if not away_id or not home_id:
+                no_calls.append({**base, "reason": "NO_CALL_HOME_AWAY_UNRESOLVED"})
+                continue
+            if any(team_id not in ratings for team_id in team_ids):
+                no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
+                continue
+            away_fair, home_fair = tie_aware_fair_values(
+                book.decisive_home_probability(away_id, home_id), tie_probability
+            )
+            probabilities = {away_id: away_fair, home_id: home_fair}
+            by_name = {
+                _identity_key(description): probabilities[team_id]
+                for description, team_id in zip(descriptions, team_ids, strict=True)
+            }
+            try:
+                snapshot = market_client.snapshot(str(market["market_slug"]))
+            except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
+                no_calls.append({**base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]})
+                continue
+            sides = []
+            for side_name in ("long", "short"):
+                side = snapshot[side_name]
+                fair = by_name.get(_identity_key(str(side["description"])))
+                ask = side.get("ask")
+                if fair is None or ask is None:
+                    sides = []
+                    break
+                sides.append(
+                    {
+                        "side": side_name,
+                        "team": side["description"],
+                        "model_fair_settlement_value": round(fair, 6),
+                        "win_probability_component": round(max(0.0, fair - 0.5 * tie_probability), 6),
+                        "tie_probability": round(tie_probability, 6),
+                        "executable_ask": float(ask),
+                        "edge_vs_executable_ask": round(fair - float(ask), 6),
+                    }
+                )
+            if len(sides) != 2:
+                no_calls.append({**base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
+                continue
+            rows.append(
+                {
+                    **base,
+                    "league": league,
+                    "source_team_ids": team_ids,
+                    "model_version": artifact["model_version"],
+                    "model_state": "research",
+                    "artifact_hash": artifact["artifact_hash"],
+                    "observed_at_utc": snapshot["observed_at_utc"],
+                    "sides": sides,
+                    "record_type": "RESEARCH_OBSERVATION",
+                    "qualification": "NO_CALL_MODEL_UNVALIDATED",
+                    "units": 0,
+                }
+            )
+    return {
+        "league": league,
+        "game_date": game_date,
+        "model_version": artifact["model_version"],
+        "events": len(events),
+        "priced_contracts": rows,
+        "priced_count": len(rows),
+        "no_calls": no_calls,
+        "no_call_count": len(no_calls),
+        "model_state": "research",
+        "profitability": "not_established",
+        "units": 0,
+    }

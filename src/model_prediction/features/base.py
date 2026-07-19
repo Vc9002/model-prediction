@@ -16,13 +16,11 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
-from zoneinfo import ZoneInfo
 
-from ..domain import parse_utc
+from ..domain import EASTERN, parse_utc
 
 
 FeatureFunction = Callable[["FeatureContext"], dict[str, Any]]
-EASTERN = ZoneInfo("America/New_York")
 
 _REGISTRY: dict[str, FeatureFunction] = {}
 

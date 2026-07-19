@@ -78,8 +78,8 @@ def espn_pitcher_era_gap(event_id: str, home_team: str, away_team: str,
     This is intentionally fail-closed: team runs allowed is not starter ERA.
     """
     if not date_str:
-        from datetime import datetime
-        date_str = datetime.now().strftime("%Y%m%d")
+        from ..domain import eastern_today
+        date_str = eastern_today().strftime("%Y%m%d")
 
     probables = _pull_espn_probables(date_str)
     entry = probables.get(event_id)

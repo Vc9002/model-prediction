@@ -78,6 +78,38 @@ MODEL_SPECS = {
         ("scoring form", "opponent adjustment", "momentum"),
         status=ModelState.SHADOW_QUALIFIED,
     ),
+    League.LOL: ModelSpec(
+        League.LOL,
+        "venue-neutral series Elo baseline",
+        "best-of match/series winner probability",
+        "binary Elo expectation",
+        ("point-in-time team Elo",),
+        status=ModelState.RESEARCH,
+    ),
+    League.CS2: ModelSpec(
+        League.CS2,
+        "venue-neutral series Elo baseline",
+        "best-of match/series winner probability",
+        "binary Elo expectation",
+        ("point-in-time team Elo",),
+        status=ModelState.RESEARCH,
+    ),
+    League.KBO: ModelSpec(
+        League.KBO,
+        "tie-aware home-field Elo baseline",
+        "expected moneyline settlement (tie pays 0.50)",
+        "decisive-result Elo plus empirical tie probability",
+        ("point-in-time team Elo", "home field", "league tie rate"),
+        status=ModelState.RESEARCH,
+    ),
+    League.NPB: ModelSpec(
+        League.NPB,
+        "tie-aware home-field Elo baseline",
+        "expected moneyline settlement (tie pays 0.50)",
+        "decisive-result Elo plus empirical tie probability",
+        ("point-in-time team Elo", "home field", "league tie rate"),
+        status=ModelState.RESEARCH,
+    ),
 }
 
 

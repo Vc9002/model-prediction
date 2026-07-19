@@ -13,9 +13,8 @@ import json
 import os
 import sys
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from .audit import AuditLog
 from .backtester import walk_forward_backtest
@@ -49,12 +48,15 @@ from .data_sources.polymarket_us import (
 )
 from .data_sources.the_odds_api import TheOddsAPIClient
 from .domain import (
+    EASTERN,
     LOSS_CLASSIFICATIONS,
     League,
     MarketType,
     ModelOrigin,
     ModelState,
     PickRequest,
+    RecordType,
+    eastern_today,
     parse_utc,
     utc_now,
 )
@@ -88,7 +90,6 @@ from .validation import run_validation_audit, write_production_artifacts
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
 LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
-EASTERN = ZoneInfo("America/New_York")
 
 # League value on a ledger row -> ESPN league key(s) to search for results.
 _LEDGER_LEAGUE_TO_ESPN = {
@@ -137,7 +138,8 @@ def parser() -> argparse.ArgumentParser:
     slate.add_argument("--sport", choices=SPORTS)
     slate.add_argument("--league", help="single gateway league key (e.g. MLB, EPL, WTA)")
     slate.add_argument("--all", action="store_true", help="every supported sport")
-    slate.add_argument("--date", required=True)
+    slate.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     slate.add_argument("--timezone", default="America/New_York")
     slate.add_argument("--provider", default="polymarket", choices=["polymarket", "kalshi"])
     slate.add_argument(
@@ -156,7 +158,8 @@ def parser() -> argparse.ArgumentParser:
         "polymarket-ledger-prices",
         help="refresh BBOs only for exact contracts selected from the open ledger",
     )
-    ledger_prices.add_argument("--date", required=True)
+    ledger_prices.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     ledger_prices.add_argument(
         "--contract",
         action="append",
@@ -170,14 +173,16 @@ def parser() -> argparse.ArgumentParser:
     clv.add_argument("--side", required=True, choices=["long", "short"])
     clv.add_argument("--decision-price", required=True, type=float)
     clv.add_argument("--sport")
-    clv.add_argument("--date")
+    clv.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
 
     forecast = commands.add_parser(
         "forecast", help="pregame learned LR + confidence-gate moneyline slate"
     )
     forecast.add_argument("--sport", choices=SPORTS)
     forecast.add_argument("--all", action="store_true")
-    forecast.add_argument("--date", required=True)
+    forecast.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     forecast.add_argument("--log", action="store_true", help="log only rows with exact executable prices")
     forecast.add_argument(
         "--model",
@@ -196,12 +201,14 @@ def parser() -> argparse.ArgumentParser:
     )
     flat_forecast.add_argument("--sport", choices=SPORTS)
     flat_forecast.add_argument("--all", action="store_true")
-    flat_forecast.add_argument("--date", required=True)
+    flat_forecast.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     flat_forecast.add_argument("--log", action="store_true", help="log all calls to flat ledger")
 
     log_cmd = commands.add_parser("log", help="alias for forecast --log")
     log_cmd.add_argument("--sport", choices=SPORTS, default="mlb")
-    log_cmd.add_argument("--date", required=True)
+    log_cmd.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     log_cmd.add_argument(
         "--model", choices=("learned", "legacy-measured-edge"), default="learned"
     )
@@ -221,11 +228,13 @@ def parser() -> argparse.ArgumentParser:
     settle.add_argument("--closing-consensus-line", type=float)
 
     daily = commands.add_parser("daily", help="slate + forecast + log + settle + summary in one run")
-    daily.add_argument("--date", required=True)
+    daily.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
 
     ingest = commands.add_parser("ingest", help="cache one date of ESPN scores locally")
     ingest.add_argument("--sport", required=True, choices=ESPN_SPORTS)
-    ingest.add_argument("--date", required=True)
+    ingest.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
 
     bootstrap = commands.add_parser("bootstrap", help="idempotent historical backfill from ESPN")
     bootstrap.add_argument("--sport", choices=ESPN_SPORTS)
@@ -259,7 +268,8 @@ def parser() -> argparse.ArgumentParser:
         help="zero-unit exact-identity LoL/CS2 prices for Polymarket US match-winner contracts",
     )
     esports_forecast.add_argument("--title", required=True, choices=tuple(TITLE_SPECS))
-    esports_forecast.add_argument("--date", required=True)
+    esports_forecast.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     esports_forecast.add_argument("--timezone", default="America/New_York")
 
     international_backfill = commands.add_parser(
@@ -295,7 +305,8 @@ def parser() -> argparse.ArgumentParser:
     international_forecast.add_argument(
         "--league", required=True, choices=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS)
     )
-    international_forecast.add_argument("--date", required=True)
+    international_forecast.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     international_forecast.add_argument("--timezone")
 
     entities = commands.add_parser("bootstrap-entities", help="merge ESPN team lists into the registry")
@@ -303,7 +314,8 @@ def parser() -> argparse.ArgumentParser:
 
     features = commands.add_parser("features", help="compute point-in-time feature snapshots")
     features.add_argument("--sport", required=True, choices=SPORTS)
-    features.add_argument("--date", required=True)
+    features.add_argument("--date", default=eastern_today().isoformat(),
+        help="ISO date; defaults to today in US-Eastern time")
     features.add_argument("--refresh", action="store_true")
 
     backtest = commands.add_parser("backtest", help="walk-forward chronological backtest")
@@ -484,6 +496,12 @@ def parser() -> argparse.ArgumentParser:
 
     collect = commands.add_parser("collect-scores", help="pull recent soccer scores from The Odds API (free tier, last 3 days)")
     collect.add_argument("--days", type=int, default=3, help="days to look back (max 3 on free tier)")
+
+    checklist = commands.add_parser(
+        "verify-checklist",
+        help="run the model_improvements.md section-13 verification checklist for a sport",
+    )
+    checklist.add_argument("--sport", required=True)
     return root
 
 
@@ -705,10 +723,8 @@ def _forecast_learned_sport(
                     )
                     continue
             # Convert UTC event time to Eastern for consistent ledger display
-            from datetime import datetime as _dt
-            from zoneinfo import ZoneInfo as _ZI
             try:
-                event_et = _dt.fromisoformat(candidate.event_start_utc.replace('Z','+00:00')).astimezone(_ZI('America/New_York')).strftime('%Y-%m-%dT%H:%M:%S%z')
+                event_et = datetime.fromisoformat(candidate.event_start_utc.replace('Z','+00:00')).astimezone(EASTERN).strftime('%Y-%m-%dT%H:%M:%S%z')
             except (ValueError, TypeError):
                 event_et = candidate.event_start_utc
             request = PickRequest(
@@ -1302,6 +1318,28 @@ def main(argv: list[str] | None = None) -> None:
                     }
             settle_args = argparse.Namespace(all_unsettled=True, void_postponed=False)
             settlement = _settle_all_unsettled(settle_args, config, ledger)
+
+            # Flat forecast (no edge gate, separate ledger) rides along with
+            # daily so both views stay in sync from the same slate/BBO capture
+            # instead of requiring a second manual `flat-forecast` run.
+            flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
+            flat_ledger = PickLedger(flat_ledger_path)
+            _clear_today_open(flat_ledger, args.date)
+            flat_forecast_result = {
+                sport: _forecast_learned_sport(
+                    sport, args.date, True, config, registry, bans, flat_ledger,
+                    maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                    maximum_unreviewed_disagreement=float(
+                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                    ),
+                    flat_mode=True,
+                )
+                for sport in LEARNED_PRODUCTION_SPORTS
+            }
+            for result in flat_forecast_result.values():
+                result.pop("candidates", None)
+            flat_settlement = _settle_all_unsettled(settle_args, config, flat_ledger)
+
             output = {
                 "date": args.date,
                 "step1_polymarket_search": {
@@ -1316,6 +1354,8 @@ def main(argv: list[str] | None = None) -> None:
                 "step4_settlement": settlement,
                 "step1b_soccer_scores": soccer_collection,
                 "step5_summary": _summary(config, ledger),
+                "step6_flat_forecast_and_log": flat_forecast_result,
+                "step7_flat_settlement": flat_settlement,
             }
         elif args.command == "ingest":
             output = Ingestor(data_root, audit=audit).ingest_scores(args.sport, args.date)
@@ -1615,6 +1655,35 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "collect-scores":
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             output = collect_soccer_scores(days_from=args.days)
+        elif args.command == "verify-checklist":
+            from .source_policy import DEFAULT_SOURCES
+            from .verification_checklist import format_checklist, run_checklist
+
+            sport = args.sport.lower()
+            source_keys = [key for key, spec in DEFAULT_SOURCES.items() if sport in spec.leagues]
+            artifact_hashes: list[str] = []
+            model_config = config["models"].get(sport.upper())
+            if model_config and model_config.get("production_artifact"):
+                artifact_path = PROJECT_ROOT / model_config["production_artifact"]
+                if artifact_path.exists():
+                    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+                    if artifact.get("artifact_hash"):
+                        artifact_hashes.append(artifact["artifact_hash"])
+            research_units = [
+                float(row["units"] or 0)
+                for row in ledger.rows()
+                if row["league"].lower() == sport and row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
+            ]
+            results = run_checklist(
+                source_keys=source_keys or None,
+                artifact_hashes=artifact_hashes or None,
+                research_units=research_units or None,
+            )
+            output = {
+                "sport": sport,
+                "results": [vars(result) for result in results],
+                "formatted": format_checklist(results),
+            }
         elif args.command == "score-research":
             if bool(args.pick_ids) == bool(args.all_research):
                 raise ValueError("provide either --pick-id or --all-research")

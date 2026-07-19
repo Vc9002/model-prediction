@@ -507,15 +507,25 @@ def status() -> dict:
                 alerts.append({"level": "warn", "kind": "data_stale",
                                "text": f"{sport.upper()} data is {age} days old"})
 
-    # Check qualification using the same fallback as _ml_cell
+    # Check qualification using the same fallback as _ml_cell. lol/cs2/kbo/npb
+    # are zero-unit research baselines tracked via esports_grid/baseball_grid,
+    # not the learned-market "sports" structure _ml_cell expects, so they're
+    # checked separately below instead of always reporting "no data" here.
     sports_meta = (validation.get("sports") or {})
-    for sport in MATRIX_SPORTS:
+    for sport in ("mlb", "nba", "wnba", "nfl", "soccer"):
         meta = sports_meta.get(sport) or {}
         ml = _ml_cell(meta)
         if ml.get("state") == "tested_not_qualified":
             alerts.append({"level": "warn", "kind": "not_qualified",
                            "text": f"{sport.upper()} moneyline below qualification gate"})
         if ml.get("state") == "no_data":
+            alerts.append({"level": "info", "kind": "no_data",
+                           "text": f"{sport.upper()} moneyline has no validation data"})
+
+    for sport, grid_key in (("lol", "esports_grid"), ("cs2", "esports_grid"),
+                            ("kbo", "baseball_grid"), ("npb", "baseball_grid")):
+        research_ml = ((validation.get(grid_key) or {}).get(sport) or {}).get("moneyline") or {}
+        if not research_ml or research_ml.get("state") == "no_data":
             alerts.append({"level": "info", "kind": "no_data",
                            "text": f"{sport.upper()} moneyline has no validation data"})
 

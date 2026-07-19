@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import dashboard_server
+import pytest
 
 
 def _configure_archive(monkeypatch, tmp_path: Path, rows: list[dict]) -> Path:
@@ -70,6 +71,18 @@ def test_clear_all_keeps_open_positive_unit_rows_visible(monkeypatch, tmp_path: 
     assert result["archived_now"] == 1
     assert result["protected_open_staked"] == 1
     assert json.loads(archive_path.read_text())["pick_ids"] == ["paper-open"]
+
+
+def test_settled_pick_keeps_its_decision_time_model_size() -> None:
+    open_row = {
+        "status": "open",
+        "model_probability": 0.672,
+        "market_implied_probability": 0.64,
+    }
+    settled_row = {**open_row, "status": "settled", "result": "loss"}
+
+    assert dashboard_server._suggested_units(open_row) == 2.0
+    assert dashboard_server._suggested_units(settled_row) == 2.0
 
 
 def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
@@ -727,7 +740,7 @@ def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, 
     )
     monkeypatch.setattr(dashboard_server, "ARCHIVE_FILE", archive_path)
     monkeypatch.setattr(dashboard_server, "read_picks", lambda: [old, latest, archived_only])
-    monkeypatch.setattr(dashboard_server, "_decorate_pick", lambda row: row)
+    monkeypatch.setattr(dashboard_server, "_decorate_pick", lambda row, *args: row)
 
     ledger = dashboard_server.dashboard_picks()
     today = dashboard_server.today_picks("2026-07-17")
@@ -821,6 +834,7 @@ def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
                     "costBasis": {"value": "1.75", "currency": "USD"},
                     "realizedPnl": {"value": "0.00", "currency": "USD"},
                     "updateTime": "2026-07-17T14:58:00Z",
+                    "outcomeSide": "OUTCOME_SIDE_YES",
                 }
             },
             {
@@ -857,6 +871,110 @@ def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
     assert result["recent_history"]["settlement_count"] == 1
     assert result["history_start_date"] == "2026-07-17"
     assert history_file.exists()
+
+
+def test_opposite_side_exchange_activity_is_not_linked_to_model_pick() -> None:
+    links = {
+        ("wnba-market", "short"): {
+            "pick_id": "phoenix-pick",
+            "model_version": "wnba-v3",
+            "side": "short",
+        }
+    }
+
+    connecticut = dashboard_server._normalize_live_activity(
+        {
+            "positionResolution": {
+                "marketSlug": "wnba-market",
+                "tradeId": "connecticut-settlement",
+                "side": "POSITION_RESOLUTION_SIDE_LONG",
+                "updateTime": "2026-07-18T04:00:00Z",
+            }
+        },
+        links,
+    )
+    phoenix = dashboard_server._normalize_live_activity(
+        {
+            "trade": {
+                "id": "phoenix-fill",
+                "marketSlug": "wnba-market",
+                "intent": "ORDER_INTENT_BUY_SHORT",
+                "updateTime": "2026-07-17T20:00:00Z",
+            }
+        },
+        links,
+    )
+
+    assert connecticut["outcome_side"] == "long"
+    assert connecticut["model_pick"] is None
+    assert phoenix["outcome_side"] == "short"
+    assert phoenix["model_pick"]["pick_id"] == "phoenix-pick"
+
+
+def test_market_slugs_are_rendered_as_readable_names(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server,
+        "_team_name_index",
+        lambda: {
+            ("wnba", "conn"): "Connecticut Sun",
+            ("wnba", "phx"): "Phoenix Mercury",
+            ("mlb", "sd"): "San Diego Padres",
+            ("mlb", "kc"): "Kansas City Royals",
+        },
+    )
+    monkeypatch.setattr(dashboard_server, "_public_market_question", lambda slug: None)
+
+    assert dashboard_server._human_market_name("aec-wnba-conn-phx-2026-07-17") == (
+        "WNBA · Connecticut Sun @ Phoenix Mercury · Moneyline"
+    )
+    assert dashboard_server._human_market_name("tsc-mlb-sd-kc-2026-07-17-9pt5") == (
+        "MLB · San Diego Padres @ Kansas City Royals · Total 9.5"
+    )
+
+
+def test_player_prop_market_uses_public_question(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server,
+        "_public_market_question",
+        lambda slug: "Will Kyle Tucker record at least 1 hits + runs + RBIs?",
+    )
+
+    name = dashboard_server._human_market_name(
+        "astatc-mlb-lad-nyy-2026-07-17-hrr-kyltuc-gte1"
+    )
+
+    assert name == (
+        "Kyle Tucker · 1+ hits + runs + RBIs · "
+        "Los Angeles Dodgers @ New York Yankees"
+    )
+
+
+def test_unit_value_update_is_atomic_persistent_and_audited(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config" / "model.yaml"
+    config_path.parent.mkdir()
+    config_path.write_text(
+        "bankroll:\n  unit_value_usd: 7.5\n  reference_units: 5\n",
+        encoding="utf-8",
+    )
+    data_path = tmp_path / "data"
+    monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config_path)
+    monkeypatch.setattr(dashboard_server, "DATA", data_path)
+
+    result = dashboard_server._set_unit_value_usd(25)
+
+    saved = dashboard_server.yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert result["status"] == "ok"
+    assert result["previous_unit_value_usd"] == 7.5
+    assert result["unit_value_usd"] == 25
+    assert saved["bankroll"]["unit_value_usd"] == 25
+    events = [json.loads(line) for line in (data_path / "events.jsonl").read_text().splitlines()]
+    assert events[-1]["event_type"] == "unit_value_updated"
+    assert events[-1]["payload"]["unit_value_usd"] == 25
+
+
+def test_unit_value_update_rejects_invalid_amounts() -> None:
+    with pytest.raises(ValueError, match="between"):
+        dashboard_server._set_unit_value_usd(0)
 
 
 def test_portfolio_history_ignores_everything_before_fixed_start_date(
@@ -921,3 +1039,206 @@ def test_portfolio_never_falls_back_to_model_picks_when_authentication_fails(
     assert result["status"] == "unavailable"
     assert result["open"]["count"] == 0
     assert result["open"]["positions"] == []
+
+
+def test_pick_quote_freezes_last_valid_pregame_price(monkeypatch, tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    path = data / "odds" / "wnba" / "2026-07-18" / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    base = {
+        "market_slug": "aec-wnba-ny-ind-2026-07-18",
+        "market_type": "moneyline",
+        "market_state": "MARKET_STATE_OPEN",
+        "event_start_utc": "2026-07-19T00:00:00Z",
+        "long": {"description": "Liberty", "ask": 0.53},
+        "short": {"description": "Fever", "ask": 0.48},
+    }
+    snapshots = [
+        {**base, "observed_at_utc": "2026-07-18T23:56:27Z", "timestamp_valid": True},
+        {
+            **base,
+            "observed_at_utc": "2026-07-19T00:06:16Z",
+            "timestamp_valid": False,
+            "short": {"description": "Fever", "ask": 0.50},
+        },
+        {
+            **base,
+            "observed_at_utc": "2026-07-19T00:07:00Z",
+            "timestamp_valid": True,
+            "short": {"description": "Fever", "ask": 0.51},
+        },
+    ]
+    path.write_text("\n".join(json.dumps(item) for item in snapshots) + "\n", encoding="utf-8")
+    monkeypatch.setattr(dashboard_server, "DATA", data)
+    row = {
+        "league": "WNBA",
+        "market_type": "moneyline",
+        "away_team": "New York Liberty",
+        "home_team": "Indiana Fever",
+        "selection": "home",
+        "event_start_utc": "2026-07-19T00:00:00Z",
+    }
+
+    quote = dashboard_server._pick_quote(row)
+
+    assert quote is not None
+    assert quote["ask"] == 0.48
+    assert quote["observed_at_utc"] == "2026-07-18T23:56:27Z"
+    assert quote["price_role"] == "pregame_close"
+    assert quote["seconds_before_start"] == 213
+
+
+def test_filled_entry_uses_selected_side_exchange_fill(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server,
+        "_load_orders",
+        lambda: {
+            "orders": [
+                {
+                    "pick_id": "indiana",
+                    "action": "buy",
+                    "status": "filled",
+                    "market_slug": "aec-wnba-ny-ind-2026-07-18",
+                    "side": "short",
+                    "price": 0.44,
+                    "size_shares": 25.56,
+                    "cum_quantity": 25.56,
+                    "submitted_at_utc": "2026-07-18T15:44:02Z",
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        dashboard_server,
+        "_load_portfolio_history",
+        lambda: {
+            "activities": [
+                {
+                    "activity_id": "trade:fill",
+                    "type": "trade",
+                    "market_slug": "aec-wnba-ny-ind-2026-07-18",
+                    "occurred_at_utc": "2026-07-18T15:52:08Z",
+                    "price": 0.56,
+                    "quantity": 25.56,
+                },
+                {
+                    "activity_id": "trade:resolution",
+                    "type": "trade",
+                    "market_slug": "aec-wnba-ny-ind-2026-07-18",
+                    "occurred_at_utc": "2026-07-19T02:01:55Z",
+                    "price": 0.01,
+                    "quantity": 25.56,
+                },
+            ]
+        },
+    )
+
+    entry = dashboard_server._filled_entry_for_pick({"pick_id": "indiana"})
+
+    assert entry == {
+        "price": 0.44,
+        "basis": "exchange_trade",
+        "side": "short",
+        "market_slug": "aec-wnba-ny-ind-2026-07-18",
+        "activity_id": "trade:fill",
+    }
+
+
+def test_short_activity_displays_selected_price_and_pnl() -> None:
+    links = {
+        ("aec-wnba-ny-ind-2026-07-18", "short"): {
+            "pick_id": "indiana",
+            "side": "short",
+            "model_version": "wnba-v3",
+        }
+    }
+    activity = dashboard_server._normalize_live_activity(
+        {
+            "trade": {
+                "id": "resolution-trade",
+                "marketSlug": "aec-wnba-ny-ind-2026-07-18",
+                "price": {"value": "0.01", "currency": "USD"},
+                "qtyDecimal": "25.56",
+                "realizedPnl": {"value": "-11.23", "currency": "USD"},
+                "updateTime": "2026-07-19T02:01:55Z",
+            }
+        },
+        links,
+    )
+
+    assert activity["outcome_side"] == "short"
+    assert activity["price"] == 0.99
+    assert activity["exchange_price"] == 0.01
+    assert activity["realized_pnl_usd"] == 11.23
+    assert activity["exchange_realized_pnl_usd"] == -11.23
+    assert activity["model_pick"]["pick_id"] == "indiana"
+
+    ordinary_trade = dashboard_server._selected_short_pnl(0.38, -6.36)
+    assert ordinary_trade == -6.36
+
+
+def test_settlement_reports_realized_delta_not_cumulative_total() -> None:
+    activity = dashboard_server._normalize_live_activity(
+        {
+            "positionResolution": {
+                "marketSlug": "example",
+                "side": "POSITION_RESOLUTION_SIDE_LONG",
+                "updateTime": "2026-07-19T02:00:00Z",
+                "beforePosition": {"realized": {"value": "4.00"}},
+                "afterPosition": {"realized": {"value": "9.50"}},
+            }
+        },
+        {},
+    )
+
+    assert activity["realized_pnl_usd"] == 5.5
+    assert activity["cumulative_realized_pnl_usd"] == 9.5
+    assert activity["pnl_basis"] == "position_realized_delta"
+
+
+def test_team_total_history_name_uses_exact_exchange_question(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server,
+        "_public_market_question",
+        lambda slug: "Will France score more than 0.5 goals in the first half of FRA vs ENG?",
+    )
+
+    name = dashboard_server._human_market_name(
+        "tsc-fwc-fra-eng-2026-07-18-ttg-fh-fra-0pt5"
+    )
+
+    assert name == "Will France score more than 0.5 goals in the first half of FRA vs ENG"
+
+
+def test_cached_short_trade_is_side_adjusted_in_history_summary(monkeypatch) -> None:
+    links = {
+        ("aec-wnba-ny-ind-2026-07-18", "short"): {
+            "pick_id": "indiana",
+            "side": "short",
+            "model_version": "wnba-v3",
+        }
+    }
+    monkeypatch.setattr(dashboard_server, "_human_market_name", lambda slug, title="": slug)
+
+    summary = dashboard_server._portfolio_history_summary(
+        [
+            {
+                "activity_id": "trade:legacy",
+                "type": "trade",
+                "market_slug": "aec-wnba-ny-ind-2026-07-18",
+                "price": 0.56,
+                "quantity": 25.56,
+                "realized_pnl_usd": None,
+                "outcome_side": None,
+                "model_pick": None,
+            }
+        ],
+        "cached",
+        links,
+    )
+
+    trade = summary["activities"][0]
+    assert trade["price"] == 0.44
+    assert trade["exchange_price"] == 0.56
+    assert trade["outcome_side"] == "short"
+    assert trade["model_pick"]["pick_id"] == "indiana"

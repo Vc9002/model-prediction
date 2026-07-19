@@ -41,7 +41,17 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert 'step="0.01"' in html
     assert 'placeholder=".50"' in html
     assert "1U = $" in html
-    assert '"Market price"' in html
+    assert 'id="unitValueInput"' in html
+    assert 'id="unitValueLabel"' in html
+    assert '"/api/settings/unit-value"' in html
+    assert "Historical unit records and existing orders will not change" in html
+    assert '"Pregame close"' in html
+    assert '"Bought at"' in html
+    assert '"Decision edge"' in html
+    assert "const pregamePrice" in html
+    assert "const entryPrice" in html
+    assert "side-adjusted realized P&amp;L" in html
+    assert "Your-side price" in html
     assert '"Odds"' not in html
     assert "shortDate" in html
     assert '"Game (ET)"' in html
@@ -54,9 +64,13 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "order-wrap" in html
     assert "Live Portfolio — Exchange Positions" in html
     assert "Model Picks Ledger" in html
-    assert "Model Bet Execution History" in html
-    assert ".filter(p=>p.model_pick)" in html
+    assert "Paper model forecasts" in html
+    assert "Order shows exchange status only" in html
+    assert "Model Bet Execution History" not in html
+    assert ".filter(p=>p.model_pick)" not in html
+    assert 'join("")+"<th>Order</th><th>Matchup</th>' in html
     assert "model picks are not shown here" in html
+    assert "p.market_name||p.title||slugToTitle" in html
     assert 'id="posSellPrice-${i}"' in html
     assert 'id="posSellShares-${i}"' in html
     assert "openPositionSell" not in html

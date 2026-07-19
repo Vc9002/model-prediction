@@ -29,6 +29,16 @@ LEAGUE_SLUGS = {
     "WTA": "wta",
     "ITF_MEN": "itfm",
     "ITF_WOMEN": "itfw",
+    "LOL": "lol",
+    "CS2": "cs2",
+    "KBO": "kbo",
+    "NPB": "npb",
+    "COD": "cod",
+    "VALORANT": "valorant",
+    "DOTA2": "dota2",
+    "ROCKET_LEAGUE": "rl",
+    "OVERWATCH": "ow",
+    "RAINBOW_SIX": "r6",
 }
 
 # Gateway coverage per sport key. Ligue 1, Eredivisie, Primeira Liga,
@@ -40,7 +50,31 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "nfl": ("NFL",),
     "soccer": ("EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "UCL", "UEFA", "MLS", "WORLD_CUP"),
     "tennis": ("WTA", "ITF_MEN", "ITF_WOMEN"),
+    "esports": (
+        "LOL",
+        "CS2",
+        "COD",
+        "VALORANT",
+        "DOTA2",
+        "ROCKET_LEAGUE",
+        "OVERWATCH",
+        "RAINBOW_SIX",
+    ),
+    "kbo": ("KBO",),
+    "npb": ("NPB",),
 }
+
+# Sports whose prospective BBO capture feeds the daily qualification/promotion
+# pipeline (config/model.yaml, models/registry.py). Soccer and tennis have
+# Polymarket gateway coverage in POLYMARKET_SPORT_LEAGUES above but are not
+# yet wired into daily BBO capture, so they stay out of this set on purpose —
+# do not derive this from "every league in POLYMARKET_SPORT_LEAGUES" or from
+# registry.MODEL_SPECS wholesale, both of which also include soccer/tennis.
+# Esports is research-only, but prospective BBO capture must begin before
+# profitability can ever be tested; capturing prices does not qualify a model
+# or authorize execution.
+BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "esports", "kbo", "npb"}
+
 MARKET_TYPES = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "moneyline",
     "SPORTS_MARKET_TYPE_SPREAD": "spread",
@@ -306,7 +340,7 @@ def capture_slate_snapshots(
         for sport, leagues in POLYMARKET_SPORT_LEAGUES.items()
         for league in leagues
     }
-    qualification_sports = {"mlb", "nba", "wnba", "nfl"}
+    qualification_sports = BBO_CAPTURE_SPORTS
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
     failure_details: list[dict[str, str]] = []
     for league, events in events_by_league.items():

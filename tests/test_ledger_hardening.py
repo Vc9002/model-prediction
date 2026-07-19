@@ -92,6 +92,53 @@ def test_research_can_auto_score_one_hypothetical_unit_on_settlement(
     assert settled["research_scoring_note"] == "one-unit hypothetical policy"
 
 
+def test_research_can_keep_model_recommended_units_on_settlement(
+    registry, ban_list, tmp_path
+) -> None:
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tmp_path / "events.jsonl",
+        research_score_units=1.0,
+        research_scoring_mode="model_recommended",
+        research_scoring_note="decision-time model size",
+    )
+    req = request("research-model-size", probability=0.672, state=ModelState.RESEARCH)
+    gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
+    row = ledger.append_evaluated(req, gate, NOW)
+
+    settled = ledger.settle(row["pick_id"], 3, 2)
+
+    assert settled["units"] == "0.00"
+    assert settled["research_score_units"] == "2.0000"
+    assert settled["research_pnl_units"] == "-2.000000"
+    assert settled["research_scoring_note"] == "decision-time model size"
+
+
+def test_research_model_recommended_skips_scoring_without_uncertainty(
+    registry, ban_list, tmp_path
+) -> None:
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tmp_path / "events.jsonl",
+        research_score_units=1.0,
+        research_scoring_mode="model_recommended",
+        research_scoring_note="decision-time model size",
+    )
+    req = request("research-missing-uncertainty", probability=0.672, state=ModelState.RESEARCH)
+    req = PickRequest(**{**req.__dict__, "model_uncertainty": None})
+    gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
+    row = ledger.append_evaluated(req, gate, NOW)
+    assert row["model_uncertainty"] == ""
+
+    settled = ledger.settle(row["pick_id"], 3, 2)
+
+    # A row with no recorded uncertainty must not be scored as if uncertainty
+    # were 0 (which would manufacture an overconfident unit size) -- it stays
+    # unscored instead.
+    assert not settled["research_score_units"]
+    assert not settled["research_pnl_units"]
+
+
 def test_banned_total_is_recorded_as_zero_unit_no_call(registry, ban_list, tmp_path) -> None:
     ban_list.add(League.MLB, "BAL")
     req = request("banned-total")
