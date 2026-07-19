@@ -20,6 +20,10 @@ team_ban_list:
     WNBA: []
     NFL: []
     TENNIS: []
+    LOL: []
+    CS2: []
+    KBO: []
+    NPB: []
     WORLD_CUP:
     - canonical_team_id: world-cup-kor
       input: South Korea
@@ -66,6 +70,17 @@ data_sources:
     soccer_enrichment: football_data
     tennis_historical: sackmann_csv
     optional_upgrade: sportsdataio
+    esports_series:
+      provider: bo3_public
+      base_url: https://api.bo3.gg/api/v1
+      requires_api_key: false
+      requires_signup: false
+      titles:
+      - lol
+      - cs2
+      status: research_replaceable
+      attribution: https://bo3.gg/
+      terms: https://bo3.gg/wiki/use-of-services
 execution:
   status: hard_gated
   allow_manual_research_orders: true
@@ -156,6 +171,7 @@ models:
     status: shadow_qualified
     origin: statistical_model
     active_production_version: wnba-elo-trend-lr-v3
+    min_edge: 0.07
     production_artifact: config/models/wnba-elo-trend-lr-v3.json
     protected_versions:
     - wnba-elo-trend-v1
@@ -200,6 +216,38 @@ models:
     family: poisson_dixon_coles
     status: research
     origin: statistical_model
+  LOL:
+    family: neutral_series_elo
+    status: research
+    origin: statistical_model
+    active_research_version: lol-neutral-series-elo-v1
+    research_artifact: config/models/lol-neutral-series-elo-v1.json
+    market_target: esports_match_winner
+    research_outputs_zero_units: true
+  CS2:
+    family: neutral_series_elo
+    status: research
+    origin: statistical_model
+    active_research_version: cs2-neutral-series-elo-v1
+    research_artifact: config/models/cs2-neutral-series-elo-v1.json
+    market_target: esports_match_winner
+    research_outputs_zero_units: true
+  KBO:
+    family: tie_aware_home_elo
+    status: research
+    origin: statistical_model
+    active_research_version: kbo-tie-aware-elo-v1
+    research_artifact: config/models/kbo-tie-aware-elo-v1.json
+    market_target: expected_moneyline_settlement_tie_pays_half
+    research_outputs_zero_units: true
+  NPB:
+    family: tie_aware_home_elo
+    status: research
+    origin: statistical_model
+    active_research_version: npb-tie-aware-elo-v1
+    research_artifact: config/models/npb-tie-aware-elo-v1.json
+    market_target: expected_moneyline_settlement_tie_pays_half
+    research_outputs_zero_units: true
   market_residual:
     method: logistic_regression
     rolling_window_days: 90

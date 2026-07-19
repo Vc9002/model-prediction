@@ -457,6 +457,22 @@ def performance(picks: list[dict]) -> dict:
 # ── SECTION: Status & Health ────────────────────────────────────────
 
 
+def _daily_pipeline_status() -> dict:
+    """Staleness of the launchd daily pipeline, from data/logs/daily_*.log mtimes."""
+    logs = sorted((DATA / "logs").glob("daily_*.log"))
+    if not logs:
+        return {"last_run_at_utc": None, "age_hours": None, "stale": True}
+    mtime = datetime.fromtimestamp(logs[-1].stat().st_mtime, tz=timezone.utc)
+    age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
+    # The daily job runs every 3 hours (com.modelprediction.daily); two missed
+    # runs in a row is a meaningful signal something is wrong, not just late.
+    return {
+        "last_run_at_utc": mtime.isoformat(),
+        "age_hours": round(age_hours, 1),
+        "stale": age_hours > 6,
+    }
+
+
 def status() -> dict:
     validation, _source = _newest_validation()
     termination = _read_json(OUTPUTS / "termination-audit-2026-07-17.json") or {}
@@ -507,6 +523,16 @@ def status() -> dict:
         alerts.append({"level": "error", "kind": "no_api_key",
                        "text": "Polymarket API key not configured — execution disabled"})
 
+    daily_pipeline = _daily_pipeline_status()
+    if daily_pipeline["stale"]:
+        detail = (
+            f"{daily_pipeline['age_hours']}h since last daily run"
+            if daily_pipeline["age_hours"] is not None
+            else "no daily log found"
+        )
+        alerts.append({"level": "warn", "kind": "daily_pipeline_stale",
+                       "text": f"Daily pipeline is stale — {detail}"})
+
     tests = _LAST_ACTION.get("run_tests")
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -516,6 +542,7 @@ def status() -> dict:
         "last_ingest": last_ingest,
         "audit_events": audit_events,
         "last_audit_event": (last_event or {}).get("event_type") if last_event else None,
+        "daily_pipeline": daily_pipeline,
         "alerts": alerts,
         "tests": tests or {"status": "not_run_this_session"},
         "validation_status": termination.get("status") or validation.get("status"),
@@ -816,19 +843,20 @@ def market_snapshots(sport: str, day: str) -> dict:
                     continue
                 # Historical dashboard prices are pregame-only. Once an event
                 # starts, later BBOs must never replace the last valid quote.
+                # Legacy snapshots captured before these fields existed lack
+                # them entirely — fall back to the pre-filter behavior for
+                # those rather than dropping their price history outright.
                 if snap.get("timestamp_valid") is False:
                     continue
-                try:
-                    observed_at = datetime.fromisoformat(
-                        str(snap.get("observed_at_utc") or "").replace("Z", "+00:00")
-                    )
-                    event_start = datetime.fromisoformat(
-                        str(snap.get("event_start_utc") or "").replace("Z", "+00:00")
-                    )
-                except ValueError:
-                    continue
-                if observed_at >= event_start:
-                    continue
+                observed_raw, event_start_raw = snap.get("observed_at_utc"), snap.get("event_start_utc")
+                if observed_raw and event_start_raw:
+                    try:
+                        observed_at = datetime.fromisoformat(str(observed_raw).replace("Z", "+00:00"))
+                        event_start = datetime.fromisoformat(str(event_start_raw).replace("Z", "+00:00"))
+                    except ValueError:
+                        observed_at = event_start = None
+                    if observed_at is not None and observed_at >= event_start:
+                        continue
                 ask = ((snap.get("long") or {}).get("ask"))
                 if slug not in first_ask and ask is not None:
                     first_ask[slug] = ask
@@ -896,14 +924,14 @@ def _pick_quote(row: dict) -> dict | None:
                 continue
             if snapshot.get("timestamp_valid") is False:
                 continue
-            try:
-                snapshot_observed = datetime.fromisoformat(
-                    str(snapshot.get("observed_at_utc") or "").replace("Z", "+00:00")
-                )
-            except ValueError:
-                continue
-            if snapshot_observed >= event_start:
-                continue
+            observed_raw = snapshot.get("observed_at_utc")
+            if observed_raw:
+                try:
+                    snapshot_observed = datetime.fromisoformat(str(observed_raw).replace("Z", "+00:00"))
+                except ValueError:
+                    snapshot_observed = None
+                if snapshot_observed is not None and snapshot_observed >= event_start:
+                    continue
             if snapshot.get("market_type") != "moneyline":
                 continue
             slug = str(snapshot.get("market_slug") or "")
@@ -1019,9 +1047,9 @@ def _decode_command_output(raw: str) -> dict:
     return best
 
 
-def _latest_order_for_pick(row: dict, quote: dict | None) -> dict | None:
+def _latest_order_for_pick(row: dict, quote: dict | None, orders: dict | None = None) -> dict | None:
     """Find an order across equivalent model-version rows for the same contract side."""
-    orders = _load_orders()["orders"]
+    orders = (orders or _load_orders())["orders"]
     pick_id = str(row.get("pick_id") or "")
     direct = [order for order in orders if str(order.get("pick_id") or "") == pick_id]
     if direct:
@@ -1038,12 +1066,14 @@ def _latest_order_for_pick(row: dict, quote: dict | None) -> dict | None:
     return equivalent[-1] if equivalent else None
 
 
-def _filled_entry_for_pick(row: dict) -> dict | None:
+def _filled_entry_for_pick(
+    row: dict, orders: dict | None = None, portfolio_history: dict | None = None
+) -> dict | None:
     """Exchange-backed entry price for a filled dashboard BUY, in pick-side terms."""
     pick_id = str(row.get("pick_id") or "")
     filled = [
         order
-        for order in _load_orders()["orders"]
+        for order in (orders or _load_orders())["orders"]
         if str(order.get("pick_id") or "") == pick_id
         and order.get("action", "buy") == "buy"
         and (
@@ -1063,7 +1093,7 @@ def _filled_entry_for_pick(row: dict) -> dict | None:
     # Portfolio trades use the exchange's YES/long coordinate even for a NO
     # fill. Match the fill and convert it back to the outcome actually bought.
     candidates = []
-    for activity in _load_portfolio_history()["activities"]:
+    for activity in (portfolio_history or _load_portfolio_history())["activities"]:
         if activity.get("type") != "trade" or activity.get("market_slug") != slug:
             continue
         occurred = str(activity.get("occurred_at_utc") or "")
@@ -1209,16 +1239,18 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     return True, "ready"
 
 
-def _decorate_pick(row: dict) -> dict:
+def _decorate_pick(
+    row: dict, orders: dict | None = None, portfolio_history: dict | None = None
+) -> dict:
     quote = _pick_quote(row)
     ready, reason = _order_readiness(row, quote)
-    order = _latest_order_for_pick(row, quote)
+    order = _latest_order_for_pick(row, quote, orders)
     manual, _ = _manual_research_eligibility(row)
     return {
         **row,
         "quote": quote,
         "order": order,
-        "filled_entry": _filled_entry_for_pick(row),
+        "filled_entry": _filled_entry_for_pick(row, orders, portfolio_history),
         "buy_ready": ready,
         "buy_block_reason": reason,
         "unit_value_usd": _unit_value_usd(),
@@ -1266,9 +1298,10 @@ def dashboard_picks() -> list[dict]:
     """Latest unique picks with persistent local-clear and order state attached."""
     _reconcile_orders()
     archived = set(_load_archive()["pick_ids"])
+    orders, portfolio_history = _load_orders(), _load_portfolio_history()
     return [
         {
-            **_decorate_pick(row),
+            **_decorate_pick(row, orders, portfolio_history),
             "archived": str(row.get("pick_id")) in archived,
             "suggested_paper_units": _suggested_units(row),
         }
@@ -1639,6 +1672,8 @@ def _action_command(name: str, payload: dict) -> list[str]:
     cli = runner if len(runner) > 1 else runner  # module or console-script form
     if name == "daily":
         return cli + ["daily", "--date", str(payload.get("date") or _today())]
+    if name == "flat_forecast":
+        return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
     if name == "refresh_prices":
         day = str(payload.get("date") or _today())
         command = cli + ["polymarket-ledger-prices", "--date", day]
@@ -1848,6 +1883,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("matrix", 60, matrix))
             elif route == "/api/picks":
                 self._send(_cached("picks", 30, dashboard_picks))
+            elif route == "/api/flat-picks":
+                self._send(_cached("flat-picks", 30, lambda: _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []))
             elif route == "/api/performance":
                 self._send(_cached("performance", 30, lambda: performance(read_picks())))
             elif route == "/api/backtests":
@@ -1951,6 +1988,7 @@ def today_picks(day: str) -> dict:
     """Latest unique, locally visible picks played on a US-Eastern date."""
     rows = []
     archived = set(_load_archive()["pick_ids"])
+    orders, portfolio_history = _load_orders(), _load_portfolio_history()
     for row in _dedupe_picks(read_picks()):
         if str(row.get("pick_id")) in archived:
             continue
@@ -1964,7 +2002,7 @@ def today_picks(day: str) -> dict:
         start_et = start_dt.astimezone(EASTERN)
         if start_et.date().isoformat() != day:
             continue
-        rows.append({**_decorate_pick(row), "start_et": start_et.strftime("%I:%M %p ET"),
+        rows.append({**_decorate_pick(row, orders, portfolio_history), "start_et": start_et.strftime("%I:%M %p ET"),
                      "start_sort": start_dt.isoformat(),
                      "suggested_paper_units": _suggested_units(row)})
     rows.sort(key=lambda r: (r["start_sort"], str(r.get("league")), str(r.get("market_type"))))

@@ -45,21 +45,35 @@ input.order-price{width:62px;padding:5px 6px;font-family:var(--mono);font-size:1
 .exit-wrap{display:grid;grid-template-columns:auto 62px auto 66px auto;align-items:center;gap:4px;white-space:nowrap}
 .exit-wrap input{width:62px;padding:5px 6px}.exit-wrap .shares{width:66px}
 .exit-wrap .order-note{grid-column:1/-1}
-/* matrix */
-table.matrix{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px}
+/* matrix — heatmap cards: color intensity encodes magnitude within each
+   qualified band, SVG glyphs replace emoji for consistent cross-platform
+   rendering, sticky header/first column keep context while scrolling. */
+.matrix-scroll{overflow:auto;max-height:70vh;border-radius:8px}
+table.matrix{border-collapse:separate;border-spacing:0;width:100%;font-family:var(--mono);font-size:12.5px}
 table.matrix th,table.matrix td{border:1px solid var(--accent);padding:8px 10px;text-align:center}
-table.matrix th{color:var(--dim);font-weight:600}
-td.cell{cursor:pointer;min-width:110px;vertical-align:middle;padding:9px 10px}
-td.cell .c1{font-size:13px;font-weight:600;line-height:1.5;white-space:nowrap}
+table.matrix th{color:var(--dim);font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
+table.matrix th:first-child,table.matrix td:first-child{position:sticky;left:0;z-index:1;background:var(--card)}
+table.matrix th:first-child{z-index:3}
+td.cell{cursor:pointer;min-width:110px;vertical-align:middle;padding:9px 10px;position:relative;transition:filter .15s ease}
+td.cell:hover{filter:brightness(1.18)}
+td.cell .c1{font-size:13px;font-weight:600;line-height:1.5;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:5px}
 td.cell .c2{font-size:11px;color:var(--dim);line-height:1.45;white-space:nowrap}
-td.cell.q{background:rgba(0,255,136,.12);border-color:rgba(0,255,136,.5)}
+td.cell .icon{width:12px;height:12px;flex:0 0 auto}
+td.cell.q .c1{color:var(--green)}
 td.cell.t{background:rgba(255,68,68,.10);border-color:rgba(255,68,68,.4)}
+td.cell.t .c1{color:var(--red)}
 td.cell.u{background:rgba(255,170,0,.10);border-color:rgba(255,170,0,.4)}
+td.cell.u .c1{color:var(--yellow)}
 td.cell.r{background:rgba(120,160,255,.08);border-color:rgba(120,160,255,.35)}
+td.cell.r .c1{color:#9db4ff}
 td.cell.b{background:rgba(255,255,255,.03)}
 td.cell.b .c1{color:#667}
 td.cell.n .c1{color:#556}
 td.cell.na .c1{color:#445}
+td.cell[data-tip]:hover:after{content:attr(data-tip);position:absolute;left:50%;bottom:100%;
+  transform:translateX(-50%) translateY(-6px);background:#000;color:#fff;padding:6px 9px;
+  border-radius:6px;font-size:11px;white-space:nowrap;z-index:10;box-shadow:0 4px 14px rgba(0,0,0,.4);
+  pointer-events:none}
 /* tables */
 table.data{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
 table.data th{color:var(--dim);text-align:left;padding:5px 6px;border-bottom:1px solid var(--accent);cursor:pointer;white-space:nowrap}
@@ -121,6 +135,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span class="chip"><span class="dot gray" id="testDot"></span><span id="testTxt">Tests: not run</span></span>
   <span class="chip"><span class="dot g"></span><span id="modelsTxt">Models: …</span></span>
   <span class="chip mono dim" id="dataTxt">Data: …</span>
+  <span class="chip"><span class="dot gray" id="dailyDot"></span><span id="dailyTxt" title="Last successful com.modelprediction.daily launchd run">Daily: …</span></span>
   <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
   <span class="chip dim" id="updatedTxt">Updated: —</span>
   <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
@@ -142,6 +157,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <button data-tab="today">Today</button>
     <button data-tab="market">Market</button>
     <button data-tab="research">Research</button>
+    <button data-tab="flat">Flat</button>
     <button data-tab="settings">Settings</button>
   </div>
 
@@ -149,14 +165,18 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <h2>Sports × Market Matrix</h2>
       <div class="small dim" id="matrixGate" style="margin-bottom:8px"></div>
-      <table class="matrix" id="matrixTable"></table>
+      <div class="matrix-scroll"><table class="matrix" id="matrixTable"></table></div>
       <div class="small dim" style="margin-top:8px">
-        ✅ qualified · 🔴 tested, below gate · 🧪 research score model (shadow only) · ⛔ blocked, no valid contract lines · 🟡 untested · ⬛ no data · — n/a — click a cell to drill down
+        <span class="green">qualified</span> · <span class="red">tested, below gate</span> · <span style="color:#9db4ff">research score model (shadow only)</span> · blocked, no valid contract lines · <span class="yellow">untested</span> · no data · — n/a — click a cell to drill down, hover for detail
       </div>
     </div>
     <div class="card" id="esportsCard" style="display:none">
       <h2>Esports</h2>
-      <table class="matrix" id="esportsTable"></table>
+      <div class="matrix-scroll"><table class="matrix" id="esportsTable"></table></div>
+    </div>
+    <div class="card" id="baseballCard" style="display:none">
+      <h2>Baseball</h2>
+      <div class="matrix-scroll"><table class="matrix" id="baseballTable"></table></div>
     </div>
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
   </section>
@@ -263,6 +283,18 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
   </section>
 
+  <section id="tab-flat" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 style="margin:0">Flat Forecast — All Games (No Edge Gate)</h2>
+      <span class="chip dim">Model run on every game regardless of edge</span>
+      <span style="flex:1"></span>
+      <button class="primary" onclick="confirmAction('flat_forecast','Run flat forecast on all games for today?')">Run Flat Forecast</button>
+    </div>
+    <div id="flatKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div class="card">
+      <table class="data" id="flatTable"><tr><td>Loading…</td></tr></table>
+    </div>
+  </section>
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -362,6 +394,11 @@ function renderStatus(s){
   else {dot.className="dot gray";txt.textContent="Tests: not run";}
   $("#modelsTxt").textContent=`Models: ${s.models_loaded} artifacts`;
   $("#dataTxt").textContent="Data: "+Object.entries(s.data_counts).map(([k,v])=>`${k.toUpperCase()} ${v.toLocaleString()}`).join(" · ");
+  const dp=s.daily_pipeline||{};
+  const dailyDot=$("#dailyDot"), dailyTxt=$("#dailyTxt");
+  if(dp.age_hours==null){dailyDot.className="dot gray";dailyTxt.textContent="Daily: no log found";}
+  else if(dp.stale){dailyDot.className="dot r";dailyTxt.textContent=`Daily: STALE (${dp.age_hours}h ago)`;}
+  else {dailyDot.className="dot g";dailyTxt.textContent=`Daily: ${dp.age_hours}h ago`;}
   const n=(s.alerts||[]).length + (t.status==="failed"?1:0);
   $("#alertTxt").textContent=`Alerts: ${n}`;
   $("#alertDot").className="dot "+(n? (s.alerts.some(a=>a.level==="warn")?"y":"g"):"g");
@@ -380,39 +417,66 @@ function renderStatus(s){
 
 /* ---------- matrix ---------- */
 const MARKET_LABELS={moneyline:"ML",spread:"Spread",total:"Total",f5_spread:"F5 Spread",f5_total:"F5 Total",yrfi_nrfi:"YRFI/NRFI"};
+const MATRIX_ICONS={
+  q:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.2 3.2L13 4.5"/></svg>',
+  t:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  r:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h4M6.5 2v3.2L3.4 11a1.5 1.5 0 0 0 1.3 2.2h6.6a1.5 1.5 0 0 0 1.3-2.2L9.5 5.2V2"/></svg>',
+  b:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M4 4l8 8"/></svg>',
+  u:'<svg class="icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="3.4"/></svg>',
+};
+// Heatmap range is scoped per-table: qualified cells are colored by hit_rate
+// relative to the weakest/strongest qualified cell in that same table, not
+// against a single global bound (grid/esports/baseball are different scales).
+function matrixHeat(rate,lo,hi){
+  if(rate==null||hi<=lo)return .30;
+  const t=Math.max(0,Math.min(1,(rate-lo)/(hi-lo)));
+  return .14+t*.34;
+}
+function matrixQualifiedRange(cells){
+  const rates=cells.filter(c=>c&&c.state==="qualified"&&c.hit_rate!=null).map(c=>Number(c.hit_rate));
+  return [rates.length?Math.min(...rates):0, rates.length?Math.max(...rates):1];
+}
+function matrixCell(c,sport,mk,heatRange){
+  c=c||{state:"no_data"};
+  // Every cell renders the SAME two-line template: .c1 = status + primary
+  // metric, .c2 = one dim detail line. No third lines, no mixed styles.
+  let cls="n",l1="no data",l2="—";
+  if(c.state==="qualified"){
+    cls="q";l1=pct(c.hit_rate);
+    l2=mk==="moneyline"&&c.three_way?`${c.calls} binary · 3W ${pct(c.three_way.hit_rate)}/${c.three_way.calls}c`:
+      mk==="total"?`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`:
+      (c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`);
+  }else if(c.state==="tested_not_qualified"){
+    cls="t";l1=pct(c.hit_rate);l2=`${c.calls} calls · below gate`;
+  }else if(c.state==="research_total_candidate"||c.state==="research_active"){
+    cls="r";l1=pct(c.hit_rate);
+    l2=c.calls?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls??'—'} calls · research`;
+  }else if(c.state==="blocked"){
+    cls="b";l1="blocked";l2="missing valid contract lines";
+  }else if(c.state==="model_untested"){
+    cls="u";l1="untested";l2="model exists · no holdout";
+  }else if(c.state==="not_applicable"){
+    cls="na";l1="—";l2="n/a";
+  }
+  const style=cls==="q"
+    ?`style="background:rgba(0,255,136,${matrixHeat(c.hit_rate!=null?Number(c.hit_rate):null,heatRange[0],heatRange[1]).toFixed(3)})"`
+    :"";
+  const tip=[l2,c.qualification?String(c.qualification).replaceAll("_"," "):""]
+    .filter(Boolean).join(" · ").replaceAll('"',"&quot;");
+  return `<td class="cell ${cls}" ${style} data-tip="${tip}" onclick='drill("${sport}","${mk}")'>`+
+    `<div class="c1">${MATRIX_ICONS[cls]||""}${l1}</div><div class="c2">${l2}</div></td>`;
+}
 function renderMatrix(m){
   state.matrix=m;
   $("#matrixGate").textContent=m.gate?("Qualification gate: "+m.gate+"  ·  source: "+m.source):"";
   const tbl=$("#matrixTable");
+  const gridCells=Object.keys(m.grid).flatMap(sport=>m.markets.map(mk=>m.grid[sport][mk]));
+  const gridHeat=matrixQualifiedRange(gridCells);
   let html="<tr><th>Sport</th>"+m.markets.map(k=>`<th>${MARKET_LABELS[k]||k}</th>`).join("")+"</tr>";
   for(const sport of Object.keys(m.grid)){
     if(!visibleSports().includes(sport))continue;
     html+=`<tr><th>${sport.toUpperCase()}</th>`;
-    for(const mk of m.markets){
-      const c=m.grid[sport][mk]||{state:"no_data"};
-      // Every cell renders the SAME two-line template: .c1 = status + primary
-      // metric, .c2 = one dim detail line. No third lines, no mixed styles.
-      let cls="n",l1="⬛ no data",l2="—";
-      if(c.state==="qualified"){
-        cls="q";l1=`✅ ${pct(c.hit_rate)}`;
-        l2=mk==="moneyline"&&c.three_way?`${c.calls} binary · 3W ${pct(c.three_way.hit_rate)}/${c.three_way.calls}c`:
-          mk==="total"?`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`:
-          (c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`);
-      }else if(c.state==="tested_not_qualified"){
-        cls="t";l1=`🔴 ${pct(c.hit_rate)}`;
-        l2=`${c.calls} calls · below gate`;
-      }else if(c.state==="research_total_candidate"||c.state==="research_active"){
-        cls="r";l1=`🧪 ${pct(c.hit_rate)}`;
-        l2=c.calls?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls??'—'} calls · research`;
-      }else if(c.state==="blocked"){
-        cls="b";l1="⛔ blocked";l2="missing valid contract lines";
-      }else if(c.state==="model_untested"){
-        cls="u";l1="🟡 untested";l2="model exists · no holdout";
-      }else if(c.state==="not_applicable"){
-        cls="na";l1="—";l2="n/a";
-      }
-      html+=`<td class="cell ${cls}" onclick='drill("${sport}","${mk}")'><div class="c1">${l1}</div><div class="c2">${l2}</div></td>`;
-    }
+    for(const mk of m.markets)html+=matrixCell(m.grid[sport][mk],sport,mk,gridHeat);
     html+="</tr>";
   }
   tbl.innerHTML=html;
@@ -420,19 +484,23 @@ function renderMatrix(m){
   if(m.esports&&Object.keys(m.esports).length){
     const et=$("#esportsTable"), ec=$("#esportsCard");
     ec.style.display="";
+    const heat=matrixQualifiedRange(Object.values(m.esports).map(v=>v.moneyline));
     let ehtml="<tr><th>Sport</th><th>ML</th></tr>";
     for(const sport of Object.keys(m.esports)){
-      const c=m.esports[sport].moneyline||{state:"no_data"};
-      let cls="n",l1="⬛ no data",l2="—";
-      if(c.state==="qualified"){
-        cls="q";l1=`✅ ${pct(c.hit_rate)}`;
-        l2=c.units!=null?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls} calls`;
-      }else if(c.state==="tested_not_qualified"){
-        cls="t";l1=`🔴 ${pct(c.hit_rate)}`;l2=`${c.calls} calls · below gate`;
-      }
-      ehtml+=`<tr><th>${sport.toUpperCase()}</th><td class="cell ${cls}" onclick='drill(\"${sport}\",\"moneyline\")'><div class="c1">${l1}</div><div class="c2">${l2}</div></td></tr>`;
+      ehtml+=`<tr><th>${sport.toUpperCase()}</th>${matrixCell(m.esports[sport].moneyline,sport,"moneyline",heat)}</tr>`;
     }
     et.innerHTML=ehtml;
+  }
+  // Render baseball table (MLB/KBO/NPB)
+  if(m.baseball&&Object.keys(m.baseball).length){
+    const bt=$("#baseballTable"), bc=$("#baseballCard");
+    bc.style.display="";
+    const heat=matrixQualifiedRange(Object.values(m.baseball).map(v=>v.moneyline));
+    let bhtml="<tr><th>Sport</th><th>ML</th></tr>";
+    for(const sport of Object.keys(m.baseball)){
+      bhtml+=`<tr><th>${sport.toUpperCase()}</th>${matrixCell(m.baseball[sport].moneyline,sport,"moneyline",heat)}</tr>`;
+    }
+    bt.innerHTML=bhtml;
   }
 }
 function drill(sport,market){
@@ -524,9 +592,11 @@ const etDate=value=>{const p=etParts(value);return p?`${p.year}-${p.month}-${p.d
 const gameTimeET=value=>{const p=etParts(value);return p?`${p.month}/${p.day} ${p.hour}:${p.minute} ${p.dayPeriod}`:"—";};
 const todayET=()=>etDate(new Date());
 const shortDate=value=>{const s=String(value||"");return s.length>=16?`${s.slice(5,10).replace("-","/")} ${s.slice(11,16)}`:s;};
-const marketPrice=p=>Number(p.quote?.ask??p.market_implied_probability)||null;
+const pregamePrice=p=>Number(p.quote?.ask??p.market_implied_probability)||null;
+const entryPrice=p=>Number(p.filled_entry?.price)||null;
 const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
-const edgePoints=p=>{const m=marketPrice(p),model=Number(p.model_probability);return m&&model?model-m:null;};
+const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))return stored;
+  const m=pregamePrice(p),model=Number(p.model_probability);return m&&model?model-m:null;};
 function populateFilters(){
   const sports=[...new Set(state.picks.map(p=>p.league))].sort();
   const markets=[...new Set(state.picks.map(p=>p.market_type))].sort();
@@ -563,24 +633,40 @@ function renderPicks(){
   const rows=filteredPicks().sort((a,b)=>{
     const x=a[sortKey]??"",y=b[sortKey]??"";
     return (x>y?1:x<y?-1:0)*(sortAsc?1:-1);});
-  const perf=state.perf||{};
-  $("#pickKpis").innerHTML=`
-    <div class="k"><b>${rows.length}</b><span>shown picks</span></div>
-    <div class="k"><b>${pct(perf.win_rate)}</b><span>win rate</span></div>
-    <div class="k"><b class="${(perf.total_pnl||0)>=0?"green":"red"}">${fmt(perf.total_pnl)}</b><span>total P&amp;L (U)</span></div>
-    <div class="k"><b>${pct(perf.roi)}</b><span>ROI</span></div>
-    <div class="k"><b>${perf.streaks?(perf.streaks.current>0?"W"+perf.streaks.current:perf.streaks.current<0?"L"+(-perf.streaks.current):"—"):"—"}</b><span>streak</span></div>`;
+   // Compute KPIs from filtered rows (not global state.perf)
+   const settled=rows.filter(p=>p.status==="settled"&&(p.result==="win"||p.result==="loss"));
+   const wins=settled.filter(p=>p.result==="win").length;
+   const losses=settled.filter(p=>p.result==="loss").length;
+   const winRate=wins+losses>0?wins/(wins+losses):0;
+   const totalPnl=settled.reduce((s,p)=>s+pickPnl(p),0);
+   const totalRisked=settled.reduce((s,p)=>s+(Number(p.units)||0),0);
+   const roi=totalRisked>0?totalPnl/totalRisked:0;
+   // Streak from settled sorted by settled_at_utc
+   const bySettled=[...settled].sort((a,b)=>(a.settled_at_utc||"").localeCompare(b.settled_at_utc||""));
+   let streak=0;
+   for(let i=bySettled.length-1;i>=0;i--){
+     if(bySettled[i].result==="win"){if(streak>=0)streak++;else break;}
+     else{if(streak<=0)streak--;else break;}
+   }
+   const streakLabel=streak>0?"W"+streak:streak<0?"L"+(-streak):"—";
+   $("#pickKpis").innerHTML=`
+     <div class="k"><b>${rows.length}</b><span>shown picks</span></div>
+     <div class="k"><b>${pct(winRate)}</b><span>win rate</span></div>
+     <div class="k"><b class="${totalPnl>=0?"green":"red"}">${fmt(totalPnl)}</b><span>total P&amp;L (U)</span></div>
+     <div class="k"><b>${pct(roi)}</b><span>ROI</span></div>
+     <div class="k"><b>${streakLabel}</b><span>streak</span></div>`;
   const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
-    ["model_probability","Model"],["market_implied_probability","Market price"],["edge","Edge"],
+    ["model_probability","Model"],["market_implied_probability","Pregame close"],["filled_entry","Bought at"],["edge","Decision edge"],
     ["units","Size"],["result","State"],["pnl_units","P&L"]];
   let html=`<tr><th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>`+cols.map(([k,l])=>`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`).join("")+"<th>Order</th><th>Matchup</th></tr>";
   rows.forEach(p=>{
     const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
-    const mp=marketPrice(p),edge=edgePoints(p),size=Number(p.units)||Number(p.suggested_paper_units)||0;
+    const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p),size=Number(p.units)||Number(p.suggested_paper_units)||0;
     html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td title="Scheduled ${esc(String(p.event_start_utc||""))}">${gameTimeET(p.event_start_utc)}</td><td>${p.league||""}</td>
       <td>${p.market_type||""}</td><td>${pickLabel(p)}</td>
       <td>${p.model_probability?pct(p.model_probability):"—"}</td>
-      <td>${cents(mp)} <span class="dim">${mp?pct(mp):"—"}</span></td>
+      <td title="${escAttr(p.quote?.observed_at_utc?`Last valid quote before tipoff · ${p.quote.observed_at_utc}`:"Stored decision-time pregame quote")}">${cents(mp)} <span class="dim">${mp?pct(mp):"—"}</span></td>
+      <td title="${escAttr(p.filled_entry?.basis==="exchange_trade"?"Exchange-confirmed fill in the selected outcome coordinate":p.filled_entry?"Filled order limit; exact execution price unavailable":"No filled exchange buy")}">${cents(entry)}</td>
       <td class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</td>
       <td>${size?size.toFixed(2)+"U":"—"}</td><td>${res}</td>
       <td class="${pickPnl(p)>=0?"green":"red"}">${fmt(pickPnl(p))}</td>
@@ -698,6 +784,42 @@ function calChart(id,buckets){const {ctx,w,h}=canvasCtx(id);
   ctx.fillText("predicted →",w/2-30,h-6);ctx.save();ctx.translate(10,h/2+24);ctx.rotate(-Math.PI/2);ctx.fillText("actual →",0,0);ctx.restore();}
 function noData(ctx,w,h){ctx.fillStyle="#556";ctx.font="12px monospace";ctx.fillText("No data",w/2-24,h/2);}
 
+async function renderFlat(){
+  try{
+    const resp=await fetch('/api/flat-picks');
+    const raw=await resp.json();
+    const flatPicks=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
+    const rows=flatPicks.sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
+    const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
+    const wins=settled.filter(p=>String(p.result||p.Result||'')==='win').length;
+    const losses=settled.filter(p=>String(p.result||p.Result||'')==='loss').length;
+    const pnl=settled.reduce((s,p)=>s+pickPnl(p),0);
+    const risked=settled.reduce((s,p)=>s+(Number(p.units||p.Units)||0),0);
+    document.getElementById('flatKpis').innerHTML=`
+      <div class="k"><b>${rows.length}</b><span>games</span></div>
+      <div class="k"><b>${wins+losses>0?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
+      <div class="k"><b class="${pnl>=0?'green':'red'}">${fmt(pnl)}</b><span>P&L (U)</span></div>
+      <div class="k"><b>${risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
+    let html='<tr><th>Game (ET)</th><th>Sport</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Size</th><th>Result</th><th>P&L</th><th>Matchup</th></tr>';
+    if(!rows.length){html+='<tr><td colspan=10>No flat forecast data. Click Run Flat Forecast.</td></tr>';}
+    rows.forEach(p=>{
+      const res=String(p.result||p.Result||'');
+      const st=String(p.status||p.State||'');
+      const resPill=res?`<span class=\"pill ${res}\">${res}</span>`:(st==='open'?'<span class=\"pill open\">open</span>':'');
+      const edge=Number(p.edge||p.Edge)||0;
+      const size=Number(p.units||p.Units)||0;
+      html+=`<tr>
+        <td>${gameTimeET(p.event_start_utc||p['Game (ET)'])}</td><td>${p.league||p.Sport||''}</td><td>${pickLabel(p)}</td>
+        <td>${Number(p.model_probability||p.Model)?pct(Number(p.model_probability||p.Model)):'—'}</td>
+        <td>${Number(p.market_implied_probability||p['Pregame close'])?pct(Number(p.market_implied_probability||p['Pregame close'])):'—'}</td>
+        <td class=\"${edge>=0?'green':'red'}\">${edge?(edge>=0?'+':'')+(edge*100).toFixed(1)+'pp':'—'}</td>
+        <td>${size?size.toFixed(2)+'U':'—'}</td>
+        <td>${resPill}</td><td class=\"${pickPnl(p)>=0?'green':'red'}\">${fmt(pickPnl(p))}</td>
+        <td class=\"dim\">${p.away_team||p.Away||''} @ ${p.home_team||p.Home||''}</td></tr>`;
+    });
+    document.getElementById('flatTable').innerHTML=html;
+  }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=10>Error loading flat data: '+esc(String(e))+'</td></tr>';}
+}
 function renderPerf(p){
   state.perf=p;
   lineChart("#cPnl",p.pnl_curve||[]);
@@ -749,7 +871,7 @@ async function renderToday(){
     box.appendChild(h);
     rows.forEach(p=>{
       const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
-      const market=marketPrice(p);
+      const market=pregamePrice(p);
       const edge=pickEdge(p);
       // Border reflects tailability: green only when the model DISAGREES with
       // the market in our favor. High confidence with negative edge is the
@@ -986,11 +1108,11 @@ async function renderFolio(){
     <div class="k"><b>${tradeCount}</b><span>filled trades</span></div>
     <div class="k"><b>${settlementCount}</b><span>settlements</span></div>
     <div class="k"><b>${winRate}</b><span>win rate (${winCount}W-${lossCount}L)</span></div>
-    <div class="k"><b class="${realized>=0?"green":"red"}">${realized>=0?"+$":"-$"}${fmt(Math.abs(realized),2)}</b><span>reported realized P&amp;L</span></div>`;
+    <div class="k"><b class="${realized>=0?"green":"red"}">${realized>=0?"+$":"-$"}${fmt(Math.abs(realized),2)}</b><span>side-adjusted realized P&amp;L</span></div>`;
   if(!activityCount){$("#folioHistory").innerHTML=`<p class="dim">No exchange trade or settlement history has been synced since ${esc(historyStart)}.</p>`;}
   else {
     let html=`<table class="data"><tr>
-      <th>Date</th><th>Type</th><th>Market</th><th>Price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Model link</th></tr>`;
+      <th>Date</th><th>Type</th><th>Market</th><th>Your-side price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Model link</th></tr>`;
       (h.activities||[]).forEach(p=>{
       html+=`<tr>
         <td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">${p.type}</span></td>
@@ -1150,7 +1272,7 @@ function resetTimer(){
 async function refreshAll(){
   try{
     const [s,m,p,perf]=await Promise.all([api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance")]);
-    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); populateFilters(); renderPicks(); renderLive(); renderFolio(); renderResearch();
+    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); populateFilters(); renderPicks(); renderLive(); renderFolio(); renderResearch(); renderFlat();
   }catch(e){
     $("#updatedTxt").innerHTML='<span class="red">Updated: SERVER UNREACHABLE — is dashboard_server.py running?</span>';
   }

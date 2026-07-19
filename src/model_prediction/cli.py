@@ -185,6 +185,19 @@ def parser() -> argparse.ArgumentParser:
         default="learned",
         help="default learned production path; legacy option is MLB-only research rollback",
     )
+    forecast.add_argument(
+        "--replace-today",
+        action="store_true",
+        help="clear existing open picks for today before re-forecasting (default on daily)",
+    )
+
+    flat_forecast = commands.add_parser(
+        "flat-forecast", help="forecast every game with no edge gate → flat_picks.xlsx"
+    )
+    flat_forecast.add_argument("--sport", choices=SPORTS)
+    flat_forecast.add_argument("--all", action="store_true")
+    flat_forecast.add_argument("--date", required=True)
+    flat_forecast.add_argument("--log", action="store_true", help="log all calls to flat ledger")
 
     log_cmd = commands.add_parser("log", help="alias for forecast --log")
     log_cmd.add_argument("--sport", choices=SPORTS, default="mlb")
@@ -626,6 +639,7 @@ def _forecast_learned_sport(
     *,
     maximum_data_age_hours: float | None = None,
     maximum_unreviewed_disagreement: float | None = None,
+    flat_mode: bool = False,
 ) -> dict:
     """Default production forecast path for audited learned moneyline models."""
     model_config = config["models"][sport.upper()]
@@ -679,14 +693,18 @@ def _forecast_learned_sport(
                 )
                 continue
             # Gate: require minimum edge over executable Polymarket ask.
-            # Model probability must exceed the market ask by at least 2% (absolute).
-            model_edge = candidate.model_probability - quote["executable_ask"]
-            if model_edge < 0.02:
-                unmatched.append(
-                    {"event_id": candidate.event_id,
-                     "reason": f"model edge {model_edge:.4f} below 2% minimum over executable ask {quote['executable_ask']:.4f}"}
-                )
-                continue
+            # Per-sport minimum edge from model.yaml; defaults to 2% absolute.
+            # Flat mode bypasses the edge gate — log every call regardless.
+            if not flat_mode:
+                min_edge = float(model_config.get("min_edge", 0.02))
+                model_edge = candidate.model_probability - quote["executable_ask"]
+                if model_edge < min_edge:
+                    edge_pct = f"{min_edge*100:.0f}%"
+                    unmatched.append(
+                        {"event_id": candidate.event_id,
+                         "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f}"}
+                    )
+                    continue
             request = PickRequest(
                 event_start_utc=candidate.event_start_utc,
                 event_id=candidate.event_id,
@@ -1126,9 +1144,19 @@ def main(argv: list[str] | None = None) -> None:
                 "closing_snapshot_observed_at_utc": closing["observed_at_utc"],
                 "definition": "closing executable probability minus decision executable probability",
             }
-        elif args.command in {"forecast", "log"}:
-            log = args.command == "log" or getattr(args, "log", False)
+        elif args.command in {"forecast", "log", "flat-forecast"}:
+            log = args.command == "log" or getattr(args, "log", False) or args.command == "flat-forecast"
+            replace_today = getattr(args, "replace_today", False) or args.command == "flat-forecast"
+            is_flat = args.command == "flat-forecast"
             sports = list(SPORTS) if getattr(args, "all", False) else [args.sport or "mlb"]
+            if is_flat:
+                # Flat forecast: separate ledger, no edge gate
+                flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
+                flat_ledger = PickLedger(flat_ledger_path)
+                if replace_today and log:
+                    _clear_today_open(flat_ledger, args.date)
+            elif replace_today and log:
+                _clear_today_open(ledger, args.date)
             results = {}
             for sport in sports:
                 selected_model = getattr(args, "model", "learned")
@@ -1137,12 +1165,14 @@ def main(argv: list[str] | None = None) -> None:
                         raise ValueError("legacy-measured-edge is available only for MLB")
                     results[sport] = _forecast_mlb(args.date, log, config, registry, bans, ledger, audit)
                 elif sport in LEARNED_PRODUCTION_SPORTS:
+                    use_ledger = flat_ledger if is_flat else ledger
                     results[sport] = _forecast_learned_sport(
-                        sport, args.date, log, config, registry, bans, ledger,
+                        sport, args.date, log, config, registry, bans, use_ledger,
                         maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
                         maximum_unreviewed_disagreement=float(
                             config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                         ),
+                        flat_mode=is_flat,
                     )
                 else:
                     results[sport] = _forecast_research_sport(sport, args.date, config)
