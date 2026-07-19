@@ -23,7 +23,7 @@
             "status": "evaluated",
             "learned_threshold": 0.515,
             "locked_holdout": {
-              "qualified": false,
+              "qualified": true,
               "calls": 1155,
               "hits": 638,
               "hit_rate": 0.552381,

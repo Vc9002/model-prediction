@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "b03e1c2d36c32e5b1f3970d910b257783fb79353a4c170faf57523285982c9f5",
+  "artifact_hash": "ebdb392c90fd9a9414a97c1b39024e1a4f2c894aee118b3b4598ecd7e5e96695",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -103,10 +103,11 @@
     "monthly_minimum_calls": 10,
     "price_diagnostics": null,
     "qualification_eligible": true,
-    "qualified": false,
+    "qualified": true,
     "roi": null,
     "secondary_reporting_complete": true,
     "selectivity": 0.18034,
+    "status": "shadow_qualified",
     "total_predictions": 1353,
     "units_at_minus_110": 63.0
   },
