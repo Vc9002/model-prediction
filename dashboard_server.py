@@ -507,14 +507,14 @@ def status() -> dict:
                 alerts.append({"level": "warn", "kind": "data_stale",
                                "text": f"{sport.upper()} data is {age} days old"})
 
-    # Check qualification using the same fallback as _ml_cell. lol/cs2/kbo/npb
-    # are zero-unit research baselines tracked via esports_grid/baseball_grid,
-    # not the learned-market "sports" structure _ml_cell expects, so they're
-    # checked separately below instead of always reporting "no data" here.
+    # Check qualification using the same artifact fallback as _ml_cell and matrix().
+    # lol/cs2/kbo/npb are zero-unit research baselines tracked via esports_grid/
+    # baseball_grid, checked separately below.
     sports_meta = (validation.get("sports") or {})
     for sport in ("mlb", "nba", "wnba", "nfl", "soccer"):
         meta = sports_meta.get(sport) or {}
-        ml = _ml_cell(meta)
+        artifact = _production_artifact(validation, sport)
+        ml = _ml_cell(meta, artifact)
         if ml.get("state") == "tested_not_qualified":
             alerts.append({"level": "warn", "kind": "not_qualified",
                            "text": f"{sport.upper()} moneyline below qualification gate"})
@@ -608,11 +608,33 @@ def _newest_validation() -> tuple[dict, str]:
 def _production_artifact(validation: dict, sport: str) -> dict:
     raw_path = str((validation.get("production_artifacts") or {}).get(sport) or "")
     if not raw_path:
+        # Fallback: read from model.yaml config when the validation output
+        # doesn't include this sport at all (no sport_meta, no production
+        # artifact path), e.g. MLB whose section is missing from
+        # learned-model-validation.json.
+        sports_meta = validation.get("sports") or {}
+        if sport not in sports_meta:
+            raw_path = _config_production_artifact_path(sport)
+    if not raw_path:
         return {}
     path = Path(raw_path)
     if not path.is_absolute():
         path = ROOT / path
     return _read_json(path) or {}
+
+
+def _config_production_artifact_path(sport: str) -> str:
+    """Read model.yaml and return the production_artifact path for a sport."""
+    try:
+        import yaml
+        if CONFIG_FILE.exists():
+            config = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
+            models = config.get("models") or {}
+            sport_config = models.get(sport.upper()) or {}
+            return str(sport_config.get("production_artifact") or "")
+    except Exception:
+        pass
+    return ""
 
 
 def _readiness_cell(readiness: str | None) -> dict:
@@ -689,6 +711,18 @@ def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
         primary = {"learned_threshold": market_model.get("confidence_threshold")}
         variant_name = "artifact_pinned"
     if not holdout:
+        # Fallback: artifact may declare qualified=True at top level
+        # without a nested qualification dict (e.g. newly promoted model).
+        if artifact.get("qualified"):
+            return {
+                "state": "qualified",
+                "hit_rate": None,
+                "calls": None,
+                "threshold": market_model.get("confidence_threshold"),
+                "variant": list(artifact_features),
+                "variant_name": "artifact_pinned",
+                "model_version": artifact.get("model_version"),
+            }
         return {"state": "no_data"}
 
     cell = {
