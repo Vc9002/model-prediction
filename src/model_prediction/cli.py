@@ -859,6 +859,93 @@ def _forecast_learned_sport(
     }
 
 
+def _log_esports_forecast(
+    forecast: dict,
+    config: dict,
+    ledger: Any,
+    flat_mode: bool = False,
+) -> int:
+    """Log esports forecast results to a PickLedger. Returns count of logged rows."""
+    from .domain import League, MarketType, PickRequest, ModelOrigin, ModelState
+    from .eligibility import EligibilityResult
+    from .entities import CanonicalTeam
+    from .data_sources.polymarket_us import probability_to_american
+
+    logged = 0
+    model_config = config["models"].get(forecast["title"].upper(), {})
+    min_edge = float(model_config.get("min_edge", 0.02))
+    configured_state = str(model_config.get("status", "shadow_qualified"))
+    title = forecast["title"].upper()
+    league = League(title)
+
+    for contract in forecast.get("priced_contracts", []):
+        # Only log the model's pick: the side with higher model probability
+        sides = contract.get("sides", [])
+        if len(sides) != 2:
+            continue
+        best_side = max(sides, key=lambda s: float(s["model_probability"]))
+        model_prob = float(best_side["model_probability"])
+        ask = float(best_side["executable_ask"])
+        edge = model_prob - ask
+
+        # Edge gate for main ledger
+        if not flat_mode and edge < min_edge:
+            continue
+
+        selected_team = str(best_side["team"])
+        other_team = next(t for t in contract["teams"] if t != selected_team)
+        selection = "home" if best_side["side"] == "long" else "away"
+
+        american_odds = probability_to_american(ask)
+        request = PickRequest(
+            event_start_utc=str(contract["event_start_utc"]),
+            event_id=str(contract["event_id"]),
+            league=league,
+            away_team=other_team,
+            home_team=selected_team,
+            market_type=MarketType.MONEYLINE,
+            selection=selection,
+            line=None,
+            sportsbook="polymarket_us",
+            american_odds=american_odds,
+            model_probability=round(model_prob, 6),
+            model_uncertainty=None,
+            model_version=str(forecast["model_version"]),
+            rationale=f"Neutral Elo baseline; executable ask {ask:.4f} ({contract['market_slug']}).",
+            risks="Research baseline; zero-unit shadow until qualified.",
+            model_origin=ModelOrigin.STATISTICAL_MODEL,
+            model_state=ModelState(configured_state),
+            model_artifact_hash=str(contract.get("artifact_hash", "")),
+            calibration_method="neutral_elo",
+            calibration_version=str(forecast["model_version"]),
+            calibration_artifact_hash=str(contract.get("artifact_hash", "")),
+        )
+
+        away_team = CanonicalTeam(other_team, league, other_team, other_team, True, None, None, ())
+        home_team = CanonicalTeam(selected_team, league, selected_team, selected_team, True, None, None, ())
+
+        units = edge_scaled_units(model_prob, 0.05, american_odds, unit_policy(config))
+        eligibility = EligibilityResult(
+            RecordType.QUALIFIED_SHADOW_CALL,
+            "CALL",
+            "QUALIFIED",
+            units,
+            min(100, max(0, int(edge * 1000))),
+            edge,
+            edge - 0.05,
+            away_team,
+            home_team,
+        )
+
+        try:
+            ledger.append_evaluated(request, eligibility)
+            logged += 1
+        except Exception:
+            pass
+
+    return logged
+
+
 def _forecast_research_sport(sport: str, args_date: str, config) -> dict:
     """Research-only preview for non-MLB sports from cached data. Never logs."""
     store = FeatureStore(Path(ledger_path(config)).parent)
@@ -1254,7 +1341,6 @@ def main(argv: list[str] | None = None) -> None:
                         raise ValueError("legacy-measured-edge is available only for MLB")
                     results[sport] = _forecast_mlb(args.date, log, config, registry, bans, ledger, audit)
                 elif sport in ("lol", "cs2"):
-                    # Esports: separate Elo-based pipeline, no ledger integration yet
                     from .esports import forecast_esports_slate
                     results[sport] = forecast_esports_slate(
                         data_root=Path(ledger_path(config)).parent,
@@ -1262,6 +1348,9 @@ def main(argv: list[str] | None = None) -> None:
                         title=sport,
                         game_date=args.date,
                     )
+                    if log and ledger is not None:
+                        use_ledger = flat_ledger if is_flat else ledger
+                        _log_esports_forecast(results[sport], config, use_ledger, flat_mode=is_flat)
                 elif sport in LEARNED_PRODUCTION_SPORTS:
                     use_ledger = flat_ledger if is_flat else ledger
                     results[sport] = _forecast_learned_sport(
@@ -1337,6 +1426,19 @@ def main(argv: list[str] | None = None) -> None:
                             pass
             except Exception:
                 pass  # Availability capture is best-effort; never block daily
+            # Build WNBA player priors for today's games
+            try:
+                from .features.base import FeatureStore
+                from .data_sources.espn import ESPNClient
+                from .wnba_availability_evaluation import build_and_save_priors
+                wnba_priors_result = build_and_save_priors(
+                    store=FeatureStore(data_root),
+                    client=ESPNClient(),
+                    game_date=args.date,
+                    data_root=data_root,
+                )
+            except Exception:
+                wnba_priors_result = {"status": "skipped"}
             _clear_today_open(ledger, args.date)
             # Also clear and forecast for flat ledger
             flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
@@ -1362,6 +1464,7 @@ def main(argv: list[str] | None = None) -> None:
                     title=title,
                     game_date=args.date,
                 )
+                _log_esports_forecast(forecast_result[title], config, ledger, flat_mode=False)
             # Run flat forecast (all games, no edge gate) to flat_picks.xlsx
             flat_result = {}
             for sport in LEARNED_SPORTS:
@@ -1380,6 +1483,7 @@ def main(argv: list[str] | None = None) -> None:
                     title=title,
                     game_date=args.date,
                 )
+                _log_esports_forecast(flat_result[title], config, flat_ledger, flat_mode=True)
             for result in forecast_result.values():
                 result.pop("candidates", None)
             # Read back stored Polymarket odds snapshots for per-sport summaries.
@@ -1434,6 +1538,9 @@ def main(argv: list[str] | None = None) -> None:
                 "step4_settlement": settlement,
                 "step1b_soccer_scores": soccer_collection,
                 "step5_summary": _summary(config, ledger),
+                "step5b_wnba_availability": {
+                    "priors": wnba_priors_result,
+                },
                 "step6_flat_forecast_and_log": flat_result,
                 "step7_flat_settlement": flat_settlement,
             }
