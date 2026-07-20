@@ -894,19 +894,22 @@ def _log_esports_forecast(
             continue
 
         selected_team = str(best_side["team"])
-        other_team = next(t for t in contract["teams"] if t != selected_team)
-        # Always "home" — home_team IS the team we're betting on.
-        # Polymarket "long"/"short" are contract-side labels only.
+        # Use Polymarket's teams ordering for home/away; selection reflects
+        # which side we're picking (can be home or away).
+        teams = list(contract["teams"])
+        home_team = teams[0]
+        away_team = teams[1]
+        pick_is_home = selected_team == home_team
 
         american_odds = probability_to_american(ask)
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
             league=league,
-            away_team=other_team,
-            home_team=selected_team,
+            away_team=away_team,
+            home_team=home_team,
             market_type=MarketType.MONEYLINE,
-            selection="home",
+            selection="home" if pick_is_home else "away",
             line=None,
             sportsbook="polymarket_us",
             american_odds=american_odds,
@@ -923,8 +926,8 @@ def _log_esports_forecast(
             calibration_artifact_hash=str(contract.get("artifact_hash", "")),
         )
 
-        away_team = CanonicalTeam(other_team, league, other_team, other_team, True, None, None, ())
-        home_team = CanonicalTeam(selected_team, league, selected_team, selected_team, True, None, None, ())
+        away_ct = CanonicalTeam(away_team, league, away_team, away_team, True, None, None, ())
+        home_ct = CanonicalTeam(home_team, league, home_team, home_team, True, None, None, ())
 
         units = edge_scaled_units(model_prob, 0.05, american_odds, unit_policy(config))
         eligibility = EligibilityResult(
@@ -935,8 +938,8 @@ def _log_esports_forecast(
             min(100, max(0, int(edge * 1000))),
             edge,
             edge - 0.05,
-            away_team,
-            home_team,
+            away_ct,
+            home_ct,
         )
 
         try:
@@ -1324,7 +1327,7 @@ def main(argv: list[str] | None = None) -> None:
             log = args.command == "log" or getattr(args, "log", False) or args.command == "flat-forecast"
             replace_today = getattr(args, "replace_today", False) or args.command == "flat-forecast"
             is_flat = args.command == "flat-forecast"
-            sports = list(SPORTS) if getattr(args, "all", False) else [args.sport or "mlb"]
+            sports = list(SPORTS) + list(ESPORTS_TITLES) if getattr(args, "all", False) else [args.sport or "mlb"]
             if is_flat:
                 # Flat forecast: separate ledger, no edge gate
                 flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
