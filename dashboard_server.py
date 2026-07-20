@@ -786,7 +786,7 @@ def matrix() -> dict:
     mlb_meta = sports_meta.get("mlb") or {}
     mlb_row["moneyline"] = _ml_cell(mlb_meta, _production_artifact(validation, "mlb"))
     mlb_readiness = mlb_meta.get("multi_market_readiness") or {}
-    for mk in ["spread", "total", "f5_spread", "f5_total"]:
+    for mk in ["spread", "total", "f5_spread", "f5_total", "yrfi_nrfi"]:
         key = f"full_game_{mk}" if mk in ("spread","total") else mk
         rd = mlb_readiness.get(key) or mlb_readiness.get(mk)
         if isinstance(rd, dict) and rd.get("state"):

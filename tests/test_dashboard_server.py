@@ -271,15 +271,15 @@ def test_matrix_uses_newest_artifact_backed_soccer_variant(monkeypatch, tmp_path
 def test_matrix_marks_mlb_special_markets_blocked_from_readiness(monkeypatch) -> None:
     meta = {
         "multi_market_readiness": {
-            "first_five_spread": "BLOCKED_F5_SPREAD",
-            "first_five_total": "BLOCKED_F5_TOTAL",
+            "f5_spread": "BLOCKED_F5_SPREAD",
+            "f5_total": "BLOCKED_F5_TOTAL",
             "yrfi_nrfi": "BLOCKED_YRFI_NRFI",
         }
     }
     validation = {"sports": {"mlb": meta}, "production_artifacts": {}}
 
     monkeypatch.setattr(dashboard_server, "_newest_validation", lambda: (validation, "test"))
-    result = dashboard_server.matrix()["grid"]["mlb"]
+    result = dashboard_server.matrix()["baseball"]["mlb"]
 
     assert result["f5_spread"] == {
         "state": "blocked",
