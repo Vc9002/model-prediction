@@ -31,6 +31,7 @@ from .config import (
     unit_policy,
 )
 from .data_sources.espn import ESPNClient, ESPNMLBClient, SPORT_LEAGUES
+from .data_sources.espn_wnba_injuries import capture_espn_event_injuries
 from .data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
 from .data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
 from .data_sources.polymarket_execute import (
@@ -244,6 +245,12 @@ def parser() -> argparse.ArgumentParser:
     availability.add_argument(
         "--observed-at",
         help="UTC-aware ISO timestamp; defaults to now and never selects a future report",
+    )
+    availability.add_argument(
+        "--event-id",
+        action="append",
+        default=[],
+        help="also archive ESPN event injury statuses; repeat for each WNBA game",
     )
 
     bootstrap = commands.add_parser("bootstrap", help="idempotent historical backfill from ESPN")
@@ -1288,8 +1295,8 @@ def main(argv: list[str] | None = None) -> None:
                 no_snapshot_bbo=False,
             )
             slate = _polymarket_slate(slate_args, config)
-            _clear_today_open(ledger, args.date)
-            # Also clear and forecast for flat ledger (all games, no edge gate)
+            _clear_today_open(ledger, args.date, by_event_date=True)
+            # Also clear and forecast for flat ledger
             flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
             flat_ledger = PickLedger(flat_ledger_path)
             _clear_today_open(flat_ledger, args.date, by_event_date=True)
@@ -1393,10 +1400,24 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "ingest":
             output = Ingestor(data_root, audit=audit).ingest_scores(args.sport, args.date)
         elif args.command == "wnba-availability-capture":
-            output = capture_latest_report(
-                data_root,
-                observed_at=parse_utc(args.observed_at) if args.observed_at else utc_now(),
+            availability_observed_at = (
+                parse_utc(args.observed_at) if args.observed_at else utc_now()
             )
+            output = {
+                "official_report": capture_latest_report(
+                    data_root,
+                    observed_at=availability_observed_at,
+                ),
+                "espn_events": [
+                    capture_espn_event_injuries(
+                        data_root,
+                        event_id=event_id,
+                        client=ESPNClient(),
+                        observed_at=availability_observed_at,
+                    )
+                    for event_id in args.event_id
+                ],
+            }
         elif args.command == "bootstrap":
             ingestor = Ingestor(data_root, audit=audit)
             if args.all:
