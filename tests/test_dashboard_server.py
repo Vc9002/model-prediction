@@ -97,6 +97,41 @@ def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
     server.server_close.assert_called_once_with()
 
 
+def test_latest_persisted_action_returns_newest_finished_job(
+    monkeypatch, tmp_path: Path
+) -> None:
+    jobs = tmp_path / "jobs.json"
+    jobs.write_text(
+        json.dumps(
+            {
+                "old": {
+                    "action": "run_tests",
+                    "status": "failed",
+                    "started_at": "2026-07-20T10:00:00",
+                },
+                "running": {
+                    "action": "run_tests",
+                    "status": "running",
+                    "started_at": "2026-07-20T12:00:00",
+                },
+                "new": {
+                    "action": "run_tests",
+                    "status": "ok",
+                    "started_at": "2026-07-20T11:00:00",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "JOBS_FILE", jobs)
+
+    result = dashboard_server._latest_persisted_action("run_tests")
+
+    assert result is not None
+    assert result["status"] == "ok"
+    assert result["started_at"] == "2026-07-20T11:00:00"
+
+
 def test_matrix_labels_total_score_artifact_as_research_only(monkeypatch, tmp_path: Path) -> None:
     output = tmp_path / "outputs"
     output.mkdir()
@@ -287,6 +322,112 @@ def test_matrix_marks_mlb_special_markets_blocked_from_readiness(monkeypatch) ->
     }
     assert result["f5_total"]["state"] == "blocked"
     assert result["yrfi_nrfi"]["state"] == "blocked"
+
+
+def test_metricless_qualified_artifact_is_not_rendered_as_qualified() -> None:
+    cell = dashboard_server._ml_cell(
+        {},
+        {
+            "model_version": "mlb-example-v1",
+            "qualified": True,
+            "market_models": {
+                "moneyline": {
+                    "feature_names": ["elo_probability"],
+                    "confidence_threshold": 0.55,
+                }
+            },
+        },
+    )
+
+    assert cell["state"] == "tested_not_qualified"
+    assert cell["calls"] is None
+    assert cell["readiness"] == "ARTIFACT_QUALIFIED_FLAG_WITHOUT_LOCKED_HOLDOUT_METRICS"
+
+
+def test_newest_validation_loads_dedicated_research_grids(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "learned-model-validation.json").write_text(
+        json.dumps({"sports": {}}), encoding="utf-8"
+    )
+    (tmp_path / "international-baseball-baseline-validation.json").write_text(
+        json.dumps(
+            {
+                "leagues": {
+                    "kbo": {
+                        "model_version": "kbo-v1",
+                        "locked_test": {
+                            "accuracy_decisive": 0.55,
+                            "calls": 100,
+                            "brier_settlement": 0.24,
+                            "units_at_minus_110": 5.0,
+                            "observations": 102,
+                            "ties": 2,
+                        },
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "esports-baseline-validation.json").write_text(
+        json.dumps(
+            {
+                "titles": {
+                    "lol": {
+                        "model_version": "lol-v1",
+                        "chosen": {"confidence_threshold": 0.05},
+                        "locked_test": {
+                            "selected_matches": {
+                                "accuracy": 0.69,
+                                "calls": 200,
+                                "brier": 0.20,
+                                "units_at_minus_110": 12.0,
+                            }
+                        },
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "OUTPUTS", tmp_path)
+
+    validation, source = dashboard_server._newest_validation()
+
+    kbo = validation["baseball_grid"]["kbo"]["moneyline"]
+    lol = validation["esports_grid"]["lol"]["moneyline"]
+    assert kbo == {
+        "state": "research_only",
+        "hit_rate": 0.55,
+        "calls": 100,
+        "brier": 0.24,
+        "units": 0.0,
+        "diagnostic_units": 5.0,
+        "observations": 102,
+        "ties": 2,
+        "model_version": "kbo-v1",
+        "qualified_for_betting": False,
+    }
+    assert lol["state"] == "research_only"
+    assert lol["hit_rate"] == 0.69
+    assert lol["units"] == 0.0
+    assert "international-baseball-baseline-validation.json" in source
+    assert "esports-baseline-validation.json" in source
+
+
+def test_production_artifact_falls_back_to_active_config_path(
+    monkeypatch, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "active.json"
+    artifact.write_text(json.dumps({"model_version": "active-v1"}), encoding="utf-8")
+    monkeypatch.setattr(
+        dashboard_server,
+        "_config_production_artifact_path",
+        lambda _sport: str(artifact),
+    )
+
+    loaded = dashboard_server._production_artifact({"sports": {"wnba": {}}}, "wnba")
+
+    assert loaded["model_version"] == "active-v1"
 
 
 def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_path: Path) -> None:

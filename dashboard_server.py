@@ -542,7 +542,7 @@ def status() -> dict:
         alerts.append({"level": "warn", "kind": "daily_pipeline_stale",
                        "text": f"Daily pipeline is stale — {detail}"})
 
-    tests = _LAST_ACTION.get("run_tests")
+    tests = _LAST_ACTION.get("run_tests") or _latest_persisted_action("run_tests")
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "models_loaded": len(models),
@@ -578,6 +578,7 @@ def _newest_validation() -> tuple[dict, str]:
     )
     merged: dict = {"sports": {}, "production_artifacts": {}}
     sources = []
+    newest: dict = {}
     if candidates:
         newest = _read_json(candidates[-1]) or {}
         merged["sports"].update(newest.get("sports") or {})
@@ -597,9 +598,58 @@ def _newest_validation() -> tuple[dict, str]:
         merged["production_artifacts"].update(soccer.get("production_artifacts") or {})
         sources.append(path.name)
 
-    # Preserve esports/baseball grids from learned-model-validation
-    merged["esports_grid"] = newest.get("esports_grid") or {}
-    merged["baseball_grid"] = newest.get("baseball_grid") or {}
+    # Preserve embedded grids, then fill them from their dedicated validation
+    # reports. Core learned-model validation intentionally does not own these
+    # research-only leagues and may omit both keys entirely.
+    esports_grid = dict(newest.get("esports_grid") or {})
+    esports_validation = _read_json(OUTPUTS / "esports-baseline-validation.json") or {}
+    for sport, result in (esports_validation.get("titles") or {}).items():
+        locked = (result.get("locked_test") or {}).get("selected_matches") or {}
+        if not locked:
+            continue
+        esports_grid[str(sport)] = {
+            "moneyline": {
+                "state": "research_only",
+                "hit_rate": locked.get("accuracy"),
+                "calls": locked.get("calls"),
+                "brier": locked.get("brier"),
+                "units": 0.0,
+                "diagnostic_units": locked.get("units_at_minus_110"),
+                "threshold": (result.get("chosen") or {}).get("confidence_threshold"),
+                "model_version": result.get("model_version"),
+                "qualified_for_betting": False,
+            }
+        }
+    if esports_validation.get("titles"):
+        sources.append("esports-baseline-validation.json")
+
+    baseball_grid = dict(newest.get("baseball_grid") or {})
+    baseball_validation = (
+        _read_json(OUTPUTS / "international-baseball-baseline-validation.json") or {}
+    )
+    for sport, result in (baseball_validation.get("leagues") or {}).items():
+        locked = result.get("locked_test") or {}
+        if not locked:
+            continue
+        baseball_grid[str(sport)] = {
+            "moneyline": {
+                "state": "research_only",
+                "hit_rate": locked.get("accuracy_decisive"),
+                "calls": locked.get("calls"),
+                "brier": locked.get("brier_settlement"),
+                "units": 0.0,
+                "diagnostic_units": locked.get("units_at_minus_110"),
+                "observations": locked.get("observations"),
+                "ties": locked.get("ties"),
+                "model_version": result.get("model_version"),
+                "qualified_for_betting": False,
+            }
+        }
+    if baseball_validation.get("leagues"):
+        sources.append("international-baseball-baseline-validation.json")
+
+    merged["esports_grid"] = esports_grid
+    merged["baseball_grid"] = baseball_grid
 
     return merged, " + ".join(sources)
 
@@ -607,13 +657,10 @@ def _newest_validation() -> tuple[dict, str]:
 def _production_artifact(validation: dict, sport: str) -> dict:
     raw_path = str((validation.get("production_artifacts") or {}).get(sport) or "")
     if not raw_path:
-        # Fallback: read from model.yaml config when the validation output
-        # doesn't include this sport at all (no sport_meta, no production
-        # artifact path), e.g. MLB whose section is missing from
-        # learned-model-validation.json.
-        sports_meta = validation.get("sports") or {}
-        if sport not in sports_meta:
-            raw_path = _config_production_artifact_path(sport)
+        # The validation report can contain sport metrics without repeating
+        # the active artifact path. model.yaml remains authoritative for which
+        # version the dashboard labels as production/shadow.
+        raw_path = _config_production_artifact_path(sport)
     if not raw_path:
         return {}
     path = Path(raw_path)
@@ -648,6 +695,33 @@ def _readiness_cell(readiness: str | None) -> dict:
         return {"state": "blocked", "readiness": readiness}
     # BLOCKED_*, DIAGNOSTIC_ONLY_*, etc.
     return {"state": "blocked", "readiness": readiness}
+
+
+def _configured_research_cell(sport: str, market: str) -> dict | None:
+    """Return an untested cell when config declares a research artifact."""
+    try:
+        config = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        config = {}
+    model = ((config.get("models") or {}).get(sport.upper()) or {})
+    key = f"{market}_research_artifact"
+    raw_path = str(model.get(key) or "")
+    if not raw_path:
+        return None
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = ROOT / path
+    if not path.exists():
+        return {
+            "state": "blocked",
+            "readiness": "CONFIGURED_RESEARCH_ARTIFACT_MISSING",
+        }
+    artifact = _read_json(path) or {}
+    return {
+        "state": "model_untested",
+        "readiness": "MODEL_EXISTS_NO_LOCKED_HOLDOUT",
+        "model_version": artifact.get("model_version"),
+    }
 
 
 def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
@@ -710,17 +784,19 @@ def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
         primary = {"learned_threshold": market_model.get("confidence_threshold")}
         variant_name = "artifact_pinned"
     if not holdout:
-        # Fallback: artifact may declare qualified=True at top level
-        # without a nested qualification dict (e.g. newly promoted model).
+        # A boolean without calls/hit-rate evidence is not enough to render a
+        # qualified cell. Show as tested (model exists, qualified flag set)
+        # rather than untested, but make the missing metrics explicit.
         if artifact.get("qualified"):
             return {
-                "state": "qualified",
+                "state": "tested_not_qualified",
                 "hit_rate": None,
                 "calls": None,
                 "threshold": market_model.get("confidence_threshold"),
                 "variant": list(artifact_features),
                 "variant_name": "artifact_pinned",
                 "model_version": artifact.get("model_version"),
+                "readiness": "ARTIFACT_QUALIFIED_FLAG_WITHOUT_LOCKED_HOLDOUT_METRICS",
             }
         return {"state": "no_data"}
 
@@ -839,7 +915,8 @@ def matrix() -> dict:
         if isinstance(rd, dict) and rd.get("state"):
             mlb_row[mk] = rd
         else:
-            mlb_row[mk] = _readiness_cell(rd)
+            configured = _configured_research_cell("mlb", mk)
+            mlb_row[mk] = configured or _readiness_cell(rd)
     baseball["mlb"] = mlb_row
     # Build basketball grid (NBA/WNBA) with moneyline + spread + total
     basketball = {}
@@ -1974,6 +2051,17 @@ def _load_persisted_jobs() -> dict:
         return json.loads(JOBS_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def _latest_persisted_action(action: str) -> dict | None:
+    matches = [
+        job
+        for job in _load_persisted_jobs().values()
+        if job.get("action") == action and job.get("status") != "running"
+    ]
+    if not matches:
+        return None
+    return max(matches, key=lambda job: str(job.get("started_at") or ""))
 
 
 # ---------------------------------------------------------------------------
