@@ -564,8 +564,10 @@ def status() -> dict:
     }
 
 
-MATRIX_SPORTS = ("nba", "wnba", "nfl", "soccer")  # main grid: moneyline only, non-baseball sports
-MATRIX_MARKETS = ["moneyline"]  # main grid only shows moneyline
+MATRIX_SPORTS = ("nfl", "soccer")  # main grid: moneyline only
+MATRIX_MARKETS = ["moneyline"]
+BASKETBALL_SPORTS = ("nba", "wnba")
+BASKETBALL_MARKETS = ["moneyline", "spread", "total"]
 # ── SECTION: Validation & Matrix ────────────────────────────────────
 
 
@@ -792,7 +794,21 @@ def matrix() -> dict:
         else:
             mlb_row[mk] = {"state": "blocked" if rd else "no_data", "readiness": rd}
     baseball["mlb"] = mlb_row
-    return {"markets": markets, "grid": grid, "esports": esports, "baseball": baseball, "source": source, "gate": gate}
+    # Build basketball grid (NBA/WNBA) with moneyline + spread + total
+    basketball = {}
+    for sport in BASKETBALL_SPORTS:
+        bball_row = {}
+        meta = sports_meta.get(sport) or {}
+        bball_row["moneyline"] = _ml_cell(meta, _production_artifact(validation, sport))
+        readiness = meta.get("multi_market_readiness") or {}
+        for mk in ["spread", "total"]:
+            rd = readiness.get(mk)
+            if isinstance(rd, dict) and rd.get("state"):
+                bball_row[mk] = rd
+            else:
+                bball_row[mk] = {"state": "blocked" if rd else "no_data", "readiness": rd}
+        basketball[sport] = bball_row
+    return {"markets": markets, "grid": grid, "esports": esports, "baseball": baseball, "basketball": basketball, "source": source, "gate": gate}
 # ── SECTION: Backtests & Odds ───────────────────────────────────────
 
 

@@ -178,6 +178,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <h2>Baseball</h2>
       <div class="matrix-scroll"><table class="matrix" id="baseballTable"></table></div>
     </div>
+    <div class="card" id="basketballCard" style="display:none">
+      <h2>Basketball</h2>
+      <div class="matrix-scroll"><table class="matrix" id="basketballTable"></table></div>
+    </div>
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
   </section>
 
@@ -510,6 +514,23 @@ function renderMatrix(m){
       bhtml+="</tr>";
     }
     bt.innerHTML=bhtml;
+  }
+  // Render basketball table (NBA/WNBA) with ML + Spread + Total
+  if(m.basketball&&Object.keys(m.basketball).length){
+    const bbt=$("#basketballTable"), bbc=$("#basketballCard");
+    bbc.style.display="";
+    const allCells=Object.values(m.basketball).flatMap(v=>Object.values(v));
+    const heat=matrixQualifiedRange(allCells);
+    const bballMarkets=["moneyline","spread","total"];
+    let bhtml="<tr><th>Sport</th>"+bballMarkets.map(k=>`<th>${MARKET_LABELS[k]||k}</th>`).join("")+"</tr>";
+    for(const sport of Object.keys(m.basketball)){
+      bhtml+=`<tr><th>${sport.toUpperCase()}</th>`;
+      for(const mk of bballMarkets){
+        bhtml+=matrixCell((m.basketball[sport]||{})[mk],sport,mk,heat);
+      }
+      bhtml+="</tr>";
+    }
+    bbt.innerHTML=bhtml;
   }
 }
 function drill(sport,market){
