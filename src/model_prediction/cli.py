@@ -1289,6 +1289,10 @@ def main(argv: list[str] | None = None) -> None:
             )
             slate = _polymarket_slate(slate_args, config)
             _clear_today_open(ledger, args.date)
+            # Also clear and forecast for flat ledger (all games, no edge gate)
+            flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
+            flat_ledger = PickLedger(flat_ledger_path)
+            _clear_today_open(flat_ledger, args.date, by_event_date=True)
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             soccer_collection = collect_soccer_scores(days_from=3)
             forecast_result = {
@@ -1298,6 +1302,18 @@ def main(argv: list[str] | None = None) -> None:
                     maximum_unreviewed_disagreement=float(
                         config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                     ),
+                )
+                for sport in LEARNED_PRODUCTION_SPORTS
+            }
+            # Run flat forecast (all games, no edge gate) to flat_picks.xlsx
+            flat_result = {
+                sport: _forecast_learned_sport(
+                    sport, args.date, True, config, registry, bans, flat_ledger,
+                    maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                    maximum_unreviewed_disagreement=float(
+                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                    ),
+                    flat_mode=True,
                 )
                 for sport in LEARNED_PRODUCTION_SPORTS
             }
