@@ -710,15 +710,17 @@ def _forecast_learned_sport(
     calls = [candidate for candidate in candidates if candidate.call]
     qualified_calls = [candidate for candidate in calls if candidate.model_qualified]
     research_calls = [candidate for candidate in calls if not candidate.model_qualified]
+    # Flat mode: log every game regardless of confidence threshold.
+    to_log = candidates if flat_mode else calls
     logged: list[dict] = []
     duplicates: list[str] = []
     unmatched: list[dict] = []
-    if log and calls and registry is not None and bans is not None and ledger is not None:
+    if log and to_log and registry is not None and bans is not None and ledger is not None:
         data_root = Path(ledger_path(config)).parent
         observed_at = utc_now()
         # All logged picks carry edge-scaled units — no shadow/research calls.
         configured_state = str(model_config.get("status", "research"))
-        for candidate in calls:
+        for candidate in to_log:
             quote = match_executable_quote(data_root, sport, args_date, candidate)
             if quote is None:
                 unmatched.append(
@@ -820,6 +822,12 @@ def _forecast_learned_sport(
                 unmatched.append({"event_id": candidate.event_id, "reason": str(error)[:200]})
     if not log:
         logging_note = "Logging not requested."
+    elif flat_mode:
+        logging_note = (
+            f"Flat mode: logged {len(logged)} of {len(candidates)} games "
+            f"({len(calls)} above threshold); "
+            f"{len(duplicates)} duplicates, {len(unmatched)} without a matched quote."
+        )
     elif not calls:
         logging_note = "No calls above the learned confidence threshold."
     else:
