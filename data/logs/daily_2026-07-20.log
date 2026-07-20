@@ -809,3 +809,406 @@ Started: Mon Jul 20 06:27:22 EDT 2026
   }
 }
 Finished: Mon Jul 20 06:29:12 EDT 2026
+=== model-prediction daily 2026-07-20 (America/New_York) ===
+Started: Mon Jul 20 09:29:13 EDT 2026
+{
+  "date": "2026-07-20",
+  "step1_polymarket_search": {
+    "bbo_capture": {
+      "captured": 326,
+      "failure_details": [],
+      "failures": 0,
+      "missing_executable_ask": 0,
+      "skipped_nonqualification_contracts": 144,
+      "sports_scope": [
+        "esports",
+        "kbo",
+        "mlb",
+        "nba",
+        "nfl",
+        "npb",
+        "wnba"
+      ],
+      "status": "ok",
+      "storage": "data/odds/<sport>/2026-07-20/polymarket_snapshots.jsonl",
+      "timestamp_valid": true
+    },
+    "event_count": 67,
+    "leagues_with_events": [
+      "MLB",
+      "WNBA",
+      "WTA",
+      "LOL",
+      "CS2",
+      "VALORANT",
+      "DOTA2",
+      "RAINBOW_SIX"
+    ]
+  },
+  "step1b_soccer_scores": {
+    "ARGENTINA": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_argentina_pri",
+      "status": "error"
+    },
+    "BRASILEIRAO": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_brazil_campeo",
+      "status": "error"
+    },
+    "BRAZIL_SERIE_B": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_brazil_serie_",
+      "status": "error"
+    },
+    "CHAMPIONSHIP": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_efl_champ/sco",
+      "status": "error"
+    },
+    "COPA_LIBERTADORES": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_conmebol_copa",
+      "status": "error"
+    },
+    "CSL": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_china_superle",
+      "status": "error"
+    },
+    "ELITESERIEN": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_norway_elites",
+      "status": "error"
+    },
+    "EREDIVISIE": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_netherlands_e",
+      "status": "error"
+    },
+    "K_LEAGUE_1": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_korea_kleague",
+      "status": "error"
+    },
+    "LIGA_MX": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_mexico_ligamx",
+      "status": "error"
+    },
+    "LIGUE_1": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_france_ligue_",
+      "status": "error"
+    },
+    "SUPERLIGA": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_denmark_super",
+      "status": "error"
+    },
+    "historical_path": "data/historical/soccer_games_all.jsonl",
+    "total_new_games": 0
+  },
+  "step2_3_forecast_and_log": {
+    "mlb": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-elo-trend-lr-v3.json",
+      "calls": 13,
+      "duplicate_pick_ids": [
+        "4ae204a92d8a47fc",
+        "279e8c5dd40743fe",
+        "5d2cb57b32f14866",
+        "742b29ba1ffd440b",
+        "c7a1577522fb4d37"
+      ],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "mlb-elo-trend-lr-v3",
+      "note": "Logged 0 of 13 calls against stored executable asks; 5 duplicates, 8 without a matched quote.",
+      "qualified_shadow_calls": 13,
+      "scheduled_games": 15,
+      "skipped": [
+        {
+          "event_id": "401816194",
+          "reason": "NO_CALL_STARTERS_UNAVAILABLE: no two-sided probable-starter ERA for event 401816194 on 2026-07-20 (Miami Marlins at Houston Astros)"
+        }
+      ],
+      "sport": "mlb",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [
+        {
+          "event_id": "401816191",
+          "reason": "model edge -0.0614 below 2% minimum over executable ask 0.5900"
+        },
+        {
+          "event_id": "401816186",
+          "reason": "model edge -0.0153 below 2% minimum over executable ask 0.5800"
+        },
+        {
+          "event_id": "401816190",
+          "reason": "model edge -0.0275 below 2% minimum over executable ask 0.5750"
+        },
+        {
+          "event_id": "401816195",
+          "reason": "model edge -0.0266 below 2% minimum over executable ask 0.6650"
+        },
+        {
+          "event_id": "401816192",
+          "reason": "model edge -0.0961 below 2% minimum over executable ask 0.6150"
+        },
+        {
+          "event_id": "401816197",
+          "reason": "model edge 0.0124 below 2% minimum over executable ask 0.5350"
+        },
+        {
+          "event_id": "401816198",
+          "reason": "model edge -0.0108 below 2% minimum over executable ask 0.6000"
+        },
+        {
+          "event_id": "401816199",
+          "reason": "model edge 0.0075 below 2% minimum over executable ask 0.5900"
+        }
+      ],
+      "zero_unit_research_calls": 0
+    },
+    "nba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nba-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nfl": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nfl-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nfl",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "soccer": {
+      "logged": 0,
+      "reason": "unsupported ESPN league: SOCCER",
+      "sport": "soccer",
+      "status": "forecast_unavailable"
+    },
+    "wnba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json",
+      "calls": 4,
+      "duplicate_pick_ids": [
+        "5ddbae8d805944cb"
+      ],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "wnba-elo-trend-lr-v3",
+      "note": "Logged 0 of 4 calls against stored executable asks; 1 duplicates, 3 without a matched quote.",
+      "qualified_shadow_calls": 4,
+      "scheduled_games": 4,
+      "skipped": [],
+      "sport": "wnba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [
+        {
+          "event_id": "401857083",
+          "reason": "model edge -0.1828 below 7% minimum over executable ask 0.8400"
+        },
+        {
+          "event_id": "401857084",
+          "reason": "model edge -0.0095 below 7% minimum over executable ask 0.7600"
+        },
+        {
+          "event_id": "401857085",
+          "reason": "model edge -0.0812 below 7% minimum over executable ask 0.8200"
+        }
+      ],
+      "zero_unit_research_calls": 0
+    }
+  },
+  "step3b_polymarket_odds_snapshots": {
+    "mlb": {
+      "moneyline_snapshots": 186,
+      "snapshots": 2316,
+      "spread_snapshots": 990,
+      "total_snapshots": 1140,
+      "with_executable_bbo": 2316
+    },
+    "wnba": {
+      "moneyline_snapshots": 47,
+      "snapshots": 758,
+      "spread_snapshots": 315,
+      "total_snapshots": 396,
+      "with_executable_bbo": 758
+    }
+  },
+  "step4_settlement": {
+    "failures": [],
+    "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+    "settled": [],
+    "still_open": [
+      "4ae204a92d8a47fc",
+      "279e8c5dd40743fe",
+      "5d2cb57b32f14866",
+      "a1f560f16ca8495f",
+      "369b925b172f4b6a",
+      "c7a1577522fb4d37",
+      "5ddbae8d805944cb",
+      "742b29ba1ffd440b"
+    ],
+    "voided": []
+  },
+  "step5_summary": {
+    "bankroll_reference_units": 5,
+    "date_et": "2026-07-20",
+    "mean_probability_clv": null,
+    "model_drift": {},
+    "note": "Shadow research accounting only; no real-money authorization.",
+    "open_picks": 8,
+    "open_units": 0,
+    "picks_logged_today": 0,
+    "picks_settled_today": 0,
+    "qualified_pnl_units_all_time": 0,
+    "research_progress": {
+      "iteration_policy": "continuous_no_parameter_freezes",
+      "measured_edge_forward_picks": 0,
+      "measured_edge_settled": 0,
+      "promotion_requires": "versioned walk-forward ablation and locked holdout"
+    }
+  },
+  "step6_flat_forecast_and_log": {
+    "mlb": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-elo-trend-lr-v3.json",
+      "calls": 13,
+      "duplicate_pick_ids": [
+        "39f07dbdee044f92",
+        "25fe08e3be954adb",
+        "043f9b9799c44ad4",
+        "75cf9949602a4c17",
+        "bd769f5d72db48bb",
+        "6f908cfbb4fb4660",
+        "b3d04af2bb2445ec",
+        "07c094e50e3443bc",
+        "fe1acb3bd59e41b3",
+        "41914e723f8545e3",
+        "226f56cb020a4d72",
+        "a9cd87c83dca4e08",
+        "8e420714a95e4d9c"
+      ],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "mlb-elo-trend-lr-v3",
+      "note": "Logged 0 of 13 calls against stored executable asks; 13 duplicates, 0 without a matched quote.",
+      "qualified_shadow_calls": 13,
+      "scheduled_games": 15,
+      "skipped": [
+        {
+          "event_id": "401816194",
+          "reason": "NO_CALL_STARTERS_UNAVAILABLE: no two-sided probable-starter ERA for event 401816194 on 2026-07-20 (Miami Marlins at Houston Astros)"
+        }
+      ],
+      "sport": "mlb",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nba-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nfl": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nfl-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nfl",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "soccer": {
+      "logged": 0,
+      "reason": "unsupported ESPN league: SOCCER",
+      "sport": "soccer",
+      "status": "forecast_unavailable"
+    },
+    "wnba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json",
+      "calls": 4,
+      "duplicate_pick_ids": [
+        "e35a217d64aa4265",
+        "6c42d2d2436849c1",
+        "0da50dc88c9649b8",
+        "2d184773492d4263"
+      ],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "wnba-elo-trend-lr-v3",
+      "note": "Logged 0 of 4 calls against stored executable asks; 4 duplicates, 0 without a matched quote.",
+      "qualified_shadow_calls": 4,
+      "scheduled_games": 4,
+      "skipped": [],
+      "sport": "wnba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    }
+  },
+  "step7_flat_settlement": {
+    "failures": [],
+    "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+    "settled": [],
+    "still_open": [
+      "39f07dbdee044f92",
+      "25fe08e3be954adb",
+      "043f9b9799c44ad4",
+      "75cf9949602a4c17",
+      "bd769f5d72db48bb",
+      "6f908cfbb4fb4660",
+      "b3d04af2bb2445ec",
+      "07c094e50e3443bc",
+      "fe1acb3bd59e41b3",
+      "41914e723f8545e3",
+      "226f56cb020a4d72",
+      "a9cd87c83dca4e08",
+      "8e420714a95e4d9c",
+      "e35a217d64aa4265",
+      "6c42d2d2436849c1",
+      "0da50dc88c9649b8",
+      "2d184773492d4263",
+      "369b925b172f4b6a",
+      "c7a1577522fb4d37",
+      "5ddbae8d805944cb"
+    ],
+    "voided": []
+  }
+}
+Finished: Mon Jul 20 09:31:40 EDT 2026

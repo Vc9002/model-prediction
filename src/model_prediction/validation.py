@@ -353,10 +353,18 @@ def historical_pitcher_feature_audit(store: FeatureStore) -> dict[str, Any]:
 
 
 def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
-    """Report whether exact non-moneyline contracts can be validated honestly."""
+    """Report whether exact non-moneyline contracts can be validated honestly.
+
+    Two-stage scan: (1) ESPN raw score files for legacy odds entries (informational
+    only — these are almost always empty), then (2) timestamp-valid Polymarket
+    BBO snapshots under ``data/odds/{sport}/*/polymarket_snapshots.jsonl`` as the
+    authoritative source for spread and total contract lines.
+    """
     key = sport.lower()
+
+    # ── Stage 1: legacy ESPN raw-file scan (diagnostic only) ──────────────
     raw_root = store.data_root / "raw" / key
-    events = spread_lines = total_lines = 0
+    events = 0
     first_inning_outcomes = first_five_outcomes = 0
     for path in raw_root.glob(f"*/scores_{key}.json") if raw_root.exists() else ():
         try:
@@ -365,15 +373,9 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
             continue
         for event in payload.get("events", []):
             events += 1
-            competition = (event.get("competitions") or [{}])[0]
-            odds = competition.get("odds") or []
-            if odds:
-                spread_lines += any(
-                    item.get("spread") is not None or item.get("details") for item in odds
-                )
-                total_lines += any(item.get("overUnder") is not None for item in odds)
             if key != "mlb":
                 continue
+            competition = (event.get("competitions") or [{}])[0]
             competitors = competition.get("competitors", [])
             if len(competitors) != 2:
                 continue
@@ -385,19 +387,50 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
             first_five_outcomes += all(
                 set(range(1, 6)).issubset(values) for values in periods
             )
+
+    # ── Stage 2: Polymarket BBO snapshot scan (authoritative) ─────────────
+    odds_root = store.data_root / "odds" / key
+    spread_snapshots = total_snapshots = 0
+    if odds_root.exists():
+        for snap_path in sorted(odds_root.glob("*/polymarket_snapshots.jsonl")):
+            try:
+                with snap_path.open(encoding="utf-8") as fh:
+                    for line in fh:
+                        try:
+                            snap = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if not snap.get("timestamp_valid"):
+                            continue
+                        mt = snap.get("market_type")
+                        if mt == "spread":
+                            spread_snapshots += 1
+                        elif mt == "total":
+                            total_snapshots += 1
+            except OSError:
+                continue
+
+    # ── Stage 3: legacy flat-file backfill ────────────────────────────────
+    spread_snapshots, total_snapshots = _add_legacy_backfill(
+        store.data_root, key, spread_snapshots, total_snapshots
+    )
+
+    # ── Per-sport readiness ───────────────────────────────────────────────
     if key in {"nba", "wnba", "nfl"}:
+        spread_status, total_status = _readiness_for_market(
+            spread_snapshots, total_snapshots, "basketball" if key != "nfl" else "football"
+        )
         return {
             "events_scanned": events,
-            "spread_lines": spread_lines,
-            "total_lines": total_lines,
+            "spread_lines": spread_snapshots,
+            "total_lines": total_snapshots,
             "model_parameters_changed": False,
-            "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-            "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-            "reason": (
-                "A spread or total outcome is undefined without its exact pregame line; "
-                "score-only history cannot validate the configured normal-CDF heads."
-            ),
+            "spread": spread_status,
+            "total": total_status,
+            "reason": _readiness_reason(spread_snapshots, total_snapshots),
+            "source": "data/odds/polymarket_snapshots.jsonl",
         }
+
     if key == "mlb":
         return {
             "events_scanned": events,
@@ -413,7 +446,140 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
                 "starter/bullpen snapshots are not."
             ),
         }
+
     return {"status": "not_requested", "events_scanned": events}
+
+
+_MINIMUM_SNAPSHOT_COUNT = 50
+
+
+def _readiness_for_market(
+    spread_count: int,
+    total_count: int,
+    sport_family: str,
+) -> tuple[str, str]:
+    """Map snapshot counts to readiness status strings."""
+    def _status(count: int) -> str:
+        if count >= _MINIMUM_SNAPSHOT_COUNT:
+            return "DATA_READY_PENDING_BACKTEST"
+        if count > 0:
+            return "INSUFFICIENT_DATA_IN_PROGRESS"
+        return "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"
+
+    return _status(spread_count), _status(total_count)
+
+
+def _readiness_reason(spread_count: int, total_count: int) -> str:
+    """Human-readable reason derived from the snapshot counts."""
+    if spread_count == 0 and total_count == 0:
+        return (
+            "A spread or total outcome is undefined without its exact pregame line; "
+            "score-only history cannot validate the configured normal-CDF heads. "
+            "No timestamp-valid Polymarket snapshots found — the daily BBO capture "
+            "pipeline has not yet collected spread or total contracts for this sport."
+        )
+    parts = []
+    if spread_count < _MINIMUM_SNAPSHOT_COUNT:
+        parts.append(
+            f"spread: {spread_count}/{_MINIMUM_SNAPSHOT_COUNT} timestamp-valid snapshots"
+        )
+    if total_count < _MINIMUM_SNAPSHOT_COUNT:
+        parts.append(
+            f"total: {total_count}/{_MINIMUM_SNAPSHOT_COUNT} timestamp-valid snapshots"
+        )
+    if parts:
+        return (
+            f"Need >= {_MINIMUM_SNAPSHOT_COUNT} timestamp-valid pregame contract lines "
+            f"per market for backtesting. {'; '.join(parts)}. "
+            "Spread and total outcomes are undefined without their exact pregame lines."
+        )
+    return (
+        f"Timestamp-valid historical contract lines available from Polymarket snapshots "
+        f"(spread: {spread_count}, total: {total_count}). "
+        "Spread and total backtesting is data-ready pending a locked-holdout evaluation."
+    )
+
+
+def _add_legacy_backfill(
+    data_root: Path, sport: str, spread_count: int, total_count: int
+) -> tuple[int, int]:
+    """Scan legacy flat-file snapshots that predate the per-sport odds directory.
+
+    Sources:
+    - ``data/polymarket_us_snapshots.jsonl`` — early Polymarket snapshots
+      where sport and market_type must be inferred from the slug prefix.
+    - ``data/market_odds_snapshots.jsonl`` — MLB-specific market odds
+      format with explicit ``markets.spread`` / ``markets.total`` keys.
+    """
+    from .domain import parse_utc
+
+    # ── Legacy Polymarket flat file (slug-based inference) ─────────────
+    legacy_pm_path = data_root / "polymarket_us_snapshots.jsonl"
+    if legacy_pm_path.exists():
+        # Slug prefixes: aec=moneyline, asc=spread, tsc=total
+        _PM_PREFIX_MAP = {"asc": "spread", "tsc": "total"}
+        try:
+            with legacy_pm_path.open(encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        snap = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    slug = str(snap.get("market_slug") or "")
+                    parts = slug.split("-")
+                    if len(parts) < 2:
+                        continue
+                    prefix = parts[0].casefold()
+                    slug_sport = parts[1].casefold() if len(parts) > 1 else ""
+                    if slug_sport != sport:
+                        continue
+                    mt = _PM_PREFIX_MAP.get(prefix)
+                    if mt is None:
+                        continue
+                    observed = snap.get("observed_at_utc", "")
+                    event_start = snap.get("event_start_utc", "")
+                    if not observed or not event_start:
+                        continue
+                    try:
+                        if parse_utc(observed) > parse_utc(event_start):
+                            continue
+                    except (ValueError, TypeError):
+                        continue
+                    if mt == "spread":
+                        spread_count += 1
+                    elif mt == "total":
+                        total_count += 1
+        except OSError:
+            pass
+
+    # ── Legacy market odds file (MLB-specific dict format) ─────────────
+    legacy_mo_path = data_root / "market_odds_snapshots.jsonl"
+    if sport == "mlb" and legacy_mo_path.exists():
+        try:
+            with legacy_mo_path.open(encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        snap = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    observed = snap.get("observed_at_utc", "")
+                    event_start = snap.get("event_start_utc", "")
+                    if not observed or not event_start:
+                        continue
+                    try:
+                        if parse_utc(observed) > parse_utc(event_start):
+                            continue
+                    except (ValueError, TypeError):
+                        continue
+                    markets = snap.get("markets") or {}
+                    if isinstance(markets.get("spread"), dict):
+                        spread_count += 1
+                    if isinstance(markets.get("total"), dict):
+                        total_count += 1
+        except OSError:
+            pass
+
+    return spread_count, total_count
 
 
 def run_validation_audit(

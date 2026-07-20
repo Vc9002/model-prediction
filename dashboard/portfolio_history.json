@@ -1,6 +1,6 @@
 {
   "history_start_date": "2026-07-17",
-  "last_synced_at_utc": "2026-07-19T23:34:35.848081Z",
+  "last_synced_at_utc": "2026-07-20T14:51:36.281765Z",
   "activities": [
     {
       "activity_id": "trade:BBP5MHCP88K0",
@@ -144,9 +144,9 @@
       "exchange_price": 0.9,
       "price_basis": "long_probability",
       "quantity": 8.16,
-      "cost_basis_usd": 4.49,
-      "realized_pnl_usd": 2.87,
-      "exchange_realized_pnl_usd": 2.87,
+      "cost_basis_usd": 4.58,
+      "realized_pnl_usd": 2.78,
+      "exchange_realized_pnl_usd": 2.78,
       "pnl_basis": "exchange_reported",
       "state": "TRADE_STATE_NEW",
       "is_aggressor": false,
@@ -163,9 +163,9 @@
       "exchange_price": 0.9,
       "price_basis": "long_probability",
       "quantity": 11.84,
-      "cost_basis_usd": 6.51,
-      "realized_pnl_usd": 4.15,
-      "exchange_realized_pnl_usd": 4.15,
+      "cost_basis_usd": 6.64,
+      "realized_pnl_usd": 4.02,
+      "exchange_realized_pnl_usd": 4.02,
       "pnl_basis": "exchange_reported",
       "state": "TRADE_STATE_NEW",
       "is_aggressor": false,
