@@ -640,11 +640,16 @@ function onFilterChange(){renderPicks();renderFlat();}
 let sortKey="event_start_utc",sortAsc=false;
 function renderPicks(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
-  const openCount=state.picks.filter(p=>!p.archived&&p.status==="open").length;
-  const settledCount=state.picks.filter(p=>!p.archived&&p.status==="settled").length;
+  // Use flat cache (superset) for accurate counts
+  const flatData=_flatCache||[];
+  const fOpen=flatData.filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
+  const fSettled=flatData.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
+  // Fall back to main ledger if flat cache not loaded yet
+  const mOpen=state.picks.filter(p=>!p.archived&&p.status==='open').length;
+  const mSettled=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
   $("#archCount").textContent=archivedCount;
-  $("#openCount").textContent=openCount;
-  $("#settledCount").textContent=settledCount;
+  $("#openCount").textContent=flatData.length?fOpen:mOpen;
+  $("#settledCount").textContent=flatData.length?fSettled:mSettled;
   $("#restoreBtn").style.display=archivedCount?"":"none";
   const rows=filteredPicks().sort((a,b)=>{
     const x=a[sortKey]??"",y=b[sortKey]??"";
