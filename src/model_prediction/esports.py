@@ -278,9 +278,15 @@ class NeutralElo:
     ratings: dict[str, float]
 
     def probability(self, team1_id: str, team2_id: str) -> float:
+        """Calibrated probability capped at [0.20, 0.80] to prevent extreme
+        predictions from raw Elo differences in thin/esports markets."""
         rating1 = self.ratings.get(team1_id, 1500.0)
         rating2 = self.ratings.get(team2_id, 1500.0)
-        return 1.0 / (1.0 + 10.0 ** ((rating2 - rating1) / 400.0))
+        raw = 1.0 / (1.0 + 10.0 ** ((rating2 - rating1) / 400.0))
+        # Shrink toward 0.5: calibrated = 0.5 + 0.5 * (raw - 0.5)
+        # This caps at [0.25, 0.75] while preserving rank order
+        calibrated = 0.5 + 0.5 * (raw - 0.5)
+        return max(0.25, min(0.75, calibrated))
 
     def update(self, row: dict[str, Any]) -> None:
         probability = self.probability(row["team1_id"], row["team2_id"])
@@ -607,6 +613,16 @@ def forecast_esports_slate(
                 )
             if len(sides) != 2:
                 no_calls.append({**base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
+                continue
+            # Reject illiquid/thin markets where the Polymarket pricing is unreliable.
+            # These are typically very small/esoteric esports leagues with extreme
+            # bid-ask spreads and no real two-sided liquidity.
+            asks = [float(s["executable_ask"]) for s in sides]
+            if any(a < 0.30 or a > 0.70 for a in asks):
+                no_calls.append({**base, "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK", "asks": asks})
+                continue
+            if asks[0] + asks[1] > 1.10:
+                no_calls.append({**base, "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD", "asks": asks})
                 continue
             rows.append(
                 {
