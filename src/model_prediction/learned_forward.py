@@ -17,6 +17,7 @@ from .features.trends import TrendEngine
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
 from .models.learned_market import LearnedMarketArtifact
+from .wnba_availability_evaluation import adjust_home_probability, historical_margin_sigma
 
 
 # ── Feature registry ──────────────────────────────────────────────────────
@@ -210,7 +211,41 @@ def build_learned_moneyline_slate(
             )
             decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
-            action = "QUALIFIED_SHADOW_CALL" if decision.call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+
+            # ── WNBA availability gate (5pp threshold) ──────────────────────
+            if key == "wnba":
+                try:
+                    avail = matchup_player_availability(
+                        data_root=store.data_root,
+                        home_team=home_team,
+                        away_team=away_team,
+                        game_date=game_date,
+                        observed_at=observed_at,
+                        event_start=start,
+                        event_id=event_id,
+                    )
+                    points_gap = float(avail.get("availability_points_gap", 0.0))
+                    # Cache margin_sigma per invocation
+                    if not hasattr(build_learned_moneyline_slate, "_wnba_sigma_cache"):
+                        build_learned_moneyline_slate._wnba_sigma_cache = {}  # type: ignore[attr-defined]
+                    cache = build_learned_moneyline_slate._wnba_sigma_cache  # type: ignore[attr-defined]
+                    if game_date not in cache:
+                        cache[game_date] = historical_margin_sigma(store, observed_at)
+                    sigma = cache[game_date]
+                    adjusted_home = adjust_home_probability(home_probability, points_gap, sigma)
+                    delta = abs(adjusted_home - home_probability)
+                    if delta >= 0.05:
+                        features["availability_points_gap"] = points_gap
+                        features["availability_adjusted"] = 1.0
+                        home_probability = adjusted_home
+                except (ValueError, KeyError, TypeError):
+                    pass  # Availability data unavailable; pass through v3 unchanged
+
+            # Recompute selection from (possibly adjusted) home_probability
+            selection = "home" if home_probability >= 0.5 else "away"
+            model_probability = home_probability if selection == "home" else (1 - home_probability)
+            call = model_probability >= decision.confidence_threshold
+            action = "QUALIFIED_SHADOW_CALL" if call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
             basis = _build_basis(features, home_trend, away_trend, len(history))
             snap_hash = _feature_hash(key, game_date, event_id, basis)
             
@@ -225,11 +260,11 @@ def build_learned_moneyline_slate(
                     away_team=away_team,
                     home_team=home_team,
                     market_type="moneyline",
-                    selection=decision.selection,
-                    model_probability=decision.probability,
+                    selection=selection,
+                    model_probability=round(model_probability, 6),
                     home_probability=round(home_probability, 6),
                     confidence_threshold=decision.confidence_threshold,
-                    call=decision.call,
+                    call=call,
                     action=action,
                     reason=decision.reason,
                     model_version=artifact.version,
