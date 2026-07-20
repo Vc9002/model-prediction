@@ -611,8 +611,10 @@ const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return
 const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))return stored;
   const m=pregamePrice(p),model=Number(p.model_probability);return m&&model?model-m:null;};
 function populateFilters(){
-  const allLeagues=[...new Set([...state.picks.map(p=>p.league),..._flatCache.map(p=>p.league||p.Sport||'')])].filter(Boolean).sort();
-  const allMarkets=[...new Set([...state.picks.map(p=>p.market_type),..._flatCache.map(p=>p.market_type||p.Type||'moneyline')])].filter(Boolean).sort();
+  const flatLeagues=(_flatCache||[]).map(p=>p.league||p.Sport||'');
+  const flatMarkets=(_flatCache||[]).map(p=>p.market_type||p.Type||'moneyline');
+  const allLeagues=[...new Set([...state.picks.map(p=>p.league),...flatLeagues])].filter(Boolean).sort();
+  const allMarkets=[...new Set([...state.picks.map(p=>p.market_type),...flatMarkets])].filter(Boolean).sort();
   $("#fSport").innerHTML='<option value="">all sports</option>'+allLeagues.map(s=>`<option>${s}</option>`).join("");
   $("#fMarket").innerHTML='<option value="">all markets</option>'+allMarkets.map(s=>`<option>${s}</option>`).join("");
 }
@@ -742,7 +744,7 @@ window.preset=which=>{
     const [year,month,day]=today.split("-").map(Number);
     $("#fFrom").value=new Date(Date.UTC(year,month-1,day-6)).toISOString().slice(0,10);
   }
-  renderPicks();
+  onFilterChange();
 };
 function exportCsv(){
   const rows=filteredPicks();
