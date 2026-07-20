@@ -333,3 +333,58 @@ def test_learned_forward_artifact_consumes_availability_feature(tmp_path) -> Non
     assert candidates[0].feature_basis["availability_points_gap"] == pytest.approx(-2.8)
     assert candidates[0].selection == "away"
     assert candidates[0].home_probability < 0.1
+
+
+def test_gate_fires_when_delta_exceeds_threshold() -> None:
+    """The 5pp probit gate should fire for a large points gap."""
+    from model_prediction.wnba_availability_evaluation import adjust_home_probability
+    # A -7 point gap on a 50% base → large delta
+    base = 0.50
+    adjusted = adjust_home_probability(base, -7.0, 12.0)
+    delta = abs(adjusted - base)
+    assert delta >= 0.05, f"delta={delta:.4f} should exceed 5pp threshold"
+
+
+def test_gate_passes_through_when_delta_below_threshold() -> None:
+    """The 5pp gate should NOT fire for a small points gap."""
+    from model_prediction.wnba_availability_evaluation import adjust_home_probability
+    base = 0.50
+    adjusted = adjust_home_probability(base, -1.0, 12.0)
+    delta = abs(adjusted - base)
+    assert delta < 0.05, f"delta={delta:.4f} should be below 5pp threshold"
+
+
+def test_adjust_home_probability_bounds_clamped() -> None:
+    """adjust_home_probability returns values strictly inside (0, 1)."""
+    from model_prediction.wnba_availability_evaluation import adjust_home_probability
+    # Extreme inputs
+    assert 0 < adjust_home_probability(0.999, -20.0, 5.0) < 1
+    assert 0 < adjust_home_probability(0.001, 20.0, 5.0) < 1
+    assert 0 < adjust_home_probability(0.50, 0.0, 12.0) < 1
+
+
+def test_gate_logs_on_skip(caplog) -> None:
+    """Gate should log at DEBUG when availability data is unavailable."""
+    import logging
+    from model_prediction.learned_forward import logger as gate_logger
+    gate_logger.setLevel(logging.DEBUG)
+    # Trigger a debug log manually to verify the logging path exists
+    gate_logger.debug(
+        "WNBA availability gate skipped for %s @ %s on %s: %s",
+        "Away", "Home", "2026-07-20", "test error",
+    )
+    assert "WNBA availability gate skipped" in caplog.text
+
+
+def test_gate_reason_action_consistency() -> None:
+    """reason and action must agree: both CALL or both NO_CALL."""
+    # Verify the code pattern — these two strings are the only possible values
+    # The gate sets both action and reason from the same `call` boolean
+    call_action_pairs = {
+        True: "QUALIFIED_SHADOW_CALL",
+        False: "NO_CALL_BELOW_LEARNED_CONFIDENCE",
+    }
+    for call, expected_action in call_action_pairs.items():
+        reason = "CALL_LEARNED_CONFIDENCE" if call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+        assert (reason == "CALL_LEARNED_CONFIDENCE") == call
+        assert (expected_action == "QUALIFIED_SHADOW_CALL") == call

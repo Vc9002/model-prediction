@@ -71,7 +71,12 @@ def _latest_snapshot(
     return max(eligible, key=lambda item: (item[0], str(item[1])))[2]
 
 
-def _load_priors(data_root: Path, game_date: str, observed_at: datetime) -> dict[str, Any]:
+def _load_priors(
+    data_root: Path,
+    game_date: str,
+    observed_at: datetime,
+    maximum_age_hours: float = 168.0,
+) -> dict[str, Any]:
     root = data_root / "player_priors" / "wnba"
     eligible: list[tuple[datetime, Path, dict[str, Any]]] = []
     for path in root.glob("*.json"):
@@ -86,6 +91,9 @@ def _load_priors(data_root: Path, game_date: str, observed_at: datetime) -> dict
             and as_of <= observed_at
             and str(payload.get("valid_from")) <= game_date <= str(payload.get("valid_through"))
         ):
+            age_hours = (observed_at - as_of).total_seconds() / 3600
+            if age_hours > maximum_age_hours:
+                continue  # Prior too old
             eligible.append((as_of, path, payload))
     if not eligible:
         raise ValueError(
@@ -273,6 +281,7 @@ def matchup_player_availability(
     event_start: datetime,
     event_id: str | None = None,
     maximum_report_age_hours: float = 12.0,
+    maximum_prior_age_hours: float = 168.0,
 ) -> dict[str, float]:
     """Build home-oriented WNBA availability features or fail closed."""
     observed = parse_utc(observed_at.isoformat())
@@ -282,12 +291,16 @@ def matchup_player_availability(
     root = Path(data_root)
     snapshot = _latest_snapshot(root, observed, game_date)
     if event_id is not None:
-        snapshot = merge_availability_sources(
-            snapshot,
-            _latest_espn_snapshot(root, event_id, observed),
-            game_date=game_date,
-        )
-    priors = _load_priors(root, game_date, observed)
+        try:
+            snapshot = merge_availability_sources(
+                snapshot,
+                _latest_espn_snapshot(root, event_id, observed),
+                game_date=game_date,
+            )
+        except (ValueError, KeyError, TypeError, OSError):
+            # ESPN snapshot unavailable; proceed with official report only
+            pass
+    priors = _load_priors(root, game_date, observed, maximum_age_hours=maximum_prior_age_hours)
     return matchup_player_availability_from_payloads(
         snapshot=snapshot,
         priors=priors,

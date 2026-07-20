@@ -89,9 +89,9 @@ from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
 
 
-SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
+SPORTS = tuple(POLYMARKET_SPORT_LEAGUES) + ("lol", "cs2")
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
-LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
+LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2")
 
 # League value on a ledger row -> ESPN league key(s) to search for results.
 _LEDGER_LEAGUE_TO_ESPN = {
@@ -715,6 +715,7 @@ def _forecast_learned_sport(
     logged: list[dict] = []
     duplicates: list[str] = []
     unmatched: list[dict] = []
+    edge_blocked: list[dict] = []
     if log and to_log and registry is not None and bans is not None and ledger is not None:
         data_root = Path(ledger_path(config)).parent
         observed_at = utc_now()
@@ -736,7 +737,7 @@ def _forecast_learned_sport(
                 model_edge = candidate.model_probability - quote["executable_ask"]
                 if model_edge < min_edge:
                     edge_pct = f"{min_edge*100:.0f}%"
-                    unmatched.append(
+                    edge_blocked.append(
                         {"event_id": candidate.event_id,
                          "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f}"}
                     )
@@ -826,14 +827,16 @@ def _forecast_learned_sport(
         logging_note = (
             f"Flat mode: logged {len(logged)} of {len(candidates)} games "
             f"({len(calls)} above threshold); "
-            f"{len(duplicates)} duplicates, {len(unmatched)} without a matched quote."
+            f"{len(duplicates)} duplicates, {len(unmatched)} without a matched quote, "
+            f"{len(edge_blocked)} blocked by edge gate."
         )
     elif not calls:
         logging_note = "No calls above the learned confidence threshold."
     else:
         logging_note = (
             f"Logged {len(logged)} of {len(calls)} calls against stored executable asks; "
-            f"{len(duplicates)} duplicates, {len(unmatched)} without a matched quote."
+            f"{len(duplicates)} duplicates, {len(unmatched)} without a matched quote, "
+            f"{len(edge_blocked)} blocked by edge gate."
         )
     return {
         "sport": sport,
@@ -849,6 +852,7 @@ def _forecast_learned_sport(
         "logged_pick_ids": [row["pick_id"] for row in logged],
         "duplicate_pick_ids": duplicates,
         "unmatched_quotes": unmatched,
+        "edge_blocked": edge_blocked,
         "skipped": skipped,
         "candidates": [candidate.to_dict() for candidate in candidates],
         "note": logging_note,
@@ -1242,11 +1246,22 @@ def main(argv: list[str] | None = None) -> None:
                 _clear_today_open(ledger, args.date)
             results = {}
             for sport in sports:
+                if sport == "esports":
+                    continue  # handled individually as lol/cs2
                 selected_model = getattr(args, "model", "learned")
                 if selected_model == "legacy-measured-edge":
                     if sport != "mlb":
                         raise ValueError("legacy-measured-edge is available only for MLB")
                     results[sport] = _forecast_mlb(args.date, log, config, registry, bans, ledger, audit)
+                elif sport in ("lol", "cs2"):
+                    # Esports: separate Elo-based pipeline, no ledger integration yet
+                    from .esports import forecast_esports_slate
+                    results[sport] = forecast_esports_slate(
+                        data_root=Path(ledger_path(config)).parent,
+                        artifact_dir=PROJECT_ROOT / "config/models",
+                        title=sport,
+                        game_date=args.date,
+                    )
                 elif sport in LEARNED_PRODUCTION_SPORTS:
                     use_ledger = flat_ledger if is_flat else ledger
                     results[sport] = _forecast_learned_sport(
@@ -1303,26 +1318,54 @@ def main(argv: list[str] | None = None) -> None:
                 no_snapshot_bbo=False,
             )
             slate = _polymarket_slate(slate_args, config)
-            _clear_today_open(ledger, args.date, by_event_date=True)
+            # Capture WNBA availability data before running WNBA forecast
+            try:
+                from .data_sources.espn import ESPNClient
+                wnba_scoreboard = ESPNClient().scoreboard("WNBA", args.date)
+                wnba_event_ids = [
+                    str(event["id"]) for event in wnba_scoreboard.get("events", [])
+                ]
+                if wnba_event_ids:
+                    capture_latest_report(data_root, observed_at=utc_now())
+                    for event_id in wnba_event_ids:
+                        try:
+                            capture_espn_event_injuries(
+                                data_root, event_id=event_id,
+                                client=ESPNClient(), observed_at=utc_now(),
+                            )
+                        except Exception:
+                            pass
+            except Exception:
+                pass  # Availability capture is best-effort; never block daily
+            _clear_today_open(ledger, args.date)
             # Also clear and forecast for flat ledger
             flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
             flat_ledger = PickLedger(flat_ledger_path)
-            _clear_today_open(flat_ledger, args.date, by_event_date=True)
+            _clear_today_open(flat_ledger, args.date)
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             soccer_collection = collect_soccer_scores(days_from=3)
-            forecast_result = {
-                sport: _forecast_learned_sport(
+            LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
+            ESPORTS_TITLES = ("lol", "cs2")
+            forecast_result = {}
+            for sport in LEARNED_SPORTS:
+                forecast_result[sport] = _forecast_learned_sport(
                     sport, args.date, True, config, registry, bans, ledger,
                     maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
                     maximum_unreviewed_disagreement=float(
                         config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                     ),
                 )
-                for sport in LEARNED_PRODUCTION_SPORTS
-            }
+            for title in ESPORTS_TITLES:
+                forecast_result[title] = forecast_esports_slate(
+                    data_root=Path(ledger_path(config)).parent,
+                    artifact_dir=PROJECT_ROOT / "config/models",
+                    title=title,
+                    game_date=args.date,
+                )
             # Run flat forecast (all games, no edge gate) to flat_picks.xlsx
-            flat_result = {
-                sport: _forecast_learned_sport(
+            flat_result = {}
+            for sport in LEARNED_SPORTS:
+                flat_result[sport] = _forecast_learned_sport(
                     sport, args.date, True, config, registry, bans, flat_ledger,
                     maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
                     maximum_unreviewed_disagreement=float(
@@ -1330,16 +1373,22 @@ def main(argv: list[str] | None = None) -> None:
                     ),
                     flat_mode=True,
                 )
-                for sport in LEARNED_PRODUCTION_SPORTS
-            }
+            for title in ESPORTS_TITLES:
+                flat_result[title] = forecast_esports_slate(
+                    data_root=Path(ledger_path(config)).parent,
+                    artifact_dir=PROJECT_ROOT / "config/models",
+                    title=title,
+                    game_date=args.date,
+                )
             for result in forecast_result.values():
                 result.pop("candidates", None)
             # Read back stored Polymarket odds snapshots for per-sport summaries.
             odds_by_sport = {}
             for sport in LEARNED_PRODUCTION_SPORTS:
+                odds_sport = "esports" if sport in ("lol", "cs2") else sport
                 snap_path = (
                     Path(ledger_path(config)).parent
-                    / "odds" / sport / args.date / "polymarket_snapshots.jsonl"
+                    / "odds" / odds_sport / args.date / "polymarket_snapshots.jsonl"
                 )
                 if snap_path.exists():
                     snaps = [
@@ -1367,24 +1416,7 @@ def main(argv: list[str] | None = None) -> None:
             settle_args = argparse.Namespace(all_unsettled=True, void_postponed=False)
             settlement = _settle_all_unsettled(settle_args, config, ledger)
 
-            # Flat forecast (no edge gate, separate ledger) rides along with
-            # daily so both views stay in sync from the same slate/BBO capture
-            # instead of requiring a second manual `flat-forecast` run.
-            flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
-            flat_ledger = PickLedger(flat_ledger_path)
-            _clear_today_open(flat_ledger, args.date)
-            flat_forecast_result = {
-                sport: _forecast_learned_sport(
-                    sport, args.date, True, config, registry, bans, flat_ledger,
-                    maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
-                    maximum_unreviewed_disagreement=float(
-                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
-                    ),
-                    flat_mode=True,
-                )
-                for sport in LEARNED_PRODUCTION_SPORTS
-            }
-            for result in flat_forecast_result.values():
+            for result in flat_result.values():
                 result.pop("candidates", None)
             flat_settlement = _settle_all_unsettled(settle_args, config, flat_ledger)
 
@@ -1402,7 +1434,7 @@ def main(argv: list[str] | None = None) -> None:
                 "step4_settlement": settlement,
                 "step1b_soccer_scores": soccer_collection,
                 "step5_summary": _summary(config, ledger),
-                "step6_flat_forecast_and_log": flat_forecast_result,
+                "step6_flat_forecast_and_log": flat_result,
                 "step7_flat_settlement": flat_settlement,
             }
         elif args.command == "ingest":

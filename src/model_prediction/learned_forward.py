@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +19,8 @@ from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_
 from .features.player_availability import matchup_player_availability
 from .models.learned_market import LearnedMarketArtifact
 from .wnba_availability_evaluation import adjust_home_probability, historical_margin_sigma
+
+logger = logging.getLogger(__name__)
 
 
 # ── Feature registry ──────────────────────────────────────────────────────
@@ -209,8 +212,8 @@ def build_learned_moneyline_slate(
                 store.data_root,
                 observed_at,
             )
-            decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
+            confidence_threshold = artifact.raw.get("market_models", {}).get("moneyline", {}).get("confidence_threshold", 0.50)
 
             # ── WNBA availability gate (5pp threshold) ──────────────────────
             if key == "wnba":
@@ -225,27 +228,32 @@ def build_learned_moneyline_slate(
                         event_id=event_id,
                     )
                     points_gap = float(avail.get("availability_points_gap", 0.0))
-                    # Cache margin_sigma per invocation
+                    # Cache margin_sigma keyed on (game_date, observed_at)
                     if not hasattr(build_learned_moneyline_slate, "_wnba_sigma_cache"):
                         build_learned_moneyline_slate._wnba_sigma_cache = {}  # type: ignore[attr-defined]
                     cache = build_learned_moneyline_slate._wnba_sigma_cache  # type: ignore[attr-defined]
-                    if game_date not in cache:
-                        cache[game_date] = historical_margin_sigma(store, observed_at)
-                    sigma = cache[game_date]
+                    sigma_key = (game_date, observed_at.isoformat())
+                    if sigma_key not in cache:
+                        cache[sigma_key] = historical_margin_sigma(store, observed_at)
+                    sigma = cache[sigma_key]
                     adjusted_home = adjust_home_probability(home_probability, points_gap, sigma)
                     delta = abs(adjusted_home - home_probability)
                     if delta >= 0.05:
                         features["availability_points_gap"] = points_gap
                         features["availability_adjusted"] = 1.0
                         home_probability = adjusted_home
-                except (ValueError, KeyError, TypeError):
-                    pass  # Availability data unavailable; pass through v3 unchanged
+                except (ValueError, KeyError, TypeError) as exc:
+                    logger.debug(
+                        "WNBA availability gate skipped for %s @ %s on %s: %s",
+                        away_team, home_team, game_date, exc,
+                    )
 
-            # Recompute selection from (possibly adjusted) home_probability
+            # Recompute selection/call/action/reason from (possibly adjusted) probability
             selection = "home" if home_probability >= 0.5 else "away"
             model_probability = home_probability if selection == "home" else (1 - home_probability)
-            call = model_probability >= decision.confidence_threshold
+            call = model_probability >= confidence_threshold
             action = "QUALIFIED_SHADOW_CALL" if call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+            reason = "CALL_LEARNED_CONFIDENCE" if call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
             basis = _build_basis(features, home_trend, away_trend, len(history))
             snap_hash = _feature_hash(key, game_date, event_id, basis)
             
@@ -263,10 +271,10 @@ def build_learned_moneyline_slate(
                     selection=selection,
                     model_probability=round(model_probability, 6),
                     home_probability=round(home_probability, 6),
-                    confidence_threshold=decision.confidence_threshold,
+                    confidence_threshold=confidence_threshold,
                     call=call,
                     action=action,
-                    reason=decision.reason,
+                    reason=reason,
                     model_version=artifact.version,
                     model_artifact_hash=artifact.hash,
                     model_qualified=artifact.qualified,
