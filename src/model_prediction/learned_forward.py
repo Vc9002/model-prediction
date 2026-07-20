@@ -12,7 +12,10 @@ from typing import Any, Mapping
 from .domain import parse_utc
 from .features.base import FeatureStore
 from .features.elo_ratings import build_elo
+from .features.schedule_load import matchup_schedule_load
 from .features.trends import TrendEngine
+from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
+from .features.player_availability import matchup_player_availability
 from .models.learned_market import LearnedMarketArtifact
 
 
@@ -32,9 +35,13 @@ def _compute_features(
     away_team: str,
     event_id: str,
     game_date: str,
+    event_start: datetime,
+    history: list[Any],
     elo: Any,
     home_trend: Any,
     away_trend: Any,
+    data_root: Path,
+    observed_at: datetime,
 ) -> dict[str, float]:
     features: dict[str, float] = {
         "elo_probability": elo.expected_home_win(home_team, away_team),
@@ -42,6 +49,36 @@ def _compute_features(
         "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
     }
     wanted = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
+    if "consistency_gap" in wanted:
+        features["consistency_gap"] = home_trend.consistency - away_trend.consistency
+    if "hot_cold_gap" in wanted:
+        features["hot_cold_gap"] = home_trend.hot_cold_score - away_trend.hot_cold_score
+    schedule_names = {
+        "rest_disparity",
+        "back_to_back_gap",
+        "games_last_7_gap",
+        "schedule_available",
+    }
+    if wanted & schedule_names:
+        schedule = matchup_schedule_load(history, home_team, away_team, event_start)
+        features.update({name: value for name, value in schedule.items() if name in wanted})
+    if wanted & AVAILABILITY_FEATURE_NAMES:
+        if sport != "wnba":
+            raise ValueError(
+                "NO_CALL_AVAILABILITY_UNSUPPORTED: official player-availability feature is WNBA-only"
+            )
+        availability = matchup_player_availability(
+            data_root=data_root,
+            home_team=home_team,
+            away_team=away_team,
+            game_date=game_date,
+            observed_at=observed_at,
+            event_start=event_start,
+            event_id=event_id,
+        )
+        features.update(
+            {name: value for name, value in availability.items() if name in wanted}
+        )
     _init_providers()
     for name in wanted:
         if name in features:
@@ -61,6 +98,9 @@ def _init_providers() -> None:
 
     from .features.weather import live_weather
     _FEATURE_PROVIDERS["weather_factor"] = lambda h, a, eid, gd: float(live_weather(h).get("weather_run_factor", 1.0))
+
+    from .validation import _starter_era_gap as _seg
+    _FEATURE_PROVIDERS["starter_era_gap"] = lambda h, a, eid, gd: _seg(eid)
 
     def _pitcher_gap(home_team, away_team, event_id, game_date):
         from .data_sources.espn_probables import espn_pitcher_era_gap
@@ -153,7 +193,21 @@ def build_learned_moneyline_slate(
                     f"{home_team}={home_trend.games_played}, "
                     f"required={minimum_team_history_games}"
                 )
-            features = _compute_features(key, artifact, home_team, away_team, event_id, game_date, elo, home_trend, away_trend)
+            features = _compute_features(
+                key,
+                artifact,
+                home_team,
+                away_team,
+                event_id,
+                game_date,
+                start,
+                history,
+                elo,
+                home_trend,
+                away_trend,
+                store.data_root,
+                observed_at,
+            )
             decision = artifact.decide_binary("moneyline", features)
             home_probability = artifact.probability("moneyline", features)
             action = "QUALIFIED_SHADOW_CALL" if decision.call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
@@ -187,13 +241,6 @@ def build_learned_moneyline_slate(
             )
         except (KeyError, TypeError, ValueError) as error:
             skipped.append({"event_id": event_id, "reason": str(error)})
-
-    # ── rest-fatigue flip filter ───────────────────────────────────
-    # Flip to the rested side when the selected team has 3+ fewer rest
-    # days. WNBA +5.73U, NFL +3.82U, MLB harmless. Skipped for NBA
-    # (-3.82U) and soccer (-3.82U).
-    if key not in ("nba", "soccer"):
-        candidates = _apply_rest_fatigue_filter(candidates, history, game_date, threshold=-3)
 
     return candidates, skipped, len(events)
 
@@ -312,88 +359,3 @@ def _teams(event: Mapping[str, Any]) -> tuple[str, str]:
     competitors = event["competitions"][0]["competitors"]
     by_side = {item["homeAway"]: item["team"]["displayName"] for item in competitors}
     return str(by_side["away"]), str(by_side["home"])
-
-
-def _apply_rest_fatigue_filter(
-    candidates: list[LearnedForwardCandidate],
-    history: list[Any],
-    game_date: str,
-    threshold: int = -3,
-) -> list[LearnedForwardCandidate]:
-    """Suppress qualified calls when the home team has significantly fewer rest days.
-
-    Computes days-since-last-game for both teams from the pre-game-date history.
-    Only suppresses QUALIFIED_SHADOW_CALL rows; already-NO_CALL rows pass through.
-
-    Args:
-        threshold: maximum allowed rest disparity before suppression (e.g. -3
-                   means suppress when home_rest - away_rest ≤ -3)
-    """
-    from datetime import date as _date
-
-    # Build team → sorted game dates from history
-    team_dates: dict[str, list[_date]] = {}
-    for game in history:
-        try:
-            if hasattr(game, 'start'):
-                dt = game.start.date()
-            else:
-                dt = _date.fromisoformat(str(game.get("event_start_utc", ""))[:10])
-        except (ValueError, TypeError):
-            continue
-        for team in (getattr(game, "home_team", None) or game.get("home_team", ""),
-                     getattr(game, "away_team", None) or game.get("away_team", "")):
-            if team:
-                team_dates.setdefault(str(team), []).append(dt)
-
-    cutoff = _date.fromisoformat(game_date)
-
-    def _rest(team: str) -> int | None:
-        dates = sorted(team_dates.get(team, []))
-        prior = [d for d in dates if d < cutoff]
-        if not prior:
-            return None
-        return (cutoff - max(prior)).days
-
-    filtered: list[LearnedForwardCandidate] = []
-    for c in candidates:
-        if c.call and c.action == "QUALIFIED_SHADOW_CALL":
-            home_rest = _rest(c.home_team)
-            away_rest = _rest(c.away_team)
-            if home_rest is not None and away_rest is not None:
-                disparity = home_rest - away_rest
-                # Symmetric: flip to the rested side when the selected team is tired
-                tired = (
-                    (c.selection == "home" and disparity <= threshold)
-                    or (c.selection == "away" and disparity >= -threshold)
-                )
-                if tired:
-                    flipped_side = "away" if c.selection == "home" else "home"
-                    flipped_prob = round(1 - c.model_probability, 6)
-                    filtered.append(LearnedForwardCandidate(
-                        event_id=c.event_id,
-                        event_start_utc=c.event_start_utc,
-                        away_team=c.away_team,
-                        home_team=c.home_team,
-                        market_type=c.market_type,
-                        selection=flipped_side,
-                        model_probability=flipped_prob,
-                        home_probability=c.home_probability,
-                        confidence_threshold=c.confidence_threshold,
-                        call=True,
-                        action="QUALIFIED_SHADOW_CALL_REST_FLIP",
-                        reason=f"flipped {c.selection}→{flipped_side}: home_rest={home_rest}d away_rest={away_rest}d",
-                        model_version=c.model_version,
-                        model_artifact_hash=c.model_artifact_hash,
-                        model_qualified=c.model_qualified,
-                        feature_basis={**c.feature_basis,
-                            "home_rest_days": home_rest,
-                            "away_rest_days": away_rest,
-                            "rest_disparity": disparity,
-                            "original_selection": c.selection},
-                        feature_snapshot_hash=c.feature_snapshot_hash,
-                    ))
-                    continue
-        filtered.append(c)
-
-    return filtered

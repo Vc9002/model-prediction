@@ -22,6 +22,7 @@ from .calibration import calibration_metrics
 from .features.base import FeatureStore, GameRecord
 from .features.elo_ratings import build_elo
 from .features.park_factors import park_factor
+from .features.schedule_load import matchup_schedule_load
 from .features.trends import TrendEngine
 from .lifecycle import evaluate_locked_holdout
 from .models.learned_market import build_artifact, learn_confidence_threshold
@@ -58,8 +59,13 @@ class ValidationRow:
     trailing_home_games_30d: int = 0
     defensive_trend_gap: float = 0.0
     pitcher_era_gap: float = 0.0
+    starter_era_gap: float = 0.0
     consistency_gap: float = 0.0
     hot_cold_gap: float = 0.0
+    rest_disparity: float = 0.0
+    back_to_back_gap: float = 0.0
+    games_last_7_gap: float = 0.0
+    schedule_available: float = 0.0
     outcome_3way: int = 0  # 2=home, 1=draw, 0=away — used for soccer 3-way
 
 
@@ -91,6 +97,12 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "trend_gap",
         "park_factor",
         "pitcher_era_gap",
+    ),
+    "elo_trend_park_starter": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "starter_era_gap",
     ),
     "elo_trend_park_weather_pitcher": (
         "elo_probability",
@@ -129,11 +141,20 @@ def build_walk_forward_rows(
                     continue
                 home_trend = trends.team_trend(game.home_team)
                 away_trend = trends.team_trend(game.away_team)
+                schedule = matchup_schedule_load(
+                    history,
+                    game.home_team,
+                    game.away_team,
+                    game.start,
+                )
                 
                 # Rolling pitching quality: runs allowed per game (last 5)
                 home_ra = _rolling_runs_allowed(history, game.home_team, 5)
                 away_ra = _rolling_runs_allowed(history, game.away_team, 5)
                 pitcher_gap = round(home_ra - away_ra, 4) if home_ra and away_ra else 0.0
+                
+                # Real starter ERA gap from MLB Stats API snapshots (point-in-time)
+                starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
                 
                 # Historical weather from Open-Meteo DB
                 weather = _lookup_weather(game.home_team, game.start.date().isoformat())
@@ -161,9 +182,16 @@ def build_walk_forward_rows(
                         elo_probability=elo.expected_home_win(game.home_team, game.away_team),
                         trend_gap=home_trend.offensive_momentum - away_trend.offensive_momentum,
                         defensive_trend_gap=home_trend.defensive_momentum - away_trend.defensive_momentum,
+                        consistency_gap=home_trend.consistency - away_trend.consistency,
+                        hot_cold_gap=home_trend.hot_cold_score - away_trend.hot_cold_score,
+                        rest_disparity=schedule["rest_disparity"],
+                        back_to_back_gap=schedule["back_to_back_gap"],
+                        games_last_7_gap=schedule["games_last_7_gap"],
+                        schedule_available=schedule["schedule_available"],
                         park_factor=float(park["park_factor"]),
                         weather_factor=float(weather.get("run_factor", 1.0)),
                         pitcher_era_gap=pitcher_gap,
+                        starter_era_gap=starter_gap,
                         park_available=park["status"] == "available",
                         weather_available=weather.get("available", False),
                         elo_neutral_probability=elo.expected_neutral_win(
@@ -1160,3 +1188,94 @@ def _lookup_weather(home_team: str, game_date: str) -> dict:
             "available": True,
         }
     return {"run_factor": 1.0, "available": False}
+
+
+# ── Starter ERA gap from MLB Stats API snapshots ─────────────────────────
+
+_STARTER_ERA_MAP: dict[str, float] | None = None
+
+
+def _load_starter_era_map() -> dict[str, float]:
+    """Build point-in-time starter ERA gap map from mlb_statsapi snapshots.
+    
+    Returns dict of event_id → (home_starter_era - away_starter_era).
+    Computed from rolling 5-start ERA for each confirmed starting pitcher.
+    History is built strictly chronologically — the current game's stats
+    are NOT included in its own ERA computation."""
+    global _STARTER_ERA_MAP
+    if _STARTER_ERA_MAP is not None:
+        return _STARTER_ERA_MAP
+    
+    import json as _json
+    from pathlib import Path as _Path
+    
+    snap_path = _Path("data/mlb_statsapi/game_snapshots.jsonl")
+    crosswalk_path = _Path("data/processed/mlb/games.jsonl")
+    if not snap_path.exists() or not crosswalk_path.exists():
+        _STARTER_ERA_MAP = {}
+        return _STARTER_ERA_MAP
+    
+    def _ip_float(v):
+        w, _, f = v.partition(".")
+        return int(w) + {"0": 0.0, "1": 1 / 3, "2": 2 / 3}.get(f, 0.0)
+    
+    # Load crosswalk: (time, home, away) → event_id
+    crosswalk = {}
+    with crosswalk_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            g = _json.loads(line)
+            crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
+    
+    # Load snapshots, build point-in-time ERA history
+    snaps = []
+    with snap_path.open(encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                snaps.append(_json.loads(line))
+    snaps.sort(key=lambda r: r["game_start_utc"])
+    
+    history: dict[int, list[dict]] = {}
+    result: dict[str, float] = {}
+    
+    for snap in snaps:
+        key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
+        eid = crosswalk.get(key)
+        if not eid:
+            continue
+        
+        home_era = away_era = None
+        for side_key, side_data in [("home", snap["home"]), ("away", snap["away"])]:
+            order = side_data.get("pitcher_order") or []
+            if not order:
+                continue
+            pid = order[0]
+            player = next((p for p in side_data["players"] if p["player_id"] == pid), None)
+            if not player or "inningsPitched" not in player.get("pitching", {}):
+                continue
+            stats = player["pitching"]
+            ip = _ip_float(stats["inningsPitched"])
+            er = int(stats.get("earnedRuns", 0))
+            
+            prior = history.get(pid, [])
+            if len(prior) >= 2:
+                era = sum(g["er"] for g in prior[-5:]) / max(0.001, sum(g["ip"] for g in prior[-5:])) * 9
+                if side_key == "home":
+                    home_era = era
+                else:
+                    away_era = era
+            
+            # Update history AFTER computing this game's feature (point-in-time)
+            history.setdefault(pid, []).append({"ip": ip, "er": er})
+        
+        if home_era is not None and away_era is not None:
+            result[eid] = round(home_era - away_era, 6)
+    
+    _STARTER_ERA_MAP = result
+    return result
+
+
+def _starter_era_gap(event_id: str) -> float:
+    """Get the real starter ERA gap for a given event, or 0.0 if unavailable."""
+    return _load_starter_era_map().get(event_id, 0.0)

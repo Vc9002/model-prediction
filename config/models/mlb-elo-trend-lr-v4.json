@@ -1,0 +1,26 @@
+{
+  "sport": "mlb",
+  "model_version": "mlb-elo-trend-lr-v4",
+  "qualified": true,
+  "method": "logistic_regression",
+  "market_models": {
+    "moneyline": {
+      "positive_class": "home",
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "starter_era_gap"
+      ],
+      "coefficients": [
+        2.883359426891703,
+        -0.024350269573046555,
+        -0.9910290697330675,
+        -0.017897902251052634
+      ],
+      "intercept": -0.41336226879097454,
+      "confidence_threshold": 0.55
+    }
+  },
+  "artifact_hash": "5224fb6ffbc9ddf8fa517627b830ac851192da94d241963d556945393a42bb9d"
+}

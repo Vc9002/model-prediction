@@ -126,8 +126,8 @@ models:
     family: elo_trend_logistic_regression
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: mlb-elo-trend-lr-v3
-    production_artifact: config/models/mlb-elo-trend-lr-v3.json
+    active_production_version: mlb-elo-trend-lr-v4
+    production_artifact: config/models/mlb-elo-trend-lr-v4.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
     legacy_research_rollback: legacy-measured-edge
