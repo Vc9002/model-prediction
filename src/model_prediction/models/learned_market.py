@@ -67,8 +67,15 @@ class LearnedMarketArtifact:
 
     @property
     def qualified(self) -> bool:
-        """Whether the pinned locked-holdout evaluation qualified this version."""
-        return bool(self.raw.get("qualification", {}).get("qualified", False))
+        """Whether the pinned locked-holdout evaluation qualified this version.
+
+        Checks the nested qualification block first (standard for most artifacts),
+        then falls back to the top-level qualified key (used by MLB v4 and esports).
+        """
+        qual_block = self.raw.get("qualification", {})
+        if "qualified" in qual_block:
+            return bool(qual_block["qualified"])
+        return bool(self.raw.get("qualified", False))
 
     @property
     def qualification(self) -> dict[str, Any]:

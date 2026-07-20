@@ -89,9 +89,10 @@ from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
 
 
-SPORTS = tuple(POLYMARKET_SPORT_LEAGUES) + ("lol", "cs2")
+SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
 LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2")
+ESPORTS_TITLES = ("lol", "cs2")
 
 # League value on a ledger row -> ESPN league key(s) to search for results.
 _LEDGER_LEAGUE_TO_ESPN = {
@@ -181,7 +182,7 @@ def parser() -> argparse.ArgumentParser:
     forecast = commands.add_parser(
         "forecast", help="pregame learned LR + confidence-gate moneyline slate"
     )
-    forecast.add_argument("--sport", choices=SPORTS)
+    forecast.add_argument("--sport", choices=SPORTS + ESPORTS_TITLES)
     forecast.add_argument("--all", action="store_true")
     forecast.add_argument("--date", default=eastern_today().isoformat(),
         help="ISO date; defaults to today in US-Eastern time")
@@ -201,7 +202,7 @@ def parser() -> argparse.ArgumentParser:
     flat_forecast = commands.add_parser(
         "flat-forecast", help="forecast every game with no edge gate → flat_picks.xlsx"
     )
-    flat_forecast.add_argument("--sport", choices=SPORTS)
+    flat_forecast.add_argument("--sport", choices=SPORTS + ESPORTS_TITLES)
     flat_forecast.add_argument("--all", action="store_true")
     flat_forecast.add_argument("--date", default=eastern_today().isoformat(),
         help="ISO date; defaults to today in US-Eastern time")
@@ -1341,7 +1342,6 @@ def main(argv: list[str] | None = None) -> None:
                         raise ValueError("legacy-measured-edge is available only for MLB")
                     results[sport] = _forecast_mlb(args.date, log, config, registry, bans, ledger, audit)
                 elif sport in ("lol", "cs2"):
-                    from .esports import forecast_esports_slate
                     results[sport] = forecast_esports_slate(
                         data_root=Path(ledger_path(config)).parent,
                         artifact_dir=PROJECT_ROOT / "config/models",
@@ -1447,7 +1447,6 @@ def main(argv: list[str] | None = None) -> None:
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             soccer_collection = collect_soccer_scores(days_from=3)
             LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
-            ESPORTS_TITLES = ("lol", "cs2")
             forecast_result = {}
             for sport in LEARNED_SPORTS:
                 forecast_result[sport] = _forecast_learned_sport(
