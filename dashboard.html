@@ -850,25 +850,27 @@ async function renderFlat(){
       <div class=\"k\"><b class=\"${pnl>=0?'green':'red'}\">${fmt(pnl)}</b><span>P&L (U)</span></div>
       <div class=\"k\"><b>${risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
     
-    let html='<tr><th>Game (ET)</th><th>Sport</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Size</th><th>Result</th><th>P&L</th><th>Matchup</th></tr>';
-    if(!rows.length){html+='<tr><td colspan=10>No matches.</td></tr>';}
+    let html='<tr><th>Game (ET)</th><th>Sport</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Size</th><th>Result</th><th>P&L</th><th>Order</th><th>Matchup</th></tr>';
+    if(!rows.length){html+='<tr><td colspan=11>No matches.</td></tr>';}
     rows.forEach(p=>{
       const res=String(p.result||p.Result||'');
       const st=String(p.status||p.State||'');
       const resPill=res?`<span class=\"pill ${res}\">${res}</span>`:(st==='open'?'<span class=\"pill open\">open</span>':'');
       const edge=Number(p.edge||p.Edge)||0;
       const size=Number(p.units||p.Units)||0;
+      const mp=pregamePrice(p), bid=p.quote?.bid;
       html+=`<tr>
         <td>${gameTimeET(p.event_start_utc||p['Game (ET)'])}</td><td>${p.league||p.Sport||''}</td><td>${pickLabel(p)}</td>
         <td>${Number(p.model_probability||p.Model)?pct(Number(p.model_probability||p.Model)):'—'}</td>
-        <td>${Number(p.market_implied_probability||p['Pregame close'])?pct(Number(p.market_implied_probability||p['Pregame close'])):'—'}</td>
+        <td title=\"${bid!=null?'B '+cents(bid)+' / A '+cents(mp):''}\">${cents(mp)} <span class=\"dim\">${mp?pct(mp):'—'}</span></td>
         <td class=\"${edge>=0?'green':'red'}\">${edge?(edge>=0?'+':'')+(edge*100).toFixed(1)+'pp':'—'}</td>
         <td>${size?size.toFixed(2)+'U':'—'}</td>
         <td>${resPill}</td><td class=\"${pnlClass(pickPnl(p))}\">${fmt(pickPnl(p))}</td>
+        <td>${orderControl(p)}</td>
         <td class=\"dim\">${p.away_team||p.Away||''} @ ${p.home_team||p.Home||''}</td></tr>`;
     });
     document.getElementById('flatTable').innerHTML=html;
-  }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=10>Error: '+esc(String(e))+'</td></tr>';}
+  }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=11>Error: '+esc(String(e))+'</td></tr>';}
 }
 function renderPerf(p){
   state.perf=p;
