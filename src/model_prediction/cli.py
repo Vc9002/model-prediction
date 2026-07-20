@@ -47,6 +47,7 @@ from .data_sources.polymarket_us import (
     refresh_contract_snapshots,
 )
 from .data_sources.the_odds_api import TheOddsAPIClient
+from .data_sources.wnba_injuries import capture_latest_report
 from .domain import (
     EASTERN,
     LOSS_CLASSIFICATIONS,
@@ -235,6 +236,15 @@ def parser() -> argparse.ArgumentParser:
     ingest.add_argument("--sport", required=True, choices=ESPN_SPORTS)
     ingest.add_argument("--date", default=eastern_today().isoformat(),
         help="ISO date; defaults to today in US-Eastern time")
+
+    availability = commands.add_parser(
+        "wnba-availability-capture",
+        help="archive the latest official WNBA injury PDF and normalized point-in-time rows",
+    )
+    availability.add_argument(
+        "--observed-at",
+        help="UTC-aware ISO timestamp; defaults to now and never selects a future report",
+    )
 
     bootstrap = commands.add_parser("bootstrap", help="idempotent historical backfill from ESPN")
     bootstrap.add_argument("--sport", choices=ESPN_SPORTS)
@@ -969,15 +979,22 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
     return None
 
 
-def _clear_today_open(ledger, date_str: str) -> None:
-    """Remove all open picks created on the given date before re-forecasting."""
+def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> None:
+    """Remove all open picks created on the given date before re-forecasting.
+    
+    When by_event_date is True, also removes open picks whose event_start_utc
+    matches date_str — used for flat ledger to prevent duplicate forecast runs.
+    """
     rows = ledger.rows()
     to_remove = []
     for row in rows:
         if row.get("status") != "open":
             continue
         created = str(row.get("created_at_utc", "") or "")
+        event = str(row.get("event_start_utc", "") or "")
         if created.startswith(date_str):
+            to_remove.append(row["pick_id"])
+        elif by_event_date and event.startswith(date_str):
             to_remove.append(row["pick_id"])
     if to_remove:
         # Use openpyxl directly since ledger has no remove method
@@ -1205,7 +1222,7 @@ def main(argv: list[str] | None = None) -> None:
                 flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
                 flat_ledger = PickLedger(flat_ledger_path)
                 if replace_today and log:
-                    _clear_today_open(flat_ledger, args.date)
+                    _clear_today_open(flat_ledger, args.date, by_event_date=True)
             elif replace_today and log:
                 _clear_today_open(ledger, args.date)
             results = {}
@@ -1359,6 +1376,11 @@ def main(argv: list[str] | None = None) -> None:
             }
         elif args.command == "ingest":
             output = Ingestor(data_root, audit=audit).ingest_scores(args.sport, args.date)
+        elif args.command == "wnba-availability-capture":
+            output = capture_latest_report(
+                data_root,
+                observed_at=parse_utc(args.observed_at) if args.observed_at else utc_now(),
+            )
         elif args.command == "bootstrap":
             ingestor = Ingestor(data_root, audit=audit)
             if args.all:
