@@ -508,6 +508,23 @@ def validate_all_esports_baselines(
     }
 
 
+def _fuzzy_match_team(
+    description: str, teams: dict[str, dict[str, Any]], aliases: dict[str, set[str]]
+) -> str | None:
+    """Fallback fuzzy match when exact alias lookup returns nothing."""
+    key = _identity_key(description)
+    # Try direct substring: if description contains a known team name or vice versa
+    for team_id, team in teams.items():
+        for field in ("name", "slug", "acronym"):
+            alias = str(team.get(field, ""))
+            if not alias:
+                continue
+            alias_key = _identity_key(alias)
+            if len(alias_key) >= 4 and (alias_key in key or key in alias_key):
+                return team_id
+    return None
+
+
 def _team_alias_index(teams: dict[str, dict[str, Any]]) -> dict[str, set[str]]:
     index: dict[str, set[str]] = {}
     for team_id, team in teams.items():
@@ -558,7 +575,20 @@ def forecast_esports_slate(
             if market.get("market_type") != "moneyline" or len(market.get("sides", [])) != 2:
                 continue
             descriptions = [str(side.get("description") or "") for side in market["sides"]]
-            matches = [aliases.get(_identity_key(description), set()) for description in descriptions]
+            matches: list[set[str]] = []
+            for description in descriptions:
+                exact = aliases.get(_identity_key(description), set())
+                if exact:
+                    matches.append(exact)
+                    continue
+                fuzzy = _fuzzy_match_team(description, teams, aliases)
+                if fuzzy:
+                    matches.append({fuzzy})
+                    continue
+                # Unknown team: assign a synthetic ID so we can still price
+                # the match using default 1500 Elo rating for the unknown side.
+                synthetic_id = "unknown:" + _identity_key(description)
+                matches.append({synthetic_id})
             base = {
                 "event_id": event["event_id"],
                 "event_start_utc": event["event_start_utc"],
@@ -581,9 +611,10 @@ def forecast_esports_slate(
                 )
                 continue
             team_ids = [next(iter(candidate_ids)) for candidate_ids in matches]
-            if team_ids[0] == team_ids[1] or any(team_id not in ratings for team_id in team_ids):
+            if team_ids[0] == team_ids[1]:
                 no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
                 continue
+            # Unknown teams default to 1500 Elo in NeutralElo.probability — safe to proceed.
             probability1 = book.probability(team_ids[0], team_ids[1])
             probabilities_by_name = {
                 _identity_key(descriptions[0]): probability1,
