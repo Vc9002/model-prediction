@@ -181,37 +181,37 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
   </section>
 
+  <div class="filters" style="padding:0 16px;margin-bottom:12px">
+    <button class="primary" onclick="preset('open')">Active (<span id="openCount">0</span>)</button>
+    <button onclick="preset('settled')">Settled (<span id="settledCount">0</span>)</button>
+    <button onclick="preset('today')">Today active</button>
+    <button onclick="preset('7d')">Active 7d</button>
+    <button onclick="preset('all')">All picks</button>
+    <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
+    <details class="view-tools"><summary>Manage hidden rows</summary><div class="menu">
+      <span class="dim small">Hide from this dashboard:</span>
+      <button onclick="clearLedger('day')">Today</button>
+      <button onclick="clearLedger('week')">7 days</button>
+      <button onclick="clearLedger('month')">30 days</button>
+      <button onclick="clearLedger('all')">Everything</button>
+      <label class="small dim"><input type="checkbox" id="fArchived" onchange="onFilterChange()"> show hidden (<span id="archCount">0</span>)</label>
+      <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore hidden</button>
+    </div></details>
+    <span style="width:10px"></span>
+    <select id="fSport" onchange="onFilterChange()"><option value="">all sports</option></select>
+    <select id="fMarket" onchange="onFilterChange()"><option value="">all markets</option></select>
+    <select id="fStatus" onchange="onFilterChange()"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
+    <select id="fResult" onchange="onFilterChange()"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
+    <input id="fSearch" placeholder="search team / event id" size="22" oninput="onFilterChange()">
+    <input id="fFrom" type="date"><input id="fTo" type="date">
+    <button onclick="onFilterChange()">Apply</button>
+    <button onclick="exportCsv()">Export CSV</button>
+  </div>
   <section id="tab-picks" style="display:none">
     <div class="card">
       <h2>Model Picks Ledger</h2>
       <div class="small dim" style="margin-bottom:8px">Paper model forecasts: Size and P&amp;L are hypothetical units. Order shows exchange status only; live positions and dollar P&amp;L appear in Portfolio.</div>
       <div class="kpis" id="pickKpis"></div>
-      <div class="filters">
-        <button class="primary" onclick="preset('open')">Active (<span id="openCount">0</span>)</button>
-        <button onclick="preset('settled')">Settled (<span id="settledCount">0</span>)</button>
-        <button onclick="preset('today')">Today active</button>
-        <button onclick="preset('7d')">Active 7d</button>
-        <button onclick="preset('all')">All picks</button>
-        <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
-        <details class="view-tools"><summary>Manage hidden rows</summary><div class="menu">
-          <span class="dim small">Hide from this dashboard:</span>
-          <button onclick="clearLedger('day')">Today</button>
-          <button onclick="clearLedger('week')">7 days</button>
-          <button onclick="clearLedger('month')">30 days</button>
-          <button onclick="clearLedger('all')">Everything</button>
-          <label class="small dim"><input type="checkbox" id="fArchived" onchange="renderPicks()"> show hidden (<span id="archCount">0</span>)</label>
-          <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore hidden</button>
-        </div></details>
-        <span style="width:10px"></span>
-        <select id="fSport" onchange="renderPicks()"><option value="">all sports</option></select>
-        <select id="fMarket" onchange="renderPicks()"><option value="">all markets</option></select>
-        <select id="fStatus" onchange="renderPicks()"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
-        <select id="fResult" onchange="renderPicks()"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
-        <input id="fSearch" placeholder="search team / event id" size="22" oninput="renderPicks()">
-        <input id="fFrom" type="date"><input id="fTo" type="date">
-        <button onclick="renderPicks()">Apply</button>
-        <button onclick="exportCsv()">Export CSV</button>
-      </div>
       <div style="overflow:auto;max-height:520px"><table class="data" id="pickTable"></table></div>
     </div>
   </section>
@@ -292,15 +292,6 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
     <div id="flatKpis" class="kpis" style="margin-bottom:16px"></div>
     <div class="card">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <select id="fFlatSport" onchange="renderFlat()"><option value="">all sports</option></select>
-        <select id="fFlatMarket" onchange="renderFlat()"><option value="">all markets</option></select>
-        <select id="fFlatStatus" onchange="renderFlat()"><option value="open">active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
-        <select id="fFlatResult" onchange="renderFlat()"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
-        <input id="fFlatSearch" placeholder="search team / event id" size="22" oninput="renderFlat()">
-        <input id="fFlatFrom" type="date"><input id="fFlatTo" type="date">
-        <button onclick="renderFlat()">Apply</button>
-      </div>
       <table class="data" id="flatTable"><tr><td>Loading…</td></tr></table>
     </div>
   </section>
@@ -614,10 +605,10 @@ const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return
 const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))return stored;
   const m=pregamePrice(p),model=Number(p.model_probability);return m&&model?model-m:null;};
 function populateFilters(){
-  const sports=[...new Set(state.picks.map(p=>p.league))].sort();
-  const markets=[...new Set(state.picks.map(p=>p.market_type))].sort();
-  $("#fSport").innerHTML='<option value="">all sports</option>'+sports.map(s=>`<option>${s}</option>`).join("");
-  $("#fMarket").innerHTML='<option value="">all markets</option>'+markets.map(s=>`<option>${s}</option>`).join("");
+  const allLeagues=[...new Set([...state.picks.map(p=>p.league),..._flatCache.map(p=>p.league||p.Sport||'')])].filter(Boolean).sort();
+  const allMarkets=[...new Set([...state.picks.map(p=>p.market_type),..._flatCache.map(p=>p.market_type||p.Type||'moneyline')])].filter(Boolean).sort();
+  $("#fSport").innerHTML='<option value="">all sports</option>'+allLeagues.map(s=>`<option>${s}</option>`).join("");
+  $("#fMarket").innerHTML='<option value="">all markets</option>'+allMarkets.map(s=>`<option>${s}</option>`).join("");
 }
 function filteredPicks(){
   const s=$("#fSport").value,m=$("#fMarket").value,st=$("#fStatus").value,r=$("#fResult").value,
@@ -637,6 +628,7 @@ function filteredPicks(){
     return true;
   });
 }
+function onFilterChange(){renderPicks();renderFlat();}
 let sortKey="event_start_utc",sortAsc=false;
 function renderPicks(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
@@ -807,16 +799,10 @@ async function renderFlat(){
     const raw=await resp.json();
     _flatCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
     
-    // Populate sport dropdown
-    const sports=[...new Set(_flatCache.map(p=>p.league||p.Sport||''))].filter(Boolean).sort();
-    $("#fFlatSport").innerHTML='<option value=\"\">all sports</option>'+sports.map(s=>`<option>${s}</option>`).join('');
-    const markets=[...new Set(_flatCache.map(p=>p.market_type||p.Type||'moneyline'))].filter(Boolean).sort();
-    $("#fFlatMarket").innerHTML='<option value=\"\">all markets</option>'+markets.map(s=>`<option>${s}</option>`).join('');
-    
-    // Apply filters
-    const fs=$("#fFlatSport").value, fm=$("#fFlatMarket").value, fst=$("#fFlatStatus").value, fr=$("#fFlatResult").value;
-    const fq=($("#fFlatSearch").value||'').toLowerCase();
-    const ff=$("#fFlatFrom").value, ft=$("#fFlatTo").value;
+    // Apply filters (shared with Ledger tab)
+    const fs=$("#fSport").value, fm=$("#fMarket").value, fst=$("#fStatus").value, fr=$("#fResult").value;
+    const fq=($("#fSearch").value||'').toLowerCase();
+    const ff=$("#fFrom").value, ft=$("#fTo").value;
     
     let rows=_flatCache.filter(p=>{
       if(fs&&(p.league||p.Sport||'')!==fs)return false;
