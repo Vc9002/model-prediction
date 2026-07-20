@@ -192,7 +192,6 @@ because a paid credential is absent.
 | Official NBA/WNBA injury-report pages and PDFs | None | Timestamped player participation status and report updates | Prospective archive must be built locally; PDFs and layouts can change |
 | Baseball Savant through `pybaseball` or direct CSV | None | MLB pitch-level Statcast, batted-ball quality, pitcher/batter, fielding, and catcher inputs | Scraping endpoint is not a contractual API; cache and throttle it |
 | nflverse GitHub releases | None | NFL play-by-play from 1999, EPA/success fields, rosters, depth charts, injuries, officials, and aggregated NGS tables where available | Dataset-specific licences/attribution and in-season release lag |
-| Local schedule-derived features | None | Rest, back-to-backs, short weeks, travel distance, time zones, local start time | Requires a versioned venue/coordinate table and correct relocations |
 | BO3 public website data endpoint | None | Series-level LoL and CS2 match IDs, timestamps, source team IDs, scores, best-of format, tier, and tournament ID | No published stable API contract; cache, hash, attribute, and keep replaceable |
 | Oracle's Elixir public downloads | None | LoL game, player, draft, champion, patch, and team performance detail | Game-level rows require leak-free series grouping; use as enrichment after the series baseline |
 
@@ -200,8 +199,8 @@ because a paid credential is absent.
 
 | League | Default no-signup sources |
 |---|---|
-| NBA | Existing ESPN client + SportsDataverse `hoopR` releases + official NBA injury reports + local schedule/venue features + Polymarket US gateway |
-| WNBA | Existing ESPN client + SportsDataverse `wehoop` releases + official WNBA injury reports + local schedule/venue features + Polymarket US gateway |
+| NBA | Existing ESPN client + SportsDataverse `hoopR` releases + official NBA injury reports + Polymarket US gateway |
+| WNBA | Existing ESPN client + SportsDataverse `wehoop` releases + official WNBA injury reports + Polymarket US gateway |
 | MLB | Existing ESPN/MLB StatsAPI path + Baseball Savant via cached `pybaseball` pulls + Open-Meteo + local park/venue table + Polymarket US gateway |
 | NFL | Existing ESPN client + nflverse release files + official public injury status where available + Open-Meteo + local venue table + Polymarket US gateway |
 | LoL | BO3 series results baseline + Oracle's Elixir enrichment + Polymarket US gateway |
@@ -250,11 +249,24 @@ and transformations remain league-specific.
 | Feature group | Candidate variables | Primary use | Priority |
 |---|---|---|---|
 | Availability state | projected active probability, confirmed/inactive flag, minutes/snaps/innings at risk, time since last update | Probability and uncertainty | P0 |
-| Schedule load | rest days, back-to-back/short week, games in 7/14 days, travel distance, time-zone shift, east/west direction, local body-clock start | Probability and totals | P1 |
 | Venue/environment | home/neutral, altitude, surface, roof state, game-time weather forecast | Margin and total | P1 |
 | Regime and continuity | season phase, roster continuity, coach/manager change, expansion/relocation, rule era | Priors and uncertainty | P1 |
 | Missingness and freshness | feature age, confirmed vs projected, number of key inputs missing, source disagreement | Uncertainty/no-call gate | P0 |
 | Market residual | executable no-vig probability, spread/total context, bid-ask width, liquidity, price movement since first snapshot | Separate market-aware layer | P0 for profitability |
+
+### Rejected score-history and schedule additions
+
+The 2026-07-20 isolated-feature audit rejected `consistency_gap`,
+`hot_cold_gap`, `rest_disparity`, `back_to_back_gap`, `games_last_7_gap`, and
+`schedule_available` as predictive additions. None produced a reliable positive
+effect after validation-direction checks, date-cluster randomization, and Holm
+correction across 24 sport-feature tests. `schedule_available` was also constant
+or nearly constant and behaved like a cohort marker.
+
+Do not put these variables back into a promotion candidate without a new,
+prospectively timestamped hypothesis. Schedule information may remain in
+operational diagnostics and no-call context, but it is not a model-improvement
+priority.
 
 The market residual layer must remain separate from the independent sports
 model. That preserves an honest answer to two different questions:
@@ -277,8 +289,7 @@ and minutes information.
 | 3 | Possession and efficiency decomposition | Projected pace plus opponent-adjusted eFG%, turnover rate, offensive-rebound rate, and free-throw rate; separate offense and defense | Maps directly to expected possessions and points per possession | Available from box/play-by-play history; must be walk-forward |
 | 4 | Shot-profile matchup | Rim, short-mid, long-mid, corner-three and above-break-three frequency/efficiency; opponent allowed profile; transition and half-court rates | Captures stylistic interactions hidden by one net-rating number | Tracking data may be licensed; use public zone data only if stable |
 | 5 | Lineup continuity and role change | Returning-minute share, games with current starting five, new-starter indicator, usage redistribution after a key absence | Helps early-season and post-trade adaptation | Requires transaction-effective timestamps |
-| 6 | Travel, rest, and altitude | Back-to-back, 3-in-4, 5-in-7, distance, time-zone direction, Denver altitude, local start time | Plausible fatigue/context effect; should affect pace and shooting differently | Evidence is mixed; test, do not hard-code folklore |
-| 7 | Referee crew | Crew foul rate, home/away differential, free-throw effect, interaction with drive rate | May affect totals and foul-dependent matchups | Assignment is late and effects are noisy; P3 only |
+| 6 | Referee crew | Crew foul rate, home/away differential, free-throw effect, interaction with drive rate | May affect totals and foul-dependent matchups | Assignment is late and effects are noisy; P3 only |
 
 ### NBA model form
 
@@ -296,8 +307,7 @@ that can imply contradictory moneyline, spread, and total forecasts.
 2. `+ opponent-adjusted Four Factors + pace`.
 3. `+ projected minutes x player impact`.
 4. Combined basketball model.
-5. Combined model plus schedule/travel.
-6. Separate market-residual layer using timestamp-valid executable prices.
+5. Separate market-residual layer using timestamp-valid executable prices.
 
 ---
 
@@ -314,9 +324,8 @@ pretending the sample is NBA-sized.
 | 2 | Hierarchical player/lineup impact | WNBA-only RAPM with player and lineup priors; partial pooling by role/position; uncertainty grows for low-minute players | Handles sparse lineups without using raw plus-minus | Must not transfer NBA coefficients; priors may share structure only |
 | 3 | Pace and Four Factors | Opponent-adjusted pace, eFG%, TOV%, OREB%, FTA rate on 5/10/season horizons with reliability shrinkage | Directly models possessions and efficiency | Public WNBA advanced data exists; verify use and archival terms |
 | 4 | Roster and role discontinuity | Returning-minute share, transactions, hardship contracts, expansion/new-franchise flag, coach change | Stabilizes early-season and expansion-era priors | Entity mapping is a kill gate |
-| 5 | Travel/circadian load | Distance, time zones, eastward/westward travel, recovery days, local start time, cumulative road miles | Recent WNBA-specific research finds travel and directional jet-lag relationships worth testing | Do not assume a universal penalty; estimate with team/season controls |
-| 6 | Overseas/offseason workload | Days since overseas season, games in prior 30/60 days, late arrival to camp | Could explain early-season fatigue and role uncertainty | Data collection is difficult and licensing-sensitive; P2 research |
-| 7 | Shot-profile and matchup | Rim/three frequency, assisted-shot rate, transition share, paint touches, opponent allowed profile | Adds matchup context to team efficiency | Public tracking coverage may be incomplete; report coverage explicitly |
+| 5 | Overseas/offseason workload | Days since overseas season, games in prior 30/60 days, late arrival to camp | Could explain early-season fatigue and role uncertainty | Data collection is difficult and licensing-sensitive; P2 research |
+| 6 | Shot-profile and matchup | Rim/three frequency, assisted-shot rate, transition share, paint touches, opponent allowed profile | Adds matchup context to team efficiency | Public tracking coverage may be incomplete; report coverage explicitly |
 
 ### WNBA first ablations
 
@@ -324,8 +333,49 @@ pretending the sample is NBA-sized.
 2. `+ pace + Four Factors` with heavy shrinkage.
 3. `+ projected minutes x WNBA player impact`.
 4. `+ roster continuity`.
-5. `+ directional travel/circadian features`.
-6. Combined model and a separately calibrated market-residual layer.
+5. Combined model and a separately calibrated market-residual layer.
+
+### Player-availability implementation status — 2026-07-20
+
+Implemented, but not promoted:
+
+- official timestamped WNBA injury-report PDF capture and normalized snapshots;
+- timestamped ESPN event-injury capture to fill explicit statuses omitted from
+  the official PDF, with fail-closed handling for explicit source conflicts;
+- report/PDF timestamp reconciliation, SHA-256 provenance, submission-status
+  tracking, and multi-page table parsing;
+- projected minutes × player impact above replacement with explicit status
+  probabilities, uncertainty, report age, and home-oriented point gap;
+- fail-closed handling for stale/missing reports, unsubmitted teams, unmapped
+  players, incomplete 200-minute rotations, and post-decision observations;
+- forward-model support only when a future artifact explicitly requests the
+  availability feature names; the active `wnba-elo-trend-lr-v3` remains
+  unchanged;
+- expanded May 14–July 20 reconstruction: 208 official reports covered 180
+  scheduled matchups; V3 produced 169 candidates, 164 were settled, and 142
+  had conflict-free fully mapped availability inputs. On that paired subset,
+  winner accuracy moved from 71.83% to 71.13% while Brier improved from
+  0.21278 to 0.20680 (delta -0.00599; paired bootstrap 95% interval -0.01076
+  to -0.00119). Seven selections flipped: three corrections and four new
+  errors. The 132 games before the original July 17 audit independently showed
+  the same pattern: one fewer correct winner but Brier improved by 0.00590.
+
+Keep the feature as a shadow challenger, but do not promote a coefficient from
+this reconstruction. The larger sample supports probability-quality signal,
+especially at confidence gates, but does not improve unconditional winner
+accuracy. The official reports were downloaded retrospectively and the
+research impact prior uses heavily shrunk 10-game box plus/minus, not
+hierarchical WNBA lineup impact. Keep the collector and feature contract;
+replace the impact proxy and score a fresh prospective cohort before
+reconsidering activation.
+
+Dallas/Paige Bueckers correction: the official PDF omitted Bueckers, but ESPN's
+timestamped event status marked her Out with an undisclosed issue. The merged
+feature now captures that. Her isolated absence moves the frozen July 20 Dallas
+probability from 67.878% to 59.313%; after all listed New York and Dallas
+absences are combined, Dallas remains favored at 66.100%. The status bug is
+fixed, but the Dallas edge is not. An Alanna Smith disagreement (official
+Doubtful, ESPN Out) makes the production disposition a no-call.
 
 Because the WNBA sample is small, report season-by-season results and use a
 fresh prospective cohort. A model chosen after repeatedly viewing a 100-game
@@ -347,8 +397,7 @@ details; they are major components of the run-generating process.
 | 4 | Park, roof, and game-time forecast | Season-versioned handedness-specific park factors; roof/open state; temperature, dew point, pressure, precipitation, and wind vector projected onto home-plate-to-center-field orientation | Models the physical run environment instead of a crude magnitude-only factor | Train on archived forecasts issued at the same lead time, not realized weather |
 | 5 | Pitch-mix/platoon matchup | Expected lineup performance against starter pitch families, velocity bands and movement; team weakness/strength by pitch type with shrinkage | Captures nonlinear batter-pitcher style matchups without relying on tiny head-to-head samples | Avoid batter-vs-pitcher history; it is usually too sparse |
 | 6 | Defense and catching | Projected-fielders OAA/fielding run value, catcher framing/blocking/throwing, lineup-position interaction | Converts balls in play and borderline pitches into expected runs | Lower priority than starter/lineup/bullpen; keep season-versioned |
-| 7 | Travel/circadian context | Eastward/westward shift, days to acclimate, local start time, getaway day, doubleheader game number | MLB research finds detectable eastward-travel effects | Estimate interactions; do not use one blanket penalty |
-| 8 | Umpire assignment | Called-strike tendency, zone width, walk/strikeout effect, interaction with catcher framing and pitcher command | May affect totals and strikeout/run environment | Late assignment and substantial noise; P3 only |
+| 7 | Umpire assignment | Called-strike tendency, zone width, walk/strikeout effect, interaction with catcher framing and pitcher command | May affect totals and strikeout/run environment | Late assignment and substantial noise; P3 only |
 
 ### Correct MLB model form
 
@@ -371,7 +420,7 @@ that same distribution.
 5. Starter + lineup + bullpen.
 6. Add season-versioned park and archived game-time forecast.
 7. Add pitch-mix/platoon interaction.
-8. Evaluate defense/catcher and travel as later challengers.
+8. Evaluate defense/catcher as a later challenger.
 
 The first three groups should be collected prospectively even before the model
 is ready. Coefficients cannot recover information that was never timestamped.
@@ -394,8 +443,7 @@ available signal.
 | 6 | Receiver-coverage matchup | Target share/air-yards share, separation/cushion where available, man/zone tendencies, coverage shell, personnel grouping rates | Adds matchup detail beyond aggregate passing efficiency | Tracking access and sample size are limiting; P2 unless licensed |
 | 7 | Weather, roof, and surface | Wind speed/direction, precipitation, temperature, roof state, grass/turf, kicker range and QB hand-size/cold interactions only if predeclared | Wind can alter passing, kicking, pace, and totals | Avoid fishing for arbitrary temperature thresholds |
 | 8 | Special teams and field position | Opponent-adjusted kicking, punting, return value, starting field position, kicker availability | Close games turn on hidden yards and field-goal conversion | Shrink heavily because attempts are sparse |
-| 9 | Rest and travel | Short week, mini-bye, post-bye, international travel, time-zone shift, altitude, consecutive road games | Meaningful context with few games per season | Team and season confounding; use partial pooling |
-| 10 | Coaching/regime | Coordinator/head-coach continuity, play-caller change, fourth-down policy, neutral pace/PROE shift | Helps detect structural changes that Elo updates slowly | Must be effective-dated, not assigned retrospectively |
+| 9 | Coaching/regime | Coordinator/head-coach continuity, play-caller change, fourth-down policy, neutral pace/PROE shift | Helps detect structural changes that Elo updates slowly | Must be effective-dated, not assigned retrospectively |
 
 ### NFL model form
 
@@ -596,7 +644,7 @@ The highest-value work is data provenance, not a more complex algorithm.
    exotica such as coverage shells.
 5. **Build MLB starter/lineup/bullpen states.** This is higher value than more
    tuning of team score trends.
-6. **Add environment and interaction features.** Travel, weather, park, shot
+6. **Add environment and interaction features.** Weather, park, shot
    profile, pitch mix, protection-pressure.
 7. **Build the market-residual/economic layer.** Train only on timestamp-valid
    BBO history; keep it separate from independent probabilities.
@@ -680,9 +728,6 @@ guarantee that a feature will improve this repository's model.
 - Petridis and Pelechrinis, [Lineup Regularized Adjusted Plus-Minus
   (L-RAPM)](https://arxiv.org/abs/2601.15000): lineup sparsity and informed-prior
   regularization.
-- Leota et al., [Home-Court Advantage and the Associations of Travel and Jet Lag
-  with Team Performance in the WNBA](https://pubmed.ncbi.nlm.nih.gov/42426359/):
-  direct WNBA evidence for testing directional travel and recovery variables.
 
 NBA/WNBA Stats data may be visible without being licensed for unrestricted bulk
 reuse. Confirm access, archival, and commercial terms before making it a
@@ -702,9 +747,6 @@ production dependency.
   [Outs Above Average](https://www.mlb.com/glossary/statcast/outs-above-average),
   and [catcher framing](https://www.mlb.com/glossary/statcast/catcher-framing):
   official definitions for venue, defense, and receiving features.
-- Song et al., [How jet lag impairs Major League Baseball
-  performance](https://pmc.ncbi.nlm.nih.gov/articles/PMC5307448/): 20 seasons
-  and 46,535 games, with stronger detectable effects after eastward travel.
 - Koch and Panorska, [The Impact of Temperature on Major League
   Baseball](https://journals.ametsoc.org/view/journals/wcas/5/4/wcas-d-13-00002_1.xml):
   empirical motivation for a physically specified run-environment feature.

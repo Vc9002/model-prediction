@@ -13,6 +13,12 @@ See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the verified health
 snapshot, current model evidence, architecture, safety boundaries, and repair
 order. That document supersedes historical metrics elsewhere when they conflict.
 
+See [`docs/ENGINEERING_ROADMAP.md`](docs/ENGINEERING_ROADMAP.md) for the
+software-side punch list: dead code, oversized files worth splitting, a
+verified broken dashboard route, missing CI, and non-model/dashboard/
+portfolio-layer feature ideas. `model_improvements.md` stays scoped to
+per-sport modeling research only.
+
 The project uses complete-date chronological 60/20/20 validation. Model
 accuracy, calibration, diagnostic units, and executable profitability are
 separate claims. A model is operationally eligible only when its config,
@@ -60,7 +66,9 @@ env PYTHONPATH=src:. .venv/bin/python dashboard_server.py --port 8765
 # The installed console entry point is currently stale. Use the module form.
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli summary
 
-# Daily pipeline; this logs and settles rows, so inspect before running
+# Daily pipeline; this logs and settles rows, so inspect before running.
+# Runs the main forecast+log+settle steps AND the flat one-unit forecast+log+
+# settle steps against a separate flat ledger in the same invocation.
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli daily --date YYYY-MM-DD
 
 # Bootstrap historical data
@@ -113,15 +121,17 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 │   ├── model.yaml              # Active model configuration
 │   └── models/                 # Immutable, hash-verified artifacts
 ├── src/model_prediction/
-│   ├── learned_forward.py      # Forward model + rest flip filter
+│   ├── learned_forward.py      # Forward model + fail-closed feature hooks
 │   ├── validation.py           # Walk-forward validation pipeline
-│   ├── features/               # Elo, trends, park factors, rest
+│   ├── features/               # Elo, trends, park factors, player availability
+│   ├── data_sources/           # ESPN, markets, official WNBA injury reports
 │   ├── models/                 # LearnedMarketArtifact loader
 │   └── cli.py                  # CLI entry point
 ├── data/
 │   ├── historical/             # Processed game records
 │   ├── raw/                    # Cached ESPN scoreboards
 │   ├── odds/                   # Polymarket BBO snapshots
+│   ├── availability/           # Timestamped official report and research caches
 │   ├── esports/                # Versioned LoL/CS2 series backfills and identities
 │   ├── international_baseball/ # Official KBO/NPB results, identities, and manifests
 │   └── events.jsonl            # Audit chain

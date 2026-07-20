@@ -112,6 +112,12 @@ class ESPNClient:
     def teams(self, league: str) -> dict[str, Any]:
         return self._get(f"{SITE_API}/{self._league_path(league)}/teams", {"limit": 500})
 
+    def roster(self, league: str, team_id: str, season: int) -> dict[str, Any]:
+        return self._get(
+            f"{SITE_API}/{self._league_path(league)}/teams/{team_id}/roster",
+            {"season": season},
+        )
+
     def team_schedule(self, league: str, team_id: str, season: int) -> dict[str, Any]:
         return self._get(
             f"{SITE_API}/{self._league_path(league)}/teams/{team_id}/schedule",

@@ -65,15 +65,26 @@ Artifacts:
 - Rating: neutral-site Elo, initial 1500.
 - Model selection: K factor chosen by validation Brier score, log loss as
   tiebreaker.
-- Confidence threshold: selected on validation only and reported diagnostically.
+- Confidence threshold: selected on validation by the flat-`-110` diagnostic
+  unit result (`units_at_minus_110`), not by raw observation count. The
+  earlier selector picked whichever threshold had the most observations,
+  which always resolved to the loosest (0.0) threshold and made the gate a
+  no-op; fixed 2026-07-20.
 - Split: chronological 60% train / 20% validation / 20% locked test.
 - Feature timing: each probability uses only completed prior series.
 - Economics: not established until timestamp-valid pre-match executable asks
-  have accumulated prospectively.
+  have accumulated prospectively. Real per-side moneyline BBO capture started
+  2026-07-20 (`data/odds/esports/<date>/`); real esports lines are frequently
+  skewed (e.g. 70/30, 60/40) rather than flat `-110`, so the diagnostic units
+  below overstate edge until enough executable-price history accumulates to
+  replace the flat-stake assumption.
 
 The artifact remains `research` even if its locked-test hit rate exceeds 60%.
 Without roster continuity, market identity, and point-in-time price evidence,
-that number is not a trading edge.
+that number is not a trading edge. `_metrics()` now reports `units_at_minus_110`
+alongside `calls`/`hits` for both the unfiltered baseline and every swept
+confidence-gate threshold, so the diagnostic profitability effect of gating is
+visible directly rather than inferred from hit rate alone.
 
 ## Next feature order
 

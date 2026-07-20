@@ -403,6 +403,13 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
                         if not snap.get("timestamp_valid"):
                             continue
                         mt = snap.get("market_type")
+                        if mt not in ("spread", "total"):
+                            continue
+                        # Exclude sub-market contracts (F5, YRFI, team totals, etc.)
+                        # whose lines are not valid for full-game spread/total validation.
+                        slug = str(snap.get("market_slug") or "").casefold()
+                        if _is_sub_market_slug(slug, key):
+                            continue
                         if mt == "spread":
                             spread_snapshots += 1
                         elif mt == "total":
@@ -448,6 +455,33 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
         }
 
     return {"status": "not_requested", "events_scanned": events}
+
+
+def _is_sub_market_slug(slug: str, sport: str) -> bool:
+    """Return True if the slug belongs to a sub-market that is not a full-game contract.
+
+    First-5-innings (F5), first-half, team totals, and player props are
+    excluded because their lines cannot validate full-game spread/total models.
+    """
+    # MLB: F5 (first 5 innings), YRFI, team totals, player props
+    if sport == "mlb":
+        _MLB_SUB_PATTERNS = (
+            "-f5-",      # first 5 innings
+            "-yrfi",     # yes run first inning
+            "-nrfi",     # no run first inning
+            "-tt-",      # team total
+        )
+        if any(pattern in slug for pattern in _MLB_SUB_PATTERNS):
+            return True
+    # NBA/WNBA: quarter/half markets, player props
+    if sport in ("nba", "wnba"):
+        _BBALL_SUB_PATTERNS = (
+            "-1q-", "-2q-", "-3q-", "-4q-",  # quarter markets
+            "-1h-", "-2h-",                    # half markets
+        )
+        if any(pattern in slug for pattern in _BBALL_SUB_PATTERNS):
+            return True
+    return False
 
 
 _MINIMUM_SNAPSHOT_COUNT = 50

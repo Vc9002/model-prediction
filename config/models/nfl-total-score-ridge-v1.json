@@ -1,16 +1,16 @@
 {
   "alpha": 10.0,
-  "artifact_hash": "67e80c3038686a377348b63a639caac5998d12612942ab7fa31b7b7abe45d680",
+  "artifact_hash": "2037dce752a16d772a8fd21972ae30568584743e2d4f399f5c7891934105d3a4",
   "coefficients": [
-    -0.6157138699,
-    0.1869722298,
-    0.1606142713,
-    -0.299038361,
-    0.4676960599,
-    -0.2410860826,
-    0.6718508398,
-    -0.2946799422,
-    0.2886264178
+    -0.9219467384,
+    0.1571971572,
+    0.2005001307,
+    -0.2920078422,
+    0.4716572267,
+    -0.1212459111,
+    0.5948933098,
+    -0.2690989142,
+    0.3060140936
   ],
   "feature_names": [
     "league_total_mean",
@@ -23,25 +23,26 @@
     "home_allowed_5",
     "home_allowed_10"
   ],
-  "intercept": 52.3511852878,
+  "intercept": 63.8971494845,
   "locked_holdout": {
-    "baseline_mae": 11.70698,
-    "baseline_rmse": 14.388175,
+    "baseline_mae": 11.625613,
+    "baseline_rmse": 14.269528,
     "beats_baseline_mae": true,
-    "mae": 11.203117,
+    "mae": 11.078702,
     "mae_gain_95pct_interval": [
-      -0.068442,
-      1.050856
+      -8.7e-05,
+      1.114917
     ],
-    "mae_gain_vs_rolling_league_mean": 0.503863,
-    "mean_error": 0.331449,
-    "rmse": 13.901586,
+    "mae_gain_vs_rolling_league_mean": 0.546911,
+    "mean_error": 0.450551,
+    "rmse": 13.723563,
     "statistically_clear_mae_gain": false
   },
   "market_qualification": {
     "eligible": false,
-    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
-    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI. No timestamp-valid historical total lines found.",
+    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES",
+    "total_snapshots": 0
   },
   "method": "ridge_regression",
   "model_version": "nfl-total-score-ridge-v1",
@@ -50,14 +51,14 @@
   "status": "research_score_model_candidate",
   "training": {
     "holdout_end": "2026-02-08",
-    "holdout_rows": 101,
+    "holdout_rows": 106,
     "point_in_time": true,
-    "total_games": 670,
-    "train_end": "2025-10-12",
-    "train_rows": 303,
-    "usable_rows": 505,
-    "validation_end": "2025-11-30",
-    "validation_rows": 101
+    "total_games": 700,
+    "train_end": "2025-10-05",
+    "train_rows": 315,
+    "usable_rows": 526,
+    "validation_end": "2025-11-27",
+    "validation_rows": 105
   },
-  "validation_residual_sd": 13.287409
+  "validation_residual_sd": 13.301906
 }

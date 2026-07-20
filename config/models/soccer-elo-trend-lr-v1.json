@@ -1,33 +1,171 @@
 {
-  "artifact_hash": "f412eb7c178a3f27fa54961bff5a3ba612cbf0181cc00ebb66cb7467e1c0c3ed",
+  "artifact_hash": "b6c39924e4fcf7e9fdf9fc868674504d033d049c54cb975899f2396d7874094f",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        5.9214058166
+        5.5467087207,
+        -0.1383193976
       ],
-      "confidence_threshold": 0.54397949,
+      "confidence_threshold": 0.53758622,
       "feature_names": [
-        "elo_probability"
+        "elo_probability",
+        "trend_gap"
       ],
-      "intercept": -3.6887669973,
+      "intercept": -3.5283681352,
       "positive_class": "home"
     }
   },
   "method": "logistic_regression",
   "model_version": "soccer-elo-trend-lr-v1",
   "qualification": {
-    "calls": 268,
-    "hit_rate": 0.600746,
+    "brier_score": 0.220097,
+    "calibration": {
+      "brier_score": 0.22009655699240516,
+      "calibration_intercept": 0.013621383954351854,
+      "calibration_slope": 0.7825752845190932,
+      "expected_calibration_error": 0.03511523901304534,
+      "log_loss": 0.6332333561908446,
+      "reliability_buckets": [
+        {
+          "count": 410,
+          "hit_rate": 0.5414634146341464,
+          "lower": 0.5,
+          "mean_p": 0.5695379116562889,
+          "upper": 0.6
+        },
+        {
+          "count": 456,
+          "hit_rate": 0.6096491228070176,
+          "lower": 0.6,
+          "mean_p": 0.6460352012917817,
+          "upper": 0.7
+        },
+        {
+          "count": 330,
+          "hit_rate": 0.7575757575757576,
+          "lower": 0.7,
+          "mean_p": 0.746546672972071,
+          "upper": 0.8
+        },
+        {
+          "count": 162,
+          "hit_rate": 0.7716049382716049,
+          "lower": 0.8,
+          "mean_p": 0.8451761417853398,
+          "upper": 0.9
+        },
+        {
+          "count": 43,
+          "hit_rate": 0.7906976744186046,
+          "lower": 0.9,
+          "mean_p": 0.9194353814117214,
+          "upper": 1.0
+        }
+      ],
+      "sample_size": 1401,
+      "status": "ok"
+    },
+    "called_rate": 0.864281,
+    "calls": 1401,
+    "every_called_month_positive_at_minus_110": true,
+    "every_qualifying_month_positive_at_minus_110": true,
+    "failures": [],
+    "framework": "locked_complete_date_60_20_20",
+    "hit_rate": 0.648822,
+    "hits": 909,
     "locked_holdout": true,
-    "note": "Binary elo_only for Team to Win. 3-way soccer_3way also qualified (53c/66%).",
+    "market_type": "moneyline",
+    "meets_primary_holdout_metrics": true,
+    "minimum_calls": 50,
+    "minimum_hit_rate": 0.6,
+    "monthly_at_minus_110": [
+      {
+        "calls": 56,
+        "hit_rate": 0.696429,
+        "hits": 39,
+        "month": "2026-01",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 18.454545
+      },
+      {
+        "calls": 313,
+        "hit_rate": 0.693291,
+        "hits": 217,
+        "month": "2026-02",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 101.272727
+      },
+      {
+        "calls": 296,
+        "hit_rate": 0.64527,
+        "hits": 191,
+        "month": "2026-03",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 68.636364
+      },
+      {
+        "calls": 342,
+        "hit_rate": 0.672515,
+        "hits": 230,
+        "month": "2026-04",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 97.090909
+      },
+      {
+        "calls": 302,
+        "hit_rate": 0.592715,
+        "hits": 179,
+        "month": "2026-05",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 39.727273
+      },
+      {
+        "calls": 71,
+        "hit_rate": 0.56338,
+        "hits": 40,
+        "month": "2026-06",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 5.363636
+      },
+      {
+        "calls": 21,
+        "hit_rate": 0.619048,
+        "hits": 13,
+        "month": "2026-07",
+        "qualification_status": "partial_month",
+        "units_at_minus_110": 3.818182
+      }
+    ],
+    "monthly_minimum_calls": 10,
+    "price_diagnostics": null,
+    "qualification_eligible": true,
     "qualified": true,
-    "units_at_minus_110": 39.363636
+    "roi": null,
+    "secondary_reporting_complete": true,
+    "selectivity": 0.864281,
+    "total_predictions": 1621,
+    "units_at_minus_110": 334.363636
   },
   "schema_version": "1",
   "sport": "soccer",
   "training": {
-    "end": "2026-02-28",
-    "observations": 2340,
-    "start": "2025-08-17"
+    "coefficient_fit": {
+      "end": "2025-07-24",
+      "observations": 5459,
+      "start": "2024-01-13"
+    },
+    "locked_holdout": {
+      "end": "2026-07-18",
+      "observations": 1621,
+      "start": "2026-01-27"
+    },
+    "market_inputs_used": false,
+    "threshold_selection": {
+      "end": "2026-01-26",
+      "observations": 2006,
+      "start": "2025-07-25"
+    },
+    "threshold_source": "later validation cohort; never locked holdout",
+    "walk_forward_features": true
   }
 }

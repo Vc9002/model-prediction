@@ -1,15 +1,15 @@
 {
-  "artifact_hash": "ebdb392c90fd9a9414a97c1b39024e1a4f2c894aee118b3b4598ecd7e5e96695",
+  "artifact_hash": "4435038a58216942bf16fe711ddd39108b44e3bba72e2eb18988fc65b8e9f664",
   "market_models": {
     "moneyline": {
       "coefficients": [
-        3.3424,
-        -0.027,
-        -1.0506,
-        -0.3347,
-        0.026
+        3.2814163868,
+        -0.0216130299,
+        -1.022893425,
+        -0.3364653227,
+        0.0242438421
       ],
-      "confidence_threshold": 0.515,
+      "confidence_threshold": 0.59377952,
       "feature_names": [
         "elo_probability",
         "trend_gap",
@@ -17,50 +17,57 @@
         "weather_factor",
         "pitcher_era_gap"
       ],
-      "intercept": -0.2661,
+      "intercept": -0.2598155656,
       "positive_class": "home"
     }
   },
   "method": "logistic_regression",
   "model_version": "mlb-elo-trend-lr-v3",
   "qualification": {
-    "brier_score": 0.246884,
+    "brier_score": 0.249282,
     "calibration": {
-      "brier_score": 0.24688416663244242,
-      "calibration_intercept": 0.07638917826927856,
-      "calibration_slope": 0.4385904444928828,
-      "expected_calibration_error": 0.06905683504582555,
-      "log_loss": 0.6872759897252058,
+      "brier_score": 0.24928190659965993,
+      "calibration_intercept": -0.10531124975287169,
+      "calibration_slope": 0.6948528540075789,
+      "expected_calibration_error": 0.071225778883407,
+      "log_loss": 0.6920539949454105,
       "reliability_buckets": [
         {
-          "count": 229,
-          "hit_rate": 0.5676855895196506,
+          "count": 51,
+          "hit_rate": 0.5294117647058824,
+          "lower": 0.5,
+          "mean_p": 0.5969033937368667,
+          "upper": 0.6
+        },
+        {
+          "count": 221,
+          "hit_rate": 0.5610859728506787,
           "lower": 0.6,
-          "mean_p": 0.6357198247440242,
+          "mean_p": 0.6330822148669436,
           "upper": 0.7
         },
         {
-          "count": 15,
-          "hit_rate": 0.8,
+          "count": 14,
+          "hit_rate": 0.7857142857142857,
           "lower": 0.7,
-          "mean_p": 0.7153314743466744,
+          "mean_p": 0.7130478432514525,
           "upper": 0.8
         }
       ],
-      "sample_size": 244,
+      "sample_size": 286,
       "status": "ok"
     },
-    "called_rate": 0.18034,
-    "calls": 1155,
+    "called_rate": 0.214232,
+    "calls": 286,
     "every_called_month_positive_at_minus_110": false,
     "every_qualifying_month_positive_at_minus_110": false,
     "failures": [
-      "selective hit rate 58.20% below required 60.00%",
+      "selective hit rate 56.64% below required 60.00%",
       "non-positive qualifying months at -110: 2026-04"
     ],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.552381,
-    "hits": 638,
+    "hit_rate": 0.566434,
+    "hits": 162,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": false,
@@ -69,66 +76,65 @@
     "monthly_at_minus_110": [
       {
         "calls": 75,
-        "hit_rate": 0.52,
-        "hits": 39,
+        "hit_rate": 0.48,
+        "hits": 36,
         "month": "2026-04",
         "qualification_status": "qualifying",
-        "units_at_minus_110": -0.545455
+        "units_at_minus_110": -6.272727
       },
       {
-        "calls": 71,
-        "hit_rate": 0.647887,
-        "hits": 46,
+        "calls": 84,
+        "hit_rate": 0.630952,
+        "hits": 53,
         "month": "2026-05",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 16.818182
+        "units_at_minus_110": 17.181818
       },
       {
-        "calls": 74,
-        "hit_rate": 0.594595,
-        "hits": 44,
+        "calls": 91,
+        "hit_rate": 0.593407,
+        "hits": 54,
         "month": "2026-06",
         "qualification_status": "qualifying",
-        "units_at_minus_110": 10.0
+        "units_at_minus_110": 12.090909
       },
       {
-        "calls": 24,
-        "hit_rate": 0.541667,
-        "hits": 13,
+        "calls": 36,
+        "hit_rate": 0.527778,
+        "hits": 19,
         "month": "2026-07",
         "qualification_status": "partial_month",
-        "units_at_minus_110": 0.818182
+        "units_at_minus_110": 0.272727
       }
     ],
     "monthly_minimum_calls": 10,
     "price_diagnostics": null,
     "qualification_eligible": true,
-    "qualified": true,
+    "qualified": false,
     "roi": null,
     "secondary_reporting_complete": true,
-    "selectivity": 0.18034,
-    "status": "shadow_qualified",
-    "total_predictions": 1353,
-    "units_at_minus_110": 63.0
+    "selectivity": 0.214232,
+    "total_predictions": 1335,
+    "units_at_minus_110": 23.272727
   },
   "schema_version": "1",
   "sport": "mlb",
   "training": {
     "coefficient_fit": {
-      "end": "2025-07-18",
-      "observations": 3752,
+      "end": "2025-07-20",
+      "observations": 3787,
       "start": "2024-04-06"
     },
     "locked_holdout": {
-      "end": "2026-07-15",
-      "observations": 1353,
-      "start": "2026-04-03"
+      "end": "2026-07-19",
+      "observations": 1335,
+      "start": "2026-04-06"
     },
     "market_inputs_used": false,
     "threshold_selection": {
-      "end": "2026-04-02",
-      "observations": 1036,
-      "start": "2025-07-19"
+      "end": "2026-04-05",
+      "observations": 1048,
+      "start": "2025-07-21"
     },
     "threshold_source": "later validation cohort; never locked holdout",
     "walk_forward_features": true

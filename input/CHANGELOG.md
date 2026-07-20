@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-07-20 — esports/KBO/NPB unit tracking, confidence-gate fix, BBO collection
+
+- Fixed a no-op confidence-gate selector in `esports.py`: threshold selection
+  picked whichever gate had the most observations, which always resolved to
+  the loosest threshold (0.0) and never actually gated anything. Now selects
+  by the diagnostic `units_at_minus_110` result on validation, verified to
+  hold on the untouched locked test. Commit `51899ea`.
+- Added `units_at_minus_110` reporting to `_metrics()` in both `esports.py`
+  and `international_baseball.py` (KBO/NPB), so validation/holdout
+  profitability is visible directly. KBO/NPB treat ties as a push (0 P&L),
+  not a loss.
+- Investigated why LoL/CS2 diagnostic numbers looked inflated: partly the
+  gate no-op above, and more fundamentally real esports contract lines are
+  skewed (70/30, 60/40) rather than flat `-110`, so the flat-stake diagnostic
+  overstates edge. KBO/NPB lines are comparatively even, so the diagnostic is
+  a closer (but still not executable) proxy there.
+- Started real per-side moneyline BBO capture for esports, KBO, and NPB
+  (`BBO_CAPTURE_SPORTS` in `data_sources/polymarket_us.py` now covers all
+  7 sports: mlb, nba, wnba, nfl, esports, kbo, npb). Snapshots land in
+  `data/odds/<sport>/<date>/`.
+- Reviewed a concurrent roadmap-challenger factorial experiment
+  (`src/model_prediction/roadmap_challenger.py`,
+  `outputs/roadmap_challenger/ROADMAP_CHALLENGER_DECISION_DOSSIER.md`): 0 of
+  64 tested feature combinations across MLB/NBA/WNBA/NFL clear the full
+  statistical screen. `schedule_available` is structurally degenerate
+  (near-constant). No production model or config was changed by that
+  experiment.
+
 ## 2026-07-20 — documentation truth reset
 
 - Added `docs/PROJECT_STATUS.md` as the current source-of-truth entry point.

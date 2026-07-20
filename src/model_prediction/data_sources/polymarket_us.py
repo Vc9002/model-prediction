@@ -342,6 +342,7 @@ def capture_slate_snapshots(
     }
     qualification_sports = BBO_CAPTURE_SPORTS
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
+    skipped_summer_league = 0
     failure_details: list[dict[str, str]] = []
     for league, events in events_by_league.items():
         sport = league_to_sport.get(league.upper())
@@ -358,12 +359,27 @@ def capture_slate_snapshots(
         # Collect every contract for the league, fetch BBOs concurrently
         # (each snapshot is two HTTP round-trips; ~200 serial contracts took
         # minutes), then append serially so the JSONL stays clean.
-        contracts = [
+        #
+        # Skip summer league / preseason events — they offer only moneyline
+        # markets and pollute the spread/total readiness counts. Match known
+        # summer league slug patterns (e.g. "nbasl" for NBA Summer League).
+        _SUMMER_LEAGUE_PATTERNS = (
+            "nbasl",   # NBA Summer League
+        )
+        all_contracts = [
             (str(market.get("market_slug") or ""), event, market)
             for event in events
             for market in event.get("markets", [])
             if market.get("market_slug")
         ]
+        contracts = [
+            entry for entry in all_contracts
+            if not any(
+                pattern in str(entry[0]).casefold()
+                for pattern in _SUMMER_LEAGUE_PATTERNS
+            )
+        ]
+        skipped_summer_league += len(all_contracts) - len(contracts)
 
         def _fetch(entry):
             slug, event, market = entry
@@ -404,6 +420,7 @@ def capture_slate_snapshots(
         "missing_executable_ask": missing_bbo,
         "failures": failures,
         "skipped_nonqualification_contracts": skipped_nonqualification_contracts,
+        "skipped_summer_league": skipped_summer_league,
         "failure_details": failure_details,
         "timestamp_valid": True,
         "sports_scope": sorted(qualification_sports),

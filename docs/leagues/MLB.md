@@ -57,11 +57,15 @@ Decision: reject `mlb-opponent-adjusted-trend-score-v2` and continue iterating.
 ## Required inputs and known gaps
 
 The intended model uses pitcher quality and platoon matchups, projected lineups,
-bullpen workload, park, weather, travel, and rest. Score-only history cannot
+bullpen workload, park, and weather. Score-only history cannot
 reconstruct those inputs point-in-time. Missing two-sided probable starters must
 skip the forecast; never substitute team runs allowed for starter ERA. Other
 neutral research fallbacks must remain explicit missingness states and cannot
 support a qualified call.
+
+Simple rest, back-to-back, schedule-density, consistency, hot/cold, and
+schedule-availability additions failed the 2026-07-20 isolated audit. Keep them
+out of the predictive roadmap; schedule context is operational only.
 
 The highest-priority data work is prospective capture of two-sided executable
 prices, confirmed starters and lineups, bullpen availability, park/weather, and

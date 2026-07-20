@@ -1,16 +1,16 @@
 {
   "alpha": 10.0,
-  "artifact_hash": "fd300d8f2328d6c48c56c356b54ab6dde5a8fc65d452fc47c8e0f479407b44f3",
+  "artifact_hash": "0dddbff34b848f65453428d052b256f6b23f7092d10c953a1de3b3e4606da517",
   "coefficients": [
-    -2.6662523021,
-    -0.0995550285,
-    0.5799852462,
-    0.434929872,
-    0.1884727328,
-    -0.5542342395,
-    1.0098662786,
-    -0.2265120425,
-    1.092863291
+    -2.5837087858,
+    -0.0061901708,
+    0.4631894474,
+    0.1611363328,
+    0.4193866039,
+    -0.2212975484,
+    0.8280771825,
+    -0.2712464838,
+    1.0557180234
   ],
   "feature_names": [
     "league_total_mean",
@@ -23,25 +23,26 @@
     "home_allowed_5",
     "home_allowed_10"
   ],
-  "intercept": 401.326206447,
+  "intercept": 387.3600114837,
   "locked_holdout": {
-    "baseline_mae": 13.985642,
-    "baseline_rmse": 17.370425,
-    "beats_baseline_mae": true,
-    "mae": 13.732078,
+    "baseline_mae": 17.918592,
+    "baseline_rmse": 23.085377,
+    "beats_baseline_mae": false,
+    "mae": 19.868038,
     "mae_gain_95pct_interval": [
-      -1.149854,
-      1.566496
+      -3.387878,
+      -0.393392
     ],
-    "mae_gain_vs_rolling_league_mean": 0.253564,
-    "mean_error": -3.129312,
-    "rmse": 16.994024,
+    "mae_gain_vs_rolling_league_mean": -1.949446,
+    "mean_error": -12.102628,
+    "rmse": 25.299849,
     "statistically_clear_mae_gain": false
   },
   "market_qualification": {
     "eligible": false,
-    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
-    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+    "note": "Timestamp-valid total lines available (2123 snapshots, >= 50 minimum). Score MAE/RMSE do not directly prove over-under accuracy, but a contract-level backtest against these historical lines is now feasible.",
+    "reason": "DATA_READY_PENDING_OVER_UNDER_EVALUATION",
+    "total_snapshots": 2123
   },
   "method": "ridge_regression",
   "model_version": "wnba-total-score-ridge-v1",
@@ -49,15 +50,15 @@
   "sport": "wnba",
   "status": "research_score_model_candidate",
   "training": {
-    "holdout_end": "2026-07-16",
-    "holdout_rows": 109,
+    "holdout_end": "2026-07-19",
+    "holdout_rows": 142,
     "point_in_time": true,
-    "total_games": 630,
-    "train_end": "2025-07-05",
-    "train_rows": 325,
-    "usable_rows": 542,
-    "validation_end": "2025-08-19",
-    "validation_rows": 108
+    "total_games": 813,
+    "train_end": "2025-08-15",
+    "train_rows": 424,
+    "usable_rows": 708,
+    "validation_end": "2026-05-27",
+    "validation_rows": 142
   },
-  "validation_residual_sd": 18.208023
+  "validation_residual_sd": 16.554472
 }

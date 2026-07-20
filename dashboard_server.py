@@ -615,6 +615,20 @@ def _production_artifact(validation: dict, sport: str) -> dict:
     return _read_json(path) or {}
 
 
+def _readiness_cell(readiness: str | None) -> dict:
+    """Map a multi_market_readiness status string to a dashboard cell."""
+    if not readiness:
+        return {"state": "no_data", "readiness": None}
+    if readiness.startswith("DATA_READY"):
+        # Data exists but no locked-holdout evaluation has been run yet.
+        return {"state": "model_untested", "readiness": readiness}
+    if readiness.startswith("INSUFFICIENT_DATA"):
+        # Some data collected but below the minimum threshold.
+        return {"state": "blocked", "readiness": readiness}
+    # BLOCKED_*, DIAGNOSTIC_ONLY_*, etc.
+    return {"state": "blocked", "readiness": readiness}
+
+
 def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
     """Moneyline cell pinned to the active artifact's exact validated variant."""
     variants = sport_meta.get("variants") or {}
@@ -792,7 +806,7 @@ def matrix() -> dict:
         if isinstance(rd, dict) and rd.get("state"):
             mlb_row[mk] = rd
         else:
-            mlb_row[mk] = {"state": "blocked" if rd else "no_data", "readiness": rd}
+            mlb_row[mk] = _readiness_cell(rd)
     baseball["mlb"] = mlb_row
     # Build basketball grid (NBA/WNBA) with moneyline + spread + total
     basketball = {}
@@ -806,7 +820,7 @@ def matrix() -> dict:
             if isinstance(rd, dict) and rd.get("state"):
                 bball_row[mk] = rd
             else:
-                bball_row[mk] = {"state": "blocked" if rd else "no_data", "readiness": rd}
+                bball_row[mk] = _readiness_cell(rd)
         basketball[sport] = bball_row
     return {"markets": markets, "grid": grid, "esports": esports, "baseball": baseball, "basketball": basketball, "source": source, "gate": gate}
 # ── SECTION: Backtests & Odds ───────────────────────────────────────

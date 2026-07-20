@@ -1,16 +1,16 @@
 {
   "alpha": 10.0,
-  "artifact_hash": "4cd335ac89a0a8c5906d9a7730c4e6c6b594b8d07e96d255e2e48f4aafd0b9ee",
+  "artifact_hash": "9f236fee189ddeba3363252305e330c880e467fea887fe2f89fa0ecb1a41fa74",
   "coefficients": [
-    -0.5153986369,
-    0.1088512565,
-    0.5760235699,
-    -0.0458801862,
-    0.492926243,
-    -0.1560764241,
-    0.8455917759,
-    0.030781872,
-    0.4903080119
+    -0.4392368604,
+    0.0728840024,
+    0.4934443941,
+    0.1547309886,
+    0.3660776192,
+    -0.0279671001,
+    0.6232495931,
+    0.1236039269,
+    0.427874569
   ],
   "feature_names": [
     "league_total_mean",
@@ -23,25 +23,26 @@
     "home_allowed_5",
     "home_allowed_10"
   ],
-  "intercept": 78.2202551943,
+  "intercept": 72.4548602011,
   "locked_holdout": {
-    "baseline_mae": 16.209385,
-    "baseline_rmse": 20.107096,
+    "baseline_mae": 16.486004,
+    "baseline_rmse": 20.4394,
     "beats_baseline_mae": true,
-    "mae": 15.83859,
+    "mae": 15.165675,
     "mae_gain_95pct_interval": [
-      -0.267318,
-      0.984008
+      0.808985,
+      1.828615
     ],
-    "mae_gain_vs_rolling_league_mean": 0.370795,
-    "mean_error": -2.363646,
-    "rmse": 19.812714,
-    "statistically_clear_mae_gain": false
+    "mae_gain_vs_rolling_league_mean": 1.320329,
+    "mean_error": -0.906684,
+    "rmse": 19.277906,
+    "statistically_clear_mae_gain": true
   },
   "market_qualification": {
     "eligible": false,
-    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI.",
-    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES"
+    "note": "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI. No timestamp-valid historical total lines found.",
+    "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES",
+    "total_snapshots": 0
   },
   "method": "ridge_regression",
   "model_version": "nba-total-score-ridge-v1",
@@ -49,15 +50,15 @@
   "sport": "nba",
   "status": "research_score_model_candidate",
   "training": {
-    "holdout_end": "2026-01-05",
-    "holdout_rows": 366,
+    "holdout_end": "2026-06-14",
+    "holdout_rows": 692,
     "point_in_time": true,
-    "total_games": 1996,
-    "train_end": "2025-04-08",
-    "train_rows": 1098,
-    "usable_rows": 1830,
-    "validation_end": "2025-11-12",
-    "validation_rows": 366
+    "total_games": 3633,
+    "train_end": "2025-10-04",
+    "train_rows": 2076,
+    "usable_rows": 3460,
+    "validation_end": "2026-01-19",
+    "validation_rows": 692
   },
-  "validation_residual_sd": 20.105523
+  "validation_residual_sd": 19.321322
 }

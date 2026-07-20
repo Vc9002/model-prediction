@@ -23,6 +23,13 @@ The locked chronological result makes the limitation obvious: score-only Elo
 is a weak control. NPB has meaningful starting-pitcher, bullpen, park, travel,
 roster, and tie dynamics that must be modeled before any economic claim.
 
+`_metrics()` reports a diagnostic `units_at_minus_110` alongside `calls`/`hits`
+for the train/validation/locked-test cohorts, with ties correctly scored as a
+push (0 P&L) rather than a loss. NPB's contract line is comparatively even
+(unlike the skewed esports lines), so the flat `-110` diagnostic is a closer
+proxy here, but it is still not an executable-price claim. Real per-side
+moneyline BBO capture started 2026-07-20 (`data/odds/npb/<date>/`).
+
 ## Feature order
 
 1. **Probable and confirmed starter.** Effective-dated pitcher identity,

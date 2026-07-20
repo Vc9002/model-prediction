@@ -22,6 +22,13 @@ The locked chronological test is a control, not a strategy. Team Elo alone is
 too weak for KBO betting because the starting pitcher, bullpen state, and
 lineup can move fair value far more than small Elo changes.
 
+`_metrics()` reports a diagnostic `units_at_minus_110` alongside `calls`/`hits`
+for the train/validation/locked-test cohorts, with ties correctly scored as a
+push (0 P&L) rather than a loss. KBO's contract line is comparatively even
+(unlike the skewed esports lines), so the flat `-110` diagnostic is a closer
+proxy here, but it is still not an executable-price claim. Real per-side
+moneyline BBO capture started 2026-07-20 (`data/odds/kbo/<date>/`).
+
 ## Feature order
 
 1. **Probable and confirmed starter identity.** Build pitcher ratings from

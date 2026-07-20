@@ -1,12 +1,12 @@
 {
-  "artifact_hash": "75466d2935fafde3e00566ac14b7535b4fd36aceaa2760b54ea9a37322e7b967",
+  "artifact_hash": "05998c5d7daa14024f5cb8cc9f2a3d5415797e58e4c76a9b6c95e6bee90da91c",
   "market_models": {
     "moneyline": {
       "coefficients": [
         2.7214626305,
         0.0348450788
       ],
-      "confidence_threshold": 0.535,
+      "confidence_threshold": 0.50012402,
       "feature_names": [
         "elo_probability",
         "trend_gap"
@@ -52,15 +52,15 @@
       "status": "ok"
     },
     "called_rate": 1.0,
-    "calls": 82,
+    "calls": 110,
     "every_called_month_positive_at_minus_110": false,
     "every_qualifying_month_positive_at_minus_110": false,
     "failures": [
       "non-positive qualifying months at -110: 2025-11"
     ],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.731707,
-    "hits": 60,
+    "hit_rate": 0.627273,
+    "hits": 69,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": false,
@@ -108,7 +108,7 @@
     "secondary_reporting_complete": true,
     "selectivity": 1.0,
     "total_predictions": 110,
-    "units_at_minus_110": 32.545455
+    "units_at_minus_110": 21.727273
   },
   "schema_version": "1",
   "sport": "nfl",

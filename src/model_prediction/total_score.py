@@ -136,6 +136,67 @@ def _paired_mae_gain_interval(
     )
 
 
+_MINIMUM_TOTAL_SNAPSHOTS = 50
+
+
+def _count_timestamp_valid_total_snapshots(data_root: Path, sport: str) -> int:
+    """Count timestamp-valid total-market snapshots in the odds directory."""
+    odds_root = data_root / "odds" / sport.lower()
+    if not odds_root.exists():
+        return 0
+    count = 0
+    for snap_path in sorted(odds_root.glob("*/polymarket_snapshots.jsonl")):
+        try:
+            with snap_path.open(encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        snap = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if snap.get("timestamp_valid") and snap.get("market_type") == "total":
+                        count += 1
+        except OSError:
+            continue
+    return count
+
+
+def _total_market_qualification(store: FeatureStore, sport: str) -> dict[str, Any]:
+    """Derive total-market eligibility from actual snapshot counts."""
+    total_snapshots = _count_timestamp_valid_total_snapshots(store.data_root, sport)
+    if total_snapshots >= _MINIMUM_TOTAL_SNAPSHOTS:
+        return {
+            "eligible": False,
+            "reason": "DATA_READY_PENDING_OVER_UNDER_EVALUATION",
+            "note": (
+                f"Timestamp-valid total lines available ({total_snapshots} snapshots, "
+                f">= {_MINIMUM_TOTAL_SNAPSHOTS} minimum). Score MAE/RMSE do not directly "
+                "prove over-under accuracy, but a contract-level backtest against these "
+                "historical lines is now feasible."
+            ),
+            "total_snapshots": total_snapshots,
+        }
+    if total_snapshots > 0:
+        return {
+            "eligible": False,
+            "reason": "INSUFFICIENT_DATA_TOTAL_LINES_IN_PROGRESS",
+            "note": (
+                f"Only {total_snapshots}/{_MINIMUM_TOTAL_SNAPSHOTS} timestamp-valid "
+                "total snapshots collected. Score MAE/RMSE do not directly prove "
+                "over-under accuracy; contract-level validation requires more data."
+            ),
+            "total_snapshots": total_snapshots,
+        }
+    return {
+        "eligible": False,
+        "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES",
+        "note": (
+            "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI. "
+            "No timestamp-valid historical total lines found."
+        ),
+        "total_snapshots": 0,
+    }
+
+
 def validate_total_score_model(store: FeatureStore, sport: str) -> dict[str, Any]:
     rows = build_total_score_rows(store.load_games(sport))
     if len(rows) < 150:
@@ -190,13 +251,7 @@ def validate_total_score_model(store: FeatureStore, sport: str) -> dict[str, Any
             "beats_baseline_mae": mae_gain > 0,
             "statistically_clear_mae_gain": gain_interval[0] > 0,
         },
-        "market_qualification": {
-            "eligible": False,
-            "reason": "BLOCKED_MISSING_TIMESTAMP_VALID_HISTORICAL_TOTAL_LINES",
-            "note": (
-                "Score MAE/RMSE do not prove over-under accuracy, executable edge, or ROI."
-            ),
-        },
+        "market_qualification": _total_market_qualification(store, sport),
         "status": "research_score_model_candidate",
     }
     payload["artifact_hash"] = _artifact_hash(payload)

@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "75dc49ff4fdd33721e56362fbead751cd705245983dd3790dde4449f02dd1aec",
+  "artifact_hash": "2142b340d28def3014fa11540e4278e2e16e45e0e9e2adb1315dd127607e610f",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -7,7 +7,7 @@
         -0.004394871,
         -0.0140026801
       ],
-      "confidence_threshold": 0.565,
+      "confidence_threshold": 0.54365445,
       "feature_names": [
         "elo_probability",
         "trend_gap",
@@ -61,13 +61,13 @@
       "status": "ok"
     },
     "called_rate": 0.883686,
-    "calls": 540,
+    "calls": 585,
     "every_called_month_positive_at_minus_110": true,
     "every_qualifying_month_positive_at_minus_110": true,
     "failures": [],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.757407,
-    "hits": 409,
+    "hit_rate": 0.735043,
+    "hits": 430,
     "locked_holdout": true,
     "market_type": "moneyline",
     "meets_primary_holdout_metrics": true,
@@ -131,7 +131,7 @@
     "secondary_reporting_complete": true,
     "selectivity": 0.883686,
     "total_predictions": 662,
-    "units_at_minus_110": 240.818182
+    "units_at_minus_110": 235.909091
   },
   "schema_version": "1",
   "sport": "nba",
