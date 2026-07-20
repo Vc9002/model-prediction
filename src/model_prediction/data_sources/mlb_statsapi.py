@@ -37,6 +37,7 @@ _PITCHING_FIELDS = (
     "hits",
     "homeRuns",
     "baseOnBalls",
+    "hitByPitch",
     "strikeOuts",
     "battersFaced",
     "numberOfPitches",

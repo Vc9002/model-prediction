@@ -4,8 +4,6 @@ from . import (  # noqa: F401
     elo_ratings,
     head_to_head,
     lineup_strength,
-    rest_travel,
-    soccer_form,
     tennis_surface,
     trends,
 )
