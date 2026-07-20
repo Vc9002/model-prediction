@@ -10,6 +10,7 @@ from model_prediction.data_sources.polymarket_us import LEAGUE_SLUGS, POLYMARKET
 from model_prediction.international_baseball import (
     HomeElo,
     _chronological_split,
+    _metrics,
     forecast_international_baseball_slate,
     parse_kbo_rows,
     parse_npb_calendar,
@@ -82,6 +83,29 @@ def test_tie_aware_contract_values_sum_to_one() -> None:
     assert home == pytest.approx(0.596)
     assert away == pytest.approx(0.404)
     assert away + home == pytest.approx(1.0)
+
+
+def test_metrics_units_at_minus_110_treats_ties_as_a_push() -> None:
+    # 2 decisive hits, 1 decisive miss, 1 tie -- the tie must not count as a
+    # loss (accuracy_decisive already excludes it; units must match).
+    rows = [
+        {"probability": 0.7, "outcome": 1.0, "tie": False},
+        {"probability": 0.7, "outcome": 1.0, "tie": False},
+        {"probability": 0.7, "outcome": 0.0, "tie": False},
+        {"probability": 0.6, "outcome": 0.5, "tie": True},
+    ]
+    metrics = _metrics(rows)
+    assert metrics["ties"] == 1
+    assert metrics["calls"] == 3
+    assert metrics["hits"] == 2
+    assert metrics["units_at_minus_110"] == pytest.approx(2 * (10 / 11) - 1)
+
+
+def test_metrics_empty_rows_report_zero_units_not_none() -> None:
+    metrics = _metrics([])
+    assert metrics["calls"] == 0
+    assert metrics["hits"] == 0
+    assert metrics["units_at_minus_110"] == 0.0
 
 
 def _write_synthetic_history(tmp_path, league: str = "kbo") -> None:

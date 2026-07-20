@@ -390,22 +390,32 @@ def _tie_rate(rows: Sequence[dict[str, Any]]) -> float:
 
 def _metrics(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     if not rows:
-        return {"observations": 0, "brier_settlement": None, "mae_settlement": None, "accuracy_decisive": None}
+        return {
+            "observations": 0, "brier_settlement": None, "mae_settlement": None, "accuracy_decisive": None,
+            "ties": 0, "calls": 0, "hits": 0, "units_at_minus_110": 0.0,
+        }
     brier = sum((float(row["probability"]) - float(row["outcome"])) ** 2 for row in rows) / len(rows)
     mae = sum(abs(float(row["probability"]) - float(row["outcome"])) for row in rows) / len(rows)
     decisive = [row for row in rows if not row["tie"]]
-    accuracy = (
-        sum((float(row["probability"]) >= 0.5) == bool(row["outcome"]) for row in decisive)
-        / len(decisive)
-        if decisive
-        else None
-    )
+    hits = sum((float(row["probability"]) >= 0.5) == bool(row["outcome"]) for row in decisive)
+    accuracy = hits / len(decisive) if decisive else None
+    # Diagnostic flat one-unit -110 P&L, same convention as esports.py/
+    # validation.py. A tie settles the contract at $0.50 regardless of side
+    # picked -- treated as a push (0 P&L), matching how accuracy_decisive
+    # already excludes ties from the hit-rate rather than scoring them as a
+    # loss. Not real or Polymarket-executable profitability; see
+    # model_improvements.md section 2's economic gate.
+    misses = len(decisive) - hits
+    units_at_minus_110 = round(hits * (10 / 11) - misses, 6)
     return {
         "observations": len(rows),
         "brier_settlement": round(brier, 6),
         "mae_settlement": round(mae, 6),
         "accuracy_decisive": round(accuracy, 6) if accuracy is not None else None,
         "ties": len(rows) - len(decisive),
+        "calls": len(decisive),
+        "hits": hits,
+        "units_at_minus_110": units_at_minus_110,
     }
 
 

@@ -1,13 +1,13 @@
 {
-  "generated_at_utc": "2026-07-19T11:10:53.844027Z",
+  "generated_at_utc": "2026-07-20T11:10:05.632310Z",
   "promotion_eligible": false,
   "scope": "research-only separate-title series-winner baselines",
   "titles": {
     "cs2": {
       "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/cs2-neutral-series-elo-v1.json",
-      "artifact_hash": "441fc314cdd8087448ba613b3a5d70713dcb6eecefc52fe86926e94627779290",
+      "artifact_hash": "40df7f7b9128e86cfbc485914f5801a00963b62604711b733b60f782ba9e258b",
       "chosen": {
-        "confidence_threshold": 0.0,
+        "confidence_threshold": 0.03,
         "k": 48.0
       },
       "chronological_split": {
@@ -30,124 +30,169 @@
         {
           "accuracy": 0.635872,
           "brier": 0.223751,
+          "calls": 7577,
           "ece_10_bin": 0.028531,
+          "hits": 4818,
           "log_loss": 0.638648,
           "observations": 7577,
-          "threshold": 0.0
+          "threshold": 0.0,
+          "units_at_minus_110": 1621.0
         },
         {
           "accuracy": 0.654704,
           "brier": 0.220081,
+          "calls": 6632,
           "ece_10_bin": 0.029183,
+          "hits": 4342,
           "log_loss": 0.631022,
           "observations": 6632,
-          "threshold": 0.03
+          "threshold": 0.03,
+          "units_at_minus_110": 1657.272727
         },
         {
           "accuracy": 0.664897,
           "brier": 0.217354,
+          "calls": 6028,
           "ece_10_bin": 0.032386,
+          "hits": 4008,
           "log_loss": 0.62534,
           "observations": 6028,
-          "threshold": 0.05
+          "threshold": 0.05,
+          "units_at_minus_110": 1623.636364
         },
         {
           "accuracy": 0.679969,
           "brier": 0.212888,
+          "calls": 5162,
           "ece_10_bin": 0.035546,
+          "hits": 3510,
           "log_loss": 0.615995,
           "observations": 5162,
-          "threshold": 0.08
+          "threshold": 0.08,
+          "units_at_minus_110": 1538.909091
         },
         {
           "accuracy": 0.688865,
           "brier": 0.209799,
+          "calls": 4625,
           "ece_10_bin": 0.036724,
+          "hits": 3186,
           "log_loss": 0.609494,
           "observations": 4625,
-          "threshold": 0.1
+          "threshold": 0.1,
+          "units_at_minus_110": 1457.363636
         },
         {
           "accuracy": 0.704938,
           "brier": 0.204941,
+          "calls": 4111,
           "ece_10_bin": 0.038015,
+          "hits": 2898,
           "log_loss": 0.599351,
           "observations": 4111,
-          "threshold": 0.12
+          "threshold": 0.12,
+          "units_at_minus_110": 1421.545455
         },
         {
           "accuracy": 0.720119,
           "brier": 0.198977,
+          "calls": 3355,
           "ece_10_bin": 0.039626,
+          "hits": 2416,
           "log_loss": 0.586695,
           "observations": 3355,
-          "threshold": 0.15
+          "threshold": 0.15,
+          "units_at_minus_110": 1257.363636
         }
       ],
       "k_selection_on_validation": [
         {
           "accuracy": 0.608552,
           "brier": 0.234713,
+          "calls": 7577,
           "ece_10_bin": 0.047457,
+          "hits": 4611,
           "k": 8.0,
           "log_loss": 0.66194,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1225.818182
         },
         {
           "accuracy": 0.617659,
           "brier": 0.231067,
+          "calls": 7577,
           "ece_10_bin": 0.043473,
+          "hits": 4680,
           "k": 12.0,
           "log_loss": 0.654188,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1357.545455
         },
         {
           "accuracy": 0.621618,
           "brier": 0.228594,
+          "calls": 7577,
           "ece_10_bin": 0.039343,
+          "hits": 4710,
           "k": 16.0,
           "log_loss": 0.648833,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1414.818182
         },
         {
           "accuracy": 0.624786,
           "brier": 0.226879,
+          "calls": 7577,
           "ece_10_bin": 0.032998,
+          "hits": 4734,
           "k": 20.0,
           "log_loss": 0.64507,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1460.636364
         },
         {
           "accuracy": 0.629141,
           "brier": 0.22568,
+          "calls": 7577,
           "ece_10_bin": 0.028346,
+          "hits": 4767,
           "k": 24.0,
           "log_loss": 0.642422,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1523.636364
         },
         {
           "accuracy": 0.632572,
           "brier": 0.224289,
+          "calls": 7577,
           "ece_10_bin": 0.0233,
+          "hits": 4793,
           "k": 32.0,
           "log_loss": 0.639379,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1573.272727
         },
         {
           "accuracy": 0.63508,
           "brier": 0.223752,
+          "calls": 7577,
           "ece_10_bin": 0.02223,
+          "hits": 4812,
           "k": 40.0,
           "log_loss": 0.638342,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1609.545455
         },
         {
           "accuracy": 0.635872,
           "brier": 0.223751,
+          "calls": 7577,
           "ece_10_bin": 0.028531,
+          "hits": 4818,
           "k": 48.0,
           "log_loss": 0.638648,
-          "observations": 7577
+          "observations": 7577,
+          "units_at_minus_110": 1621.0
         }
       ],
       "limitations": [
@@ -160,16 +205,22 @@
         "all_matches": {
           "accuracy": 0.641198,
           "brier": 0.220148,
+          "calls": 7578,
           "ece_10_bin": 0.018129,
+          "hits": 4859,
           "log_loss": 0.630003,
-          "observations": 7578
+          "observations": 7578,
+          "units_at_minus_110": 1698.272727
         },
         "selected_matches": {
-          "accuracy": 0.641198,
-          "brier": 0.220148,
-          "ece_10_bin": 0.018129,
-          "log_loss": 0.630003,
-          "observations": 7578
+          "accuracy": 0.659087,
+          "brier": 0.215971,
+          "calls": 6641,
+          "ece_10_bin": 0.017704,
+          "hits": 4377,
+          "log_loss": 0.621163,
+          "observations": 6641,
+          "units_at_minus_110": 1715.090909
         }
       },
       "model_state": "research",
@@ -184,9 +235,9 @@
     },
     "lol": {
       "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/lol-neutral-series-elo-v1.json",
-      "artifact_hash": "ff401a2a0c6810d1e883ad29e80a93e5fa651b5f52df6252ee32b88e13a2cc7d",
+      "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
       "chosen": {
-        "confidence_threshold": 0.0,
+        "confidence_threshold": 0.05,
         "k": 48.0
       },
       "chronological_split": {
@@ -209,124 +260,169 @@
         {
           "accuracy": 0.65128,
           "brier": 0.216669,
+          "calls": 2383,
           "ece_10_bin": 0.027573,
+          "hits": 1552,
           "log_loss": 0.624171,
           "observations": 2383,
-          "threshold": 0.0
+          "threshold": 0.0,
+          "units_at_minus_110": 579.909091
         },
         {
           "accuracy": 0.667461,
           "brier": 0.212204,
+          "calls": 2099,
           "ece_10_bin": 0.031432,
+          "hits": 1401,
           "log_loss": 0.614929,
           "observations": 2099,
-          "threshold": 0.03
+          "threshold": 0.03,
+          "units_at_minus_110": 575.636364
         },
         {
           "accuracy": 0.680391,
           "brier": 0.209107,
+          "calls": 1943,
           "ece_10_bin": 0.031329,
+          "hits": 1322,
           "log_loss": 0.608524,
           "observations": 1943,
-          "threshold": 0.05
+          "threshold": 0.05,
+          "units_at_minus_110": 580.818182
         },
         {
           "accuracy": 0.701413,
           "brier": 0.203311,
+          "calls": 1698,
           "ece_10_bin": 0.031544,
+          "hits": 1191,
           "log_loss": 0.596519,
           "observations": 1698,
-          "threshold": 0.08
+          "threshold": 0.08,
+          "units_at_minus_110": 575.727273
         },
         {
           "accuracy": 0.713736,
           "brier": 0.199384,
+          "calls": 1558,
           "ece_10_bin": 0.032104,
+          "hits": 1112,
           "log_loss": 0.588371,
           "observations": 1558,
-          "threshold": 0.1
+          "threshold": 0.1,
+          "units_at_minus_110": 564.909091
         },
         {
           "accuracy": 0.726233,
           "brier": 0.194788,
+          "calls": 1399,
           "ece_10_bin": 0.035028,
+          "hits": 1016,
           "log_loss": 0.578786,
           "observations": 1399,
-          "threshold": 0.12
+          "threshold": 0.12,
+          "units_at_minus_110": 540.636364
         },
         {
           "accuracy": 0.746622,
           "brier": 0.187045,
+          "calls": 1184,
           "ece_10_bin": 0.039931,
+          "hits": 884,
           "log_loss": 0.562617,
           "observations": 1184,
-          "threshold": 0.15
+          "threshold": 0.15,
+          "units_at_minus_110": 503.636364
         }
       ],
       "k_selection_on_validation": [
         {
           "accuracy": 0.630298,
           "brier": 0.229907,
+          "calls": 2383,
           "ece_10_bin": 0.060803,
+          "hits": 1502,
           "k": 8.0,
           "log_loss": 0.651861,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 484.454545
         },
         {
           "accuracy": 0.631557,
           "brier": 0.225953,
+          "calls": 2383,
           "ece_10_bin": 0.042641,
+          "hits": 1505,
           "k": 12.0,
           "log_loss": 0.643226,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 490.181818
         },
         {
           "accuracy": 0.631977,
           "brier": 0.223316,
+          "calls": 2383,
           "ece_10_bin": 0.042624,
+          "hits": 1506,
           "k": 16.0,
           "log_loss": 0.637384,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 492.090909
         },
         {
           "accuracy": 0.636593,
           "brier": 0.221435,
+          "calls": 2383,
           "ece_10_bin": 0.049571,
+          "hits": 1517,
           "k": 20.0,
           "log_loss": 0.633221,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 513.090909
         },
         {
           "accuracy": 0.642048,
           "brier": 0.220045,
+          "calls": 2383,
           "ece_10_bin": 0.037371,
+          "hits": 1530,
           "k": 24.0,
           "log_loss": 0.630189,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 537.909091
         },
         {
           "accuracy": 0.641628,
           "brier": 0.218211,
+          "calls": 2383,
           "ece_10_bin": 0.035206,
+          "hits": 1529,
           "k": 32.0,
           "log_loss": 0.626392,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 536.0
         },
         {
           "accuracy": 0.644566,
           "brier": 0.217182,
+          "calls": 2383,
           "ece_10_bin": 0.028876,
+          "hits": 1536,
           "k": 40.0,
           "log_loss": 0.624611,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 549.363636
         },
         {
           "accuracy": 0.65128,
           "brier": 0.216669,
+          "calls": 2383,
           "ece_10_bin": 0.027573,
+          "hits": 1552,
           "k": 48.0,
           "log_loss": 0.624171,
-          "observations": 2383
+          "observations": 2383,
+          "units_at_minus_110": 579.909091
         }
       ],
       "limitations": [
@@ -339,16 +435,22 @@
         "all_matches": {
           "accuracy": 0.661074,
           "brier": 0.213101,
+          "calls": 2384,
           "ece_10_bin": 0.024868,
+          "hits": 1576,
           "log_loss": 0.614652,
-          "observations": 2384
+          "observations": 2384,
+          "units_at_minus_110": 624.727273
         },
         "selected_matches": {
-          "accuracy": 0.661074,
-          "brier": 0.213101,
-          "ece_10_bin": 0.024868,
-          "log_loss": 0.614652,
-          "observations": 2384
+          "accuracy": 0.697389,
+          "brier": 0.204687,
+          "calls": 1953,
+          "ece_10_bin": 0.029126,
+          "hits": 1362,
+          "log_loss": 0.596785,
+          "observations": 1953,
+          "units_at_minus_110": 647.181818
         }
       },
       "model_state": "research",

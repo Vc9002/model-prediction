@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-07-19T11:11:06.071726Z",
+  "generated_at_utc": "2026-07-19T23:52:28.239816Z",
   "leagues": {
     "kbo": {
       "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/kbo-tie-aware-elo-v1.json",
@@ -34,9 +34,12 @@
       "locked_test": {
         "accuracy_decisive": 0.551938,
         "brier_settlement": 0.242601,
+        "calls": 645,
+        "hits": 356,
         "mae_settlement": 0.480563,
         "observations": 658,
-        "ties": 13
+        "ties": 13,
+        "units_at_minus_110": 34.636364
       },
       "model_state": "research",
       "model_version": "kbo-tie-aware-elo-v1",
@@ -45,380 +48,506 @@
         {
           "accuracy_decisive": 0.550077,
           "brier_settlement": 0.23824,
+          "calls": 649,
+          "hits": 357,
           "home_advantage": 0.0,
           "k": 8.0,
           "mae_settlement": 0.476744,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 32.545455
         },
         {
           "accuracy_decisive": 0.579353,
           "brier_settlement": 0.238106,
+          "calls": 649,
+          "hits": 376,
           "home_advantage": 20.0,
           "k": 8.0,
           "mae_settlement": 0.475652,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 68.818182
         },
         {
           "accuracy_decisive": 0.559322,
           "brier_settlement": 0.239011,
+          "calls": 649,
+          "hits": 363,
           "home_advantage": 35.0,
           "k": 8.0,
           "mae_settlement": 0.474988,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 44.0
         },
         {
           "accuracy_decisive": 0.543914,
           "brier_settlement": 0.240757,
+          "calls": 649,
+          "hits": 353,
           "home_advantage": 50.0,
           "k": 8.0,
           "mae_settlement": 0.47454,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 24.909091
         },
         {
           "accuracy_decisive": 0.546995,
           "brier_settlement": 0.243309,
+          "calls": 649,
+          "hits": 355,
           "home_advantage": 65.0,
           "k": 8.0,
           "mae_settlement": 0.474163,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 28.727273
         },
         {
           "accuracy_decisive": 0.539291,
           "brier_settlement": 0.246626,
+          "calls": 649,
+          "hits": 350,
           "home_advantage": 80.0,
           "k": 8.0,
           "mae_settlement": 0.473855,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 19.181818
         },
         {
           "accuracy_decisive": 0.562404,
           "brier_settlement": 0.239131,
+          "calls": 649,
+          "hits": 365,
           "home_advantage": 0.0,
           "k": 12.0,
           "mae_settlement": 0.475865,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 47.818182
         },
         {
           "accuracy_decisive": 0.576271,
           "brier_settlement": 0.238983,
+          "calls": 649,
+          "hits": 374,
           "home_advantage": 20.0,
           "k": 12.0,
           "mae_settlement": 0.474794,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 65.0
         },
         {
           "accuracy_decisive": 0.567026,
           "brier_settlement": 0.239858,
+          "calls": 649,
+          "hits": 368,
           "home_advantage": 35.0,
           "k": 12.0,
           "mae_settlement": 0.474127,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 53.545455
         },
         {
           "accuracy_decisive": 0.553159,
           "brier_settlement": 0.241559,
+          "calls": 649,
+          "hits": 359,
           "home_advantage": 50.0,
           "k": 12.0,
           "mae_settlement": 0.473593,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 36.363636
         },
         {
           "accuracy_decisive": 0.539291,
           "brier_settlement": 0.244051,
+          "calls": 649,
+          "hits": 350,
           "home_advantage": 65.0,
           "k": 12.0,
           "mae_settlement": 0.473215,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 19.181818
         },
         {
           "accuracy_decisive": 0.543914,
           "brier_settlement": 0.247291,
+          "calls": 649,
+          "hits": 353,
           "home_advantage": 80.0,
           "k": 12.0,
           "mae_settlement": 0.472852,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 24.909091
         },
         {
           "accuracy_decisive": 0.5547,
           "brier_settlement": 0.240389,
+          "calls": 649,
+          "hits": 360,
           "home_advantage": 0.0,
           "k": 16.0,
           "mae_settlement": 0.475575,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 38.272727
         },
         {
           "accuracy_decisive": 0.568567,
           "brier_settlement": 0.240235,
+          "calls": 649,
+          "hits": 369,
           "home_advantage": 20.0,
           "k": 16.0,
           "mae_settlement": 0.474502,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 55.454545
         },
         {
           "accuracy_decisive": 0.559322,
           "brier_settlement": 0.24109,
+          "calls": 649,
+          "hits": 363,
           "home_advantage": 35.0,
           "k": 16.0,
           "mae_settlement": 0.473847,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 44.0
         },
         {
           "accuracy_decisive": 0.548536,
           "brier_settlement": 0.242756,
+          "calls": 649,
+          "hits": 356,
           "home_advantage": 50.0,
           "k": 16.0,
           "mae_settlement": 0.47324,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 30.636364
         },
         {
           "accuracy_decisive": 0.540832,
           "brier_settlement": 0.245201,
+          "calls": 649,
+          "hits": 351,
           "home_advantage": 65.0,
           "k": 16.0,
           "mae_settlement": 0.472797,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 21.090909
         },
         {
           "accuracy_decisive": 0.543914,
           "brier_settlement": 0.24838,
+          "calls": 649,
+          "hits": 353,
           "home_advantage": 80.0,
           "k": 16.0,
           "mae_settlement": 0.472438,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 24.909091
         },
         {
           "accuracy_decisive": 0.563945,
           "brier_settlement": 0.241748,
+          "calls": 649,
+          "hits": 366,
           "home_advantage": 0.0,
           "k": 20.0,
           "mae_settlement": 0.475557,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 49.727273
         },
         {
           "accuracy_decisive": 0.55624,
           "brier_settlement": 0.241592,
+          "calls": 649,
+          "hits": 361,
           "home_advantage": 20.0,
           "k": 20.0,
           "mae_settlement": 0.474399,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 40.181818
         },
         {
           "accuracy_decisive": 0.542373,
           "brier_settlement": 0.242431,
+          "calls": 649,
+          "hits": 352,
           "home_advantage": 35.0,
           "k": 20.0,
           "mae_settlement": 0.473728,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 23.0
         },
         {
           "accuracy_decisive": 0.543914,
           "brier_settlement": 0.24407,
+          "calls": 649,
+          "hits": 353,
           "home_advantage": 50.0,
           "k": 20.0,
           "mae_settlement": 0.473123,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 24.909091
         },
         {
           "accuracy_decisive": 0.542373,
           "brier_settlement": 0.246474,
+          "calls": 649,
+          "hits": 352,
           "home_advantage": 65.0,
           "k": 20.0,
           "mae_settlement": 0.472584,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 23.0
         },
         {
           "accuracy_decisive": 0.542373,
           "brier_settlement": 0.2496,
+          "calls": 649,
+          "hits": 352,
           "home_advantage": 80.0,
           "k": 20.0,
           "mae_settlement": 0.4722,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 23.0
         },
         {
           "accuracy_decisive": 0.557781,
           "brier_settlement": 0.243119,
+          "calls": 649,
+          "hits": 362,
           "home_advantage": 0.0,
           "k": 24.0,
           "mae_settlement": 0.475584,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 42.090909
         },
         {
           "accuracy_decisive": 0.546995,
           "brier_settlement": 0.242961,
+          "calls": 649,
+          "hits": 355,
           "home_advantage": 20.0,
           "k": 24.0,
           "mae_settlement": 0.474447,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 28.727273
         },
         {
           "accuracy_decisive": 0.53775,
           "brier_settlement": 0.243787,
+          "calls": 649,
+          "hits": 349,
           "home_advantage": 35.0,
           "k": 24.0,
           "mae_settlement": 0.473676,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 17.272727
         },
         {
           "accuracy_decisive": 0.548536,
           "brier_settlement": 0.2454,
+          "calls": 649,
+          "hits": 356,
           "home_advantage": 50.0,
           "k": 24.0,
           "mae_settlement": 0.473034,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 30.636364
         },
         {
           "accuracy_decisive": 0.53775,
           "brier_settlement": 0.247768,
+          "calls": 649,
+          "hits": 349,
           "home_advantage": 65.0,
           "k": 24.0,
           "mae_settlement": 0.472503,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 17.272727
         },
         {
           "accuracy_decisive": 0.546995,
           "brier_settlement": 0.250845,
+          "calls": 649,
+          "hits": 355,
           "home_advantage": 80.0,
           "k": 24.0,
           "mae_settlement": 0.472028,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 28.727273
         },
         {
           "accuracy_decisive": 0.5547,
           "brier_settlement": 0.245798,
+          "calls": 649,
+          "hits": 360,
           "home_advantage": 0.0,
           "k": 32.0,
           "mae_settlement": 0.475575,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 38.272727
         },
         {
           "accuracy_decisive": 0.53775,
           "brier_settlement": 0.245633,
+          "calls": 649,
+          "hits": 349,
           "home_advantage": 20.0,
           "k": 32.0,
           "mae_settlement": 0.474465,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 17.272727
         },
         {
           "accuracy_decisive": 0.530046,
           "brier_settlement": 0.24643,
+          "calls": 649,
+          "hits": 344,
           "home_advantage": 35.0,
           "k": 32.0,
           "mae_settlement": 0.473663,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 7.727273
         },
         {
           "accuracy_decisive": 0.543914,
           "brier_settlement": 0.247994,
+          "calls": 649,
+          "hits": 353,
           "home_advantage": 50.0,
           "k": 32.0,
           "mae_settlement": 0.472947,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 24.909091
         },
         {
           "accuracy_decisive": 0.534669,
           "brier_settlement": 0.250292,
+          "calls": 649,
+          "hits": 347,
           "home_advantage": 65.0,
           "k": 32.0,
           "mae_settlement": 0.472322,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 13.454545
         },
         {
           "accuracy_decisive": 0.531587,
           "brier_settlement": 0.25328,
+          "calls": 649,
+          "hits": 345,
           "home_advantage": 80.0,
           "k": 32.0,
           "mae_settlement": 0.471779,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 9.636364
         },
         {
           "accuracy_decisive": 0.553159,
           "brier_settlement": 0.248371,
+          "calls": 649,
+          "hits": 359,
           "home_advantage": 0.0,
           "k": 40.0,
           "mae_settlement": 0.47546,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 36.363636
         },
         {
           "accuracy_decisive": 0.53775,
           "brier_settlement": 0.248192,
+          "calls": 649,
+          "hits": 349,
           "home_advantage": 20.0,
           "k": 40.0,
           "mae_settlement": 0.474327,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 17.272727
         },
         {
           "accuracy_decisive": 0.53775,
           "brier_settlement": 0.248956,
+          "calls": 649,
+          "hits": 349,
           "home_advantage": 35.0,
           "k": 40.0,
           "mae_settlement": 0.473518,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 17.272727
         },
         {
           "accuracy_decisive": 0.53775,
           "brier_settlement": 0.250468,
+          "calls": 649,
+          "hits": 349,
           "home_advantage": 50.0,
           "k": 40.0,
           "mae_settlement": 0.472741,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 17.272727
         },
         {
           "accuracy_decisive": 0.534669,
           "brier_settlement": 0.252696,
+          "calls": 649,
+          "hits": 347,
           "home_advantage": 65.0,
           "k": 40.0,
           "mae_settlement": 0.472126,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 13.454545
         },
         {
           "accuracy_decisive": 0.528505,
           "brier_settlement": 0.255596,
+          "calls": 649,
+          "hits": 343,
           "home_advantage": 80.0,
           "k": 40.0,
           "mae_settlement": 0.471558,
           "observations": 667,
-          "ties": 18
+          "ties": 18,
+          "units_at_minus_110": 5.818182
         }
       ],
       "point_in_time": "all games on one local date are predicted before that date updates ratings",
@@ -461,9 +590,12 @@
       "locked_test": {
         "accuracy_decisive": 0.571238,
         "brier_settlement": 0.241767,
+        "calls": 751,
+        "hits": 429,
         "mae_settlement": 0.478061,
         "observations": 766,
-        "ties": 15
+        "ties": 15,
+        "units_at_minus_110": 68.0
       },
       "model_state": "research",
       "model_version": "npb-tie-aware-elo-v1",
@@ -472,380 +604,506 @@
         {
           "accuracy_decisive": 0.549333,
           "brier_settlement": 0.240686,
+          "calls": 750,
+          "hits": 412,
           "home_advantage": 0.0,
           "k": 8.0,
           "mae_settlement": 0.479596,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 36.545455
         },
         {
           "accuracy_decisive": 0.544,
           "brier_settlement": 0.239223,
+          "calls": 750,
+          "hits": 408,
           "home_advantage": 20.0,
           "k": 8.0,
           "mae_settlement": 0.477619,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 28.909091
         },
         {
           "accuracy_decisive": 0.548,
           "brier_settlement": 0.239118,
+          "calls": 750,
+          "hits": 411,
           "home_advantage": 35.0,
           "k": 8.0,
           "mae_settlement": 0.476357,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 34.636364
         },
         {
           "accuracy_decisive": 0.552,
           "brier_settlement": 0.239846,
+          "calls": 750,
+          "hits": 414,
           "home_advantage": 50.0,
           "k": 8.0,
           "mae_settlement": 0.475227,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 40.363636
         },
         {
           "accuracy_decisive": 0.538667,
           "brier_settlement": 0.241378,
+          "calls": 750,
+          "hits": 404,
           "home_advantage": 65.0,
           "k": 8.0,
           "mae_settlement": 0.47419,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 21.272727
         },
         {
           "accuracy_decisive": 0.54,
           "brier_settlement": 0.243673,
+          "calls": 750,
+          "hits": 405,
           "home_advantage": 80.0,
           "k": 8.0,
           "mae_settlement": 0.473265,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 23.181818
         },
         {
           "accuracy_decisive": 0.546667,
           "brier_settlement": 0.241719,
+          "calls": 750,
+          "hits": 410,
           "home_advantage": 0.0,
           "k": 12.0,
           "mae_settlement": 0.479387,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 32.727273
         },
         {
           "accuracy_decisive": 0.552,
           "brier_settlement": 0.240245,
+          "calls": 750,
+          "hits": 414,
           "home_advantage": 20.0,
           "k": 12.0,
           "mae_settlement": 0.477489,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 40.363636
         },
         {
           "accuracy_decisive": 0.553333,
           "brier_settlement": 0.240123,
+          "calls": 750,
+          "hits": 415,
           "home_advantage": 35.0,
           "k": 12.0,
           "mae_settlement": 0.476164,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 42.272727
         },
         {
           "accuracy_decisive": 0.549333,
           "brier_settlement": 0.240828,
+          "calls": 750,
+          "hits": 412,
           "home_advantage": 50.0,
           "k": 12.0,
           "mae_settlement": 0.47504,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 36.545455
         },
         {
           "accuracy_decisive": 0.538667,
           "brier_settlement": 0.24233,
+          "calls": 750,
+          "hits": 404,
           "home_advantage": 65.0,
           "k": 12.0,
           "mae_settlement": 0.474024,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 21.272727
         },
         {
           "accuracy_decisive": 0.544,
           "brier_settlement": 0.244588,
+          "calls": 750,
+          "hits": 408,
           "home_advantage": 80.0,
           "k": 12.0,
           "mae_settlement": 0.473086,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 28.909091
         },
         {
           "accuracy_decisive": 0.545333,
           "brier_settlement": 0.242746,
+          "calls": 750,
+          "hits": 409,
           "home_advantage": 0.0,
           "k": 16.0,
           "mae_settlement": 0.479271,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 30.818182
         },
         {
           "accuracy_decisive": 0.56,
           "brier_settlement": 0.241266,
+          "calls": 750,
+          "hits": 420,
           "home_advantage": 20.0,
           "k": 16.0,
           "mae_settlement": 0.477404,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 51.818182
         },
         {
           "accuracy_decisive": 0.54,
           "brier_settlement": 0.241134,
+          "calls": 750,
+          "hits": 405,
           "home_advantage": 35.0,
           "k": 16.0,
           "mae_settlement": 0.476091,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 23.181818
         },
         {
           "accuracy_decisive": 0.553333,
           "brier_settlement": 0.241822,
+          "calls": 750,
+          "hits": 415,
           "home_advantage": 50.0,
           "k": 16.0,
           "mae_settlement": 0.475004,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 42.272727
         },
         {
           "accuracy_decisive": 0.541333,
           "brier_settlement": 0.243303,
+          "calls": 750,
+          "hits": 406,
           "home_advantage": 65.0,
           "k": 16.0,
           "mae_settlement": 0.474006,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 25.090909
         },
         {
           "accuracy_decisive": 0.544,
           "brier_settlement": 0.245533,
+          "calls": 750,
+          "hits": 408,
           "home_advantage": 80.0,
           "k": 16.0,
           "mae_settlement": 0.473082,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 28.909091
         },
         {
           "accuracy_decisive": 0.550667,
           "brier_settlement": 0.243776,
+          "calls": 750,
+          "hits": 413,
           "home_advantage": 0.0,
           "k": 20.0,
           "mae_settlement": 0.479157,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 38.454545
         },
         {
           "accuracy_decisive": 0.554667,
           "brier_settlement": 0.242294,
+          "calls": 750,
+          "hits": 416,
           "home_advantage": 20.0,
           "k": 20.0,
           "mae_settlement": 0.477307,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 44.181818
         },
         {
           "accuracy_decisive": 0.545333,
           "brier_settlement": 0.242153,
+          "calls": 750,
+          "hits": 409,
           "home_advantage": 35.0,
           "k": 20.0,
           "mae_settlement": 0.476038,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 30.818182
         },
         {
           "accuracy_decisive": 0.553333,
           "brier_settlement": 0.242826,
+          "calls": 750,
+          "hits": 415,
           "home_advantage": 50.0,
           "k": 20.0,
           "mae_settlement": 0.474997,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 42.272727
         },
         {
           "accuracy_decisive": 0.537333,
           "brier_settlement": 0.244285,
+          "calls": 750,
+          "hits": 403,
           "home_advantage": 65.0,
           "k": 20.0,
           "mae_settlement": 0.474022,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 19.363636
         },
         {
           "accuracy_decisive": 0.54,
           "brier_settlement": 0.246489,
+          "calls": 750,
+          "hits": 405,
           "home_advantage": 80.0,
           "k": 20.0,
           "mae_settlement": 0.473144,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 23.181818
         },
         {
           "accuracy_decisive": 0.545333,
           "brier_settlement": 0.244831,
+          "calls": 750,
+          "hits": 409,
           "home_advantage": 0.0,
           "k": 24.0,
           "mae_settlement": 0.479068,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 30.818182
         },
         {
           "accuracy_decisive": 0.549333,
           "brier_settlement": 0.24335,
+          "calls": 750,
+          "hits": 412,
           "home_advantage": 20.0,
           "k": 24.0,
           "mae_settlement": 0.477215,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 36.545455
         },
         {
           "accuracy_decisive": 0.549333,
           "brier_settlement": 0.243199,
+          "calls": 750,
+          "hits": 412,
           "home_advantage": 35.0,
           "k": 24.0,
           "mae_settlement": 0.476002,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 36.545455
         },
         {
           "accuracy_decisive": 0.548,
           "brier_settlement": 0.243857,
+          "calls": 750,
+          "hits": 411,
           "home_advantage": 50.0,
           "k": 24.0,
           "mae_settlement": 0.475001,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 34.636364
         },
         {
           "accuracy_decisive": 0.542667,
           "brier_settlement": 0.245293,
+          "calls": 750,
+          "hits": 407,
           "home_advantage": 65.0,
           "k": 24.0,
           "mae_settlement": 0.474055,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 27.0
         },
         {
           "accuracy_decisive": 0.541333,
           "brier_settlement": 0.247468,
+          "calls": 750,
+          "hits": 406,
           "home_advantage": 80.0,
           "k": 24.0,
           "mae_settlement": 0.473225,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 25.090909
         },
         {
           "accuracy_decisive": 0.537333,
           "brier_settlement": 0.24704,
+          "calls": 750,
+          "hits": 403,
           "home_advantage": 0.0,
           "k": 32.0,
           "mae_settlement": 0.478981,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 19.363636
         },
         {
           "accuracy_decisive": 0.544,
           "brier_settlement": 0.245562,
+          "calls": 750,
+          "hits": 408,
           "home_advantage": 20.0,
           "k": 32.0,
           "mae_settlement": 0.477114,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 28.909091
         },
         {
           "accuracy_decisive": 0.552,
           "brier_settlement": 0.245394,
+          "calls": 750,
+          "hits": 414,
           "home_advantage": 35.0,
           "k": 32.0,
           "mae_settlement": 0.475982,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 40.363636
         },
         {
           "accuracy_decisive": 0.544,
           "brier_settlement": 0.246017,
+          "calls": 750,
+          "hits": 408,
           "home_advantage": 50.0,
           "k": 32.0,
           "mae_settlement": 0.475021,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 28.909091
         },
         {
           "accuracy_decisive": 0.550667,
           "brier_settlement": 0.247402,
+          "calls": 750,
+          "hits": 413,
           "home_advantage": 65.0,
           "k": 32.0,
           "mae_settlement": 0.474173,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 38.454545
         },
         {
           "accuracy_decisive": 0.544,
           "brier_settlement": 0.24951,
+          "calls": 750,
+          "hits": 408,
           "home_advantage": 80.0,
           "k": 32.0,
           "mae_settlement": 0.473407,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 28.909091
         },
         {
           "accuracy_decisive": 0.538667,
           "brier_settlement": 0.249355,
+          "calls": 750,
+          "hits": 404,
           "home_advantage": 0.0,
           "k": 40.0,
           "mae_settlement": 0.478891,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 21.272727
         },
         {
           "accuracy_decisive": 0.538667,
           "brier_settlement": 0.247885,
+          "calls": 750,
+          "hits": 404,
           "home_advantage": 20.0,
           "k": 40.0,
           "mae_settlement": 0.477079,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 21.272727
         },
         {
           "accuracy_decisive": 0.538667,
           "brier_settlement": 0.247699,
+          "calls": 750,
+          "hits": 404,
           "home_advantage": 35.0,
           "k": 40.0,
           "mae_settlement": 0.476008,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 21.272727
         },
         {
           "accuracy_decisive": 0.542667,
           "brier_settlement": 0.248285,
+          "calls": 750,
+          "hits": 407,
           "home_advantage": 50.0,
           "k": 40.0,
           "mae_settlement": 0.475061,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 27.0
         },
         {
           "accuracy_decisive": 0.546667,
           "brier_settlement": 0.249614,
+          "calls": 750,
+          "hits": 410,
           "home_advantage": 65.0,
           "k": 40.0,
           "mae_settlement": 0.474284,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 32.727273
         },
         {
           "accuracy_decisive": 0.552,
           "brier_settlement": 0.251649,
+          "calls": 750,
+          "hits": 414,
           "home_advantage": 80.0,
           "k": 40.0,
           "mae_settlement": 0.473578,
           "observations": 771,
-          "ties": 21
+          "ties": 21,
+          "units_at_minus_110": 40.363636
         }
       ],
       "point_in_time": "all games on one local date are predicted before that date updates ratings",

@@ -1,6 +1,6 @@
 {
-  "artifact_hash": "ff401a2a0c6810d1e883ad29e80a93e5fa651b5f52df6252ee32b88e13a2cc7d",
-  "confidence_threshold": 0.0,
+  "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
+  "confidence_threshold": 0.05,
   "home_or_order_advantage": 0.0,
   "initial_rating": 1500.0,
   "k": 48.0,

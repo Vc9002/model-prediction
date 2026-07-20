@@ -311,7 +311,10 @@ def _predict(book: NeutralElo, rows: Iterable[dict[str, Any]], update: bool = Tr
 def _metrics(rows: Sequence[dict[str, Any]], threshold: float = 0.0) -> dict[str, Any]:
     selected = [row for row in rows if abs(float(row["probability"]) - 0.5) >= threshold]
     if not selected:
-        return {"observations": 0, "brier": None, "log_loss": None, "accuracy": None}
+        return {
+            "observations": 0, "brier": None, "log_loss": None, "accuracy": None,
+            "calls": 0, "hits": 0, "units_at_minus_110": 0.0,
+        }
     probabilities = [min(1 - 1e-9, max(1e-9, float(row["probability"]))) for row in selected]
     outcomes = [int(row["outcome"]) for row in selected]
     brier = sum((p - y) ** 2 for p, y in zip(probabilities, outcomes, strict=True)) / len(selected)
@@ -335,12 +338,23 @@ def _metrics(rows: Sequence[dict[str, Any]], threshold: float = 0.0) -> dict[str
         expected_calibration_error += len(bucket) / len(selected) * abs(
             mean_probability - observed_rate
         )
+    # Diagnostic flat one-unit -110 P&L -- the same convention used by the
+    # production MLB/NBA/WNBA/NFL validation pipeline (validation.py). This is
+    # a comparability diagnostic, not real or Polymarket-executable
+    # profitability: model_state stays "research" and units stay 0 for any
+    # actual forecast until explicit promotion (see model_improvements.md
+    # section 2's economic gate).
+    misses = len(selected) - correct
+    units_at_minus_110 = round(correct * (10 / 11) - misses, 6)
     return {
         "observations": len(selected),
         "brier": round(brier, 6),
         "log_loss": round(log_loss, 6),
         "accuracy": round(correct / len(selected), 6),
         "ece_10_bin": round(expected_calibration_error, 6),
+        "calls": len(selected),
+        "hits": correct,
+        "units_at_minus_110": units_at_minus_110,
     }
 
 
@@ -396,7 +410,15 @@ def validate_esports_baseline(
         row for row in threshold_scores
         if int(row["observations"]) >= 50 and float(row["accuracy"] or 0) >= 0.60
     ]
-    chosen_threshold = float(max(viable, key=lambda row: row["observations"])["threshold"]) if viable else 0.0
+    # Selecting by observation count alone always picks threshold=0 (no
+    # filtering) whenever the unfiltered baseline already clears the 60%
+    # floor, making the "confidence gate" a no-op. Select by validation-set
+    # profitability instead -- that's the actual point of gating on
+    # confidence, and it's a proper diagnostic gate since it never touches
+    # the locked test set.
+    chosen_threshold = (
+        float(max(viable, key=lambda row: row["units_at_minus_110"])["threshold"]) if viable else 0.0
+    )
     _, test_predictions = _fit_and_score([*train, *validation], test, chosen_k)
     all_book, _ = _fit_and_score(rows, (), chosen_k)
     source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

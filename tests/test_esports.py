@@ -3,11 +3,13 @@ import json
 from datetime import date, datetime, timedelta, timezone
 
 import httpx
+import pytest
 
 from model_prediction.data_sources.polymarket_us import POLYMARKET_SPORT_LEAGUES
 from model_prediction.esports import (
     Bo3EsportsClient,
     NeutralElo,
+    _metrics,
     forecast_esports_slate,
     validate_esports_baseline,
 )
@@ -29,6 +31,27 @@ def test_polymarket_us_esports_taxonomy_is_explicit_and_complete() -> None:
 def test_neutral_elo_has_no_team_order_advantage() -> None:
     book = NeutralElo(k=20, ratings={"a": 1600, "b": 1400})
     assert round(book.probability("a", "b") + book.probability("b", "a"), 12) == 1.0
+
+
+def test_metrics_units_at_minus_110_matches_flat_stake_diagnostic() -> None:
+    # 3 correct, 1 wrong at threshold 0 (all rows selected) -> 3*(10/11) - 1
+    rows = [
+        {"probability": 0.7, "outcome": 1},
+        {"probability": 0.7, "outcome": 1},
+        {"probability": 0.3, "outcome": 0},
+        {"probability": 0.7, "outcome": 0},
+    ]
+    metrics = _metrics(rows)
+    assert metrics["calls"] == 4
+    assert metrics["hits"] == 3
+    assert metrics["units_at_minus_110"] == pytest.approx(3 * (10 / 11) - 1)
+
+
+def test_metrics_empty_selection_reports_zero_units_not_none() -> None:
+    metrics = _metrics([], threshold=0.9)
+    assert metrics["calls"] == 0
+    assert metrics["hits"] == 0
+    assert metrics["units_at_minus_110"] == 0.0
 
 
 def test_cs2_backfill_excludes_legacy_csgo_game_version() -> None:

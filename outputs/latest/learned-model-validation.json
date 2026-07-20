@@ -5262,19 +5262,21 @@
     "cs2": {
       "moneyline": {
         "state": "research_active",
-        "hit_rate": 0.641198,
-        "calls": 7578,
-        "units": 0,
-        "brier": 0.220148
+        "hit_rate": 0.659087,
+        "calls": 6641,
+        "units": 1715.090909,
+        "brier": 0.215971,
+        "confidence_threshold": 0.03
       }
     },
     "lol": {
       "moneyline": {
         "state": "research_active",
-        "hit_rate": 0.661074,
-        "calls": 2384,
-        "units": 0,
-        "brier": 0.213101
+        "hit_rate": 0.697389,
+        "calls": 1953,
+        "units": 647.181818,
+        "brier": 0.204687,
+        "confidence_threshold": 0.05
       }
     }
   },
@@ -5283,8 +5285,8 @@
       "moneyline": {
         "state": "research_active",
         "hit_rate": 0.551938,
-        "calls": 658,
-        "units": 0,
+        "calls": 645,
+        "units": 34.636364,
         "brier": 0.242601
       }
     },
@@ -5292,8 +5294,8 @@
       "moneyline": {
         "state": "research_active",
         "hit_rate": 0.571238,
-        "calls": 766,
-        "units": 0,
+        "calls": 751,
+        "units": 68.0,
         "brier": 0.241767
       }
     }
