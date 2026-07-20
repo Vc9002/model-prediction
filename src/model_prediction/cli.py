@@ -895,7 +895,8 @@ def _log_esports_forecast(
 
         selected_team = str(best_side["team"])
         other_team = next(t for t in contract["teams"] if t != selected_team)
-        selection = "home" if best_side["side"] == "long" else "away"
+        # Always "home" — home_team IS the team we're betting on.
+        # Polymarket "long"/"short" are contract-side labels only.
 
         american_odds = probability_to_american(ask)
         request = PickRequest(
@@ -905,7 +906,7 @@ def _log_esports_forecast(
             away_team=other_team,
             home_team=selected_team,
             market_type=MarketType.MONEYLINE,
-            selection=selection,
+            selection="home",
             line=None,
             sportsbook="polymarket_us",
             american_odds=american_odds,
