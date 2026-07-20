@@ -342,7 +342,7 @@ const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
 /* ---------- tabs ---------- */
 $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
-  $("#tab-"+b.dataset.tab).style.display=""; });
+  $("#tab-"+b.dataset.tab).style.display=""; updateCounts(); });
 
 /* ---------- settings ---------- */
 function applySettings(){
@@ -659,19 +659,22 @@ function filteredPicks(){
 }
 function onFilterChange(){renderPicks();renderFlat();}
 let sortKey="event_start_utc",sortAsc=false;
-function renderPicks(){
+function updateCounts(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
-  // Use flat cache (superset) for accurate counts
-  const flatData=_flatCache||[];
-  const fOpen=flatData.filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
-  const fSettled=flatData.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
-  // Fall back to main ledger if flat cache not loaded yet
-  const mOpen=state.picks.filter(p=>!p.archived&&p.status==='open').length;
-  const mSettled=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
+  const activeTab=$$("#tabs button.on")[0]?.dataset?.tab||'picks';
+  if(activeTab==='flat'){
+    const fd=_flatCache||[];
+    $("#openCount").textContent=fd.filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
+    $("#settledCount").textContent=fd.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
+  }else{
+    $("#openCount").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
+    $("#settledCount").textContent=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
+  }
   $("#archCount").textContent=archivedCount;
-  $("#openCount").textContent=flatData.length?fOpen:mOpen;
-  $("#settledCount").textContent=flatData.length?fSettled:mSettled;
-  $("#restoreBtn").style.display=archivedCount?"":"none";
+  $("#restoreBtn").style.display=archivedCount?'':'none';
+}
+function renderPicks(){
+  updateCounts();
   const rows=filteredPicks().sort((a,b)=>{
     const x=a[sortKey]??"",y=b[sortKey]??"";
     return (x>y?1:x<y?-1:0)*(sortAsc?1:-1);});
