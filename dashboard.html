@@ -292,6 +292,15 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
     <div id="flatKpis" class="kpis" style="margin-bottom:16px"></div>
     <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <select id="fFlatSport" onchange="renderFlat()"><option value="">all sports</option></select>
+        <select id="fFlatMarket" onchange="renderFlat()"><option value="">all markets</option></select>
+        <select id="fFlatStatus" onchange="renderFlat()"><option value="open">active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
+        <select id="fFlatResult" onchange="renderFlat()"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
+        <input id="fFlatSearch" placeholder="search team / event id" size="22" oninput="renderFlat()">
+        <input id="fFlatFrom" type="date"><input id="fFlatTo" type="date">
+        <button onclick="renderFlat()">Apply</button>
+      </div>
       <table class="data" id="flatTable"><tr><td>Loading…</td></tr></table>
     </div>
   </section>
@@ -791,24 +800,59 @@ function calChart(id,buckets){const {ctx,w,h}=canvasCtx(id);
   ctx.fillText("predicted →",w/2-30,h-6);ctx.save();ctx.translate(10,h/2+24);ctx.rotate(-Math.PI/2);ctx.fillText("actual →",0,0);ctx.restore();}
 function noData(ctx,w,h){ctx.fillStyle="#556";ctx.font="12px monospace";ctx.fillText("No data",w/2-24,h/2);}
 
+let _flatCache=[];
 async function renderFlat(){
   try{
     const resp=await fetch('/api/flat-picks');
     const raw=await resp.json();
-    const flatPicks=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
-    const rows=flatPicks.sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
+    _flatCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
+    
+    // Populate sport dropdown
+    const sports=[...new Set(_flatCache.map(p=>p.league||p.Sport||''))].filter(Boolean).sort();
+    $("#fFlatSport").innerHTML='<option value=\"\">all sports</option>'+sports.map(s=>`<option>${s}</option>`).join('');
+    const markets=[...new Set(_flatCache.map(p=>p.market_type||p.Type||'moneyline'))].filter(Boolean).sort();
+    $("#fFlatMarket").innerHTML='<option value=\"\">all markets</option>'+markets.map(s=>`<option>${s}</option>`).join('');
+    
+    // Apply filters
+    const fs=$("#fFlatSport").value, fm=$("#fFlatMarket").value, fst=$("#fFlatStatus").value, fr=$("#fFlatResult").value;
+    const fq=($("#fFlatSearch").value||'').toLowerCase();
+    const ff=$("#fFlatFrom").value, ft=$("#fFlatTo").value;
+    
+    let rows=_flatCache.filter(p=>{
+      if(fs&&(p.league||p.Sport||'')!==fs)return false;
+      if(fm&&(p.market_type||p.Type||'moneyline')!==fm)return false;
+      const st=String(p.status||p.State||'').toLowerCase();
+      if(fst==='open'&&st!=='open')return false;
+      if(fst==='settled'&&st!=='settled')return false;
+      const res=String(p.result||p.Result||'').toLowerCase();
+      if(fr&&res!==fr)return false;
+      if(fq){
+        const hay=(p.away_team||p.Away||'')+' '+(p.home_team||p.Home||'')+' '+(p.event_id||'');
+        if(!hay.toLowerCase().includes(fq))return false;
+      }
+      if(ff||ft){
+        const d=(p.event_start_utc||'').slice(0,10);
+        if(ff&&d<ff)return false;
+        if(ft&&d>ft)return false;
+      }
+      return true;
+    });
+    rows.sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
+    
+    // KPI
     const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
     const wins=settled.filter(p=>String(p.result||p.Result||'')==='win').length;
     const losses=settled.filter(p=>String(p.result||p.Result||'')==='loss').length;
     const pnl=settled.reduce((s,p)=>s+pickPnl(p),0);
     const risked=settled.reduce((s,p)=>s+(Number(p.units||p.Units)||0),0);
-    document.getElementById('flatKpis').innerHTML=`
-      <div class="k"><b>${rows.length}</b><span>games</span></div>
-      <div class="k"><b>${wins+losses>0?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
-      <div class="k"><b class="${pnl>=0?'green':'red'}">${fmt(pnl)}</b><span>P&L (U)</span></div>
-      <div class="k"><b>${risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
+    $("#flatKpis").innerHTML=`
+      <div class=\"k\"><b>${rows.length}</b><span>games</span></div>
+      <div class=\"k\"><b>${wins+losses>0?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
+      <div class=\"k\"><b class=\"${pnl>=0?'green':'red'}\">${fmt(pnl)}</b><span>P&L (U)</span></div>
+      <div class=\"k\"><b>${risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
+    
     let html='<tr><th>Game (ET)</th><th>Sport</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Size</th><th>Result</th><th>P&L</th><th>Matchup</th></tr>';
-    if(!rows.length){html+='<tr><td colspan=10>No flat forecast data. Click Run Flat Forecast.</td></tr>';}
+    if(!rows.length){html+='<tr><td colspan=10>No matches.</td></tr>';}
     rows.forEach(p=>{
       const res=String(p.result||p.Result||'');
       const st=String(p.status||p.State||'');
@@ -825,7 +869,7 @@ async function renderFlat(){
         <td class=\"dim\">${p.away_team||p.Away||''} @ ${p.home_team||p.Home||''}</td></tr>`;
     });
     document.getElementById('flatTable').innerHTML=html;
-  }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=10>Error loading flat data: '+esc(String(e))+'</td></tr>';}
+  }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=10>Error: '+esc(String(e))+'</td></tr>';}
 }
 function renderPerf(p){
   state.perf=p;
@@ -938,17 +982,22 @@ function orderControl(p,compact=false){
     const label=exchangeState==="pending_cancel"?"cancel pending":exchangeState==="partially_filled"?"partially filled":"order placed";
     return `<span class="pill ${exchangeState==="pending_cancel"?"open":"win"}" title="${escAttr((order.order_id||"")+(exchangeState?" · "+exchangeState:""))}">${label}</span>`;
   }
-  if(order.status==="filled")return `<span class="pill win" title="${escAttr(order.order_id||"")}">filled</span>`;
+  if(order.status==="filled"&&!p.position_closed)return `<span class="pill win" title="${escAttr(order.order_id||"")}">filled</span>`;
   const bid=p.quote?.bid,ask=p.quote?.ask;
   const defaultPrice=ask!=null?Number(ask).toFixed(2):"";
   const inputId=`orderPrice-${p.pick_id}`;
   const reason=p.buy_ready?"Current ask buys immediately; a lower price rests on the book":(p.buy_block_reason||"order unavailable");
   const auth=p.order_authorization==="manual_research_override"?"MAN":"MOD";
   const blocked=reason.includes("older")?"scan prices":reason.includes("POLYMARKET_")?"API key needed":"blocked";
-  const priorLabel={canceled:"CXL",rejected:"REJ",expired:"EXP",replaced:"RPL"}[order.status];
+  // A previously filled buy whose position has since been fully sold/closed
+  // (net shares back to ~0, per cached trade history) resets to a fresh buy
+  // control instead of permanently showing "filled".
+  const priorLabel=p.position_closed?"CLOSED":{canceled:"CXL",rejected:"REJ",expired:"EXP",replaced:"RPL"}[order.status];
   const prior=priorLabel?priorLabel+" · ":"";
   const book=bid!=null&&ask!=null?`B ${cents(bid)} / A ${cents(ask)} · `:ask!=null?`A ${cents(ask)} · `:"";
-  const title=[reason,bid!=null?`Bid ${cents(bid)}`:"",ask!=null?`Ask ${cents(ask)}`:"",order.status?`Previous order ${order.status}`:""].filter(Boolean).join(" · ");
+  const title=[reason,bid!=null?`Bid ${cents(bid)}`:"",ask!=null?`Ask ${cents(ask)}`:"",
+    p.position_closed?"Previous fill was fully sold/closed — showing a fresh buy":(order.status?`Previous order ${order.status}`:"")]
+    .filter(Boolean).join(" · ");
   return `<span class="order-wrap${compact?" compact":""}" title="${escAttr(title)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
     `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
     `<span class="order-note">${prior}${book}${p.buy_ready?auth:blocked}</span></span>`;
