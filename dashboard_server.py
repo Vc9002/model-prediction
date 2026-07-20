@@ -508,10 +508,10 @@ def status() -> dict:
                                "text": f"{sport.upper()} data is {age} days old"})
 
     # Check qualification using the same artifact fallback as _ml_cell and matrix().
-    # lol/cs2/kbo/npb are zero-unit research baselines tracked via esports_grid/
-    # baseball_grid, checked separately below.
+    # kbo/npb are zero-unit research baselines tracked via baseball_grid, checked
+    # separately below. lol/cs2 are now shadow_qualified production.
     sports_meta = (validation.get("sports") or {})
-    for sport in ("mlb", "nba", "wnba", "nfl", "soccer"):
+    for sport in ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2"):
         meta = sports_meta.get(sport) or {}
         artifact = _production_artifact(validation, sport)
         ml = _ml_cell(meta, artifact)
@@ -522,8 +522,7 @@ def status() -> dict:
             alerts.append({"level": "info", "kind": "no_data",
                            "text": f"{sport.upper()} moneyline has no validation data"})
 
-    for sport, grid_key in (("lol", "esports_grid"), ("cs2", "esports_grid"),
-                            ("kbo", "baseball_grid"), ("npb", "baseball_grid")):
+    for sport, grid_key in (("kbo", "baseball_grid"), ("npb", "baseball_grid")):
         research_ml = ((validation.get(grid_key) or {}).get(sport) or {}).get("moneyline") or {}
         if not research_ml or research_ml.get("state") == "no_data":
             alerts.append({"level": "info", "kind": "no_data",

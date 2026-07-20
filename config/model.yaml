@@ -218,20 +218,20 @@ models:
     origin: statistical_model
   LOL:
     family: neutral_series_elo
-    status: research
+    status: shadow_qualified
     origin: statistical_model
-    active_research_version: lol-neutral-series-elo-v1
-    research_artifact: config/models/lol-neutral-series-elo-v1.json
+    active_production_version: lol-neutral-series-elo-v1
+    production_artifact: config/models/lol-neutral-series-elo-v1.json
     market_target: esports_match_winner
-    research_outputs_zero_units: true
+    min_edge: 0.02
   CS2:
     family: neutral_series_elo
-    status: research
+    status: shadow_qualified
     origin: statistical_model
-    active_research_version: cs2-neutral-series-elo-v1
-    research_artifact: config/models/cs2-neutral-series-elo-v1.json
+    active_production_version: cs2-neutral-series-elo-v1
+    production_artifact: config/models/cs2-neutral-series-elo-v1.json
     market_target: esports_match_winner
-    research_outputs_zero_units: true
+    min_edge: 0.02
   KBO:
     family: tie_aware_home_elo
     status: research
