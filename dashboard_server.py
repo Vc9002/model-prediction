@@ -564,7 +564,8 @@ def status() -> dict:
     }
 
 
-MATRIX_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "kbo", "npb")
+MATRIX_SPORTS = ("nba", "wnba", "nfl", "soccer")  # main grid: moneyline only, non-baseball sports
+MATRIX_MARKETS = ["moneyline"]  # main grid only shows moneyline
 # ── SECTION: Validation & Matrix ────────────────────────────────────
 
 
@@ -707,7 +708,7 @@ def matrix() -> dict:
     total_validation = _read_json(OUTPUTS / "total-score-validation.json") or {}
     total_results = total_validation.get("sports") or {}
     sports_meta = validation.get("sports") or {}
-    markets = ["moneyline", "spread", "total", "f5_spread", "f5_total", "yrfi_nrfi"]
+    markets = list(MATRIX_MARKETS)
     grid = {}
     for sport in MATRIX_SPORTS:
         row = {}
@@ -778,6 +779,19 @@ def matrix() -> dict:
     )
     esports = validation.get("esports_grid") or {}
     baseball = validation.get("baseball_grid") or {}
+    # Add MLB to baseball grid with all markets
+    mlb_row = {}
+    mlb_meta = sports_meta.get("mlb") or {}
+    mlb_row["moneyline"] = _ml_cell(mlb_meta, _production_artifact(validation, "mlb"))
+    mlb_readiness = mlb_meta.get("multi_market_readiness") or {}
+    for mk in ["spread", "total", "f5_spread", "f5_total"]:
+        key = f"full_game_{mk}" if mk in ("spread","total") else mk
+        rd = mlb_readiness.get(key) or mlb_readiness.get(mk)
+        if isinstance(rd, dict) and rd.get("state"):
+            mlb_row[mk] = rd
+        else:
+            mlb_row[mk] = {"state": "blocked" if rd else "no_data", "readiness": rd}
+    baseball["mlb"] = mlb_row
     return {"markets": markets, "grid": grid, "esports": esports, "baseball": baseball, "source": source, "gate": gate}
 # ── SECTION: Backtests & Odds ───────────────────────────────────────
 
@@ -1249,6 +1263,41 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     return True, "ready"
 
 
+def _net_position_quantity(slug: str, portfolio_history: dict) -> float | None:
+    """Net shares still held on a market, from cached (no live call) activity history.
+
+    Prefers the exchange's own settlement record when one exists: a
+    "settlement" activity's after_quantity is ground truth for a resolved
+    market, and holds even when a position went through several buy/sell
+    round-trips beforehand. Only when the market hasn't settled does this
+    fall back to summing trades -- the exchange reports cost_basis_usd/
+    realized_pnl_usd on trades that close or reduce a position (null on
+    pure opens), so opening-quantity minus closing-quantity approximates net
+    exposure for a still-open, never-settled position. That fallback is a
+    heuristic, not ground truth: multiple round-trips on the same market
+    (sell then rebuy) can make it wrong, which is exactly why the settlement
+    record is checked first.
+    """
+    activities = [a for a in portfolio_history.get("activities", []) if a.get("market_slug") == slug]
+    if not activities:
+        return None
+    settlements = [a for a in activities if a.get("type") == "settlement"]
+    if settlements:
+        latest = max(settlements, key=lambda a: str(a.get("occurred_at_utc") or ""))
+        after = latest.get("after_quantity")
+        if after is not None:
+            return _number(after, 0.0)
+    trades = [a for a in activities if a.get("type") == "trade"]
+    if not trades:
+        return None
+    net = 0.0
+    for trade in trades:
+        quantity = _number(trade.get("quantity"), 0.0)
+        closing = trade.get("cost_basis_usd") is not None or trade.get("realized_pnl_usd") is not None
+        net += -quantity if closing else quantity
+    return net
+
+
 def _decorate_pick(
     row: dict, orders: dict | None = None, portfolio_history: dict | None = None
 ) -> dict:
@@ -1256,11 +1305,19 @@ def _decorate_pick(
     ready, reason = _order_readiness(row, quote)
     order = _latest_order_for_pick(row, quote, orders)
     manual, _ = _manual_research_eligibility(row)
+    filled_entry = _filled_entry_for_pick(row, orders, portfolio_history)
+    position_closed = False
+    if order and order.get("action", "buy") == "buy" and order.get("status") == "filled":
+        slug = str(order.get("market_slug") or "")
+        if slug:
+            net = _net_position_quantity(slug, portfolio_history or _load_portfolio_history())
+            position_closed = net is not None and abs(net) < 1e-6
     return {
         **row,
         "quote": quote,
         "order": order,
-        "filled_entry": _filled_entry_for_pick(row, orders, portfolio_history),
+        "filled_entry": filled_entry,
+        "position_closed": position_closed,
         "buy_ready": ready,
         "buy_block_reason": reason,
         "unit_value_usd": _unit_value_usd(),

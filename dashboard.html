@@ -494,14 +494,20 @@ function renderMatrix(m){
     }
     et.innerHTML=ehtml;
   }
-  // Render baseball table (MLB/KBO/NPB)
+  // Render baseball table (MLB/KBO/NPB) — MLB gets spread/total/F5 columns
   if(m.baseball&&Object.keys(m.baseball).length){
     const bt=$("#baseballTable"), bc=$("#baseballCard");
     bc.style.display="";
-    const heat=matrixQualifiedRange(Object.values(m.baseball).map(v=>v.moneyline));
-    let bhtml="<tr><th>Sport</th><th>ML</th></tr>";
+    const allCells=Object.values(m.baseball).flatMap(v=>Object.values(v));
+    const heat=matrixQualifiedRange(allCells);
+    const baseballMarkets=["moneyline","spread","total","f5_spread","f5_total"];
+    let bhtml="<tr><th>Sport</th>"+baseballMarkets.map(k=>`<th>${MARKET_LABELS[k]||k}</th>`).join("")+"</tr>";
     for(const sport of Object.keys(m.baseball)){
-      bhtml+=`<tr><th>${sport.toUpperCase()}</th>${matrixCell(m.baseball[sport].moneyline,sport,"moneyline",heat)}</tr>`;
+      bhtml+=`<tr><th>${sport.toUpperCase()}</th>`;
+      for(const mk of baseballMarkets){
+        bhtml+=matrixCell((m.baseball[sport]||{})[mk],sport,mk,heat);
+      }
+      bhtml+="</tr>";
     }
     bt.innerHTML=bhtml;
   }
