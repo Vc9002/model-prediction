@@ -10,7 +10,7 @@ that silently marks manual items as passed is worse than no checklist.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any, Sequence
 
 from .economic_gate import GateResult
 from .experiment_design import ExperimentLog

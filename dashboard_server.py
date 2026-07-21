@@ -1130,17 +1130,23 @@ def _pick_quote(row: dict) -> dict | None:
             latest[slug] = snapshot
     if not latest:
         return None
+    if len(latest) > 1:
+        return None  # doubleheader: two contracts matched; never guess which game
     snapshot = max(latest.values(), key=lambda item: str(item.get("observed_at_utc") or ""))
     selected_team = (
         str(row.get("home_team") or "")
         if str(row.get("selection") or "").casefold() == "home"
         else str(row.get("away_team") or "")
     )
-    side_name = (
-        "long"
-        if _team_matches(selected_team, str((snapshot.get("long") or {}).get("description") or ""))
-        else "short"
+    matches_long = _team_matches(
+        selected_team, str((snapshot.get("long") or {}).get("description") or "")
     )
+    matches_short = _team_matches(
+        selected_team, str((snapshot.get("short") or {}).get("description") or "")
+    )
+    if matches_long == matches_short:
+        return None  # ambiguous side (same-city names) — never default to long
+    side_name = "long" if matches_long else "short"
     side = snapshot.get(side_name) or {}
     ask = _number(side.get("ask"), -1)
     if not 0 < ask < 1:
@@ -2147,19 +2153,6 @@ class Handler(BaseHTTPRequestHandler):
                 day = query.get("date") or _today()
                 self._send(_cached(f"live:{sport}:{day}", 120,
                                    lambda: live_gateway_slate(sport, day)))
-            elif route == "/api/scan":
-                try:
-                    from model_prediction.data_sources.polymarket_us import capture_snapshots
-                    sport = query.get("sport", "").strip()
-                    sports = [sport] if sport in ("mlb","nba","wnba","nfl") else ["mlb","nba","wnba"]
-                    results = {}
-                    for s in sports:
-                        results[s] = capture_snapshots(s, _today())
-                    _CACHE.pop("matrix", None)
-                    _CACHE.pop("market", None)
-                    self._send({"status": "ok", "captured": results})
-                except Exception as e:
-                    self._send({"status": "error", "error": str(e)}, code=500)
             elif route == "/api/audit":
                 self._send(_cached("audit", 60, _audit_tail))
             elif route == "/api/job":
@@ -2189,7 +2182,22 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as error:  # noqa: BLE001
             self._send({"error": f"{type(error).__name__}: {error}"}, code=500)
 
+    def _local_origin_ok(self) -> bool:
+        """Reject cross-site (CSRF) POSTs: browser requests from any web page
+        carry an Origin header; only same-host origins (or none — curl, CLI)
+        are allowed to hit state-changing routes on this local server."""
+        origin = str(self.headers.get("Origin") or "")
+        if not origin:
+            return True
+        host = str(self.headers.get("Host") or "")
+        return origin in (f"http://{host}", f"https://{host}") or origin.startswith(
+            ("http://127.0.0.1:", "http://localhost:")
+        )
+
     def do_POST(self) -> None:  # noqa: N802
+        if not self._local_origin_ok():
+            self._send({"status": "refused", "error": "cross-origin request rejected"}, code=403)
+            return
         parsed = urlparse(self.path)
         length = int(self.headers.get("Content-Length") or 0)
         try:

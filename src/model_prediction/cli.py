@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 from .audit import AuditLog
 from .backtester import walk_forward_backtest

@@ -125,6 +125,11 @@ models:
       require_ablation_gain: true
   MLB:
     family: elo_trend_logistic_regression
+    # OPERATOR PROMOTION (2026-07-21): live/flat performance has exceeded the
+    # historical locked holdout (v5 artifact records qualified=false at 56.3%).
+    # Promotion to shadow_qualified units is a deliberate operator decision;
+    # the artifact keeps the honest evidence. Revisit if live hit rate drifts
+    # below the model_drift check's 2-sigma band.
     status: shadow_qualified
     origin: statistical_model
     active_production_version: mlb-elo-trend-lr-v5

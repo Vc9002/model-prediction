@@ -321,6 +321,7 @@ def match_executable_quote(
     away = candidate.away_team
     home = candidate.home_team
     best: dict[str, Any] | None = None
+    matched_slugs: set[str] = set()
     with path.open(encoding="utf-8") as handle:
         for line in handle:
             if not line.strip():
@@ -345,15 +346,28 @@ def match_executable_quote(
             )
             if not pairing:
                 continue
+            matched_slugs.add(slug)
             if best is None or str(snap.get("observed_at_utc", "")) > str(
                 best.get("observed_at_utc", "")
             ):
                 best = snap
     if best is None:
         return None
+    if len(matched_slugs) > 1:
+        # Two distinct contracts matched the same team pair on one date — an
+        # MLB doubleheader. Pricing both games off whichever snapshot is
+        # newest would mis-price one of them; skip instead of guessing.
+        return None
     selected_team = home if candidate.selection == "home" else away
     long_desc = str((best.get("long") or {}).get("description", ""))
-    side_key = "long" if _team_matches(selected_team, long_desc) else "short"
+    short_desc = str((best.get("short") or {}).get("description", ""))
+    matches_long = _team_matches(selected_team, long_desc)
+    matches_short = _team_matches(selected_team, short_desc)
+    if matches_long == matches_short:
+        # Same-city ambiguity ("New York" matches both sides) or no match at
+        # all — the side cannot be resolved uniquely. Never default to long.
+        return None
+    side_key = "long" if matches_long else "short"
     other_key = "short" if side_key == "long" else "long"
     side = best.get(side_key) or {}
     other = best.get(other_key) or {}
