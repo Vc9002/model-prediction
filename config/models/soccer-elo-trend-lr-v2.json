@@ -1,0 +1,171 @@
+{
+  "artifact_hash": "65f2de8e0775e5cddb542440598cf8cc6c14adeb4cab295d32b5d8756c8862a9",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        5.5624945626,
+        -0.1507014663
+      ],
+      "confidence_threshold": 0.53841851,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "intercept": -3.5389203491,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "soccer-elo-trend-lr-v2",
+  "qualification": {
+    "brier_score": 0.220149,
+    "calibration": {
+      "brier_score": 0.22014908572937486,
+      "calibration_intercept": 0.017634055934840638,
+      "calibration_slope": 0.7759222100144554,
+      "expected_calibration_error": 0.03671587097641917,
+      "log_loss": 0.6334969617138538,
+      "reliability_buckets": [
+        {
+          "count": 404,
+          "hit_rate": 0.5445544554455446,
+          "lower": 0.5,
+          "mean_p": 0.5696358503881291,
+          "upper": 0.6
+        },
+        {
+          "count": 449,
+          "hit_rate": 0.6035634743875279,
+          "lower": 0.6,
+          "mean_p": 0.6457593110387577,
+          "upper": 0.7
+        },
+        {
+          "count": 321,
+          "hit_rate": 0.7601246105919003,
+          "lower": 0.7,
+          "mean_p": 0.745884156695696,
+          "upper": 0.8
+        },
+        {
+          "count": 162,
+          "hit_rate": 0.7777777777777778,
+          "lower": 0.8,
+          "mean_p": 0.8437983670401888,
+          "upper": 0.9
+        },
+        {
+          "count": 45,
+          "hit_rate": 0.7777777777777778,
+          "lower": 0.9,
+          "mean_p": 0.9190951654230303,
+          "upper": 1.0
+        }
+      ],
+      "sample_size": 1381,
+      "status": "ok"
+    },
+    "called_rate": 0.862586,
+    "calls": 1381,
+    "every_called_month_positive_at_minus_110": true,
+    "every_qualifying_month_positive_at_minus_110": true,
+    "failures": [],
+    "framework": "locked_complete_date_60_20_20",
+    "hit_rate": 0.648805,
+    "hits": 896,
+    "locked_holdout": true,
+    "market_type": "moneyline",
+    "meets_primary_holdout_metrics": true,
+    "minimum_calls": 50,
+    "minimum_hit_rate": 0.6,
+    "monthly_at_minus_110": [
+      {
+        "calls": 36,
+        "hit_rate": 0.722222,
+        "hits": 26,
+        "month": "2026-01",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 13.636364
+      },
+      {
+        "calls": 321,
+        "hit_rate": 0.691589,
+        "hits": 222,
+        "month": "2026-02",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 102.818182
+      },
+      {
+        "calls": 289,
+        "hit_rate": 0.647059,
+        "hits": 187,
+        "month": "2026-03",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 68.0
+      },
+      {
+        "calls": 341,
+        "hit_rate": 0.671554,
+        "hits": 229,
+        "month": "2026-04",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 96.181818
+      },
+      {
+        "calls": 302,
+        "hit_rate": 0.592715,
+        "hits": 179,
+        "month": "2026-05",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 39.727273
+      },
+      {
+        "calls": 71,
+        "hit_rate": 0.56338,
+        "hits": 40,
+        "month": "2026-06",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 5.363636
+      },
+      {
+        "calls": 21,
+        "hit_rate": 0.619048,
+        "hits": 13,
+        "month": "2026-07",
+        "qualification_status": "partial_month",
+        "units_at_minus_110": 3.818182
+      }
+    ],
+    "monthly_minimum_calls": 10,
+    "price_diagnostics": null,
+    "qualification_eligible": true,
+    "qualified": true,
+    "roi": null,
+    "secondary_reporting_complete": true,
+    "selectivity": 0.862586,
+    "total_predictions": 1601,
+    "units_at_minus_110": 329.545455
+  },
+  "schema_version": "1",
+  "sport": "soccer",
+  "training": {
+    "coefficient_fit": {
+      "end": "2025-08-08",
+      "observations": 5476,
+      "start": "2024-01-13"
+    },
+    "locked_holdout": {
+      "end": "2026-07-17",
+      "observations": 1601,
+      "start": "2026-01-30"
+    },
+    "market_inputs_used": false,
+    "threshold_selection": {
+      "end": "2026-01-28",
+      "observations": 2009,
+      "start": "2025-08-09"
+    },
+    "threshold_source": "later validation cohort; never locked holdout",
+    "walk_forward_features": true
+  }
+}

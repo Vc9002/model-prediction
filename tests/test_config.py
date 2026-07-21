@@ -38,11 +38,16 @@ def test_default_qualification_policy_is_accuracy_first() -> None:
 
 def test_configured_production_artifact_state_matches_locked_audit() -> None:
     config = load_config()
+    # config `status` is the operator's deliberate promotion decision;
+    # the artifact `qualified` boolean is the locked-holdout EVIDENCE. They
+    # are allowed to differ only in the documented direction (operator
+    # promotes despite a failed gate), and this test pins the current truth
+    # so silent drift in either direction fails CI.
     expected = {
-        "MLB": ("shadow_qualified", True),
+        "MLB": ("shadow_qualified", False),  # v5 holdout 56.3% < 60% gate; promotion is operator override
         "NBA": ("shadow_qualified", True),
         "WNBA": ("shadow_qualified", True),
-        "NFL": ("shadow_qualified", False),  # Elo regression + data backfill changed holdout
+        "NFL": ("shadow_qualified", True),  # v4 (ET cohorts) qualifies: 71.3% on 87 locked calls
     }
     for sport, (status, qualified) in expected.items():
         model = config["models"][sport]

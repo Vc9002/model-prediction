@@ -19,9 +19,11 @@ from typing import Any, Mapping, Sequence
 from sklearn.linear_model import LogisticRegression
 
 from .calibration import calibration_metrics
+from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
 from .features.elo_ratings import build_elo
 from .features.park_factors import park_factor
+from .features.team_runs import pitcher_era_gap_from_history
 from .features.schedule_load import matchup_schedule_load
 from .features.trends import TrendEngine
 from .lifecycle import evaluate_locked_holdout
@@ -34,12 +36,15 @@ DIAGNOSTIC_THRESHOLD_TARGET_HIT_RATE = 0.60
 QUALIFICATION_MINIMUM_HIT_RATE = 0.60
 MINIMUM_CALLS = 50
 MINIMUM_MONTHLY_CALLS = 10
+# v5/v4/v2 lineage (2026-07-21): Eastern-time point-in-time cutoff (was UTC)
+# and unified train/serve feature definitions (pitcher_era_gap = shared rolling
+# runs-allowed gap). Bump again on any further change to the training basis.
 LEARNED_ARTIFACT_VERSIONS = {
-    "mlb": "mlb-elo-trend-lr-v3",
-    "nba": "nba-elo-trend-lr-v3",
-    "wnba": "wnba-elo-trend-lr-v3",
-    "nfl": "nfl-elo-trend-lr-v3",
-    "soccer": "soccer-elo-trend-lr-v1",
+    "mlb": "mlb-elo-trend-lr-v5",
+    "nba": "nba-elo-trend-lr-v4",
+    "wnba": "wnba-elo-trend-lr-v4",
+    "nfl": "nfl-elo-trend-lr-v4",
+    "soccer": "soccer-elo-trend-lr-v2",
 }
 
 
@@ -125,7 +130,7 @@ def build_walk_forward_rows(
     games = store.load_games(sport)
     by_date: dict[str, list[GameRecord]] = defaultdict(list)
     for game in games:
-        by_date[game.start.date().isoformat()].append(game)
+        by_date[game.start.astimezone(EASTERN).date().isoformat()].append(game)
 
     history: list[GameRecord] = []
     rows: list[ValidationRow] = []
@@ -148,16 +153,17 @@ def build_walk_forward_rows(
                     game.start,
                 )
                 
-                # Rolling pitching quality: runs allowed per game (last 5)
-                home_ra = _rolling_runs_allowed(history, game.home_team, 5)
-                away_ra = _rolling_runs_allowed(history, game.away_team, 5)
-                pitcher_gap = round(home_ra - away_ra, 4) if home_ra and away_ra else 0.0
+                # Rolling pitching quality: runs allowed per game (last 5).
+                # Shared definition with forward inference (features/team_runs).
+                pitcher_gap = pitcher_era_gap_from_history(
+                    history, game.home_team, game.away_team
+                )
                 
                 # Real starter ERA gap from MLB Stats API snapshots (point-in-time)
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
                 
                 # Historical weather from Open-Meteo DB
-                weather = _lookup_weather(game.home_team, game.start.date().isoformat())
+                weather = _lookup_weather(game.home_team, game.start.astimezone(EASTERN).date().isoformat())
                 
                 park = (
                     park_factor(game.home_team)
@@ -290,7 +296,7 @@ def _trailing_home_rate(history: Sequence[GameRecord], day: str) -> tuple[float,
     recent = [
         game
         for game in history
-        if cutoff <= game.start.date() < date.fromisoformat(day)
+        if cutoff <= game.start.astimezone(EASTERN).date() < date.fromisoformat(day)
         and game.home_score != game.away_score
     ]
     if not recent:
@@ -1394,25 +1400,6 @@ def _cohort_metadata(rows: Sequence[ValidationRow]) -> dict[str, Any]:
 
 
 # ── Rolling metrics for validation ────────────────────────────────────────
-
-def _rolling_runs_allowed(history: list, team: str, n: int = 5) -> float | None:
-    """Rolling runs allowed per game for a team from prior games only."""
-    team_games = [
-        g for g in history
-        if (g.home_team == team or g.away_team == team)
-        and g.home_score is not None and g.away_score is not None
-    ]
-    if len(team_games) < n:
-        return None
-    recent = team_games[-n:]
-    total = 0
-    for g in recent:
-        if g.home_team == team:
-            total += float(g.away_score)
-        else:
-            total += float(g.home_score)
-    return total / n
-
 
 _WEATHER_DB: dict | None = None
 

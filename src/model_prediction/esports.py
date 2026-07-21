@@ -12,7 +12,7 @@ import json
 import math
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -53,6 +53,9 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
         "minimum_date": "2020-01-01",
     },
 }
+# v2 lineage (2026-07-21): rating updates use the raw Elo expectation
+# (previously the shrunk prediction, which inflated favorites).
+ESPORTS_MODEL_LINEAGE = "v2"
 K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0, 80.0, 96.0)
 CONFIDENCE_CANDIDATES = (0.0, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15)
 
@@ -289,19 +292,24 @@ class NeutralElo:
     k: float
     ratings: dict[str, float]
 
-    def probability(self, team1_id: str, team2_id: str) -> float:
-        """Calibrated probability capped at [0.20, 0.80] to prevent extreme
-        predictions from raw Elo differences in thin/esports markets."""
+    def raw_probability(self, team1_id: str, team2_id: str) -> float:
+        """Unshrunk Elo expectation — the correct basis for rating updates."""
         rating1 = self.ratings.get(team1_id, 1500.0)
         rating2 = self.ratings.get(team2_id, 1500.0)
-        raw = 1.0 / (1.0 + 10.0 ** ((rating2 - rating1) / 400.0))
-        # Shrink toward 0.5: calibrated = 0.5 + 0.5 * (raw - 0.5)
-        # This caps at [0.25, 0.75] while preserving rank order
-        calibrated = 0.5 + 0.5 * (raw - 0.5)
+        return 1.0 / (1.0 + 10.0 ** ((rating2 - rating1) / 400.0))
+
+    def probability(self, team1_id: str, team2_id: str) -> float:
+        """Prediction shrunk toward 0.5 and capped at [0.25, 0.75] for
+        thin/esports markets, preserving rank order."""
+        calibrated = 0.5 + 0.5 * (self.raw_probability(team1_id, team2_id) - 0.5)
         return max(0.25, min(0.75, calibrated))
 
     def update(self, row: dict[str, Any]) -> None:
-        probability = self.probability(row["team1_id"], row["team2_id"])
+        # Update against the RAW expectation: updating against the shrunk
+        # prediction systematically inflates strong favorites' ratings on
+        # routine expected wins (a 0.85 favorite treated as 0.675 banks
+        # k*0.175 of phantom surprise every win).
+        probability = self.raw_probability(row["team1_id"], row["team2_id"])
         outcome = 1.0 if row["winner_id"] == row["team1_id"] else 0.0
         delta = self.k * (outcome - probability)
         self.ratings[row["team1_id"]] = self.ratings.get(row["team1_id"], 1500.0) + delta
@@ -442,7 +450,7 @@ def validate_esports_baseline(
     source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     artifact = {
         "schema_version": "esports-neutral-elo-v1",
-        "model_version": f"{title}-neutral-series-elo-v1",
+        "model_version": f"{title}-neutral-series-elo-{ESPORTS_MODEL_LINEAGE}",
         "model_state": "research",
         "title": title,
         "target": "best-of match/series winner",
@@ -462,7 +470,7 @@ def validate_esports_baseline(
     artifact["artifact_hash"] = artifact_hash
     artifact_path = None
     if artifact_dir is not None:
-        artifact_path = Path(artifact_dir) / f"{title}-neutral-series-elo-v1.json"
+        artifact_path = Path(artifact_dir) / f"{title}-neutral-series-elo-{ESPORTS_MODEL_LINEAGE}.json"
         _atomic_write(artifact_path, json.dumps(artifact, indent=2, sort_keys=True) + "\n")
     return {
         "status": "ok",
@@ -523,9 +531,15 @@ def validate_all_esports_baselines(
 def _fuzzy_match_team(
     description: str, teams: dict[str, dict[str, Any]], aliases: dict[str, set[str]]
 ) -> str | None:
-    """Fallback fuzzy match when exact alias lookup returns nothing."""
+    """Fallback fuzzy match when exact alias lookup returns nothing.
+
+    Returns a team id only when the substring match is UNAMBIGUOUS — exactly
+    one candidate team. "Liquid" matching both "Team Liquid" and "Liquid
+    Academy" must resolve to nothing (NO_CALL_ENTITY_UNRESOLVED upstream),
+    never to whichever team happens to iterate first.
+    """
     key = _identity_key(description)
-    # Try direct substring: if description contains a known team name or vice versa
+    matched: set[str] = set()
     for team_id, team in teams.items():
         for field in ("name", "slug", "acronym"):
             alias = str(team.get(field, ""))
@@ -533,8 +547,9 @@ def _fuzzy_match_team(
                 continue
             alias_key = _identity_key(alias)
             if len(alias_key) >= 4 and (alias_key in key or key in alias_key):
-                return team_id
-    return None
+                matched.add(team_id)
+                break
+    return next(iter(matched)) if len(matched) == 1 else None
 
 
 def _team_alias_index(teams: dict[str, dict[str, Any]]) -> dict[str, set[str]]:
@@ -566,7 +581,7 @@ def forecast_esports_slate(
     if title not in TITLE_SPECS:
         raise ValueError(f"unsupported baseline title: {title}")
     directory = Path(data_root) / "esports" / title
-    artifact_path = Path(artifact_dir) / f"{title}-neutral-series-elo-v1.json"
+    artifact_path = Path(artifact_dir) / f"{title}-neutral-series-elo-{ESPORTS_MODEL_LINEAGE}.json"
     if not artifact_path.exists():
         raise FileNotFoundError(f"missing research artifact: {artifact_path}")
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))

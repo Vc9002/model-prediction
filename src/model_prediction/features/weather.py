@@ -22,6 +22,21 @@ DOME_TEAMS = {
 }
 
 
+def run_factor_from_conditions(temperature_f: float | None, wind_mph: float | None) -> float:
+    """One shared run-factor formula for live fetches AND historical DB builds.
+
+    ~+1% runs per 10F above 70F; +0.2% per mph of wind above 10. Clamped to
+    [0.90, 1.10]. Any weather source used for training or serving must go
+    through this function so the feature means the same thing everywhere.
+    """
+    factor = 1.0
+    if temperature_f is not None:
+        factor *= 1.0 + (float(temperature_f) - 70.0) / 1000.0
+    if wind_mph is not None:
+        factor *= 1.0 + max(0.0, float(wind_mph) - 10.0) / 500.0
+    return round(max(0.90, min(1.10, factor)), 4)
+
+
 def weather_profile(home_team: str, espn_game_info: dict[str, Any] | None = None) -> dict[str, Any]:
     if home_team in DOME_TEAMS:
         return {
@@ -138,18 +153,11 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
         wind = float(winds[0]) if winds else None
         humid = float(humids[0]) if humids else None
         
-        # Run factor: temperature effect + wind effect
-        factor = 1.0
-        factor *= 1.0 + (temp - 70.0) / 1000.0  # ~1% per 10F from 70F
-        if wind is not None:
-            # Wind blowing OUT to center field increases runs (crude: just wind magnitude)
-            factor *= 1.0 + max(0, (wind - 10)) / 500.0  # +0.2% per mph above 10
-        
         return {
             "temperature_f": round(temp, 1),
             "wind_mph": round(wind, 1) if wind else None,
             "humidity_pct": round(humid, 1) if humid else None,
-            "weather_run_factor": round(max(0.90, min(1.10, factor)), 4),
+            "weather_run_factor": run_factor_from_conditions(temp, wind),
             "status": "available",
             "source": "open-meteo",
         }

@@ -17,6 +17,7 @@ from .features.schedule_load import matchup_schedule_load
 from .features.trends import TrendEngine
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
+from .features.team_runs import pitcher_era_gap_from_history
 from .models.learned_market import LearnedMarketArtifact
 from .wnba_availability_evaluation import adjust_home_probability, historical_margin_sigma
 
@@ -66,6 +67,13 @@ def _compute_features(
     if wanted & schedule_names:
         schedule = matchup_schedule_load(history, home_team, away_team, event_start)
         features.update({name: value for name, value in schedule.items() if name in wanted})
+    if "pitcher_era_gap" in wanted:
+        # Same definition as training (features/team_runs): rolling team
+        # runs-allowed gap from prior cached games. Never an ESPN starter ERA —
+        # that was a different quantity and caused train/serve skew.
+        features["pitcher_era_gap"] = pitcher_era_gap_from_history(
+            history, home_team, away_team
+        )
     if wanted & AVAILABILITY_FEATURE_NAMES:
         if sport != "wnba":
             raise ValueError(
@@ -94,6 +102,14 @@ def _compute_features(
 
 
 def _init_providers() -> None:
+    """Providers for features computable without game history.
+
+    History-dependent features (pitcher_era_gap) are computed inline in
+    ``_compute_features`` with the SAME definition as validation. There is no
+    ``starter_era_gap`` provider: its only source is a historical map that can
+    never contain a future event, so serving it would silently emit 0.0 —
+    an artifact requiring it now fails closed instead.
+    """
     if _FEATURE_PROVIDERS:
         return
     # Lazy imports to avoid circular dependencies
@@ -102,14 +118,6 @@ def _init_providers() -> None:
 
     from .features.weather import live_weather
     _FEATURE_PROVIDERS["weather_factor"] = lambda h, a, eid, gd: float(live_weather(h).get("weather_run_factor", 1.0))
-
-    from .validation import _starter_era_gap as _seg
-    _FEATURE_PROVIDERS["starter_era_gap"] = lambda h, a, eid, gd: _seg(eid)
-
-    def _pitcher_gap(home_team, away_team, event_id, game_date):
-        from .data_sources.espn_probables import espn_pitcher_era_gap
-        return espn_pitcher_era_gap(event_id, home_team, away_team, game_date)
-    _FEATURE_PROVIDERS["pitcher_era_gap"] = _pitcher_gap
 
 
 def _build_basis(features: dict[str, float], home_trend: Any, away_trend: Any, history_games: int) -> dict[str, float | int]:
