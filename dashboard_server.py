@@ -317,6 +317,20 @@ def read_picks() -> list[dict]:
     return rows_out
 
 
+def _find_pick_by_id(pick_id: str) -> dict | None:
+    """Search both main and flat ledgers for a pick by pick_id."""
+    # Try main ledger first
+    row = next((item for item in read_picks() if str(item.get("pick_id")) == pick_id), None)
+    if row is not None:
+        return row
+    # Try flat ledger
+    flat_path = DATA / "flat_picks.xlsx"
+    if flat_path.exists():
+        flat_picks = _parse_picks(flat_path)
+        return next((item for item in flat_picks if str(item.get("pick_id")) == pick_id), None)
+    return None
+
+
 def _parse_picks(path: Path) -> list[dict]:
     wb = load_workbook(path, read_only=True, data_only=True)
     sheet = wb["Picks"] if "Picks" in wb.sheetnames else wb.active
@@ -1521,7 +1535,7 @@ def preview_order(payload: dict) -> dict:
     if action not in ("buy", "sell"):
         return {"status": "refused", "error": "action must be buy or sell"}
     pick_id = str(payload.get("pick_id") or "")
-    row = next((item for item in read_picks() if str(item.get("pick_id")) == pick_id), None)
+    row = _find_pick_by_id(pick_id)
     if row is None:
         return {"status": "refused", "error": "unknown pick id"}
     decorated = _decorate_pick(row)
@@ -1620,10 +1634,7 @@ def submit_order(payload: dict) -> dict:
         ticket = _ORDER_PREVIEWS.pop(nonce, None)
     if ticket is None or time.time() > float(ticket["expires_at"]):
         return {"status": "refused", "error": "order preview expired; preview it again"}
-    row = next(
-        (item for item in read_picks() if str(item.get("pick_id")) == ticket["pick_id"]),
-        None,
-    )
+    row = _find_pick_by_id(ticket["pick_id"])
     if row is None:
         return {"status": "refused", "error": "pick disappeared before submission"}
     quote = _pick_quote(row)
@@ -2102,7 +2113,12 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/picks":
                 self._send(_cached("picks", 30, dashboard_picks))
             elif route == "/api/flat-picks":
-                self._send(_cached("flat-picks", 30, lambda: _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []))
+                def _flat_picks_decorated():
+                    flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
+                    orders = _load_orders()
+                    portfolio = _load_portfolio_history()
+                    return [_decorate_pick(row, orders, portfolio) for row in flat]
+                self._send(_cached("flat-picks", 30, _flat_picks_decorated))
             elif route == "/api/performance":
                 self._send(_cached("performance", 30, lambda: performance(read_picks())))
             elif route == "/api/backtests":
