@@ -2218,15 +2218,17 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/settings/auto-unit-value":
-            self._send(_auto_adjust_unit_value())
+            pct = float(payload.get("pct", 10))
+            self._send(_auto_adjust_unit_value(pct))
         else:
             self._send({"error": "unknown route"}, code=404)
 
 
-def _auto_adjust_unit_value() -> dict:
-    """Set unit value to 10% of current bankroll. Only ratchets up, never down."""
+def _auto_adjust_unit_value(pct: float = 10.0) -> dict:
+    """Set unit value to pct% of current bankroll. Only ratchets up, never down."""
+    fraction = max(0.01, min(0.50, pct / 100.0))  # clamp 1-50%
     bankroll = _compute_bankroll()
-    suggested = round(bankroll * 0.10, 2)
+    suggested = round(bankroll * fraction, 2)
     current = _unit_value_usd()
     # Only increase — ratchet up, never shrink
     if suggested <= current:
@@ -2235,7 +2237,7 @@ def _auto_adjust_unit_value() -> dict:
             "bankroll_usd": round(bankroll, 2),
             "current_unit": current,
             "suggested_unit": suggested,
-            "note": "Bankroll at $" + f"{bankroll:,.2f}" + ", 10% = $" + f"{suggested:.2f}" + " <= current $" + f"{current:.2f}" + ". No change.",
+            "note": "Bankroll at $" + f"{bankroll:,.2f}" + f", {pct:.1f}% = $" + f"{suggested:.2f}" + " <= current $" + f"{current:.2f}" + ". No change.",
         }
     try:
         result = _set_unit_value_usd(suggested)

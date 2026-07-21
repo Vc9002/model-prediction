@@ -140,7 +140,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span class="chip dim" id="updatedTxt">Updated: —</span>
   <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
   <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
-   <label class="chip" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><button onclick="autoUnitValue()" title="Set 1U to 10% of bankroll (ratchets up only)">10%</button></label>
+   <label class="chip" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><input id="autoPctInput" type="number" min="1" max="50" step="0.5" value="10" style="width:42px;padding:1px 2px" title="Percentage of bankroll">%<button onclick="autoUnitValue()" title="Set 1U to % of bankroll (ratchets up only)">Apply</button></label>
   <span style="flex:1"></span>
   <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button onclick="bootstrapDialog()">Bootstrap</button>
@@ -400,15 +400,16 @@ async function saveUnitValue(){
 }
 window.saveUnitValue=saveUnitValue;
 async function autoUnitValue(){
-  if(!window.confirm("Auto-set 1U to 10% of current bankroll?\n\nOnly ratchets UP — never reduces unit size. Considers open positions."))return;
-  const r=await fetch("/api/settings/auto-unit-value",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:true})});
+  const pct=Number($("#autoPctInput").value)||10;
+  if(!window.confirm(`Auto-set 1U to ${pct}% of current bankroll?\n\nOnly ratchets UP — never reduces unit size.`))return;
+  const r=await fetch("/api/settings/auto-unit-value",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:true,pct:pct})});
   const d=await r.json();
   if(d.status==="no_change"){
-    showModal(`<h2>1U unchanged at $${d.current_unit.toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. 10% = $${d.suggested_unit.toFixed(2)} ≤ current $${d.current_unit.toFixed(2)}.</p>`);
+    showModal(`<h2>1U unchanged at $${d.current_unit.toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. ${pct}% = $${d.suggested_unit.toFixed(2)} ≤ current $${d.current_unit.toFixed(2)}.</p>`);
   }else if(d.status==="ok"){
     $("#unitValueInput").value=Number(d.unit_value_usd).toFixed(2);
     await refreshAll();
-    showModal(`<h2 class="green">1U ratcheted to $${Number(d.unit_value_usd).toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. 10% auto-adjusted.</p>`);
+    showModal(`<h2 class="green">1U ratcheted to $${Number(d.unit_value_usd).toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. ${pct}% auto-adjusted.</p>`);
   }else{
     showModal(`<h2 class="red">Error</h2><pre>${esc(d.error||JSON.stringify(d))}</pre>`);
   }
