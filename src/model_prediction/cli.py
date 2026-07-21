@@ -1512,11 +1512,11 @@ def main(argv: list[str] | None = None) -> None:
                 )
             except Exception:
                 wnba_priors_result = {"status": "skipped"}
-            _clear_today_open(ledger, args.date)
+            _clear_today_open(ledger, args.date, by_event_date=True)
             # Also clear and forecast for flat ledger
             flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
             flat_ledger = PickLedger(flat_ledger_path)
-            _clear_today_open(flat_ledger, args.date)
+            _clear_today_open(flat_ledger, args.date, by_event_date=True)
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             soccer_collection = collect_soccer_scores(days_from=3)
             LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
