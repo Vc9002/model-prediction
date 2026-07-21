@@ -987,7 +987,7 @@ def _forecast_research_sport(sport: str, args_date: str, config) -> dict:
 
 
 def _settle_all_unsettled(args, config, ledger) -> dict:
-    """Grade every started open pick from ESPN scoreboards; void postponed if asked."""
+    """Grade every started open pick from ESPN scoreboards or Polymarket resolution."""
     now = utc_now()
     espn = ESPNClient()
     market_store = MarketOddsSnapshotStore(market_odds_snapshot_path(config))
@@ -1002,6 +1002,18 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             continue
         if start > now:
             pending.append(row["pick_id"])
+            continue
+        # Esports: settle via Polymarket contract resolution
+        if row["league"] in ("LOL", "CS2", "DOTA2", "VALORANT"):
+            result = _settle_esports_pick(row, ledger)
+            if result is None:
+                pending.append(row["pick_id"])
+            elif result.get("voided"):
+                voided.append(result["pick_id"])
+            elif result.get("settled"):
+                settled.append(result)
+            else:
+                failures.append(result)
             continue
         leagues = _LEDGER_LEAGUE_TO_ESPN.get(row["league"], ())
         game_day = start.astimezone(EASTERN).date().isoformat()
@@ -1093,6 +1105,58 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
                     record["completed"] = False
             return record
     return None
+
+
+def _settle_esports_pick(row: dict, ledger) -> dict | None:
+    """Settle an esports pick via Polymarket contract resolution. Returns None if pending."""
+    import re
+    from .data_sources.polymarket_us import PolymarketUSClient
+    # Extract market slug from rationale: "... (slug)."
+    rationale = str(row.get("rationale", ""))
+    match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
+    if not match:
+        return {"pick_id": row["pick_id"], "reason": "no market slug in rationale"}
+    slug = match.group(1)
+    try:
+        snap = PolymarketUSClient().snapshot(slug)
+    except Exception as e:
+        return None  # API unavailable, leave pending
+    resolution = snap.get("resolution")
+    if not resolution:
+        return None  # not resolved yet
+    # Determine win/loss: did the team we picked win (contract resolved YES)?
+    outcome = snap.get("outcome", "")
+    # For moneyline: if resolution matches our selection side, it's a win
+    # Contract resolves to the winning team's side
+    selected_team = row["home_team"] if row["selection"] == "home" else row["away_team"]
+    # Get closing price from resolution
+    try:
+        closing_price = float(snap.get("close_price", 0) or 0)
+    except (ValueError, TypeError):
+        closing_price = 0
+    # Determine result
+    if outcome == "Yes":
+        # Contract resolved YES = the listed outcome team won
+        resolved_team = snap.get("question", "").split("?")[0].strip() if "?" in snap.get("question","") else ""
+        is_win = _identity_key(str(selected_team)) in _identity_key(str(resolved_team)) or \
+                 _identity_key(str(resolved_team)) in _identity_key(str(selected_team))
+    else:
+        is_win = False
+    try:
+        result = ledger.settle(
+            row["pick_id"],
+            int(is_win), 0 if is_win else 1,  # away_score, home_score
+            None,  # closing_line
+            None,  # closing_american_odds
+            closing_raw_probability=closing_price if closing_price else None,
+        )
+        return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
+    except Exception as e:
+        return {"pick_id": row["pick_id"], "reason": str(e)}
+
+
+def _identity_key(value: str) -> str:
+    return "".join(c.lower() for c in value if c.isalnum())
 
 
 def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> None:
