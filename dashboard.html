@@ -401,17 +401,17 @@ async function saveUnitValue(){
 window.saveUnitValue=saveUnitValue;
 async function autoUnitValue(){
   const pct=Number($("#autoPctInput").value)||10;
-  if(!window.confirm(`Auto-set 1U to ${pct}% of current bankroll?\n\nOnly ratchets UP — never reduces unit size.`))return;
+  if(!window.confirm(`Auto-set 1U to ${pct}% of your LIVE exchange balance?\n\nMoves both up and down to track the real account.`))return;
   const r=await fetch("/api/settings/auto-unit-value",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:true,pct:pct})});
   const d=await r.json();
   if(d.status==="no_change"){
-    showModal(`<h2>1U unchanged at $${d.current_unit.toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. ${pct}% = $${d.suggested_unit.toFixed(2)} ≤ current $${d.current_unit.toFixed(2)}.</p>`);
+    showModal(`<h2>1U unchanged at $${d.current_unit.toFixed(2)}</h2><p>Live balance: $${d.balance_usd.toFixed(2)}. ${pct}% = $${d.suggested_unit.toFixed(2)}, already current.</p>`);
   }else if(d.status==="ok"){
     $("#unitValueInput").value=Number(d.unit_value_usd).toFixed(2);
     await refreshAll();
-    showModal(`<h2 class="green">1U ratcheted to $${Number(d.unit_value_usd).toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. ${pct}% auto-adjusted.</p>`);
+    showModal(`<h2 class="green">1U ${d.action==="lowered"?"lowered":"raised"} to $${Number(d.unit_value_usd).toFixed(2)}</h2><p>Live balance: $${d.balance_usd.toFixed(2)}. ${pct}% auto-adjusted.</p>`);
   }else{
-    showModal(`<h2 class="red">Error</h2><pre>${esc(d.error||JSON.stringify(d))}</pre>`);
+    showModal(`<h2 class="red">${d.status==="unavailable"?"Live balance unavailable":"Error"}</h2><pre>${esc(d.error||JSON.stringify(d))}</pre>`);
   }
 }
 window.autoUnitValue=autoUnitValue;

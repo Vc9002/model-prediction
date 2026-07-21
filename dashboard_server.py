@@ -1547,12 +1547,15 @@ def preview_order(payload: dict) -> dict:
     if action == "buy" and not decorated["buy_ready"]:
         return {"status": "refused", "error": decorated["buy_block_reason"]}
     try:
-        price = round(float(payload.get("price")), 2)
+        raw_price = float(payload.get("price"))
         size_shares = float(payload.get("size_shares"))
     except (TypeError, ValueError):
         return {"status": "refused", "error": "price and shares must be numeric"}
-    if not 0.01 <= price <= 0.99 or abs(price * 100 - round(price * 100)) > 1e-8:
+    # Validate the tick on the RAW input; rounding first would silently accept
+    # (and change) a sub-cent price the user never confirmed.
+    if not 0.01 <= raw_price <= 0.99 or abs(raw_price * 100 - round(raw_price * 100)) > 1e-8:
         return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
+    price = round(raw_price, 2)
     if not 0 < size_shares <= 100000:
         return {"status": "refused", "error": "shares must be greater than 0 and at most 100,000"}
     estimated_cost = round(price * size_shares, 2)
@@ -1727,12 +1730,13 @@ def preview_position_sell(payload: dict) -> dict:
     if not slug or side not in ("long", "short"):
         return {"status": "refused", "error": "market_slug and side (long|short) are required"}
     try:
-        price = round(float(payload.get("price")), 2)
+        raw_price = float(payload.get("price"))
         size_shares = float(payload.get("size_shares"))
     except (TypeError, ValueError):
         return {"status": "refused", "error": "price and shares must be numeric"}
-    if not 0.01 <= price <= 0.99 or abs(price * 100 - round(price * 100)) > 1e-8:
+    if not 0.01 <= raw_price <= 0.99 or abs(raw_price * 100 - round(raw_price * 100)) > 1e-8:
         return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
+    price = round(raw_price, 2)
     if not 0 < size_shares <= 1_000_000:
         return {"status": "refused", "error": "shares must be greater than 0"}
     portfolio = live_portfolio_view()
@@ -2225,59 +2229,48 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def _auto_adjust_unit_value(pct: float = 10.0) -> dict:
-    """Set unit value to pct% of current bankroll. Only ratchets up, never down."""
+    """Set 1U to pct% of the LIVE exchange USD balance, moving up or down.
+
+    The exchange balance is the only honest bankroll number: revaluing
+    historical unit P&L at the current unit value (the previous approach)
+    was circular and compounded the unit on every win. When the live
+    account is unreachable the unit value is left unchanged.
+    """
     fraction = max(0.01, min(0.50, pct / 100.0))  # clamp 1-50%
-    bankroll = _compute_bankroll()
-    suggested = round(bankroll * fraction, 2)
+    portfolio = live_portfolio_view()
+    if portfolio.get("status") != "live":
+        return {
+            "status": "unavailable",
+            "error": (
+                "live exchange balance unreachable: "
+                + str(portfolio.get("error") or "authentication required")
+            ),
+            "note": "Unit value unchanged; auto-sizing requires the real account balance.",
+        }
+    balance = _number((portfolio.get("balance") or {}).get("current_usd"), None)
+    if balance is None or balance <= 0:
+        return {
+            "status": "unavailable",
+            "error": "exchange returned no positive USD balance",
+            "note": "Unit value unchanged.",
+        }
+    suggested = round(balance * fraction, 2)
     current = _unit_value_usd()
-    # Only increase — ratchet up, never shrink
-    if suggested <= current:
+    if abs(suggested - current) < 0.01:
         return {
             "status": "no_change",
-            "bankroll_usd": round(bankroll, 2),
+            "balance_usd": round(balance, 2),
             "current_unit": current,
             "suggested_unit": suggested,
-            "note": "Bankroll at $" + f"{bankroll:,.2f}" + f", {pct:.1f}% = $" + f"{suggested:.2f}" + " <= current $" + f"{current:.2f}" + ". No change.",
+            "note": f"{pct:.1f}% of ${balance:,.2f} = ${suggested:.2f}, already current.",
         }
     try:
         result = _set_unit_value_usd(suggested)
-        result["bankroll_usd"] = round(bankroll, 2)
-        result["action"] = "ratchet_up"
+        result["balance_usd"] = round(balance, 2)
+        result["action"] = "raised" if suggested > current else "lowered"
         return result
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-def _compute_bankroll() -> float:
-    """Compute bankroll: starting + settled P&L from main ledger."""
-    import openpyxl as _xl
-    uv = _unit_value_usd()
-    # Read starting bankroll from config
-    try:
-        cfg = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
-        starting = float((cfg.get("bankroll") or {}).get("starting_bankroll_usd", max(100 * uv, 500.0)))
-    except Exception:
-        starting = max(100 * uv, 500.0)
-    total_pnl_usd = 0.0
-    open_pnl_usd = 0.0
-    path = ROOT / "data" / "picks.xlsx"
-    if path.exists():
-        try:
-            wb = _xl.load_workbook(path, data_only=True)
-            ws = wb["Picks"] if "Picks" in wb.sheetnames else wb[wb.sheetnames[0]]
-            headers = {str(ws.cell(1, c).value or ""): c for c in range(1, ws.max_column + 1)}
-            if "pnl_units" in headers and "status" in headers:
-                for r in range(2, ws.max_row + 1):
-                    status = str(ws.cell(r, headers["status"]).value or "")
-                    pnl = float(ws.cell(r, headers["pnl_units"]).value or 0)
-                    if status == "settled":
-                        total_pnl_usd += pnl * uv
-                    elif status == "open":
-                        open_pnl_usd += pnl * uv
-            wb.close()
-        except Exception:
-            pass
-    return starting + total_pnl_usd + open_pnl_usd
+    except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
+        return {"status": "error", "error": str(error)}
 
 
 def today_picks(day: str) -> dict:

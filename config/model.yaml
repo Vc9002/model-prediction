@@ -85,8 +85,8 @@ data_sources:
 execution:
   status: hard_gated
   allow_manual_research_orders: true
-  manual_research_require_active_model: false
-  manual_research_require_positive_edge: false
+  manual_research_require_active_model: true
+  manual_research_require_positive_edge: true
   requirements:
   - explicit user execute command in the current turn
   - --execute CLI flag
@@ -172,6 +172,9 @@ models:
     status: shadow_qualified
     origin: statistical_model
     active_production_version: wnba-elo-trend-lr-v3
+    # min_edge 0.0 is DELIBERATE (2026-07-21): a 2026-07 experiment showed the
+    # WNBA model's directional accuracy holds without an edge floor. Do not
+    # "fix" this to 0.02 without a new experiment.
     min_edge: 0.0
     production_artifact: config/models/wnba-elo-trend-lr-v3.json
     protected_versions:

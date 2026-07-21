@@ -724,7 +724,8 @@ def _forecast_learned_sport(
     if log and to_log and registry is not None and bans is not None and ledger is not None:
         data_root = Path(ledger_path(config)).parent
         observed_at = utc_now()
-        # All logged picks carry edge-scaled units — no shadow/research calls.
+        # Main ledger: units come from evaluate_eligibility (fail-closed).
+        # Flat ledger: every game gets diagnostic edge-scaled units.
         configured_state = str(model_config.get("status", "research"))
         for candidate in to_log:
             quote = match_executable_quote(data_root, sport, args_date, candidate)
@@ -801,10 +802,13 @@ def _forecast_learned_sport(
                     ),
                     unit_policy(config), **eligibility_kwargs,
                 )
-                # No shadow picks: force edge-scaled units if eligibility returned 0
-                if eligibility.units <= 0:
-                    from .units import edge_scaled_units as _esu
-                    forced_units = _esu(
+                # Flat mode only: assign diagnostic edge-scaled units so the
+                # separate flat ledger's one-unit accounting stays comparable.
+                # The MAIN ledger honors evaluate_eligibility exactly — a gate
+                # that returned 0 units did so for a reason (staleness,
+                # disagreement, exposure caps) and must never be overridden.
+                if flat_mode and eligibility.units <= 0:
+                    forced_units = edge_scaled_units(
                         candidate.model_probability,
                         request.model_uncertainty or 0.05,
                         request.american_odds,
@@ -871,18 +875,25 @@ def _log_esports_forecast(
     ledger: Any,
     flat_mode: bool = False,
 ) -> int:
-    """Log esports forecast results to a PickLedger. Returns count of logged rows."""
-    from .domain import League, MarketType, PickRequest, ModelOrigin, ModelState
-    from .eligibility import EligibilityResult
-    from .entities import CanonicalTeam
+    """Log esports contracts through the real eligibility gates.
+
+    Esports promotion to shadow_qualified units is a DELIBERATE config
+    decision (models.<TITLE>.status). This path enforces the same gates as
+    every other sport — staleness, model/market disagreement, exposure caps,
+    and unit-engine sizing — via ``evaluate_esports_eligibility``. Entity and
+    ban resolution is name-based because esports teams are not yet in the
+    canonical registry. Returns the count of logged rows.
+    """
     from .data_sources.polymarket_us import probability_to_american
+    from .eligibility import evaluate_esports_eligibility
 
     logged = 0
     model_config = config["models"].get(forecast["title"].upper(), {})
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = str(model_config.get("status", "shadow_qualified"))
+    configured_state = str(model_config.get("status", "research"))
     title = forecast["title"].upper()
     league = League(title)
+    observed_now = utc_now()
 
     for contract in forecast.get("priced_contracts", []):
         # Only log the model's pick: the side with higher model probability
@@ -899,8 +910,9 @@ def _log_esports_forecast(
             continue
 
         selected_team = str(best_side["team"])
-        # Use Polymarket's teams ordering for home/away; selection reflects
-        # which side we're picking (can be home or away).
+        # Polymarket side ordering is arbitrary for venue-neutral esports;
+        # teams[0]/teams[1] map to ledger home/away consistently with
+        # settlement, which reconstructs the selected team the same way.
         teams = list(contract["teams"])
         home_team = teams[0]
         away_team = teams[1]
@@ -921,37 +933,55 @@ def _log_esports_forecast(
             model_probability=round(model_prob, 6),
             model_uncertainty=None,
             model_version=str(forecast["model_version"]),
-            rationale=f"Neutral Elo baseline; executable ask {ask:.4f} ({contract['market_slug']}).",
-            risks="Research baseline; zero-unit shadow until qualified.",
+            rationale=(
+                f"Neutral Elo baseline; executable ask {ask:.4f} "
+                f"(market_slug={contract['market_slug']})."
+            ),
+            risks="Config-promoted esports baseline; gates enforced at log time.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState(configured_state),
+            observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="neutral_elo",
             calibration_version=str(forecast["model_version"]),
             calibration_artifact_hash=str(contract.get("artifact_hash", "")),
+            code_revision=str(forecast["model_version"]),
         )
-
-        away_ct = CanonicalTeam(away_team, league, away_team, away_team, True, None, None, ())
-        home_ct = CanonicalTeam(home_team, league, home_team, home_team, True, None, None, ())
-
-        units = edge_scaled_units(model_prob, 0.05, american_odds, unit_policy(config))
-        eligibility = EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
-            "CALL",
-            "QUALIFIED",
-            units,
-            min(100, max(0, int(edge * 1000))),
-            edge,
-            edge - 0.05,
-            away_ct,
-            home_ct,
-        )
-
         try:
-            ledger.append_evaluated(request, eligibility)
+            request.validate(now=observed_now)
+            exposure = ledger.exposure(request, now=observed_now)
+            eligibility = evaluate_esports_eligibility(
+                request,
+                exposure,
+                unit_policy(config),
+                now=observed_now,
+                maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                maximum_unreviewed_disagreement=float(
+                    config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                ),
+            )
+            if flat_mode and eligibility.units <= 0:
+                # Flat ledger: diagnostic edge-scaled sizing, same as the
+                # learned-sport flat path.
+                from .eligibility import EligibilityResult as _ER
+                eligibility = _ER(
+                    eligibility.record_type,
+                    eligibility.decision,
+                    eligibility.reason_code,
+                    edge_scaled_units(model_prob, 0.05, american_odds, unit_policy(config)),
+                    eligibility.confidence_score,
+                    eligibility.edge,
+                    eligibility.adjusted_edge,
+                    eligibility.away_team,
+                    eligibility.home_team,
+                )
+            with _LEDGER_LOCK:
+                ledger.append_evaluated(request, eligibility, now=observed_now)
             logged += 1
-        except Exception:
-            pass
+        except DuplicatePickError:
+            continue
+        except (ValueError, KeyError):
+            continue
 
     return logged
 

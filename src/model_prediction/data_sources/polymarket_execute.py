@@ -131,6 +131,13 @@ class PolymarketExecutor:
         # Gate 5 is upstream (unit engine sized the pick); re-assert sanity.
         if ticket.size_shares <= 0 or not 0 < ticket.price < 1:
             raise ExecutionGateError("REFUSED: order size/price failed sanity checks.")
+        # The exchange prices in whole cents. A sub-cent limit must be refused,
+        # never silently rounded — rounding changes the user-confirmed price.
+        if abs(ticket.price * 100 - round(ticket.price * 100)) > 1e-9:
+            raise ExecutionGateError(
+                f"REFUSED: limit price {ticket.price} is not a whole-cent tick; "
+                "resubmit at a 0.01 increment."
+            )
         if (
             ticket.maximum_cost_usd is not None
             and ticket.estimated_cost_usd > ticket.maximum_cost_usd + 0.005
