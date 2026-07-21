@@ -2969,70 +2969,63 @@ def _model_version_rank(row: dict) -> tuple:
 
 
 def dedupe_ledger() -> dict:
-    """Physically remove duplicate ledger rows from picks.xlsx.
+    """Remove duplicate OPEN ledger rows through the audited ledger path.
 
     A duplicate = same contract identity (league/event/market/selection/line)
-    logged under more than one model version or run. Keeps exactly one row per
-    identity — the newest model version — and DELETES the rest from the file.
-    picks.xlsx is backed up first (picks.xlsx.dedupe-bak-<ts>). Rows carrying
-    real units are never deleted. Archived-hidden ids are pruned to match.
+    logged under more than one model version or run. Keeps one row per
+    identity — the newest model version — and removes the rest via
+    ``PickLedger.remove_open_rows`` (ledger lock + ``pick_removed`` audit
+    events). Settled rows are results and are never touched; staked open rows
+    are never deleted. picks.xlsx is backed up first.
     """
-    from model_prediction.ledger import FIELDNAMES  # local: heavy import
-    from model_prediction.xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
+    from model_prediction.ledger import PickLedger  # local: heavy import
 
     path = DATA / "picks.xlsx"
     if not path.exists():
         return {"status": "refused", "error": "picks.xlsx not found"}
-    headers, rows = read_xlsx_rows(path)
-    if headers != FIELDNAMES:
-        return {"status": "refused",
-                "error": "picks.xlsx schema does not match this code version; not touching it"}
+    ledger = PickLedger(path, DATA / "events.jsonl")
+    try:
+        rows = ledger.rows()
+    except ValueError as error:
+        return {"status": "refused", "error": str(error)}
     groups: dict[tuple, list[dict]] = {}
     for row in rows:
+        if row.get("status") != "open":
+            continue
         groups.setdefault(_pick_identity(row), []).append(row)
-    keep: list[dict] = []
-    removed = 0
-    removed_ids: list[str] = []
+    to_remove: list[str] = []
     for members in groups.values():
         if len(members) == 1:
-            keep.append(members[0])
             continue
-        # Never delete a row with real staked units; keep every staked row.
-        staked = [m for m in members if _number(m.get("units")) > 0]
         unstaked = [m for m in members if _number(m.get("units")) <= 0]
-        survivors = list(staked)
-        if unstaked:
-            survivors.append(max(unstaked, key=_model_version_rank))
-        keep_ids = {id(m) for m in survivors}
-        for member in members:
-            if id(member) in keep_ids:
-                keep.append(member)
-            else:
-                removed += 1
-                removed_ids.append(str(member.get("pick_id") or ""))
-    if removed == 0:
-        return {"status": "ok", "removed": 0, "kept": len(keep),
-                "note": "No duplicate contracts found."}
+        if not unstaked:
+            continue
+        survivor = max(unstaked, key=_model_version_rank)
+        to_remove.extend(
+            str(m.get("pick_id") or "") for m in unstaked if m is not survivor
+        )
+    if not to_remove:
+        return {"status": "ok", "removed": 0, "kept": len(rows),
+                "note": "No open duplicate contracts found."}
     backup = path.with_suffix(f".xlsx.dedupe-bak-{int(time.time())}")
     import shutil
 
     shutil.copy2(path, backup)
-    keep.sort(key=lambda r: str(r.get("created_at_utc") or ""))
-    write_xlsx_rows_atomic(path, FIELDNAMES, keep)
+    removed_ids = ledger.remove_open_rows(to_remove, reason="dashboard duplicate-contract dedupe")
     # Prune archived ids that no longer exist so the counter stays honest.
+    surviving = {str(r.get("pick_id")) for r in ledger.rows()}
     archive = _load_archive()
-    surviving = {str(r.get("pick_id")) for r in keep}
     archive["pick_ids"] = sorted(pid for pid in archive["pick_ids"] if pid in surviving)
     archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
-                               "action": "dedupe", "rows": removed})
+                               "action": "dedupe", "rows": len(removed_ids)})
     _save_archive(archive)
     with _CACHE_LOCK:
         _CACHE.clear()
-    _PICKS_CACHE["mtime"] = None
-    _log(f"dedupe: removed {removed} duplicate rows, backup {backup.name}")
-    return {"status": "ok", "removed": removed, "kept": len(keep),
+        _PICKS_CACHE["mtime"] = None
+    _log(f"dedupe: removed {len(removed_ids)} open duplicate rows, backup {backup.name}")
+    return {"status": "ok", "removed": len(removed_ids), "kept": len(surviving),
             "backup": backup.name, "removed_pick_ids": removed_ids[:50],
-            "note": f"Physically removed {removed} duplicate rows. Original backed up to {backup.name}."}
+            "note": f"Removed {len(removed_ids)} open duplicates via the audited ledger path. Backup: {backup.name}."}
 
 
 def _load_archive() -> dict:

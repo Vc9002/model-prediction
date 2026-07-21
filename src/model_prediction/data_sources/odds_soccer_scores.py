@@ -3,11 +3,13 @@ Appends to the existing historical soccer JSONL file.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
 from typing import Any
 
+from ..config import PROJECT_ROOT
 from .the_odds_api import TheOddsAPIClient
 
 # The Odds API sport keys for smaller Polymarket soccer leagues.
@@ -31,10 +33,12 @@ ODDS_SOCCER_KEYS: dict[str, str] = {
 
 def collect_soccer_scores(
     api_key: str | None = None,
-    data_root: str | Path = "data",
+    data_root: str | Path | None = None,
     days_from: int = 3,
 ) -> dict[str, Any]:
     """Fetch recent scores for all configured soccer leagues from The Odds API."""
+    if data_root is None:
+        data_root = PROJECT_ROOT / "data"
     if api_key is None:
         api_key = os.environ.get("THE_ODDS_API_KEY", "")
     if not api_key:
@@ -86,7 +90,11 @@ def collect_soccer_scores(
                 if home_score is None or away_score is None:
                     continue
 
-                event_id = f"oddsapi:{odds_key}:{commence[:10]}:{hash(home + away) & 0xFFFFFFFF:08x}"
+                # Deterministic digest: Python's built-in hash() is randomized
+                # per process, which made every daily run mint a NEW id for the
+                # same game and re-append it (dedup never fired across runs).
+                digest = hashlib.sha1(f"{home}|{away}".encode("utf-8")).hexdigest()[:8]
+                event_id = f"oddsapi:{odds_key}:{commence[:10]}:{digest}"
                 if event_id in existing_ids:
                     continue
 

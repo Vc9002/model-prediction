@@ -524,6 +524,11 @@ def parser() -> argparse.ArgumentParser:
         help="run the model_improvements.md section-13 verification checklist for a sport",
     )
     checklist.add_argument("--sport", required=True)
+
+    commands.add_parser(
+        "verify-chain",
+        help="verify audit-chain link/hash integrity and ledger<->audit reconciliation",
+    )
     return root
 
 
@@ -1189,37 +1194,25 @@ def _identity_key(value: str) -> str:
     return "".join(c.lower() for c in value if c.isalnum())
 
 
-def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> None:
-    """Remove all open picks created on the given date before re-forecasting.
-    
+def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> list[str]:
+    """Remove open picks for a date before re-forecasting, via the audited path.
+
     When by_event_date is True, also removes open picks whose event_start_utc
     matches date_str — used for flat ledger to prevent duplicate forecast runs.
+    All removals go through ``PickLedger.remove_open_rows`` so they hold the
+    ledger lock and append ``pick_removed`` audit events.
     """
-    rows = ledger.rows()
     to_remove = []
-    for row in rows:
+    for row in ledger.rows():
         if row.get("status") != "open":
             continue
         created = str(row.get("created_at_utc", "") or "")
         event = str(row.get("event_start_utc", "") or "")
-        if created.startswith(date_str):
+        if created.startswith(date_str) or (by_event_date and event.startswith(date_str)):
             to_remove.append(row["pick_id"])
-        elif by_event_date and event.startswith(date_str):
-            to_remove.append(row["pick_id"])
-    if to_remove:
-        # Use openpyxl directly since ledger has no remove method
-        import openpyxl as _xl
-        wb = _xl.load_workbook(ledger.path)
-        ws = wb[wb.sheetnames[0] if wb.sheetnames else "Picks"]
-        headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
-        pid_col = headers.index("pick_id") + 1 if "pick_id" in headers else 1
-        rows_to_delete = []
-        for r in range(2, ws.max_row + 1):
-            if str(ws.cell(r, pid_col).value or "") in to_remove:
-                rows_to_delete.append(r)
-        for r in reversed(rows_to_delete):
-            ws.delete_rows(r)
-        wb.save(ledger.path)
+    if not to_remove:
+        return []
+    return ledger.remove_open_rows(to_remove, reason=f"re-forecast replacement for {date_str}")
 
 
 def _drift_check(settled_qualified: list, config: dict) -> dict:
@@ -2028,6 +2021,8 @@ def main(argv: list[str] | None = None) -> None:
                 "results": [vars(result) for result in results],
                 "formatted": format_checklist(results),
             }
+        elif args.command == "verify-chain":
+            output = _verify_chain(audit_path(config), ledger)
         elif args.command == "score-research":
             if bool(args.pick_ids) == bool(args.all_research):
                 raise ValueError("provide either --pick-id or --all-research")
@@ -2142,6 +2137,61 @@ def main(argv: list[str] | None = None) -> None:
         else:
             reason = "NO_CALL_EVENT_STARTED" if "started" in str(error) else "NO_CALL_INVALID_MARKET"
         _fail(str(error), reason)
+
+
+def _verify_chain(events_path, ledger) -> dict:
+    """Audit-chain link/hash verification plus ledger<->audit reconciliation."""
+    import hashlib
+
+    previous = "0" * 64
+    lines = 0
+    breaks: list[dict] = []
+    created: set[str] = set()
+    removed: set[str] = set()
+    path = Path(events_path)
+    if path.exists():
+        with path.open(encoding="utf-8") as handle:
+            for number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                lines += 1
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    breaks.append({"line": number, "kind": "unparseable"})
+                    continue
+                if event.get("previous_hash") != previous:
+                    breaks.append({"line": number, "kind": "broken_link"})
+                canonical = {key: value for key, value in event.items() if key != "event_hash"}
+                digest = hashlib.sha256(
+                    json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+                ).hexdigest()
+                if digest != event.get("event_hash"):
+                    breaks.append({"line": number, "kind": "hash_mismatch"})
+                previous = event.get("event_hash", previous)
+                event_type = event.get("event_type")
+                if event_type in ("pick_created", "research_observation_created"):
+                    created.add(str(event.get("subject_id")))
+                elif event_type == "pick_removed":
+                    removed.add(str(event.get("subject_id")))
+    ledger_ids = {row["pick_id"] for row in ledger.rows()}
+    deleted_unaudited = created - removed - ledger_ids
+    return {
+        "audit_lines": lines,
+        "breaks": breaks,
+        "break_count": len(breaks),
+        "ledger_rows": len(ledger_ids),
+        "audited_created": len(created),
+        "audited_removed": len(removed),
+        "rows_missing_creation_event": sorted(ledger_ids - created),
+        "created_but_absent_without_removal_event": len(deleted_unaudited),
+        "chain_intact": not breaks,
+        "reconciled": not deleted_unaudited and not (ledger_ids - created),
+        "note": (
+            "created_but_absent_without_removal_event counts historical deletions "
+            "made before the audited remove_open_rows path existed."
+        ),
+    }
 
 
 def _handle_ban(args: argparse.Namespace, bans: TeamBanList) -> object:
