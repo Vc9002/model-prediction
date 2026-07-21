@@ -2121,6 +2121,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("flat-picks", 30, _flat_picks_decorated))
             elif route == "/api/performance":
                 self._send(_cached("performance", 30, lambda: performance(read_picks())))
+            elif route == "/api/flat-performance":
+                flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
+                self._send(_cached("flat-performance", 30, lambda: performance(flat)))
             elif route == "/api/backtests":
                 self._send(_cached("backtests", 60, backtests))
             elif route == "/api/backtest":
@@ -2214,8 +2217,65 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_set_unit_value_usd(payload.get("unit_value_usd")))
             except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
+        elif parsed.path == "/api/settings/auto-unit-value":
+            self._send(_auto_adjust_unit_value())
         else:
             self._send({"error": "unknown route"}, code=404)
+
+
+def _auto_adjust_unit_value() -> dict:
+    """Set unit value to 10% of current bankroll. Only ratchets up, never down."""
+    bankroll = _compute_bankroll()
+    suggested = round(bankroll * 0.10, 2)
+    current = _unit_value_usd()
+    # Only increase — ratchet up, never shrink
+    if suggested <= current:
+        return {
+            "status": "no_change",
+            "bankroll_usd": round(bankroll, 2),
+            "current_unit": current,
+            "suggested_unit": suggested,
+            "note": "Bankroll at $" + f"{bankroll:,.2f}" + ", 10% = $" + f"{suggested:.2f}" + " <= current $" + f"{current:.2f}" + ". No change.",
+        }
+    try:
+        result = _set_unit_value_usd(suggested)
+        result["bankroll_usd"] = round(bankroll, 2)
+        result["action"] = "ratchet_up"
+        return result
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+def _compute_bankroll() -> float:
+    """Compute bankroll: starting + settled P&L from main ledger."""
+    import openpyxl as _xl
+    uv = _unit_value_usd()
+    # Read starting bankroll from config
+    try:
+        cfg = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
+        starting = float((cfg.get("bankroll") or {}).get("starting_bankroll_usd", max(100 * uv, 500.0)))
+    except Exception:
+        starting = max(100 * uv, 500.0)
+    total_pnl_usd = 0.0
+    open_pnl_usd = 0.0
+    path = ROOT / "data" / "picks.xlsx"
+    if path.exists():
+        try:
+            wb = _xl.load_workbook(path, data_only=True)
+            ws = wb["Picks"] if "Picks" in wb.sheetnames else wb[wb.sheetnames[0]]
+            headers = {str(ws.cell(1, c).value or ""): c for c in range(1, ws.max_column + 1)}
+            if "pnl_units" in headers and "status" in headers:
+                for r in range(2, ws.max_row + 1):
+                    status = str(ws.cell(r, headers["status"]).value or "")
+                    pnl = float(ws.cell(r, headers["pnl_units"]).value or 0)
+                    if status == "settled":
+                        total_pnl_usd += pnl * uv
+                    elif status == "open":
+                        open_pnl_usd += pnl * uv
+            wb.close()
+        except Exception:
+            pass
+    return starting + total_pnl_usd + open_pnl_usd
 
 
 def today_picks(day: str) -> dict:

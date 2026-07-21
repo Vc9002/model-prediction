@@ -140,7 +140,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span class="chip dim" id="updatedTxt">Updated: —</span>
   <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
   <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
-  <label class="chip" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button></label>
+   <label class="chip" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><button onclick="autoUnitValue()" title="Set 1U to 10% of bankroll (ratchets up only)">10%</button></label>
   <span style="flex:1"></span>
   <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button onclick="bootstrapDialog()">Bootstrap</button>
@@ -158,6 +158,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <button data-tab="market">Market</button>
     <button data-tab="research">Research</button>
     <button data-tab="flat">Flat</button>
+    <button data-tab="flat-perf">Flat Perf</button>
     <button data-tab="settings">Settings</button>
   </div>
 
@@ -299,6 +300,19 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <table class="data" id="flatTable"><tr><td>Loading…</td></tr></table>
     </div>
   </section>
+  <section id="tab-flat-perf" style="display:none">
+    <div class="card">
+      <h2>Flat Performance — All Games (No Edge Gate)</h2>
+      <div class="small dim" style="margin-bottom:8px">Settled picks from flat_picks.xlsx. Same metrics as main Performance tab.</div>
+      <div id="flatPerfKpis" class="kpis" style="margin-bottom:16px"></div>
+      <div class="two-col">
+        <div><canvas id="flatPerfChart" height="180"></canvas></div>
+        <div><table class="data" id="flatPerfSport"></table></div>
+      </div>
+      <div style="margin-top:16px"><table class="data" id="flatPerfBucket"></table></div>
+      <div class="small dim" style="margin-top:8px" id="flatPerfMonthly"></div>
+    </div>
+  </section>
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -342,7 +356,8 @@ const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
 /* ---------- tabs ---------- */
 $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
-  $("#tab-"+b.dataset.tab).style.display=""; updateCounts(); });
+  $("#tab-"+b.dataset.tab).style.display=""; updateCounts();
+  if(b.dataset.tab==="flat-perf")renderFlatPerf(); });
 
 /* ---------- settings ---------- */
 function applySettings(){
@@ -384,6 +399,21 @@ async function saveUnitValue(){
   showModal(`<h2 class="green">1U = $${Number(result.unit_value_usd).toFixed(2)}</h2><p>Future dollar displays and order sizing now use this value. Historical units are unchanged.</p>`);
 }
 window.saveUnitValue=saveUnitValue;
+async function autoUnitValue(){
+  if(!window.confirm("Auto-set 1U to 10% of current bankroll?\n\nOnly ratchets UP — never reduces unit size. Considers open positions."))return;
+  const r=await fetch("/api/settings/auto-unit-value",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:true})});
+  const d=await r.json();
+  if(d.status==="no_change"){
+    showModal(`<h2>1U unchanged at $${d.current_unit.toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. 10% = $${d.suggested_unit.toFixed(2)} ≤ current $${d.current_unit.toFixed(2)}.</p>`);
+  }else if(d.status==="ok"){
+    $("#unitValueInput").value=Number(d.unit_value_usd).toFixed(2);
+    await refreshAll();
+    showModal(`<h2 class="green">1U ratcheted to $${Number(d.unit_value_usd).toFixed(2)}</h2><p>Bankroll: $${d.bankroll_usd.toFixed(2)}. 10% auto-adjusted.</p>`);
+  }else{
+    showModal(`<h2 class="red">Error</h2><pre>${esc(d.error||JSON.stringify(d))}</pre>`);
+  }
+}
+window.autoUnitValue=autoUnitValue;
 
 /* ---------- status bar ---------- */
 function renderStatus(s){
@@ -920,6 +950,27 @@ function renderPerf(p){
     current <b>${s.current>0?"W"+s.current:s.current<0?"L"+(-s.current):"—"}</b><br>
     mean probability CLV <b>${p.mean_clv??"—"}</b><br>
     settled sample <b>${p.settled??0}</b>`;
+}
+
+async function renderFlatPerf(){
+  let p;
+  try{p=await api("/api/flat-performance");}catch(e){$("#flatPerfKpis").innerHTML='<div class="red small">server unreachable</div>';return;}
+  if(!p||!p.settled){$("#flatPerfKpis").innerHTML='<div class="dim">No settled flat picks yet.</div>';return;}
+  const wr=p.wins/p.calls*100;
+  $("#flatPerfKpis").innerHTML=`
+    <div class="k"><b>${p.calls}</b><span>settled</span></div>
+    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
+    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
+    <div class="k"><b>${(p.roi||0).toFixed(1)}%</b><span>ROI</span></div>`;
+  lineChart("#flatPerfChart",p.pnl_curve||[]);
+  const bs=Object.entries(p.by_sport||{});
+  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#flatPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Win%</th><th>PnL</th></tr>${rows}`;
+  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
+  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td></tr>`;}).join("");
+  $("#flatPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Win%</th></tr>${bb}`;
+  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
+  $("#flatPerfMonthly").textContent=mm.join(" · ");
 }
 
 /* ---------- Today tab ---------- */
