@@ -574,14 +574,13 @@ def forecast_esports_slate(
     aliases = _team_alias_index(teams)
     market_client = client or PolymarketUSClient()
     league = str(TITLE_SPECS[title]["polymarket_league"])
-    # Fetch a 3-day window (yesterday, today, tomorrow) to capture all open
-    # contracts — Polymarket lists events by start date, and many contracts
-    # are created days before their event date.
+    # Fetch today + tomorrow to capture all open contracts without stale
+    # yesterday events that may have already resolved or expired.
     from datetime import timedelta
     base_date = date.fromisoformat(game_date)
     events: list[dict[str, Any]] = []
     seen_event_ids: set[str] = set()
-    for offset in (-1, 0, 1):
+    for offset in (0, 1):
         day = base_date + timedelta(days=offset)
         for event in market_client.slate(league, day, timezone_name):
             eid = str(event.get("event_id", ""))
