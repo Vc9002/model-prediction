@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-18T01:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -5.12091,
+      "player_name": "Alyssa Thomas",
+      "projected_minutes": 27.308397,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 9,
+      "source_minutes": 303.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.532182,
+      "player_name": "DeWanna Bonner",
+      "projected_minutes": 18.990322,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 10,
+      "source_minutes": 237.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.26087,
+      "player_name": "Jovana Nogic",
+      "projected_minutes": 12.450955,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 10,
+      "source_minutes": 175.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -5.835735,
+      "player_name": "Kahleah Copper",
+      "projected_minutes": 25.163484,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 9,
+      "source_minutes": 294.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.114155,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 9.416688,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 3,
+      "source_minutes": 38.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.515152,
+      "player_name": "Kyara Linskens",
+      "projected_minutes": 9.521318,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 5,
+      "source_minutes": 62.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.359223,
+      "player_name": "Lexi Held",
+      "projected_minutes": 17.525504,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 6,
+      "source_minutes": 115.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.976744,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 8.108815,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 3,
+      "source_minutes": 30.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.800327,
+      "player_name": "Monique Akoa Makani",
+      "projected_minutes": 21.030604,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 8,
+      "source_minutes": 211.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.283105,
+      "player_name": "Natasha Mack",
+      "projected_minutes": 22.076903,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 10,
+      "source_minutes": 257.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -4.009434,
+      "player_name": "Noemie Brochant",
+      "projected_minutes": 19.356526,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 10,
+      "source_minutes": 236.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.771363,
+      "player_name": "Quionche Carter",
+      "projected_minutes": 4.656029,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 5,
+      "source_minutes": 33.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sami Whitcomb",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shay Ciezki",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.144165,
+      "player_name": "Valeriane Ayayi",
+      "projected_minutes": 4.394455,
+      "replacement_impact_points_per_100": -3.532182,
+      "source_games": 6,
+      "source_minutes": 37.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 1.834239,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 30.022215,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 10,
+      "source_minutes": 336.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.105263,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 5.712472,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 9,
+      "source_minutes": 75.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.872483,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 31.609013,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 10,
+      "source_minutes": 345.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 1.01833,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 10.345922,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 6,
+      "source_minutes": 91.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 12.059664,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 7,
+      "source_minutes": 73.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dana Evans",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.551724,
+      "player_name": "Jackie Young",
+      "projected_minutes": 30.276103,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 10,
+      "source_minutes": 325.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -3.605769,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 26.53126,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 8,
+      "source_minutes": 224.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.520833,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 10.028562,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 7,
+      "source_minutes": 80.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.691244,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 24.055855,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 10,
+      "source_minutes": 251.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.838926,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 19.358934,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 10,
+      "source_minutes": 196.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.105263,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Las Vegas Aces": {
+      "normalization_scale": 0.952079,
+      "players": 15,
+      "players_with_minutes": 10,
+      "raw_projected_minutes": 210.066667,
+      "replacement_impact_points_per_100": -0.105263
+    },
+    "Phoenix Mercury": {
+      "normalization_scale": 0.784724,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 254.866667,
+      "replacement_impact_points_per_100": -3.532182
+    }
+  },
+  "valid_from": "2026-06-18",
+  "valid_through": "2026-06-18"
+}

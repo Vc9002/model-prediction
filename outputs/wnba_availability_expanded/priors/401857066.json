@@ -1,0 +1,280 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-14T14:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -3.820034,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 15.813455,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 10,
+      "source_minutes": 189.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 1.578947,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 9.595283,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 5,
+      "source_minutes": 75.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.987654,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 4.02037,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.520833,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 22.567676,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 7,
+      "source_minutes": 176.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.699844,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 22.728491,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 10,
+      "source_minutes": 243.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.241935,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 18.922541,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 10,
+      "source_minutes": 220.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.847575,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 5.950147,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 5,
+      "source_minutes": 33.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.611247,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 7.236666,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 1,
+      "source_minutes": 9.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.384615,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 19.136961,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 10,
+      "source_minutes": 250.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.147776,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 25.247923,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 10,
+      "source_minutes": 297.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.458333,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 9.166443,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 8,
+      "source_minutes": 80.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.507837,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 21.334763,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 10,
+      "source_minutes": 238.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.32967,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 7.82632,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 7,
+      "source_minutes": 55.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.900901,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 10.452962,
+      "replacement_impact_points_per_100": -1.147776,
+      "source_games": 8,
+      "source_minutes": 155.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.409154,
+      "player_name": "Bridget Carleton",
+      "projected_minutes": 27.255588,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 10,
+      "source_minutes": 321.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.172876,
+      "player_name": "Carla Leite",
+      "projected_minutes": 21.492055,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 10,
+      "source_minutes": 271.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.940994,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 21.599785,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 10,
+      "source_minutes": 244.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.609929,
+      "player_name": "Frieda Buhner",
+      "projected_minutes": 13.897118,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 10,
+      "source_minutes": 164.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.252847,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 5.978993,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 6,
+      "source_minutes": 39.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.595238,
+      "player_name": "Jordan Harrison",
+      "projected_minutes": 7.271748,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 2,
+      "source_minutes": 20.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -5.974843,
+      "player_name": "Karlie Samuelson",
+      "projected_minutes": 9.534069,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 6,
+      "source_minutes": 77.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.928416,
+      "player_name": "Luisa Geiselsoder",
+      "projected_minutes": 9.210881,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 5,
+      "source_minutes": 61.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.175775,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 23.754377,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 10,
+      "source_minutes": 277.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.464684,
+      "player_name": "Nyadiew Puoch",
+      "projected_minutes": 14.758955,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 9,
+      "source_minutes": 138.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.285714,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 24.723943,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 9,
+      "source_minutes": 265.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.8,
+      "player_name": "Serah Williams",
+      "projected_minutes": 8.995421,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 10,
+      "source_minutes": 100.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.41556,
+      "player_name": "Teja Oblak",
+      "projected_minutes": 11.527067,
+      "replacement_impact_points_per_100": -4.285714,
+      "source_games": 10,
+      "source_minutes": 127.0,
+      "team": "Portland Fire"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.804074,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 248.733333,
+      "replacement_impact_points_per_100": -1.147776
+    },
+    "Portland Fire": {
+      "normalization_scale": 0.807972,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 247.533333,
+      "replacement_impact_points_per_100": -4.285714
+    }
+  },
+  "valid_from": "2026-07-14",
+  "valid_through": "2026-07-14"
+}

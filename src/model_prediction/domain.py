@@ -25,6 +25,8 @@ class League(StrEnum):
     WORLD_CUP = "WORLD_CUP"
     LOL = "LOL"
     CS2 = "CS2"
+    DOTA2 = "DOTA2"
+    VALORANT = "VALORANT"
     KBO = "KBO"
     NPB = "NPB"
 

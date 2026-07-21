@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-12T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 1.556017,
+      "player_name": "Alanna Smith",
+      "projected_minutes": 10.953037,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 7,
+      "source_minutes": 82.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.146789,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 9.821019,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 4,
+      "source_minutes": 36.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.985294,
+      "player_name": "Arike Ogunbowale",
+      "projected_minutes": 26.740095,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 10,
+      "source_minutes": 280.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.83612,
+      "player_name": "Awak Kuier",
+      "projected_minutes": 16.766101,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 10,
+      "source_minutes": 198.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 2.268245,
+      "player_name": "Aziaha James",
+      "projected_minutes": 7.404008,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 10,
+      "source_minutes": 107.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 2.288022,
+      "player_name": "Azzi Fudd",
+      "projected_minutes": 31.084595,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 10,
+      "source_minutes": 343.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Costanza Verona",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Haley Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 2.220727,
+      "player_name": "Jessica Shepard",
+      "projected_minutes": 32.98149,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 10,
+      "source_minutes": 343.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.863931,
+      "player_name": "Li Yueru",
+      "projected_minutes": 6.547346,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 7,
+      "source_minutes": 63.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0998,
+      "player_name": "Maddy Siegrist",
+      "projected_minutes": 8.933762,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 9,
+      "source_minutes": 101.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.351351,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 10.279945,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 4,
+      "source_minutes": 44.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 3.552279,
+      "player_name": "Paige Bueckers",
+      "projected_minutes": 32.124828,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 10,
+      "source_minutes": 346.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.72314,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 6.363775,
+      "replacement_impact_points_per_100": 0.0998,
+      "source_games": 8,
+      "source_minutes": 84.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.954733,
+      "player_name": "Aicha Coulibaly",
+      "projected_minutes": 10.011062,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 7,
+      "source_minutes": 86.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.949025,
+      "player_name": "Azura Stevens",
+      "projected_minutes": 23.230088,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 10,
+      "source_minutes": 267.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Chloe Bibby",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 1.028807,
+      "player_name": "Courtney Vandersloot",
+      "projected_minutes": 14.933628,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 5,
+      "source_minutes": 86.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "DiJonai Carrington",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.548446,
+      "player_name": "Elizabeth Williams",
+      "projected_minutes": 10.287611,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 10,
+      "source_minutes": 147.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.40264,
+      "player_name": "Gabriela Jaquez",
+      "projected_minutes": 14.159292,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 10,
+      "source_minutes": 206.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 1.388889,
+      "player_name": "Jacy Sheldon",
+      "projected_minutes": 14.767699,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 10,
+      "source_minutes": 176.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.437216,
+      "player_name": "Kamilla Cardoso",
+      "projected_minutes": 23.064159,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 10,
+      "source_minutes": 261.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.187648,
+      "player_name": "Maddy Westbeld",
+      "projected_minutes": 8.849558,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 2,
+      "source_minutes": 21.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.131222,
+      "player_name": "Natasha Cloud",
+      "projected_minutes": 23.727876,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 10,
+      "source_minutes": 263.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.107066,
+      "player_name": "Rachel Banham",
+      "projected_minutes": 9.513274,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 7,
+      "source_minutes": 67.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Rickea Jackson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.246914,
+      "player_name": "Saylor Poffenbarger",
+      "projected_minutes": 4.14823,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -0.96,
+      "player_name": "Skylar Diggins",
+      "projected_minutes": 23.285398,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 8,
+      "source_minutes": 225.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 1.168224,
+      "player_name": "Sydney Taylor",
+      "projected_minutes": 20.022124,
+      "replacement_impact_points_per_100": -1.187648,
+      "source_games": 10,
+      "source_minutes": 242.0,
+      "team": "Chicago Sky"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Chicago Sky": {
+      "normalization_scale": 0.829646,
+      "players": 16,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 241.066667,
+      "replacement_impact_points_per_100": -1.187648
+    },
+    "Dallas Wings": {
+      "normalization_scale": 0.917852,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 217.9,
+      "replacement_impact_points_per_100": 0.0998
+    }
+  },
+  "valid_from": "2026-07-12",
+  "valid_through": "2026-07-12"
+}

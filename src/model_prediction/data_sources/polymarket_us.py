@@ -328,6 +328,25 @@ class PolymarketSnapshotStore:
         return max(candidates, key=lambda item: item[0])[1] if candidates else None
 
 
+def _is_preseason_event(event: dict[str, Any], league: str) -> bool:
+    """Return True for preseason/exhibition events that should be skipped.
+
+    NFL preseason runs in August; regular season starts September.
+    Polymarket does not tag preseason explicitly, so we use the date.
+    """
+    if league.upper() != "NFL":
+        return False
+    start_str = str(event.get("startTime") or event.get("event_start_utc") or "")
+    if not start_str:
+        return False
+    try:
+        start_month = int(start_str[5:7])
+    except (ValueError, IndexError):
+        return False
+    # NFL regular season begins in September. August = preseason.
+    return start_month < 9
+
+
 def capture_slate_snapshots(
     client: PolymarketUSClient,
     events_by_league: dict[str, list[dict[str, Any]]],
@@ -361,8 +380,7 @@ def capture_slate_snapshots(
         # minutes), then append serially so the JSONL stays clean.
         #
         # Skip summer league / preseason events — they offer only moneyline
-        # markets and pollute the spread/total readiness counts. Match known
-        # summer league slug patterns (e.g. "nbasl" for NBA Summer League).
+        # markets and pollute the spread/total readiness counts.
         _SUMMER_LEAGUE_PATTERNS = (
             "nbasl",   # NBA Summer League
         )
@@ -374,9 +392,12 @@ def capture_slate_snapshots(
         ]
         contracts = [
             entry for entry in all_contracts
-            if not any(
-                pattern in str(entry[0]).casefold()
-                for pattern in _SUMMER_LEAGUE_PATTERNS
+            if not (
+                any(
+                    pattern in str(entry[0]).casefold()
+                    for pattern in _SUMMER_LEAGUE_PATTERNS
+                )
+                or _is_preseason_event(entry[1], league)
             )
         ]
         skipped_summer_league += len(all_contracts) - len(contracts)

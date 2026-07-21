@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-14T18:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -1.388889,
+      "player_name": "Alex Fowler",
+      "projected_minutes": 10.503967,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 2,
+      "source_minutes": 32.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.118483,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 7.375126,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 2,
+      "source_minutes": 22.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.248756,
+      "player_name": "Aubrey Griffin",
+      "projected_minutes": 1.340932,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 5.555556,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 10.146385,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 8,
+      "source_minutes": 131.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.150198,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 22.304168,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 11,
+      "source_minutes": 359.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.460405,
+      "player_name": "Han Xu",
+      "projected_minutes": 8.224383,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 11,
+      "source_minutes": 143.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.701016,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 19.532909,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 10,
+      "source_minutes": 289.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.223714,
+      "player_name": "Julie Vanloo",
+      "projected_minutes": 10.8392,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 3,
+      "source_minutes": 47.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.616725,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 18.72835,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 6,
+      "source_minutes": 174.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.240385,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 3.575819,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 3,
+      "source_minutes": 16.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.154519,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 15.822997,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 11,
+      "source_minutes": 286.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.391304,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 17.566209,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 11,
+      "source_minutes": 290.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.70922,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 4.961448,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 4,
+      "source_minutes": 23.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.441614,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 8.358476,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 5,
+      "source_minutes": 71.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.208981,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 8.090289,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 11,
+      "source_minutes": 179.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.508121,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 20.784445,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 1,
+      "source_minutes": 31.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.42315,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 11.844899,
+      "replacement_impact_points_per_100": -1.208981,
+      "source_games": 8,
+      "source_minutes": 127.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.814059,
+      "player_name": "Alex Wilson",
+      "projected_minutes": 9.495037,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 3,
+      "source_minutes": 41.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.764706,
+      "player_name": "Alicia Florez",
+      "projected_minutes": 13.17796,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 6,
+      "source_minutes": 110.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.631285,
+      "player_name": "Angela Dugalic",
+      "projected_minutes": 14.213782,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 10,
+      "source_minutes": 137.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.23741,
+      "player_name": "Cassandre Prosper",
+      "projected_minutes": 6.79039,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.123894,
+      "player_name": "Cotie McMahon",
+      "projected_minutes": 17.43634,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 9,
+      "source_minutes": 165.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Darianna Littlepage-Buggs",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.173913,
+      "player_name": "Georgia Amoore",
+      "projected_minutes": 21.867357,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 10,
+      "source_minutes": 244.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.430843,
+      "player_name": "Kiki Iriafen",
+      "projected_minutes": 17.666523,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 9,
+      "source_minutes": 229.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.018349,
+      "player_name": "Lauren Betts",
+      "projected_minutes": 13.868508,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.813953,
+      "player_name": "Lucy Olsen",
+      "projected_minutes": 6.9918,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 4,
+      "source_minutes": 30.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 1.520572,
+      "player_name": "Michaela Onyenwere",
+      "projected_minutes": 21.406992,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 7,
+      "source_minutes": 159.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.565611,
+      "player_name": "Rori Harmon",
+      "projected_minutes": 2.416918,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 6,
+      "source_minutes": 42.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.870827,
+      "player_name": "Shakira Austin",
+      "projected_minutes": 25.147461,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 10,
+      "source_minutes": 289.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.857143,
+      "player_name": "Sonia Citron",
+      "projected_minutes": 29.520932,
+      "replacement_impact_points_per_100": -2.123894,
+      "source_games": 9,
+      "source_minutes": 300.0,
+      "team": "Washington Mystics"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "New York Liberty": {
+      "normalization_scale": 0.670466,
+      "players": 17,
+      "players_with_minutes": 17,
+      "raw_projected_minutes": 298.3,
+      "replacement_impact_points_per_100": -1.208981
+    },
+    "Washington Mystics": {
+      "normalization_scale": 0.863185,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 231.7,
+      "replacement_impact_points_per_100": -2.123894
+    }
+  },
+  "valid_from": "2026-06-14",
+  "valid_through": "2026-06-14"
+}

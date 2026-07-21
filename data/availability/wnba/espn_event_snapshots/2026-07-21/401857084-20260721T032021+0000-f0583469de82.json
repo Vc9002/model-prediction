@@ -1,0 +1,20 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4790263",
+      "current_status": "Out",
+      "player_name": "Iliana Rupert",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-07T15:18:00+00:00",
+      "team": "Golden State Valkyries"
+    }
+  ],
+  "event_id": "401857084",
+  "observed_at_utc": "2026-07-21T03:20:21.669945+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "f0583469de82c362639b8421b08ed308e06d78aa563b69b84f219cc9eb502501",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

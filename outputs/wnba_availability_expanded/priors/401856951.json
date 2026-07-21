@@ -1,0 +1,361 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-30T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -0.911854,
+      "player_name": "Bridget Carleton",
+      "projected_minutes": 17.888199,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 9,
+      "source_minutes": 258.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.515464,
+      "player_name": "Carla Leite",
+      "projected_minutes": 13.913043,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 8,
+      "source_minutes": 182.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 1.442308,
+      "player_name": "Chloe Bibby",
+      "projected_minutes": 9.937888,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 1,
+      "source_minutes": 16.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.740864,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 13.043478,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 9,
+      "source_minutes": 202.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.016129,
+      "player_name": "Frieda Buhner",
+      "projected_minutes": 8.15735,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 7,
+      "source_minutes": 96.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.131524,
+      "player_name": "Haley Jones",
+      "projected_minutes": 7.743271,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 6,
+      "source_minutes": 79.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.429204,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 9.068323,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 4,
+      "source_minutes": 52.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.748252,
+      "player_name": "Jordan Harrison",
+      "projected_minutes": 8.281573,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 2,
+      "source_minutes": 29.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.209302,
+      "player_name": "Kamiah Smalls",
+      "projected_minutes": 9.52381,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 2,
+      "source_minutes": 30.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.463964,
+      "player_name": "Karlie Samuelson",
+      "projected_minutes": 9.730849,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 3,
+      "source_minutes": 44.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.080257,
+      "player_name": "Luisa Geiselsoder",
+      "projected_minutes": 13.00207,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 10,
+      "source_minutes": 223.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 9.31677,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 1,
+      "source_minutes": 15.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.314917,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 11.345756,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 9,
+      "source_minutes": 143.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.670473,
+      "player_name": "Nyadiew Puoch",
+      "projected_minutes": 11.801242,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 10,
+      "source_minutes": 213.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 2.725724,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 12.587992,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 9,
+      "source_minutes": 187.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.193798,
+      "player_name": "Serah Williams",
+      "projected_minutes": 9.192547,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 9,
+      "source_minutes": 116.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.492537,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 14.699793,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 3,
+      "source_minutes": 69.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 1.769912,
+      "player_name": "Teja Oblak",
+      "projected_minutes": 10.766046,
+      "replacement_impact_points_per_100": -2.740864,
+      "source_games": 3,
+      "source_minutes": 52.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 4.800725,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 16.986564,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 7,
+      "source_minutes": 152.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.603175,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 21.59309,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 9,
+      "source_minutes": 230.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.196653,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 6.71785,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 6,
+      "source_minutes": 78.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.248756,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 1.439539,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.027397,
+      "player_name": "Jessica Timmons",
+      "projected_minutes": 8.997121,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 3,
+      "source_minutes": 38.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.95122,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 7.197697,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.229885,
+      "player_name": "Kayana Traylor",
+      "projected_minutes": 8.15739,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 3,
+      "source_minutes": 35.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 5.64759,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 21.737044,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 10,
+      "source_minutes": 264.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.428044,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 16.362764,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 7,
+      "source_minutes": 142.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.83304,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 10.700576,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 10,
+      "source_minutes": 169.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.231481,
+      "player_name": "Megan McConnell",
+      "projected_minutes": 7.797505,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 3,
+      "source_minutes": 32.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.77187,
+      "player_name": "Monique Billings",
+      "projected_minutes": 13.339731,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 9,
+      "source_minutes": 183.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.211806,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 12.523992,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 10,
+      "source_minutes": 176.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.361162,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 12.907869,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.498929,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 7.005758,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 5,
+      "source_minutes": 67.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.217822,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 16.890595,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 10,
+      "source_minutes": 206.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.234568,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 9.644914,
+      "replacement_impact_points_per_100": 1.027397,
+      "source_games": 7,
+      "source_minutes": 86.0,
+      "team": "Indiana Fever"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Indiana Fever": {
+      "normalization_scale": 0.71977,
+      "players": 18,
+      "players_with_minutes": 17,
+      "raw_projected_minutes": 277.866667,
+      "replacement_impact_points_per_100": 1.027397
+    },
+    "Portland Fire": {
+      "normalization_scale": 0.621118,
+      "players": 19,
+      "players_with_minutes": 18,
+      "raw_projected_minutes": 322.0,
+      "replacement_impact_points_per_100": -2.740864
+    }
+  },
+  "valid_from": "2026-05-31",
+  "valid_through": "2026-05-31"
+}

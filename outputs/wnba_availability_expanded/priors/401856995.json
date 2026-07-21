@@ -1,0 +1,316 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-16T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 3.095975,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 26.564118,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 9,
+      "source_minutes": 246.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.650957,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 31.474634,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 9,
+      "source_minutes": 279.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.118203,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 6.65582,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 3,
+      "source_minutes": 23.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.980392,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 4.141399,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 2,
+      "source_minutes": 8.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.808864,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 31.415471,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 10,
+      "source_minutes": 322.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.765751,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 21.41695,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 10,
+      "source_minutes": 219.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.018519,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 9.525218,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 10,
+      "source_minutes": 140.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.857633,
+      "player_name": "Monique Billings",
+      "projected_minutes": 18.636296,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 10,
+      "source_minutes": 183.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.234266,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 14.080757,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 10,
+      "source_minutes": 172.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.182482,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 8.578613,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 10,
+      "source_minutes": 148.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.724138,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 2.662328,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.258389,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 17.571365,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 9,
+      "source_minutes": 196.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.207469,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 7.27703,
+      "replacement_impact_points_per_100": -0.182482,
+      "source_games": 7,
+      "source_minutes": 82.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -2.69337,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 24.55389,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 10,
+      "source_minutes": 324.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.15304,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 14.48965,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 4,
+      "source_minutes": 77.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 2.135231,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 21.746372,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 6,
+      "source_minutes": 162.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.816901,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 3.94956,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 10,
+      "source_minutes": 97.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.311189,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 19.605044,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 6,
+      "source_minutes": 172.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.621118,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 18.891268,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 10,
+      "source_minutes": 244.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.336323,
+      "player_name": "Lexi Held",
+      "projected_minutes": 7.351892,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 4,
+      "source_minutes": 46.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.189793,
+      "player_name": "Maria Conde",
+      "projected_minutes": 15.560314,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 10,
+      "source_minutes": 227.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mariella Fasoula",
+      "projected_minutes": 4.04473,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 2,
+      "source_minutes": 14.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.129222,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 20.6995,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 10,
+      "source_minutes": 281.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.223214,
+      "player_name": "Nikolina Milic",
+      "projected_minutes": 6.376398,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 5,
+      "source_minutes": 48.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.26738,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 19.842969,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 6,
+      "source_minutes": 161.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.235294,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 9.992862,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 2,
+      "source_minutes": 25.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.755906,
+      "player_name": "Teonni Key",
+      "projected_minutes": 7.137759,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 10,
+      "source_minutes": 108.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.366743,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 5.757792,
+      "replacement_impact_points_per_100": -2.69337,
+      "source_games": 6,
+      "source_minutes": 39.0,
+      "team": "Toronto Tempo"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Indiana Fever": {
+      "normalization_scale": 0.887443,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 225.366667,
+      "replacement_impact_points_per_100": -0.182482
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.713776,
+      "players": 17,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 280.2,
+      "replacement_impact_points_per_100": -2.69337
+    }
+  },
+  "valid_from": "2026-06-16",
+  "valid_through": "2026-06-16"
+}

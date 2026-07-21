@@ -1,0 +1,496 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-28T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.714286,
+      "player_name": "Awa Fam",
+      "projected_minutes": 8.141113,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 20.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.248756,
+      "player_name": "Beatrice Mompremier",
+      "projected_minutes": 0.814111,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.472813,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 9.36228,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 23.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.552486,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 10.474898,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 6,
+      "source_minutes": 143.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.849515,
+      "player_name": "Elle Ladine",
+      "projected_minutes": 2.442334,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 2,
+      "source_minutes": 12.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.461894,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 13.432836,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 33.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.469484,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 10.583446,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 26.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.558214,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 10.36635,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 9,
+      "source_minutes": 227.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.700935,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 11.397558,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 28.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.209644,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 5.156038,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 6,
+      "source_minutes": 77.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.384868,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 10.339213,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 9,
+      "source_minutes": 208.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.004717,
+      "player_name": "Jaelyn Brown",
+      "projected_minutes": 4.884668,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jalyn Brown",
+      "projected_minutes": 1.628223,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 4.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 1.628352,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 7.788331,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 7,
+      "source_minutes": 122.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.240964,
+      "player_name": "Joyner Holmes",
+      "projected_minutes": 6.105834,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 15.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 1.435407,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 7.327001,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 18.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.996448,
+      "player_name": "Lexie Brown",
+      "projected_minutes": 5.644505,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 9,
+      "source_minutes": 163.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.957486,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 6.648575,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 9,
+      "source_minutes": 141.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.332779,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 11.451832,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 8,
+      "source_minutes": 201.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.462963,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 13.02578,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 32.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 1.199041,
+      "player_name": "Rennia Davis",
+      "projected_minutes": 3.799186,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 2,
+      "source_minutes": 17.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.573394,
+      "player_name": "Skylar Diggins",
+      "projected_minutes": 14.654003,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 1,
+      "source_minutes": 36.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.773246,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 10.746269,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 9,
+      "source_minutes": 213.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.314815,
+      "player_name": "Taina Mair",
+      "projected_minutes": 3.39213,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 3,
+      "source_minutes": 32.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.605327,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 2.306649,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 2,
+      "source_minutes": 13.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tiffany Mitchell",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.714536,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 8.086839,
+      "replacement_impact_points_per_100": -0.472813,
+      "source_games": 9,
+      "source_minutes": 171.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.183406,
+      "player_name": "Alex Wilson",
+      "projected_minutes": 6.73547,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 4,
+      "source_minutes": 58.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alicia Florez",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -5.082988,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 13.851168,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 3,
+      "source_minutes": 82.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.448276,
+      "player_name": "Angela Dugalic",
+      "projected_minutes": 5.866377,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 7,
+      "source_minutes": 93.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.075269,
+      "player_name": "Cassandre Prosper",
+      "projected_minutes": 13.036393,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 7,
+      "source_minutes": 158.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.487805,
+      "player_name": "Christeen Iwuala",
+      "projected_minutes": 2.353793,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -4.352031,
+      "player_name": "Cotie McMahon",
+      "projected_minutes": 11.986239,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 5,
+      "source_minutes": 117.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.235849,
+      "player_name": "Darianna Littlepage-Buggs",
+      "projected_minutes": 6.880319,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.34965,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 4.798117,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 3,
+      "source_minutes": 29.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.009174,
+      "player_name": "Georgia Amoore",
+      "projected_minutes": 13.036393,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 7,
+      "source_minutes": 145.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jacy Sheldon",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.407002,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 10.773131,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 3,
+      "source_minutes": 57.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.490196,
+      "player_name": "Kamaria McDaniel",
+      "projected_minutes": 4.345464,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.120125,
+      "player_name": "Kiki Iriafen",
+      "projected_minutes": 15.426399,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 9,
+      "source_minutes": 241.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.934741,
+      "player_name": "Lauren Betts",
+      "projected_minutes": 7.785624,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 7,
+      "source_minutes": 121.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.476378,
+      "player_name": "Lucy Olsen",
+      "projected_minutes": 4.019555,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 9,
+      "source_minutes": 108.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.239808,
+      "player_name": "Madison Scott",
+      "projected_minutes": 2.607279,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 4,
+      "source_minutes": 17.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.719424,
+      "player_name": "Michaela Onyenwere",
+      "projected_minutes": 9.234112,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 1,
+      "source_minutes": 17.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mya Hollingshed",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.121655,
+      "player_name": "Nyla Harris",
+      "projected_minutes": 5.975014,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.521298,
+      "player_name": "Rori Harmon",
+      "projected_minutes": 4.562738,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 7,
+      "source_minutes": 93.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.857143,
+      "player_name": "Shakira Austin",
+      "projected_minutes": 16.114431,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 8,
+      "source_minutes": 230.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.418208,
+      "player_name": "Sonia Citron",
+      "projected_minutes": 17.526707,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 10,
+      "source_minutes": 303.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.578475,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 8.600398,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 3,
+      "source_minutes": 46.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.079002,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 14.484881,
+      "replacement_impact_points_per_100": -2.857143,
+      "source_games": 3,
+      "source_minutes": 81.0,
+      "team": "Washington Mystics"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Seattle Storm": {
+      "normalization_scale": 0.407056,
+      "players": 27,
+      "players_with_minutes": 26,
+      "raw_projected_minutes": 491.333333,
+      "replacement_impact_points_per_100": -0.472813
+    },
+    "Washington Mystics": {
+      "normalization_scale": 0.543183,
+      "players": 25,
+      "players_with_minutes": 22,
+      "raw_projected_minutes": 368.2,
+      "replacement_impact_points_per_100": -2.857143
+    }
+  },
+  "valid_from": "2026-05-28",
+  "valid_through": "2026-05-28"
+}

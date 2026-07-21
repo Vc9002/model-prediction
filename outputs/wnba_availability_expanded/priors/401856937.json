@@ -1,0 +1,496 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-26T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 1.643192,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 13.536966,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 1,
+      "source_minutes": 26.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -2.18894,
+      "player_name": "Carla Leite",
+      "projected_minutes": 4.477612,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 4,
+      "source_minutes": 34.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.614251,
+      "player_name": "Caroline Ducharme",
+      "projected_minutes": 3.644568,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.486618,
+      "player_name": "Cate Reese",
+      "projected_minutes": 5.727178,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -2.520161,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 10.482471,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 5,
+      "source_minutes": 96.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.883239,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 13.120444,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 5,
+      "source_minutes": 131.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -2.443992,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 12.808053,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 4,
+      "source_minutes": 91.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.226994,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 11.766748,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 9,
+      "source_minutes": 252.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.76565,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 13.120444,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 9,
+      "source_minutes": 223.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.38835,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 8.434571,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 8,
+      "source_minutes": 115.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -2.325581,
+      "player_name": "Kate Martin",
+      "projected_minutes": 8.330441,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 5,
+      "source_minutes": 73.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.069519,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 14.890663,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 6,
+      "source_minutes": 161.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.761905,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 12.356821,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 6,
+      "source_minutes": 125.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kokoro Tanaka",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 4.809619,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 7.080875,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 8,
+      "source_minutes": 99.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.369458,
+      "player_name": "Mariella Fasoula",
+      "projected_minutes": 3.123915,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.241546,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 7.289136,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 1,
+      "source_minutes": 14.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.071429,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 2.516487,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 3,
+      "source_minutes": 20.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.385928,
+      "player_name": "Monique Billings",
+      "projected_minutes": 8.694898,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 4,
+      "source_minutes": 69.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.344743,
+      "player_name": "Ndjakalenga Mwenentanda",
+      "projected_minutes": 1.041305,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 3,
+      "source_minutes": 9.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -2.371134,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 13.189865,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 3,
+      "source_minutes": 85.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.101322,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 8.538702,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 4,
+      "source_minutes": 54.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.426743,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 15.827838,
+      "replacement_impact_points_per_100": -1.76565,
+      "source_games": 10,
+      "source_minutes": 303.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -4.857143,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 11.451375,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 6,
+      "source_minutes": 125.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.424528,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 10.340939,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 10,
+      "source_minutes": 236.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.301887,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 5.725688,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bria Hartley",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.082852,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 13.394639,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 5,
+      "source_minutes": 119.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.787879,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 13.290535,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 9,
+      "source_minutes": 194.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -7.638889,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 9.299905,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 9,
+      "source_minutes": 176.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.777778,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 4.684653,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 9,
+      "source_minutes": 104.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.666667,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 8.293572,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 7,
+      "source_minutes": 125.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.123762,
+      "player_name": "Haley Peters",
+      "projected_minutes": 2.082068,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 1,
+      "source_minutes": 4.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.966184,
+      "player_name": "Harmoni Turner",
+      "projected_minutes": 7.287239,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 1,
+      "source_minutes": 14.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.668262,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 12.457708,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 9,
+      "source_minutes": 227.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.740741,
+      "player_name": "Kyla Oldacre",
+      "projected_minutes": 2.602585,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.385681,
+      "player_name": "Lindsay Allen",
+      "projected_minutes": 17.177063,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 1,
+      "source_minutes": 33.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.59952,
+      "player_name": "Madison Hayes",
+      "projected_minutes": 4.858159,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 2,
+      "source_minutes": 17.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.309524,
+      "player_name": "Mamignan Toure",
+      "projected_minutes": 4.684653,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 2,
+      "source_minutes": 20.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.06422,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 18.738614,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 1,
+      "source_minutes": 36.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.76087,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 8.484428,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 4,
+      "source_minutes": 60.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.368421,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 8.432376,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 5,
+      "source_minutes": 75.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 1.364522,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 8.362974,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 8,
+      "source_minutes": 113.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.990099,
+      "player_name": "Rayah Marshall",
+      "projected_minutes": 2.082068,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 1,
+      "source_minutes": 4.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -6.702619,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 11.347272,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 10,
+      "source_minutes": 249.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shey Peddy",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.357995,
+      "player_name": "Taylor Bigby",
+      "projected_minutes": 5.031665,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.357995,
+      "player_name": "Tina Charles",
+      "projected_minutes": 9.889824,
+      "replacement_impact_points_per_100": -3.668262,
+      "source_games": 1,
+      "source_minutes": 19.0,
+      "team": "Connecticut Sun"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.520517,
+      "players": 26,
+      "players_with_minutes": 23,
+      "raw_projected_minutes": 384.233333,
+      "replacement_impact_points_per_100": -3.668262
+    },
+    "Golden State Valkyries": {
+      "normalization_scale": 0.520653,
+      "players": 26,
+      "players_with_minutes": 22,
+      "raw_projected_minutes": 384.133333,
+      "replacement_impact_points_per_100": -1.76565
+    }
+  },
+  "valid_from": "2026-05-26",
+  "valid_through": "2026-05-26"
+}

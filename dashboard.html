@@ -452,9 +452,11 @@ function matrixCell(c,sport,mk,heatRange){
       (c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`);
   }else if(c.state==="tested_not_qualified"){
     cls="t";l1=pct(c.hit_rate);l2=`${c.calls} calls · below gate`;
-  }else if(c.state==="research_total_candidate"||c.state==="research_active"){
+  }else if(c.state==="research_total_candidate"||c.state==="research_active"||c.state==="research_only"){
     cls="r";l1=pct(c.hit_rate);
-    l2=c.calls?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls??'—'} calls · research`;
+    l2=c.state==="research_only"
+      ?`${c.calls??'—'} calls · research only · 0U`
+      :(c.calls?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls??'—'} calls · research`);
   }else if(c.state==="blocked"){
     cls="b";l1="blocked";
     l2=c.readiness&&typeof c.readiness==="string"
@@ -535,7 +537,10 @@ function renderMatrix(m){
 }
 function drill(sport,market){
   const esportsCell=(state.matrix.esports||{})[sport]||{};
-  const cell=esportsCell[market]||(state.matrix.grid[sport]||{})[market]||{};
+  const baseballCell=(state.matrix.baseball||{})[sport]||{};
+  const basketballCell=(state.matrix.basketball||{})[sport]||{};
+  const cell=esportsCell[market]||baseballCell[market]||basketballCell[market]||
+    (state.matrix.grid[sport]||{})[market]||{};
   if(market==="total"&&(cell.state==="qualified"||cell.state==="research_total_candidate")){
     const calls=Number(cell.calls)||0,hits=calls&&cell.hit_rate!=null?Math.round(calls*Number(cell.hit_rate)):null;
     const reason=String(cell.qualification||"not reported").replaceAll("_"," ");

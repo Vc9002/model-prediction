@@ -1,0 +1,469 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-29T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 1.643192,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 13.644713,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 1,
+      "source_minutes": 26.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.246914,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 2.623983,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.635514,
+      "player_name": "Carla Leite",
+      "projected_minutes": 4.548238,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 3,
+      "source_minutes": 28.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.614251,
+      "player_name": "Caroline Ducharme",
+      "projected_minutes": 3.673576,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.486618,
+      "player_name": "Cate Reese",
+      "projected_minutes": 5.772763,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.980198,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 9.656258,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 5,
+      "source_minutes": 105.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.734062,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 11.790431,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 6,
+      "source_minutes": 149.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -3.481013,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 13.557247,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 3,
+      "source_minutes": 74.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.855365,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 12.315228,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 9,
+      "source_minutes": 243.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.246914,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 2.623983,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.405844,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 12.525147,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 9,
+      "source_minutes": 216.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.301115,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 9.83119,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 9,
+      "source_minutes": 138.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.630435,
+      "player_name": "Kate Martin",
+      "projected_minutes": 8.764104,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 4,
+      "source_minutes": 60.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.292894,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 12.700079,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 7,
+      "source_minutes": 177.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.743494,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 10.705851,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 7,
+      "source_minutes": 138.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kokoro Tanaka",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 5.019305,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 7.836963,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 9,
+      "source_minutes": 118.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.369458,
+      "player_name": "Mariella Fasoula",
+      "projected_minutes": 3.14878,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.241546,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 7.347153,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 1,
+      "source_minutes": 14.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.071429,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 2.536517,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 3,
+      "source_minutes": 20.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.675676,
+      "player_name": "Monique Billings",
+      "projected_minutes": 8.571678,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 3,
+      "source_minutes": 44.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.325301,
+      "player_name": "Ndjakalenga Mwenentanda",
+      "projected_minutes": 1.889268,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 4,
+      "source_minutes": 15.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -2.46085,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 11.720458,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 2,
+      "source_minutes": 47.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.424628,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 8.711624,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 5,
+      "source_minutes": 71.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.38484,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 13.504767,
+      "replacement_impact_points_per_100": -1.325301,
+      "source_games": 10,
+      "source_minutes": 286.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.369458,
+      "player_name": "Aerial Powers",
+      "projected_minutes": 2.989537,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 5.071174,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 12.091015,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 7,
+      "source_minutes": 162.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.591017,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 11.45989,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 1,
+      "source_minutes": 23.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.991681,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 15.279854,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 8,
+      "source_minutes": 201.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.196653,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 4.65039,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 6,
+      "source_minutes": 78.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.248756,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 0.996512,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.027397,
+      "player_name": "Jessica Timmons",
+      "projected_minutes": 6.228201,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 3,
+      "source_minutes": 38.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.95122,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 4.982561,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.229885,
+      "player_name": "Kayana Traylor",
+      "projected_minutes": 5.646903,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 3,
+      "source_minutes": 35.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 5.85997,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 15.146986,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 10,
+      "source_minutes": 257.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.291815,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 10.961634,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 7,
+      "source_minutes": 162.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.586331,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 7.008803,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.231481,
+      "player_name": "Megan McConnell",
+      "projected_minutes": 5.397774,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 3,
+      "source_minutes": 32.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.177305,
+      "player_name": "Monique Billings",
+      "projected_minutes": 9.898688,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 8,
+      "source_minutes": 164.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.482143,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 9.001827,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 9,
+      "source_minutes": 160.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.501155,
+      "player_name": "Natasha Howard",
+      "projected_minutes": 16.442451,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 1,
+      "source_minutes": 33.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.793651,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 20.4285,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 1,
+      "source_minutes": 41.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.037736,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 7.540276,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 9,
+      "source_minutes": 130.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.498929,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 4.849693,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 5,
+      "source_minutes": 67.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.184834,
+      "player_name": "Shey Peddy",
+      "projected_minutes": 10.961634,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 1,
+      "source_minutes": 22.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.270224,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 11.360239,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 9,
+      "source_minutes": 181.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.234568,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 6.676632,
+      "replacement_impact_points_per_100": -0.177305,
+      "source_games": 7,
+      "source_minutes": 86.0,
+      "team": "Indiana Fever"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Golden State Valkyries": {
+      "normalization_scale": 0.524797,
+      "players": 26,
+      "players_with_minutes": 24,
+      "raw_projected_minutes": 381.1,
+      "replacement_impact_points_per_100": -1.325301
+    },
+    "Indiana Fever": {
+      "normalization_scale": 0.498256,
+      "players": 23,
+      "players_with_minutes": 22,
+      "raw_projected_minutes": 401.4,
+      "replacement_impact_points_per_100": -0.177305
+    }
+  },
+  "valid_from": "2026-05-29",
+  "valid_through": "2026-05-29"
+}

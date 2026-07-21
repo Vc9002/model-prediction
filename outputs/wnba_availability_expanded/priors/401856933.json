@@ -1,0 +1,541 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-24T18:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.124378,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 0.540151,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 2,
+      "source_minutes": 2.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 3.10192,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 17.861001,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 277.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.181488,
+      "player_name": "Angel Reese",
+      "projected_minutes": 16.312568,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 6,
+      "source_minutes": 151.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bella Fontleroy",
+      "projected_minutes": 4.32121,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.499002,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 14.692114,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 4,
+      "source_minutes": 101.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.766004,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 6.31977,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 4,
+      "source_minutes": 53.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.592417,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 11.883327,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 1,
+      "source_minutes": 22.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.111607,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 4.105149,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 5,
+      "source_minutes": 48.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 2.088585,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 6,
+      "source_minutes": 51.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.871632,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 15.772416,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 231.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kejia Ran",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.121655,
+      "player_name": "Laila Phelia",
+      "projected_minutes": 5.941664,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.361396,
+      "player_name": "Madina Okot",
+      "projected_minutes": 6.193734,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 6,
+      "source_minutes": 87.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.118483,
+      "player_name": "Maite Cazorla",
+      "projected_minutes": 11.883327,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 1,
+      "source_minutes": 22.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.558635,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 7.184012,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 4,
+      "source_minutes": 69.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 3.264095,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 17.42888,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 9,
+      "source_minutes": 274.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.232019,
+      "player_name": "Nia Coffey",
+      "projected_minutes": 5.041412,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 3,
+      "source_minutes": 31.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Paige Robinson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.750751,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 17.104789,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 9,
+      "source_minutes": 266.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sacha Washington",
+      "projected_minutes": 3.781059,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.609756,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 1.890529,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 3,
+      "source_minutes": 10.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.0,
+      "player_name": "Sika Kone",
+      "projected_minutes": 1.872524,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 9,
+      "source_minutes": 50.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.428571,
+      "player_name": "Stephanie Jones",
+      "projected_minutes": 10.803025,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 1,
+      "source_minutes": 20.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.2331,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 6.211739,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 3,
+      "source_minutes": 29.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.128472,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 10.767015,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 176.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Aisha Sheppard",
+      "projected_minutes": 3.145149,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 13.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 2.986111,
+      "player_name": "Alyssa Thomas",
+      "projected_minutes": 16.354773,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 10,
+      "source_minutes": 320.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.123153,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 2.830634,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.058824,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 5.346753,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 25.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 2.654867,
+      "player_name": "DeWanna Bonner",
+      "projected_minutes": 14.499135,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 10,
+      "source_minutes": 278.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaime Nared",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 1.193317,
+      "player_name": "Jillian Alleyne",
+      "projected_minutes": 4.245951,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 2.972973,
+      "player_name": "Jovana Nogic",
+      "projected_minutes": 13.209624,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 6,
+      "source_minutes": 155.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.350631,
+      "player_name": "Kahleah Copper",
+      "projected_minutes": 16.606385,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 10,
+      "source_minutes": 313.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kalani Brown",
+      "projected_minutes": 8.491901,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 1,
+      "source_minutes": 18.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.121359,
+      "player_name": "Kara Dunn",
+      "projected_minutes": 5.661267,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 1,
+      "source_minutes": 12.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.777251,
+      "player_name": "Kathryn Westbeld",
+      "projected_minutes": 5.975782,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 22.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.290135,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 5.252398,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 8,
+      "source_minutes": 117.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kitija Laksa",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.470588,
+      "player_name": "Kyara Linskens",
+      "projected_minutes": 3.365309,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 5,
+      "source_minutes": 42.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.294118,
+      "player_name": "Lauren Jensen",
+      "projected_minutes": 5.346753,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 25.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Lee-Seul Kang",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.36855,
+      "player_name": "Lexi Held",
+      "projected_minutes": 3.302406,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.970874,
+      "player_name": "Maggie Doogan",
+      "projected_minutes": 2.516119,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 12.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.589242,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 4.245951,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 1,
+      "source_minutes": 9.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.770925,
+      "player_name": "Monique Akoa Makani",
+      "projected_minutes": 13.052367,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 54.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.697674,
+      "player_name": "Morgan Maly",
+      "projected_minutes": 6.76207,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 30.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 4.401993,
+      "player_name": "Natasha Mack",
+      "projected_minutes": 12.171725,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 10,
+      "source_minutes": 202.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.704225,
+      "player_name": "Noemie Brochant",
+      "projected_minutes": 7.799969,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 6,
+      "source_minutes": 97.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.123153,
+      "player_name": "Peyton Williams",
+      "projected_minutes": 2.830634,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.5625,
+      "player_name": "Quionche Carter",
+      "projected_minutes": 4.7649,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 4,
+      "source_minutes": 48.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 1.995798,
+      "player_name": "Sami Whitcomb",
+      "projected_minutes": 8.586256,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 4,
+      "source_minutes": 76.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.694444,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 15.096713,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 1,
+      "source_minutes": 32.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.240385,
+      "player_name": "Shay Ciezki",
+      "projected_minutes": 3.774178,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 2,
+      "source_minutes": 16.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.006711,
+      "player_name": "Valeriane Ayayi",
+      "projected_minutes": 4.7649,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 4,
+      "source_minutes": 47.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Yarden Garzon",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.006711,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.540151,
+      "players": 26,
+      "players_with_minutes": 23,
+      "raw_projected_minutes": 370.266667,
+      "replacement_impact_points_per_100": 0.0
+    },
+    "Phoenix Mercury": {
+      "normalization_scale": 0.471772,
+      "players": 31,
+      "players_with_minutes": 27,
+      "raw_projected_minutes": 423.933333,
+      "replacement_impact_points_per_100": -1.006711
+    }
+  },
+  "valid_from": "2026-05-24",
+  "valid_through": "2026-05-24"
+}

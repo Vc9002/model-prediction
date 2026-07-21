@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-12T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 8.0,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 25.502781,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 7,
+      "source_minutes": 225.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.231237,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 12.551704,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 8,
+      "source_minutes": 93.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 6.351351,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 27.784909,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 10,
+      "source_minutes": 340.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.428266,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 13.607189,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 4,
+      "source_minutes": 67.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -2.12766,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 10.726002,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 10,
+      "source_minutes": 117.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dana Evans",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 5.818674,
+      "player_name": "Jackie Young",
+      "projected_minutes": 26.073313,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 10,
+      "source_minutes": 339.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 5.499276,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 26.358579,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 10,
+      "source_minutes": 291.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.609756,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 8.55798,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.098039,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 10.726002,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 10,
+      "source_minutes": 110.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 3.16358,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 20.539153,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 10,
+      "source_minutes": 248.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 17.572386,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 10,
+      "source_minutes": 189.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.098039,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.94012,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 27.007092,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 9,
+      "source_minutes": 268.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.851582,
+      "player_name": "Bree Hall",
+      "projected_minutes": 3.404255,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 2,
+      "source_minutes": 11.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.668896,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 19.631206,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 7,
+      "source_minutes": 198.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -2.183908,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 9.87234,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 4,
+      "source_minutes": 35.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -2.905569,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 2.609929,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 5,
+      "source_minutes": 13.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.303279,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 28.141844,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 10,
+      "source_minutes": 332.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.107926,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 17.475177,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 10,
+      "source_minutes": 193.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.442308,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 12.255319,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 9,
+      "source_minutes": 120.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 5.778894,
+      "player_name": "Monique Billings",
+      "projected_minutes": 15.546099,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 10,
+      "source_minutes": 197.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.767754,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 9.531915,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 10,
+      "source_minutes": 121.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.807899,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 16.680851,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 10,
+      "source_minutes": 157.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.96,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 17.702128,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 10,
+      "source_minutes": 225.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.537594,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 20.141844,
+      "replacement_impact_points_per_100": -0.767754,
+      "source_games": 8,
+      "source_minutes": 132.0,
+      "team": "Indiana Fever"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Indiana Fever": {
+      "normalization_scale": 0.851064,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 235.0,
+      "replacement_impact_points_per_100": -0.767754
+    },
+    "Las Vegas Aces": {
+      "normalization_scale": 0.855798,
+      "players": 15,
+      "players_with_minutes": 11,
+      "raw_projected_minutes": 233.7,
+      "replacement_impact_points_per_100": -0.098039
+    }
+  },
+  "valid_from": "2026-07-13",
+  "valid_through": "2026-07-13"
+}

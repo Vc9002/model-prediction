@@ -1,0 +1,33 @@
+{
+  "effective_window": {
+    "from": "2020-01-01",
+    "to": "2026-07-20"
+  },
+  "extracted_at_utc": "2026-07-20T17:08:30.414274Z",
+  "limitations": [
+    "BO3 does not publish a stable public API contract; schema availability may change.",
+    "Historical corrections after extraction require a new versioned backfill.",
+    "Team IDs do not encode point-in-time rosters or substitutions."
+  ],
+  "match_count": 14509,
+  "matches_sha256": "969da1b7eeaa62a4c64dfe35383ea2484de36080690cccc3fbc924ac816e5bbd",
+  "request_pages": {
+    "matches": 147,
+    "teams": 43
+  },
+  "requested_window": {
+    "from": "2020-01-01",
+    "to": "2026-07-20"
+  },
+  "requires_api_key": false,
+  "requires_signup": false,
+  "schema_version": "esports-series-v1",
+  "source": "bo3.gg public website data endpoint",
+  "source_attribution_url": "https://bo3.gg/",
+  "source_base_url": "https://api.bo3.gg/api/v1",
+  "source_terms_url": "https://bo3.gg/wiki/use-of-services",
+  "team_count": 1809,
+  "teams_sha256": "13ec4ee63f3d7797fc02aa6f0f323f16d6a36812f28730ed2e9081a8e6dbe186",
+  "title": "dota2",
+  "title_name": "Dota 2"
+}

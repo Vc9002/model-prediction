@@ -1,0 +1,271 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-14T14:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -1.431718,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 18.25913,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 2,
+      "source_minutes": 54.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -5.81571,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 19.65983,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 10,
+      "source_minutes": 262.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.5,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 26.113057,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 9,
+      "source_minutes": 280.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.097561,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 7.503752,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -5.783582,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 9.704852,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 10,
+      "source_minutes": 136.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.635514,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 20.610305,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 10,
+      "source_minutes": 242.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.792135,
+      "player_name": "Maria Conde",
+      "projected_minutes": 25.512756,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 10,
+      "source_minutes": 312.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.660793,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 23.961981,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 9,
+      "source_minutes": 281.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.333333,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 15.807904,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 6,
+      "source_minutes": 125.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.487805,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 3.001501,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.348748,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 14.757379,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 6,
+      "source_minutes": 119.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.548673,
+      "player_name": "Teonni Key",
+      "projected_minutes": 5.752876,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 8,
+      "source_minutes": 52.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.088803,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 9.354677,
+      "replacement_impact_points_per_100": -3.088803,
+      "source_games": 10,
+      "source_minutes": 118.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.096154,
+      "player_name": "Alicia Florez",
+      "projected_minutes": 17.29639,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 6,
+      "source_minutes": 120.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.490421,
+      "player_name": "Angela Dugalic",
+      "projected_minutes": 5.821439,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 10,
+      "source_minutes": 122.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Cassandre Prosper",
+      "projected_minutes": 8.956059,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 6,
+      "source_minutes": 56.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -4.358162,
+      "player_name": "Cotie McMahon",
+      "projected_minutes": 19.647355,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 10,
+      "source_minutes": 231.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Darianna Littlepage-Buggs",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.086677,
+      "player_name": "Georgia Amoore",
+      "projected_minutes": 16.456759,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 10,
+      "source_minutes": 223.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.460123,
+      "player_name": "Kiki Iriafen",
+      "projected_minutes": 27.036104,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 8,
+      "source_minutes": 252.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 1.032702,
+      "player_name": "Lauren Betts",
+      "projected_minutes": 12.482508,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 10,
+      "source_minutes": 181.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 1.446281,
+      "player_name": "Lucy Olsen",
+      "projected_minutes": 8.396306,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 9,
+      "source_minutes": 84.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.294118,
+      "player_name": "Michaela Onyenwere",
+      "projected_minutes": 24.069409,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 10,
+      "source_minutes": 280.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.621891,
+      "player_name": "Rori Harmon",
+      "projected_minutes": 1.679261,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.413273,
+      "player_name": "Shakira Austin",
+      "projected_minutes": 26.196474,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 9,
+      "source_minutes": 263.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.65407,
+      "player_name": "Sonia Citron",
+      "projected_minutes": 31.961937,
+      "replacement_impact_points_per_100": -2.413273,
+      "source_games": 8,
+      "source_minutes": 288.0,
+      "team": "Washington Mystics"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Toronto Tempo": {
+      "normalization_scale": 0.750375,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 266.533333,
+      "replacement_impact_points_per_100": -3.088803
+    },
+    "Washington Mystics": {
+      "normalization_scale": 0.839631,
+      "players": 13,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 238.2,
+      "replacement_impact_points_per_100": -2.413273
+    }
+  },
+  "valid_from": "2026-07-14",
+  "valid_through": "2026-07-14"
+}

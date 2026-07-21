@@ -1,0 +1,280 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-19T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -2.288984,
+      "player_name": "Alyssa Thomas",
+      "projected_minutes": 27.720628,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 9,
+      "source_minutes": 299.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.101449,
+      "player_name": "DeWanna Bonner",
+      "projected_minutes": 23.443422,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 10,
+      "source_minutes": 290.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jovana Nogic",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.536755,
+      "player_name": "Kahleah Copper",
+      "projected_minutes": 26.421224,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 10,
+      "source_minutes": 321.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.644737,
+      "player_name": "Kyara Linskens",
+      "projected_minutes": 8.17542,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 5,
+      "source_minutes": 56.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.474684,
+      "player_name": "Lexi Held",
+      "projected_minutes": 14.239307,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 10,
+      "source_minutes": 232.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.160338,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 6.44288,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 8,
+      "source_minutes": 74.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -4.174573,
+      "player_name": "Monique Akoa Makani",
+      "projected_minutes": 18.733081,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 6,
+      "source_minutes": 127.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 1.238739,
+      "player_name": "Natasha Mack",
+      "projected_minutes": 17.596102,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 2,
+      "source_minutes": 44.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.487805,
+      "player_name": "Noemie Brochant",
+      "projected_minutes": 16.134272,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 9,
+      "source_minutes": 215.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 1.976744,
+      "player_name": "Quionche Carter",
+      "projected_minutes": 6.118029,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 5,
+      "source_minutes": 30.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.524229,
+      "player_name": "Sami Whitcomb",
+      "projected_minutes": 11.532214,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 4,
+      "source_minutes": 54.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 2.195122,
+      "player_name": "Shay Ciezki",
+      "projected_minutes": 4.872767,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.078582,
+      "player_name": "Valeriane Ayayi",
+      "projected_minutes": 18.570655,
+      "replacement_impact_points_per_100": -2.288984,
+      "source_games": 10,
+      "source_minutes": 249.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.264755,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 18.960752,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 10,
+      "source_minutes": 193.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.881057,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 8.623549,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 4,
+      "source_minutes": 54.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.987654,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 4.145937,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.152318,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 22.609176,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 8,
+      "source_minutes": 204.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.526003,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 24.433389,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 10,
+      "source_minutes": 273.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.631579,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 21.227197,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 10,
+      "source_minutes": 227.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.408257,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 5.140962,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 6,
+      "source_minutes": 36.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.611247,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 7.462687,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 1,
+      "source_minutes": 9.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.862069,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 18.131564,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 10,
+      "source_minutes": 238.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.649351,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 24.765064,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 10,
+      "source_minutes": 293.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.21097,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 7.794362,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 8,
+      "source_minutes": 74.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 3.543307,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 20.287452,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 10,
+      "source_minutes": 235.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.110375,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 5.749033,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 7,
+      "source_minutes": 53.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.493097,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 10.668878,
+      "replacement_impact_points_per_100": -0.611247,
+      "source_games": 7,
+      "source_minutes": 107.0,
+      "team": "Connecticut Sun"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.829187,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 241.2,
+      "replacement_impact_points_per_100": -0.611247
+    },
+    "Phoenix Mercury": {
+      "normalization_scale": 0.812128,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 246.266667,
+      "replacement_impact_points_per_100": -2.288984
+    }
+  },
+  "valid_from": "2026-07-19",
+  "valid_through": "2026-07-19"
+}

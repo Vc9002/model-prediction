@@ -1,0 +1,415 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-23T23:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 6.071429,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 22.334762,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 10,
+      "source_minutes": 300.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.118203,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 3.765745,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 3,
+      "source_minutes": 23.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.204918,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 7.375665,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 7,
+      "source_minutes": 88.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 6.300813,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 23.529412,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 11,
+      "source_minutes": 338.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 1.104972,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 16.984807,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 7,
+      "source_minutes": 143.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.625,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 8.985846,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 9,
+      "source_minutes": 80.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.208333,
+      "player_name": "Dana Evans",
+      "projected_minutes": 15.660304,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 4,
+      "source_minutes": 80.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 6.25,
+      "player_name": "Jackie Young",
+      "projected_minutes": 23.996884,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 11,
+      "source_minutes": 336.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -1.597052,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 5.453837,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.957507,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 21.45176,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 11,
+      "source_minutes": 306.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.612745,
+      "player_name": "Jordan Obi",
+      "projected_minutes": 2.856772,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 2,
+      "source_minutes": 8.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -1.108374,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 1.817946,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -2.574257,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 10.180496,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 8,
+      "source_minutes": 105.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.797267,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 7.869108,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 4,
+      "source_minutes": 39.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 8.0,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 14.283859,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 11,
+      "source_minutes": 220.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.852273,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 13.452798,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 7,
+      "source_minutes": 128.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.797267,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.36855,
+      "player_name": "Alissa Pili",
+      "projected_minutes": 2.258121,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.728155,
+      "player_name": "Amelia Hassett",
+      "projected_minutes": 6.253257,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 1,
+      "source_minutes": 12.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 2.734375,
+      "player_name": "Ariel Atkins",
+      "projected_minutes": 11.707487,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 5,
+      "source_minutes": 112.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.10352,
+      "player_name": "Azura Stevens",
+      "projected_minutes": 14.069828,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 3,
+      "source_minutes": 83.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Cameron Brink",
+      "projected_minutes": 9.067223,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -5.660377,
+      "player_name": "Chance Gray",
+      "projected_minutes": 4.273059,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 7,
+      "source_minutes": 77.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 1.804511,
+      "player_name": "Dearica Hamby",
+      "projected_minutes": 15.806844,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 10,
+      "source_minutes": 265.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.117096,
+      "player_name": "Emma Cannon",
+      "projected_minutes": 3.074518,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 4,
+      "source_minutes": 27.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.99278,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 14.208789,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 7,
+      "source_minutes": 154.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.464037,
+      "player_name": "Jihyun Park",
+      "projected_minutes": 4.273059,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 4,
+      "source_minutes": 31.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 3.232759,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 16.154247,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 2,
+      "source_minutes": 64.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.626374,
+      "player_name": "Julie Vanloo",
+      "projected_minutes": 5.940594,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 5,
+      "source_minutes": 55.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.941176,
+      "player_name": "Kate Martin",
+      "projected_minutes": 3.908286,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 3,
+      "source_minutes": 25.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.638298,
+      "player_name": "Kelsey Plum",
+      "projected_minutes": 18.134445,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 10,
+      "source_minutes": 305.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.415094,
+      "player_name": "Laura Ziegler",
+      "projected_minutes": 5.905854,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.518135,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 16.397429,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 6,
+      "source_minutes": 179.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Rae Burrell",
+      "projected_minutes": 12.958138,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 9,
+      "source_minutes": 229.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.0181,
+      "player_name": "Rickea Jackson",
+      "projected_minutes": 10.769498,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 2,
+      "source_minutes": 42.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.37931,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 3.717214,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 5,
+      "source_minutes": 35.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.301518,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 12.506514,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 3,
+      "source_minutes": 61.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.182033,
+      "player_name": "Sevgi Uzun",
+      "projected_minutes": 5.732152,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 2,
+      "source_minutes": 23.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.11236,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 2.883446,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 5,
+      "source_minutes": 45.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tonie Morgan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.182033,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Las Vegas Aces": {
+      "normalization_scale": 0.77912,
+      "players": 19,
+      "players_with_minutes": 16,
+      "raw_projected_minutes": 256.7,
+      "replacement_impact_points_per_100": -0.797267
+    },
+    "Los Angeles Sparks": {
+      "normalization_scale": 0.521105,
+      "players": 24,
+      "players_with_minutes": 22,
+      "raw_projected_minutes": 383.8,
+      "replacement_impact_points_per_100": -1.182033
+    }
+  },
+  "valid_from": "2026-05-24",
+  "valid_through": "2026-05-24"
+}

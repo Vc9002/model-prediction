@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-09T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alissa Pili",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.767661,
+      "player_name": "Ariel Atkins",
+      "projected_minutes": 16.168717,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 10,
+      "source_minutes": 237.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 1.458333,
+      "player_name": "Cameron Brink",
+      "projected_minutes": 12.653779,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 5,
+      "source_minutes": 80.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.020202,
+      "player_name": "Chance Gray",
+      "projected_minutes": 9.540547,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 9,
+      "source_minutes": 95.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -4.758419,
+      "player_name": "Dearica Hamby",
+      "projected_minutes": 21.240271,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 10,
+      "source_minutes": 283.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.340909,
+      "player_name": "Emma Cannon",
+      "projected_minutes": 8.511172,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 4,
+      "source_minutes": 40.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.770739,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 17.725333,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 10,
+      "source_minutes": 263.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.586066,
+      "player_name": "Jihyun Park",
+      "projected_minutes": 11.599297,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 8,
+      "source_minutes": 88.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.777778,
+      "player_name": "Kate Martin",
+      "projected_minutes": 8.134572,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 6,
+      "source_minutes": 50.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.331675,
+      "player_name": "Kelsey Plum",
+      "projected_minutes": 25.508411,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 6,
+      "source_minutes": 203.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.396514,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 12.201858,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 4,
+      "source_minutes": 59.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.582751,
+      "player_name": "Laura Ziegler",
+      "projected_minutes": 7.029877,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 3,
+      "source_minutes": 29.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -5.414909,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 21.340698,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 10,
+      "source_minutes": 311.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -5.963303,
+      "player_name": "Rae Burrell",
+      "projected_minutes": 20.18579,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 10,
+      "source_minutes": 254.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.4914,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 3.263871,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.586854,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 4.895807,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 4,
+      "source_minutes": 26.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tonie Morgan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.770739,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 4.956268,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 24.381829,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 10,
+      "source_minutes": 286.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.487805,
+      "player_name": "Bree Hall",
+      "projected_minutes": 8.625647,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.607963,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 23.691777,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 8,
+      "source_minutes": 253.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -2.906977,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 4.370328,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 5,
+      "source_minutes": 30.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.589242,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 2.242668,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 4,
+      "source_minutes": 9.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.495913,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 27.544566,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 10,
+      "source_minutes": 334.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.289474,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 18.40138,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 10,
+      "source_minutes": 208.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.099206,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 7.130535,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 9,
+      "source_minutes": 104.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 7.504216,
+      "player_name": "Monique Billings",
+      "projected_minutes": 18.516389,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 10,
+      "source_minutes": 193.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.02952,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 12.305923,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 10,
+      "source_minutes": 142.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.756007,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 17.711328,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 10,
+      "source_minutes": 141.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.233553,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 18.573893,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 9,
+      "source_minutes": 208.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.56917,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 16.503738,
+      "replacement_impact_points_per_100": 0.099206,
+      "source_games": 8,
+      "source_minutes": 106.0,
+      "team": "Indiana Fever"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Indiana Fever": {
+      "normalization_scale": 0.862565,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 231.866667,
+      "replacement_impact_points_per_100": 0.099206
+    },
+    "Los Angeles Sparks": {
+      "normalization_scale": 0.753201,
+      "players": 17,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 265.533333,
+      "replacement_impact_points_per_100": -3.770739
+    }
+  },
+  "valid_from": "2026-07-09",
+  "valid_through": "2026-07-09"
+}

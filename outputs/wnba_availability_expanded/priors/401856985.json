@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-13T01:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -5.130293,
+      "player_name": "Awa Fam",
+      "projected_minutes": 25.786253,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 8,
+      "source_minutes": 214.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.659341,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 17.076989,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 3,
+      "source_minutes": 55.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.972686,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 23.167781,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 10,
+      "source_minutes": 259.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -4.26045,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 16.109293,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 10,
+      "source_minutes": 222.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.57377,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 18.500071,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 10,
+      "source_minutes": 210.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.240964,
+      "player_name": "Joyner Holmes",
+      "projected_minutes": 12.807742,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 1,
+      "source_minutes": 15.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -5.038023,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 12.807742,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 8,
+      "source_minutes": 126.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.162791,
+      "player_name": "Lexie Brown",
+      "projected_minutes": 8.140031,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 6,
+      "source_minutes": 73.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.041145,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 10.075423,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 10,
+      "source_minutes": 159.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.148148,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 23.964708,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 10,
+      "source_minutes": 275.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.813505,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 16.450833,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 10,
+      "source_minutes": 222.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.37037,
+      "player_name": "Taina Mair",
+      "projected_minutes": 1.992315,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 2,
+      "source_minutes": 5.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.843373,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 3.27309,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 3,
+      "source_minutes": 15.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.540835,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 9.84773,
+      "replacement_impact_points_per_100": -3.041145,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.246914,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 4.46495,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.657895,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 17.681203,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 7,
+      "source_minutes": 132.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.054795,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 24.825123,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 257.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.31746,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 21.491293,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 230.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.017937,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 8.275041,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 5,
+      "source_minutes": 46.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.711864,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 15.597559,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 190.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.929368,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 7.560649,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 138.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.921569,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 27.20643,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 263.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.88853,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 17.562137,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 219.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.785714,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 7.382051,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 7,
+      "source_minutes": 76.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.496278,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 2.67897,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 3.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.606796,
+      "player_name": "Ndjakalenga Mwenentanda",
+      "projected_minutes": 2.589671,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 4,
+      "source_minutes": 12.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.736648,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 14.525971,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 9,
+      "source_minutes": 143.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.425656,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 28.158952,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 286.0,
+      "team": "Golden State Valkyries"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Golden State Valkyries": {
+      "normalization_scale": 0.89299,
+      "players": 16,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 223.966667,
+      "replacement_impact_points_per_100": -0.246914
+    },
+    "Seattle Storm": {
+      "normalization_scale": 0.853849,
+      "players": 15,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 234.233333,
+      "replacement_impact_points_per_100": -3.041145
+    }
+  },
+  "valid_from": "2026-06-13",
+  "valid_through": "2026-06-13"
+}

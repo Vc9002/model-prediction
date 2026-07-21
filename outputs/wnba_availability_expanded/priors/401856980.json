@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-11T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.958466,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 24.569425,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 9,
+      "source_minutes": 226.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.937407,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 27.861606,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 9,
+      "source_minutes": 271.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.03211,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 8.321902,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 4,
+      "source_minutes": 36.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.980392,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 4.267642,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 2,
+      "source_minutes": 8.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.511236,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 29.141899,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 10,
+      "source_minutes": 312.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.476821,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 18.350861,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 10,
+      "source_minutes": 204.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.011494,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 7.864655,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 10,
+      "source_minutes": 122.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.656814,
+      "player_name": "Monique Billings",
+      "projected_minutes": 18.838592,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 10,
+      "source_minutes": 209.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.714536,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 14.753848,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 10,
+      "source_minutes": 171.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.739372,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 12.985825,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 10,
+      "source_minutes": 141.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.724138,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 2.743484,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.08,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 19.326322,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 10,
+      "source_minutes": 225.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.10142,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 10.973937,
+      "replacement_impact_points_per_100": -0.656814,
+      "source_games": 7,
+      "source_minutes": 93.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.556017,
+      "player_name": "Aicha Coulibaly",
+      "projected_minutes": 12.623595,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 5,
+      "source_minutes": 82.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.11215,
+      "player_name": "Azura Stevens",
+      "projected_minutes": 17.716375,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 7,
+      "source_minutes": 135.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Chloe Bibby",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Courtney Vandersloot",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "DiJonai Carrington",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.865546,
+      "player_name": "Elizabeth Williams",
+      "projected_minutes": 17.120412,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 10,
+      "source_minutes": 195.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -2.090909,
+      "player_name": "Gabriela Jaquez",
+      "projected_minutes": 17.770554,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 6,
+      "source_minutes": 150.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -2.106084,
+      "player_name": "Jacy Sheldon",
+      "projected_minutes": 20.154409,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 10,
+      "source_minutes": 241.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -5.081001,
+      "player_name": "Kamilla Cardoso",
+      "projected_minutes": 24.922118,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 10,
+      "source_minutes": 279.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Maddy Westbeld",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.124457,
+      "player_name": "Natasha Cloud",
+      "projected_minutes": 22.484085,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 10,
+      "source_minutes": 291.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.801029,
+      "player_name": "Rachel Banham",
+      "projected_minutes": 15.332521,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 10,
+      "source_minutes": 183.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.160271,
+      "player_name": "Rickea Jackson",
+      "projected_minutes": 14.6282,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 2,
+      "source_minutes": 43.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -0.712589,
+      "player_name": "Saylor Poffenbarger",
+      "projected_minutes": 5.11987,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 4,
+      "source_minutes": 21.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -6.505295,
+      "player_name": "Skylar Diggins",
+      "projected_minutes": 24.217798,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 9,
+      "source_minutes": 261.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.625954,
+      "player_name": "Sydney Taylor",
+      "projected_minutes": 7.910064,
+      "replacement_impact_points_per_100": -4.124457,
+      "source_games": 9,
+      "source_minutes": 124.0,
+      "team": "Chicago Sky"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Chicago Sky": {
+      "normalization_scale": 0.812678,
+      "players": 16,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 246.1,
+      "replacement_impact_points_per_100": -4.124457
+    },
+    "Indiana Fever": {
+      "normalization_scale": 0.914495,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 218.7,
+      "replacement_impact_points_per_100": -0.656814
+    }
+  },
+  "valid_from": "2026-06-11",
+  "valid_through": "2026-06-11"
+}

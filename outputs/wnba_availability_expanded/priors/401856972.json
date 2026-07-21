@@ -1,0 +1,316 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-08T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -5.577299,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 13.377571,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 6,
+      "source_minutes": 111.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -7.469512,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 24.260119,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 10,
+      "source_minutes": 256.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.057018,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 7.856669,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 5,
+      "source_minutes": 56.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.2,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 20.703384,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 4,
+      "source_minutes": 100.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.100334,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 11.46649,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 10,
+      "source_minutes": 198.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -6.489185,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 19.163902,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 10,
+      "source_minutes": 201.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.549696,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 5.733245,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 10,
+      "source_minutes": 93.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.867925,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 9.236894,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 8,
+      "source_minutes": 130.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.718543,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 16.191108,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 9,
+      "source_minutes": 204.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.656315,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 23.755806,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 3,
+      "source_minutes": 83.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.193798,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 9.555408,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 9,
+      "source_minutes": 116.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.926978,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 10.564035,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 6,
+      "source_minutes": 93.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 1.553398,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 7.644326,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 9,
+      "source_minutes": 115.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.637771,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 20.491042,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 10,
+      "source_minutes": 246.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shey Peddy",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -5.100334,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.388889,
+      "player_name": "Alex Fowler",
+      "projected_minutes": 10.713472,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 2,
+      "source_minutes": 32.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.118483,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 7.522225,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 2,
+      "source_minutes": 22.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.248756,
+      "player_name": "Aubrey Griffin",
+      "projected_minutes": 1.367677,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.530534,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 9.847276,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 7,
+      "source_minutes": 124.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.129121,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 21.563711,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 10,
+      "source_minutes": 328.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.346154,
+      "player_name": "Han Xu",
+      "projected_minutes": 7.704582,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 10,
+      "source_minutes": 120.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.586801,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 21.107819,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 10,
+      "source_minutes": 297.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.108932,
+      "player_name": "Julie Vanloo",
+      "projected_minutes": 10.599499,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 4,
+      "source_minutes": 59.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.757225,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 19.899704,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 4,
+      "source_minutes": 119.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.617284,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 3.419193,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.154532,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 16.868019,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 10,
+      "source_minutes": 273.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.197605,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 18.372464,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 10,
+      "source_minutes": 268.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.621891,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 0.683839,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 2,
+      "source_minutes": 2.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.441614,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 8.525188,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 5,
+      "source_minutes": 71.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.172414,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 10.166401,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 10,
+      "source_minutes": 180.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.508121,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 21.198997,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 1,
+      "source_minutes": 31.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.527495,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 10.439936,
+      "replacement_impact_points_per_100": -1.346154,
+      "source_games": 6,
+      "source_minutes": 91.0,
+      "team": "New York Liberty"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.796284,
+      "players": 15,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 251.166667,
+      "replacement_impact_points_per_100": -5.100334
+    },
+    "New York Liberty": {
+      "normalization_scale": 0.683839,
+      "players": 17,
+      "players_with_minutes": 17,
+      "raw_projected_minutes": 292.466667,
+      "replacement_impact_points_per_100": -1.346154
+    }
+  },
+  "valid_from": "2026-06-08",
+  "valid_through": "2026-06-08"
+}

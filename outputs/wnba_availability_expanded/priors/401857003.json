@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-19T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -5.555556,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 15.867504,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 7,
+      "source_minutes": 140.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.033003,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 20.141579,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 8,
+      "source_minutes": 206.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.721088,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 7.372779,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 4,
+      "source_minutes": 41.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.474903,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 19.393616,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 5,
+      "source_minutes": 118.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.49827,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 12.875651,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 10,
+      "source_minutes": 178.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.681818,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 15.600374,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 10,
+      "source_minutes": 216.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.599147,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 6.250835,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 8,
+      "source_minutes": 69.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.11804,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 9.055697,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 4,
+      "source_minutes": 49.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.596639,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 18.218245,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 9,
+      "source_minutes": 195.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.839733,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 23.614265,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 7,
+      "source_minutes": 199.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.162791,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 9.616669,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 10,
+      "source_minutes": 116.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.974865,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 15.119541,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 9,
+      "source_minutes": 157.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.413223,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 5.556298,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 9,
+      "source_minutes": 84.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.007587,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 21.316949,
+      "replacement_impact_points_per_100": -5.007587,
+      "source_games": 10,
+      "source_minutes": 259.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.471751,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 20.875341,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 10,
+      "source_minutes": 308.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.198807,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 15.798838,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 5,
+      "source_minutes": 103.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.832461,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 17.411932,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 7,
+      "source_minutes": 173.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -4.809619,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 6.215158,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 10,
+      "source_minutes": 99.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.185874,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 19.54691,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 5,
+      "source_minutes": 138.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.934985,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 18.692919,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 10,
+      "source_minutes": 246.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.457666,
+      "player_name": "Lexi Held",
+      "projected_minutes": 6.760764,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 3,
+      "source_minutes": 37.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -5.04,
+      "player_name": "Maria Conde",
+      "projected_minutes": 17.791484,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 10,
+      "source_minutes": 225.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mariella Fasoula",
+      "projected_minutes": 4.032736,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 2,
+      "source_minutes": 14.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.676471,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 21.112561,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 10,
+      "source_minutes": 280.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nikolina Milic",
+      "projected_minutes": 6.12027,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 4,
+      "source_minutes": 38.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.26738,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 19.78413,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 6,
+      "source_minutes": 161.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.950339,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 11.38655,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 3,
+      "source_minutes": 43.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -4.330709,
+      "player_name": "Teonni Key",
+      "projected_minutes": 7.306369,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 10,
+      "source_minutes": 108.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.207965,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 7.164037,
+      "replacement_impact_points_per_100": -3.950339,
+      "source_games": 7,
+      "source_minutes": 52.0,
+      "team": "Toronto Tempo"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.801389,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 249.566667,
+      "replacement_impact_points_per_100": -5.007587
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.711659,
+      "players": 17,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 281.033333,
+      "replacement_impact_points_per_100": -3.950339
+    }
+  },
+  "valid_from": "2026-06-19",
+  "valid_through": "2026-06-19"
+}

@@ -1,0 +1,280 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-26T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -2.646503,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 15.3801,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 7,
+      "source_minutes": 129.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.430976,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 15.3801,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 8,
+      "source_minutes": 194.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.837321,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 5.576754,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 2,
+      "source_minutes": 18.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.280142,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 20.428529,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 7,
+      "source_minutes": 164.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.347222,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 18.784855,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 10,
+      "source_minutes": 176.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.818035,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 17.845612,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 10,
+      "source_minutes": 221.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.886918,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 6.16378,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 7,
+      "source_minutes": 51.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.835322,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 7.337834,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.911814,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 21.778691,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 9,
+      "source_minutes": 201.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.846154,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 23.481068,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 9,
+      "source_minutes": 250.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.601202,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 7.220429,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 10,
+      "source_minutes": 99.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.380952,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 17.610801,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 10,
+      "source_minutes": 188.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.213675,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 5.341943,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 8,
+      "source_minutes": 68.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.076923,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 17.669504,
+      "replacement_impact_points_per_100": -2.646503,
+      "source_games": 10,
+      "source_minutes": 250.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alex Wilson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.913894,
+      "player_name": "Alicia Florez",
+      "projected_minutes": 10.721277,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 7,
+      "source_minutes": 111.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.953819,
+      "player_name": "Angela Dugalic",
+      "projected_minutes": 12.10661,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 10,
+      "source_minutes": 163.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.333333,
+      "player_name": "Cassandre Prosper",
+      "projected_minutes": 5.360638,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 8,
+      "source_minutes": 65.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.333333,
+      "player_name": "Cotie McMahon",
+      "projected_minutes": 21.141394,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 10,
+      "source_minutes": 200.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Darianna Littlepage-Buggs",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.388802,
+      "player_name": "Georgia Amoore",
+      "projected_minutes": 23.85183,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 10,
+      "source_minutes": 243.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.923077,
+      "player_name": "Kiki Iriafen",
+      "projected_minutes": 22.707424,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 7,
+      "source_minutes": 172.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.086059,
+      "player_name": "Lauren Betts",
+      "projected_minutes": 17.527481,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 10,
+      "source_minutes": 181.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.656455,
+      "player_name": "Lucy Olsen",
+      "projected_minutes": 7.589218,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 6,
+      "source_minutes": 57.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 2.472952,
+      "player_name": "Michaela Onyenwere",
+      "projected_minutes": 22.647192,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 10,
+      "source_minutes": 247.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.37037,
+      "player_name": "Rori Harmon",
+      "projected_minutes": 1.656377,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 3,
+      "source_minutes": 5.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.708075,
+      "player_name": "Shakira Austin",
+      "projected_minutes": 23.731366,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 9,
+      "source_minutes": 244.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.468265,
+      "player_name": "Sonia Citron",
+      "projected_minutes": 30.959193,
+      "replacement_impact_points_per_100": -2.468265,
+      "source_games": 9,
+      "source_minutes": 309.0,
+      "team": "Washington Mystics"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.88054,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 227.133333,
+      "replacement_impact_points_per_100": -2.646503
+    },
+    "Washington Mystics": {
+      "normalization_scale": 0.903478,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 221.366667,
+      "replacement_impact_points_per_100": -2.468265
+    }
+  },
+  "valid_from": "2026-06-26",
+  "valid_through": "2026-06-26"
+}

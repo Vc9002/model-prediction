@@ -1,0 +1,325 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-25T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.152905,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 21.120845,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 8,
+      "source_minutes": 254.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.530973,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 20.352814,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 7,
+      "source_minutes": 165.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.496063,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 19.344774,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 9,
+      "source_minutes": 235.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.395833,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 7.632305,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 10,
+      "source_minutes": 80.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 3.195876,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 19.080763,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 3,
+      "source_minutes": 85.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.382488,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 18.048722,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 10,
+      "source_minutes": 251.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.123153,
+      "player_name": "Lexi Held",
+      "projected_minutes": 4.320173,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.286385,
+      "player_name": "Maria Conde",
+      "projected_minutes": 20.25681,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 10,
+      "source_minutes": 239.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.502152,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 22.176887,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 10,
+      "source_minutes": 297.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.201923,
+      "player_name": "Nikolina Milic",
+      "projected_minutes": 5.76023,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 2,
+      "source_minutes": 16.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.269784,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 17.712709,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 6,
+      "source_minutes": 156.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.476483,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 14.112565,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 5,
+      "source_minutes": 89.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.08642,
+      "player_name": "Teonni Key",
+      "projected_minutes": 3.936157,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 10,
+      "source_minutes": 86.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.896996,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 6.144246,
+      "replacement_impact_points_per_100": -2.896996,
+      "source_games": 9,
+      "source_minutes": 66.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alissa Pili",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.074738,
+      "player_name": "Ariel Atkins",
+      "projected_minutes": 21.505376,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 10,
+      "source_minutes": 269.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 2.314815,
+      "player_name": "Cameron Brink",
+      "projected_minutes": 13.548387,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 8,
+      "source_minutes": 140.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.590457,
+      "player_name": "Chance Gray",
+      "projected_minutes": 8.064516,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 9,
+      "source_minutes": 103.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.464129,
+      "player_name": "Dearica Hamby",
+      "projected_minutes": 22.580645,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 10,
+      "source_minutes": 283.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.49505,
+      "player_name": "Emma Cannon",
+      "projected_minutes": 3.225806,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 1,
+      "source_minutes": 4.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.218978,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 21.397849,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 10,
+      "source_minutes": 285.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.011236,
+      "player_name": "Jihyun Park",
+      "projected_minutes": 6.72043,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 7,
+      "source_minutes": 45.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.569507,
+      "player_name": "Kate Martin",
+      "projected_minutes": 5.913978,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 6,
+      "source_minutes": 46.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.331675,
+      "player_name": "Kelsey Plum",
+      "projected_minutes": 27.311828,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 6,
+      "source_minutes": 203.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.737101,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 5.645161,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.121951,
+      "player_name": "Laura Ziegler",
+      "projected_minutes": 8.064516,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.856946,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 26.182796,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 10,
+      "source_minutes": 327.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.108434,
+      "player_name": "Rae Burrell",
+      "projected_minutes": 20.483871,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 10,
+      "source_minutes": 264.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.4914,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 3.494624,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.925926,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 5.860215,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 5,
+      "source_minutes": 32.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tonie Morgan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.569507,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Los Angeles Sparks": {
+      "normalization_scale": 0.806452,
+      "players": 17,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 248.0,
+      "replacement_impact_points_per_100": -1.569507
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.720029,
+      "players": 16,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 277.766667,
+      "replacement_impact_points_per_100": -2.896996
+    }
+  },
+  "valid_from": "2026-06-25",
+  "valid_through": "2026-06-25"
+}

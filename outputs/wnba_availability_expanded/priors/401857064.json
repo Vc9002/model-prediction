@@ -1,0 +1,316 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-13T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -0.621891,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 1.850139,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.892857,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 30.342276,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 10,
+      "source_minutes": 328.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Amy Okonkwo",
+      "projected_minutes": 0.925069,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.073964,
+      "player_name": "Angel Reese",
+      "projected_minutes": 29.910577,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 9,
+      "source_minutes": 276.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.118765,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 2.281838,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 7,
+      "source_minutes": 21.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.553931,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 11.717545,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 10,
+      "source_minutes": 147.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.61348,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 32.069072,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 10,
+      "source_minutes": 327.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -3.288201,
+      "player_name": "Madina Okot",
+      "projected_minutes": 12.519272,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 10,
+      "source_minutes": 117.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.639752,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 27.69041,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 9,
+      "source_minutes": 244.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.197071,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 32.069072,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 10,
+      "source_minutes": 351.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.10395,
+      "player_name": "Sika Kone",
+      "projected_minutes": 11.532532,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 9,
+      "source_minutes": 81.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -3.359684,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 7.092199,
+      "replacement_impact_points_per_100": -2.197071,
+      "source_games": 10,
+      "source_minutes": 106.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alissa Pili",
+      "projected_minutes": 4.774409,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 2,
+      "source_minutes": 16.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.843318,
+      "player_name": "Ariel Atkins",
+      "projected_minutes": 18.763428,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 10,
+      "source_minutes": 251.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 1.868132,
+      "player_name": "Cameron Brink",
+      "projected_minutes": 12.771545,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 3,
+      "source_minutes": 55.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.83682,
+      "player_name": "Chance Gray",
+      "projected_minutes": 6.922893,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 8,
+      "source_minutes": 78.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.202329,
+      "player_name": "Dearica Hamby",
+      "projected_minutes": 21.675818,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 10,
+      "source_minutes": 287.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.986842,
+      "player_name": "Emma Cannon",
+      "projected_minutes": 7.161614,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 6,
+      "source_minutes": 56.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.939394,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 18.811172,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 10,
+      "source_minutes": 260.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.766798,
+      "player_name": "Jihyun Park",
+      "projected_minutes": 8.450704,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 10,
+      "source_minutes": 106.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.914414,
+      "player_name": "Kate Martin",
+      "projected_minutes": 6.684173,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 5,
+      "source_minutes": 44.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.46729,
+      "player_name": "Kelsey Plum",
+      "projected_minutes": 24.206254,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 4,
+      "source_minutes": 135.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.124744,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 11.363094,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 6,
+      "source_minutes": 89.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.582751,
+      "player_name": "Laura Ziegler",
+      "projected_minutes": 6.684173,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 3,
+      "source_minutes": 29.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -5.367232,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 21.580329,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 10,
+      "source_minutes": 308.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -4.197349,
+      "player_name": "Rae Burrell",
+      "projected_minutes": 22.391979,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 10,
+      "source_minutes": 279.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.4914,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 3.103366,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.586854,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 4.655049,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 4,
+      "source_minutes": 26.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tonie Morgan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.202329,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.925069,
+      "players": 15,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 216.2,
+      "replacement_impact_points_per_100": -2.197071
+    },
+    "Los Angeles Sparks": {
+      "normalization_scale": 0.716161,
+      "players": 17,
+      "players_with_minutes": 16,
+      "raw_projected_minutes": 279.266667,
+      "replacement_impact_points_per_100": -3.202329
+    }
+  },
+  "valid_from": "2026-07-13",
+  "valid_through": "2026-07-13"
+}

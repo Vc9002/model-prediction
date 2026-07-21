@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-13T21:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -5.072464,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 16.606149,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 7,
+      "source_minutes": 152.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -6.528926,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 22.125393,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 8,
+      "source_minutes": 205.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.057018,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 7.165335,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 5,
+      "source_minutes": 56.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.2,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 18.881627,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 4,
+      "source_minutes": 100.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.691275,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 10.409102,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 10,
+      "source_minutes": 196.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.796748,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 19.268942,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 10,
+      "source_minutes": 215.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.694915,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 6.439119,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 9,
+      "source_minutes": 72.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.366255,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 8.42411,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 6,
+      "source_minutes": 86.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.854975,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 15.734689,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 9,
+      "source_minutes": 193.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.23475,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 21.447591,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 5,
+      "source_minutes": 141.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 8.956669,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 10,
+      "source_minutes": 125.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.140684,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 15.395788,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 7,
+      "source_minutes": 126.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.394477,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 7.504236,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 9,
+      "source_minutes": 107.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.607362,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 21.641249,
+      "replacement_impact_points_per_100": -4.057018,
+      "source_games": 10,
+      "source_minutes": 252.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.944882,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 25.061782,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 9,
+      "source_minutes": 235.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.573529,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 29.655473,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 9,
+      "source_minutes": 280.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.232558,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 6.541648,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 4,
+      "source_minutes": 30.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.980392,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 4.070359,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 2,
+      "source_minutes": 8.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.348066,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 29.888065,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 10,
+      "source_minutes": 324.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.414125,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 20.991423,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 10,
+      "source_minutes": 223.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.407129,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 9.885158,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 10,
+      "source_minutes": 133.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.435811,
+      "player_name": "Monique Billings",
+      "projected_minutes": 15.409216,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 10,
+      "source_minutes": 192.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.373928,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 16.048844,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 10,
+      "source_minutes": 183.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.728597,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 11.629597,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 10,
+      "source_minutes": 149.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.724138,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 2.616659,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.086957,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 18.432912,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 9,
+      "source_minutes": 198.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.614754,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 9.768862,
+      "replacement_impact_points_per_100": -0.980392,
+      "source_games": 7,
+      "source_minutes": 88.0,
+      "team": "Indiana Fever"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.726216,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 275.4,
+      "replacement_impact_points_per_100": -4.057018
+    },
+    "Indiana Fever": {
+      "normalization_scale": 0.87222,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 229.3,
+      "replacement_impact_points_per_100": -0.980392
+    }
+  },
+  "valid_from": "2026-06-13",
+  "valid_through": "2026-06-13"
+}

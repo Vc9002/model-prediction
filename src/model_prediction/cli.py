@@ -12,6 +12,8 @@ import argparse
 import json
 import os
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
@@ -91,8 +93,10 @@ from .validation import run_validation_audit, write_production_artifacts
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
-LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2")
-ESPORTS_TITLES = ("lol", "cs2")
+LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
+ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant")
+
+_LEDGER_LOCK = threading.Lock()
 
 # League value on a ledger row -> ESPN league key(s) to search for results.
 _LEDGER_LEAGUE_TO_ESPN = {
@@ -817,7 +821,8 @@ def _forecast_learned_sport(
                         eligibility.away_team,
                         eligibility.home_team,
                     )
-                logged.append(ledger.append_evaluated(request, eligibility, now=observed_at))
+                with _LEDGER_LOCK:
+                    logged.append(ledger.append_evaluated(request, eligibility, now=observed_at))
             except DuplicatePickError as error:
                 duplicates.append(error.pick_id)
             except (EntityResolutionError, ValueError) as error:
@@ -1345,7 +1350,7 @@ def main(argv: list[str] | None = None) -> None:
                     if sport != "mlb":
                         raise ValueError("legacy-measured-edge is available only for MLB")
                     results[sport] = _forecast_mlb(args.date, log, config, registry, bans, ledger, audit)
-                elif sport in ("lol", "cs2"):
+                elif sport in ESPORTS_TITLES:
                     results[sport] = forecast_esports_slate(
                         data_root=Path(ledger_path(config)).parent,
                         artifact_dir=PROJECT_ROOT / "config/models",
@@ -1451,15 +1456,30 @@ def main(argv: list[str] | None = None) -> None:
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             soccer_collection = collect_soccer_scores(days_from=3)
             LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
+            max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
+            max_disagreement = float(config["project"].get("maximum_unreviewed_market_disagreement", 0.10))
+            # Parallelize sport forecasts — each sport is independent I/O
             forecast_result = {}
-            for sport in LEARNED_SPORTS:
-                forecast_result[sport] = _forecast_learned_sport(
-                    sport, args.date, True, config, registry, bans, ledger,
-                    maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
-                    maximum_unreviewed_disagreement=float(
-                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
-                    ),
-                )
+            workers = min(len(LEARNED_SPORTS), 5)
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {}
+                for sport in LEARNED_SPORTS:
+                    futures[pool.submit(
+                        _forecast_learned_sport,
+                        sport, args.date, True, config, registry, bans, ledger,
+                        maximum_data_age_hours=max_data_age,
+                        maximum_unreviewed_disagreement=max_disagreement,
+                    )] = sport
+                for future in as_completed(futures):
+                    sport = futures[future]
+                    try:
+                        forecast_result[sport] = future.result()
+                    except Exception as exc:
+                        forecast_result[sport] = {
+                            "sport": sport, "status": "error", "reason": str(exc),
+                            "logged": 0, "candidates": [],
+                        }
+            # Esports run serially (external API calls)
             for title in ESPORTS_TITLES:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=Path(ledger_path(config)).parent,
@@ -1468,31 +1488,36 @@ def main(argv: list[str] | None = None) -> None:
                     game_date=args.date,
                 )
                 _log_esports_forecast(forecast_result[title], config, ledger, flat_mode=False)
-            # Run flat forecast (all games, no edge gate) to flat_picks.xlsx
+                _log_esports_forecast(forecast_result[title], config, flat_ledger, flat_mode=True)
+            # Flat forecast: parallel re-run with flat_mode logging
             flat_result = {}
-            for sport in LEARNED_SPORTS:
-                flat_result[sport] = _forecast_learned_sport(
-                    sport, args.date, True, config, registry, bans, flat_ledger,
-                    maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
-                    maximum_unreviewed_disagreement=float(
-                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
-                    ),
-                    flat_mode=True,
-                )
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {}
+                for sport in LEARNED_SPORTS:
+                    futures[pool.submit(
+                        _forecast_learned_sport,
+                        sport, args.date, True, config, registry, bans, flat_ledger,
+                        maximum_data_age_hours=max_data_age,
+                        maximum_unreviewed_disagreement=max_disagreement,
+                        flat_mode=True,
+                    )] = sport
+                for future in as_completed(futures):
+                    sport = futures[future]
+                    try:
+                        flat_result[sport] = future.result()
+                    except Exception as exc:
+                        flat_result[sport] = {
+                            "sport": sport, "status": "error", "reason": str(exc),
+                            "logged": 0, "candidates": [],
+                        }
             for title in ESPORTS_TITLES:
-                flat_result[title] = forecast_esports_slate(
-                    data_root=Path(ledger_path(config)).parent,
-                    artifact_dir=PROJECT_ROOT / "config/models",
-                    title=title,
-                    game_date=args.date,
-                )
-                _log_esports_forecast(flat_result[title], config, flat_ledger, flat_mode=True)
+                flat_result[title] = forecast_result[title]
             for result in forecast_result.values():
                 result.pop("candidates", None)
             # Read back stored Polymarket odds snapshots for per-sport summaries.
             odds_by_sport = {}
             for sport in LEARNED_PRODUCTION_SPORTS:
-                odds_sport = "esports" if sport in ("lol", "cs2") else sport
+                odds_sport = "esports" if sport in ESPORTS_TITLES else sport
                 snap_path = (
                     Path(ledger_path(config)).parent
                     / "odds" / odds_sport / args.date / "polymarket_snapshots.jsonl"

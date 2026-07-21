@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-05T18:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -0.762712,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 21.179302,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 6,
+      "source_minutes": 190.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.163132,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 19.302046,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 9,
+      "source_minutes": 213.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.965066,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 23.008424,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 10,
+      "source_minutes": 287.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -4.90982,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 11.552347,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 10,
+      "source_minutes": 99.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.472813,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 16.606498,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 1,
+      "source_minutes": 23.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.393701,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 13.670277,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 10,
+      "source_minutes": 235.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.496218,
+      "player_name": "Maria Conde",
+      "projected_minutes": 22.864019,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 10,
+      "source_minutes": 261.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.041667,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 22.719615,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 9,
+      "source_minutes": 272.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.980392,
+      "player_name": "Nikolina Milic",
+      "projected_minutes": 5.776173,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.279707,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 16.606498,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 6,
+      "source_minutes": 147.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.897533,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 14.199759,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 7,
+      "source_minutes": 127.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -4.051173,
+      "player_name": "Teonni Key",
+      "projected_minutes": 2.647413,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 9,
+      "source_minutes": 69.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.512097,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 9.867629,
+      "replacement_impact_points_per_100": -1.897533,
+      "source_games": 10,
+      "source_minutes": 96.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.041667,
+      "player_name": "Alanna Smith",
+      "projected_minutes": 9.408451,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 7,
+      "source_minutes": 80.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.897321,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 7.43662,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 5,
+      "source_minutes": 48.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.903367,
+      "player_name": "Arike Ogunbowale",
+      "projected_minutes": 22.140845,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 10,
+      "source_minutes": 283.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.213172,
+      "player_name": "Awak Kuier",
+      "projected_minutes": 14.366197,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 9,
+      "source_minutes": 177.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.816697,
+      "player_name": "Aziaha James",
+      "projected_minutes": 11.098592,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.608931,
+      "player_name": "Azzi Fudd",
+      "projected_minutes": 29.633803,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 10,
+      "source_minutes": 339.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.492611,
+      "player_name": "Costanza Verona",
+      "projected_minutes": 5.070423,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Haley Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.484262,
+      "player_name": "JJ Quinerly",
+      "projected_minutes": 4.507042,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 2,
+      "source_minutes": 13.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.821918,
+      "player_name": "Jessica Shepard",
+      "projected_minutes": 28.225352,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 10,
+      "source_minutes": 330.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.713062,
+      "player_name": "Li Yueru",
+      "projected_minutes": 8.0,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 8,
+      "source_minutes": 67.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.111111,
+      "player_name": "Maddy Siegrist",
+      "projected_minutes": 13.239437,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 10,
+      "source_minutes": 140.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.364078,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 10.140845,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 1,
+      "source_minutes": 12.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Paige Bueckers",
+      "projected_minutes": 31.098592,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 9,
+      "source_minutes": 306.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.210526,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 5.633803,
+      "replacement_impact_points_per_100": -1.041667,
+      "source_games": 7,
+      "source_minutes": 75.0,
+      "team": "Dallas Wings"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Dallas Wings": {
+      "normalization_scale": 0.84507,
+      "players": 15,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 236.666667,
+      "replacement_impact_points_per_100": -1.041667
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.722022,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 277.0,
+      "replacement_impact_points_per_100": -1.897533
+    }
+  },
+  "valid_from": "2026-07-05",
+  "valid_through": "2026-07-05"
+}

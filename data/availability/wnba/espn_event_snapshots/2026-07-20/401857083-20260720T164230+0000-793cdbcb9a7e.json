@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4398768",
+      "current_status": "Out",
+      "player_name": "Nyara Sabally",
+      "raw_status": "Out",
+      "reason": "Ribs",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-19T21:05:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "2988756",
+      "current_status": "Out",
+      "player_name": "Brittney Sykes",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-16T16:36:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "4565505",
+      "current_status": "Out",
+      "player_name": "Kiki Rice",
+      "raw_status": "Out",
+      "reason": "Ankle",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-16T16:34:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "4433633",
+      "current_status": "Out",
+      "player_name": "Kierstan Bell",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-19T20:50:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "5220104",
+      "current_status": "Out",
+      "player_name": "Mai Yamamoto",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-19T20:50:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4565501",
+      "current_status": "Out",
+      "player_name": "Janiah Barker",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-15T23:46:00+00:00",
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "event_id": "401857083",
+  "observed_at_utc": "2026-07-20T16:42:30.746221+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "793cdbcb9a7ee6eca1fb59fd85915dbb35dcd4c484f7e56a14e10d838e8bf168",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

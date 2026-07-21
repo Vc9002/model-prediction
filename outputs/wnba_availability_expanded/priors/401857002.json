@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-18T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 3.422619,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 26.172765,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 10,
+      "source_minutes": 272.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.202329,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 31.577349,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 9,
+      "source_minutes": 287.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.789976,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 4.250797,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 3,
+      "source_minutes": 19.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.977995,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 2.580841,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 3,
+      "source_minutes": 9.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.512397,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 31.516624,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 10,
+      "source_minutes": 326.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.193548,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 21.071808,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 10,
+      "source_minutes": 220.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.110092,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 13.724002,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.801029,
+      "player_name": "Monique Billings",
+      "projected_minutes": 18.885684,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 10,
+      "source_minutes": 183.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.355072,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 11.720055,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 10,
+      "source_minutes": 152.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.192661,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 9.230302,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.620347,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 2.732655,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 1,
+      "source_minutes": 3.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.588235,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 19.067861,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 9,
+      "source_minutes": 195.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.066098,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 7.469258,
+      "replacement_impact_points_per_100": 0.588235,
+      "source_games": 6,
+      "source_minutes": 69.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.966184,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 1.524188,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 9,
+      "source_minutes": 14.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 5.555556,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 32.471836,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 329.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 6.187767,
+      "player_name": "Angel Reese",
+      "projected_minutes": 30.019881,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 303.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.233645,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 2.385686,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 9,
+      "source_minutes": 28.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.868069,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 16.500994,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 123.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 6.857143,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 28.959576,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 300.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.598753,
+      "player_name": "Madina Okot",
+      "projected_minutes": 7.819748,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 81.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.657343,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 31.278993,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 315.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 5.107527,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 34.526176,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 344.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.130045,
+      "player_name": "Sika Kone",
+      "projected_minutes": 3.313453,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 46.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.115385,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 11.19947,
+      "replacement_impact_points_per_100": 0.233645,
+      "source_games": 10,
+      "source_minutes": 120.0,
+      "team": "Atlanta Dream"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.994036,
+      "players": 14,
+      "players_with_minutes": 11,
+      "raw_projected_minutes": 201.2,
+      "replacement_impact_points_per_100": 0.233645
+    },
+    "Indiana Fever": {
+      "normalization_scale": 0.910885,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 219.566667,
+      "replacement_impact_points_per_100": 0.588235
+    }
+  },
+  "valid_from": "2026-06-18",
+  "valid_through": "2026-06-18"
+}

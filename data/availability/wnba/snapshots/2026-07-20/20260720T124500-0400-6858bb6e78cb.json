@@ -1,0 +1,153 @@
+{
+  "entries": [
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "LVA@TOR",
+      "player_name": "Bell, Kierstan",
+      "reason": "Injury/Illness - Right Leg; right leg injury",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "LVA@TOR",
+      "player_name": "Yamamoto, Mai",
+      "reason": "Not With Team",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "LVA@TOR",
+      "player_name": "Rice, Kiki",
+      "reason": "Injury/Illness - Left Ankle; Injury",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "LVA@TOR",
+      "player_name": "Sabally, Nyara",
+      "reason": "Injury/Illness - Rib Cage; Injury",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "LVA@TOR",
+      "player_name": "Sykes, Brittney",
+      "reason": "Injury/Illness - Left Foot; Injury",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "NYL@DAL",
+      "player_name": "Fiebich, Leonie",
+      "reason": "Injury/Illness - Left Foot; L. Foot",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "NYL@DAL",
+      "player_name": "Johannes, Marine",
+      "reason": "Injury/Illness - Left Ankle; L. Ankle",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "NYL@DAL",
+      "player_name": "Sabally, Satou",
+      "reason": "Concussion Protocol",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Doubtful",
+      "game_date": "2026-07-20",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "NYL@DAL",
+      "player_name": "Smith, Alanna",
+      "reason": "Injury/Illness - Right Leg; right leg",
+      "team": "Dallas Wings"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@SEA",
+      "player_name": "Cechova, Emma",
+      "reason": "Injury/Illness - Right Knee; Right Knee",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@SEA",
+      "player_name": "Collier, Napheesa",
+      "reason": "Injury/Illness - Left Ankle; Left Ankle",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@SEA",
+      "player_name": "Magbegor, Ezi",
+      "reason": "Injury/Illness - Face; Injury",
+      "team": "Seattle Storm"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-20",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@SEA",
+      "player_name": "Mair, Taina",
+      "reason": "Coach's Decision",
+      "team": "Seattle Storm"
+    }
+  ],
+  "observed_at_utc": "2026-07-20T16:52:47.301871+00:00",
+  "report_at_utc": "2026-07-20T16:45:00+00:00",
+  "schema_version": "1",
+  "source": "official_wnba_injury_report",
+  "source_index_url": "https://www.wnba.com/api/injury-reports",
+  "source_pdf_sha256": "6858bb6e78cb861a6f60a8407ab2d0fcf16f32d7e6f08923eb258fed14e74cf3",
+  "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-20_12_45PM.pdf",
+  "sport": "wnba",
+  "team_matchups": {
+    "Dallas Wings": "NYL@DAL",
+    "Las Vegas Aces": "LVA@TOR",
+    "Minnesota Lynx": "MIN@SEA",
+    "New York Liberty": "NYL@DAL",
+    "Seattle Storm": "MIN@SEA",
+    "Toronto Tempo": "LVA@TOR"
+  },
+  "team_report_status": {
+    "Dallas Wings": "submitted",
+    "Las Vegas Aces": "submitted",
+    "Minnesota Lynx": "submitted",
+    "New York Liberty": "submitted",
+    "Seattle Storm": "submitted",
+    "Toronto Tempo": "submitted"
+  },
+  "teams_listed": [
+    "Dallas Wings",
+    "Las Vegas Aces",
+    "Minnesota Lynx",
+    "New York Liberty",
+    "Seattle Storm",
+    "Toronto Tempo"
+  ]
+}

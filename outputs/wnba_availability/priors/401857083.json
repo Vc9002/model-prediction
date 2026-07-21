@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-20T12:15:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -5.235205,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 20.422219,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 10,
+      "source_minutes": 259.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.571429,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 29.824824,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 9,
+      "source_minutes": 300.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.240566,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 5.839197,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 3,
+      "source_minutes": 24.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.981481,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 11.139392,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 10,
+      "source_minutes": 140.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 2.251553,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 25.333134,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 10,
+      "source_minutes": 244.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.62622,
+      "player_name": "Maria Conde",
+      "projected_minutes": 28.866597,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 10,
+      "source_minutes": 317.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.754386,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 28.028148,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 9,
+      "source_minutes": 284.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.933566,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 19.763438,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 8,
+      "source_minutes": 172.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.487805,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 3.593352,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.901804,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 16.050307,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 5,
+      "source_minutes": 99.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.572082,
+      "player_name": "Teonni Key",
+      "projected_minutes": 3.713131,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 8,
+      "source_minutes": 37.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.096899,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 7.426261,
+      "replacement_impact_points_per_100": -3.933566,
+      "source_games": 10,
+      "source_minutes": 116.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 6.542811,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 24.340216,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 7,
+      "source_minutes": 219.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.201613,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 11.431697,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 8,
+      "source_minutes": 96.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.489796,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 25.543553,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 10,
+      "source_minutes": 335.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.428266,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 13.045262,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 4,
+      "source_minutes": 67.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -1.547389,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 7.493505,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 10,
+      "source_minutes": 117.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -4.066986,
+      "player_name": "Dana Evans",
+      "projected_minutes": 14.768221,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 1,
+      "source_minutes": 18.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 3.819918,
+      "player_name": "Jackie Young",
+      "projected_minutes": 24.83249,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 10,
+      "source_minutes": 333.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.589928,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 24.176125,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 10,
+      "source_minutes": 295.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -2.240566,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 10.392452,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.990099,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 10.283058,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 9,
+      "source_minutes": 105.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 1.567398,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 18.706413,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 10,
+      "source_minutes": 238.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.773196,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 14.987009,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 10,
+      "source_minutes": 182.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.547389,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Las Vegas Aces": {
+      "normalization_scale": 0.820457,
+      "players": 15,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 243.766667,
+      "replacement_impact_points_per_100": -1.547389
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.898338,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 222.633333,
+      "replacement_impact_points_per_100": -3.933566
+    }
+  },
+  "valid_from": "2026-07-21",
+  "valid_through": "2026-07-21"
+}

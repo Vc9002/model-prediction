@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-26T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -6.056338,
+      "player_name": "Awa Fam",
+      "projected_minutes": 26.755496,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 10,
+      "source_minutes": 310.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.951389,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 24.570286,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 7,
+      "source_minutes": 176.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.464129,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 26.115923,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 10,
+      "source_minutes": 283.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -7.179054,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 16.575616,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 9,
+      "source_minutes": 192.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.956989,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 18.387742,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 7,
+      "source_minutes": 158.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Joyner Holmes",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -6.648936,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 14.870087,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 10,
+      "source_minutes": 164.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.477327,
+      "player_name": "Lexie Brown",
+      "projected_minutes": 6.395736,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.332657,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 3.944037,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 9,
+      "source_minutes": 93.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.607504,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 26.169221,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 10,
+      "source_minutes": 293.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -6.26087,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 11.512325,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 10,
+      "source_minutes": 175.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.731707,
+      "player_name": "Taina Mair",
+      "projected_minutes": 4.796802,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.606796,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 3.864091,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 3,
+      "source_minutes": 12.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -7.051282,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 16.042638,
+      "replacement_impact_points_per_100": -6.26087,
+      "source_games": 10,
+      "source_minutes": 146.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.174603,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 13.018279,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 7,
+      "source_minutes": 104.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 5.082418,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 30.435429,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 10,
+      "source_minutes": 328.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.853565,
+      "player_name": "Han Xu",
+      "projected_minutes": 9.511071,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 10,
+      "source_minutes": 119.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.47006,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 26.987665,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 9,
+      "source_minutes": 268.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.363905,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 24.907118,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 10,
+      "source_minutes": 276.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.240385,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 4.755536,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 3,
+      "source_minutes": 16.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.752039,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 17.238817,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 10,
+      "source_minutes": 213.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 6.518283,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 16.644375,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 10,
+      "source_minutes": 229.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.533019,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 3.477486,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 4,
+      "source_minutes": 24.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.366748,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 4.458315,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 2,
+      "source_minutes": 9.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.679842,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 8.976074,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 9,
+      "source_minutes": 106.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.186567,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 24.372121,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 5,
+      "source_minutes": 136.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.895105,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 15.217714,
+      "replacement_impact_points_per_100": 0.186567,
+      "source_games": 10,
+      "source_minutes": 172.0,
+      "team": "New York Liberty"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "New York Liberty": {
+      "normalization_scale": 0.891663,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 224.3,
+      "replacement_impact_points_per_100": 0.186567
+    },
+    "Seattle Storm": {
+      "normalization_scale": 0.799467,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 250.166667,
+      "replacement_impact_points_per_100": -6.26087
+    }
+  },
+  "valid_from": "2026-06-26",
+  "valid_through": "2026-06-26"
+}

@@ -135,3 +135,23 @@
 2026-07-20T12:31:32 job finished: daily-1784550423 :: ok in 268.5s
 2026-07-20T12:41:14 job started: daily-1784551274 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
 2026-07-20T12:46:24 job finished: daily-1784551274 :: ok in 310.2s
+2026-07-20T15:33:16 job started: daily-1784561596 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
+2026-07-20T15:34:59 job finished: daily-1784561596 :: ok in 103.3s
+2026-07-20T15:40:13 job started: daily-1784562013 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
+2026-07-20T15:42:07 job finished: daily-1784562013 :: ok in 114.0s
+2026-07-20T16:15:29 job started: daily-1784564129 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
+2026-07-20T16:15:49 job finished: daily-1784564129 :: failed in 19.7s
+2026-07-20T16:15:56 job started: daily-1784564156 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
+2026-07-20T16:16:27 job finished: daily-1784564156 :: failed in 31.2s
+2026-07-20T16:18:56 job started: run_tests-1784564336 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m pytest tests/ -q --no-header
+2026-07-20T16:19:01 job finished: run_tests-1784564336 :: failed in 5.4s
+2026-07-20T16:32:35 job started: run_tests-1784565155 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m pytest tests/ -q --no-header
+2026-07-20T16:32:38 job finished: run_tests-1784565155 :: ok in 3.2s
+2026-07-20T16:50:39 job started: run_tests-1784566239 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m pytest tests/ -q --no-header
+2026-07-20T16:50:45 job finished: run_tests-1784566239 :: ok in 5.9s
+2026-07-20T23:21:09 job started: daily-1784589669 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
+2026-07-20T23:23:10 job finished: daily-1784589669 :: failed in 121.2s
+2026-07-20T23:23:43 job started: daily-1784589823 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
+2026-07-20T23:55:10 job finished: daily-1784589823 :: failed in 1887.6s
+2026-07-21T03:16:36 job started: daily-1784603796 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-20
+2026-07-21T03:23:04 job finished: daily-1784603796 :: ok in 387.4s

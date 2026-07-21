@@ -1,0 +1,361 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-06T16:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.2457,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 0.818882,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 6,
+      "source_minutes": 7.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 4.1841,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 24.662813,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 317.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.65312,
+      "player_name": "Angel Reese",
+      "projected_minutes": 21.820809,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 289.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.592417,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 15.895954,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 1,
+      "source_minutes": 22.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.015801,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 1.589595,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 9,
+      "source_minutes": 43.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.778243,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 6.117534,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 78.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.386861,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 22.83237,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 285.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.397206,
+      "player_name": "Madina Okot",
+      "projected_minutes": 5.732177,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 101.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.118483,
+      "player_name": "Maite Cazorla",
+      "projected_minutes": 15.895954,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 1,
+      "source_minutes": 22.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.503577,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 22.880539,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 299.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.78174,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 26.05973,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 9,
+      "source_minutes": 301.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.008969,
+      "player_name": "Sika Kone",
+      "projected_minutes": 2.697495,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 46.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.428571,
+      "player_name": "Stephanie Jones",
+      "projected_minutes": 14.450867,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 1,
+      "source_minutes": 20.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.210654,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 9.393064,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 1,
+      "source_minutes": 13.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.252252,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 9.152216,
+      "replacement_impact_points_per_100": -1.210654,
+      "source_games": 10,
+      "source_minutes": 155.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.183406,
+      "player_name": "Alex Wilson",
+      "projected_minutes": 8.971422,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 4,
+      "source_minutes": 58.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alicia Florez",
+      "projected_minutes": 15.675871,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 3,
+      "source_minutes": 67.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -4.267161,
+      "player_name": "Angela Dugalic",
+      "projected_minutes": 10.514892,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 10,
+      "source_minutes": 139.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.589226,
+      "player_name": "Cassandre Prosper",
+      "projected_minutes": 10.756059,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 10,
+      "source_minutes": 194.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.487805,
+      "player_name": "Christeen Iwuala",
+      "projected_minutes": 3.135174,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.063063,
+      "player_name": "Cotie McMahon",
+      "projected_minutes": 10.707826,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 8,
+      "source_minutes": 155.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.235849,
+      "player_name": "Darianna Littlepage-Buggs",
+      "projected_minutes": 9.164355,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.405844,
+      "player_name": "Georgia Amoore",
+      "projected_minutes": 17.074641,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 10,
+      "source_minutes": 216.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.490196,
+      "player_name": "Kamaria McDaniel",
+      "projected_minutes": 5.788014,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 2.037618,
+      "player_name": "Kiki Iriafen",
+      "projected_minutes": 18.955746,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 9,
+      "source_minutes": 238.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.141831,
+      "player_name": "Lauren Betts",
+      "projected_minutes": 9.116122,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 10,
+      "source_minutes": 157.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Lucy Olsen",
+      "projected_minutes": 5.836247,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 7,
+      "source_minutes": 78.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.364078,
+      "player_name": "Madison Scott",
+      "projected_minutes": 4.099843,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 2,
+      "source_minutes": 12.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 3.608247,
+      "player_name": "Michaela Onyenwere",
+      "projected_minutes": 15.989389,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 4,
+      "source_minutes": 85.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mya Hollingshed",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.121655,
+      "player_name": "Nyla Harris",
+      "projected_minutes": 7.958519,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.315789,
+      "player_name": "Rori Harmon",
+      "projected_minutes": 3.472808,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 8,
+      "source_minutes": 94.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 1.987281,
+      "player_name": "Shakira Austin",
+      "projected_minutes": 19.100446,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 8,
+      "source_minutes": 229.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 1.190476,
+      "player_name": "Sonia Citron",
+      "projected_minutes": 23.682624,
+      "replacement_impact_points_per_100": -1.315789,
+      "source_games": 9,
+      "source_minutes": 272.0,
+      "team": "Washington Mystics"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.722543,
+      "players": 18,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 276.8,
+      "replacement_impact_points_per_100": -1.210654
+    },
+    "Washington Mystics": {
+      "normalization_scale": 0.723502,
+      "players": 19,
+      "players_with_minutes": 18,
+      "raw_projected_minutes": 276.433333,
+      "replacement_impact_points_per_100": -1.315789
+    }
+  },
+  "valid_from": "2026-06-06",
+  "valid_through": "2026-06-06"
+}

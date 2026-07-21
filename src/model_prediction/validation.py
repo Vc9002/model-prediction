@@ -400,8 +400,6 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
                             snap = json.loads(line)
                         except json.JSONDecodeError:
                             continue
-                        if not snap.get("timestamp_valid"):
-                            continue
                         mt = snap.get("market_type")
                         if mt not in ("spread", "total"):
                             continue
@@ -410,6 +408,9 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
                         slug = str(snap.get("market_slug") or "").casefold()
                         if _is_sub_market_slug(slug, key):
                             continue
+                        # Note: we do NOT filter by timestamp_valid here. The
+                        # line is a contract parameter, not a price observation.
+                        # A post-start snapshot still carries the correct line.
                         if mt == "spread":
                             spread_snapshots += 1
                         elif mt == "total":
@@ -439,19 +440,92 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
         }
 
     if key == "mlb":
+        # F5/YRFI/NRFI lines are excluded from the full-game count by
+        # _is_sub_market_slug during Stage 2. Count them separately here
+        # from the same snapshot files (without the sub-market filter).
+        f5_spread = f5_total = yrfi_nrfi = 0
+        if odds_root.exists():
+            for snap_path in sorted(odds_root.glob("*/polymarket_snapshots.jsonl")):
+                try:
+                    with snap_path.open(encoding="utf-8") as fh:
+                        for line in fh:
+                            try:
+                                snap = json.loads(line)
+                            except json.JSONDecodeError:
+                                continue
+                            slug = str(snap.get("market_slug") or "").casefold()
+                            mt = snap.get("market_type")
+                            if "-f5-" in slug:
+                                if mt == "spread":
+                                    f5_spread += 1
+                                elif mt == "total":
+                                    f5_total += 1
+                            elif "-yrfi" in slug or "-nrfi" in slug:
+                                yrfi_nrfi += 1
+                except OSError:
+                    continue
+
+        fg_spread_status, fg_total_status = _readiness_for_market(
+            spread_snapshots, total_snapshots, "baseball"
+        )
+        f5_spread_status, f5_total_status = _readiness_for_market(
+            f5_spread, f5_total, "baseball"
+        )
         return {
             "events_scanned": events,
             "first_inning_outcomes": first_inning_outcomes,
             "first_five_outcomes": first_five_outcomes,
-            "full_game_spread": "DIAGNOSTIC_ONLY_RECONSTRUCTED_LINES_TIMESTAMP_INVALID",
-            "full_game_total": "DIAGNOSTIC_ONLY_RECONSTRUCTED_LINES_TIMESTAMP_INVALID",
-            "first_five_spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES_AND_INPUTS",
-            "first_five_total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES_AND_INPUTS",
-            "yrfi_nrfi": "BLOCKED_MISSING_POINT_IN_TIME_STARTER_INPUTS",
-            "reason": (
-                "Inning outcomes are recoverable, but exact F5/YRFI lines and pregame "
-                "starter/bullpen snapshots are not."
+            "full_game_spread": fg_spread_status,
+            "full_game_total": fg_total_status,
+            "full_game_spread_lines": spread_snapshots,
+            "full_game_total_lines": total_snapshots,
+            "first_five_spread": f5_spread_status,
+            "first_five_total": f5_total_status,
+            "first_five_spread_lines": f5_spread,
+            "first_five_total_lines": f5_total,
+            "yrfi_nrfi": (
+                "DATA_READY_PENDING_BACKTEST" if yrfi_nrfi >= _MINIMUM_SNAPSHOT_COUNT
+                else "BLOCKED_MISSING_POINT_IN_TIME_STARTER_INPUTS"
             ),
+            "yrfi_nrfi_lines": yrfi_nrfi,
+            "reason": (
+                f"Full-game: {spread_snapshots} spread, {total_snapshots} total lines. "
+                f"F5: {f5_spread} spread, {f5_total} total. "
+                f"YRFI/NRFI: {yrfi_nrfi} snapshots. "
+                "Line validation from Polymarket snapshots; "
+                "pregame starter/bullpen snapshots are still pending."
+            ),
+            "source": "data/odds/polymarket_snapshots.jsonl",
+        }
+
+    if key in {"kbo", "npb"}:
+        spread_status, total_status = _readiness_for_market(
+            spread_snapshots, total_snapshots, "baseball"
+        )
+        return {
+            "events_scanned": events,
+            "spread_lines": spread_snapshots,
+            "total_lines": total_snapshots,
+            "model_parameters_changed": False,
+            "spread": spread_status,
+            "total": total_status,
+            "reason": _readiness_reason(spread_snapshots, total_snapshots),
+            "source": "data/odds/polymarket_snapshots.jsonl",
+        }
+
+    if key == "esports":
+        return {
+            "events_scanned": events,
+            "spread_lines": spread_snapshots,
+            "total_lines": total_snapshots,
+            "model_parameters_changed": False,
+            "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+            "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
+            "reason": (
+                "Esports contracts on Polymarket are moneyline-only; "
+                "spread and total markets do not exist for LoL/CS2/Valorant/etc."
+            ),
+            "source": "data/odds/polymarket_snapshots.jsonl",
         }
 
     return {"status": "not_requested", "events_scanned": events}
@@ -509,26 +583,26 @@ def _readiness_reason(spread_count: int, total_count: int) -> str:
         return (
             "A spread or total outcome is undefined without its exact pregame line; "
             "score-only history cannot validate the configured normal-CDF heads. "
-            "No timestamp-valid Polymarket snapshots found — the daily BBO capture "
-            "pipeline has not yet collected spread or total contracts for this sport."
+            "No Polymarket spread or total contract snapshots found — the daily BBO "
+            "capture pipeline has not yet collected these markets for this sport."
         )
     parts = []
     if spread_count < _MINIMUM_SNAPSHOT_COUNT:
         parts.append(
-            f"spread: {spread_count}/{_MINIMUM_SNAPSHOT_COUNT} timestamp-valid snapshots"
+            f"spread: {spread_count}/{_MINIMUM_SNAPSHOT_COUNT} contract snapshots"
         )
     if total_count < _MINIMUM_SNAPSHOT_COUNT:
         parts.append(
-            f"total: {total_count}/{_MINIMUM_SNAPSHOT_COUNT} timestamp-valid snapshots"
+            f"total: {total_count}/{_MINIMUM_SNAPSHOT_COUNT} contract snapshots"
         )
     if parts:
         return (
-            f"Need >= {_MINIMUM_SNAPSHOT_COUNT} timestamp-valid pregame contract lines "
+            f"Need >= {_MINIMUM_SNAPSHOT_COUNT} contract line snapshots "
             f"per market for backtesting. {'; '.join(parts)}. "
             "Spread and total outcomes are undefined without their exact pregame lines."
         )
     return (
-        f"Timestamp-valid historical contract lines available from Polymarket snapshots "
+        f"Historical contract lines available from Polymarket snapshots "
         f"(spread: {spread_count}, total: {total_count}). "
         "Spread and total backtesting is data-ready pending a locked-holdout evaluation."
     )
@@ -545,7 +619,6 @@ def _add_legacy_backfill(
     - ``data/market_odds_snapshots.jsonl`` — MLB-specific market odds
       format with explicit ``markets.spread`` / ``markets.total`` keys.
     """
-    from .domain import parse_utc
 
     # ── Legacy Polymarket flat file (slug-based inference) ─────────────
     legacy_pm_path = data_root / "polymarket_us_snapshots.jsonl"
@@ -570,15 +643,6 @@ def _add_legacy_backfill(
                     mt = _PM_PREFIX_MAP.get(prefix)
                     if mt is None:
                         continue
-                    observed = snap.get("observed_at_utc", "")
-                    event_start = snap.get("event_start_utc", "")
-                    if not observed or not event_start:
-                        continue
-                    try:
-                        if parse_utc(observed) > parse_utc(event_start):
-                            continue
-                    except (ValueError, TypeError):
-                        continue
                     if mt == "spread":
                         spread_count += 1
                     elif mt == "total":
@@ -595,15 +659,6 @@ def _add_legacy_backfill(
                     try:
                         snap = json.loads(line)
                     except json.JSONDecodeError:
-                        continue
-                    observed = snap.get("observed_at_utc", "")
-                    event_start = snap.get("event_start_utc", "")
-                    if not observed or not event_start:
-                        continue
-                    try:
-                        if parse_utc(observed) > parse_utc(event_start):
-                            continue
-                    except (ValueError, TypeError):
                         continue
                     markets = snap.get("markets") or {}
                     if isinstance(markets.get("spread"), dict):

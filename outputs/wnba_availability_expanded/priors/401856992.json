@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-14T18:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -2.394636,
+      "player_name": "Alanna Smith",
+      "projected_minutes": 11.210762,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 9,
+      "source_minutes": 122.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.619835,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 9.192825,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 8,
+      "source_minutes": 84.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.811594,
+      "player_name": "Arike Ogunbowale",
+      "projected_minutes": 25.840807,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 10,
+      "source_minutes": 290.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 4.087452,
+      "player_name": "Awak Kuier",
+      "projected_minutes": 17.264574,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 7,
+      "source_minutes": 126.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.115242,
+      "player_name": "Aziaha James",
+      "projected_minutes": 18.161435,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 10,
+      "source_minutes": 138.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 6.805158,
+      "player_name": "Azzi Fudd",
+      "projected_minutes": 26.90583,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 10,
+      "source_minutes": 298.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.492611,
+      "player_name": "Costanza Verona",
+      "projected_minutes": 5.044843,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dulcy Fankam Mendjiadeu",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Haley Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.484262,
+      "player_name": "JJ Quinerly",
+      "projected_minutes": 4.484305,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 2,
+      "source_minutes": 13.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 4.114365,
+      "player_name": "Jessica Shepard",
+      "projected_minutes": 27.410314,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 10,
+      "source_minutes": 317.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.222222,
+      "player_name": "Li Yueru",
+      "projected_minutes": 4.035874,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 7,
+      "source_minutes": 50.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 3.463588,
+      "player_name": "Maddy Siegrist",
+      "projected_minutes": 14.686099,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 10,
+      "source_minutes": 163.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 3.024194,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 9.192825,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 7,
+      "source_minutes": 96.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 3.535354,
+      "player_name": "Paige Bueckers",
+      "projected_minutes": 26.569507,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 9,
+      "source_minutes": 293.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.492611,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 4.043127,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 32.401884,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 10,
+      "source_minutes": 342.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 1.070664,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 4.709576,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 9,
+      "source_minutes": 67.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.677376,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 33.21821,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 10,
+      "source_minutes": 347.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.682261,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 10.235479,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 7,
+      "source_minutes": 113.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.533049,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 9.167975,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 7,
+      "source_minutes": 69.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dana Evans",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 5.122951,
+      "player_name": "Jackie Young",
+      "projected_minutes": 33.594976,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 10,
+      "source_minutes": 332.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -2.741935,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 24.992151,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 8,
+      "source_minutes": 220.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.21645,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 7.598116,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 6,
+      "source_minutes": 62.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 3.023256,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 24.615385,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 10,
+      "source_minutes": 245.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.180602,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 19.466248,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 10,
+      "source_minutes": 198.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.21645,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Dallas Wings": {
+      "normalization_scale": 0.840807,
+      "players": 16,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 237.866667,
+      "replacement_impact_points_per_100": -0.492611
+    },
+    "Las Vegas Aces": {
+      "normalization_scale": 0.941915,
+      "players": 15,
+      "players_with_minutes": 10,
+      "raw_projected_minutes": 212.333333,
+      "replacement_impact_points_per_100": -0.21645
+    }
+  },
+  "valid_from": "2026-06-16",
+  "valid_through": "2026-06-16"
+}

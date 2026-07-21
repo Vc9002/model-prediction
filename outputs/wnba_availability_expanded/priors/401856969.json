@@ -1,0 +1,334 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-06T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -1.388889,
+      "player_name": "Alex Fowler",
+      "projected_minutes": 10.748999,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 2,
+      "source_minutes": 32.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.118483,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 7.54717,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 2,
+      "source_minutes": 22.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.4914,
+      "player_name": "Aubrey Griffin",
+      "projected_minutes": 2.058319,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 5.0,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 11.114923,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 7,
+      "source_minutes": 140.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.42047,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 21.406518,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 10,
+      "source_minutes": 323.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.59176,
+      "player_name": "Han Xu",
+      "projected_minutes": 8.919383,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 10,
+      "source_minutes": 134.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.818444,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 21.955403,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 10,
+      "source_minutes": 294.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.326403,
+      "player_name": "Julie Vanloo",
+      "projected_minutes": 10.79474,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 5,
+      "source_minutes": 81.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.453988,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 19.554031,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 3,
+      "source_minutes": 89.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.254438,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 16.878216,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 10,
+      "source_minutes": 276.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.903614,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 18.982276,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 10,
+      "source_minutes": 264.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.621891,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 0.686106,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 2,
+      "source_minutes": 2.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.441614,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 8.553459,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 5,
+      "source_minutes": 71.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.546689,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 10.931961,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 10,
+      "source_minutes": 189.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.508121,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 21.269297,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 1,
+      "source_minutes": 31.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.665245,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 8.5992,
+      "replacement_impact_points_per_100": -1.388889,
+      "source_games": 5,
+      "source_minutes": 69.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.858785,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 20.492011,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 9,
+      "source_minutes": 209.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.461538,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 21.20213,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 9,
+      "source_minutes": 250.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.826087,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 7.101192,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 5,
+      "source_minutes": 60.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.980392,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 3.550596,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 2,
+      "source_minutes": 8.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.331719,
+      "player_name": "Jessica Timmons",
+      "projected_minutes": 9.890946,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 1,
+      "source_minutes": 13.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.243309,
+      "player_name": "Kayana Traylor",
+      "projected_minutes": 8.369262,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 5.45977,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 24.194776,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 10,
+      "source_minutes": 296.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.768166,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 15.369008,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 9,
+      "source_minutes": 178.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.732143,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 13.137205,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 10,
+      "source_minutes": 160.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.334951,
+      "player_name": "Megan McConnell",
+      "projected_minutes": 9.130104,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 1,
+      "source_minutes": 12.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.069519,
+      "player_name": "Monique Billings",
+      "projected_minutes": 9.992392,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 9,
+      "source_minutes": 161.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.086957,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 12.376363,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 10,
+      "source_minutes": 175.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.642202,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 13.695156,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.352941,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 4.311438,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 3,
+      "source_minutes": 25.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 4.333868,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 17.499366,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 10,
+      "source_minutes": 223.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.702811,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 9.688055,
+      "replacement_impact_points_per_100": 0.352941,
+      "source_games": 8,
+      "source_minutes": 98.0,
+      "team": "Indiana Fever"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Indiana Fever": {
+      "normalization_scale": 0.760842,
+      "players": 17,
+      "players_with_minutes": 16,
+      "raw_projected_minutes": 262.866667,
+      "replacement_impact_points_per_100": 0.352941
+    },
+    "New York Liberty": {
+      "normalization_scale": 0.686106,
+      "players": 17,
+      "players_with_minutes": 16,
+      "raw_projected_minutes": 291.5,
+      "replacement_impact_points_per_100": -1.388889
+    }
+  },
+  "valid_from": "2026-06-07",
+  "valid_through": "2026-06-07"
+}

@@ -1,0 +1,334 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-06T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.300752,
+      "player_name": "Bridget Carleton",
+      "projected_minutes": 22.307029,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 9,
+      "source_minutes": 265.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 2.835052,
+      "player_name": "Carla Leite",
+      "projected_minutes": 18.121384,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 8,
+      "source_minutes": 182.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.88383,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 18.761541,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 10,
+      "source_minutes": 237.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.925926,
+      "player_name": "Frieda Buhner",
+      "projected_minutes": 9.208421,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 7,
+      "source_minutes": 86.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Haley Jones",
+      "projected_minutes": 9.528499,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 4,
+      "source_minutes": 51.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.030501,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 6.204604,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 6,
+      "source_minutes": 59.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jordan Harrison",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.209302,
+      "player_name": "Kamiah Smalls",
+      "projected_minutes": 11.325865,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 2,
+      "source_minutes": 30.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.096491,
+      "player_name": "Karlie Samuelson",
+      "projected_minutes": 10.488736,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 4,
+      "source_minutes": 56.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.083333,
+      "player_name": "Luisa Geiselsoder",
+      "projected_minutes": 11.276622,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 10,
+      "source_minutes": 200.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.204819,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 16.742583,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 10,
+      "source_minutes": 181.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.239203,
+      "player_name": "Nyadiew Puoch",
+      "projected_minutes": 11.621322,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 10,
+      "source_minutes": 202.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 3.013029,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 17.333497,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 10,
+      "source_minutes": 214.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.200803,
+      "player_name": "Serah Williams",
+      "projected_minutes": 9.553121,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 8,
+      "source_minutes": 98.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.492537,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 17.481226,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 3,
+      "source_minutes": 69.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.316456,
+      "player_name": "Teja Oblak",
+      "projected_minutes": 10.04555,
+      "replacement_impact_points_per_100": -1.88383,
+      "source_games": 5,
+      "source_minutes": 74.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.455285,
+      "player_name": "Alyssa Thomas",
+      "projected_minutes": 26.948555,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 10,
+      "source_minutes": 338.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.957382,
+      "player_name": "DeWanna Bonner",
+      "projected_minutes": 16.40592,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 10,
+      "source_minutes": 257.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.149425,
+      "player_name": "Jovana Nogic",
+      "projected_minutes": 11.782946,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 10,
+      "source_minutes": 209.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -5.802969,
+      "player_name": "Kahleah Copper",
+      "projected_minutes": 27.963354,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 10,
+      "source_minutes": 341.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.169421,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 10.147992,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 7,
+      "source_minutes": 84.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.892562,
+      "player_name": "Kyara Linskens",
+      "projected_minutes": 11.895701,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 8,
+      "source_minutes": 84.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Lexi Held",
+      "projected_minutes": 11.557435,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 2,
+      "source_minutes": 28.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.789976,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 8.174771,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.9,
+      "player_name": "Monique Akoa Makani",
+      "projected_minutes": 22.071882,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 4,
+      "source_minutes": 100.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.612903,
+      "player_name": "Natasha Mack",
+      "projected_minutes": 20.634249,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 10,
+      "source_minutes": 251.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -4.180602,
+      "player_name": "Noemie Brochant",
+      "projected_minutes": 19.61945,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 10,
+      "source_minutes": 198.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Peyton Williams",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.802885,
+      "player_name": "Quionche Carter",
+      "projected_minutes": 7.329105,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 2,
+      "source_minutes": 16.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sami Whitcomb",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shay Ciezki",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.371308,
+      "player_name": "Valeriane Ayayi",
+      "projected_minutes": 5.46864,
+      "replacement_impact_points_per_100": -3.455285,
+      "source_games": 8,
+      "source_minutes": 74.0,
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Phoenix Mercury": {
+      "normalization_scale": 0.845666,
+      "players": 17,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 236.5,
+      "replacement_impact_points_per_100": -3.455285
+    },
+    "Portland Fire": {
+      "normalization_scale": 0.738643,
+      "players": 17,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 270.766667,
+      "replacement_impact_points_per_100": -1.88383
+    }
+  },
+  "valid_from": "2026-06-06",
+  "valid_through": "2026-06-06"
+}

@@ -232,6 +232,22 @@ models:
     production_artifact: config/models/cs2-neutral-series-elo-v1.json
     market_target: esports_match_winner
     min_edge: 0.02
+  DOTA2:
+    family: neutral_series_elo
+    status: shadow_qualified
+    origin: statistical_model
+    active_production_version: dota2-neutral-series-elo-v1
+    production_artifact: config/models/dota2-neutral-series-elo-v1.json
+    market_target: esports_match_winner
+    min_edge: 0.02
+  VALORANT:
+    family: neutral_series_elo
+    status: shadow_qualified
+    origin: statistical_model
+    active_production_version: valorant-neutral-series-elo-v1
+    production_artifact: config/models/valorant-neutral-series-elo-v1.json
+    market_target: esports_match_winner
+    min_edge: 0.02
   KBO:
     family: tie_aware_home_elo
     status: research

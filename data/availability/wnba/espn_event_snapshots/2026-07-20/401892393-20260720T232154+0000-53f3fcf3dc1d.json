@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3913881",
+      "current_status": "Out",
+      "player_name": "Alanna Smith",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-20T22:44:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4433730",
+      "current_status": "Out",
+      "player_name": "Paige Bueckers",
+      "raw_status": "Out",
+      "reason": "Head",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-20T18:01:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-20T23:00:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4038379",
+      "current_status": "Out",
+      "player_name": "Marine Johannes",
+      "raw_status": "Out",
+      "reason": "Ankle",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-20T17:34:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-17T14:45:00+00:00",
+      "team": "New York Liberty"
+    }
+  ],
+  "event_id": "401892393",
+  "observed_at_utc": "2026-07-20T23:21:54.691724+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "53f3fcf3dc1d4ca1e33908aa9ba75d71852c7aabb4934693c13d59551ce3b568",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-17T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.71599,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 14.855356,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 1,
+      "source_minutes": 19.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -5.64759,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 18.973156,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 10,
+      "source_minutes": 264.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.209131,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 26.791764,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 9,
+      "source_minutes": 279.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.12766,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 9.38233,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 2,
+      "source_minutes": 23.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -4.748603,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 8.391973,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 10,
+      "source_minutes": 137.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 2.652106,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 21.735731,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 10,
+      "source_minutes": 241.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.62622,
+      "player_name": "Maria Conde",
+      "projected_minutes": 25.540787,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 10,
+      "source_minutes": 317.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.388889,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 24.498306,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 9,
+      "source_minutes": 284.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.903811,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 17.670055,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 7,
+      "source_minutes": 151.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.487805,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 3.127443,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.099602,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 15.376596,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 5,
+      "source_minutes": 102.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.677852,
+      "player_name": "Teonni Key",
+      "projected_minutes": 4.586917,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 8,
+      "source_minutes": 47.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.711027,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 9.069586,
+      "replacement_impact_points_per_100": -2.903811,
+      "source_games": 10,
+      "source_minutes": 126.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.621891,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 1.879111,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.343879,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 30.692139,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 10,
+      "source_minutes": 327.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Amy Okonkwo",
+      "projected_minutes": 0.939555,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.294118,
+      "player_name": "Angel Reese",
+      "projected_minutes": 30.692139,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 9,
+      "source_minutes": 280.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.118765,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 2.31757,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 7,
+      "source_minutes": 21.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.186131,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 12.527404,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 10,
+      "source_minutes": 148.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.728513,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 32.633887,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 10,
+      "source_minutes": 333.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.681992,
+      "player_name": "Madina Okot",
+      "projected_minutes": 12.088945,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 10,
+      "source_minutes": 122.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 3.18323,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 29.126214,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 9,
+      "source_minutes": 244.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.27577,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 32.007516,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 10,
+      "source_minutes": 347.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.416667,
+      "player_name": "Sika Kone",
+      "projected_minutes": 9.145005,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 9,
+      "source_minutes": 80.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -3.420523,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 5.950517,
+      "replacement_impact_points_per_100": -2.27577,
+      "source_games": 10,
+      "source_minutes": 97.0,
+      "team": "Atlanta Dream"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.939555,
+      "players": 15,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 212.866667,
+      "replacement_impact_points_per_100": -2.27577
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.781861,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 255.8,
+      "replacement_impact_points_per_100": -2.903811
+    }
+  },
+  "valid_from": "2026-07-17",
+  "valid_through": "2026-07-17"
+}

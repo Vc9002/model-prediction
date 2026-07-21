@@ -1,0 +1,325 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-07T22:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alissa Pili",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.016129,
+      "player_name": "Ariel Atkins",
+      "projected_minutes": 24.851737,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 8,
+      "source_minutes": 220.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.072539,
+      "player_name": "Cameron Brink",
+      "projected_minutes": 16.21011,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 10,
+      "source_minutes": 179.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.807615,
+      "player_name": "Chance Gray",
+      "projected_minutes": 9.940695,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 9,
+      "source_minutes": 99.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.002861,
+      "player_name": "Dearica Hamby",
+      "projected_minutes": 24.399887,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 10,
+      "source_minutes": 299.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.248139,
+      "player_name": "Emma Cannon",
+      "projected_minutes": 1.129624,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 2,
+      "source_minutes": 3.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.58309,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 26.150805,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 10,
+      "source_minutes": 286.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.342466,
+      "player_name": "Jihyun Park",
+      "projected_minutes": 5.365716,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 6,
+      "source_minutes": 38.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 1.789709,
+      "player_name": "Kate Martin",
+      "projected_minutes": 5.930528,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 6,
+      "source_minutes": 47.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.162791,
+      "player_name": "Kelsey Plum",
+      "projected_minutes": 29.370234,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 7,
+      "source_minutes": 245.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.460203,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 27.958204,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 9,
+      "source_minutes": 291.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.298351,
+      "player_name": "Rae Burrell",
+      "projected_minutes": 22.140638,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 10,
+      "source_minutes": 267.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.496278,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 2.541655,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 1,
+      "source_minutes": 3.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.176471,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 4.010167,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 6,
+      "source_minutes": 25.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tonie Morgan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.072539,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.896813,
+      "player_name": "Bridget Carleton",
+      "projected_minutes": 21.498531,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 9,
+      "source_minutes": 259.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Carla Leite",
+      "projected_minutes": 18.021548,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 8,
+      "source_minutes": 180.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.333333,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 16.797258,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 10,
+      "source_minutes": 230.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 1.724138,
+      "player_name": "Frieda Buhner",
+      "projected_minutes": 9.696376,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 7,
+      "source_minutes": 93.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.909091,
+      "player_name": "Haley Jones",
+      "projected_minutes": 9.549461,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 3,
+      "source_minutes": 40.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.030501,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 6.170421,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 6,
+      "source_minutes": 59.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jordan Harrison",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.841346,
+      "player_name": "Kamiah Smalls",
+      "projected_minutes": 11.753183,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 1,
+      "source_minutes": 16.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.105263,
+      "player_name": "Karlie Samuelson",
+      "projected_minutes": 11.606268,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 5,
+      "source_minutes": 75.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.252951,
+      "player_name": "Luisa Geiselsoder",
+      "projected_minutes": 11.410382,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 10,
+      "source_minutes": 193.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.530612,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 16.846229,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 10,
+      "source_minutes": 188.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.288364,
+      "player_name": "Nyadiew Puoch",
+      "projected_minutes": 10.626836,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 10,
+      "source_minutes": 193.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 2.495974,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 18.854065,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 10,
+      "source_minutes": 221.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.200803,
+      "player_name": "Serah Williams",
+      "projected_minutes": 9.50049,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 8,
+      "source_minutes": 98.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.492537,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 17.384917,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 3,
+      "source_minutes": 69.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 1.632653,
+      "player_name": "Teja Oblak",
+      "projected_minutes": 10.284035,
+      "replacement_impact_points_per_100": -1.896813,
+      "source_games": 6,
+      "source_minutes": 90.0,
+      "team": "Portland Fire"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Los Angeles Sparks": {
+      "normalization_scale": 0.847218,
+      "players": 16,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 236.066667,
+      "replacement_impact_points_per_100": -2.072539
+    },
+    "Portland Fire": {
+      "normalization_scale": 0.734574,
+      "players": 17,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 272.266667,
+      "replacement_impact_points_per_100": -1.896813
+    }
+  },
+  "valid_from": "2026-06-07",
+  "valid_through": "2026-06-07"
+}

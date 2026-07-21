@@ -1,0 +1,2155 @@
+{
+  "aggregate": {
+    "adjusted_accuracy": 0.9,
+    "adjusted_brier": 0.1566884653782176,
+    "base_accuracy": 0.9,
+    "base_brier": 0.1665623077778,
+    "brier_delta_adjusted_minus_base": -0.009873842399582416,
+    "diagnostic_evaluable_settled_games": 10,
+    "settled_games": 10,
+    "strict_settled_games": 9
+  },
+  "artifact": "wnba-elo-trend-lr-v3",
+  "artifact_hash": "d339198b196cb3fcd02950ed5efbdd4cefbeb95b2cd63cd756e77f99dc483719",
+  "dallas_audit": {
+    "conclusion": "**The status bug is fixed; the Dallas edge is not.** ESPN identifies Paige Bueckers as Out even though the official WNBA PDF omits her. Isolated, her absence moves Dallas from 67.878% to 59.313%. After all listed absences are combined, Dallas remains 66.100% because New York is also missing material players. That is still a Dallas pick, and the Alanna Smith status conflict makes the production result a no-call.",
+    "games": [
+      {
+        "adjusted_dallas_probability": 0.7944256181728739,
+        "base_dallas_probability": 0.750975,
+        "bueckers_status": "Not listed (treated Available)",
+        "dallas_availability_gap": 2.1095460938,
+        "game_date": "2026-07-19",
+        "outcome": "Dallas win",
+        "paige_only_dallas_probability": 0.750975,
+        "production_disposition": "NO CALL: explicit source conflict"
+      },
+      {
+        "adjusted_dallas_probability": 0.6609984397703345,
+        "base_dallas_probability": 0.678784,
+        "bueckers_status": "Out",
+        "dallas_availability_gap": -0.7179075182,
+        "game_date": "2026-07-20",
+        "outcome": "unsettled",
+        "paige_only_dallas_probability": 0.593131880235857,
+        "production_disposition": "NO CALL: explicit source conflict"
+      }
+    ]
+  },
+  "data_validation": {
+    "official_player_rows": 224,
+    "reports_parsed": 10,
+    "settled_games": 10,
+    "settled_games_diagnostic_evaluable": 10,
+    "settled_games_feature_complete": 9,
+    "status_counts": {
+      "Available": 25,
+      "Doubtful": 13,
+      "Out": 157,
+      "Probable": 22,
+      "Questionable": 7
+    }
+  },
+  "decision": "**Probability-quality positive, winner-accuracy neutral, not promotable.** The challenger preserved winner accuracy and improved Brier in this tiny window.",
+  "games": [
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.5661317452139508,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": -2.0579869093,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.944545445,
+      "away_score": 107,
+      "away_team": "Seattle Storm",
+      "base_home_probability": 0.6207,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:607e61329ed3424c",
+      "delta_probability": -0.05456825478604921,
+      "event_id": "401857073",
+      "event_start_utc": "2026-07-17T23:30Z",
+      "game_date": "2026-07-17",
+      "home_available_minutes_share": 0.871610725,
+      "home_score": 110,
+      "home_team": "Indiana Fever",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 2.796,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 5.445,
+          "matchup": "Seattle Storm @ Indiana Fever",
+          "player": "Aliyah Boston",
+          "projected_minutes": 25.678,
+          "status": "Out",
+          "team": "Indiana Fever"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.738,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 3.328,
+          "matchup": "Seattle Storm @ Indiana Fever",
+          "player": "Ezi Magbegor",
+          "projected_minutes": 11.091,
+          "status": "Out",
+          "team": "Seattle Storm"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Indiana Fever": {
+          "normalization_scale": 0.879379,
+          "players": 13,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 227.433333,
+          "replacement_impact_points_per_100": -0.851582
+        },
+        "Seattle Storm": {
+          "normalization_scale": 0.909091,
+          "players": 13,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 220.0,
+          "replacement_impact_points_per_100": -2.777778
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.6207,
+        "0.5": 0.5936432949471147,
+        "1.0": 0.5661317452139508,
+        "1.5": 0.5382959199154753,
+        "2.0": 0.5102711504457788
+      },
+      "report_at_utc": "2026-07-17T23:00:00+00:00",
+      "report_sha256": "478a848cdaeb977cc2333e1714a81fcb8b8506208bd5112b6de5814e9fd26bb7",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": false,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.4316248255363769,
+      "adjusted_selection": "away",
+      "availability_error": null,
+      "availability_points_gap": -1.2518344653,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.958659575,
+      "away_score": 111,
+      "away_team": "Atlanta Dream",
+      "base_home_probability": 0.46549399999999996,
+      "base_selection": "away",
+      "baseline_source": "flat_picks.xlsx:deb68aa7d25042de",
+      "delta_probability": -0.033869174463623086,
+      "event_id": "401857074",
+      "event_start_utc": "2026-07-17T23:30Z",
+      "game_date": "2026-07-17",
+      "home_available_minutes_share": 0.910086005,
+      "home_score": 92,
+      "home_team": "Toronto Tempo",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 1.075,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 3.62,
+          "matchup": "Atlanta Dream @ Toronto Tempo",
+          "player": "Brittney Sykes",
+          "projected_minutes": 14.855,
+          "status": "Out",
+          "team": "Toronto Tempo"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.151,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 2.416,
+          "matchup": "Atlanta Dream @ Toronto Tempo",
+          "player": "Ornella Bankole",
+          "projected_minutes": 3.127,
+          "status": "Out",
+          "team": "Toronto Tempo"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.136,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": -1.145,
+          "matchup": "Atlanta Dream @ Toronto Tempo",
+          "player": "Te-Hina Paopao",
+          "projected_minutes": 5.951,
+          "status": "Out",
+          "team": "Atlanta Dream"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.111,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 2.395,
+          "matchup": "Atlanta Dream @ Toronto Tempo",
+          "player": "Indya Nivar",
+          "projected_minutes": 2.318,
+          "status": "Out",
+          "team": "Atlanta Dream"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 2.904,
+          "matchup": "Atlanta Dream @ Toronto Tempo",
+          "player": "Kiki Rice",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Toronto Tempo"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Atlanta Dream": {
+          "normalization_scale": 0.939555,
+          "players": 15,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 212.866667,
+          "replacement_impact_points_per_100": -2.27577
+        },
+        "Toronto Tempo": {
+          "normalization_scale": 0.781861,
+          "players": 14,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 255.8,
+          "replacement_impact_points_per_100": -2.903811
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.46549399999999996,
+        "0.5": 0.4485124977275582,
+        "1.0": 0.4316248255363769,
+        "1.5": 0.4148612233531579,
+        "2.0": 0.39825125614678997
+      },
+      "report_at_utc": "2026-07-17T23:00:00+00:00",
+      "report_sha256": "478a848cdaeb977cc2333e1714a81fcb8b8506208bd5112b6de5814e9fd26bb7",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.5285749741693594,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": 0.8515985734,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.86203558,
+      "away_score": 82,
+      "away_team": "Los Angeles Sparks",
+      "base_home_probability": 0.505358,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:9d42b77cda3d44a7",
+      "delta_probability": 0.023216974169359417,
+      "event_id": "401857075",
+      "event_start_utc": "2026-07-17T23:30Z",
+      "game_date": "2026-07-17",
+      "home_available_minutes_share": 0.895998025,
+      "home_score": 96,
+      "home_team": "Chicago Sky",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.874,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 1.788,
+          "matchup": "Los Angeles Sparks @ Chicago Sky",
+          "player": "Kelsey Plum",
+          "projected_minutes": 24.446,
+          "status": "Out",
+          "team": "Los Angeles Sparks"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.212,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 0.509,
+          "matchup": "Los Angeles Sparks @ Chicago Sky",
+          "player": "Skylar Diggins",
+          "projected_minutes": 20.8,
+          "status": "Out",
+          "team": "Chicago Sky"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.189,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 3.006,
+          "matchup": "Los Angeles Sparks @ Chicago Sky",
+          "player": "Alissa Pili",
+          "projected_minutes": 3.147,
+          "status": "Out",
+          "team": "Los Angeles Sparks"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 1.399,
+          "matchup": "Los Angeles Sparks @ Chicago Sky",
+          "player": "DiJonai Carrington",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Chicago Sky"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 1.399,
+          "matchup": "Los Angeles Sparks @ Chicago Sky",
+          "player": "Rickea Jackson",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Chicago Sky"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 3.723,
+          "matchup": "Los Angeles Sparks @ Chicago Sky",
+          "player": "Tonie Morgan",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Los Angeles Sparks"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Chicago Sky": {
+          "normalization_scale": 0.741107,
+          "players": 16,
+          "players_with_minutes": 14,
+          "raw_projected_minutes": 269.866667,
+          "replacement_impact_points_per_100": -1.398601
+        },
+        "Los Angeles Sparks": {
+          "normalization_scale": 0.726129,
+          "players": 17,
+          "players_with_minutes": 16,
+          "raw_projected_minutes": 275.433333,
+          "replacement_impact_points_per_100": -3.723404
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.505358,
+        "0.5": 0.5169736821067865,
+        "1.0": 0.5285749741693594,
+        "1.5": 0.5401520676374906,
+        "2.0": 0.5516952154209558
+      },
+      "report_at_utc": "2026-07-17T23:00:00+00:00",
+      "report_sha256": "478a848cdaeb977cc2333e1714a81fcb8b8506208bd5112b6de5814e9fd26bb7",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": false,
+      "adjusted_correct": false,
+      "adjusted_home_probability": 0.6137912449496834,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": -0.9316044395,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0189544762,
+      "away_available_minutes_share": 0.896017105,
+      "away_score": 96,
+      "away_team": "Connecticut Sun",
+      "base_home_probability": 0.637935,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:33934bb67697420b",
+      "delta_probability": -0.02414375505031663,
+      "event_id": "401857076",
+      "event_start_utc": "2026-07-18T02:00Z",
+      "game_date": "2026-07-17",
+      "home_available_minutes_share": 0.8370525705,
+      "home_score": 83,
+      "home_team": "Phoenix Mercury",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.913,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 2.803,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Natasha Mack",
+          "projected_minutes": 16.292,
+          "status": "Out",
+          "team": "Phoenix Mercury"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.558,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 1.793,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Jovana Nogic",
+          "projected_minutes": 15.552,
+          "status": "Out",
+          "team": "Phoenix Mercury"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.491,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 2.567,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Aneesah Morrow",
+          "projected_minutes": 9.57,
+          "status": "Out",
+          "team": "Connecticut Sun"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.054,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 0.376,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Hailey Van Lith",
+          "projected_minutes": 7.217,
+          "status": "Out",
+          "team": "Connecticut Sun"
+        },
+        {
+          "active_probability": 0.9,
+          "expected_points_lost": 0.006,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 0.424,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Kyara Linskens",
+          "projected_minutes": 7.455,
+          "status": "Probable",
+          "team": "Phoenix Mercury"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-17",
+          "impact_above_replacement_per_100": 0.0,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Ashlon Jackson",
+          "projected_minutes": 4.01,
+          "status": "Out",
+          "team": "Connecticut Sun"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Connecticut Sun": {
+          "normalization_scale": 0.801925,
+          "players": 14,
+          "players_with_minutes": 14,
+          "raw_projected_minutes": 249.4,
+          "replacement_impact_points_per_100": -0.987654
+        },
+        "Phoenix Mercury": {
+          "normalization_scale": 0.740558,
+          "players": 14,
+          "players_with_minutes": 14,
+          "raw_projected_minutes": 270.066667,
+          "replacement_impact_points_per_100": -2.267574
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.637935,
+        "0.5": 0.6259248719786409,
+        "1.0": 0.6137912449496834,
+        "1.5": 0.6015452886886907,
+        "2.0": 0.5891985054140001
+      },
+      "report_at_utc": "2026-07-18T01:30:00+00:00",
+      "report_sha256": "53001b0f844b3376201bcb47ba0a513ee2703b4bd576e198118de9e9838d1340",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.6495594315501887,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": 2.1644127499,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.808599345,
+      "away_score": 88,
+      "away_team": "New York Liberty",
+      "base_home_probability": 0.593309,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:ef7830f025d54963",
+      "delta_probability": 0.05625043155018872,
+      "event_id": "401857077",
+      "event_start_utc": "2026-07-19T00:00Z",
+      "game_date": "2026-07-18",
+      "home_available_minutes_share": 1.000000005,
+      "home_score": 108,
+      "home_team": "Indiana Fever",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 1.314,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 2.537,
+          "matchup": "New York Liberty @ Indiana Fever",
+          "player": "Leonie Fiebich",
+          "projected_minutes": 25.902,
+          "status": "Out",
+          "team": "New York Liberty"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.85,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 3.434,
+          "matchup": "New York Liberty @ Indiana Fever",
+          "player": "Satou Sabally",
+          "projected_minutes": 12.378,
+          "status": "Out",
+          "team": "New York Liberty"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Indiana Fever": {
+          "normalization_scale": 0.870575,
+          "players": 13,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 229.733333,
+          "replacement_impact_points_per_100": -0.851582
+        },
+        "New York Liberty": {
+          "normalization_scale": 0.781759,
+          "players": 14,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 255.833333,
+          "replacement_impact_points_per_100": -1.0
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.593309,
+        "0.5": 0.62175689660352,
+        "1.0": 0.6495594315501887,
+        "1.5": 0.6765827947782184,
+        "2.0": 0.7027053208360726
+      },
+      "report_at_utc": "2026-07-18T23:30:00+00:00",
+      "report_sha256": "3690b7839c328625ec8462b6c2cd1451178a81994d5f6ecf86ed1081ad92de22",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.7600696184590829,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": 0.8466968724,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.79453799,
+      "away_score": 93,
+      "away_team": "Portland Fire",
+      "base_home_probability": 0.741703,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:5c32fca0897f4465",
+      "delta_probability": 0.01836661845908294,
+      "event_id": "401857078",
+      "event_start_utc": "2026-07-19T00:00Z",
+      "game_date": "2026-07-18",
+      "home_available_minutes_share": 0.978729645,
+      "home_score": 101,
+      "home_team": "Minnesota Lynx",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.502,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 1.005,
+          "matchup": "Portland Fire @ Minnesota Lynx",
+          "player": "Megan Gustafson",
+          "projected_minutes": 24.961,
+          "status": "Out",
+          "team": "Portland Fire"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.258,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 2.396,
+          "matchup": "Portland Fire @ Minnesota Lynx",
+          "player": "Holly Winterburn",
+          "projected_minutes": 5.377,
+          "status": "Out",
+          "team": "Portland Fire"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.158,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": -1.853,
+          "matchup": "Portland Fire @ Minnesota Lynx",
+          "player": "Liatu King",
+          "projected_minutes": 4.254,
+          "status": "Out",
+          "team": "Minnesota Lynx"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.07,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": -0.327,
+          "matchup": "Portland Fire @ Minnesota Lynx",
+          "player": "Karlie Samuelson",
+          "projected_minutes": 10.754,
+          "status": "Out",
+          "team": "Portland Fire"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.0,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": -0.651,
+          "matchup": "Portland Fire @ Minnesota Lynx",
+          "player": "Emma Cechova",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Minnesota Lynx"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.0,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": -0.651,
+          "matchup": "Portland Fire @ Minnesota Lynx",
+          "player": "Napheesa Collier",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Minnesota Lynx"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 3.528,
+          "matchup": "Portland Fire @ Minnesota Lynx",
+          "player": "Sania Feagin",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Portland Fire"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Minnesota Lynx": {
+          "normalization_scale": 0.880153,
+          "players": 14,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 227.233333,
+          "replacement_impact_points_per_100": 0.65123
+        },
+        "Portland Fire": {
+          "normalization_scale": 0.849017,
+          "players": 14,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 235.566667,
+          "replacement_impact_points_per_100": -3.527607
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.741703,
+        "0.5": 0.7509764018977843,
+        "1.0": 0.7600696184590829,
+        "1.5": 0.7689786757674717,
+        "2.0": 0.777699986032808
+      },
+      "report_at_utc": "2026-07-18T23:30:00+00:00",
+      "report_sha256": "3690b7839c328625ec8462b6c2cd1451178a81994d5f6ecf86ed1081ad92de22",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.7445228581649423,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": 0.0287174656,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 1.0,
+      "away_score": 69,
+      "away_team": "Washington Mystics",
+      "base_home_probability": 0.743891,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:413a2bc86aab48de",
+      "delta_probability": 0.0006318581649423782,
+      "event_id": "401857079",
+      "event_start_utc": "2026-07-19T00:30Z",
+      "game_date": "2026-07-18",
+      "home_available_minutes_share": 0.9872,
+      "home_score": 74,
+      "home_team": "Golden State Valkyries",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.029,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": -0.561,
+          "matchup": "Washington Mystics @ Golden State Valkyries",
+          "player": "Juste Jocyte",
+          "projected_minutes": 2.56,
+          "status": "Out",
+          "team": "Golden State Valkyries"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 0.537,
+          "matchup": "Washington Mystics @ Golden State Valkyries",
+          "player": "Ashten Prechtel",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Golden State Valkyries"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 0.537,
+          "matchup": "Washington Mystics @ Golden State Valkyries",
+          "player": "Iliana Rupert",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Golden State Valkyries"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-18",
+          "impact_above_replacement_per_100": 0.537,
+          "matchup": "Washington Mystics @ Golden State Valkyries",
+          "player": "Miela Sowah",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Golden State Valkyries"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Golden State Valkyries": {
+          "normalization_scale": 0.96,
+          "players": 15,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 208.333333,
+          "replacement_impact_points_per_100": -0.536673
+        },
+        "Washington Mystics": {
+          "normalization_scale": 0.938967,
+          "players": 13,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 213.0,
+          "replacement_impact_points_per_100": -1.975052
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.743891,
+        "0.5": 0.744207030927492,
+        "1.0": 0.7445228581649423,
+        "1.5": 0.7448384815391033,
+        "2.0": 0.7451539008772318
+      },
+      "report_at_utc": "2026-07-19T00:00:00+00:00",
+      "report_sha256": "5720c38d5ab252705107d399c5fed60629199a158c30f03212b0ab308d94e28c",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.7944256181728739,
+      "adjusted_selection": "home",
+      "availability_error": "NO_CALL_AVAILABILITY_SOURCE_CONFLICT: Smith, Alanna official=Doubtful espn=Out",
+      "availability_points_gap": 2.1095460938,
+      "availability_status": "diagnostic_conflict_resolution",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.81310418,
+      "away_score": 82,
+      "away_team": "Los Angeles Sparks",
+      "base_home_probability": 0.750975,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:660d896695654e99",
+      "delta_probability": 0.04345061817287399,
+      "event_id": "401857080",
+      "event_start_utc": "2026-07-19T17:00Z",
+      "game_date": "2026-07-19",
+      "home_available_minutes_share": 0.95213352,
+      "home_score": 90,
+      "home_team": "Dallas Wings",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 2.17,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 4.209,
+          "matchup": "Los Angeles Sparks @ Dallas Wings",
+          "player": "Kelsey Plum",
+          "projected_minutes": 25.779,
+          "status": "Out",
+          "team": "Los Angeles Sparks"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.601,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 3.141,
+          "matchup": "Los Angeles Sparks @ Dallas Wings",
+          "player": "Alanna Smith",
+          "projected_minutes": 9.573,
+          "status": "Out",
+          "team": "Dallas Wings"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.353,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 2.077,
+          "matchup": "Los Angeles Sparks @ Dallas Wings",
+          "player": "Kiana Williams",
+          "projected_minutes": 8.497,
+          "status": "Out",
+          "team": "Los Angeles Sparks"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.188,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 3.032,
+          "matchup": "Los Angeles Sparks @ Dallas Wings",
+          "player": "Alissa Pili",
+          "projected_minutes": 3.103,
+          "status": "Out",
+          "team": "Los Angeles Sparks"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 1.889,
+          "matchup": "Los Angeles Sparks @ Dallas Wings",
+          "player": "Costanza Verona",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Dallas Wings"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 1.889,
+          "matchup": "Los Angeles Sparks @ Dallas Wings",
+          "player": "Haley Jones",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Dallas Wings"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 3.75,
+          "matchup": "Los Angeles Sparks @ Dallas Wings",
+          "player": "Tonie Morgan",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Los Angeles Sparks"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Dallas Wings": {
+          "normalization_scale": 0.944733,
+          "players": 14,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 211.7,
+          "replacement_impact_points_per_100": -1.888889
+        },
+        "Los Angeles Sparks": {
+          "normalization_scale": 0.716076,
+          "players": 17,
+          "players_with_minutes": 16,
+          "raw_projected_minutes": 279.3,
+          "replacement_impact_points_per_100": -3.75
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.750975,
+        "0.5": 0.7732875463648338,
+        "1.0": 0.7944256181728739,
+        "1.5": 0.8143470896757687,
+        "2.0": 0.8330245263531385
+      },
+      "report_at_utc": "2026-07-19T16:30:00+00:00",
+      "report_sha256": "47f61a1108de2858827250c4c99823dbacad9e7bfb922a29e8e03ad100ca27ae",
+      "source_conflicts": [
+        {
+          "espn_status": "Out",
+          "official_status": "Doubtful",
+          "player_name": "Smith, Alanna",
+          "team": "Dallas Wings"
+        }
+      ]
+    },
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.6730953868898508,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": -0.1062754072,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.856256465,
+      "away_score": 91,
+      "away_team": "Chicago Sky",
+      "base_home_probability": 0.675714,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:9f52810e7f374e1c",
+      "delta_probability": -0.002618613110149215,
+      "event_id": "401857081",
+      "event_start_utc": "2026-07-19T20:00Z",
+      "game_date": "2026-07-19",
+      "home_available_minutes_share": 0.96133567,
+      "home_score": 93,
+      "home_team": "Atlanta Dream",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.158,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": -1.13,
+          "matchup": "Chicago Sky @ Atlanta Dream",
+          "player": "Maddy Westbeld",
+          "projected_minutes": 6.98,
+          "status": "Out",
+          "team": "Chicago Sky"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.153,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": -1.378,
+          "matchup": "Chicago Sky @ Atlanta Dream",
+          "player": "Te-Hina Paopao",
+          "projected_minutes": 5.565,
+          "status": "Out",
+          "team": "Atlanta Dream"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.102,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 2.352,
+          "matchup": "Chicago Sky @ Atlanta Dream",
+          "player": "Indya Nivar",
+          "projected_minutes": 2.168,
+          "status": "Out",
+          "team": "Atlanta Dream"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 0.66,
+          "matchup": "Chicago Sky @ Atlanta Dream",
+          "player": "DiJonai Carrington",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Chicago Sky"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 0.66,
+          "matchup": "Chicago Sky @ Atlanta Dream",
+          "player": "Rickea Jackson",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Chicago Sky"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 0.0,
+          "matchup": "Chicago Sky @ Atlanta Dream",
+          "player": "Skylar Diggins",
+          "projected_minutes": 21.768,
+          "status": "Out",
+          "team": "Chicago Sky"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Atlanta Dream": {
+          "normalization_scale": 0.878735,
+          "players": 15,
+          "players_with_minutes": 15,
+          "raw_projected_minutes": 227.6,
+          "replacement_impact_points_per_100": -1.636364
+        },
+        "Chicago Sky": {
+          "normalization_scale": 0.775595,
+          "players": 16,
+          "players_with_minutes": 14,
+          "raw_projected_minutes": 257.866667,
+          "replacement_impact_points_per_100": -0.660377
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.675714,
+        "0.5": 0.6744057693516459,
+        "1.0": 0.6730953868898508,
+        "1.5": 0.6717828664190648,
+        "2.0": 0.6704682218228102
+      },
+      "report_at_utc": "2026-07-19T19:30:00+00:00",
+      "report_sha256": "9ff267270a184ddb22084c13a72b56e30ceb5cf5d5a7adf291d33e21ea14152c",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": true,
+      "adjusted_correct": true,
+      "adjusted_home_probability": 0.5543650020957003,
+      "adjusted_selection": "home",
+      "availability_error": null,
+      "availability_points_gap": -0.4226763355,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.88280819,
+      "away_score": 63,
+      "away_team": "Connecticut Sun",
+      "base_home_probability": 0.565769,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:44eda71121684cc1",
+      "delta_probability": -0.01140399790429969,
+      "event_id": "401857082",
+      "event_start_utc": "2026-07-19T23:00Z",
+      "game_date": "2026-07-19",
+      "home_available_minutes_share": 0.887384955,
+      "home_score": 72,
+      "home_team": "Phoenix Mercury",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.522,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 4.266,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Quionche Carter",
+          "projected_minutes": 6.118,
+          "status": "Out",
+          "team": "Phoenix Mercury"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.437,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 4.484,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Shay Ciezki",
+          "projected_minutes": 4.873,
+          "status": "Out",
+          "team": "Phoenix Mercury"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.285,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": -1.235,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Sami Whitcomb",
+          "projected_minutes": 11.532,
+          "status": "Out",
+          "team": "Phoenix Mercury"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.257,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 1.492,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Aneesah Morrow",
+          "projected_minutes": 8.624,
+          "status": "Out",
+          "team": "Connecticut Sun"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": -0.031,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": -0.376,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Ashlon Jackson",
+          "projected_minutes": 4.146,
+          "status": "Out",
+          "team": "Connecticut Sun"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.025,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 0.118,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Saniya Rivers",
+          "projected_minutes": 10.669,
+          "status": "Out",
+          "team": "Connecticut Sun"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-19",
+          "impact_above_replacement_per_100": 2.289,
+          "matchup": "Connecticut Sun @ Phoenix Mercury",
+          "player": "Jovana Nogic",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Phoenix Mercury"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Connecticut Sun": {
+          "normalization_scale": 0.829187,
+          "players": 14,
+          "players_with_minutes": 14,
+          "raw_projected_minutes": 241.2,
+          "replacement_impact_points_per_100": -0.611247
+        },
+        "Phoenix Mercury": {
+          "normalization_scale": 0.812128,
+          "players": 14,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 246.266667,
+          "replacement_impact_points_per_100": -2.288984
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.565769,
+        "0.5": 0.5600732312878413,
+        "1.0": 0.5543650020957003,
+        "1.5": 0.5486454807585488,
+        "2.0": 0.5429158426472301
+      },
+      "report_at_utc": "2026-07-19T22:30:00+00:00",
+      "report_sha256": "09679852c2bec17edc8ebb762c263f20514657bd7b9e7dc59bdcc99202d8b916",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": null,
+      "adjusted_correct": null,
+      "adjusted_home_probability": 0.355918952824399,
+      "adjusted_selection": "away",
+      "availability_error": null,
+      "availability_points_gap": 0.5218627256,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.948584715,
+      "away_score": null,
+      "away_team": "Las Vegas Aces",
+      "base_home_probability": 0.34270599999999996,
+      "base_selection": "away",
+      "baseline_source": "flat_picks.xlsx:e35a217d64aa4265",
+      "delta_probability": 0.013212952824399049,
+      "event_id": "401857083",
+      "event_start_utc": "2026-07-21T00:00Z",
+      "game_date": "2026-07-20",
+      "home_available_minutes_share": 0.90118281,
+      "home_score": null,
+      "home_team": "Toronto Tempo",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.522,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 2.537,
+          "matchup": "Las Vegas Aces @ Toronto Tempo",
+          "player": "Kierstan Bell",
+          "projected_minutes": 10.283,
+          "status": "Out",
+          "team": "Las Vegas Aces"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 3.934,
+          "matchup": "Las Vegas Aces @ Toronto Tempo",
+          "player": "Brittney Sykes",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Toronto Tempo"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 3.934,
+          "matchup": "Las Vegas Aces @ Toronto Tempo",
+          "player": "Kiki Rice",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Toronto Tempo"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 0.0,
+          "matchup": "Las Vegas Aces @ Toronto Tempo",
+          "player": "Nyara Sabally",
+          "projected_minutes": 19.763,
+          "status": "Out",
+          "team": "Toronto Tempo"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 1.547,
+          "matchup": "Las Vegas Aces @ Toronto Tempo",
+          "player": "Janiah Barker",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Las Vegas Aces"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 1.547,
+          "matchup": "Las Vegas Aces @ Toronto Tempo",
+          "player": "Mai Yamamoto",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Las Vegas Aces"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Las Vegas Aces": {
+          "normalization_scale": 0.820457,
+          "players": 15,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 243.766667,
+          "replacement_impact_points_per_100": -1.547389
+        },
+        "Toronto Tempo": {
+          "normalization_scale": 0.898338,
+          "players": 14,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 222.633333,
+          "replacement_impact_points_per_100": -3.933566
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.34270599999999996,
+        "0.5": 0.34928964423944,
+        "1.0": 0.355918952824399,
+        "1.5": 0.3625921159494424,
+        "2.0": 0.36930728380307953
+      },
+      "report_at_utc": "2026-07-20T12:15:00+00:00",
+      "report_sha256": "673c8d0f5042874c61fc3b9e323dd0c1f5cbb6b35a7fac536fb4434c5570fd89",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": null,
+      "adjusted_correct": null,
+      "adjusted_home_probability": 0.6609984397703345,
+      "adjusted_selection": "home",
+      "availability_error": "NO_CALL_AVAILABILITY_SOURCE_CONFLICT: Smith, Alanna official=Doubtful espn=Out",
+      "availability_points_gap": -0.7179075182,
+      "availability_status": "diagnostic_conflict_resolution",
+      "availability_uncertainty": 0.0441589583,
+      "away_available_minutes_share": 0.7884945025,
+      "away_score": null,
+      "away_team": "New York Liberty",
+      "base_home_probability": 0.678784,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:5ddbae8d805944cb",
+      "delta_probability": -0.017785560229665598,
+      "event_id": "401892393",
+      "event_start_utc": "2026-07-21T00:00Z",
+      "game_date": "2026-07-20",
+      "home_available_minutes_share": 0.79051507,
+      "home_score": null,
+      "home_team": "Dallas Wings",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 3.343,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 5.167,
+          "matchup": "New York Liberty @ Dallas Wings",
+          "player": "Paige Bueckers",
+          "projected_minutes": 32.349,
+          "status": "Out",
+          "team": "Dallas Wings"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 2.047,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 4.205,
+          "matchup": "New York Liberty @ Dallas Wings",
+          "player": "Leonie Fiebich",
+          "projected_minutes": 24.333,
+          "status": "Out",
+          "team": "New York Liberty"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.842,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 4.0,
+          "matchup": "New York Liberty @ Dallas Wings",
+          "player": "Satou Sabally",
+          "projected_minutes": 10.526,
+          "status": "Out",
+          "team": "New York Liberty"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.308,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 1.612,
+          "matchup": "New York Liberty @ Dallas Wings",
+          "player": "Alanna Smith",
+          "projected_minutes": 9.548,
+          "status": "Out",
+          "team": "Dallas Wings"
+        },
+        {
+          "active_probability": 0.5,
+          "expected_points_lost": 0.044,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 0.297,
+          "matchup": "New York Liberty @ Dallas Wings",
+          "player": "Marine Johannes",
+          "projected_minutes": 14.884,
+          "status": "Questionable",
+          "team": "New York Liberty"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 0.857,
+          "matchup": "New York Liberty @ Dallas Wings",
+          "player": "Costanza Verona",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Dallas Wings"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 0.857,
+          "matchup": "New York Liberty @ Dallas Wings",
+          "player": "Haley Jones",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Dallas Wings"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Dallas Wings": {
+          "normalization_scale": 0.942211,
+          "players": 14,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 212.266667,
+          "replacement_impact_points_per_100": -0.856531
+        },
+        "New York Liberty": {
+          "normalization_scale": 0.734394,
+          "players": 14,
+          "players_with_minutes": 14,
+          "raw_projected_minutes": 272.333333,
+          "replacement_impact_points_per_100": -2.1611
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.678784,
+        "0.5": 0.6699392304201977,
+        "1.0": 0.6609984397703345,
+        "1.5": 0.6519660334079003,
+        "2.0": 0.6428465728448791
+      },
+      "report_at_utc": "2026-07-20T12:15:00+00:00",
+      "report_sha256": "673c8d0f5042874c61fc3b9e323dd0c1f5cbb6b35a7fac536fb4434c5570fd89",
+      "source_conflicts": [
+        {
+          "espn_status": "Out",
+          "official_status": "Doubtful",
+          "player_name": "Smith, Alanna",
+          "team": "Dallas Wings"
+        }
+      ]
+    },
+    {
+      "actual_home_win": null,
+      "adjusted_correct": null,
+      "adjusted_home_probability": 0.750444,
+      "adjusted_selection": "home",
+      "availability_error": "NO_CALL_AVAILABILITY_REPORT_INCOMPLETE: reports not submitted for Washington Mystics, Golden State Valkyries",
+      "availability_points_gap": 0.0,
+      "availability_status": "fail_closed",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 1.0,
+      "away_score": null,
+      "away_team": "Washington Mystics",
+      "base_home_probability": 0.750444,
+      "base_selection": "home",
+      "baseline_source": "flat_picks.xlsx:0da50dc88c9649b8",
+      "delta_probability": 0.0,
+      "event_id": "401857084",
+      "event_start_utc": "2026-07-21T02:00Z",
+      "game_date": "2026-07-20",
+      "home_available_minutes_share": 1.0,
+      "home_score": null,
+      "home_team": "Golden State Valkyries",
+      "player_effects": [],
+      "prior_team_diagnostics": {},
+      "probabilities_by_scale": {
+        "0.0": 0.750444,
+        "0.5": 0.750444,
+        "1.0": 0.750444,
+        "1.5": 0.750444,
+        "2.0": 0.750444
+      },
+      "report_at_utc": "2026-07-19T22:30:00+00:00",
+      "report_sha256": "09679852c2bec17edc8ebb762c263f20514657bd7b9e7dc59bdcc99202d8b916",
+      "source_conflicts": []
+    },
+    {
+      "actual_home_win": null,
+      "adjusted_correct": null,
+      "adjusted_home_probability": 0.25023605026477314,
+      "adjusted_selection": "away",
+      "availability_error": null,
+      "availability_points_gap": -0.4875414215,
+      "availability_status": "complete",
+      "availability_uncertainty": 0.0,
+      "away_available_minutes_share": 0.999999995,
+      "away_score": null,
+      "away_team": "Minnesota Lynx",
+      "base_home_probability": 0.260958,
+      "base_selection": "away",
+      "baseline_source": "flat_picks.xlsx:2d184773492d4263",
+      "delta_probability": -0.010721949735226888,
+      "event_id": "401857085",
+      "event_start_utc": "2026-07-21T02:00Z",
+      "game_date": "2026-07-20",
+      "home_available_minutes_share": 0.90945764,
+      "home_score": null,
+      "home_team": "Seattle Storm",
+      "player_effects": [
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.385,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 1.758,
+          "matchup": "Minnesota Lynx @ Seattle Storm",
+          "player": "Ezi Magbegor",
+          "projected_minutes": 10.937,
+          "status": "Out",
+          "team": "Seattle Storm"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.103,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 0.718,
+          "matchup": "Minnesota Lynx @ Seattle Storm",
+          "player": "Taina Mair",
+          "projected_minutes": 7.172,
+          "status": "Out",
+          "team": "Seattle Storm"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 0.482,
+          "matchup": "Minnesota Lynx @ Seattle Storm",
+          "player": "Emma Cechova",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Minnesota Lynx"
+        },
+        {
+          "active_probability": 0.0,
+          "expected_points_lost": 0.0,
+          "game_date": "2026-07-20",
+          "impact_above_replacement_per_100": 0.482,
+          "matchup": "Minnesota Lynx @ Seattle Storm",
+          "player": "Napheesa Collier",
+          "projected_minutes": 0.0,
+          "status": "Out",
+          "team": "Minnesota Lynx"
+        }
+      ],
+      "prior_team_diagnostics": {
+        "Minnesota Lynx": {
+          "normalization_scale": 0.904977,
+          "players": 14,
+          "players_with_minutes": 12,
+          "raw_projected_minutes": 221.0,
+          "replacement_impact_points_per_100": -0.481696
+        },
+        "Seattle Storm": {
+          "normalization_scale": 0.896459,
+          "players": 13,
+          "players_with_minutes": 13,
+          "raw_projected_minutes": 223.1,
+          "replacement_impact_points_per_100": -1.207729
+        }
+      },
+      "probabilities_by_scale": {
+        "0.0": 0.260958,
+        "0.5": 0.25556765483169974,
+        "1.0": 0.25023605026477314,
+        "1.5": 0.24496401247945948,
+        "2.0": 0.23975232548552883
+      },
+      "report_at_utc": "2026-07-20T12:15:00+00:00",
+      "report_sha256": "673c8d0f5042874c61fc3b9e323dd0c1f5cbb6b35a7fac536fb4434c5570fd89",
+      "source_conflicts": []
+    }
+  ],
+  "generated_at_utc": "2026-07-20T12:42:19.894966+00:00",
+  "margin_sigma": 14.617892053080281,
+  "recommendation": "Keep the official report parser, immutable snapshots, player mapping, projected-minute contract, and fail-closed model hook. Do **not** replace the active WNBA artifact or assign a production coefficient from these ten games. Run the collector prospectively, replace shrunk raw plus/minus with a WNBA-specific regularized lineup-impact prior, then re-run a preregistered fresh cohort.",
+  "reports": [
+    {
+      "entry_count": 31,
+      "not_submitted_teams": 2,
+      "report_at_utc": "2026-07-17T23:00:00+00:00",
+      "sha256": "478a848cdaeb977cc2333e1714a81fcb8b8506208bd5112b6de5814e9fd26bb7",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-17_07_00PM.pdf",
+      "submitted_teams": 11
+    },
+    {
+      "entry_count": 34,
+      "not_submitted_teams": 0,
+      "report_at_utc": "2026-07-18T01:30:00+00:00",
+      "sha256": "53001b0f844b3376201bcb47ba0a513ee2703b4bd576e198118de9e9838d1340",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-17_09_30PM.pdf",
+      "submitted_teams": 13
+    },
+    {
+      "entry_count": 18,
+      "not_submitted_teams": 2,
+      "report_at_utc": "2026-07-18T23:00:00+00:00",
+      "sha256": "ed86550042bffc884e7f02f1dfb48c349f0641cb2409674d1ccd110d3894b0cb",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-18_07_00PM.pdf",
+      "submitted_teams": 9
+    },
+    {
+      "entry_count": 18,
+      "not_submitted_teams": 2,
+      "report_at_utc": "2026-07-18T23:30:00+00:00",
+      "sha256": "3690b7839c328625ec8462b6c2cd1451178a81994d5f6ecf86ed1081ad92de22",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-18_07_30PM.pdf",
+      "submitted_teams": 9
+    },
+    {
+      "entry_count": 26,
+      "not_submitted_teams": 0,
+      "report_at_utc": "2026-07-19T00:00:00+00:00",
+      "sha256": "5720c38d5ab252705107d399c5fed60629199a158c30f03212b0ab308d94e28c",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-18_08_00PM.pdf",
+      "submitted_teams": 12
+    },
+    {
+      "entry_count": 19,
+      "not_submitted_teams": 6,
+      "report_at_utc": "2026-07-19T16:30:00+00:00",
+      "sha256": "47f61a1108de2858827250c4c99823dbacad9e7bfb922a29e8e03ad100ca27ae",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-19_12_30PM.pdf",
+      "submitted_teams": 7
+    },
+    {
+      "entry_count": 22,
+      "not_submitted_teams": 6,
+      "report_at_utc": "2026-07-19T19:30:00+00:00",
+      "sha256": "9ff267270a184ddb22084c13a72b56e30ceb5cf5d5a7adf291d33e21ea14152c",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-19_03_30PM.pdf",
+      "submitted_teams": 7
+    },
+    {
+      "entry_count": 30,
+      "not_submitted_teams": 4,
+      "report_at_utc": "2026-07-19T22:30:00+00:00",
+      "sha256": "09679852c2bec17edc8ebb762c263f20514657bd7b9e7dc59bdcc99202d8b916",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-19_06_30PM.pdf",
+      "submitted_teams": 9
+    },
+    {
+      "entry_count": 13,
+      "not_submitted_teams": 0,
+      "report_at_utc": "2026-07-20T11:30:00+00:00",
+      "sha256": "2422ccc3c88520ff3992c530dac5ebe0797b047c164431e07f2a7d4d557f52b9",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-20_07_30AM.pdf",
+      "submitted_teams": 6
+    },
+    {
+      "entry_count": 13,
+      "not_submitted_teams": 0,
+      "report_at_utc": "2026-07-20T12:15:00+00:00",
+      "sha256": "673c8d0f5042874c61fc3b9e323dd0c1f5cbb6b35a7fac536fb4434c5570fd89",
+      "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-20_08_15AM.pdf",
+      "submitted_teams": 6
+    }
+  ],
+  "schema_version": "1",
+  "sensitivity": [
+    {
+      "accuracy": 0.888889,
+      "brier_all_games": 0.178179,
+      "calls": 9,
+      "cohort": "strict",
+      "gate": 0.5,
+      "scale": 0.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.857143,
+      "brier_all_games": 0.178179,
+      "calls": 7,
+      "cohort": "strict",
+      "gate": 0.55,
+      "scale": 0.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.8,
+      "brier_all_games": 0.178179,
+      "calls": 5,
+      "cohort": "strict",
+      "gate": 0.6,
+      "scale": 0.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.178179,
+      "calls": 3,
+      "cohort": "strict",
+      "gate": 0.65,
+      "scale": 0.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.178179,
+      "calls": 2,
+      "cohort": "strict",
+      "gate": 0.7,
+      "scale": 0.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": null,
+      "brier_all_games": 0.178179,
+      "calls": 0,
+      "cohort": "strict",
+      "gate": 0.75,
+      "scale": 0.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.888889,
+      "brier_all_games": 0.173494,
+      "calls": 9,
+      "cohort": "strict",
+      "gate": 0.5,
+      "scale": 0.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.875,
+      "brier_all_games": 0.173494,
+      "calls": 8,
+      "cohort": "strict",
+      "gate": 0.55,
+      "scale": 0.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.8,
+      "brier_all_games": 0.173494,
+      "calls": 5,
+      "cohort": "strict",
+      "gate": 0.6,
+      "scale": 0.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.173494,
+      "calls": 3,
+      "cohort": "strict",
+      "gate": 0.65,
+      "scale": 0.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.173494,
+      "calls": 2,
+      "cohort": "strict",
+      "gate": 0.7,
+      "scale": 0.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.173494,
+      "calls": 1,
+      "cohort": "strict",
+      "gate": 0.75,
+      "scale": 0.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.888889,
+      "brier_all_games": 0.169403,
+      "calls": 9,
+      "cohort": "strict",
+      "gate": 0.5,
+      "scale": 1.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.875,
+      "brier_all_games": 0.169403,
+      "calls": 8,
+      "cohort": "strict",
+      "gate": 0.55,
+      "scale": 1.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.8,
+      "brier_all_games": 0.169403,
+      "calls": 5,
+      "cohort": "strict",
+      "gate": 0.6,
+      "scale": 1.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.169403,
+      "calls": 3,
+      "cohort": "strict",
+      "gate": 0.65,
+      "scale": 1.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.169403,
+      "calls": 2,
+      "cohort": "strict",
+      "gate": 0.7,
+      "scale": 1.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.169403,
+      "calls": 1,
+      "cohort": "strict",
+      "gate": 0.75,
+      "scale": 1.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.888889,
+      "brier_all_games": 0.165902,
+      "calls": 9,
+      "cohort": "strict",
+      "gate": 0.5,
+      "scale": 1.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.833333,
+      "brier_all_games": 0.165902,
+      "calls": 6,
+      "cohort": "strict",
+      "gate": 0.55,
+      "scale": 1.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.8,
+      "brier_all_games": 0.165902,
+      "calls": 5,
+      "cohort": "strict",
+      "gate": 0.6,
+      "scale": 1.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.165902,
+      "calls": 4,
+      "cohort": "strict",
+      "gate": 0.65,
+      "scale": 1.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.165902,
+      "calls": 2,
+      "cohort": "strict",
+      "gate": 0.7,
+      "scale": 1.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.165902,
+      "calls": 1,
+      "cohort": "strict",
+      "gate": 0.75,
+      "scale": 1.5,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.888889,
+      "brier_all_games": 0.162982,
+      "calls": 9,
+      "cohort": "strict",
+      "gate": 0.5,
+      "scale": 2.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.857143,
+      "brier_all_games": 0.162982,
+      "calls": 7,
+      "cohort": "strict",
+      "gate": 0.55,
+      "scale": 2.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.162982,
+      "calls": 5,
+      "cohort": "strict",
+      "gate": 0.6,
+      "scale": 2.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.162982,
+      "calls": 4,
+      "cohort": "strict",
+      "gate": 0.65,
+      "scale": 2.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.162982,
+      "calls": 3,
+      "cohort": "strict",
+      "gate": 0.7,
+      "scale": 2.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.162982,
+      "calls": 1,
+      "cohort": "strict",
+      "gate": 0.75,
+      "scale": 2.0,
+      "settled_games": 9
+    },
+    {
+      "accuracy": 0.9,
+      "brier_all_games": 0.166562,
+      "calls": 10,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.5,
+      "scale": 0.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.875,
+      "brier_all_games": 0.166562,
+      "calls": 8,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.55,
+      "scale": 0.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.833333,
+      "brier_all_games": 0.166562,
+      "calls": 6,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.6,
+      "scale": 0.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.166562,
+      "calls": 4,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.65,
+      "scale": 0.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.166562,
+      "calls": 3,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.7,
+      "scale": 0.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.166562,
+      "calls": 1,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.75,
+      "scale": 0.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.9,
+      "brier_all_games": 0.161284,
+      "calls": 10,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.5,
+      "scale": 0.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.888889,
+      "brier_all_games": 0.161284,
+      "calls": 9,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.55,
+      "scale": 0.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.833333,
+      "brier_all_games": 0.161284,
+      "calls": 6,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.6,
+      "scale": 0.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.161284,
+      "calls": 4,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.65,
+      "scale": 0.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.161284,
+      "calls": 3,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.7,
+      "scale": 0.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.161284,
+      "calls": 2,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.75,
+      "scale": 0.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.9,
+      "brier_all_games": 0.156688,
+      "calls": 10,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.5,
+      "scale": 1.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.888889,
+      "brier_all_games": 0.156688,
+      "calls": 9,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.55,
+      "scale": 1.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.833333,
+      "brier_all_games": 0.156688,
+      "calls": 6,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.6,
+      "scale": 1.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.156688,
+      "calls": 4,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.65,
+      "scale": 1.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.156688,
+      "calls": 3,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.7,
+      "scale": 1.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.156688,
+      "calls": 2,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.75,
+      "scale": 1.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.9,
+      "brier_all_games": 0.152759,
+      "calls": 10,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.5,
+      "scale": 1.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.857143,
+      "brier_all_games": 0.152759,
+      "calls": 7,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.55,
+      "scale": 1.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.833333,
+      "brier_all_games": 0.152759,
+      "calls": 6,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.6,
+      "scale": 1.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.152759,
+      "calls": 5,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.65,
+      "scale": 1.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.152759,
+      "calls": 3,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.7,
+      "scale": 1.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.152759,
+      "calls": 2,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.75,
+      "scale": 1.5,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.9,
+      "brier_all_games": 0.149472,
+      "calls": 10,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.5,
+      "scale": 2.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 0.875,
+      "brier_all_games": 0.149472,
+      "calls": 8,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.55,
+      "scale": 2.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.149472,
+      "calls": 6,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.6,
+      "scale": 2.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.149472,
+      "calls": 5,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.65,
+      "scale": 2.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.149472,
+      "calls": 4,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.7,
+      "scale": 2.0,
+      "settled_games": 10
+    },
+    {
+      "accuracy": 1.0,
+      "brier_all_games": 0.149472,
+      "calls": 2,
+      "cohort": "diagnostic_including_conflicts",
+      "gate": 0.75,
+      "scale": 2.0,
+      "settled_games": 10
+    }
+  ]
+}

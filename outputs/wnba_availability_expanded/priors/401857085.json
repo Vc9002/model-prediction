@@ -1,0 +1,271 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-19T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 1.478873,
+      "player_name": "Awa Fam",
+      "projected_minutes": 27.491409,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 10,
+      "source_minutes": 310.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.116071,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 24.383684,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 10,
+      "source_minutes": 272.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.550661,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 10.9368,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 4,
+      "source_minutes": 54.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.517483,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 27.312117,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 10,
+      "source_minutes": 315.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.365931,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 24.92156,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 9,
+      "source_minutes": 234.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.296443,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 14.343344,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 7,
+      "source_minutes": 106.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -4.054054,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 14.940983,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 10,
+      "source_minutes": 155.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.244499,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 2.330793,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 4,
+      "source_minutes": 9.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 1.470588,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 27.610937,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 10,
+      "source_minutes": 314.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -4.598826,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 7.769311,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 10,
+      "source_minutes": 111.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.490196,
+      "player_name": "Taina Mair",
+      "projected_minutes": 7.171672,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.207729,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 2.958315,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 4,
+      "source_minutes": 14.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.912214,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 7.829075,
+      "replacement_impact_points_per_100": -1.207729,
+      "source_games": 10,
+      "source_minutes": 124.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 3.968254,
+      "player_name": "Anastasiia Olairi Kosu",
+      "projected_minutes": 10.799397,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 10,
+      "source_minutes": 104.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.346154,
+      "player_name": "Antonia Delaere",
+      "projected_minutes": 10.437406,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 10,
+      "source_minutes": 120.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -0.069252,
+      "player_name": "Courtney Williams",
+      "projected_minutes": 30.588235,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 10,
+      "source_minutes": 322.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dorka Juhasz",
+      "projected_minutes": 17.647059,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 4,
+      "source_minutes": 81.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 2.262443,
+      "player_name": "Eliska Hamzova",
+      "projected_minutes": 5.369532,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 6,
+      "source_minutes": 42.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Emma Cechova",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.728723,
+      "player_name": "Kayla McBride",
+      "projected_minutes": 29.74359,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 10,
+      "source_minutes": 352.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -1.201923,
+      "player_name": "Liatu King",
+      "projected_minutes": 4.374057,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 3,
+      "source_minutes": 16.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -0.481696,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 7.239819,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 10,
+      "source_minutes": 119.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Napheesa Collier",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.89779,
+      "player_name": "Natasha Howard",
+      "projected_minutes": 27.812971,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 10,
+      "source_minutes": 324.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -0.684932,
+      "player_name": "Nia Coffey",
+      "projected_minutes": 22.684766,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 10,
+      "source_minutes": 257.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.307692,
+      "player_name": "Olivia Miles",
+      "projected_minutes": 27.571644,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 8,
+      "source_minutes": 250.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.213592,
+      "player_name": "Teaira McCowan",
+      "projected_minutes": 5.731523,
+      "replacement_impact_points_per_100": -0.481696,
+      "source_games": 2,
+      "source_minutes": 12.0,
+      "team": "Minnesota Lynx"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Minnesota Lynx": {
+      "normalization_scale": 0.904977,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 221.0,
+      "replacement_impact_points_per_100": -0.481696
+    },
+    "Seattle Storm": {
+      "normalization_scale": 0.896459,
+      "players": 13,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 223.1,
+      "replacement_impact_points_per_100": -1.207729
+    }
+  },
+  "valid_from": "2026-07-21",
+  "valid_through": "2026-07-21"
+}

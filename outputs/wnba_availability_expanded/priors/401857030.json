@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-28T17:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -0.297619,
+      "player_name": "Alanna Smith",
+      "projected_minutes": 8.517699,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 8,
+      "source_minutes": 104.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.495726,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 7.300885,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 7,
+      "source_minutes": 68.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.146413,
+      "player_name": "Arike Ogunbowale",
+      "projected_minutes": 22.511062,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 10,
+      "source_minutes": 283.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.457038,
+      "player_name": "Awak Kuier",
+      "projected_minutes": 17.146018,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 7,
+      "source_minutes": 147.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 2.607914,
+      "player_name": "Aziaha James",
+      "projected_minutes": 11.227876,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.923077,
+      "player_name": "Azzi Fudd",
+      "projected_minutes": 29.424779,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 10,
+      "source_minutes": 328.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.492611,
+      "player_name": "Costanza Verona",
+      "projected_minutes": 4.977876,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Haley Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.484262,
+      "player_name": "JJ Quinerly",
+      "projected_minutes": 4.424779,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 2,
+      "source_minutes": 13.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.964187,
+      "player_name": "Jessica Shepard",
+      "projected_minutes": 28.650442,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 10,
+      "source_minutes": 326.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.10846,
+      "player_name": "Li Yueru",
+      "projected_minutes": 8.960177,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 7,
+      "source_minutes": 61.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 4.462659,
+      "player_name": "Maddy Siegrist",
+      "projected_minutes": 9.457965,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 10,
+      "source_minutes": 149.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.877934,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 8.573009,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 2,
+      "source_minutes": 26.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.082251,
+      "player_name": "Paige Bueckers",
+      "projected_minutes": 29.922566,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 9,
+      "source_minutes": 293.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.646552,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 8.904867,
+      "replacement_impact_points_per_100": -0.297619,
+      "source_games": 5,
+      "source_minutes": 64.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 3.284672,
+      "player_name": "Anastasiia Olairi Kosu",
+      "projected_minutes": 12.058465,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 148.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 5.412844,
+      "player_name": "Antonia Delaere",
+      "projected_minutes": 9.257004,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 6.599713,
+      "player_name": "Courtney Williams",
+      "projected_minutes": 26.613886,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 297.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dorka Juhasz",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.356295,
+      "player_name": "Eliska Hamzova",
+      "projected_minutes": 9.744214,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 2,
+      "source_minutes": 21.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Emma Cechova",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 6.366237,
+      "player_name": "Kayla McBride",
+      "projected_minutes": 31.120585,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 299.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -0.488998,
+      "player_name": "Liatu King",
+      "projected_minutes": 8.221681,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 1,
+      "source_minutes": 9.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 5.807623,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 13.398295,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Napheesa Collier",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 7.653791,
+      "player_name": "Natasha Howard",
+      "projected_minutes": 29.963459,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 299.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 5.282738,
+      "player_name": "Nia Coffey",
+      "projected_minutes": 25.395859,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 272.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 7.264957,
+      "player_name": "Olivia Miles",
+      "projected_minutes": 28.867235,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 10,
+      "source_minutes": 302.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.384279,
+      "player_name": "Teaira McCowan",
+      "projected_minutes": 5.359318,
+      "replacement_impact_points_per_100": 3.284672,
+      "source_games": 9,
+      "source_minutes": 58.0,
+      "team": "Minnesota Lynx"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Dallas Wings": {
+      "normalization_scale": 0.829646,
+      "players": 15,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 241.066667,
+      "replacement_impact_points_per_100": -0.297619
+    },
+    "Minnesota Lynx": {
+      "normalization_scale": 0.91352,
+      "players": 14,
+      "players_with_minutes": 11,
+      "raw_projected_minutes": 218.933333,
+      "replacement_impact_points_per_100": 3.284672
+    }
+  },
+  "valid_from": "2026-06-28",
+  "valid_through": "2026-06-28"
+}

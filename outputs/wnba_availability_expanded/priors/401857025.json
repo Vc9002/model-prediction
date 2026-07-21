@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-26T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 2.876106,
+      "player_name": "Aicha Coulibaly",
+      "projected_minutes": 12.204007,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 4,
+      "source_minutes": 52.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.833597,
+      "player_name": "Azura Stevens",
+      "projected_minutes": 23.618701,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 10,
+      "source_minutes": 231.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Chloe Bibby",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Courtney Vandersloot",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "DiJonai Carrington",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.109589,
+      "player_name": "Elizabeth Williams",
+      "projected_minutes": 12.993321,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 10,
+      "source_minutes": 184.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -2.240143,
+      "player_name": "Gabriela Jaquez",
+      "projected_minutes": 21.493625,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 7,
+      "source_minutes": 158.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -2.106969,
+      "player_name": "Jacy Sheldon",
+      "projected_minutes": 17.061324,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 10,
+      "source_minutes": 217.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.068047,
+      "player_name": "Kamilla Cardoso",
+      "projected_minutes": 23.254402,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 10,
+      "source_minutes": 276.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.187648,
+      "player_name": "Maddy Westbeld",
+      "projected_minutes": 9.714633,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 2,
+      "source_minutes": 21.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.197901,
+      "player_name": "Natasha Cloud",
+      "projected_minutes": 21.493625,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 10,
+      "source_minutes": 267.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.113208,
+      "player_name": "Rachel Banham",
+      "projected_minutes": 7.893139,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 9,
+      "source_minutes": 130.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Rickea Jackson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -0.469484,
+      "player_name": "Saylor Poffenbarger",
+      "projected_minutes": 5.343048,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 5,
+      "source_minutes": 26.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.56623,
+      "player_name": "Skylar Diggins",
+      "projected_minutes": 23.982999,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 10,
+      "source_minutes": 287.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -2.495697,
+      "player_name": "Sydney Taylor",
+      "projected_minutes": 20.947177,
+      "replacement_impact_points_per_100": -4.109589,
+      "source_games": 10,
+      "source_minutes": 181.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -7.315234,
+      "player_name": "Bridget Carleton",
+      "projected_minutes": 27.329975,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 9,
+      "source_minutes": 263.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -5.954198,
+      "player_name": "Carla Leite",
+      "projected_minutes": 24.874055,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 10,
+      "source_minutes": 255.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.920635,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 20.465995,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 10,
+      "source_minutes": 230.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.314815,
+      "player_name": "Frieda Buhner",
+      "projected_minutes": 14.357683,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 10,
+      "source_minutes": 140.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.250559,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 6.171285,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 5,
+      "source_minutes": 47.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jordan Harrison",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.697495,
+      "player_name": "Karlie Samuelson",
+      "projected_minutes": 13.853904,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 8,
+      "source_minutes": 119.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -5.347092,
+      "player_name": "Luisa Geiselsoder",
+      "projected_minutes": 13.287154,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 9,
+      "source_minutes": 133.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.599374,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 22.544081,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 10,
+      "source_minutes": 239.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -4.190476,
+      "player_name": "Nyadiew Puoch",
+      "projected_minutes": 12.594458,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 9,
+      "source_minutes": 125.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.978979,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 24.874055,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 10,
+      "source_minutes": 266.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.377119,
+      "player_name": "Serah Williams",
+      "projected_minutes": 8.753149,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 7,
+      "source_minutes": 72.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.356589,
+      "player_name": "Teja Oblak",
+      "projected_minutes": 10.894207,
+      "replacement_impact_points_per_100": -5.347092,
+      "source_games": 9,
+      "source_minutes": 116.0,
+      "team": "Portland Fire"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Chicago Sky": {
+      "normalization_scale": 0.910747,
+      "players": 16,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 219.6,
+      "replacement_impact_points_per_100": -4.109589
+    },
+    "Portland Fire": {
+      "normalization_scale": 0.944584,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 211.733333,
+      "replacement_impact_points_per_100": -5.347092
+    }
+  },
+  "valid_from": "2026-06-26",
+  "valid_through": "2026-06-26"
+}

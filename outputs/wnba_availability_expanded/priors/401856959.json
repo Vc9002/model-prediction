@@ -1,0 +1,370 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-03T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.447427,
+      "player_name": "Alex Fowler",
+      "projected_minutes": 10.156672,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 3,
+      "source_minutes": 47.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.121076,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 8.535927,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 3,
+      "source_minutes": 46.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.4914,
+      "player_name": "Aubrey Griffin",
+      "projected_minutes": 1.944895,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.302103,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 10.93463,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 6,
+      "source_minutes": 123.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.758087,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 20.659103,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 10,
+      "source_minutes": 311.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.478469,
+      "player_name": "Derin Erdogan",
+      "projected_minutes": 11.669368,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 1,
+      "source_minutes": 18.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.834879,
+      "player_name": "Han Xu",
+      "projected_minutes": 8.989735,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 10,
+      "source_minutes": 139.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.450808,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 19.924365,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 10,
+      "source_minutes": 281.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.326403,
+      "player_name": "Julie Vanloo",
+      "projected_minutes": 10.199892,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 5,
+      "source_minutes": 81.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.75594,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 20.097245,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 2,
+      "source_minutes": 63.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.613569,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 15.429498,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 10,
+      "source_minutes": 278.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.607903,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 17.460832,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 10,
+      "source_minutes": 258.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.621891,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 0.648298,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 2,
+      "source_minutes": 2.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.441614,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 8.082118,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 5,
+      "source_minutes": 71.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.433836,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 10.76175,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 10,
+      "source_minutes": 197.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.454139,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 16.855754,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 2,
+      "source_minutes": 47.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.527473,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 7.649919,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 4,
+      "source_minutes": 55.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ugonne Onyiah",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.478469,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.428571,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 14.071295,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 1,
+      "source_minutes": 20.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.491477,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 21.669794,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 10,
+      "source_minutes": 304.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.843373,
+      "player_name": "Elizabeth Balogun",
+      "projected_minutes": 10.553471,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 1,
+      "source_minutes": 15.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.541426,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 15.853659,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 5,
+      "source_minutes": 119.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.529637,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 8.677298,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 10,
+      "source_minutes": 123.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.724138,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 20.919325,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 10,
+      "source_minutes": 267.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 2.859477,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 16.322702,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 10,
+      "source_minutes": 212.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Lexi Held",
+      "projected_minutes": 7.223265,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 9,
+      "source_minutes": 84.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.494234,
+      "player_name": "Maria Conde",
+      "projected_minutes": 15.994371,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 9,
+      "source_minutes": 207.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.240964,
+      "player_name": "Mariella Fasoula",
+      "projected_minutes": 3.752345,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 3,
+      "source_minutes": 15.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.180685,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 19.277674,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 9,
+      "source_minutes": 242.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.417582,
+      "player_name": "Nikolina Milic",
+      "projected_minutes": 6.5197,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 6,
+      "source_minutes": 55.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.299827,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 17.776735,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 7,
+      "source_minutes": 177.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.116009,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 11.022514,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 2,
+      "source_minutes": 31.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.52381,
+      "player_name": "Teonni Key",
+      "projected_minutes": 7.551595,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 10,
+      "source_minutes": 125.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.247525,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 2.814259,
+      "replacement_impact_points_per_100": -1.491477,
+      "source_games": 1,
+      "source_minutes": 4.0,
+      "team": "Toronto Tempo"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "New York Liberty": {
+      "normalization_scale": 0.648298,
+      "players": 19,
+      "players_with_minutes": 17,
+      "raw_projected_minutes": 308.5,
+      "replacement_impact_points_per_100": -0.478469
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.703565,
+      "players": 19,
+      "players_with_minutes": 16,
+      "raw_projected_minutes": 284.266667,
+      "replacement_impact_points_per_100": -1.491477
+    }
+  },
+  "valid_from": "2026-06-03",
+  "valid_through": "2026-06-03"
+}

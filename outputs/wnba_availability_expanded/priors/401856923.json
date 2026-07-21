@@ -1,0 +1,496 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-21T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Awa Fam",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.248756,
+      "player_name": "Beatrice Mompremier",
+      "projected_minutes": 0.91687,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.180915,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 11.094132,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 4,
+      "source_minutes": 103.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.571895,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 11.797066,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 9,
+      "source_minutes": 212.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.849515,
+      "player_name": "Elle Ladine",
+      "projected_minutes": 2.750611,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 2,
+      "source_minutes": 12.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.074219,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 12.836186,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 4,
+      "source_minutes": 112.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.40481,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 11.32335,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 4,
+      "source_minutes": 99.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.351351,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 12.744499,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 6,
+      "source_minutes": 155.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.194553,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 13.615526,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 4,
+      "source_minutes": 114.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.209644,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 5.806846,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 6,
+      "source_minutes": 77.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.001876,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 11.552567,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 6,
+      "source_minutes": 133.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.004717,
+      "player_name": "Jaelyn Brown",
+      "projected_minutes": 5.501222,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jalyn Brown",
+      "projected_minutes": 1.833741,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 1,
+      "source_minutes": 4.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.295896,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 7.28912,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 4,
+      "source_minutes": 63.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.889943,
+      "player_name": "Lexie Brown",
+      "projected_minutes": 8.404645,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 7,
+      "source_minutes": 127.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.614754,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 5.562347,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 7,
+      "source_minutes": 88.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.453488,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 11.644254,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 5,
+      "source_minutes": 116.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.857143,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 14.486553,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 4,
+      "source_minutes": 125.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 1.199041,
+      "player_name": "Rennia Davis",
+      "projected_minutes": 4.278729,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 2,
+      "source_minutes": 17.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.857143,
+      "player_name": "Skylar Diggins",
+      "projected_minutes": 15.082518,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 4,
+      "source_minutes": 125.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.93633,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 11.338631,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 6,
+      "source_minutes": 134.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.447552,
+      "player_name": "Taina Mair",
+      "projected_minutes": 6.265281,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 2,
+      "source_minutes": 29.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.121359,
+      "player_name": "Tiffany Mitchell",
+      "projected_minutes": 5.501222,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 1,
+      "source_minutes": 12.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.289575,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 8.374083,
+      "replacement_impact_points_per_100": -2.40481,
+      "source_games": 7,
+      "source_minutes": 118.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -5.610236,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 8.720691,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 6,
+      "source_minutes": 108.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.463855,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 14.348005,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 10,
+      "source_minutes": 264.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bria Hartley",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.082852,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 12.702592,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 5,
+      "source_minutes": 119.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.011194,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 9.740847,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 7,
+      "source_minutes": 136.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -6.877323,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 9.082682,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 7,
+      "source_minutes": 138.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.067485,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 5.561497,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 7,
+      "source_minutes": 89.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.39165,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 10.958453,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 5,
+      "source_minutes": 103.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.312649,
+      "player_name": "Haley Peters",
+      "projected_minutes": 3.044015,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 3,
+      "source_minutes": 19.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.966184,
+      "player_name": "Harmoni Turner",
+      "projected_minutes": 6.910736,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 1,
+      "source_minutes": 14.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.145078,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 12.702592,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 7,
+      "source_minutes": 179.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.740741,
+      "player_name": "Kyla Oldacre",
+      "projected_minutes": 2.46812,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.117647,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 12.340601,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 1,
+      "source_minutes": 25.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.838174,
+      "player_name": "Lindsay Allen",
+      "projected_minutes": 14.479638,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 3,
+      "source_minutes": 82.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.59952,
+      "player_name": "Madison Hayes",
+      "projected_minutes": 4.607158,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 2,
+      "source_minutes": 17.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.789709,
+      "player_name": "Mamignan Toure",
+      "projected_minutes": 5.627314,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 4,
+      "source_minutes": 47.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.371542,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 17.276841,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 3,
+      "source_minutes": 106.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.239808,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 3.290827,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 2,
+      "source_minutes": 17.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.368421,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 7.996709,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 5,
+      "source_minutes": 75.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.741525,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 5.627314,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 6,
+      "source_minutes": 72.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.222494,
+      "player_name": "Rayah Marshall",
+      "projected_minutes": 2.139037,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 2,
+      "source_minutes": 9.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -8.0,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 13.426573,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 10,
+      "source_minutes": 274.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shey Peddy",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.357995,
+      "player_name": "Taylor Bigby",
+      "projected_minutes": 4.771699,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.074689,
+      "player_name": "Tina Charles",
+      "projected_minutes": 12.176059,
+      "replacement_impact_points_per_100": -3.838174,
+      "source_games": 3,
+      "source_minutes": 82.0,
+      "team": "Connecticut Sun"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.493624,
+      "players": 26,
+      "players_with_minutes": 23,
+      "raw_projected_minutes": 405.166667,
+      "replacement_impact_points_per_100": -3.838174
+    },
+    "Seattle Storm": {
+      "normalization_scale": 0.458435,
+      "players": 26,
+      "players_with_minutes": 23,
+      "raw_projected_minutes": 436.266667,
+      "replacement_impact_points_per_100": -2.40481
+    }
+  },
+  "valid_from": "2026-05-21",
+  "valid_through": "2026-05-21"
+}

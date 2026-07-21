@@ -1,0 +1,33 @@
+{
+  "effective_window": {
+    "from": "2020-01-01",
+    "to": "2026-07-20"
+  },
+  "extracted_at_utc": "2026-07-20T17:09:01.437968Z",
+  "limitations": [
+    "BO3 does not publish a stable public API contract; schema availability may change.",
+    "Historical corrections after extraction require a new versioned backfill.",
+    "Team IDs do not encode point-in-time rosters or substitutions."
+  ],
+  "match_count": 10842,
+  "matches_sha256": "ee7b8bfa77bd8e3fd7b267405864838253cdbeba5c8d32f51c521db487394d9f",
+  "request_pages": {
+    "matches": 115,
+    "teams": 31
+  },
+  "requested_window": {
+    "from": "2020-01-01",
+    "to": "2026-07-20"
+  },
+  "requires_api_key": false,
+  "requires_signup": false,
+  "schema_version": "esports-series-v1",
+  "source": "bo3.gg public website data endpoint",
+  "source_attribution_url": "https://bo3.gg/",
+  "source_base_url": "https://api.bo3.gg/api/v1",
+  "source_terms_url": "https://bo3.gg/wiki/use-of-services",
+  "team_count": 1033,
+  "teams_sha256": "390371168c934351e107eba2e05352b2cec7b001c4b7e8a2d0bd2fe3f68d23df",
+  "title": "valorant",
+  "title_name": "VALORANT"
+}

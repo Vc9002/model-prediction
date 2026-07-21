@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-05T00:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -1.830986,
+      "player_name": "Awa Fam",
+      "projected_minutes": 25.243258,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 10,
+      "source_minutes": 310.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.807284,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 23.24159,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 10,
+      "source_minutes": 259.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.119904,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 14.178482,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 1,
+      "source_minutes": 17.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.0,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 27.244926,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 10,
+      "source_minutes": 300.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.246305,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 21.18432,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 9,
+      "source_minutes": 209.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.1611,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 18.960245,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 5,
+      "source_minutes": 109.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Joyner Holmes",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -5.485612,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 12.010008,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Lexie Brown",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.120536,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 2.112872,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 8,
+      "source_minutes": 48.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.631206,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 25.57687,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 10,
+      "source_minutes": 305.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -5.87156,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 11.120378,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.731707,
+      "player_name": "Taina Mair",
+      "projected_minutes": 5.00417,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.654846,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 3.336113,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 6,
+      "source_minutes": 23.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -6.996269,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 10.786767,
+      "replacement_impact_points_per_100": -2.807284,
+      "source_games": 10,
+      "source_minutes": 136.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -8.0,
+      "player_name": "Bridget Carleton",
+      "projected_minutes": 27.938144,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 10,
+      "source_minutes": 311.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -7.777778,
+      "player_name": "Carla Leite",
+      "projected_minutes": 25.412371,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 10,
+      "source_minutes": 275.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -5.868545,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 19.948454,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 10,
+      "source_minutes": 239.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.963964,
+      "player_name": "Frieda Buhner",
+      "projected_minutes": 14.845361,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 10,
+      "source_minutes": 155.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.670644,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 3.402062,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 4,
+      "source_minutes": 19.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.595238,
+      "player_name": "Jordan Harrison",
+      "projected_minutes": 6.958763,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 2,
+      "source_minutes": 20.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.3,
+      "player_name": "Karlie Samuelson",
+      "projected_minutes": 11.340206,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 7,
+      "source_minutes": 100.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.607214,
+      "player_name": "Luisa Geiselsoder",
+      "projected_minutes": 10.876289,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 7,
+      "source_minutes": 99.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -7.260479,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 25.154639,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 10,
+      "source_minutes": 268.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.571429,
+      "player_name": "Nyadiew Puoch",
+      "projected_minutes": 12.010309,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 9,
+      "source_minutes": 125.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -7.731214,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 25.618557,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 10,
+      "source_minutes": 292.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.15304,
+      "player_name": "Serah Williams",
+      "projected_minutes": 8.865979,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 8,
+      "source_minutes": 77.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.666667,
+      "player_name": "Teja Oblak",
+      "projected_minutes": 7.628866,
+      "replacement_impact_points_per_100": -7.260479,
+      "source_games": 10,
+      "source_minutes": 125.0,
+      "team": "Portland Fire"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Portland Fire": {
+      "normalization_scale": 0.773196,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 258.666667,
+      "replacement_impact_points_per_100": -7.260479
+    },
+    "Seattle Storm": {
+      "normalization_scale": 0.834028,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 239.8,
+      "replacement_impact_points_per_100": -2.807284
+    }
+  },
+  "valid_from": "2026-07-05",
+  "valid_through": "2026-07-05"
+}

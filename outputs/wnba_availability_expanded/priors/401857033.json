@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-28T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.618399,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 19.339243,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 187.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.814815,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 24.883159,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 275.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.682692,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 17.534247,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 224.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.843373,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 4.67365,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 3,
+      "source_minutes": 15.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.426343,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 15.922643,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 177.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.506591,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 15.40693,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 131.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.5,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 22.88477,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 260.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.996805,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 23.722804,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 226.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 10.378727,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 6,
+      "source_minutes": 50.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.49505,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 3.867849,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 1,
+      "source_minutes": 4.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ndjakalenga Mwenentanda",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.975177,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 16.954069,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 164.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.673945,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 24.43191,
+      "replacement_impact_points_per_100": 0.0,
+      "source_games": 10,
+      "source_minutes": 287.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.862745,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 14.145383,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 7,
+      "source_minutes": 110.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 5.007153,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 28.739826,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 9,
+      "source_minutes": 299.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.713178,
+      "player_name": "Han Xu",
+      "projected_minutes": 9.823183,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 10,
+      "source_minutes": 116.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.274363,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 25.540275,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 9,
+      "source_minutes": 267.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.840473,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 24.642155,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 10,
+      "source_minutes": 277.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.240385,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 4.490598,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 3,
+      "source_minutes": 16.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.833605,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 16.222285,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 10,
+      "source_minutes": 213.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 6.099518,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 17.457199,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 10,
+      "source_minutes": 223.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.247166,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 6.960427,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 5,
+      "source_minutes": 41.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.615764,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 5.051923,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.678571,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 9.037328,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 9,
+      "source_minutes": 104.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.061947,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 23.519506,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 6,
+      "source_minutes": 165.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.537367,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 14.369913,
+      "replacement_impact_points_per_100": -0.240385,
+      "source_games": 9,
+      "source_minutes": 162.0,
+      "team": "New York Liberty"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Golden State Valkyries": {
+      "normalization_scale": 0.966962,
+      "players": 16,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 206.833333,
+      "replacement_impact_points_per_100": 0.0
+    },
+    "New York Liberty": {
+      "normalization_scale": 0.841987,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 237.533333,
+      "replacement_impact_points_per_100": -0.240385
+    }
+  },
+  "valid_from": "2026-06-28",
+  "valid_through": "2026-06-28"
+}

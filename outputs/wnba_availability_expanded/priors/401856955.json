@@ -1,0 +1,397 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-02T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.246914,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 0.740389,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 4,
+      "source_minutes": 5.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 4.43314,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 18.490745,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 10,
+      "source_minutes": 288.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.623053,
+      "player_name": "Angel Reese",
+      "projected_minutes": 17.351685,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 9,
+      "source_minutes": 242.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bella Fontleroy",
+      "projected_minutes": 4.556241,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.347222,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 18.224964,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 32.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.122549,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 4.556241,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.592417,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 12.529663,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 22.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.43573,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 2.505933,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 8,
+      "source_minutes": 59.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 5.999051,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 9,
+      "source_minutes": 90.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.210287,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 16.592311,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 10,
+      "source_minutes": 261.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kejia Ran",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.121655,
+      "player_name": "Laila Phelia",
+      "projected_minutes": 6.264832,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.679842,
+      "player_name": "Madina Okot",
+      "projected_minutes": 4.100617,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 9,
+      "source_minutes": 106.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.118483,
+      "player_name": "Maite Cazorla",
+      "projected_minutes": 12.529663,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 22.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.493827,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 2.847651,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.514793,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 18.186996,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 9,
+      "source_minutes": 276.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nia Coffey",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Paige Robinson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.433628,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 19.857617,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 9,
+      "source_minutes": 278.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sacha Washington",
+      "projected_minutes": 3.986711,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.284797,
+      "player_name": "Sika Kone",
+      "projected_minutes": 3.417181,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 9,
+      "source_minutes": 67.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.428571,
+      "player_name": "Stephanie Jones",
+      "projected_minutes": 11.390603,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 1,
+      "source_minutes": 20.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.117096,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 7.593735,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 2,
+      "source_minutes": 27.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.595745,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 8.277171,
+      "replacement_impact_points_per_100": -0.347222,
+      "source_games": 10,
+      "source_minutes": 164.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -5.577299,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 13.374021,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 6,
+      "source_minutes": 111.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -7.010786,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 20.591747,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 10,
+      "source_minutes": 249.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.736264,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 11.38384,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 4,
+      "source_minutes": 55.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.21328,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 17.832029,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 4,
+      "source_minutes": 97.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -6.99187,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 16.876741,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 10,
+      "source_minutes": 215.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -7.595993,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 15.496882,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 10,
+      "source_minutes": 199.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.193613,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 6.793154,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 10,
+      "source_minutes": 101.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.956989,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 11.888019,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 9,
+      "source_minutes": 158.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.201863,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 17.248242,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 10,
+      "source_minutes": 244.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.475059,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 16.717527,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 1,
+      "source_minutes": 21.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.102249,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 9.022157,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 7,
+      "source_minutes": 89.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.106212,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 13.851665,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 6,
+      "source_minutes": 99.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.384615,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 9.924373,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 9,
+      "source_minutes": 120.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -6.875,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 18.999602,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 10,
+      "source_minutes": 240.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shey Peddy",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -6.875,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.56953,
+      "players": 26,
+      "players_with_minutes": 21,
+      "raw_projected_minutes": 351.166667,
+      "replacement_impact_points_per_100": -0.347222
+    },
+    "Connecticut Sun": {
+      "normalization_scale": 0.796073,
+      "players": 15,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 251.233333,
+      "replacement_impact_points_per_100": -6.875
+    }
+  },
+  "valid_from": "2026-06-02",
+  "valid_through": "2026-06-02"
+}

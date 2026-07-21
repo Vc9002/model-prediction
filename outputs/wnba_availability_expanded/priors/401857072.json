@@ -1,0 +1,280 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-15T23:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 1.25261,
+      "player_name": "Alanna Smith",
+      "projected_minutes": 9.573296,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 7,
+      "source_minutes": 79.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.343249,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 8.974965,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 4,
+      "source_minutes": 37.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.220588,
+      "player_name": "Arike Ogunbowale",
+      "projected_minutes": 28.090065,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 10,
+      "source_minutes": 280.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -2.331606,
+      "player_name": "Awak Kuier",
+      "projected_minutes": 14.108014,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 10,
+      "source_minutes": 179.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 2.195609,
+      "player_name": "Aziaha James",
+      "projected_minutes": 6.613132,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 10,
+      "source_minutes": 101.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.933333,
+      "player_name": "Azzi Fudd",
+      "projected_minutes": 32.309872,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 10,
+      "source_minutes": 350.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Costanza Verona",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Haley Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.273458,
+      "player_name": "Jessica Shepard",
+      "projected_minutes": 33.695481,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 10,
+      "source_minutes": 346.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.970954,
+      "player_name": "Li Yueru",
+      "projected_minutes": 11.210833,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 7,
+      "source_minutes": 82.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.598802,
+      "player_name": "Maddy Siegrist",
+      "projected_minutes": 8.250669,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 9,
+      "source_minutes": 101.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.888889,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 8.943473,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 5,
+      "source_minutes": 50.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 3.034301,
+      "player_name": "Paige Bueckers",
+      "projected_minutes": 33.38057,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 10,
+      "source_minutes": 358.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.935484,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 4.84963,
+      "replacement_impact_points_per_100": -1.888889,
+      "source_games": 8,
+      "source_minutes": 65.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 2.189781,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 8.599349,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -5.010225,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 10.423453,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 6,
+      "source_minutes": 89.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.355619,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 27.309446,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 9,
+      "source_minutes": 303.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.098425,
+      "player_name": "Han Xu",
+      "projected_minutes": 11.309446,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 9,
+      "source_minutes": 108.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.56101,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 25.120521,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 10,
+      "source_minutes": 313.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.537217,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 25.90228,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 7,
+      "source_minutes": 218.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.086811,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 16.364821,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 10,
+      "source_minutes": 199.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.2187,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 19.648208,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 10,
+      "source_minutes": 231.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -1.0,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 3.856678,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 8,
+      "source_minutes": 50.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 4.221498,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 4,
+      "source_minutes": 21.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -4.581673,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 8.547231,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 9,
+      "source_minutes": 102.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.710227,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 26.319218,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 10,
+      "source_minutes": 304.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 2.433628,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 12.37785,
+      "replacement_impact_points_per_100": -1.0,
+      "source_games": 3,
+      "source_minutes": 52.0,
+      "team": "New York Liberty"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Dallas Wings": {
+      "normalization_scale": 0.944733,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 211.7,
+      "replacement_impact_points_per_100": -1.888889
+    },
+    "New York Liberty": {
+      "normalization_scale": 0.781759,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 255.833333,
+      "replacement_impact_points_per_100": -1.0
+    }
+  },
+  "valid_from": "2026-07-17",
+  "valid_through": "2026-07-17"
+}

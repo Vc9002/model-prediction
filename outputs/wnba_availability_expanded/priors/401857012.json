@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-22T22:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -5.503731,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 16.572918,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 7,
+      "source_minutes": 136.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.878289,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 18.713129,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 8,
+      "source_minutes": 208.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.041667,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 6.996845,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 3,
+      "source_minutes": 32.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.073801,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 20.030182,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 6,
+      "source_minutes": 142.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.44523,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 14.158321,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 10,
+      "source_minutes": 166.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.618893,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 15.74976,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 10,
+      "source_minutes": 214.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.965066,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 6.420634,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 7,
+      "source_minutes": 58.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.822323,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 8.780354,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 3,
+      "source_minutes": 39.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.586265,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 20.194814,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 9,
+      "source_minutes": 197.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.761905,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 24.530114,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 8,
+      "source_minutes": 230.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.188119,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 7.243792,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 10,
+      "source_minutes": 105.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.61082,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 14.652216,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 10,
+      "source_minutes": 173.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.106383,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 5.70723,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 8,
+      "source_minutes": 70.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.552352,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 20.249691,
+      "replacement_impact_points_per_100": -4.761905,
+      "source_games": 10,
+      "source_minutes": 259.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.10989,
+      "player_name": "Aicha Coulibaly",
+      "projected_minutes": 11.240198,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 4,
+      "source_minutes": 55.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.10509,
+      "player_name": "Azura Stevens",
+      "projected_minutes": 21.376706,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 10,
+      "source_minutes": 209.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Chloe Bibby",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Courtney Vandersloot",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "DiJonai Carrington",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.685092,
+      "player_name": "Elizabeth Williams",
+      "projected_minutes": 14.696486,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 10,
+      "source_minutes": 197.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -2.234637,
+      "player_name": "Gabriela Jaquez",
+      "projected_minutes": 21.144351,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 6,
+      "source_minutes": 137.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.752039,
+      "player_name": "Jacy Sheldon",
+      "projected_minutes": 15.335463,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 10,
+      "source_minutes": 213.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -5.290611,
+      "player_name": "Kamilla Cardoso",
+      "projected_minutes": 23.061284,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 10,
+      "source_minutes": 271.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.365854,
+      "player_name": "Maddy Westbeld",
+      "projected_minutes": 8.713331,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.505814,
+      "player_name": "Natasha Cloud",
+      "projected_minutes": 24.745861,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 10,
+      "source_minutes": 288.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -3.159851,
+      "player_name": "Rachel Banham",
+      "projected_minutes": 8.597154,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 9,
+      "source_minutes": 138.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Rickea Jackson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -0.712589,
+      "player_name": "Saylor Poffenbarger",
+      "projected_minutes": 5.489399,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 4,
+      "source_minutes": 21.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -4.929577,
+      "player_name": "Skylar Diggins",
+      "projected_minutes": 27.359861,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 10,
+      "source_minutes": 310.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.893287,
+      "player_name": "Sydney Taylor",
+      "projected_minutes": 18.239907,
+      "replacement_impact_points_per_100": -4.505814,
+      "source_games": 10,
+      "source_minutes": 181.0,
+      "team": "Chicago Sky"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Chicago Sky": {
+      "normalization_scale": 0.871333,
+      "players": 16,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 229.533333,
+      "replacement_impact_points_per_100": -4.505814
+    },
+    "Connecticut Sun": {
+      "normalization_scale": 0.823158,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 242.966667,
+      "replacement_impact_points_per_100": -4.761905
+    }
+  },
+  "valid_from": "2026-06-22",
+  "valid_through": "2026-06-22"
+}

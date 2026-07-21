@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-04T16:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 0.951173,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 3,
+      "source_minutes": 3.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 3.082192,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 31.452124,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 10,
+      "source_minutes": 330.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Amy Okonkwo",
+      "projected_minutes": 0.951173,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.053824,
+      "player_name": "Angel Reese",
+      "projected_minutes": 29.676601,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 10,
+      "source_minutes": 306.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.358852,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 2.916931,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 7,
+      "source_minutes": 18.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.629496,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 13.189601,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 5.189341,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 31.959417,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 10,
+      "source_minutes": 313.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -5.364372,
+      "player_name": "Madina Okot",
+      "projected_minutes": 10.970197,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 10,
+      "source_minutes": 94.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.061069,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 23.398859,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 9,
+      "source_minutes": 255.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.197889,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 34.495878,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 10,
+      "source_minutes": 358.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.214128,
+      "player_name": "Sika Kone",
+      "projected_minutes": 10.209258,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 9,
+      "source_minutes": 53.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -5.145631,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 9.828789,
+      "replacement_impact_points_per_100": -0.629496,
+      "source_games": 10,
+      "source_minutes": 115.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.866551,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 18.95082,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 177.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.014925,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 23.213115,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 270.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.373183,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 16.262295,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 219.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.243902,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 3.278689,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 3,
+      "source_minutes": 10.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.136752,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 17.901639,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 185.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.09434,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 14.163934,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 130.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 4.285714,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 23.803279,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 265.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.636943,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 24.131148,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 228.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.107527,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 12.327869,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 7,
+      "source_minutes": 65.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.369458,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 2.622951,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ndjakalenga Mwenentanda",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.526032,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 18.163934,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 157.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.633721,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 25.180328,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 288.0,
+      "team": "Golden State Valkyries"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.951173,
+      "players": 15,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 210.266667,
+      "replacement_impact_points_per_100": -0.629496
+    },
+    "Golden State Valkyries": {
+      "normalization_scale": 0.983607,
+      "players": 16,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 203.333333,
+      "replacement_impact_points_per_100": -0.369458
+    }
+  },
+  "valid_from": "2026-07-04",
+  "valid_through": "2026-07-04"
+}

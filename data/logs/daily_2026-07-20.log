@@ -1212,3 +1212,1270 @@ Started: Mon Jul 20 09:29:13 EDT 2026
   }
 }
 Finished: Mon Jul 20 09:31:40 EDT 2026
+=== model-prediction daily 2026-07-20 (America/New_York) ===
+Started: Mon Jul 20 12:31:40 EDT 2026
+{
+  "date": "2026-07-20",
+  "step1_polymarket_search": {
+    "bbo_capture": {
+      "captured": 328,
+      "failure_details": [],
+      "failures": 0,
+      "missing_executable_ask": 0,
+      "skipped_nonqualification_contracts": 52,
+      "skipped_summer_league": 0,
+      "sports_scope": [
+        "esports",
+        "kbo",
+        "mlb",
+        "nba",
+        "nfl",
+        "npb",
+        "wnba"
+      ],
+      "status": "ok",
+      "storage": "data/odds/<sport>/2026-07-20/polymarket_snapshots.jsonl",
+      "timestamp_valid": true
+    },
+    "event_count": 62,
+    "leagues_with_events": [
+      "MLB",
+      "WNBA",
+      "WTA",
+      "LOL",
+      "CS2",
+      "VALORANT",
+      "DOTA2",
+      "RAINBOW_SIX"
+    ]
+  },
+  "step1b_soccer_scores": {
+    "ARGENTINA": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_argentina_pri",
+      "status": "error"
+    },
+    "BRASILEIRAO": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_brazil_campeo",
+      "status": "error"
+    },
+    "BRAZIL_SERIE_B": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_brazil_serie_",
+      "status": "error"
+    },
+    "CHAMPIONSHIP": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_efl_champ/sco",
+      "status": "error"
+    },
+    "COPA_LIBERTADORES": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_conmebol_copa",
+      "status": "error"
+    },
+    "CSL": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_china_superle",
+      "status": "error"
+    },
+    "ELITESERIEN": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_norway_elites",
+      "status": "error"
+    },
+    "EREDIVISIE": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_netherlands_e",
+      "status": "error"
+    },
+    "K_LEAGUE_1": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_korea_kleague",
+      "status": "error"
+    },
+    "LIGA_MX": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_mexico_ligamx",
+      "status": "error"
+    },
+    "LIGUE_1": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_france_ligue_",
+      "status": "error"
+    },
+    "SUPERLIGA": {
+      "error": "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/soccer_denmark_super",
+      "status": "error"
+    },
+    "historical_path": "data/historical/soccer_games_all.jsonl",
+    "total_new_games": 0
+  },
+  "step2_3_forecast_and_log": {
+    "cs2": {
+      "events": 9,
+      "game_date": "2026-07-20",
+      "model_state": "research",
+      "model_version": "cs2-neutral-series-elo-v1",
+      "no_call_count": 6,
+      "no_calls": [
+        {
+          "event_id": "56756",
+          "event_start_utc": "2026-07-20T16:00:00Z",
+          "market_slug": "aec-cs2-paina-ge-2026-07-20",
+          "reason": "NO_CALL_EVENT_STARTED",
+          "teams": [
+            "paiN Academy",
+            "Guara Esports"
+          ]
+        },
+        {
+          "candidate_counts": [
+            0,
+            1
+          ],
+          "event_id": "56747",
+          "event_start_utc": "2026-07-20T17:00:00Z",
+          "market_slug": "aec-cs2-misa-lilmix-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Misa Esports",
+            "Lilmix"
+          ]
+        },
+        {
+          "candidate_counts": [
+            0,
+            1
+          ],
+          "event_id": "54488",
+          "event_start_utc": "2026-07-20T18:00:00Z",
+          "market_slug": "aec-cs2-alka-rf-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "ALKA GAMING",
+            "Red Feet"
+          ]
+        },
+        {
+          "asks": [
+            0.87,
+            0.14
+          ],
+          "event_id": "56757",
+          "event_start_utc": "2026-07-20T19:00:00Z",
+          "market_slug": "aec-cs2-mag-bk-2026-07-20",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "MAGICOS",
+            "Blitzkrieg"
+          ]
+        },
+        {
+          "asks": [
+            0.23,
+            0.78
+          ],
+          "event_id": "54667",
+          "event_start_utc": "2026-07-20T19:00:00Z",
+          "market_slug": "aec-cs2-hat-paina-2026-07-20",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "HATERS",
+            "paiN Academy"
+          ]
+        },
+        {
+          "candidate_counts": [
+            0,
+            1
+          ],
+          "event_id": "56758",
+          "event_start_utc": "2026-07-20T22:00:00Z",
+          "market_slug": "aec-cs2-ger-mw-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Gr\u00eamio Esports",
+            "METANOIA WOLVES"
+          ]
+        }
+      ],
+      "priced_contracts": [
+        {
+          "artifact_hash": "40df7f7b9128e86cfbc485914f5801a00963b62604711b733b60f782ba9e258b",
+          "event_id": "56113",
+          "event_start_utc": "2026-07-20T17:00:00Z",
+          "market_slug": "aec-cs2-ica-ej-2026-07-20",
+          "model_state": "research",
+          "model_version": "cs2-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:24.671980Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": -0.13146,
+              "executable_ask": 0.54,
+              "model_probability": 0.40854,
+              "side": "long",
+              "team": "Inner Circle Academy"
+            },
+            {
+              "edge_vs_executable_ask": 0.12146,
+              "executable_ask": 0.47,
+              "model_probability": 0.59146,
+              "side": "short",
+              "team": "Endless Journey"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:1:22737",
+            "bo3:1:20902"
+          ],
+          "teams": [
+            "Inner Circle Academy",
+            "Endless Journey"
+          ],
+          "title": "cs2",
+          "units": 0
+        },
+        {
+          "artifact_hash": "40df7f7b9128e86cfbc485914f5801a00963b62604711b733b60f782ba9e258b",
+          "event_id": "54669",
+          "event_start_utc": "2026-07-20T21:00:00Z",
+          "market_slug": "aec-cs2-mibra-quin-2026-07-20",
+          "model_state": "research",
+          "model_version": "cs2-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:27.084820Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": -0.093981,
+              "executable_ask": 0.69,
+              "model_probability": 0.596019,
+              "side": "long",
+              "team": "MIBR Academy"
+            },
+            {
+              "edge_vs_executable_ask": 0.083981,
+              "executable_ask": 0.32,
+              "model_probability": 0.403981,
+              "side": "short",
+              "team": "QUINTESS\u00caNCIA"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:1:2239",
+            "bo3:1:23217"
+          ],
+          "teams": [
+            "MIBR Academy",
+            "QUINTESS\u00caNCIA"
+          ],
+          "title": "cs2",
+          "units": 0
+        },
+        {
+          "artifact_hash": "40df7f7b9128e86cfbc485914f5801a00963b62604711b733b60f782ba9e258b",
+          "event_id": "54672",
+          "event_start_utc": "2026-07-20T21:00:00Z",
+          "market_slug": "aec-cs2-reda-mw-2026-07-20",
+          "model_state": "research",
+          "model_version": "cs2-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:28.742912Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": 0.14105,
+              "executable_ask": 0.59,
+              "model_probability": 0.73105,
+              "side": "long",
+              "team": "RED Canids Academy"
+            },
+            {
+              "edge_vs_executable_ask": -0.15105,
+              "executable_ask": 0.42,
+              "model_probability": 0.26895,
+              "side": "short",
+              "team": "METANOIA WOLVES"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:1:16743",
+            "bo3:1:22729"
+          ],
+          "teams": [
+            "RED Canids Academy",
+            "METANOIA WOLVES"
+          ],
+          "title": "cs2",
+          "units": 0
+        }
+      ],
+      "priced_count": 3,
+      "profitability": "not_established",
+      "title": "cs2",
+      "units": 0
+    },
+    "lol": {
+      "events": 9,
+      "game_date": "2026-07-20",
+      "model_state": "research",
+      "model_version": "lol-neutral-series-elo-v1",
+      "no_call_count": 6,
+      "no_calls": [
+        {
+          "event_id": "56943",
+          "event_start_utc": "2026-07-20T16:00:00Z",
+          "market_slug": "aec-lol-bld-bnf-2026-07-20",
+          "reason": "NO_CALL_EVENT_STARTED",
+          "teams": [
+            "Bulldog Esports",
+            "Brod n Friends"
+          ]
+        },
+        {
+          "event_id": "56944",
+          "event_start_utc": "2026-07-20T16:00:00Z",
+          "market_slug": "aec-lol-vdn-abs-2026-07-20",
+          "reason": "NO_CALL_EVENT_STARTED",
+          "teams": [
+            "Verdant",
+            "Absolved"
+          ]
+        },
+        {
+          "candidate_counts": [
+            1,
+            0
+          ],
+          "event_id": "56946",
+          "event_start_utc": "2026-07-20T18:00:00Z",
+          "market_slug": "aec-lol-ap-sre-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Arctic Pandas",
+            "S\u00f8rby eSport"
+          ]
+        },
+        {
+          "candidate_counts": [
+            1,
+            0
+          ],
+          "event_id": "56945",
+          "event_start_utc": "2026-07-20T18:00:00Z",
+          "market_slug": "aec-lol-ll-b2u-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Lundqvist Lightside",
+            "B2U"
+          ]
+        },
+        {
+          "asks": [
+            0.25,
+            0.76
+          ],
+          "event_id": "54693",
+          "event_start_utc": "2026-07-20T22:00:00Z",
+          "market_slug": "aec-lol-reda-nerd-2026-07-20",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "RED Academy",
+            "Ei Nerd Esports"
+          ]
+        },
+        {
+          "asks": [
+            0.72,
+            0.29
+          ],
+          "event_id": "54745",
+          "event_start_utc": "2026-07-21T00:00:00Z",
+          "market_slug": "aec-lol-est-pnga-2026-07-21",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "Estral Esports",
+            "paiN Gaming Academy"
+          ]
+        }
+      ],
+      "priced_contracts": [
+        {
+          "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
+          "event_id": "54491",
+          "event_start_utc": "2026-07-20T20:00:00Z",
+          "market_slug": "aec-lol-vksa-kbm-2026-07-20",
+          "model_state": "research",
+          "model_version": "lol-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:20.143100Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": 0.123002,
+              "executable_ask": 0.41,
+              "model_probability": 0.533002,
+              "side": "long",
+              "team": "Vivo Keyd Stars Academy"
+            },
+            {
+              "edge_vs_executable_ask": -0.133002,
+              "executable_ask": 0.6,
+              "model_probability": 0.466998,
+              "side": "short",
+              "team": "KaBuM! Ilha das Lendas"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:3:19772",
+            "bo3:3:20354"
+          ],
+          "teams": [
+            "Vivo Keyd Stars Academy",
+            "KaBuM! Ilha das Lendas"
+          ],
+          "title": "lol",
+          "units": 0
+        },
+        {
+          "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
+          "event_id": "54670",
+          "event_start_utc": "2026-07-20T21:00:00Z",
+          "market_slug": "aec-lol-itz-7rex-2026-07-20",
+          "model_state": "research",
+          "model_version": "lol-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:20.789538Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": -0.200751,
+              "executable_ask": 0.66,
+              "model_probability": 0.459249,
+              "side": "long",
+              "team": "INTZ e-Sports"
+            },
+            {
+              "edge_vs_executable_ask": 0.190751,
+              "executable_ask": 0.35,
+              "model_probability": 0.540751,
+              "side": "short",
+              "team": "7REX"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:3:18106",
+            "bo3:3:22741"
+          ],
+          "teams": [
+            "INTZ e-Sports",
+            "7REX"
+          ],
+          "title": "lol",
+          "units": 0
+        },
+        {
+          "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
+          "event_id": "54724",
+          "event_start_utc": "2026-07-20T23:00:00Z",
+          "market_slug": "aec-lol-tse-rmd-2026-07-20",
+          "model_state": "research",
+          "model_version": "lol-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:22.179018Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": 0.05111,
+              "executable_ask": 0.42,
+              "model_probability": 0.47111,
+              "side": "long",
+              "team": "Team Solid"
+            },
+            {
+              "edge_vs_executable_ask": -0.06111,
+              "executable_ask": 0.59,
+              "model_probability": 0.52889,
+              "side": "short",
+              "team": "RMD Gaming"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:3:20445",
+            "bo3:3:23089"
+          ],
+          "teams": [
+            "Team Solid",
+            "RMD Gaming"
+          ],
+          "title": "lol",
+          "units": 0
+        }
+      ],
+      "priced_count": 3,
+      "profitability": "not_established",
+      "title": "lol",
+      "units": 0
+    },
+    "mlb": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-elo-trend-lr-v4.json",
+      "calls": 9,
+      "duplicate_pick_ids": [
+        "ad621924660a4d49",
+        "a72d0dab60924d62",
+        "f96e5bd1ebcc4c62"
+      ],
+      "edge_blocked": [
+        {
+          "event_id": "401816186",
+          "reason": "model edge -0.0242 below 2% minimum over executable ask 0.5900"
+        },
+        {
+          "event_id": "401816190",
+          "reason": "model edge -0.0091 below 2% minimum over executable ask 0.5600"
+        },
+        {
+          "event_id": "401816195",
+          "reason": "model edge -0.0240 below 2% minimum over executable ask 0.6650"
+        },
+        {
+          "event_id": "401816197",
+          "reason": "model edge 0.0164 below 2% minimum over executable ask 0.5400"
+        },
+        {
+          "event_id": "401816198",
+          "reason": "model edge -0.0031 below 2% minimum over executable ask 0.5850"
+        },
+        {
+          "event_id": "401816199",
+          "reason": "model edge 0.0079 below 2% minimum over executable ask 0.5850"
+        }
+      ],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "mlb-elo-trend-lr-v4",
+      "note": "Logged 0 of 9 calls against stored executable asks; 3 duplicates, 0 without a matched quote, 6 blocked by edge gate.",
+      "qualified_shadow_calls": 9,
+      "scheduled_games": 15,
+      "skipped": [],
+      "sport": "mlb",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "edge_blocked": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nba-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nfl": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "edge_blocked": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nfl-elo-trend-lr-v3",
+      "note": "No calls above the learned confidence threshold.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nfl",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "soccer": {
+      "logged": 0,
+      "reason": "unsupported ESPN league: SOCCER",
+      "sport": "soccer",
+      "status": "forecast_unavailable"
+    },
+    "wnba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json",
+      "calls": 4,
+      "duplicate_pick_ids": [
+        "147749d13cbd4451"
+      ],
+      "edge_blocked": [
+        {
+          "event_id": "401857083",
+          "reason": "model edge -0.1728 below 7% minimum over executable ask 0.8300"
+        },
+        {
+          "event_id": "401857084",
+          "reason": "model edge -0.0095 below 7% minimum over executable ask 0.7600"
+        },
+        {
+          "event_id": "401857085",
+          "reason": "model edge -0.0712 below 7% minimum over executable ask 0.8100"
+        }
+      ],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "wnba-elo-trend-lr-v3",
+      "note": "Logged 0 of 4 calls against stored executable asks; 1 duplicates, 0 without a matched quote, 3 blocked by edge gate.",
+      "qualified_shadow_calls": 4,
+      "scheduled_games": 4,
+      "skipped": [],
+      "sport": "wnba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    }
+  },
+  "step3b_polymarket_odds_snapshots": {
+    "cs2": {
+      "moneyline_snapshots": 699,
+      "snapshots": 699,
+      "spread_snapshots": 0,
+      "total_snapshots": 0,
+      "with_executable_bbo": 699
+    },
+    "lol": {
+      "moneyline_snapshots": 699,
+      "snapshots": 699,
+      "spread_snapshots": 0,
+      "total_snapshots": 0,
+      "with_executable_bbo": 699
+    },
+    "mlb": {
+      "moneyline_snapshots": 306,
+      "snapshots": 4116,
+      "spread_snapshots": 1710,
+      "total_snapshots": 2100,
+      "with_executable_bbo": 4116
+    },
+    "wnba": {
+      "moneyline_snapshots": 79,
+      "snapshots": 1326,
+      "spread_snapshots": 563,
+      "total_snapshots": 684,
+      "with_executable_bbo": 1326
+    }
+  },
+  "step4_settlement": {
+    "failures": [],
+    "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+    "settled": [],
+    "still_open": [
+      "ad621924660a4d49",
+      "a72d0dab60924d62",
+      "f96e5bd1ebcc4c62",
+      "147749d13cbd4451",
+      "2ca332931d5a4fdb",
+      "19b13148b06b408d",
+      "3646f4334f58469d",
+      "a2f62addc7be49e9"
+    ],
+    "voided": []
+  },
+  "step5_summary": {
+    "bankroll_reference_units": 5,
+    "date_et": "2026-07-20",
+    "mean_probability_clv": null,
+    "model_drift": {},
+    "note": "Shadow research accounting only; no real-money authorization.",
+    "open_picks": 8,
+    "open_units": 4.75,
+    "picks_logged_today": 8,
+    "picks_settled_today": 0,
+    "qualified_pnl_units_all_time": 0,
+    "research_progress": {
+      "iteration_policy": "continuous_no_parameter_freezes",
+      "measured_edge_forward_picks": 0,
+      "measured_edge_settled": 0,
+      "promotion_requires": "versioned walk-forward ablation and locked holdout"
+    }
+  },
+  "step5b_wnba_availability": {
+    "priors": {
+      "events": {
+        "401857083": {
+          "players": 29,
+          "teams": [
+            "Toronto Tempo",
+            "Las Vegas Aces"
+          ]
+        },
+        "401857084": {
+          "players": 28,
+          "teams": [
+            "Golden State Valkyries",
+            "Washington Mystics"
+          ]
+        },
+        "401857085": {
+          "players": 27,
+          "teams": [
+            "Seattle Storm",
+            "Minnesota Lynx"
+          ]
+        },
+        "401892393": {
+          "players": 28,
+          "teams": [
+            "Dallas Wings",
+            "New York Liberty"
+          ]
+        }
+      },
+      "game_date": "2026-07-20",
+      "prior_path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data/player_priors/wnba/2026-07-20.json",
+      "status": "ok",
+      "total_players": 112
+    }
+  },
+  "step6_flat_forecast_and_log": {
+    "cs2": {
+      "events": 9,
+      "game_date": "2026-07-20",
+      "model_state": "research",
+      "model_version": "cs2-neutral-series-elo-v1",
+      "no_call_count": 6,
+      "no_calls": [
+        {
+          "event_id": "56756",
+          "event_start_utc": "2026-07-20T16:00:00Z",
+          "market_slug": "aec-cs2-paina-ge-2026-07-20",
+          "reason": "NO_CALL_EVENT_STARTED",
+          "teams": [
+            "paiN Academy",
+            "Guara Esports"
+          ]
+        },
+        {
+          "candidate_counts": [
+            0,
+            1
+          ],
+          "event_id": "56747",
+          "event_start_utc": "2026-07-20T17:00:00Z",
+          "market_slug": "aec-cs2-misa-lilmix-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Misa Esports",
+            "Lilmix"
+          ]
+        },
+        {
+          "candidate_counts": [
+            0,
+            1
+          ],
+          "event_id": "54488",
+          "event_start_utc": "2026-07-20T18:00:00Z",
+          "market_slug": "aec-cs2-alka-rf-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "ALKA GAMING",
+            "Red Feet"
+          ]
+        },
+        {
+          "asks": [
+            0.87,
+            0.14
+          ],
+          "event_id": "56757",
+          "event_start_utc": "2026-07-20T19:00:00Z",
+          "market_slug": "aec-cs2-mag-bk-2026-07-20",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "MAGICOS",
+            "Blitzkrieg"
+          ]
+        },
+        {
+          "asks": [
+            0.23,
+            0.78
+          ],
+          "event_id": "54667",
+          "event_start_utc": "2026-07-20T19:00:00Z",
+          "market_slug": "aec-cs2-hat-paina-2026-07-20",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "HATERS",
+            "paiN Academy"
+          ]
+        },
+        {
+          "candidate_counts": [
+            0,
+            1
+          ],
+          "event_id": "56758",
+          "event_start_utc": "2026-07-20T22:00:00Z",
+          "market_slug": "aec-cs2-ger-mw-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Gr\u00eamio Esports",
+            "METANOIA WOLVES"
+          ]
+        }
+      ],
+      "priced_contracts": [
+        {
+          "artifact_hash": "40df7f7b9128e86cfbc485914f5801a00963b62604711b733b60f782ba9e258b",
+          "event_id": "56113",
+          "event_start_utc": "2026-07-20T17:00:00Z",
+          "market_slug": "aec-cs2-ica-ej-2026-07-20",
+          "model_state": "research",
+          "model_version": "cs2-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:49.763218Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": -0.13146,
+              "executable_ask": 0.54,
+              "model_probability": 0.40854,
+              "side": "long",
+              "team": "Inner Circle Academy"
+            },
+            {
+              "edge_vs_executable_ask": 0.12146,
+              "executable_ask": 0.47,
+              "model_probability": 0.59146,
+              "side": "short",
+              "team": "Endless Journey"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:1:22737",
+            "bo3:1:20902"
+          ],
+          "teams": [
+            "Inner Circle Academy",
+            "Endless Journey"
+          ],
+          "title": "cs2",
+          "units": 0
+        },
+        {
+          "artifact_hash": "40df7f7b9128e86cfbc485914f5801a00963b62604711b733b60f782ba9e258b",
+          "event_id": "54669",
+          "event_start_utc": "2026-07-20T21:00:00Z",
+          "market_slug": "aec-cs2-mibra-quin-2026-07-20",
+          "model_state": "research",
+          "model_version": "cs2-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:52.412465Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": -0.093981,
+              "executable_ask": 0.69,
+              "model_probability": 0.596019,
+              "side": "long",
+              "team": "MIBR Academy"
+            },
+            {
+              "edge_vs_executable_ask": 0.083981,
+              "executable_ask": 0.32,
+              "model_probability": 0.403981,
+              "side": "short",
+              "team": "QUINTESS\u00caNCIA"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:1:2239",
+            "bo3:1:23217"
+          ],
+          "teams": [
+            "MIBR Academy",
+            "QUINTESS\u00caNCIA"
+          ],
+          "title": "cs2",
+          "units": 0
+        },
+        {
+          "artifact_hash": "40df7f7b9128e86cfbc485914f5801a00963b62604711b733b60f782ba9e258b",
+          "event_id": "54672",
+          "event_start_utc": "2026-07-20T21:00:00Z",
+          "market_slug": "aec-cs2-reda-mw-2026-07-20",
+          "model_state": "research",
+          "model_version": "cs2-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:52.855226Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": 0.14105,
+              "executable_ask": 0.59,
+              "model_probability": 0.73105,
+              "side": "long",
+              "team": "RED Canids Academy"
+            },
+            {
+              "edge_vs_executable_ask": -0.15105,
+              "executable_ask": 0.42,
+              "model_probability": 0.26895,
+              "side": "short",
+              "team": "METANOIA WOLVES"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:1:16743",
+            "bo3:1:22729"
+          ],
+          "teams": [
+            "RED Canids Academy",
+            "METANOIA WOLVES"
+          ],
+          "title": "cs2",
+          "units": 0
+        }
+      ],
+      "priced_count": 3,
+      "profitability": "not_established",
+      "title": "cs2",
+      "units": 0
+    },
+    "lol": {
+      "events": 9,
+      "game_date": "2026-07-20",
+      "model_state": "research",
+      "model_version": "lol-neutral-series-elo-v1",
+      "no_call_count": 6,
+      "no_calls": [
+        {
+          "event_id": "56943",
+          "event_start_utc": "2026-07-20T16:00:00Z",
+          "market_slug": "aec-lol-bld-bnf-2026-07-20",
+          "reason": "NO_CALL_EVENT_STARTED",
+          "teams": [
+            "Bulldog Esports",
+            "Brod n Friends"
+          ]
+        },
+        {
+          "event_id": "56944",
+          "event_start_utc": "2026-07-20T16:00:00Z",
+          "market_slug": "aec-lol-vdn-abs-2026-07-20",
+          "reason": "NO_CALL_EVENT_STARTED",
+          "teams": [
+            "Verdant",
+            "Absolved"
+          ]
+        },
+        {
+          "candidate_counts": [
+            1,
+            0
+          ],
+          "event_id": "56946",
+          "event_start_utc": "2026-07-20T18:00:00Z",
+          "market_slug": "aec-lol-ap-sre-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Arctic Pandas",
+            "S\u00f8rby eSport"
+          ]
+        },
+        {
+          "candidate_counts": [
+            1,
+            0
+          ],
+          "event_id": "56945",
+          "event_start_utc": "2026-07-20T18:00:00Z",
+          "market_slug": "aec-lol-ll-b2u-2026-07-20",
+          "reason": "NO_CALL_ENTITY_UNRESOLVED",
+          "teams": [
+            "Lundqvist Lightside",
+            "B2U"
+          ]
+        },
+        {
+          "asks": [
+            0.25,
+            0.76
+          ],
+          "event_id": "54693",
+          "event_start_utc": "2026-07-20T22:00:00Z",
+          "market_slug": "aec-lol-reda-nerd-2026-07-20",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "RED Academy",
+            "Ei Nerd Esports"
+          ]
+        },
+        {
+          "asks": [
+            0.72,
+            0.29
+          ],
+          "event_id": "54745",
+          "event_start_utc": "2026-07-21T00:00:00Z",
+          "market_slug": "aec-lol-est-pnga-2026-07-21",
+          "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+          "teams": [
+            "Estral Esports",
+            "paiN Gaming Academy"
+          ]
+        }
+      ],
+      "priced_contracts": [
+        {
+          "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
+          "event_id": "54491",
+          "event_start_utc": "2026-07-20T20:00:00Z",
+          "market_slug": "aec-lol-vksa-kbm-2026-07-20",
+          "model_state": "research",
+          "model_version": "lol-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:44.719277Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": 0.123002,
+              "executable_ask": 0.41,
+              "model_probability": 0.533002,
+              "side": "long",
+              "team": "Vivo Keyd Stars Academy"
+            },
+            {
+              "edge_vs_executable_ask": -0.133002,
+              "executable_ask": 0.6,
+              "model_probability": 0.466998,
+              "side": "short",
+              "team": "KaBuM! Ilha das Lendas"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:3:19772",
+            "bo3:3:20354"
+          ],
+          "teams": [
+            "Vivo Keyd Stars Academy",
+            "KaBuM! Ilha das Lendas"
+          ],
+          "title": "lol",
+          "units": 0
+        },
+        {
+          "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
+          "event_id": "54670",
+          "event_start_utc": "2026-07-20T21:00:00Z",
+          "market_slug": "aec-lol-itz-7rex-2026-07-20",
+          "model_state": "research",
+          "model_version": "lol-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:45.936043Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": -0.200751,
+              "executable_ask": 0.66,
+              "model_probability": 0.459249,
+              "side": "long",
+              "team": "INTZ e-Sports"
+            },
+            {
+              "edge_vs_executable_ask": 0.190751,
+              "executable_ask": 0.35,
+              "model_probability": 0.540751,
+              "side": "short",
+              "team": "7REX"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:3:18106",
+            "bo3:3:22741"
+          ],
+          "teams": [
+            "INTZ e-Sports",
+            "7REX"
+          ],
+          "title": "lol",
+          "units": 0
+        },
+        {
+          "artifact_hash": "1f56359bf30bb6d51629a345226e3008ebfe73210551f6db9f5ce09f656ffdd6",
+          "event_id": "54724",
+          "event_start_utc": "2026-07-20T23:00:00Z",
+          "market_slug": "aec-lol-tse-rmd-2026-07-20",
+          "model_state": "research",
+          "model_version": "lol-neutral-series-elo-v1",
+          "observed_at_utc": "2026-07-20T16:33:47.054003Z",
+          "qualification": "NO_CALL_MODEL_UNVALIDATED",
+          "record_type": "RESEARCH_OBSERVATION",
+          "sides": [
+            {
+              "edge_vs_executable_ask": 0.05111,
+              "executable_ask": 0.42,
+              "model_probability": 0.47111,
+              "side": "long",
+              "team": "Team Solid"
+            },
+            {
+              "edge_vs_executable_ask": -0.06111,
+              "executable_ask": 0.59,
+              "model_probability": 0.52889,
+              "side": "short",
+              "team": "RMD Gaming"
+            }
+          ],
+          "source_team_ids": [
+            "bo3:3:20445",
+            "bo3:3:23089"
+          ],
+          "teams": [
+            "Team Solid",
+            "RMD Gaming"
+          ],
+          "title": "lol",
+          "units": 0
+        }
+      ],
+      "priced_count": 3,
+      "profitability": "not_established",
+      "title": "lol",
+      "units": 0
+    },
+    "mlb": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/mlb-elo-trend-lr-v4.json",
+      "calls": 9,
+      "duplicate_pick_ids": [
+        "5df3c9112e914547",
+        "e598241db79c4dfb",
+        "099694587c434b4a",
+        "6c1b1d290ce24d73",
+        "43b2ed970ab34f5f",
+        "556a298369cf47bd",
+        "1ca3aac02ee1494c",
+        "8d7ca0ea971a4878",
+        "40fd1303ee5c40bc",
+        "f140b8e744fa42a4",
+        "e2d3732e917242c3",
+        "7088516dc8f442f0",
+        "cbd07a2b3b254a5a",
+        "3f1ba5855ae540e0",
+        "2bd291e543c748bf"
+      ],
+      "edge_blocked": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "mlb-elo-trend-lr-v4",
+      "note": "Flat mode: logged 0 of 15 games (9 above threshold); 15 duplicates, 0 without a matched quote, 0 blocked by edge gate.",
+      "qualified_shadow_calls": 9,
+      "scheduled_games": 15,
+      "skipped": [],
+      "sport": "mlb",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nba-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "edge_blocked": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nba-elo-trend-lr-v3",
+      "note": "Flat mode: logged 0 of 0 games (0 above threshold); 0 duplicates, 0 without a matched quote, 0 blocked by edge gate.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "nfl": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/nfl-elo-trend-lr-v3.json",
+      "calls": 0,
+      "duplicate_pick_ids": [],
+      "edge_blocked": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "nfl-elo-trend-lr-v3",
+      "note": "Flat mode: logged 0 of 0 games (0 above threshold); 0 duplicates, 0 without a matched quote, 0 blocked by edge gate.",
+      "qualified_shadow_calls": 0,
+      "scheduled_games": 0,
+      "skipped": [],
+      "sport": "nfl",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    },
+    "soccer": {
+      "logged": 0,
+      "reason": "unsupported ESPN league: SOCCER",
+      "sport": "soccer",
+      "status": "forecast_unavailable"
+    },
+    "wnba": {
+      "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/config/models/wnba-elo-trend-lr-v3.json",
+      "calls": 4,
+      "duplicate_pick_ids": [
+        "4f41d18dabd545ca",
+        "bf6f6152e282469c",
+        "afaf853c69284bb6",
+        "23aad3907b4640b1"
+      ],
+      "edge_blocked": [],
+      "game_date": "2026-07-20",
+      "logged": 0,
+      "logged_pick_ids": [],
+      "model_version": "wnba-elo-trend-lr-v3",
+      "note": "Flat mode: logged 0 of 4 games (4 above threshold); 4 duplicates, 0 without a matched quote, 0 blocked by edge gate.",
+      "qualified_shadow_calls": 4,
+      "scheduled_games": 4,
+      "skipped": [],
+      "sport": "wnba",
+      "status": "learned_forecast_complete",
+      "unmatched_quotes": [],
+      "zero_unit_research_calls": 0
+    }
+  },
+  "step7_flat_settlement": {
+    "failures": [],
+    "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+    "settled": [],
+    "still_open": [
+      "5df3c9112e914547",
+      "e598241db79c4dfb",
+      "099694587c434b4a",
+      "6c1b1d290ce24d73",
+      "43b2ed970ab34f5f",
+      "556a298369cf47bd",
+      "1ca3aac02ee1494c",
+      "8d7ca0ea971a4878",
+      "40fd1303ee5c40bc",
+      "f140b8e744fa42a4",
+      "e2d3732e917242c3",
+      "7088516dc8f442f0",
+      "cbd07a2b3b254a5a",
+      "3f1ba5855ae540e0",
+      "2bd291e543c748bf",
+      "4f41d18dabd545ca",
+      "bf6f6152e282469c",
+      "afaf853c69284bb6",
+      "23aad3907b4640b1",
+      "8f572bd4fec54325",
+      "04bc614189f44e85",
+      "d4cef3f0c09a4253",
+      "345e121461114afb",
+      "26f9b7dd6b974bf6",
+      "1a2e4cd0bc214362"
+    ],
+    "voided": []
+  }
+}
+Finished: Mon Jul 20 12:33:53 EDT 2026

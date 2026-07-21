@@ -1,0 +1,280 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-08T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -3.839442,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 13.603887,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 9,
+      "source_minutes": 173.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.690335,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 10.231495,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 6,
+      "source_minutes": 107.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.35468,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 3.143755,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.165289,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 24.064018,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 8,
+      "source_minutes": 205.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 3.694581,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 24.521292,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 10,
+      "source_minutes": 209.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.563607,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 18.691055,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 10,
+      "source_minutes": 221.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.458716,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 5.372964,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 5,
+      "source_minutes": 36.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.35468,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 5.144327,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.831715,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 21.606173,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 9,
+      "source_minutes": 218.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.939655,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 26.06459,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 10,
+      "source_minutes": 296.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.313808,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 5.6016,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 8,
+      "source_minutes": 78.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 3.135048,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 22.920835,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 10,
+      "source_minutes": 222.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.774336,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 5.65876,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 7,
+      "source_minutes": 52.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.508361,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 13.37525,
+      "replacement_impact_points_per_100": -1.35468,
+      "source_games": 9,
+      "source_minutes": 198.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 3.13093,
+      "player_name": "Anastasiia Olairi Kosu",
+      "projected_minutes": 8.191314,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 10,
+      "source_minutes": 127.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.838951,
+      "player_name": "Antonia Delaere",
+      "projected_minutes": 11.379879,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 10,
+      "source_minutes": 134.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 2.840909,
+      "player_name": "Courtney Williams",
+      "projected_minutes": 25.838373,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 10,
+      "source_minutes": 304.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -0.588235,
+      "player_name": "Dorka Juhasz",
+      "projected_minutes": 20.615723,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 1,
+      "source_minutes": 25.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.048951,
+      "player_name": "Eliska Hamzova",
+      "projected_minutes": 7.696537,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 3,
+      "source_minutes": 29.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Emma Cechova",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.009576,
+      "player_name": "Kayla McBride",
+      "projected_minutes": 30.126443,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 10,
+      "source_minutes": 331.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -1.066351,
+      "player_name": "Liatu King",
+      "projected_minutes": 5.772402,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 3,
+      "source_minutes": 22.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 2.477064,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 12.53436,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Napheesa Collier",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.244006,
+      "player_name": "Natasha Howard",
+      "projected_minutes": 25.838373,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 10,
+      "source_minutes": 309.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 2.761194,
+      "player_name": "Nia Coffey",
+      "projected_minutes": 21.495327,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 10,
+      "source_minutes": 270.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 4.086181,
+      "player_name": "Olivia Miles",
+      "projected_minutes": 25.673447,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 9,
+      "source_minutes": 273.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.963048,
+      "player_name": "Teaira McCowan",
+      "projected_minutes": 4.837823,
+      "replacement_impact_points_per_100": 1.048951,
+      "source_games": 6,
+      "source_minutes": 33.0,
+      "team": "Minnesota Lynx"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.857388,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 233.266667,
+      "replacement_impact_points_per_100": -1.35468
+    },
+    "Minnesota Lynx": {
+      "normalization_scale": 0.824629,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 242.533333,
+      "replacement_impact_points_per_100": 1.048951
+    }
+  },
+  "valid_from": "2026-07-08",
+  "valid_through": "2026-07-08"
+}

@@ -1,0 +1,487 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-15T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Aari McDonald",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.108696,
+      "player_name": "Aerial Powers",
+      "projected_minutes": 3.322912,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 6,
+      "source_minutes": 60.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.675345,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 12.398392,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 9,
+      "source_minutes": 253.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.365854,
+      "player_name": "Bree Hall",
+      "projected_minutes": 1.697186,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 3,
+      "source_minutes": 10.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -2.104208,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 9.182671,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 6,
+      "source_minutes": 99.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.248031,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 13.112997,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 5,
+      "source_minutes": 108.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Chloe Bibby",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.630252,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 7.967843,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 5,
+      "source_minutes": 76.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.027397,
+      "player_name": "Jessica Timmons",
+      "projected_minutes": 6.699419,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 3,
+      "source_minutes": 38.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.95122,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 5.359536,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 1,
+      "source_minutes": 10.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.229885,
+      "player_name": "Kayana Traylor",
+      "projected_minutes": 6.07414,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 3,
+      "source_minutes": 35.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.654232,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 12.862885,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 11,
+      "source_minutes": 297.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.44,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 12.934346,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 8,
+      "source_minutes": 225.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.04428,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 9.432782,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 11,
+      "source_minutes": 142.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.231481,
+      "player_name": "Megan McConnell",
+      "projected_minutes": 5.806163,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 3,
+      "source_minutes": 32.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.420168,
+      "player_name": "Monique Billings",
+      "projected_minutes": 10.236713,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 4,
+      "source_minutes": 76.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.079002,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 8.325145,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 5,
+      "source_minutes": 81.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.117864,
+      "player_name": "Natasha Howard",
+      "projected_minutes": 13.64895,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 6,
+      "source_minutes": 143.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.966841,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 16.364448,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 6,
+      "source_minutes": 173.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.542373,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 6.467173,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 5,
+      "source_minutes": 72.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.036876,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 10.629745,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 3,
+      "source_minutes": 61.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -2.662722,
+      "player_name": "Shey Peddy",
+      "projected_minutes": 10.075927,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 6,
+      "source_minutes": 107.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 3.549696,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 11.326485,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 5,
+      "source_minutes": 93.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sydney Colson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.231481,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 6.07414,
+      "replacement_impact_points_per_100": 0.231481,
+      "source_games": 3,
+      "source_minutes": 32.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.453515,
+      "player_name": "Alex Wilson",
+      "projected_minutes": 11.521758,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 2,
+      "source_minutes": 41.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alicia Florez",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -7.837838,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 13.577949,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 6,
+      "source_minutes": 155.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -1.948052,
+      "player_name": "Angela Dugalic",
+      "projected_minutes": 7.232119,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 4,
+      "source_minutes": 62.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.205761,
+      "player_name": "Cassandre Prosper",
+      "projected_minutes": 12.071258,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 4,
+      "source_minutes": 86.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.487805,
+      "player_name": "Christeen Iwuala",
+      "projected_minutes": 2.304352,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.111111,
+      "player_name": "Cotie McMahon",
+      "projected_minutes": 13.648852,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 2,
+      "source_minutes": 50.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.235849,
+      "player_name": "Darianna Littlepage-Buggs",
+      "projected_minutes": 6.735797,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 2,
+      "source_minutes": 24.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.34728,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 5.707702,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 6,
+      "source_minutes": 78.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.7431,
+      "player_name": "Georgia Amoore",
+      "projected_minutes": 10.156873,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 4,
+      "source_minutes": 71.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jacy Sheldon",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -5.802708,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 10.42276,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 6,
+      "source_minutes": 117.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.490196,
+      "player_name": "Kamaria McDaniel",
+      "projected_minutes": 4.254188,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -6.347962,
+      "player_name": "Kiki Iriafen",
+      "projected_minutes": 13.542498,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 9,
+      "source_minutes": 238.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -2.296451,
+      "player_name": "Lauren Betts",
+      "projected_minutes": 9.731454,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 4,
+      "source_minutes": 79.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.057554,
+      "player_name": "Lucy Olsen",
+      "projected_minutes": 6.062217,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.465116,
+      "player_name": "Madison Scott",
+      "projected_minutes": 2.658867,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 6,
+      "source_minutes": 30.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Michaela Onyenwere",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mya Hollingshed",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": 0.121655,
+      "player_name": "Nyla Harris",
+      "projected_minutes": 5.849508,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -0.945378,
+      "player_name": "Rori Harmon",
+      "projected_minutes": 10.635469,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 4,
+      "source_minutes": 76.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -4.083333,
+      "player_name": "Shakira Austin",
+      "projected_minutes": 15.527785,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 8,
+      "source_minutes": 200.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -5.99711,
+      "player_name": "Sonia Citron",
+      "projected_minutes": 15.882301,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 10,
+      "source_minutes": 292.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -3.49076,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 8.260214,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 6,
+      "source_minutes": 87.0,
+      "team": "Washington Mystics"
+    },
+    {
+      "impact_points_per_100": -5.605787,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 14.216077,
+      "replacement_impact_points_per_100": -4.083333,
+      "source_games": 6,
+      "source_minutes": 153.0,
+      "team": "Washington Mystics"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Indiana Fever": {
+      "normalization_scale": 0.535954,
+      "players": 26,
+      "players_with_minutes": 22,
+      "raw_projected_minutes": 373.166667,
+      "replacement_impact_points_per_100": 0.231481
+    },
+    "Washington Mystics": {
+      "normalization_scale": 0.531773,
+      "players": 25,
+      "players_with_minutes": 21,
+      "raw_projected_minutes": 376.1,
+      "replacement_impact_points_per_100": -4.083333
+    }
+  },
+  "valid_from": "2026-05-15",
+  "valid_through": "2026-05-15"
+}

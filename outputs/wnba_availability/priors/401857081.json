@@ -1,0 +1,307 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-19T19:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -0.496278,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 1.171646,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 2,
+      "source_minutes": 3.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.138122,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 27.826596,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 10,
+      "source_minutes": 324.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Amy Okonkwo",
+      "projected_minutes": 0.878735,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.879765,
+      "player_name": "Angel Reese",
+      "projected_minutes": 28.763913,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 9,
+      "source_minutes": 282.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.048193,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 13.181019,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 1,
+      "source_minutes": 15.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.71599,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 2.167545,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 6,
+      "source_minutes": 19.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -1.636364,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 13.766842,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 10,
+      "source_minutes": 150.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.982801,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 6.151142,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.861035,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 30.052724,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 10,
+      "source_minutes": 334.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.394636,
+      "player_name": "Madina Okot",
+      "projected_minutes": 9.021675,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 10,
+      "source_minutes": 122.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.5625,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 25.951963,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 9,
+      "source_minutes": 240.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -2.086137,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 28.763913,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 10,
+      "source_minutes": 343.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.124688,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.878735,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.208768,
+      "player_name": "Sika Kone",
+      "projected_minutes": 5.858231,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 9,
+      "source_minutes": 79.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -3.014553,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 5.565319,
+      "replacement_impact_points_per_100": -1.636364,
+      "source_games": 9,
+      "source_minutes": 81.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 2.915767,
+      "player_name": "Aicha Coulibaly",
+      "projected_minutes": 7.032058,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 6,
+      "source_minutes": 63.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -0.801749,
+      "player_name": "Azura Stevens",
+      "projected_minutes": 23.474664,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 10,
+      "source_minutes": 286.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 1.051402,
+      "player_name": "Chloe Bibby",
+      "projected_minutes": 9.565667,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 2,
+      "source_minutes": 28.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.369686,
+      "player_name": "Courtney Vandersloot",
+      "projected_minutes": 14.01241,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 8,
+      "source_minutes": 141.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "DiJonai Carrington",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 1.451906,
+      "player_name": "Elizabeth Williams",
+      "projected_minutes": 13.185109,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -2.068966,
+      "player_name": "Gabriela Jaquez",
+      "projected_minutes": 13.185109,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 10,
+      "source_minutes": 180.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 3.767123,
+      "player_name": "Jacy Sheldon",
+      "projected_minutes": 15.977249,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 10,
+      "source_minutes": 184.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -0.625,
+      "player_name": "Kamilla Cardoso",
+      "projected_minutes": 20.837642,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 9,
+      "source_minutes": 240.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -1.789976,
+      "player_name": "Maddy Westbeld",
+      "projected_minutes": 6.980352,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.373134,
+      "player_name": "Natasha Cloud",
+      "projected_minutes": 23.888314,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 10,
+      "source_minutes": 270.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 2.376033,
+      "player_name": "Rachel Banham",
+      "projected_minutes": 6.928645,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 8,
+      "source_minutes": 84.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Rickea Jackson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 0.246914,
+      "player_name": "Saylor Poffenbarger",
+      "projected_minutes": 3.877973,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": -0.660377,
+      "player_name": "Skylar Diggins",
+      "projected_minutes": 21.768356,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 5,
+      "source_minutes": 130.0,
+      "team": "Chicago Sky"
+    },
+    {
+      "impact_points_per_100": 1.937984,
+      "player_name": "Sydney Taylor",
+      "projected_minutes": 19.286453,
+      "replacement_impact_points_per_100": -0.660377,
+      "source_games": 10,
+      "source_minutes": 245.0,
+      "team": "Chicago Sky"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.878735,
+      "players": 15,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 227.6,
+      "replacement_impact_points_per_100": -1.636364
+    },
+    "Chicago Sky": {
+      "normalization_scale": 0.775595,
+      "players": 16,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 257.866667,
+      "replacement_impact_points_per_100": -0.660377
+    }
+  },
+  "valid_from": "2026-07-19",
+  "valid_through": "2026-07-19"
+}

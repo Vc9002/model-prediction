@@ -1,0 +1,433 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-05-15T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -5.640535,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 9.538793,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 6,
+      "source_minutes": 123.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.175159,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 12.28782,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 10,
+      "source_minutes": 228.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bria Hartley",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.166667,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 12.469984,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 4,
+      "source_minutes": 92.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.636364,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 9.108222,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 95.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -6.960784,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 11.691645,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 110.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.034261,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 6.55792,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 67.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.864035,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 9.936242,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 3,
+      "source_minutes": 56.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.740139,
+      "player_name": "Haley Peters",
+      "projected_minutes": 3.378322,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 4,
+      "source_minutes": 31.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.966184,
+      "player_name": "Harmoni Turner",
+      "projected_minutes": 6.95537,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 1,
+      "source_minutes": 14.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.621723,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 14.308189,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 134.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.740741,
+      "player_name": "Kyla Oldacre",
+      "projected_minutes": 2.484061,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.301255,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 12.420303,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 3,
+      "source_minutes": 78.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.149813,
+      "player_name": "Lindsay Allen",
+      "projected_minutes": 13.94386,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 134.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.59952,
+      "player_name": "Madison Hayes",
+      "projected_minutes": 4.636913,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 2,
+      "source_minutes": 17.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.601695,
+      "player_name": "Mamignan Toure",
+      "projected_minutes": 5.895504,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 6,
+      "source_minutes": 72.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -5.793226,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 16.626646,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 161.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -3.368421,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 8.048356,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 75.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.555556,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 6.359195,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 4,
+      "source_minutes": 50.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.415094,
+      "player_name": "Rayah Marshall",
+      "projected_minutes": 2.88151,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 4,
+      "source_minutes": 24.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -8.0,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 12.552786,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 10,
+      "source_minutes": 272.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shey Peddy",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 0.357995,
+      "player_name": "Taylor Bigby",
+      "projected_minutes": 4.802517,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 2,
+      "source_minutes": 19.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -4.797048,
+      "player_name": "Tina Charles",
+      "projected_minutes": 13.11584,
+      "replacement_impact_points_per_100": -5.149813,
+      "source_games": 5,
+      "source_minutes": 142.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 3.953148,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 20.379083,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 9,
+      "source_minutes": 283.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.617284,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 1.478693,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 3,
+      "source_minutes": 5.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.626305,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 12.85119,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 5,
+      "source_minutes": 79.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.755245,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 21.239414,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 10,
+      "source_minutes": 315.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 1.6,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 16.88399,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 5,
+      "source_minutes": 100.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.549889,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 8.87216,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 6,
+      "source_minutes": 51.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.848723,
+      "player_name": "Dana Evans",
+      "projected_minutes": 17.152843,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 5,
+      "source_minutes": 109.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.444134,
+      "player_name": "Jackie Young",
+      "projected_minutes": 22.045974,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 10,
+      "source_minutes": 316.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -1.597052,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 5.64592,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 5.724638,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 21.400726,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 10,
+      "source_minutes": 290.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.612745,
+      "player_name": "Jordan Obi",
+      "projected_minutes": 2.957387,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 2,
+      "source_minutes": 8.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.249377,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 0.80656,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -3.100775,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 10.539051,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 10,
+      "source_minutes": 116.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.21645,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 9.033472,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 5,
+      "source_minutes": 62.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 3.244592,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 15.32464,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 10,
+      "source_minutes": 201.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.204082,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 13.388896,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 5,
+      "source_minutes": 90.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.249377,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.496812,
+      "players": 26,
+      "players_with_minutes": 22,
+      "raw_projected_minutes": 402.566667,
+      "replacement_impact_points_per_100": -5.149813
+    },
+    "Las Vegas Aces": {
+      "normalization_scale": 0.80656,
+      "players": 19,
+      "players_with_minutes": 16,
+      "raw_projected_minutes": 247.966667,
+      "replacement_impact_points_per_100": -0.249377
+    }
+  },
+  "valid_from": "2026-05-15",
+  "valid_through": "2026-05-15"
+}

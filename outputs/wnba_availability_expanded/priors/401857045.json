@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-07T01:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alissa Pili",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.717391,
+      "player_name": "Ariel Atkins",
+      "projected_minutes": 16.60493,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 10,
+      "source_minutes": 244.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.792079,
+      "player_name": "Cameron Brink",
+      "projected_minutes": 12.875208,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 6,
+      "source_minutes": 105.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.888446,
+      "player_name": "Chance Gray",
+      "projected_minutes": 8.890024,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 9,
+      "source_minutes": 102.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -4.646018,
+      "player_name": "Dearica Hamby",
+      "projected_minutes": 21.254311,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 10,
+      "source_minutes": 278.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.235294,
+      "player_name": "Emma Cannon",
+      "projected_minutes": 6.769702,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 3,
+      "source_minutes": 25.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.533835,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 18.239877,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 10,
+      "source_minutes": 265.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -3.73444,
+      "player_name": "Jihyun Park",
+      "projected_minutes": 12.9263,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 8,
+      "source_minutes": 82.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.963048,
+      "player_name": "Kate Martin",
+      "projected_minutes": 5.62013,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 5,
+      "source_minutes": 33.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.331675,
+      "player_name": "Kelsey Plum",
+      "projected_minutes": 25.954783,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 6,
+      "source_minutes": 203.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -2.031603,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 12.517563,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 3,
+      "source_minutes": 43.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.582751,
+      "player_name": "Laura Ziegler",
+      "projected_minutes": 7.152893,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 3,
+      "source_minutes": 29.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -4.131653,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 22.071784,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 10,
+      "source_minutes": 314.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -4.909366,
+      "player_name": "Rae Burrell",
+      "projected_minutes": 20.845574,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 10,
+      "source_minutes": 262.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.4914,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 3.320986,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.231481,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 4.955933,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 5,
+      "source_minutes": 32.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tonie Morgan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.73444,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.840336,
+      "player_name": "Awa Fam",
+      "projected_minutes": 27.166958,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 10,
+      "source_minutes": 314.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -2.108434,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 21.465969,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 10,
+      "source_minutes": 264.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.116009,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 13.089005,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 2,
+      "source_minutes": 31.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 2.269504,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 27.690518,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 10,
+      "source_minutes": 305.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.329489,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 20.244328,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 9,
+      "source_minutes": 207.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.202405,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 15.823153,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 5,
+      "source_minutes": 99.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -5.57554,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 12.798138,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.497696,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 2.210588,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 7,
+      "source_minutes": 34.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.631136,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 27.574171,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 10,
+      "source_minutes": 313.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -5.524345,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 10.005817,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 10,
+      "source_minutes": 134.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.490196,
+      "player_name": "Taina Mair",
+      "projected_minutes": 6.980803,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.425178,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 3.490401,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 5,
+      "source_minutes": 21.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -5.893186,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 11.460151,
+      "replacement_impact_points_per_100": -2.108434,
+      "source_games": 10,
+      "source_minutes": 143.0,
+      "team": "Seattle Storm"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Los Angeles Sparks": {
+      "normalization_scale": 0.766381,
+      "players": 17,
+      "players_with_minutes": 15,
+      "raw_projected_minutes": 260.966667,
+      "replacement_impact_points_per_100": -3.73444
+    },
+    "Seattle Storm": {
+      "normalization_scale": 0.8726,
+      "players": 13,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 229.2,
+      "replacement_impact_points_per_100": -2.108434
+    }
+  },
+  "valid_from": "2026-07-07",
+  "valid_through": "2026-07-07"
+}

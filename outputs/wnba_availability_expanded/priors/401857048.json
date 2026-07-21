@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-08T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.269784,
+      "player_name": "Brittney Sykes",
+      "projected_minutes": 22.312373,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 5,
+      "source_minutes": 156.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.171875,
+      "player_name": "Isabelle Harrison",
+      "projected_minutes": 20.283976,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 10,
+      "source_minutes": 240.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 2.936747,
+      "player_name": "Julie Allemand",
+      "projected_minutes": 24.239351,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 9,
+      "source_minutes": 264.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kayla Alexander",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -4.554264,
+      "player_name": "Kia Nurse",
+      "projected_minutes": 13.843813,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 10,
+      "source_minutes": 116.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiki Rice",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 1.956182,
+      "player_name": "Laura Juskaite",
+      "projected_minutes": 15.060852,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 10,
+      "source_minutes": 239.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -3.28849,
+      "player_name": "Maria Conde",
+      "projected_minutes": 23.630832,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 10,
+      "source_minutes": 269.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.812408,
+      "player_name": "Marina Mabrey",
+      "projected_minutes": 23.985801,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 9,
+      "source_minutes": 277.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -0.274223,
+      "player_name": "Nyara Sabally",
+      "projected_minutes": 18.864097,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 6,
+      "source_minutes": 147.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.122549,
+      "player_name": "Ornella Bankole",
+      "projected_minutes": 6.085193,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -1.897533,
+      "player_name": "Temi Fagbenle",
+      "projected_minutes": 14.959432,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 7,
+      "source_minutes": 127.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -4.255319,
+      "player_name": "Teonni Key",
+      "projected_minutes": 4.107505,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 9,
+      "source_minutes": 70.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": -2.918288,
+      "player_name": "Tima Pouye",
+      "projected_minutes": 12.626775,
+      "replacement_impact_points_per_100": -3.28849,
+      "source_games": 10,
+      "source_minutes": 114.0,
+      "team": "Toronto Tempo"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.516351,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 17.626016,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 181.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.591463,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 21.398374,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 256.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.636661,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 19.577236,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 211.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.243902,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 3.252033,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 3,
+      "source_minutes": 10.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.741497,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 20.227642,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 188.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.816697,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 14.373984,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 4.423381,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 20.487805,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 233.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.106084,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 24.780488,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 241.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.407332,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 12.617886,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 9,
+      "source_minutes": 91.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.369458,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 2.601626,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.785714,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 17.105691,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 160.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 4.470939,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 25.95122,
+      "replacement_impact_points_per_100": -0.369458,
+      "source_games": 10,
+      "source_minutes": 271.0,
+      "team": "Golden State Valkyries"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Golden State Valkyries": {
+      "normalization_scale": 0.97561,
+      "players": 15,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 205.0,
+      "replacement_impact_points_per_100": -0.369458
+    },
+    "Toronto Tempo": {
+      "normalization_scale": 0.760649,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 262.933333,
+      "replacement_impact_points_per_100": -3.28849
+    }
+  },
+  "valid_from": "2026-07-08",
+  "valid_through": "2026-07-08"
+}

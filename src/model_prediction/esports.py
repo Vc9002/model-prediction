@@ -40,8 +40,20 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
         "polymarket_league": "CS2",
         "minimum_date": "2023-09-27",
     },
+    "dota2": {
+        "name": "Dota 2",
+        "discipline_id": 2,
+        "polymarket_league": "DOTA2",
+        "minimum_date": "2020-01-01",
+    },
+    "valorant": {
+        "name": "VALORANT",
+        "discipline_id": 4,
+        "polymarket_league": "VALORANT",
+        "minimum_date": "2020-01-01",
+    },
 }
-K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0)
+K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0, 80.0, 96.0)
 CONFIDENCE_CANDIDATES = (0.0, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15)
 
 
@@ -562,7 +574,20 @@ def forecast_esports_slate(
     aliases = _team_alias_index(teams)
     market_client = client or PolymarketUSClient()
     league = str(TITLE_SPECS[title]["polymarket_league"])
-    events = market_client.slate(league, date.fromisoformat(game_date), timezone_name)
+    # Fetch a 3-day window (yesterday, today, tomorrow) to capture all open
+    # contracts — Polymarket lists events by start date, and many contracts
+    # are created days before their event date.
+    from datetime import timedelta
+    base_date = date.fromisoformat(game_date)
+    events: list[dict[str, Any]] = []
+    seen_event_ids: set[str] = set()
+    for offset in (-1, 0, 1):
+        day = base_date + timedelta(days=offset)
+        for event in market_client.slate(league, day, timezone_name):
+            eid = str(event.get("event_id", ""))
+            if eid and eid not in seen_event_ids:
+                seen_event_ids.add(eid)
+                events.append(event)
     ratings = {key: float(value) for key, value in artifact["ratings"].items()}
     book = NeutralElo(k=float(artifact["k"]), ratings=ratings)
     trained_through = parse_utc(str(artifact["trained_through_utc"]))

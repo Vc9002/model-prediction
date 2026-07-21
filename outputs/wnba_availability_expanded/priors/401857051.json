@@ -1,0 +1,280 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-09T23:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.124378,
+      "player_name": "Aaliyah Nye",
+      "projected_minutes": 0.957854,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 2,
+      "source_minutes": 2.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.641587,
+      "player_name": "Allisha Gray",
+      "projected_minutes": 32.822478,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 10,
+      "source_minutes": 331.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Amy Okonkwo",
+      "projected_minutes": 0.957854,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.141643,
+      "player_name": "Angel Reese",
+      "projected_minutes": 31.417625,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 10,
+      "source_minutes": 306.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Brionna Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.236967,
+      "player_name": "Indya Nivar",
+      "projected_minutes": 3.192848,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 8,
+      "source_minutes": 22.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.989209,
+      "player_name": "Isobel Borlase",
+      "projected_minutes": 11.430396,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 10,
+      "source_minutes": 156.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Jaylyn Sherrod",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 4.685315,
+      "player_name": "Jordin Canada",
+      "projected_minutes": 33.014049,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 10,
+      "source_minutes": 315.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -3.907816,
+      "player_name": "Madina Okot",
+      "projected_minutes": 9.961686,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 10,
+      "source_minutes": 99.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.404056,
+      "player_name": "Naz Hillmon",
+      "projected_minutes": 23.371648,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 9,
+      "source_minutes": 241.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -0.988142,
+      "player_name": "Rhyne Howard",
+      "projected_minutes": 35.376756,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 10,
+      "source_minutes": 359.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Shatori Walker-Kimbrough",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.637555,
+      "player_name": "Sika Kone",
+      "projected_minutes": 9.514687,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 9,
+      "source_minutes": 58.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": -4.97076,
+      "player_name": "Te-Hina Paopao",
+      "projected_minutes": 7.98212,
+      "replacement_impact_points_per_100": -0.989209,
+      "source_games": 10,
+      "source_minutes": 113.0,
+      "team": "Atlanta Dream"
+    },
+    {
+      "impact_points_per_100": 1.197183,
+      "player_name": "Awa Fam",
+      "projected_minutes": 26.336694,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 10,
+      "source_minutes": 310.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.791045,
+      "player_name": "Dominique Malonga",
+      "projected_minutes": 21.020471,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 10,
+      "source_minutes": 270.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.672646,
+      "player_name": "Ezi Magbegor",
+      "projected_minutes": 13.748854,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 3,
+      "source_minutes": 46.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 3.389831,
+      "player_name": "Flau'jae Johnson",
+      "projected_minutes": 27.192178,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 10,
+      "source_minutes": 308.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 1.400329,
+      "player_name": "Jade Melbourne",
+      "projected_minutes": 21.509319,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 9,
+      "source_minutes": 207.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.903614,
+      "player_name": "Jordan Horston",
+      "projected_minutes": 15.765353,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 5,
+      "source_minutes": 98.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -4.083485,
+      "player_name": "Katie Lou Samuelson",
+      "projected_minutes": 13.321112,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.764706,
+      "player_name": "Mackenzie Holmes",
+      "projected_minutes": 2.322029,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 7,
+      "source_minutes": 25.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": 0.774648,
+      "player_name": "Natisha Hiedeman",
+      "projected_minutes": 26.70333,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 10,
+      "source_minutes": 310.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -3.591682,
+      "player_name": "Stefanie Dolson",
+      "projected_minutes": 10.143599,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 10,
+      "source_minutes": 129.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -0.490196,
+      "player_name": "Taina Mair",
+      "projected_minutes": 7.332722,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -1.533019,
+      "player_name": "Taylor Thierry",
+      "projected_minutes": 3.299725,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 6,
+      "source_minutes": 24.0,
+      "team": "Seattle Storm"
+    },
+    {
+      "impact_points_per_100": -4.696133,
+      "player_name": "Zia Cooke",
+      "projected_minutes": 11.304614,
+      "replacement_impact_points_per_100": -1.791045,
+      "source_games": 10,
+      "source_minutes": 143.0,
+      "team": "Seattle Storm"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Atlanta Dream": {
+      "normalization_scale": 0.957854,
+      "players": 15,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 208.8,
+      "replacement_impact_points_per_100": -0.989209
+    },
+    "Seattle Storm": {
+      "normalization_scale": 0.91659,
+      "players": 13,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 218.2,
+      "replacement_impact_points_per_100": -1.791045
+    }
+  },
+  "valid_from": "2026-07-10",
+  "valid_through": "2026-07-10"
+}

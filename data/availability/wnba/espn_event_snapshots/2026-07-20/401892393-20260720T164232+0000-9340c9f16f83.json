@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3913881",
+      "current_status": "Questionable",
+      "player_name": "Alanna Smith",
+      "raw_status": "Day-To-Day",
+      "reason": "Leg",
+      "return_date": "2026-07-20",
+      "status_at_utc": "2026-07-20T14:12:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-20T16:00:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4038379",
+      "current_status": "Questionable",
+      "player_name": "Marine Johannes",
+      "raw_status": "Day-To-Day",
+      "reason": "Ankle",
+      "return_date": "2026-07-20",
+      "status_at_utc": "2026-07-19T21:10:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-17T14:45:00+00:00",
+      "team": "New York Liberty"
+    }
+  ],
+  "event_id": "401892393",
+  "observed_at_utc": "2026-07-20T16:42:32.249632+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "9340c9f16f837674efc47b1862902b2f878fac48fd0d66f173f42b9287735396",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

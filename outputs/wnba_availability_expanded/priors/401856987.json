@@ -1,0 +1,298 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-13T23:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 6.155951,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 31.983198,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 10,
+      "source_minutes": 331.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.414079,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 6.780678,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 9,
+      "source_minutes": 83.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.465494,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 32.223222,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 10,
+      "source_minutes": 339.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 2.358491,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 12.361236,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 7,
+      "source_minutes": 130.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 1.578947,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 7.740774,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 7,
+      "source_minutes": 75.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dana Evans",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 5.817175,
+      "player_name": "Jackie Young",
+      "projected_minutes": 31.683168,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 10,
+      "source_minutes": 322.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.401929,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 24.362436,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 8,
+      "source_minutes": 222.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.319829,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 10.261026,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 6,
+      "source_minutes": 69.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 3.616352,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 22.982298,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 10,
+      "source_minutes": 236.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.067797,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 19.621962,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 10,
+      "source_minutes": 190.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.414079,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 4.158416,
+      "player_name": "Anastasiia Olairi Kosu",
+      "projected_minutes": 14.207963,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 9,
+      "source_minutes": 105.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 2.924528,
+      "player_name": "Antonia Delaere",
+      "projected_minutes": 12.832999,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 10,
+      "source_minutes": 130.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 7.082153,
+      "player_name": "Courtney Williams",
+      "projected_minutes": 25.895159,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 10,
+      "source_minutes": 306.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dorka Juhasz",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.859951,
+      "player_name": "Eliska Hamzova",
+      "projected_minutes": 3.43741,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 2,
+      "source_minutes": 7.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -1.678657,
+      "player_name": "Emese Hof",
+      "projected_minutes": 6.58837,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 2,
+      "source_minutes": 17.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -0.973236,
+      "player_name": "Emma Cechova",
+      "projected_minutes": 9.452879,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 8.0,
+      "player_name": "Kayla McBride",
+      "projected_minutes": 23.660842,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 10,
+      "source_minutes": 304.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.111607,
+      "player_name": "Liatu King",
+      "projected_minutes": 9.109138,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 4,
+      "source_minutes": 48.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 4.910714,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 14.437124,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 10,
+      "source_minutes": 160.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Napheesa Collier",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 8.0,
+      "player_name": "Natasha Howard",
+      "projected_minutes": 24.634775,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 10,
+      "source_minutes": 293.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 7.377049,
+      "player_name": "Nia Coffey",
+      "projected_minutes": 23.374391,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 10,
+      "source_minutes": 271.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 8.0,
+      "player_name": "Olivia Miles",
+      "projected_minutes": 26.29619,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 10,
+      "source_minutes": 309.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.287982,
+      "player_name": "Teaira McCowan",
+      "projected_minutes": 6.072759,
+      "replacement_impact_points_per_100": 0.859951,
+      "source_games": 5,
+      "source_minutes": 41.0,
+      "team": "Minnesota Lynx"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Las Vegas Aces": {
+      "normalization_scale": 0.90009,
+      "players": 15,
+      "players_with_minutes": 10,
+      "raw_projected_minutes": 222.2,
+      "replacement_impact_points_per_100": 0.414079
+    },
+    "Minnesota Lynx": {
+      "normalization_scale": 0.859353,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 232.733333,
+      "replacement_impact_points_per_100": 0.859951
+    }
+  },
+  "valid_from": "2026-06-14",
+  "valid_through": "2026-06-14"
+}

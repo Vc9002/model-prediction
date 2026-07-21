@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-24T01:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.80292,
+      "player_name": "Aliyah Boston",
+      "projected_minutes": 26.794564,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 285.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Bree Hall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.388889,
+      "player_name": "Caitlin Clark",
+      "projected_minutes": 30.311751,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 320.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.995305,
+      "player_name": "Damiris Dantas",
+      "projected_minutes": 5.371703,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 4,
+      "source_minutes": 26.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.348039,
+      "player_name": "Grace VanSlooten",
+      "projected_minutes": 1.758593,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 3,
+      "source_minutes": 8.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 1.156463,
+      "player_name": "Kelsey Mitchell",
+      "projected_minutes": 31.398881,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 335.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.084034,
+      "player_name": "Lexie Hull",
+      "projected_minutes": 15.603517,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 195.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.852273,
+      "player_name": "Makayla Timpson",
+      "projected_minutes": 10.295763,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 128.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.730375,
+      "player_name": "Monique Billings",
+      "projected_minutes": 19.056755,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 186.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 2.752294,
+      "player_name": "Myisha Hines-Allen",
+      "projected_minutes": 12.086331,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 145.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": 0.47259,
+      "player_name": "Raven Johnson",
+      "projected_minutes": 13.685052,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 10,
+      "source_minutes": 129.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -0.821018,
+      "player_name": "Sophie Cunningham",
+      "projected_minutes": 24.940048,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 9,
+      "source_minutes": 209.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -1.089325,
+      "player_name": "Tyasha Harris",
+      "projected_minutes": 8.697042,
+      "replacement_impact_points_per_100": -1.089325,
+      "source_games": 6,
+      "source_minutes": 59.0,
+      "team": "Indiana Fever"
+    },
+    {
+      "impact_points_per_100": -4.017217,
+      "player_name": "Alyssa Thomas",
+      "projected_minutes": 27.228261,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 9,
+      "source_minutes": 297.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.305246,
+      "player_name": "DeWanna Bonner",
+      "projected_minutes": 18.695652,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 10,
+      "source_minutes": 229.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.789077,
+      "player_name": "Jovana Nogic",
+      "projected_minutes": 14.184783,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 8,
+      "source_minutes": 131.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.235294,
+      "player_name": "Kahleah Copper",
+      "projected_minutes": 24.891304,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 9,
+      "source_minutes": 280.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.723404,
+      "player_name": "Kyara Linskens",
+      "projected_minutes": 9.184783,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 6,
+      "source_minutes": 70.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.343643,
+      "player_name": "Lexi Held",
+      "projected_minutes": 19.347826,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 9,
+      "source_minutes": 182.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.243309,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 8.967391,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.349673,
+      "player_name": "Monique Akoa Makani",
+      "projected_minutes": 19.728261,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 8,
+      "source_minutes": 212.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.070552,
+      "player_name": "Natasha Mack",
+      "projected_minutes": 19.456522,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 10,
+      "source_minutes": 252.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.395062,
+      "player_name": "Noemie Brochant",
+      "projected_minutes": 20.815217,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 10,
+      "source_minutes": 248.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.505695,
+      "player_name": "Quionche Carter",
+      "projected_minutes": 3.206522,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 7,
+      "source_minutes": 39.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sami Whitcomb",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.746269,
+      "player_name": "Shay Ciezki",
+      "projected_minutes": 1.630435,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 1,
+      "source_minutes": 2.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 1.789474,
+      "player_name": "Valeriane Ayayi",
+      "projected_minutes": 12.663043,
+      "replacement_impact_points_per_100": -3.349673,
+      "source_games": 7,
+      "source_minutes": 75.0,
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Indiana Fever": {
+      "normalization_scale": 0.959233,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 208.5,
+      "replacement_impact_points_per_100": -1.089325
+    },
+    "Phoenix Mercury": {
+      "normalization_scale": 0.815217,
+      "players": 15,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 245.333333,
+      "replacement_impact_points_per_100": -3.349673
+    }
+  },
+  "valid_from": "2026-06-24",
+  "valid_through": "2026-06-24"
+}

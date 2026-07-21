@@ -1,0 +1,280 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-14T00:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 2.534113,
+      "player_name": "Anastasiia Olairi Kosu",
+      "projected_minutes": 7.159353,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 10,
+      "source_minutes": 113.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.724395,
+      "player_name": "Antonia Delaere",
+      "projected_minutes": 13.279446,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 10,
+      "source_minutes": 137.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.628895,
+      "player_name": "Courtney Williams",
+      "projected_minutes": 28.52194,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 10,
+      "source_minutes": 306.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.652174,
+      "player_name": "Dorka Juhasz",
+      "projected_minutes": 16.02194,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 3,
+      "source_minutes": 60.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.801802,
+      "player_name": "Eliska Hamzova",
+      "projected_minutes": 6.928406,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 5,
+      "source_minutes": 44.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Emma Cechova",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.04878,
+      "player_name": "Kayla McBride",
+      "projected_minutes": 30.889145,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 10,
+      "source_minutes": 338.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -0.605327,
+      "player_name": "Liatu King",
+      "projected_minutes": 5.773672,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 2,
+      "source_minutes": 13.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 2.372263,
+      "player_name": "Maya Caldwell",
+      "projected_minutes": 11.431871,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 10,
+      "source_minutes": 148.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Napheesa Collier",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.608392,
+      "player_name": "Natasha Howard",
+      "projected_minutes": 27.713626,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 10,
+      "source_minutes": 315.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 2.118003,
+      "player_name": "Nia Coffey",
+      "projected_minutes": 19.976905,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 10,
+      "source_minutes": 261.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 3.203125,
+      "player_name": "Olivia Miles",
+      "projected_minutes": 27.020785,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 8,
+      "source_minutes": 240.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": 1.882353,
+      "player_name": "Teaira McCowan",
+      "projected_minutes": 5.28291,
+      "replacement_impact_points_per_100": 1.608392,
+      "source_games": 4,
+      "source_minutes": 25.0,
+      "team": "Minnesota Lynx"
+    },
+    {
+      "impact_points_per_100": -2.635328,
+      "player_name": "Alyssa Thomas",
+      "projected_minutes": 23.201175,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 9,
+      "source_minutes": 302.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -2.723147,
+      "player_name": "DeWanna Bonner",
+      "projected_minutes": 19.872736,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 10,
+      "source_minutes": 261.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.802752,
+      "player_name": "Jovana Nogic",
+      "projected_minutes": 13.950073,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 2,
+      "source_minutes": 36.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -3.185596,
+      "player_name": "Kahleah Copper",
+      "projected_minutes": 23.543808,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 10,
+      "source_minutes": 322.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.843818,
+      "player_name": "Kyara Linskens",
+      "projected_minutes": 7.391092,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 6,
+      "source_minutes": 61.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Lexi Held",
+      "projected_minutes": 16.446402,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 10,
+      "source_minutes": 245.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.865801,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 7.488987,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 6,
+      "source_minutes": 62.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -4.666667,
+      "player_name": "Monique Akoa Makani",
+      "projected_minutes": 15.907978,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 6,
+      "source_minutes": 125.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 1.095618,
+      "player_name": "Natasha Mack",
+      "projected_minutes": 17.180617,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 4,
+      "source_minutes": 102.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -0.243112,
+      "player_name": "Noemie Brochant",
+      "projected_minutes": 15.46745,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 9,
+      "source_minutes": 217.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.570776,
+      "player_name": "Quionche Carter",
+      "projected_minutes": 5.531082,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 6,
+      "source_minutes": 38.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": -1.540284,
+      "player_name": "Sami Whitcomb",
+      "projected_minutes": 8.076358,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 2,
+      "source_minutes": 22.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 2.195122,
+      "player_name": "Shay Ciezki",
+      "projected_minutes": 4.405286,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "Phoenix Mercury"
+    },
+    {
+      "impact_points_per_100": 0.160256,
+      "player_name": "Valeriane Ayayi",
+      "projected_minutes": 21.536955,
+      "replacement_impact_points_per_100": -2.635328,
+      "source_games": 9,
+      "source_minutes": 224.0,
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Minnesota Lynx": {
+      "normalization_scale": 0.866051,
+      "players": 14,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 230.933333,
+      "replacement_impact_points_per_100": 1.608392
+    },
+    "Phoenix Mercury": {
+      "normalization_scale": 0.734214,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 272.4,
+      "replacement_impact_points_per_100": -2.635328
+    }
+  },
+  "valid_from": "2026-07-14",
+  "valid_through": "2026-07-14"
+}

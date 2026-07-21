@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-30T22:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Anneli Maley",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.296443,
+      "player_name": "Betnijah Laney-Hamilton",
+      "projected_minutes": 13.493425,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 7,
+      "source_minutes": 106.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.741007,
+      "player_name": "Breanna Stewart",
+      "projected_minutes": 27.158376,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 9,
+      "source_minutes": 295.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.003876,
+      "player_name": "Han Xu",
+      "projected_minutes": 9.662664,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 10,
+      "source_minutes": 116.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.606061,
+      "player_name": "Jonquel Jones",
+      "projected_minutes": 25.042882,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 9,
+      "source_minutes": 260.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.319648,
+      "player_name": "Leonie Fiebich",
+      "projected_minutes": 25.843339,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 10,
+      "source_minutes": 282.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -0.240385,
+      "player_name": "Marine Fauthoux",
+      "projected_minutes": 4.574042,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 3,
+      "source_minutes": 16.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.718543,
+      "player_name": "Marine Johannes",
+      "projected_minutes": 16.066324,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 10,
+      "source_minutes": 204.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 3.559871,
+      "player_name": "Pauline Astier",
+      "projected_minutes": 18.696398,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 10,
+      "source_minutes": 218.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 1.893096,
+      "player_name": "Raquel Carrera",
+      "projected_minutes": 7.03259,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 6,
+      "source_minutes": 49.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 0.365854,
+      "player_name": "Rebecca Allen",
+      "projected_minutes": 4.002287,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 2,
+      "source_minutes": 10.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.18254,
+      "player_name": "Rebekah Gardner",
+      "projected_minutes": 10.348771,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 9,
+      "source_minutes": 104.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": -2.961083,
+      "player_name": "Sabrina Ionescu",
+      "projected_minutes": 23.441967,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 7,
+      "source_minutes": 191.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 4.835766,
+      "player_name": "Satou Sabally",
+      "projected_minutes": 14.636935,
+      "replacement_impact_points_per_100": -0.296443,
+      "source_games": 8,
+      "source_minutes": 148.0,
+      "team": "New York Liberty"
+    },
+    {
+      "impact_points_per_100": 5.85034,
+      "player_name": "A'ja Wilson",
+      "projected_minutes": 32.043147,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 10,
+      "source_minutes": 335.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.10846,
+      "player_name": "Brianna Turner",
+      "projected_minutes": 6.725888,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 9,
+      "source_minutes": 61.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 3.576248,
+      "player_name": "Chelsea Gray",
+      "projected_minutes": 32.423858,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 10,
+      "source_minutes": 341.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -0.115741,
+      "player_name": "Chennedy Carter",
+      "projected_minutes": 11.42132,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 3,
+      "source_minutes": 32.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -1.619433,
+      "player_name": "Cheyenne Parker-Tyus",
+      "projected_minutes": 9.581218,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 9,
+      "source_minutes": 94.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Dana Evans",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 5.660377,
+      "player_name": "Jackie Young",
+      "projected_minutes": 33.248731,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 10,
+      "source_minutes": 342.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Janiah Barker",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 1.569507,
+      "player_name": "Jewell Loyd",
+      "projected_minutes": 25.634518,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 10,
+      "source_minutes": 269.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Justine Pissott",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -1.851852,
+      "player_name": "Kierstan Bell",
+      "projected_minutes": 10.279188,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 9,
+      "source_minutes": 86.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Mai Yamamoto",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 3.129771,
+      "player_name": "NaLyssa Smith",
+      "projected_minutes": 21.827411,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 10,
+      "source_minutes": 255.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": -2.033898,
+      "player_name": "Stephanie Talbot",
+      "projected_minutes": 16.814721,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 10,
+      "source_minutes": 190.0,
+      "team": "Las Vegas Aces"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.619433,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Las Vegas Aces": {
+      "normalization_scale": 0.951777,
+      "players": 15,
+      "players_with_minutes": 10,
+      "raw_projected_minutes": 210.133333,
+      "replacement_impact_points_per_100": -1.619433
+    },
+    "New York Liberty": {
+      "normalization_scale": 0.857633,
+      "players": 14,
+      "players_with_minutes": 13,
+      "raw_projected_minutes": 233.2,
+      "replacement_impact_points_per_100": -0.296443
+    }
+  },
+  "valid_from": "2026-06-30",
+  "valid_through": "2026-06-30"
+}

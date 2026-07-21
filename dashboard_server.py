@@ -71,7 +71,7 @@ def _log(message: str) -> None:
     except OSError:
         pass
 EASTERN = ZoneInfo("America/New_York")
-SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2")
+SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
 GATEWAY = "https://gateway.polymarket.us"
 
 _CACHE: dict[str, tuple[float, object]] = {}
@@ -511,7 +511,7 @@ def status() -> dict:
     # kbo/npb are zero-unit research baselines tracked via baseball_grid, checked
     # separately below. lol/cs2 are now shadow_qualified production.
     sports_meta = (validation.get("sports") or {})
-    for sport in ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2"):
+    for sport in ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant"):
         meta = sports_meta.get(sport) or {}
         artifact = _production_artifact(validation, sport)
         ml = _ml_cell(meta, artifact)

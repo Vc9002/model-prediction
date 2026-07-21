@@ -1,0 +1,325 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-16T01:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -0.246914,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 4.415011,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.183486,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 15.187638,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 8,
+      "source_minutes": 145.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.207002,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 25.960265,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 257.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.702786,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 24.135394,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 246.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.017937,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 8.182487,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 5,
+      "source_minutes": 46.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.577661,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 14.010302,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 173.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.188679,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 7.358352,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 130.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.500761,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 25.48933,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 257.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.163132,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 18.130979,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 213.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.258065,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 7.299485,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 6,
+      "source_minutes": 65.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.496278,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 2.649007,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 1,
+      "source_minutes": 3.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.606796,
+      "player_name": "Ndjakalenga Mwenentanda",
+      "projected_minutes": 2.560706,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 4,
+      "source_minutes": 12.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.587302,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 16.659308,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 167.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.235294,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 27.961737,
+      "replacement_impact_points_per_100": 0.183486,
+      "source_games": 10,
+      "source_minutes": 280.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Alissa Pili",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 1.083591,
+      "player_name": "Ariel Atkins",
+      "projected_minutes": 23.688562,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 9,
+      "source_minutes": 246.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 2.303754,
+      "player_name": "Cameron Brink",
+      "projected_minutes": 16.052908,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 10,
+      "source_minutes": 186.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -1.417004,
+      "player_name": "Chance Gray",
+      "projected_minutes": 8.657748,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 9,
+      "source_minutes": 94.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.502152,
+      "player_name": "Dearica Hamby",
+      "projected_minutes": 25.612506,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 10,
+      "source_minutes": 297.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.124688,
+      "player_name": "Emma Cannon",
+      "projected_minutes": 0.901849,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 1,
+      "source_minutes": 1.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 1.724138,
+      "player_name": "Erica Wheeler",
+      "projected_minutes": 25.372013,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 10,
+      "source_minutes": 296.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.678733,
+      "player_name": "Jihyun Park",
+      "projected_minutes": 3.547272,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 7,
+      "source_minutes": 42.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 1.214128,
+      "player_name": "Kate Martin",
+      "projected_minutes": 5.591462,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 7,
+      "source_minutes": 53.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 3.178295,
+      "player_name": "Kelsey Plum",
+      "projected_minutes": 31.564708,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 7,
+      "source_minutes": 245.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kiana Williams",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Laura Ziegler",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.431655,
+      "player_name": "Nneka Ogwumike",
+      "projected_minutes": 30.602736,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 9,
+      "source_minutes": 295.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.610687,
+      "player_name": "Rae Burrell",
+      "projected_minutes": 23.448069,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 10,
+      "source_minutes": 255.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": -0.360577,
+      "player_name": "Ta'Niya Latson",
+      "projected_minutes": 4.960168,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 3,
+      "source_minutes": 16.0,
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Tonie Morgan",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.610687,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Golden State Valkyries": {
+      "normalization_scale": 0.883002,
+      "players": 16,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 226.5,
+      "replacement_impact_points_per_100": 0.183486
+    },
+    "Los Angeles Sparks": {
+      "normalization_scale": 0.901849,
+      "players": 17,
+      "players_with_minutes": 12,
+      "raw_projected_minutes": 221.766667,
+      "replacement_impact_points_per_100": -0.610687
+    }
+  },
+  "valid_from": "2026-06-16",
+  "valid_through": "2026-06-16"
+}

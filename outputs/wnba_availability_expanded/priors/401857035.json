@@ -1,0 +1,289 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-07-02T23:00:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": -2.306273,
+      "player_name": "Aaliyah Edwards",
+      "projected_minutes": 14.896712,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 7,
+      "source_minutes": 142.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.973451,
+      "player_name": "Aneesah Morrow",
+      "projected_minutes": 15.245854,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 7,
+      "source_minutes": 165.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.35468,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 3.200466,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 2,
+      "source_minutes": 6.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.222222,
+      "player_name": "Brittney Griner",
+      "projected_minutes": 19.377364,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 8,
+      "source_minutes": 185.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.155172,
+      "player_name": "Charlisse Leger-Walker",
+      "projected_minutes": 21.937736,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 10,
+      "source_minutes": 180.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.277955,
+      "player_name": "Diamond Miller",
+      "projected_minutes": 18.911842,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 10,
+      "source_minutes": 226.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -0.678733,
+      "player_name": "Gianna Kneepkens",
+      "projected_minutes": 6.10998,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 6,
+      "source_minutes": 42.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.35468,
+      "player_name": "Hailey Van Lith",
+      "projected_minutes": 5.237125,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 3.191489,
+      "player_name": "Kennedy Burke",
+      "projected_minutes": 22.403259,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 9,
+      "source_minutes": 211.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -2.724595,
+      "player_name": "Leila Lacan",
+      "projected_minutes": 23.508874,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 10,
+      "source_minutes": 279.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.002004,
+      "player_name": "Nell Angloma",
+      "projected_minutes": 5.702648,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 10,
+      "source_minutes": 99.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 2.931323,
+      "player_name": "Olivia Nelson-Ododa",
+      "projected_minutes": 20.192028,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 10,
+      "source_minutes": 197.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": 1.187905,
+      "player_name": "Raegan Beers",
+      "projected_minutes": 5.760838,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 8,
+      "source_minutes": 63.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.355662,
+      "player_name": "Saniya Rivers",
+      "projected_minutes": 17.515275,
+      "replacement_impact_points_per_100": -1.355662,
+      "source_games": 9,
+      "source_minutes": 227.0,
+      "team": "Connecticut Sun"
+    },
+    {
+      "impact_points_per_100": -1.348548,
+      "player_name": "Alanna Smith",
+      "projected_minutes": 8.671171,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 7,
+      "source_minutes": 82.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -2.111111,
+      "player_name": "Alysha Clark",
+      "projected_minutes": 7.432432,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 6,
+      "source_minutes": 50.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.519537,
+      "player_name": "Arike Ogunbowale",
+      "projected_minutes": 22.40991,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 10,
+      "source_minutes": 291.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.53286,
+      "player_name": "Awak Kuier",
+      "projected_minutes": 15.878378,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 8,
+      "source_minutes": 163.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 1.730419,
+      "player_name": "Aziaha James",
+      "projected_minutes": 11.092342,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 10,
+      "source_minutes": 149.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.74124,
+      "player_name": "Azzi Fudd",
+      "projected_minutes": 30.912162,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 10,
+      "source_minutes": 342.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.492611,
+      "player_name": "Costanza Verona",
+      "projected_minutes": 5.067568,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Haley Jones",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.484262,
+      "player_name": "JJ Quinerly",
+      "projected_minutes": 4.504505,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 2,
+      "source_minutes": 13.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -1.01626,
+      "player_name": "Jessica Shepard",
+      "projected_minutes": 29.504505,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 10,
+      "source_minutes": 338.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.765864,
+      "player_name": "Li Yueru",
+      "projected_minutes": 7.939189,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 7,
+      "source_minutes": 57.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 2.813067,
+      "player_name": "Maddy Siegrist",
+      "projected_minutes": 13.400901,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 10,
+      "source_minutes": 151.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.37037,
+      "player_name": "Odyssey Sims",
+      "projected_minutes": 4.222973,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": -0.425532,
+      "player_name": "Paige Bueckers",
+      "projected_minutes": 30.968468,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 9,
+      "source_minutes": 305.0,
+      "team": "Dallas Wings"
+    },
+    {
+      "impact_points_per_100": 0.211416,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 7.995495,
+      "replacement_impact_points_per_100": -1.01626,
+      "source_games": 6,
+      "source_minutes": 73.0,
+      "team": "Dallas Wings"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Connecticut Sun": {
+      "normalization_scale": 0.872854,
+      "players": 14,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 229.133333,
+      "replacement_impact_points_per_100": -1.355662
+    },
+    "Dallas Wings": {
+      "normalization_scale": 0.844595,
+      "players": 15,
+      "players_with_minutes": 14,
+      "raw_projected_minutes": 236.8,
+      "replacement_impact_points_per_100": -1.01626
+    }
+  },
+  "valid_from": "2026-07-03",
+  "valid_through": "2026-07-03"
+}

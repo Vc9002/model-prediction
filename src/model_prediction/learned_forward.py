@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 # requires them.
 
 _FEATURE_PROVIDERS: dict[str, Any] = {}
-_seen_hashes: set[str] = set()
 
 
 def _compute_features(
@@ -180,7 +179,7 @@ def build_learned_moneyline_slate(
     trends = TrendEngine(history)
     candidates: list[LearnedForwardCandidate] = []
     skipped: list[dict[str, str]] = []
-    _seen_hashes.clear()  # reset per invocation
+    seen_hashes: set[str] = set()
     for event in events:
         event_id = str(event.get("id", "unknown"))
         try:
@@ -258,9 +257,9 @@ def build_learned_moneyline_slate(
             snap_hash = _feature_hash(key, game_date, event_id, basis)
             
             # Deduplication: skip if this exact feature snapshot was already logged
-            if snap_hash in _seen_hashes:
+            if snap_hash in seen_hashes:
                 continue
-            _seen_hashes.add(snap_hash)
+            seen_hashes.add(snap_hash)
             candidates.append(
                 LearnedForwardCandidate(
                     event_id=event_id,

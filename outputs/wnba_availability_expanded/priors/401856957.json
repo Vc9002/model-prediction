@@ -1,0 +1,406 @@
+{
+  "lookback_team_games": 10,
+  "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
+  "observed_at_utc": "2026-06-03T01:30:00+00:00",
+  "players": [
+    {
+      "impact_points_per_100": 1.643192,
+      "player_name": "Ashlon Jackson",
+      "projected_minutes": 14.408423,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 26.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.246914,
+      "player_name": "Ashten Prechtel",
+      "projected_minutes": 2.770851,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 5.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.102941,
+      "player_name": "Carla Leite",
+      "projected_minutes": 4.433361,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 8.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.614251,
+      "player_name": "Caroline Ducharme",
+      "projected_minutes": 3.879191,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 7.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.486618,
+      "player_name": "Cate Reese",
+      "projected_minutes": 6.095871,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.614754,
+      "player_name": "Cecilia Zandalasini",
+      "projected_minutes": 9.199224,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 5,
+      "source_minutes": 88.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.399668,
+      "player_name": "Gabby Williams",
+      "projected_minutes": 13.337028,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 8,
+      "source_minutes": 203.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Iliana Rupert",
+      "projected_minutes": 17.733444,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 32.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.33119,
+      "player_name": "Janelle Salaun",
+      "projected_minutes": 12.819802,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 9,
+      "source_minutes": 222.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.760563,
+      "player_name": "Juste Jocyte",
+      "projected_minutes": 4.802808,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 3,
+      "source_minutes": 26.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.5,
+      "player_name": "Kaila Charles",
+      "projected_minutes": 9.162279,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 9,
+      "source_minutes": 200.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.630435,
+      "player_name": "Kaitlyn Chen",
+      "projected_minutes": 8.349497,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 9,
+      "source_minutes": 152.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.932401,
+      "player_name": "Kate Martin",
+      "projected_minutes": 9.605616,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 2,
+      "source_minutes": 29.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 2.250804,
+      "player_name": "Kayla Thornton",
+      "projected_minutes": 12.450356,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 9,
+      "source_minutes": 222.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.085034,
+      "player_name": "Kiah Stokes",
+      "projected_minutes": 12.376466,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 9,
+      "source_minutes": 188.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Kokoro Tanaka",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 5.09434,
+      "player_name": "Laeticia Amihere",
+      "projected_minutes": 6.760876,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 9,
+      "source_minutes": 130.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.369458,
+      "player_name": "Mariella Fasoula",
+      "projected_minutes": 3.325021,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 6.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.241546,
+      "player_name": "Marta Suarez",
+      "projected_minutes": 7.758382,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 14.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.071429,
+      "player_name": "Miela Sowah",
+      "projected_minutes": 2.678489,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 3,
+      "source_minutes": 20.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.235294,
+      "player_name": "Monique Billings",
+      "projected_minutes": 13.854253,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 1,
+      "source_minutes": 25.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Nadia Fingall",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -0.477327,
+      "player_name": "Ndjakalenga Mwenentanda",
+      "projected_minutes": 2.068902,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 5,
+      "source_minutes": 19.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": -1.428571,
+      "player_name": "Tiffany Hayes",
+      "projected_minutes": 7.647548,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 7,
+      "source_minutes": 90.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 3.539823,
+      "player_name": "Veronica Burton",
+      "projected_minutes": 14.482313,
+      "replacement_impact_points_per_100": -0.246914,
+      "source_games": 10,
+      "source_minutes": 278.0,
+      "team": "Golden State Valkyries"
+    },
+    {
+      "impact_points_per_100": 1.12782,
+      "player_name": "Bridget Carleton",
+      "projected_minutes": 20.584849,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 9,
+      "source_minutes": 265.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 2.896082,
+      "player_name": "Carla Leite",
+      "projected_minutes": 16.854709,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 8,
+      "source_minutes": 187.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.426307,
+      "player_name": "Emily Engstler",
+      "projected_minutes": 16.209993,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 10,
+      "source_minutes": 231.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.613497,
+      "player_name": "Frieda Buhner",
+      "projected_minutes": 9.440479,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 7,
+      "source_minutes": 89.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.091703,
+      "player_name": "Haley Jones",
+      "projected_minutes": 8.611559,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 5,
+      "source_minutes": 58.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.736264,
+      "player_name": "Holly Winterburn",
+      "projected_minutes": 7.41423,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 5,
+      "source_minutes": 55.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.581509,
+      "player_name": "Jordan Harrison",
+      "projected_minutes": 7.598434,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 1,
+      "source_minutes": 11.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -2.209302,
+      "player_name": "Kamiah Smalls",
+      "projected_minutes": 10.591757,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 2,
+      "source_minutes": 30.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.463964,
+      "player_name": "Karlie Samuelson",
+      "projected_minutes": 10.822012,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 3,
+      "source_minutes": 44.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 1.058632,
+      "player_name": "Luisa Geiselsoder",
+      "projected_minutes": 12.38775,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 10,
+      "source_minutes": 214.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.838879,
+      "player_name": "Megan Gustafson",
+      "projected_minutes": 14.82846,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 10,
+      "source_minutes": 171.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -3.052805,
+      "player_name": "Nyadiew Puoch",
+      "projected_minutes": 12.249597,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 10,
+      "source_minutes": 206.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 0.0,
+      "player_name": "Sania Feagin",
+      "projected_minutes": 0.0,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 0,
+      "source_minutes": 0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 3.089431,
+      "player_name": "Sarah Ashlee Barker",
+      "projected_minutes": 15.887635,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 10,
+      "source_minutes": 215.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -0.503018,
+      "player_name": "Serah Williams",
+      "projected_minutes": 10.223348,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 8,
+      "source_minutes": 97.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": -1.492537,
+      "player_name": "Sug Sutton",
+      "projected_minutes": 16.348146,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 3,
+      "source_minutes": 69.0,
+      "team": "Portland Fire"
+    },
+    {
+      "impact_points_per_100": 1.623377,
+      "player_name": "Teja Oblak",
+      "projected_minutes": 9.947041,
+      "replacement_impact_points_per_100": -1.838879,
+      "source_games": 4,
+      "source_minutes": 62.0,
+      "team": "Portland Fire"
+    }
+  ],
+  "plus_minus_prior_minutes": 400.0,
+  "schema_version": "1",
+  "sport": "wnba",
+  "team_diagnostics": {
+    "Golden State Valkyries": {
+      "normalization_scale": 0.55417,
+      "players": 25,
+      "players_with_minutes": 23,
+      "raw_projected_minutes": 360.9,
+      "replacement_impact_points_per_100": -0.246914
+    },
+    "Portland Fire": {
+      "normalization_scale": 0.690767,
+      "players": 17,
+      "players_with_minutes": 16,
+      "raw_projected_minutes": 289.533333,
+      "replacement_impact_points_per_100": -1.838879
+    }
+  },
+  "valid_from": "2026-06-03",
+  "valid_through": "2026-06-03"
+}
