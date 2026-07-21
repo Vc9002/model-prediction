@@ -1480,45 +1480,61 @@ def main(argv: list[str] | None = None) -> None:
                 no_snapshot_bbo=False,
             )
             slate = _polymarket_slate(slate_args, config)
-            # Capture WNBA availability data before running WNBA forecast
-            try:
-                from .data_sources.espn import ESPNClient
-                wnba_scoreboard = ESPNClient().scoreboard("WNBA", args.date)
-                wnba_event_ids = [
-                    str(event["id"]) for event in wnba_scoreboard.get("events", [])
-                ]
-                if wnba_event_ids:
-                    capture_latest_report(data_root, observed_at=utc_now())
-                    for event_id in wnba_event_ids:
-                        try:
-                            capture_espn_event_injuries(
-                                data_root, event_id=event_id,
-                                client=ESPNClient(), observed_at=utc_now(),
-                            )
-                        except Exception:
-                            pass
-            except Exception:
-                pass  # Availability capture is best-effort; never block daily
-            # Build WNBA player priors for today's games
-            try:
-                from .features.base import FeatureStore
-                from .data_sources.espn import ESPNClient
-                from .wnba_availability_evaluation import build_and_save_priors
-                wnba_priors_result = build_and_save_priors(
-                    store=FeatureStore(data_root),
-                    client=ESPNClient(),
-                    game_date=args.date,
-                    data_root=data_root,
-                )
-            except Exception:
-                wnba_priors_result = {"status": "skipped"}
+            # Run WNBA availability capture, prior build, and soccer collection
+            # in parallel with the slate (all I/O-bound).
+            from .data_sources.odds_soccer_scores import collect_soccer_scores
+            wnba_priors_result = {"status": "skipped"}
+            soccer_collection = {}
+            def _capture_wnba():
+                try:
+                    from .data_sources.espn import ESPNClient
+                    wnba_scoreboard = ESPNClient().scoreboard("WNBA", args.date)
+                    wnba_event_ids = [
+                        str(event["id"]) for event in wnba_scoreboard.get("events", [])
+                    ]
+                    if wnba_event_ids:
+                        capture_latest_report(data_root, observed_at=utc_now())
+                        for event_id in wnba_event_ids:
+                            try:
+                                capture_espn_event_injuries(
+                                    data_root, event_id=event_id,
+                                    client=ESPNClient(), observed_at=utc_now(),
+                                )
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+            def _build_priors():
+                nonlocal wnba_priors_result
+                try:
+                    from .features.base import FeatureStore
+                    from .data_sources.espn import ESPNClient
+                    from .wnba_availability_evaluation import build_and_save_priors
+                    wnba_priors_result = build_and_save_priors(
+                        store=FeatureStore(data_root),
+                        client=ESPNClient(),
+                        game_date=args.date,
+                        data_root=data_root,
+                    )
+                except Exception:
+                    pass
+            def _collect_soccer():
+                nonlocal soccer_collection
+                try:
+                    soccer_collection = collect_soccer_scores(days_from=3)
+                except Exception:
+                    pass
+            with ThreadPoolExecutor(max_workers=3) as io_pool:
+                f1 = io_pool.submit(_capture_wnba)
+                f2 = io_pool.submit(_build_priors)
+                f3 = io_pool.submit(_collect_soccer)
+                for f in (f1, f2, f3):
+                    f.result()  # Wait for all, surface exceptions
             _clear_today_open(ledger, args.date, by_event_date=True)
             # Also clear and forecast for flat ledger
             flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
             flat_ledger = PickLedger(flat_ledger_path)
             _clear_today_open(flat_ledger, args.date, by_event_date=True)
-            from .data_sources.odds_soccer_scores import collect_soccer_scores
-            soccer_collection = collect_soccer_scores(days_from=3)
             LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
             max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
             max_disagreement = float(config["project"].get("maximum_unreviewed_market_disagreement", 0.10))
