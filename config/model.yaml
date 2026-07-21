@@ -36,7 +36,8 @@ team_ban_list:
   - market_efficiency
   - manual_governance
 bankroll:
-  unit_value_usd: 7.5
+  unit_value_usd: 7.50
+  starting_bankroll_usd: 51.0
   reference_units: 5
   kelly_fraction: 0.5
   min_edge: 0.02
