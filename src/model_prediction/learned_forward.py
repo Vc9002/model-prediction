@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # requires them.
 
 _FEATURE_PROVIDERS: dict[str, Any] = {}
+_slate_cache: dict[tuple, tuple] = {}
 
 
 def _compute_features(
@@ -164,6 +165,10 @@ def build_learned_moneyline_slate(
     Market prices are not inputs.
     """
     key = sport.lower()
+    # Cache: primary and flat forecasts call with identical params
+    cache_key = (key, game_date, str(artifact_path), observed_at.isoformat())
+    if cache_key in _slate_cache:
+        return _slate_cache[cache_key]  # type: ignore[return-value]
     artifact = LearnedMarketArtifact.load(artifact_path)
     if artifact.sport != key:
         raise ValueError(f"artifact sport {artifact.sport} does not match {key}")
@@ -284,7 +289,9 @@ def build_learned_moneyline_slate(
         except (KeyError, TypeError, ValueError) as error:
             skipped.append({"event_id": event_id, "reason": str(error)})
 
-    return candidates, skipped, len(events)
+    result = (candidates, skipped, len(events))
+    _slate_cache[cache_key] = result
+    return result
 
 
 def match_executable_quote(

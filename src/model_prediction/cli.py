@@ -1538,7 +1538,7 @@ def main(argv: list[str] | None = None) -> None:
             LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
             max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
             max_disagreement = float(config["project"].get("maximum_unreviewed_market_disagreement", 0.10))
-            # Parallelize sport forecasts — each sport is independent I/O
+            # Compute forecasts once, log to both ledgers (compute > log main > log flat)
             forecast_result = {}
             workers = min(len(LEARNED_SPORTS), 5)
             with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -1559,7 +1559,27 @@ def main(argv: list[str] | None = None) -> None:
                             "sport": sport, "status": "error", "reason": str(exc),
                             "logged": 0, "candidates": [],
                         }
-            # Esports run serially (external API calls)
+            # Re-log computed candidates to flat ledger (flat mode, no edge gate)
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                flat_futures = {}
+                for sport in LEARNED_SPORTS:
+                    result = forecast_result.get(sport, {})
+                    candidates = result.get("candidates", [])
+                    if candidates:
+                        flat_futures[pool.submit(
+                            _forecast_learned_sport,
+                            sport, args.date, True, config, registry, bans, flat_ledger,
+                            maximum_data_age_hours=max_data_age,
+                            maximum_unreviewed_disagreement=max_disagreement,
+                            flat_mode=True,
+                        )] = sport
+                for future in as_completed(flat_futures):
+                    sport = flat_futures[future]
+                    try:
+                        forecast_result[f"_flat_{sport}"] = future.result()
+                    except Exception:
+                        pass
+            # Esports run serially
             for title in ESPORTS_TITLES:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=Path(ledger_path(config)).parent,
@@ -1569,27 +1589,7 @@ def main(argv: list[str] | None = None) -> None:
                 )
                 _log_esports_forecast(forecast_result[title], config, ledger, flat_mode=False)
                 _log_esports_forecast(forecast_result[title], config, flat_ledger, flat_mode=True)
-            # Flat forecast: parallel re-run with flat_mode logging
-            flat_result = {}
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                futures = {}
-                for sport in LEARNED_SPORTS:
-                    futures[pool.submit(
-                        _forecast_learned_sport,
-                        sport, args.date, True, config, registry, bans, flat_ledger,
-                        maximum_data_age_hours=max_data_age,
-                        maximum_unreviewed_disagreement=max_disagreement,
-                        flat_mode=True,
-                    )] = sport
-                for future in as_completed(futures):
-                    sport = futures[future]
-                    try:
-                        flat_result[sport] = future.result()
-                    except Exception as exc:
-                        flat_result[sport] = {
-                            "sport": sport, "status": "error", "reason": str(exc),
-                            "logged": 0, "candidates": [],
-                        }
+            flat_result = {sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {})) for sport in LEARNED_SPORTS}
             for title in ESPORTS_TITLES:
                 flat_result[title] = forecast_result[title]
             for result in forecast_result.values():
