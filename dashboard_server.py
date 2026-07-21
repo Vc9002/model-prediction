@@ -1130,17 +1130,23 @@ def _pick_quote(row: dict) -> dict | None:
             latest[slug] = snapshot
     if not latest:
         return None
+    if len(latest) > 1:
+        return None  # doubleheader: two contracts matched; never guess which game
     snapshot = max(latest.values(), key=lambda item: str(item.get("observed_at_utc") or ""))
     selected_team = (
         str(row.get("home_team") or "")
         if str(row.get("selection") or "").casefold() == "home"
         else str(row.get("away_team") or "")
     )
-    side_name = (
-        "long"
-        if _team_matches(selected_team, str((snapshot.get("long") or {}).get("description") or ""))
-        else "short"
+    matches_long = _team_matches(
+        selected_team, str((snapshot.get("long") or {}).get("description") or "")
     )
+    matches_short = _team_matches(
+        selected_team, str((snapshot.get("short") or {}).get("description") or "")
+    )
+    if matches_long == matches_short:
+        return None  # ambiguous side (same-city names) — never default to long
+    side_name = "long" if matches_long else "short"
     side = snapshot.get(side_name) or {}
     ask = _number(side.get("ask"), -1)
     if not 0 < ask < 1:
@@ -1547,12 +1553,15 @@ def preview_order(payload: dict) -> dict:
     if action == "buy" and not decorated["buy_ready"]:
         return {"status": "refused", "error": decorated["buy_block_reason"]}
     try:
-        price = round(float(payload.get("price")), 2)
+        raw_price = float(payload.get("price"))
         size_shares = float(payload.get("size_shares"))
     except (TypeError, ValueError):
         return {"status": "refused", "error": "price and shares must be numeric"}
-    if not 0.01 <= price <= 0.99 or abs(price * 100 - round(price * 100)) > 1e-8:
+    # Validate the tick on the RAW input; rounding first would silently accept
+    # (and change) a sub-cent price the user never confirmed.
+    if not 0.01 <= raw_price <= 0.99 or abs(raw_price * 100 - round(raw_price * 100)) > 1e-8:
         return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
+    price = round(raw_price, 2)
     if not 0 < size_shares <= 100000:
         return {"status": "refused", "error": "shares must be greater than 0 and at most 100,000"}
     estimated_cost = round(price * size_shares, 2)
@@ -1727,12 +1736,13 @@ def preview_position_sell(payload: dict) -> dict:
     if not slug or side not in ("long", "short"):
         return {"status": "refused", "error": "market_slug and side (long|short) are required"}
     try:
-        price = round(float(payload.get("price")), 2)
+        raw_price = float(payload.get("price"))
         size_shares = float(payload.get("size_shares"))
     except (TypeError, ValueError):
         return {"status": "refused", "error": "price and shares must be numeric"}
-    if not 0.01 <= price <= 0.99 or abs(price * 100 - round(price * 100)) > 1e-8:
+    if not 0.01 <= raw_price <= 0.99 or abs(raw_price * 100 - round(raw_price * 100)) > 1e-8:
         return {"status": "refused", "error": "limit price must be a 0.01 tick from 0.01 to 0.99"}
+    price = round(raw_price, 2)
     if not 0 < size_shares <= 1_000_000:
         return {"status": "refused", "error": "shares must be greater than 0"}
     portfolio = live_portfolio_view()
@@ -2143,19 +2153,6 @@ class Handler(BaseHTTPRequestHandler):
                 day = query.get("date") or _today()
                 self._send(_cached(f"live:{sport}:{day}", 120,
                                    lambda: live_gateway_slate(sport, day)))
-            elif route == "/api/scan":
-                try:
-                    from model_prediction.data_sources.polymarket_us import capture_snapshots
-                    sport = query.get("sport", "").strip()
-                    sports = [sport] if sport in ("mlb","nba","wnba","nfl") else ["mlb","nba","wnba"]
-                    results = {}
-                    for s in sports:
-                        results[s] = capture_snapshots(s, _today())
-                    _CACHE.pop("matrix", None)
-                    _CACHE.pop("market", None)
-                    self._send({"status": "ok", "captured": results})
-                except Exception as e:
-                    self._send({"status": "error", "error": str(e)}, code=500)
             elif route == "/api/audit":
                 self._send(_cached("audit", 60, _audit_tail))
             elif route == "/api/job":
@@ -2185,7 +2182,22 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as error:  # noqa: BLE001
             self._send({"error": f"{type(error).__name__}: {error}"}, code=500)
 
+    def _local_origin_ok(self) -> bool:
+        """Reject cross-site (CSRF) POSTs: browser requests from any web page
+        carry an Origin header; only same-host origins (or none — curl, CLI)
+        are allowed to hit state-changing routes on this local server."""
+        origin = str(self.headers.get("Origin") or "")
+        if not origin:
+            return True
+        host = str(self.headers.get("Host") or "")
+        return origin in (f"http://{host}", f"https://{host}") or origin.startswith(
+            ("http://127.0.0.1:", "http://localhost:")
+        )
+
     def do_POST(self) -> None:  # noqa: N802
+        if not self._local_origin_ok():
+            self._send({"status": "refused", "error": "cross-origin request rejected"}, code=403)
+            return
         parsed = urlparse(self.path)
         length = int(self.headers.get("Content-Length") or 0)
         try:
@@ -2225,59 +2237,48 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def _auto_adjust_unit_value(pct: float = 10.0) -> dict:
-    """Set unit value to pct% of current bankroll. Only ratchets up, never down."""
+    """Set 1U to pct% of the LIVE exchange USD balance, moving up or down.
+
+    The exchange balance is the only honest bankroll number: revaluing
+    historical unit P&L at the current unit value (the previous approach)
+    was circular and compounded the unit on every win. When the live
+    account is unreachable the unit value is left unchanged.
+    """
     fraction = max(0.01, min(0.50, pct / 100.0))  # clamp 1-50%
-    bankroll = _compute_bankroll()
-    suggested = round(bankroll * fraction, 2)
+    portfolio = live_portfolio_view()
+    if portfolio.get("status") != "live":
+        return {
+            "status": "unavailable",
+            "error": (
+                "live exchange balance unreachable: "
+                + str(portfolio.get("error") or "authentication required")
+            ),
+            "note": "Unit value unchanged; auto-sizing requires the real account balance.",
+        }
+    balance = _number((portfolio.get("balance") or {}).get("current_usd"), None)
+    if balance is None or balance <= 0:
+        return {
+            "status": "unavailable",
+            "error": "exchange returned no positive USD balance",
+            "note": "Unit value unchanged.",
+        }
+    suggested = round(balance * fraction, 2)
     current = _unit_value_usd()
-    # Only increase — ratchet up, never shrink
-    if suggested <= current:
+    if abs(suggested - current) < 0.01:
         return {
             "status": "no_change",
-            "bankroll_usd": round(bankroll, 2),
+            "balance_usd": round(balance, 2),
             "current_unit": current,
             "suggested_unit": suggested,
-            "note": "Bankroll at $" + f"{bankroll:,.2f}" + f", {pct:.1f}% = $" + f"{suggested:.2f}" + " <= current $" + f"{current:.2f}" + ". No change.",
+            "note": f"{pct:.1f}% of ${balance:,.2f} = ${suggested:.2f}, already current.",
         }
     try:
         result = _set_unit_value_usd(suggested)
-        result["bankroll_usd"] = round(bankroll, 2)
-        result["action"] = "ratchet_up"
+        result["balance_usd"] = round(balance, 2)
+        result["action"] = "raised" if suggested > current else "lowered"
         return result
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-def _compute_bankroll() -> float:
-    """Compute bankroll: starting + settled P&L from main ledger."""
-    import openpyxl as _xl
-    uv = _unit_value_usd()
-    # Read starting bankroll from config
-    try:
-        cfg = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
-        starting = float((cfg.get("bankroll") or {}).get("starting_bankroll_usd", max(100 * uv, 500.0)))
-    except Exception:
-        starting = max(100 * uv, 500.0)
-    total_pnl_usd = 0.0
-    open_pnl_usd = 0.0
-    path = ROOT / "data" / "picks.xlsx"
-    if path.exists():
-        try:
-            wb = _xl.load_workbook(path, data_only=True)
-            ws = wb["Picks"] if "Picks" in wb.sheetnames else wb[wb.sheetnames[0]]
-            headers = {str(ws.cell(1, c).value or ""): c for c in range(1, ws.max_column + 1)}
-            if "pnl_units" in headers and "status" in headers:
-                for r in range(2, ws.max_row + 1):
-                    status = str(ws.cell(r, headers["status"]).value or "")
-                    pnl = float(ws.cell(r, headers["pnl_units"]).value or 0)
-                    if status == "settled":
-                        total_pnl_usd += pnl * uv
-                    elif status == "open":
-                        open_pnl_usd += pnl * uv
-            wb.close()
-        except Exception:
-            pass
-    return starting + total_pnl_usd + open_pnl_usd
+    except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
+        return {"status": "error", "error": str(error)}
 
 
 def today_picks(day: str) -> dict:
@@ -2976,70 +2977,63 @@ def _model_version_rank(row: dict) -> tuple:
 
 
 def dedupe_ledger() -> dict:
-    """Physically remove duplicate ledger rows from picks.xlsx.
+    """Remove duplicate OPEN ledger rows through the audited ledger path.
 
     A duplicate = same contract identity (league/event/market/selection/line)
-    logged under more than one model version or run. Keeps exactly one row per
-    identity — the newest model version — and DELETES the rest from the file.
-    picks.xlsx is backed up first (picks.xlsx.dedupe-bak-<ts>). Rows carrying
-    real units are never deleted. Archived-hidden ids are pruned to match.
+    logged under more than one model version or run. Keeps one row per
+    identity — the newest model version — and removes the rest via
+    ``PickLedger.remove_open_rows`` (ledger lock + ``pick_removed`` audit
+    events). Settled rows are results and are never touched; staked open rows
+    are never deleted. picks.xlsx is backed up first.
     """
-    from model_prediction.ledger import FIELDNAMES  # local: heavy import
-    from model_prediction.xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
+    from model_prediction.ledger import PickLedger  # local: heavy import
 
     path = DATA / "picks.xlsx"
     if not path.exists():
         return {"status": "refused", "error": "picks.xlsx not found"}
-    headers, rows = read_xlsx_rows(path)
-    if headers != FIELDNAMES:
-        return {"status": "refused",
-                "error": "picks.xlsx schema does not match this code version; not touching it"}
+    ledger = PickLedger(path, DATA / "events.jsonl")
+    try:
+        rows = ledger.rows()
+    except ValueError as error:
+        return {"status": "refused", "error": str(error)}
     groups: dict[tuple, list[dict]] = {}
     for row in rows:
+        if row.get("status") != "open":
+            continue
         groups.setdefault(_pick_identity(row), []).append(row)
-    keep: list[dict] = []
-    removed = 0
-    removed_ids: list[str] = []
+    to_remove: list[str] = []
     for members in groups.values():
         if len(members) == 1:
-            keep.append(members[0])
             continue
-        # Never delete a row with real staked units; keep every staked row.
-        staked = [m for m in members if _number(m.get("units")) > 0]
         unstaked = [m for m in members if _number(m.get("units")) <= 0]
-        survivors = list(staked)
-        if unstaked:
-            survivors.append(max(unstaked, key=_model_version_rank))
-        keep_ids = {id(m) for m in survivors}
-        for member in members:
-            if id(member) in keep_ids:
-                keep.append(member)
-            else:
-                removed += 1
-                removed_ids.append(str(member.get("pick_id") or ""))
-    if removed == 0:
-        return {"status": "ok", "removed": 0, "kept": len(keep),
-                "note": "No duplicate contracts found."}
+        if not unstaked:
+            continue
+        survivor = max(unstaked, key=_model_version_rank)
+        to_remove.extend(
+            str(m.get("pick_id") or "") for m in unstaked if m is not survivor
+        )
+    if not to_remove:
+        return {"status": "ok", "removed": 0, "kept": len(rows),
+                "note": "No open duplicate contracts found."}
     backup = path.with_suffix(f".xlsx.dedupe-bak-{int(time.time())}")
     import shutil
 
     shutil.copy2(path, backup)
-    keep.sort(key=lambda r: str(r.get("created_at_utc") or ""))
-    write_xlsx_rows_atomic(path, FIELDNAMES, keep)
+    removed_ids = ledger.remove_open_rows(to_remove, reason="dashboard duplicate-contract dedupe")
     # Prune archived ids that no longer exist so the counter stays honest.
+    surviving = {str(r.get("pick_id")) for r in ledger.rows()}
     archive = _load_archive()
-    surviving = {str(r.get("pick_id")) for r in keep}
     archive["pick_ids"] = sorted(pid for pid in archive["pick_ids"] if pid in surviving)
     archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
-                               "action": "dedupe", "rows": removed})
+                               "action": "dedupe", "rows": len(removed_ids)})
     _save_archive(archive)
     with _CACHE_LOCK:
         _CACHE.clear()
-    _PICKS_CACHE["mtime"] = None
-    _log(f"dedupe: removed {removed} duplicate rows, backup {backup.name}")
-    return {"status": "ok", "removed": removed, "kept": len(keep),
+        _PICKS_CACHE["mtime"] = None
+    _log(f"dedupe: removed {len(removed_ids)} open duplicate rows, backup {backup.name}")
+    return {"status": "ok", "removed": len(removed_ids), "kept": len(surviving),
             "backup": backup.name, "removed_pick_ids": removed_ids[:50],
-            "note": f"Physically removed {removed} duplicate rows. Original backed up to {backup.name}."}
+            "note": f"Removed {len(removed_ids)} open duplicates via the audited ledger path. Backup: {backup.name}."}
 
 
 def _load_archive() -> dict:

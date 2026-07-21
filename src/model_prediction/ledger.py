@@ -118,6 +118,9 @@ FIELDNAMES = LEGACY_FIELDNAMES + [
     "research_pnl_units",
     "research_scored_at_utc",
     "research_scoring_note",
+    # Original model_version when a migration rewrote lineage in place
+    # (e.g. the 2026-07 v3->v4 MLB migration). Empty for native rows.
+    "migrated_from_version",
 ]
 DECISION_FIELDS = {
     "pick_id",
@@ -583,6 +586,52 @@ class PickLedger:
             },
         )
         return row
+
+    def remove_open_rows(self, pick_ids: list[str], reason: str) -> list[str]:
+        """Physically remove OPEN rows under the ledger lock, with audit events.
+
+        This is the ONLY sanctioned deletion path. Settled rows and rows with
+        positive units are refused — removal exists for re-forecast cleanup
+        and duplicate hygiene, never for erasing results or live exposure.
+        Every removal writes a ``pick_removed`` audit event so the chain and
+        the workbook can always be reconciled.
+        """
+        if not reason.strip():
+            raise ValueError("a removal reason is required")
+        requested = {str(pick_id) for pick_id in pick_ids if str(pick_id)}
+        if not requested:
+            return []
+        removed: list[dict[str, str]] = []
+        with self._lock():
+            self._migrate_if_needed()
+            rows = self._read_unlocked()
+            keep: list[dict[str, str]] = []
+            for row in rows:
+                if row["pick_id"] in requested and row["status"] == PickStatus.OPEN.value:
+                    if float(row["units"] or 0) > 0 and row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value:
+                        keep.append(row)  # never delete open staked exposure
+                        continue
+                    removed.append(row)
+                    continue
+                keep.append(row)
+            if removed:
+                self._write_rows(keep)
+        for row in removed:
+            self.audit.append(
+                "pick_removed",
+                row["pick_id"],
+                {
+                    "reason": reason,
+                    "event_id": row["event_id"],
+                    "league": row["league"],
+                    "market_type": row["market_type"],
+                    "selection": row["selection"],
+                    "model_version": row["model_version"],
+                    "record_type": row["record_type"],
+                    "created_at_utc": row["created_at_utc"],
+                },
+            )
+        return [row["pick_id"] for row in removed]
 
     def void(self, pick_id: str, reason: str) -> dict[str, str]:
         self.initialize()

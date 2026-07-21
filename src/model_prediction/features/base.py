@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -188,11 +188,13 @@ class FeatureStore:
     def games_before(self, sport: str, as_of_date: str) -> list[GameRecord]:
         """Every cached completed game that started strictly before the as-of date.
 
-        This is the point-in-time chokepoint: the cutoff is midnight UTC at the
-        START of ``as_of_date``, so no same-day or future information can leak
-        into a snapshot computed for that date.
+        This is the point-in-time chokepoint: the cutoff is midnight US-Eastern
+        at the START of ``as_of_date`` (the project's canonical calendar — see
+        domain.EASTERN), so no same-ET-day or future information can leak into
+        a snapshot computed for that date. Yesterday's late ET-evening games
+        are included; under the previous UTC cutoff they were dropped.
         """
-        cutoff = datetime.combine(date.fromisoformat(as_of_date), time.min, tzinfo=timezone.utc)
+        cutoff = datetime.combine(date.fromisoformat(as_of_date), time.min, tzinfo=EASTERN)
         return [game for game in self.load_games(sport) if game.start < cutoff]
 
     # ------------------------------------------------------------- snapshots

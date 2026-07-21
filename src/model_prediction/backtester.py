@@ -23,7 +23,7 @@ from typing import Any, Sequence
 from scipy.stats import poisson, skellam
 
 from .calibration import IdentityCalibrator, TrainablePlattCalibrator, calibration_metrics
-from .domain import MarketType
+from .domain import EASTERN, MarketType
 from .features.base import FeatureStore, GameRecord
 from .features.elo_ratings import build_elo
 from .features.trends import TrendEngine
@@ -72,12 +72,12 @@ def walk_forward_backtest(
         return {"status": "no_cached_games", "sport": sport}
     by_date: dict[str, list[GameRecord]] = defaultdict(list)
     for game in games:
-        by_date[game.start.date().isoformat()].append(game)
+        by_date[game.start.astimezone(EASTERN).date().isoformat()].append(game)
     dates = sorted(day for day in by_date if start_date <= day <= end_date)
     predictions: list[dict[str, Any]] = []
     daily_brier: list[dict[str, Any]] = []
     for day in dates:
-        history = [game for game in games if game.start.date().isoformat() < day]
+        history = [game for game in games if game.start.astimezone(EASTERN).date().isoformat() < day]
         if len(history) < minimum_history_games:
             continue
         elo = build_elo(history, sport)
@@ -178,13 +178,13 @@ def walk_forward_mlb_backtest(
         return {"status": "no_cached_games", "sport": "mlb"}
     by_date: dict[str, list[GameRecord]] = defaultdict(list)
     for game in games:
-        by_date[game.start.date().isoformat()].append(game)
+        by_date[game.start.astimezone(EASTERN).date().isoformat()].append(game)
     dates = sorted(day for day in by_date if day <= end_date)
     quotes = _load_historical_market_events(market_lines_path)
     records: list[dict[str, Any]] = []
     calibration_history: dict[str, list[tuple[str, float, int]]] = defaultdict(list)
     for day in dates:
-        history = [game for game in games if game.start.date().isoformat() < day]
+        history = [game for game in games if game.start.astimezone(EASTERN).date().isoformat() < day]
         if len(history) < minimum_history_games:
             continue
         elo = build_elo(history, "mlb")
@@ -474,7 +474,7 @@ def _mlb_market_records(
         structural_baseline = elo_home_probability if market_type is MarketType.MONEYLINE else 0.5
         output.append(
             {
-                "date": game.start.date().isoformat(),
+                "date": game.start.astimezone(EASTERN).date().isoformat(),
                 "event_id": game.event_id,
                 "market_type": market_type.value,
                 "selection": "",

@@ -116,14 +116,18 @@ def test_unqualified_artifact_can_only_create_research_observation(tmp_path) -> 
     assert candidates[0].action == "QUALIFIED_SHADOW_CALL"  # All calls treated equally; user decides
 
 
-def test_missing_mlb_starters_skips_event_instead_of_using_team_proxy(
+def test_pitcher_gap_served_from_history_and_starter_gap_fails_closed(
     tmp_path, monkeypatch
 ) -> None:
+    """Train/serve unification: pitcher_era_gap is the shared rolling
+    runs-allowed gap computed from cached history (never an ESPN starter
+    lookup), and an artifact requiring starter_era_gap — which has no valid
+    forward source — fails closed instead of silently serving 0.0."""
     _write_history(tmp_path)
     artifact_path = tmp_path / "artifact.json"
     artifact = build_artifact(
         sport="mlb",
-        model_version="mlb-starter-required-test",
+        model_version="mlb-pitcher-gap-test",
         market_models={
             "moneyline": {
                 "feature_names": ["pitcher_era_gap"],
@@ -138,10 +142,10 @@ def test_missing_mlb_starters_skips_event_instead_of_using_team_proxy(
     )
     artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
 
-    def missing_starters(*args, **kwargs) -> float:
-        raise ValueError("NO_CALL_STARTERS_UNAVAILABLE: test")
+    def espn_must_not_be_called(*args, **kwargs) -> float:
+        raise AssertionError("pitcher_era_gap must never consult ESPN probables")
 
-    monkeypatch.setattr(espn_probables, "espn_pitcher_era_gap", missing_starters)
+    monkeypatch.setattr(espn_probables, "espn_pitcher_era_gap", espn_must_not_be_called)
     learned_forward._FEATURE_PROVIDERS.clear()
 
     candidates, skipped, scheduled = build_learned_moneyline_slate(
@@ -152,10 +156,40 @@ def test_missing_mlb_starters_skips_event_instead_of_using_team_proxy(
         artifact_path=artifact_path,
         observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
     )
+    assert scheduled == 1
+    assert len(candidates) == 1  # gap computed from history, no skip
+    assert "pitcher_era_gap" in candidates[0].feature_basis
+
+    starter_artifact = build_artifact(
+        sport="mlb",
+        model_version="mlb-starter-required-test",
+        market_models={
+            "moneyline": {
+                "feature_names": ["starter_era_gap"],
+                "coefficients": [-1.0],
+                "intercept": 3.0,
+                "confidence_threshold": 0.8,
+                "positive_class": "home",
+            }
+        },
+        training={"market_inputs_used": False},
+        qualification={"qualified": False},
+    )
+    starter_path = tmp_path / "starter-artifact.json"
+    starter_path.write_text(json.dumps(starter_artifact), encoding="utf-8")
+    learned_forward._slate_cache.clear()
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="mlb",
+        game_date="2026-07-17",
+        store=FeatureStore(tmp_path),
+        client=FakeESPN(),
+        artifact_path=starter_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+    )
 
     learned_forward._FEATURE_PROVIDERS.clear()
     assert scheduled == 1
     assert candidates == []
     assert skipped == [
-        {"event_id": "future-1", "reason": "NO_CALL_STARTERS_UNAVAILABLE: test"}
+        {"event_id": "future-1", "reason": "moneyline missing learned features: ['starter_era_gap']"}
     ]

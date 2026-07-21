@@ -85,8 +85,8 @@ data_sources:
 execution:
   status: hard_gated
   allow_manual_research_orders: true
-  manual_research_require_active_model: false
-  manual_research_require_positive_edge: false
+  manual_research_require_active_model: true
+  manual_research_require_positive_edge: true
   requirements:
   - explicit user execute command in the current turn
   - --execute CLI flag
@@ -125,10 +125,15 @@ models:
       require_ablation_gain: true
   MLB:
     family: elo_trend_logistic_regression
+    # OPERATOR PROMOTION (2026-07-21): live/flat performance has exceeded the
+    # historical locked holdout (v5 artifact records qualified=false at 56.3%).
+    # Promotion to shadow_qualified units is a deliberate operator decision;
+    # the artifact keeps the honest evidence. Revisit if live hit rate drifts
+    # below the model_drift check's 2-sigma band.
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: mlb-elo-trend-lr-v4
-    production_artifact: config/models/mlb-elo-trend-lr-v4.json
+    active_production_version: mlb-elo-trend-lr-v5
+    production_artifact: config/models/mlb-elo-trend-lr-v5.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
     legacy_research_rollback: legacy-measured-edge
@@ -157,8 +162,8 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: nba-elo-trend-lr-v3
-    production_artifact: config/models/nba-elo-trend-lr-v3.json
+    active_production_version: nba-elo-trend-lr-v4
+    production_artifact: config/models/nba-elo-trend-lr-v4.json
     protected_versions:
     - nba-elo-trend-v1
     - nba-elo-trend-lr-v1
@@ -171,9 +176,12 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: wnba-elo-trend-lr-v3
+    active_production_version: wnba-elo-trend-lr-v4
+    # min_edge 0.0 is DELIBERATE (2026-07-21): a 2026-07 experiment showed the
+    # WNBA model's directional accuracy holds without an edge floor. Do not
+    # "fix" this to 0.02 without a new experiment.
     min_edge: 0.0
-    production_artifact: config/models/wnba-elo-trend-lr-v3.json
+    production_artifact: config/models/wnba-elo-trend-lr-v4.json
     protected_versions:
     - wnba-elo-trend-v1
     - wnba-elo-trend-lr-v1
@@ -187,8 +195,8 @@ models:
     status: shadow_qualified
     origin: statistical_model
     model_type: multinomial_3way
-    active_production_version: soccer-elo-trend-lr-v1
-    production_artifact: config/models/soccer-elo-trend-lr-v1.json
+    active_production_version: soccer-elo-trend-lr-v2
+    production_artifact: config/models/soccer-elo-trend-lr-v2.json
     leagues:
     - EPL
     - LA_LIGA
@@ -203,8 +211,8 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: nfl-elo-trend-lr-v3
-    production_artifact: config/models/nfl-elo-trend-lr-v3.json
+    active_production_version: nfl-elo-trend-lr-v4
+    production_artifact: config/models/nfl-elo-trend-lr-v4.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
     spread_research_artifact: config/models/nfl-spread-baseline-v1.json
@@ -221,32 +229,32 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: lol-neutral-series-elo-v1
-    production_artifact: config/models/lol-neutral-series-elo-v1.json
+    active_production_version: lol-neutral-series-elo-v2
+    production_artifact: config/models/lol-neutral-series-elo-v2.json
     market_target: esports_match_winner
     min_edge: 0.02
   CS2:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: cs2-neutral-series-elo-v1
-    production_artifact: config/models/cs2-neutral-series-elo-v1.json
+    active_production_version: cs2-neutral-series-elo-v2
+    production_artifact: config/models/cs2-neutral-series-elo-v2.json
     market_target: esports_match_winner
     min_edge: 0.02
   DOTA2:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: dota2-neutral-series-elo-v1
-    production_artifact: config/models/dota2-neutral-series-elo-v1.json
+    active_production_version: dota2-neutral-series-elo-v2
+    production_artifact: config/models/dota2-neutral-series-elo-v2.json
     market_target: esports_match_winner
     min_edge: 0.02
   VALORANT:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: valorant-neutral-series-elo-v1
-    production_artifact: config/models/valorant-neutral-series-elo-v1.json
+    active_production_version: valorant-neutral-series-elo-v2
+    production_artifact: config/models/valorant-neutral-series-elo-v2.json
     market_target: esports_match_winner
     min_edge: 0.02
   KBO:

@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 from .audit import AuditLog
 from .backtester import walk_forward_backtest
@@ -524,6 +525,11 @@ def parser() -> argparse.ArgumentParser:
         help="run the model_improvements.md section-13 verification checklist for a sport",
     )
     checklist.add_argument("--sport", required=True)
+
+    commands.add_parser(
+        "verify-chain",
+        help="verify audit-chain link/hash integrity and ledger<->audit reconciliation",
+    )
     return root
 
 
@@ -724,7 +730,8 @@ def _forecast_learned_sport(
     if log and to_log and registry is not None and bans is not None and ledger is not None:
         data_root = Path(ledger_path(config)).parent
         observed_at = utc_now()
-        # All logged picks carry edge-scaled units — no shadow/research calls.
+        # Main ledger: units come from evaluate_eligibility (fail-closed).
+        # Flat ledger: every game gets diagnostic edge-scaled units.
         configured_state = str(model_config.get("status", "research"))
         for candidate in to_log:
             quote = match_executable_quote(data_root, sport, args_date, candidate)
@@ -801,10 +808,13 @@ def _forecast_learned_sport(
                     ),
                     unit_policy(config), **eligibility_kwargs,
                 )
-                # No shadow picks: force edge-scaled units if eligibility returned 0
-                if eligibility.units <= 0:
-                    from .units import edge_scaled_units as _esu
-                    forced_units = _esu(
+                # Flat mode only: assign diagnostic edge-scaled units so the
+                # separate flat ledger's one-unit accounting stays comparable.
+                # The MAIN ledger honors evaluate_eligibility exactly — a gate
+                # that returned 0 units did so for a reason (staleness,
+                # disagreement, exposure caps) and must never be overridden.
+                if flat_mode and eligibility.units <= 0:
+                    forced_units = edge_scaled_units(
                         candidate.model_probability,
                         request.model_uncertainty or 0.05,
                         request.american_odds,
@@ -871,18 +881,25 @@ def _log_esports_forecast(
     ledger: Any,
     flat_mode: bool = False,
 ) -> int:
-    """Log esports forecast results to a PickLedger. Returns count of logged rows."""
-    from .domain import League, MarketType, PickRequest, ModelOrigin, ModelState
-    from .eligibility import EligibilityResult
-    from .entities import CanonicalTeam
+    """Log esports contracts through the real eligibility gates.
+
+    Esports promotion to shadow_qualified units is a DELIBERATE config
+    decision (models.<TITLE>.status). This path enforces the same gates as
+    every other sport — staleness, model/market disagreement, exposure caps,
+    and unit-engine sizing — via ``evaluate_esports_eligibility``. Entity and
+    ban resolution is name-based because esports teams are not yet in the
+    canonical registry. Returns the count of logged rows.
+    """
     from .data_sources.polymarket_us import probability_to_american
+    from .eligibility import evaluate_esports_eligibility
 
     logged = 0
     model_config = config["models"].get(forecast["title"].upper(), {})
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = str(model_config.get("status", "shadow_qualified"))
+    configured_state = str(model_config.get("status", "research"))
     title = forecast["title"].upper()
     league = League(title)
+    observed_now = utc_now()
 
     for contract in forecast.get("priced_contracts", []):
         # Only log the model's pick: the side with higher model probability
@@ -899,8 +916,9 @@ def _log_esports_forecast(
             continue
 
         selected_team = str(best_side["team"])
-        # Use Polymarket's teams ordering for home/away; selection reflects
-        # which side we're picking (can be home or away).
+        # Polymarket side ordering is arbitrary for venue-neutral esports;
+        # teams[0]/teams[1] map to ledger home/away consistently with
+        # settlement, which reconstructs the selected team the same way.
         teams = list(contract["teams"])
         home_team = teams[0]
         away_team = teams[1]
@@ -921,37 +939,55 @@ def _log_esports_forecast(
             model_probability=round(model_prob, 6),
             model_uncertainty=None,
             model_version=str(forecast["model_version"]),
-            rationale=f"Neutral Elo baseline; executable ask {ask:.4f} ({contract['market_slug']}).",
-            risks="Research baseline; zero-unit shadow until qualified.",
+            rationale=(
+                f"Neutral Elo baseline; executable ask {ask:.4f} "
+                f"(market_slug={contract['market_slug']})."
+            ),
+            risks="Config-promoted esports baseline; gates enforced at log time.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState(configured_state),
+            observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="neutral_elo",
             calibration_version=str(forecast["model_version"]),
             calibration_artifact_hash=str(contract.get("artifact_hash", "")),
+            code_revision=str(forecast["model_version"]),
         )
-
-        away_ct = CanonicalTeam(away_team, league, away_team, away_team, True, None, None, ())
-        home_ct = CanonicalTeam(home_team, league, home_team, home_team, True, None, None, ())
-
-        units = edge_scaled_units(model_prob, 0.05, american_odds, unit_policy(config))
-        eligibility = EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
-            "CALL",
-            "QUALIFIED",
-            units,
-            min(100, max(0, int(edge * 1000))),
-            edge,
-            edge - 0.05,
-            away_ct,
-            home_ct,
-        )
-
         try:
-            ledger.append_evaluated(request, eligibility)
+            request.validate(now=observed_now)
+            exposure = ledger.exposure(request, now=observed_now)
+            eligibility = evaluate_esports_eligibility(
+                request,
+                exposure,
+                unit_policy(config),
+                now=observed_now,
+                maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                maximum_unreviewed_disagreement=float(
+                    config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                ),
+            )
+            if flat_mode and eligibility.units <= 0:
+                # Flat ledger: diagnostic edge-scaled sizing, same as the
+                # learned-sport flat path.
+                from .eligibility import EligibilityResult as _ER
+                eligibility = _ER(
+                    eligibility.record_type,
+                    eligibility.decision,
+                    eligibility.reason_code,
+                    edge_scaled_units(model_prob, 0.05, american_odds, unit_policy(config)),
+                    eligibility.confidence_score,
+                    eligibility.edge,
+                    eligibility.adjusted_edge,
+                    eligibility.away_team,
+                    eligibility.home_team,
+                )
+            with _LEDGER_LOCK:
+                ledger.append_evaluated(request, eligibility, now=observed_now)
             logged += 1
-        except Exception:
-            pass
+        except DuplicatePickError:
+            continue
+        except (ValueError, KeyError):
+            continue
 
     return logged
 
@@ -1107,89 +1143,93 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
     return None
 
 
+_TERMINAL_MARKET_STATES = {
+    "MARKET_STATE_EXPIRED",
+    "MARKET_STATE_RESOLVED",
+    "MARKET_STATE_SETTLED",
+}
+
+
 def _settle_esports_pick(row: dict, ledger) -> dict | None:
-    """Settle an esports pick via Polymarket contract resolution. Returns None if pending."""
+    """Settle an esports pick from the exchange's terminal market state.
+
+    A resolved Polymarket market reports a terminal book state (verified live:
+    ``MARKET_STATE_EXPIRED``) and terminal side prices — exactly 1 for the
+    winning team's side and 0 for the loser. Returns None while pending.
+
+    Ledger home/away were assigned from the contract's side ordering at log
+    time (teams[0]=home), so the winning description maps directly onto the
+    ledger's home/away teams: home won -> scores (0, 1); away won -> (1, 0).
+    """
     import re
     from .data_sources.polymarket_us import PolymarketUSClient
-    # Extract market slug from rationale: "... (slug)."
+
     rationale = str(row.get("rationale", ""))
-    match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
-    if not match:
-        return {"pick_id": row["pick_id"], "reason": "no market slug in rationale"}
+    match = re.search(r"market_slug=([a-z0-9\-]+)", rationale)
+    if match is None:  # legacy rows: "... (slug)."
+        match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
+    if match is None:
+        return {"pick_id": row["pick_id"], "reason": "no market slug recorded on row"}
     slug = match.group(1)
+    client = PolymarketUSClient()
     try:
-        snap = PolymarketUSClient().snapshot(slug)
-    except Exception as e:
-        return None  # API unavailable, leave pending
-    resolution = snap.get("resolution")
-    if not resolution:
-        return None  # not resolved yet
-    # Determine win/loss: did the team we picked win (contract resolved YES)?
-    outcome = snap.get("outcome", "")
-    # For moneyline: if resolution matches our selection side, it's a win
-    # Contract resolves to the winning team's side
-    selected_team = row["home_team"] if row["selection"] == "home" else row["away_team"]
-    # Get closing price from resolution
-    try:
-        closing_price = float(snap.get("close_price", 0) or 0)
-    except (ValueError, TypeError):
-        closing_price = 0
-    # Determine result
-    if outcome == "Yes":
-        # Contract resolved YES = the listed outcome team won
-        resolved_team = snap.get("question", "").split("?")[0].strip() if "?" in snap.get("question","") else ""
-        is_win = _identity_key(str(selected_team)) in _identity_key(str(resolved_team)) or \
-                 _identity_key(str(resolved_team)) in _identity_key(str(selected_team))
+        market = client.market(slug)
+        book = client.book(slug)
+    except Exception:  # noqa: BLE001 - API unavailable, leave pending
+        return None
+    if str(book.get("state") or "") not in _TERMINAL_MARKET_STATES:
+        return None
+    prices = {}
+    for side in market.get("marketSides", []):
+        try:
+            prices[str(side.get("description") or "")] = float(side.get("price"))
+        except (TypeError, ValueError):
+            return None
+    if len(prices) != 2 or sorted(prices.values()) != [0.0, 1.0]:
+        return None  # terminal state without a clean 1/0 settlement; leave pending
+    winning_description = next(name for name, price in prices.items() if price == 1.0)
+    home_key = _identity_key(str(row["home_team"]))
+    away_key = _identity_key(str(row["away_team"]))
+    winner_key = _identity_key(winning_description)
+    if winner_key == home_key:
+        away_score, home_score = 0, 1
+    elif winner_key == away_key:
+        away_score, home_score = 1, 0
     else:
-        is_win = False
+        return {
+            "pick_id": row["pick_id"],
+            "reason": f"winning side {winning_description!r} matches neither ledger team",
+        }
     try:
-        result = ledger.settle(
-            row["pick_id"],
-            int(is_win), 0 if is_win else 1,  # away_score, home_score
-            None,  # closing_line
-            None,  # closing_american_odds
-            closing_raw_probability=closing_price if closing_price else None,
-        )
+        result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
         return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
-    except Exception as e:
-        return {"pick_id": row["pick_id"], "reason": str(e)}
+    except (KeyError, ValueError) as error:
+        return {"pick_id": row["pick_id"], "reason": str(error)}
 
 
 def _identity_key(value: str) -> str:
     return "".join(c.lower() for c in value if c.isalnum())
 
 
-def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> None:
-    """Remove all open picks created on the given date before re-forecasting.
-    
+def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> list[str]:
+    """Remove open picks for a date before re-forecasting, via the audited path.
+
     When by_event_date is True, also removes open picks whose event_start_utc
     matches date_str — used for flat ledger to prevent duplicate forecast runs.
+    All removals go through ``PickLedger.remove_open_rows`` so they hold the
+    ledger lock and append ``pick_removed`` audit events.
     """
-    rows = ledger.rows()
     to_remove = []
-    for row in rows:
+    for row in ledger.rows():
         if row.get("status") != "open":
             continue
         created = str(row.get("created_at_utc", "") or "")
         event = str(row.get("event_start_utc", "") or "")
-        if created.startswith(date_str):
+        if created.startswith(date_str) or (by_event_date and event.startswith(date_str)):
             to_remove.append(row["pick_id"])
-        elif by_event_date and event.startswith(date_str):
-            to_remove.append(row["pick_id"])
-    if to_remove:
-        # Use openpyxl directly since ledger has no remove method
-        import openpyxl as _xl
-        wb = _xl.load_workbook(ledger.path)
-        ws = wb[wb.sheetnames[0] if wb.sheetnames else "Picks"]
-        headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
-        pid_col = headers.index("pick_id") + 1 if "pick_id" in headers else 1
-        rows_to_delete = []
-        for r in range(2, ws.max_row + 1):
-            if str(ws.cell(r, pid_col).value or "") in to_remove:
-                rows_to_delete.append(r)
-        for r in reversed(rows_to_delete):
-            ws.delete_rows(r)
-        wb.save(ledger.path)
+    if not to_remove:
+        return []
+    return ledger.remove_open_rows(to_remove, reason=f"re-forecast replacement for {date_str}")
 
 
 def _drift_check(settled_qualified: list, config: dict) -> dict:
@@ -1998,6 +2038,8 @@ def main(argv: list[str] | None = None) -> None:
                 "results": [vars(result) for result in results],
                 "formatted": format_checklist(results),
             }
+        elif args.command == "verify-chain":
+            output = _verify_chain(audit_path(config), ledger)
         elif args.command == "score-research":
             if bool(args.pick_ids) == bool(args.all_research):
                 raise ValueError("provide either --pick-id or --all-research")
@@ -2112,6 +2154,61 @@ def main(argv: list[str] | None = None) -> None:
         else:
             reason = "NO_CALL_EVENT_STARTED" if "started" in str(error) else "NO_CALL_INVALID_MARKET"
         _fail(str(error), reason)
+
+
+def _verify_chain(events_path, ledger) -> dict:
+    """Audit-chain link/hash verification plus ledger<->audit reconciliation."""
+    import hashlib
+
+    previous = "0" * 64
+    lines = 0
+    breaks: list[dict] = []
+    created: set[str] = set()
+    removed: set[str] = set()
+    path = Path(events_path)
+    if path.exists():
+        with path.open(encoding="utf-8") as handle:
+            for number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                lines += 1
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    breaks.append({"line": number, "kind": "unparseable"})
+                    continue
+                if event.get("previous_hash") != previous:
+                    breaks.append({"line": number, "kind": "broken_link"})
+                canonical = {key: value for key, value in event.items() if key != "event_hash"}
+                digest = hashlib.sha256(
+                    json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+                ).hexdigest()
+                if digest != event.get("event_hash"):
+                    breaks.append({"line": number, "kind": "hash_mismatch"})
+                previous = event.get("event_hash", previous)
+                event_type = event.get("event_type")
+                if event_type in ("pick_created", "research_observation_created"):
+                    created.add(str(event.get("subject_id")))
+                elif event_type == "pick_removed":
+                    removed.add(str(event.get("subject_id")))
+    ledger_ids = {row["pick_id"] for row in ledger.rows()}
+    deleted_unaudited = created - removed - ledger_ids
+    return {
+        "audit_lines": lines,
+        "breaks": breaks,
+        "break_count": len(breaks),
+        "ledger_rows": len(ledger_ids),
+        "audited_created": len(created),
+        "audited_removed": len(removed),
+        "rows_missing_creation_event": sorted(ledger_ids - created),
+        "created_but_absent_without_removal_event": len(deleted_unaudited),
+        "chain_intact": not breaks,
+        "reconciled": not deleted_unaudited and not (ledger_ids - created),
+        "note": (
+            "created_but_absent_without_removal_event counts historical deletions "
+            "made before the audited remove_open_rows path existed."
+        ),
+    }
 
 
 def _handle_ban(args: argparse.Namespace, bans: TeamBanList) -> object:

@@ -41,7 +41,7 @@ def _write_history(root, *, home_team="Home Team", away_team="Away Team",
 def _write_artifact(path, *, qualified=True, feature_names=None,
                     coefficients=None, intercept=3.0, threshold=0.55):
     if feature_names is None:
-        feature_names = ["elo_probability", "trend_gap", "park_factor", "starter_era_gap"]
+        feature_names = ["elo_probability", "trend_gap", "park_factor", "pitcher_era_gap"]
     if coefficients is None:
         coefficients = [2.88, -0.024, -0.99, -0.018]
     # Match coefficient count to feature count

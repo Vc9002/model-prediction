@@ -69,7 +69,7 @@ def test_production_artifact_pins_audited_coefficients_threshold_and_qualificati
 
     artifact = build_production_artifact(report)
 
-    assert artifact["model_version"] == "nba-elo-trend-lr-v3"
+    assert artifact["model_version"] == "nba-elo-trend-lr-v4"
     assert artifact["market_models"]["moneyline"]["coefficients"] == [2.5, 0.1]
     assert artifact["market_models"]["moneyline"]["confidence_threshold"] == 0.62
     assert artifact["qualification"]["qualified"] is True
