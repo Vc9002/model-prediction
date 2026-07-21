@@ -171,7 +171,7 @@ models:
     status: shadow_qualified
     origin: statistical_model
     active_production_version: wnba-elo-trend-lr-v3
-    min_edge: 0.0
+    min_edge: 0.02
     production_artifact: config/models/wnba-elo-trend-lr-v3.json
     protected_versions:
     - wnba-elo-trend-v1
