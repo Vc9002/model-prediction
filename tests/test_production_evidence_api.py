@@ -101,14 +101,26 @@ def test_production_evidence_enumerates_artifacts_and_uses_exact_metric_sources(
     result = dashboard_server.production_evidence()
 
     assert result["configured_production_models"] == 2
+    assert result["generated_at"] == result["generated_at_utc"]
     by_sport = {model["sport"]: model for model in result["models"]}
     assert set(by_sport) == {"mlb", "lol"}
     assert by_sport["mlb"]["artifact"]["valid"] is True
+    assert by_sport["mlb"]["artifact"]["health"] == "VERIFIED"
+    assert by_sport["mlb"]["artifact"]["sha256"] == logistic["artifact_hash"]
+    assert by_sport["mlb"]["artifact"]["hash_verified"] is True
+    assert by_sport["mlb"]["artifact"]["lineage"] == "VERIFIED"
     assert by_sport["mlb"]["model_spec"]["features"] == [
         {"name": "elo_probability", "coefficient": 2.5},
         {"name": "trend_gap", "coefficient": -0.1},
     ]
     assert by_sport["mlb"]["locked_backfill"]["metrics"]["calls"] == 51
+    assert by_sport["mlb"]["backfill"] | {
+        "observations": None,
+        "calls": 51,
+        "hit_rate": 0.61,
+        "brier_score": None,
+        "qualified": False,
+    } == by_sport["mlb"]["backfill"]
     assert by_sport["lol"]["model_spec"]["parameters"]["k"] == 48.0
     assert by_sport["lol"]["locked_backfill"]["metrics"]["selected_matches"]["calls"] == 70
     for model in by_sport.values():
@@ -196,6 +208,8 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
         {**common, "pick_id": "old", "event_id": "event-old", "model_version": "mlb-v1",
          "result": "win", "model_artifact_hash": predecessor["artifact_hash"],
          "probability_clv": 0.02},
+        {**common, "pick_id": "push", "event_id": "event-push", "model_version": "mlb-v2",
+         "result": "push", "model_artifact_hash": active["artifact_hash"]},
         {**common, "pick_id": "open", "event_id": "event-open", "model_version": "mlb-v2",
          "status": "open", "result": "win"},
     ]
@@ -217,15 +231,18 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
     assert main_result["clv"]["coverage"] == 1.0
     assert main_result["predecessor_rows_excluded"] == 0
 
-    assert flat_result["settled"] == 2
+    assert flat_result["settled"] == 3
     assert flat_result["wins"] == 1
     assert flat_result["losses"] == 1
+    assert flat_result["pushes"] == 1
     assert flat_result["duplicates_removed"] == 1
     assert flat_result["brier"] == 0.225
     assert flat_result["clv"]["coverage"] == 0.5
     assert flat_result["predecessor_rows_excluded"] == 1
     assert flat_result["predecessor_version_counts"] == {"mlb-v1": 1}
     assert flat_result["pnl"]["shadow"]["label"] == "shadow_not_executed"
+    assert flat_result["pnl_units"] == 0.0
+    assert flat_result["pnl_basis"] == "shadow"
     assert flat_result["pnl"]["executed"]["roi"] is None
     assert flat_result["profitability_claim"]["allowed"] is False
     assert flat_result["feature_value_attribution"]["status"] == "missing"
@@ -338,6 +355,8 @@ def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path
     model = dashboard_server.production_evidence()["models"][0]
 
     assert model["artifact"]["hash_valid"] is False
+    assert model["artifact"]["health"] == "FAILED"
+    assert model["artifact"]["hash_verified"] is False
     assert model["artifact"]["valid"] is False
     assert model["locked_backfill"]["metrics"] is None
     assert model["model_definition_and_backfill_valid"] is False
@@ -360,6 +379,61 @@ def test_current_configured_production_artifacts_are_verified(monkeypatch) -> No
         assert model["artifact"]["version_matches_config"] is True
         assert model["artifact"]["lineage_matches_config"] is True
         assert model["locked_backfill"]["status"] == "verified"
+
+
+def _render_model_card(model: dict) -> dict[str, str]:
+    backfill = model["backfill"]
+    if backfill["observations"] is None or backfill["calls"] is None:
+        backfill_text = "—"
+    else:
+        qualification = "QUALIFIED" if backfill["qualified"] else "NOT QUALIFIED"
+        backfill_text = (
+            f"{backfill['observations']} obs · {backfill['calls']} calls · "
+            f"{backfill['hit_rate']:.1%} · Brier {backfill['brier_score']:.3f} · "
+            f"{qualification}"
+        )
+
+    def ledger_text(ledger: dict) -> str:
+        if ledger["settled"] is None:
+            return "—"
+        return f"{ledger['wins']}-{ledger['losses']}-{ledger['pushes']}"
+
+    return {
+        "backfill": backfill_text,
+        "artifact": model["artifact"]["health"],
+        "main_ledger": ledger_text(model["main_ledger"]),
+        "flat_ledger": ledger_text(model["flat_ledger"]),
+    }
+
+
+def test_http_payload_renders_nba_verified_with_missing_ledger_dashes(monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    with dashboard_server._CACHE_LOCK:
+        dashboard_server._CACHE.clear()
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request("GET", "/api/production-evidence")
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        nba = next(model for model in payload["models"] if model["sport"] == "nba")
+
+        rendered = _render_model_card(nba)
+
+        assert response.status == 200
+        assert rendered == {
+            "backfill": "654 obs · 577 calls · 73.7% · Brier 0.185 · QUALIFIED",
+            "artifact": "VERIFIED",
+            "main_ledger": "—",
+            "flat_ledger": "—",
+        }
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_production_evidence_route_is_get_only(monkeypatch) -> None:

@@ -487,6 +487,10 @@ def _artifact_evidence(path: Path, expected_version: str, expected_sport: str) -
             "path": str(path),
             "available": False,
             "valid": False,
+            "health": "MISSING",
+            "sha256": None,
+            "hash_verified": False,
+            "lineage": "UNVERIFIED",
             "declared_hash": None,
             "computed_hash": None,
             "hash_valid": False,
@@ -517,6 +521,10 @@ def _artifact_evidence(path: Path, expected_version: str, expected_sport: str) -
         "path": str(path),
         "available": True,
         "valid": hash_valid and version_valid and lineage_valid,
+        "health": "VERIFIED" if hash_valid and version_valid and lineage_valid else "FAILED",
+        "sha256": declared_hash,
+        "hash_verified": hash_valid,
+        "lineage": "VERIFIED" if version_valid and lineage_valid else "MISMATCH",
         "declared_hash": declared_hash,
         "computed_hash": computed_hash,
         "hash_valid": hash_valid,
@@ -632,6 +640,30 @@ def _locked_backfill_evidence(
         "pnl_label": "hypothetical_at_minus_110",
         "profitability_claim": False,
     }
+
+
+def _backfill_aliases(backfill: dict, raw: dict) -> dict:
+    """Flatten locked metrics for UI consumers while retaining full detail."""
+    metrics = backfill.get("metrics") or {}
+    if raw.get("method") == "logistic_regression":
+        locked_training = (raw.get("training") or {}).get("locked_holdout") or {}
+        aliases = {
+            "observations": metrics.get("total_predictions", locked_training.get("observations")),
+            "calls": metrics.get("calls"),
+            "hit_rate": metrics.get("hit_rate"),
+            "brier_score": metrics.get("brier_score"),
+            "qualified": metrics.get("qualified"),
+        }
+    else:
+        selected = metrics.get("selected_matches") or {}
+        aliases = {
+            "observations": selected.get("observations"),
+            "calls": selected.get("calls"),
+            "hit_rate": selected.get("accuracy"),
+            "brier_score": selected.get("brier"),
+            "qualified": raw.get("qualified_for_betting"),
+        }
+    return {**backfill, **aliases}
 
 
 def _read_evidence_ledger(path: Path) -> list[dict]:
@@ -789,6 +821,7 @@ def _pnl_evidence(rows: list[dict]) -> dict:
 def _version_ledger_evidence(
     version: str,
     rows: list[dict],
+    pushes: int,
     source: str,
     source_rows_before_deduplication: int,
     duplicates_removed: int,
@@ -816,6 +849,15 @@ def _version_ledger_evidence(
     mismatching_hash_rows = sum(bool(value) and value != expected_hash for value in row_hashes)
     missing_hash_rows = sum(not value for value in row_hashes)
     pnl = _pnl_evidence(rows)
+    if pnl["shadow"]["rows"]:
+        pnl_basis = "shadow"
+        pnl_units = pnl["shadow"]["pnl_units"]
+    elif pnl["hypothetical"]["rows"]:
+        pnl_basis = "hypothetical"
+        pnl_units = pnl["hypothetical"]["pnl_units"]
+    else:
+        pnl_basis = None
+        pnl_units = None
     clv_complete = bool(rows) and len(clv_values) == len(rows)
     profitability_allowed = bool(rows) and pnl["executed"]["roi"] is not None and clv_complete
     if not rows:
@@ -843,10 +885,11 @@ def _version_ledger_evidence(
         "source": source,
         "model_version": version,
         "exact_version_rows": len(rows),
-        "settled": len(rows) if rows else None,
+        "settled": len(rows) + pushes if rows or pushes else None,
         "settled_decisive_rows": len(rows),
         "wins": wins if rows else None,
         "losses": len(rows) - wins if rows else None,
+        "pushes": pushes if rows or pushes else None,
         "hit_rate": round(wins / len(rows), 6) if rows else None,
         "brier": round(sum(brier_values) / len(brier_values), 6) if brier_values else None,
         "brier_rows": len(brier_values),
@@ -864,6 +907,8 @@ def _version_ledger_evidence(
             "status": lineage_status,
         },
         "feature_value_attribution": _feature_attribution(rows, feature_names),
+        "pnl_units": pnl_units,
+        "pnl_basis": pnl_basis,
         "pnl": pnl,
         "clv": {
             "rows": len(clv_values),
@@ -893,22 +938,34 @@ def _ledger_evidence_for_source(
         row
         for row in source_rows
         if str(row.get("status") or "").casefold() == "settled"
-        and str(row.get("result") or "").casefold() in {"win", "loss"}
+        and str(row.get("result") or "").casefold() in {"win", "loss", "push"}
         and _model_owns_row(sport, model_config, row)
     ]
     deduplicated, _all_duplicates_removed = _deduplicate_ledger_rows(relevant)
-    exact_rows = [
+    exact_settled = [
         row for row in deduplicated if str(row.get("model_version") or "") == version
     ]
-    exact_source_rows = sum(str(row.get("model_version") or "") == version for row in relevant)
+    exact_rows = [
+        row
+        for row in exact_settled
+        if str(row.get("result") or "").casefold() in {"win", "loss"}
+    ]
+    pushes = sum(str(row.get("result") or "").casefold() == "push" for row in exact_settled)
+    exact_source_rows = sum(
+        str(row.get("model_version") or "") == version
+        and str(row.get("result") or "").casefold() in {"win", "loss"}
+        for row in relevant
+    )
     predecessor_counts: dict[str, int] = {}
     for row in deduplicated:
         row_version = str(row.get("model_version") or "")
-        if row_version and row_version != version:
+        decisive = str(row.get("result") or "").casefold() in {"win", "loss"}
+        if row_version and row_version != version and decisive:
             predecessor_counts[row_version] = predecessor_counts.get(row_version, 0) + 1
     return _version_ledger_evidence(
         version,
         exact_rows,
+        pushes,
         source,
         exact_source_rows,
         exact_source_rows - len(exact_rows),
@@ -937,8 +994,11 @@ def production_evidence() -> dict:
         artifact_path = configured_path if configured_path.is_absolute() else ROOT / configured_path
         artifact, raw = _artifact_evidence(artifact_path, version, str(sport))
         spec = _production_model_spec(raw)
-        locked = _locked_backfill_evidence(
-            str(sport), version, raw, artifact, esports_validation
+        locked = _backfill_aliases(
+            _locked_backfill_evidence(
+                str(sport), version, raw, artifact, esports_validation
+            ),
+            raw,
         )
 
         feature_names = list(spec.get("feature_names") or [])
@@ -1040,8 +1100,10 @@ def production_evidence() -> dict:
             "issues": warnings,
         })
 
+    generated_at = datetime.now(timezone.utc).isoformat()
     return {
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at": generated_at,
+        "generated_at_utc": generated_at,
         "read_only": True,
         "claim_policy": {
             "profitability_requires": [
