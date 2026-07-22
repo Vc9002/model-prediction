@@ -232,3 +232,57 @@ def test_production_evidence_missing_values_are_dashes_not_zero_percent() -> Non
     assert "--" in rendered
     assert "0.0%" not in rendered
     assert "PROFITABILITY NOT ESTABLISHED" in rendered
+
+
+def test_production_evidence_collapses_identical_duplicate_models() -> None:
+    model = {
+        "sport": "mlb",
+        "model_version": "mlb-v5",
+        "status": "active_production",
+        "features": {"feature_names": ["identical-marker"]},
+        "backfill": {"calls": 41, "hit_rate": 0.61},
+        "artifact": {"path": "config/models/mlb-v5.json", "hash_verified": True},
+    }
+
+    rendered = _render_production_evidence(
+        {"models": [model, json.loads(json.dumps(model))]}
+    )
+
+    assert rendered.count('class="card evidence-card"') == 1
+    assert rendered.count("identical-marker") == 1
+    assert 'role="alert"' not in rendered
+    assert "Conflicting production evidence" not in rendered
+
+
+def test_production_evidence_warns_on_conflict_and_uses_first_verified_record() -> None:
+    def record(marker: str, calls: int, verified: bool) -> dict:
+        return {
+            "sport": "wnba",
+            "model_version": "wnba-v4",
+            "status": "active_production",
+            "features": {"feature_names": [marker]},
+            "backfill": {"calls": calls, "hit_rate": calls / 100},
+            "artifact": {
+                "path": f"config/models/{marker}.json",
+                "hash_verified": verified,
+            },
+        }
+
+    rendered = _render_production_evidence(
+        {
+            "models": [
+                record("discarded-unverified", 11, False),
+                record("selected-first-verified", 22, True),
+                record("discarded-later-verified", 33, True),
+            ]
+        }
+    )
+
+    assert rendered.count('class="card evidence-card"') == 1
+    assert rendered.count('role="alert"') == 1
+    assert "Conflicting production evidence for WNBA · wnba-v4" in rendered
+    assert "first artifact-hash-verified record" in rendered
+    assert "metrics were not merged" in rendered
+    assert "selected-first-verified" in rendered
+    assert "discarded-unverified" not in rendered
+    assert "discarded-later-verified" not in rendered

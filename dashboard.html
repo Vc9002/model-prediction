@@ -564,14 +564,49 @@ function evidenceModels(payload){
     ({sport,...(model&&typeof model==="object"?model:{})}));
   return [];
 }
+function evidenceCanonical(value){
+  if(Array.isArray(value))return `[${value.map(evidenceCanonical).join(",")}]`;
+  if(value&&typeof value==="object")return `{${Object.keys(value).sort().map(key=>
+    `${JSON.stringify(key)}:${evidenceCanonical(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+function evidenceArtifactHashVerified(model){
+  const artifact=model&&model.artifact&&typeof model.artifact==="object"?model.artifact:{};
+  return evidenceFirst(artifact,["hash_verified","hash_valid","hash_matches","valid_hash","hash_ok"])===true;
+}
+function uniqueEvidenceModels(payload){
+  const groups=[],byIdentity=new Map();
+  evidenceModels(payload).forEach(model=>{
+    const identity=JSON.stringify([
+      String(model&&model.sport||"").trim().toLowerCase(),
+      String(model&&model.model_version||"").trim(),
+    ]);
+    const signature=evidenceCanonical(model);
+    const existing=byIdentity.get(identity);
+    if(!existing){
+      const group={model,signatures:new Set([signature]),duplicateCount:1};
+      byIdentity.set(identity,group);groups.push(group);return;
+    }
+    existing.duplicateCount++;
+    existing.signatures.add(signature);
+    if(!evidenceArtifactHashVerified(existing.model)&&evidenceArtifactHashVerified(model)){
+      existing.model=model;
+    }
+  });
+  return groups.sort((a,b)=>{
+    const sport=String(a.model&&a.model.sport||"").localeCompare(String(b.model&&b.model.sport||""));
+    return sport||String(a.model&&a.model.model_version||"").localeCompare(String(b.model&&b.model.model_version||""));
+  });
+}
 function evidenceHealth(value,positive="HEALTHY",negative="BLOCKED"){
   if(!evidencePresent(value))return EVIDENCE_MISSING;
   return typeof value==="boolean"?(value?positive:negative):evidenceText(value);
 }
 function productionEvidenceHtml(payload){
-  const models=evidenceModels(payload).sort((a,b)=>String(a.sport||"").localeCompare(String(b.sport||"")));
-  if(!models.length)return '<div class="card dim">No production model evidence returned.</div>';
-  return models.map(model=>{
+  const groups=uniqueEvidenceModels(payload);
+  if(!groups.length)return '<div class="card dim">No production model evidence returned.</div>';
+  return groups.map(group=>{
+    const model=group.model;
     const sport=esc(evidenceText(model.sport).toUpperCase());
     const version=evidenceText(model.model_version);
     const versionEsc=esc(version);
@@ -625,7 +660,8 @@ function productionEvidenceHtml(payload){
       `<div class="dim">${profitEstablished?"No blockers reported.":EVIDENCE_MISSING}</div>`;
     const warnings=evidenceList(model.warnings);
     const warningsHtml=warnings.length?`<div class="evidence-block"><h3>Warnings</h3><ul class="evidence-list yellow">${warnings.map(item=>`<li>${esc(item)}</li>`).join("")}</ul></div>`:"";
-    return `<article class="card evidence-card">
+    const conflictHtml=group.signatures.size>1?`<div class="alert warn evidence-conflict" role="alert"><b>Conflicting production evidence for ${sport} · ${versionEsc}.</b> Received ${group.duplicateCount} records. Displaying the first artifact-hash-verified record; metrics were not merged.</div>`:"";
+    return `<article class="card evidence-card">${conflictHtml}
       <div class="evidence-head"><div><div class="evidence-title">${sport} · ${versionEsc}</div>
         <div class="evidence-scope">ACTIVE MODEL · scope: exact model version only</div></div>
         <span class="evidence-status ${statusOk?"ok":"warn"}">${esc(status)}</span></div>
