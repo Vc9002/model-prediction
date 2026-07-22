@@ -29,7 +29,7 @@ make the feature production-safe or establish profitability.
 | `neutral_elo_rating_difference` | LOL/CS2/Dota2/Valorant | untested | Current v3 artifacts are hash-invalid and lack locked metrics; do not inherit v2 evidence. |
 | `tie_aware_elo_rating_difference` | KBO/NPB | untested | Exact-version locked backfills exist, but the feature has no omission test and artifacts remain research-only. |
 | `defensive_trend_gap` | NBA/WNBA | remove candidate | Removal improves both validation and holdout proper scores in both leagues. |
-| `pitcher_era_gap` | MLB | remove candidate | Removal improves validation and both holdout proper scores. |
+| `pitcher_era_gap` | MLB | **keep (operator override)** | Directional removal candidate (Brier -0.0003/-0.0002) but kept: removal costs 3.4 units at frozen threshold. Profit over accuracy. |
 | `starter_era_gap` | MLB | **remove** | Unservable train/serve skew; removed in MLB v5. Never reinstate as-is. |
 | `starting_pitcher_fip` | MLB | **reject** | 84% coverage, zero effect. Collinear with `pitcher_era_gap`. |
 | `head_to_head` | all 5 | **reject** | +0.11pp to +0.61pp, all inside 1 SE. NFL untestable at 10% coverage. |
