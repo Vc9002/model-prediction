@@ -253,8 +253,8 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: valorant-neutral-series-elo-v2
-    production_artifact: config/models/valorant-neutral-series-elo-v2.json
+    active_production_version: valorant-tiered-elo-v3
+    production_artifact: config/models/valorant-tiered-elo-v3.json
     market_target: esports_match_winner
     min_edge: 0.02
   KBO:
