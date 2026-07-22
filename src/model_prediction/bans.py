@@ -55,6 +55,11 @@ class TeamBanList:
                 try:
                     team = self.registry.resolve(league, str(input_value))
                 except EntityResolutionError:
+                    self.audit_log.append(
+                        "ban_entry_unresolved",
+                        str(input_value),
+                        {"league": league.value, "input_alias": str(input_value)},
+                    )
                     continue
                 reason = (
                     value.get("reason", "manual_governance")

@@ -343,8 +343,8 @@ def _is_preseason_event(event: dict[str, Any], league: str) -> bool:
         start_month = int(start_str[5:7])
     except (ValueError, IndexError):
         return False
-    # NFL regular season begins in September. August = preseason.
-    return start_month < 9
+    # NFL regular season begins in September. Preseason runs July–August.
+    return start_month in (7, 8)
 
 
 def capture_slate_snapshots(

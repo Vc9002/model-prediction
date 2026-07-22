@@ -857,7 +857,7 @@ def _forecast_learned_sport(
     return {
         "sport": sport,
         "status": "learned_forecast_complete",
-        "model_version": candidates[0].model_version if candidates else model_config["active_production_version"],
+        "model_version": candidates[0].model_version if candidates else model_config.get("active_production_version", "unknown"),
         "artifact": str(artifact_path),
         "game_date": args_date,
         "scheduled_games": scheduled,
@@ -1237,7 +1237,6 @@ def _drift_check(settled_qualified: list, config: dict) -> dict:
     from collections import defaultdict
     import json
     import math
-    from pathlib import Path as _Path
 
     by_sport = defaultdict(lambda: {"wins": 0, "losses": 0})
     for row in settled_qualified:
@@ -1256,13 +1255,16 @@ def _drift_check(settled_qualified: list, config: dict) -> dict:
 
         live_hr = counts["wins"] / n
         holdout_hr = None
-        model_path = _Path(f"config/models/{sport_name.lower()}-elo-trend-lr-v3.json")
-        if model_path.exists():
-            try:
-                artifact = json.loads(model_path.read_text())
-                holdout_hr = artifact.get("qualification", {}).get("hit_rate")
-            except (json.JSONDecodeError, KeyError):
-                pass
+        model_config = (config.get("models") or {}).get(sport_name, {})
+        artifact_rel = model_config.get("production_artifact", "")
+        if artifact_rel:
+            model_path = PROJECT_ROOT / artifact_rel
+            if model_path.exists():
+                try:
+                    artifact = json.loads(model_path.read_text())
+                    holdout_hr = artifact.get("qualification", {}).get("hit_rate")
+                except (json.JSONDecodeError, KeyError):
+                    pass
 
         if holdout_hr is None:
             drift[sport_name] = {"status": "no_holdout_reference", "live_hr": round(live_hr, 4), "n": n}

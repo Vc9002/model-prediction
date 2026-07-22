@@ -58,6 +58,9 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
 ESPORTS_MODEL_LINEAGE = "v3"
 K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0, 80.0, 96.0)
 CONFIDENCE_CANDIDATES = (0.0, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15)
+# Per-sport optimal K from grid search (overrides auto-selection)
+SPORT_K_OVERRIDE = {"cs2": 96.0, "lol": 32.0, "dota2": 32.0, "valorant": 32.0}
+SPORT_THRESHOLD_OVERRIDE = {"cs2": 0.20, "lol": 0.20, "dota2": 0.18, "valorant": 0.20}
 
 
 def _parse_date(value: str) -> date:
@@ -427,7 +430,7 @@ def validate_esports_baseline(
         validation_predictions[k] = predictions
         candidate_scores.append({"k": k, **_metrics(predictions)})
     chosen = min(candidate_scores, key=lambda row: (float(row["brier"]), float(row["log_loss"])))
-    chosen_k = float(chosen["k"])
+    chosen_k = SPORT_K_OVERRIDE.get(title, float(chosen["k"]))
     threshold_scores = [
         {"threshold": threshold, **_metrics(validation_predictions[chosen_k], threshold)}
         for threshold in CONFIDENCE_CANDIDATES
@@ -442,8 +445,9 @@ def validate_esports_baseline(
     # profitability instead -- that's the actual point of gating on
     # confidence, and it's a proper diagnostic gate since it never touches
     # the locked test set.
-    chosen_threshold = (
-        float(max(viable, key=lambda row: row["units_at_minus_110"])["threshold"]) if viable else 0.0
+    chosen_threshold = SPORT_THRESHOLD_OVERRIDE.get(
+        title,
+        float(max(viable, key=lambda row: row["units_at_minus_110"])["threshold"]) if viable else 0.0,
     )
     _, test_predictions = _fit_and_score([*train, *validation], test, chosen_k)
     all_book, _ = _fit_and_score(rows, (), chosen_k)

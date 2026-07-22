@@ -957,12 +957,12 @@ async function renderFlatPerf(){
   let p;
   try{p=await api("/api/flat-performance");}catch(e){$("#flatPerfKpis").innerHTML='<div class="red small">server unreachable</div>';return;}
   if(!p||!p.settled){$("#flatPerfKpis").innerHTML='<div class="dim">No settled flat picks yet.</div>';return;}
-  const wr=p.wins/p.calls*100;
+  const wr=p.settled>0?p.wins/p.settled*100:0;
   $("#flatPerfKpis").innerHTML=`
-    <div class="k"><b>${p.calls}</b><span>settled</span></div>
+    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
     <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
     <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
-    <div class="k"><b>${(p.roi||0).toFixed(1)}%</b><span>ROI</span></div>`;
+    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>`;
   lineChart("#flatPerfChart",p.pnl_curve||[]);
   const bs=Object.entries(p.by_sport||{});
   const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
@@ -1023,8 +1023,8 @@ async function renderToday(){
         suggested>0?`size <b class="${edge>0?"green":"dim"}">${Number(suggested).toFixed(2)}U / $${(Number(suggested)*unitValue).toFixed(2)}</b> <span class="dim">(suggested paper)</span>`:"";
       const d=document.createElement("div");d.className="pick "+cls;
       d.innerHTML=`<div class="pick-row"><div class="pick-copy">
-        <div class="pick-event"><b>${p.away_team} @ ${p.home_team}</b><span class="dim">${p.start_et} · ${p.market_type}</span>${res}</div>
-        <div class="pick-metrics"><span>pick <b>${pickLabel(p)}</b></span>
+        <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et} · ${p.market_type}</span>${res}</div>
+        <div class="pick-metrics"><span>pick <b>${esc(pickLabel(p))}</b></span>
         <span>model <b>${conf?pct(conf):"—"}</b></span>
         <span>market <b>${cents(market)}</b> <span class="dim">(${market?pct(market):"—"})</span></span>
         <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
@@ -1239,8 +1239,11 @@ async function renderFolio(){
   const h=b.recent_history||{};
   const activityCount=Number(h.count)||0,tradeCount=Number(h.trade_count)||0,
         settlementCount=Number(h.settlement_count)||0,realized=Number(h.realized_pnl_usd)||0;
-  const settledCount=Number(h.settled_count)||0,winCount=Number(h.win_count)||0,
-        lossCount=Number(h.loss_count)||0,winRate=settledCount>0?fmt(100*winCount/settledCount,1)+"%":"—";
+  const settlements=(h.activities||[]).filter(a=>a.type==="settlement");
+  const settledCount=settlements.length,
+        winCount=settlements.filter(a=>Number(a.realized_pnl_usd)>0).length,
+        lossCount=settlements.filter(a=>Number(a.realized_pnl_usd)<0).length,
+        winRate=settledCount>0?fmt(100*winCount/settledCount,1)+"%":"—";
   $("#folioHistKpis").innerHTML=`
     <div class="k"><b>${activityCount}</b><span>activities since ${esc(historyStart)}</span></div>
     <div class="k"><b>${tradeCount}</b><span>filled trades</span></div>

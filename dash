@@ -1,30 +1,49 @@
 #!/bin/bash
-# dash — start the model-prediction dashboard and open it in the browser
-cd "$HOME/Documents/Poly & Kalshi/model prediction" || exit 1
+# dash — start the model-prediction dashboard and print the URL
+set -euo pipefail
 
-# Kill any existing server to ensure fresh code
-pkill -f "dashboard_server.py" 2>/dev/null
+PROJECT_DIR="$HOME/Documents/Poly & Kalshi/model prediction"
+PID_FILE="$PROJECT_DIR/dashboard/server.pid"
+
+cd "$PROJECT_DIR" || exit 1
+
+# ── Stop existing server ─────────────────────────────────────────────────
+if [ -f "$PID_FILE" ]; then
+    old_pid=$(cat "$PID_FILE")
+    if kill -0 "$old_pid" 2>/dev/null; then
+        kill "$old_pid" 2>/dev/null || true
+        sleep 0.3
+    fi
+    rm -f "$PID_FILE"
+fi
+# Fallback: clean up any orphaned server not tracked by PID file
+pkill -f "dashboard_server.py" 2>/dev/null || true
 sleep 0.5
 
-# Start server in background with correct venv
+# ── Start server ─────────────────────────────────────────────────────────
 PYTHONPATH=src .venv/bin/python dashboard_server.py --port 8765 &
+server_pid=$!
+echo "$server_pid" > "$PID_FILE"
 
-# Poll instead of a fixed sleep -- a cold start can take longer than 2s under
-# load, which previously made this report "failed to start" on a server that
-# was actually still coming up.
+# ── Wait for readiness ───────────────────────────────────────────────────
 started=false
 for _ in $(seq 1 20); do
-    if curl -s http://localhost:8765/api/status > /dev/null 2>&1; then
+    if curl -sf http://localhost:8765/api/status > /dev/null 2>&1; then
         started=true
         break
+    fi
+    if ! kill -0 "$server_pid" 2>/dev/null; then
+        rm -f "$PID_FILE"
+        echo "Dashboard process died unexpectedly — check data/logs/dashboard.err" >&2
+        exit 1
     fi
     sleep 0.5
 done
 
 if [ "$started" = true ]; then
-    open "http://localhost:8765/"
-    echo "Dashboard running on http://localhost:8765/"
+    echo "Dashboard running — http://localhost:8765/ (pid $server_pid)"
 else
-    echo "Dashboard failed to start after 10s — check data/logs/dashboard.err"
+    rm -f "$PID_FILE"
+    echo "Dashboard failed to start after 10s — check data/logs/dashboard.err" >&2
     exit 1
 fi

@@ -542,7 +542,7 @@ def status() -> dict:
             alerts.append({"level": "info", "kind": "no_data",
                            "text": f"{sport.upper()} moneyline has no validation data"})
 
-    if not os.environ.get("POLYMARKET_PRIVATE_KEY"):
+    if not os.environ.get("POLYMARKET_KEY_ID") or not os.environ.get("POLYMARKET_SECRET_KEY"):
         alerts.append({"level": "error", "kind": "no_api_key",
                        "text": "Polymarket API key not configured — execution disabled"})
 
@@ -571,7 +571,7 @@ def status() -> dict:
         "validation_status": termination.get("status") or validation.get("status"),
         "promotion_allowed": termination.get("promotion_allowed"),
         "polymarket_odds": odds_summary(),
-        "polymarket_configured": bool(os.environ.get("POLYMARKET_PRIVATE_KEY")),
+        "polymarket_configured": bool(os.environ.get("POLYMARKET_KEY_ID") and os.environ.get("POLYMARKET_SECRET_KEY")),
         "edge_filter_min": 0.02,
         "unit_value_usd": _unit_value_usd(),
     }
@@ -1942,9 +1942,13 @@ def _today() -> str:
     return datetime.now(timezone.utc).astimezone(EASTERN).date().isoformat()
 
 
+class InvalidSportError(ValueError):
+    """Raised when a client requests an unsupported sport slug."""
+
+
 def _safe_sport(value) -> str:
     if value not in SPORTS:
-        raise ValueError(f"unsupported sport: {value}")
+        raise InvalidSportError(f"unsupported sport: {value}")
     return str(value)
 # ── SECTION: Jobs & Actions ─────────────────────────────────────────
 
@@ -2179,6 +2183,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"ok": True, "at": datetime.now(timezone.utc).isoformat()[:19]})
             else:
                 self._send({"error": "unknown route"}, code=404)
+        except InvalidSportError as error:
+            self._send({"error": str(error)}, code=400)
         except Exception as error:  # noqa: BLE001
             self._send({"error": f"{type(error).__name__}: {error}"}, code=500)
 
