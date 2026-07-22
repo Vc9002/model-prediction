@@ -656,18 +656,33 @@ def _read_evidence_ledger(path: Path) -> list[dict]:
     return rows
 
 
-def _row_identity(row: dict) -> tuple:
-    pick_id = str(row.get("pick_id") or "").strip()
-    version = str(row.get("model_version") or "").strip()
-    if pick_id:
-        return ("pick_id", pick_id, version)
+def _normalized_line(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value).strip().casefold()
+    return f"{number:.12g}"
+
+
+def _ledger_deduplication_key(row: dict) -> tuple[str, ...]:
     return (
-        "composite",
-        str(row.get("event_id") or ""),
-        str(row.get("market_type") or ""),
-        str(row.get("selection") or ""),
-        version,
+        str(row.get("event_id") or "").strip(),
+        str(row.get("league") or "").strip().casefold(),
+        str(row.get("market_type") or "").strip().casefold(),
+        str(row.get("selection") or "").strip().casefold(),
+        _normalized_line(row.get("line")),
+        str(row.get("model_version") or "").strip(),
+        str(row.get("model_artifact_hash") or "").strip(),
     )
+
+
+def _deduplicate_ledger_rows(rows: list[dict]) -> tuple[list[dict], int]:
+    unique: dict[tuple[str, ...], dict] = {}
+    for row in rows:
+        unique.setdefault(_ledger_deduplication_key(row), row)
+    return list(unique.values()), len(rows) - len(unique)
 
 
 def _model_owns_row(sport: str, model_config: dict, row: dict) -> bool:
@@ -681,6 +696,13 @@ def _model_owns_row(sport: str, model_config: dict, row: dict) -> bool:
 
 
 def _feature_attribution(rows: list[dict], feature_names: list[str]) -> dict:
+    if not rows:
+        return {
+            "status": "no_exact_version_rows",
+            "rows_with_complete_values": 0,
+            "rows_missing_values": 0,
+            "missing_by_feature": {name: 0 for name in feature_names},
+        }
     if not feature_names:
         return {
             "status": "unavailable_artifact_has_no_explicit_feature_schema",
@@ -715,6 +737,22 @@ def _feature_attribution(rows: list[dict], feature_names: list[str]) -> dict:
 
 
 def _pnl_evidence(rows: list[dict]) -> dict:
+    if not rows:
+        empty = {
+            "rows": 0,
+            "staked_units": None,
+            "pnl_units": None,
+            "roi": None,
+        }
+        return {
+            "shadow": {"label": "shadow_not_executed", **empty},
+            "hypothetical": {"label": "hypothetical_fixed_unit_research", **empty},
+            "executed": {
+                "label": "executed",
+                **empty,
+                "status": "not_available_no_execution_attribution_in_ledgers",
+            },
+        }
     shadow = [row for row in rows if row.get("record_type") == "QUALIFIED_SHADOW_CALL"]
     shadow_staked = sum(_number(row.get("units")) for row in shadow)
     shadow_pnl = sum(_number(row.get("pnl_units")) for row in shadow)
@@ -750,14 +788,22 @@ def _pnl_evidence(rows: list[dict]) -> dict:
 
 def _version_ledger_evidence(
     version: str,
-    relationship: str,
     rows: list[dict],
-    source_counts: dict[str, int],
+    source: str,
+    source_rows_before_deduplication: int,
     duplicates_removed: int,
     artifact: dict,
     feature_names: list[str],
+    predecessor_version_counts: dict[str, int],
 ) -> dict:
     wins = sum(str(row.get("result") or "").casefold() == "win" for row in rows)
+    brier_values = []
+    for row in rows:
+        probability = _number(row.get("model_probability"), None)
+        if probability is None or not 0 <= probability <= 1:
+            continue
+        outcome = 1.0 if str(row.get("result") or "").casefold() == "win" else 0.0
+        brier_values.append((probability - outcome) ** 2)
     clv_values = [
         _number(row.get("probability_clv"), None)
         for row in rows
@@ -772,6 +818,20 @@ def _version_ledger_evidence(
     pnl = _pnl_evidence(rows)
     clv_complete = bool(rows) and len(clv_values) == len(rows)
     profitability_allowed = bool(rows) and pnl["executed"]["roi"] is not None and clv_complete
+    if not rows:
+        lineage_status = "no_exact_version_rows"
+    elif not expected_hash:
+        lineage_status = "artifact_unverified"
+    elif matching_hash_rows == len(rows):
+        lineage_status = "exact"
+    elif mismatching_hash_rows and missing_hash_rows:
+        lineage_status = "mixed_mismatch_and_missing"
+    elif mismatching_hash_rows:
+        lineage_status = "mismatch"
+    elif missing_hash_rows:
+        lineage_status = "missing"
+    else:
+        lineage_status = "mixed"
     blockers = []
     if not rows:
         blockers.append("no_exact_model_version_settled_decisive_rows")
@@ -780,14 +840,20 @@ def _version_ledger_evidence(
     if not clv_complete:
         blockers.append("clv_missing_or_incomplete")
     return {
+        "source": source,
         "model_version": version,
-        "relationship": relationship,
+        "exact_version_rows": len(rows),
+        "settled": len(rows) if rows else None,
         "settled_decisive_rows": len(rows),
-        "wins": wins,
-        "losses": len(rows) - wins,
+        "wins": wins if rows else None,
+        "losses": len(rows) - wins if rows else None,
         "hit_rate": round(wins / len(rows), 6) if rows else None,
-        "source_rows_before_deduplication": source_counts,
+        "brier": round(sum(brier_values) / len(brier_values), 6) if brier_values else None,
+        "brier_rows": len(brier_values),
+        "source_rows_before_deduplication": source_rows_before_deduplication,
         "duplicates_removed": duplicates_removed,
+        "predecessor_rows_excluded": sum(predecessor_version_counts.values()),
+        "predecessor_version_counts": predecessor_version_counts,
         "artifact_lineage": {
             "artifact_path": artifact.get("path"),
             "expected_hash": expected_hash,
@@ -795,16 +861,14 @@ def _version_ledger_evidence(
             "matching_hash_rows": matching_hash_rows,
             "mismatching_hash_rows": mismatching_hash_rows,
             "missing_hash_rows": missing_hash_rows,
-            "status": (
-                "exact"
-                if rows and expected_hash and matching_hash_rows == len(rows)
-                else "missing_or_mismatched"
-            ),
+            "status": lineage_status,
         },
         "feature_value_attribution": _feature_attribution(rows, feature_names),
         "pnl": pnl,
         "clv": {
             "rows": len(clv_values),
+            "total_exact_version_rows": len(rows),
+            "coverage": round(len(clv_values) / len(rows), 6) if rows else None,
             "complete": clv_complete,
             "mean_probability_clv": round(sum(clv_values) / len(clv_values), 6)
             if clv_values else None,
@@ -816,10 +880,42 @@ def _version_ledger_evidence(
     }
 
 
-def _version_artifact(version: str, sport: str) -> tuple[dict, dict]:
-    if not version or Path(version).name != version:
-        return _artifact_evidence(ROOT / "config" / "models" / "invalid.json", version, sport)
-    return _artifact_evidence(ROOT / "config" / "models" / f"{version}.json", version, sport)
+def _ledger_evidence_for_source(
+    sport: str,
+    model_config: dict,
+    version: str,
+    source: str,
+    source_rows: list[dict],
+    artifact: dict,
+    feature_names: list[str],
+) -> dict:
+    relevant = [
+        row
+        for row in source_rows
+        if str(row.get("status") or "").casefold() == "settled"
+        and str(row.get("result") or "").casefold() in {"win", "loss"}
+        and _model_owns_row(sport, model_config, row)
+    ]
+    deduplicated, _all_duplicates_removed = _deduplicate_ledger_rows(relevant)
+    exact_rows = [
+        row for row in deduplicated if str(row.get("model_version") or "") == version
+    ]
+    exact_source_rows = sum(str(row.get("model_version") or "") == version for row in relevant)
+    predecessor_counts: dict[str, int] = {}
+    for row in deduplicated:
+        row_version = str(row.get("model_version") or "")
+        if row_version and row_version != version:
+            predecessor_counts[row_version] = predecessor_counts.get(row_version, 0) + 1
+    return _version_ledger_evidence(
+        version,
+        exact_rows,
+        source,
+        exact_source_rows,
+        exact_source_rows - len(exact_rows),
+        artifact,
+        feature_names,
+        dict(sorted(predecessor_counts.items())),
+    )
 
 
 def production_evidence() -> dict:
@@ -845,67 +941,89 @@ def production_evidence() -> dict:
             str(sport), version, raw, artifact, esports_validation
         )
 
-        relevant_by_source: dict[str, list[dict]] = {}
-        for source, source_rows in rows_by_source.items():
-            relevant_by_source[source] = [
-                row
-                for row in source_rows
-                if str(row.get("status") or "").casefold() == "settled"
-                and str(row.get("result") or "").casefold() in {"win", "loss"}
-                and _model_owns_row(str(sport), model_config, row)
-            ]
-        deduplicated: dict[tuple, dict] = {}
-        for source in ("data/picks.xlsx", "data/flat_picks.xlsx"):
-            for row in relevant_by_source.get(source, []):
-                deduplicated.setdefault(_row_identity(row), row)
+        feature_names = list(spec.get("feature_names") or [])
+        main_ledger = _ledger_evidence_for_source(
+            str(sport), model_config, version, "data/picks.xlsx",
+            rows_by_source.get("data/picks.xlsx", []), artifact, feature_names,
+        )
+        flat_ledger = _ledger_evidence_for_source(
+            str(sport), model_config, version, "data/flat_picks.xlsx",
+            rows_by_source.get("data/flat_picks.xlsx", []), artifact, feature_names,
+        )
 
-        versions = {version}
-        versions.update(str(row.get("model_version") or "") for row in deduplicated.values())
-        versions.discard("")
-        version_evidence = []
-        for row_version in sorted(versions, key=lambda value: (value != version, value)):
-            version_rows = [
-                row for row in deduplicated.values()
-                if str(row.get("model_version") or "") == row_version
-            ]
-            source_counts = {
-                source: sum(
-                    str(row.get("model_version") or "") == row_version for row in source_rows
-                )
-                for source, source_rows in relevant_by_source.items()
-            }
-            duplicates_removed = sum(source_counts.values()) - len(version_rows)
-            if row_version == version:
-                version_artifact, version_raw = artifact, raw
-                feature_names = list(spec.get("feature_names") or [])
-                relationship = "active"
-            else:
-                version_artifact, version_raw = _version_artifact(row_version, str(sport))
-                feature_names = list(_production_model_spec(version_raw).get("feature_names") or [])
-                relationship = "predecessor"
-            version_evidence.append(_version_ledger_evidence(
-                row_version,
-                relationship,
-                version_rows,
-                source_counts,
-                duplicates_removed,
-                version_artifact,
-                feature_names,
-            ))
-
-        active_ledger = next(item for item in version_evidence if item["relationship"] == "active")
-        issues = [{"code": code, "scope": "artifact"} for code in artifact["mismatches"]]
+        warnings = [{"code": code, "scope": "artifact"} for code in artifact["mismatches"]]
         if locked.get("status") != "verified":
-            issues.append({"code": locked["status"], "scope": "locked_backfill"})
+            warnings.append({"code": locked["status"], "scope": "backfill"})
         if spec.get("coefficient_count_matches_features") is False:
-            issues.append({"code": "feature_coefficient_length_mismatch", "scope": "model_spec"})
-        if active_ledger["artifact_lineage"]["status"] != "exact":
-            issues.append({"code": "ledger_artifact_lineage_missing_or_mismatched", "scope": "ledger"})
-        if active_ledger["feature_value_attribution"]["status"] != "complete":
-            issues.append({"code": "feature_value_attribution_missing", "scope": "ledger"})
+            warnings.append({"code": "feature_coefficient_length_mismatch", "scope": "features"})
+
+        config_qualified = str(model_config.get("status") or "").casefold() in {
+            "qualified", "shadow_qualified", "production",
+        }
+        artifact_qualified = (
+            (raw.get("qualification") or {}).get("qualified")
+            if raw.get("method") == "logistic_regression"
+            else raw.get("qualified_for_betting")
+        )
+        if isinstance(artifact_qualified, bool) and config_qualified != artifact_qualified:
+            warnings.append({
+                "code": "config_artifact_qualification_mismatch",
+                "scope": "qualification",
+                "config_status": model_config.get("status"),
+                "artifact_qualified": artifact_qualified,
+            })
+
+        for ledger_name, ledger in (("main_ledger", main_ledger), ("flat_ledger", flat_ledger)):
+            if not ledger["exact_version_rows"]:
+                warnings.append({
+                    "code": "no_exact_version_settled_decisive_rows",
+                    "scope": ledger_name,
+                })
+                continue
+            if ledger["artifact_lineage"]["status"] != "exact":
+                warnings.append({
+                    "code": "ledger_artifact_lineage_missing_or_mismatched",
+                    "scope": ledger_name,
+                })
+            if ledger["feature_value_attribution"]["status"] != "complete":
+                warnings.append({"code": "feature_value_attribution_missing", "scope": ledger_name})
+
+        definition_valid = (
+            artifact["valid"]
+            and locked.get("status") == "verified"
+            and spec.get("coefficient_count_matches_features") is not False
+        )
+        performance_complete = (
+            main_ledger["profitability_claim"]["allowed"]
+            and flat_ledger["profitability_claim"]["allowed"]
+        )
+        profitability = {
+            "claim_allowed": False,
+            "status": "not_established",
+            "requires": [
+                "exact_model_version_settled_decisive_rows",
+                "executed_roi",
+                "complete_clv",
+            ],
+            "blockers": sorted({
+                blocker
+                for ledger in (main_ledger, flat_ledger)
+                for blocker in ledger["profitability_claim"]["blockers"]
+            }),
+            "main_ledger_claim_allowed": main_ledger["profitability_claim"]["allowed"],
+            "flat_ledger_claim_allowed": flat_ledger["profitability_claim"]["allowed"],
+        }
 
         models.append({
             "sport": str(sport).lower(),
+            "model_version": version or None,
+            "status": model_config.get("status"),
+            "features": spec.get("features") or [],
+            "backfill": locked,
+            "main_ledger": main_ledger,
+            "flat_ledger": flat_ledger,
+            "profitability": profitability,
+            "warnings": warnings,
             "configured_status": model_config.get("status"),
             "active_model_version": version or None,
             "production_artifact": str(model_config["production_artifact"]),
@@ -913,18 +1031,13 @@ def production_evidence() -> dict:
             "model_spec": spec,
             "locked_backfill": locked,
             "ledger_evidence": {
-                "active_version": active_ledger,
-                "predecessor_versions": [
-                    item for item in version_evidence if item["relationship"] == "predecessor"
-                ],
-                "all_versions": version_evidence,
+                "main_ledger": main_ledger,
+                "flat_ledger": flat_ledger,
             },
-            "evidence_valid": (
-                artifact["valid"]
-                and locked.get("status") == "verified"
-                and spec.get("coefficient_count_matches_features") is not False
-            ),
-            "issues": issues,
+            "model_definition_and_backfill_valid": definition_valid,
+            "production_performance_evidence_complete": performance_complete,
+            "evidence_valid": definition_valid and performance_complete,
+            "issues": warnings,
         })
 
     return {
@@ -944,6 +1057,12 @@ def production_evidence() -> dict:
             "esports_validation": "outputs/latest/esports-baseline-validation.json",
         },
         "configured_production_models": len(models),
+        "all_model_definitions_and_backfills_valid": bool(models) and all(
+            model["model_definition_and_backfill_valid"] for model in models
+        ),
+        "all_production_performance_evidence_complete": bool(models) and all(
+            model["production_performance_evidence_complete"] for model in models
+        ),
         "all_production_evidence_valid": bool(models) and all(
             model["evidence_valid"] for model in models
         ),
