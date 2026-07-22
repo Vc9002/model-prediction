@@ -127,6 +127,24 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 .secgrid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
 @media(max-width:1100px){.secgrid{grid-template-columns:1fr}}
 .small{font-size:11.5px}
+/* production model evidence */
+.evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.evidence-card{min-width:0}
+.evidence-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.evidence-title{font-family:var(--mono);font-size:16px;font-weight:700;overflow-wrap:anywhere}
+.evidence-scope{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:3px}
+.evidence-status{border:1px solid var(--accent);border-radius:999px;padding:3px 9px;font-family:var(--mono);font-size:11px;text-transform:uppercase}
+.evidence-status.ok{border-color:var(--green);color:var(--green)}
+.evidence-status.warn{border-color:var(--yellow);color:var(--yellow)}
+.evidence-block{margin-top:14px;min-width:0}
+.evidence-block h3{font-size:11px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
+.evidence-table-wrap{overflow-x:auto}
+.evidence-table td:last-child{white-space:normal;overflow-wrap:anywhere}
+.evidence-profit{border:1px solid rgba(255,170,0,.45);background:rgba(255,170,0,.08);border-radius:8px;padding:10px}
+.evidence-profit.established{border-color:rgba(0,255,136,.45);background:rgba(0,255,136,.07)}
+.evidence-list{padding-left:18px;line-height:1.55}
+@media(max-width:1000px){.evidence-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.evidence-head{display:block}.evidence-status{display:inline-block;margin-top:8px}.evidence-card{padding:11px}.evidence-table{min-width:540px}}
 </style>
 </head>
 <body>
@@ -151,6 +169,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 <div class="wrap">
   <div class="tabs" id="tabs">
     <button data-tab="matrix" class="on">Matrix</button>
+    <button data-tab="evidence">Production Evidence</button>
     <button data-tab="picks">Ledger</button>
     <button data-tab="perf">Performance</button>
     <button data-tab="folio">Portfolio</button>
@@ -184,6 +203,17 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="matrix-scroll"><table class="matrix" id="basketballTable"></table></div>
     </div>
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
+  </section>
+
+  <section id="tab-evidence" style="display:none">
+    <div class="card">
+      <h2>Production Model Evidence</h2>
+      <div class="small dim">Live, artifact-backed evidence for each active production version. Ledger metrics are exact-version only; P&amp;L is shadow/hypothetical and is not proof of executable profitability.</div>
+      <div class="small mono dim" id="productionEvidenceGenerated" style="margin-top:7px">Generated: --</div>
+    </div>
+    <div class="evidence-grid" id="productionEvidence">
+      <div class="card dim">Loading production evidence...</div>
+    </div>
   </section>
 
   <div class="filters" style="padding:0 16px;margin-bottom:12px">
@@ -349,7 +379,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 <script>
 "use strict";
 const $=q=>document.querySelector(q), $$=q=>[...document.querySelectorAll(q)];
-const state={picks:[],perf:null,matrix:null,status:null,settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
+const state={picks:[],perf:null,matrix:null,status:null,productionEvidence:null,settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
 const fmt=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
 const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
 
@@ -446,8 +476,188 @@ function renderStatus(s){
     d.className="alert "+(a.level==="warn"?"warn":"info");
     d.innerHTML=`<span class="dot ${a.level==="warn"?"y":"gray"}"></span> ${a.text}`;
     d.onclick=()=>{ if(a.kind==="tests_failed")showModal("<h2>pytest</h2><pre>"+esc((t.output_tail||""))+"</pre>");
-      else $$("#tabs button")[5].click(); };
+      else gotoTab("market"); };
     box.appendChild(d);});
+}
+
+/* ---------- production model evidence ---------- */
+const EVIDENCE_MISSING="--";
+const evidencePresent=value=>value!==null&&value!==undefined&&value!=="";
+function evidenceFirst(source,keys){
+  if(!source||typeof source!=="object")return null;
+  for(const key of keys)if(evidencePresent(source[key]))return source[key];
+  return null;
+}
+function evidenceText(value){
+  if(!evidencePresent(value))return EVIDENCE_MISSING;
+  if(typeof value==="boolean")return value?"yes":"no";
+  if(typeof value==="object")return JSON.stringify(value);
+  return String(value);
+}
+const evidenceEsc=value=>esc(evidenceText(value));
+function evidenceMetric(value,digits=null){
+  if(!evidencePresent(value))return EVIDENCE_MISSING;
+  const number=Number(value);
+  if(!Number.isFinite(number))return evidenceText(value);
+  return digits==null?String(number):number.toFixed(digits);
+}
+function evidencePct(value){
+  if(!evidencePresent(value))return EVIDENCE_MISSING;
+  const number=Number(value);
+  return Number.isFinite(number)?`${(number*100).toFixed(1)}%`:evidenceText(value);
+}
+function evidenceQualification(value){
+  if(!evidencePresent(value))return EVIDENCE_MISSING;
+  if(typeof value==="boolean")return value?"QUALIFIED":"NOT QUALIFIED";
+  return String(value).replaceAll("_"," ").toUpperCase();
+}
+function evidenceList(value){
+  if(!evidencePresent(value))return [];
+  if(Array.isArray(value))return value.map(evidenceText);
+  if(typeof value==="object")return Object.entries(value).map(([key,item])=>`${key}: ${evidenceText(item)}`);
+  return [evidenceText(value)];
+}
+function evidenceFeatureRows(features){
+  const rows=[],seen=new Set();
+  const add=(name,value)=>{
+    const label=evidenceText(name);
+    if(label===EVIDENCE_MISSING||seen.has(label))return;
+    seen.add(label);rows.push([label,evidenceText(value)]);
+  };
+  if(Array.isArray(features)){
+    features.forEach(item=>{
+      if(item&&typeof item==="object")add(
+        evidenceFirst(item,["name","feature","parameter","key"]),
+        evidenceFirst(item,["coefficient","weight","value","estimate"]),
+      );
+      else add(item,null);
+    });
+    return rows;
+  }
+  if(!features||typeof features!=="object")return rows;
+  const names=evidenceFirst(features,["feature_names","names"]);
+  const coefficients=evidenceFirst(features,["coefficients","weights"]);
+  if(Array.isArray(names))names.forEach((name,index)=>{
+    const value=Array.isArray(coefficients)?coefficients[index]:
+      (coefficients&&typeof coefficients==="object"?coefficients[name]:null);
+    add(name,value);
+  });
+  if(coefficients&&typeof coefficients==="object"&&!Array.isArray(coefficients)){
+    Object.entries(coefficients).forEach(([name,value])=>add(name,value));
+  }
+  for(const groupName of ["elo_parameters","elo","parameters"]){
+    const group=features[groupName];
+    if(group&&typeof group==="object"&&!Array.isArray(group)){
+      Object.entries(group).forEach(([name,value])=>add(name,value));
+    }
+  }
+  const reserved=new Set(["feature_names","names","coefficients","weights","elo_parameters","elo","parameters"]);
+  Object.entries(features).forEach(([name,value])=>{
+    if(!reserved.has(name)&&(typeof value!=="object"||value===null))add(name,value);
+  });
+  return rows;
+}
+function evidenceModels(payload){
+  const models=payload&&payload.models;
+  if(Array.isArray(models))return models;
+  if(models&&typeof models==="object")return Object.entries(models).map(([sport,model])=>
+    ({sport,...(model&&typeof model==="object"?model:{})}));
+  return [];
+}
+function evidenceHealth(value,positive="HEALTHY",negative="BLOCKED"){
+  if(!evidencePresent(value))return EVIDENCE_MISSING;
+  return typeof value==="boolean"?(value?positive:negative):evidenceText(value);
+}
+function productionEvidenceHtml(payload){
+  const models=evidenceModels(payload).sort((a,b)=>String(a.sport||"").localeCompare(String(b.sport||"")));
+  if(!models.length)return '<div class="card dim">No production model evidence returned.</div>';
+  return models.map(model=>{
+    const sport=esc(evidenceText(model.sport).toUpperCase());
+    const version=evidenceText(model.model_version);
+    const versionEsc=esc(version);
+    const status=evidenceText(model.status);
+    const normalizedStatus=status.toLowerCase();
+    const statusOk=status!==EVIDENCE_MISSING&&!normalizedStatus.includes("not_")&&
+      !normalizedStatus.includes("blocked")&&!normalizedStatus.includes("fail")&&
+      /(active|production|qualified|healthy|ok)/.test(normalizedStatus);
+    const backfill=model.backfill&&typeof model.backfill==="object"?model.backfill:{};
+    const observations=evidenceFirst(backfill,["observations","rows","games","holdout_observations","holdout_rows"]);
+    const calls=evidenceFirst(backfill,["calls","called","holdout_calls"]);
+    const hitRate=evidenceFirst(backfill,["hit_rate","accuracy"]);
+    const brier=evidenceFirst(backfill,["brier","brier_score"]);
+    const qualification=evidenceFirst(backfill,["qualification","qualification_status","qualified","status"]);
+    const featureRows=evidenceFeatureRows(model.features);
+    const featureHtml=featureRows.length?featureRows.map(([name,value])=>
+      `<tr><td>${esc(name)}</td><td>${esc(value)}</td></tr>`).join(""):
+      `<tr><td>${EVIDENCE_MISSING}</td><td>${EVIDENCE_MISSING}</td></tr>`;
+    const ledgerRow=(label,ledger)=>{
+      const item=ledger&&typeof ledger==="object"?ledger:{};
+      const settled=evidenceFirst(item,["settled","settled_rows","calls"]);
+      const wins=evidenceFirst(item,["wins","won"]),losses=evidenceFirst(item,["losses","lost"]);
+      const pushes=evidenceFirst(item,["pushes","push"]),rate=evidenceFirst(item,["hit_rate","win_rate"]);
+      const pnl=evidenceFirst(item,["pnl_units","pnl","units"]);
+      const excluded=evidenceFirst(item,["predecessor_rows_excluded","excluded_predecessor_rows","predecessor_excluded"]);
+      const pnlNumber=Number(pnl),pnlClass=evidencePresent(pnl)&&Number.isFinite(pnlNumber)?(pnlNumber>=0?"green":"red"):"";
+      return `<tr><td>${label}</td><td>${esc(version)}</td><td>${esc(evidenceMetric(settled))}</td>`+
+        `<td>${esc(evidenceMetric(wins))} / ${esc(evidenceMetric(losses))} / ${esc(evidenceMetric(pushes))}</td>`+
+        `<td>${esc(evidencePct(rate))}</td><td class="${pnlClass}">${esc(evidenceMetric(pnl,2))}</td>`+
+        `<td>${esc(evidenceMetric(excluded))}</td></tr>`;
+    };
+    const artifact=typeof model.artifact==="string"?{path:model.artifact}:
+      (model.artifact&&typeof model.artifact==="object"?model.artifact:{});
+    const lineage=artifact.lineage&&typeof artifact.lineage==="object"?artifact.lineage:{};
+    const artifactPath=evidenceFirst(artifact,["path","artifact_path","file"]);
+    const artifactStatus=evidenceFirst(artifact,["health","status","exists","valid"]);
+    const artifactHash=evidenceFirst(artifact,["sha256","artifact_hash","hash"]);
+    const hashHealth=evidenceFirst(artifact,["hash_verified","hash_matches","valid_hash","hash_ok"]);
+    const lineageHealth=evidenceFirst(artifact,["lineage_health","lineage_ok","lineage_verified"])??
+      evidenceFirst(lineage,["health","status","valid","verified"]);
+    const lineageDetail=evidenceFirst(lineage,["model_version","parent_version","source","artifact_hash","path"])??
+      (evidencePresent(artifact.lineage)&&typeof artifact.lineage!=="object"?artifact.lineage:null);
+    const profitability=typeof model.profitability==="string"?{status:model.profitability}:
+      (model.profitability&&typeof model.profitability==="object"?model.profitability:{});
+    const profitStatus=evidenceFirst(profitability,["status","qualification","result"]);
+    const blockers=evidenceList(evidenceFirst(profitability,["blockers","reasons","missing_evidence"]));
+    const profitEstablished=profitability.established===true||String(profitStatus||"").toLowerCase()==="established";
+    const fallbackBlocker=!profitEstablished&&!blockers.length&&evidencePresent(profitStatus)?evidenceText(profitStatus):null;
+    const blockerItems=blockers.length?blockers:(fallbackBlocker?[fallbackBlocker]:[]);
+    const blockersHtml=blockerItems.length?`<ul class="evidence-list">${blockerItems.map(item=>`<li>${esc(item)}</li>`).join("")}</ul>`:
+      `<div class="dim">${profitEstablished?"No blockers reported.":EVIDENCE_MISSING}</div>`;
+    const warnings=evidenceList(model.warnings);
+    const warningsHtml=warnings.length?`<div class="evidence-block"><h3>Warnings</h3><ul class="evidence-list yellow">${warnings.map(item=>`<li>${esc(item)}</li>`).join("")}</ul></div>`:"";
+    return `<article class="card evidence-card">
+      <div class="evidence-head"><div><div class="evidence-title">${sport} · ${versionEsc}</div>
+        <div class="evidence-scope">ACTIVE MODEL · scope: exact model version only</div></div>
+        <span class="evidence-status ${statusOk?"ok":"warn"}">${esc(status)}</span></div>
+      <div class="evidence-block"><h3>Locked backfill</h3><div class="kpis">
+        <div class="k"><b>${esc(evidenceMetric(observations))}</b><span>observations</span></div>
+        <div class="k"><b>${esc(evidenceMetric(calls))}</b><span>calls</span></div>
+        <div class="k"><b>${esc(evidencePct(hitRate))}</b><span>hit rate</span></div>
+        <div class="k"><b>${esc(evidenceMetric(brier,4))}</b><span>Brier</span></div>
+        <div class="k"><b>${esc(evidenceQualification(qualification))}</b><span>qualification</span></div>
+      </div></div>
+      <div class="evidence-block"><h3>Features / Elo parameters</h3><div class="evidence-table-wrap"><table class="data evidence-table">
+        <tr><th>Feature or parameter</th><th>Coefficient / value</th></tr>${featureHtml}</table></div></div>
+      <div class="evidence-block"><h3>Exact-version ledger evidence</h3><div class="small dim" style="margin-bottom:6px">Both sources are scoped to ${versionEsc}. P&amp;L is shadow/hypothetical.</div>
+        <div class="evidence-table-wrap"><table class="data evidence-table"><tr><th>Source</th><th>Exact version</th><th>Settled</th><th>W / L / P</th><th>Hit rate</th><th>Shadow/hypothetical P&amp;L (units)</th><th>Predecessor rows excluded</th></tr>
+        ${ledgerRow("Main ledger",model.main_ledger)}${ledgerRow("Flat ledger",model.flat_ledger)}</table></div></div>
+      <div class="evidence-block"><h3>Artifact &amp; lineage health</h3><div class="evidence-table-wrap"><table class="data evidence-table">
+        <tr><th>Artifact path</th><td>${evidenceEsc(artifactPath)}</td></tr>
+        <tr><th>Artifact health</th><td>${esc(evidenceHealth(artifactStatus))}</td></tr>
+        <tr><th>SHA-256</th><td>${evidenceEsc(artifactHash)}</td></tr>
+        <tr><th>Hash health</th><td>${esc(evidenceHealth(hashHealth,"VERIFIED","MISMATCH"))}</td></tr>
+        <tr><th>Lineage health</th><td>${esc(evidenceHealth(lineageHealth))}</td></tr>
+        <tr><th>Lineage detail</th><td>${evidenceEsc(lineageDetail)}</td></tr>
+      </table></div></div>
+      <div class="evidence-block evidence-profit ${profitEstablished?"established":""}"><h3>${profitEstablished?"Profitability status: ESTABLISHED":"PROFITABILITY NOT ESTABLISHED"}</h3>${blockersHtml}</div>
+      ${warningsHtml}
+    </article>`;
+  }).join("");
+}
+function renderProductionEvidence(payload){
+  state.productionEvidence=payload;
+  $("#productionEvidenceGenerated").textContent=`Generated: ${evidenceText(payload&&payload.generated_at)}`;
+  $("#productionEvidence").innerHTML=productionEvidenceHtml(payload);
 }
 
 /* ---------- matrix ---------- */
@@ -1416,8 +1626,8 @@ function resetTimer(){
 }
 async function refreshAll(){
   try{
-    const [s,m,p,perf]=await Promise.all([api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance")]);
-    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); populateFilters(); renderPicks(); renderLive(); renderFolio(); renderResearch(); renderFlat();
+    const [s,m,p,perf,evidence]=await Promise.all([api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence")]);
+    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); renderProductionEvidence(evidence); populateFilters(); renderPicks(); renderLive(); renderFolio(); renderResearch(); renderFlat();
   }catch(e){
     $("#updatedTxt").innerHTML='<span class="red">Updated: SERVER UNREACHABLE — is dashboard_server.py running?</span>';
   }

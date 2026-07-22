@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -9,6 +10,32 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _render_production_evidence(payload: dict) -> str:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    match = re.search(
+        r"/\* ---------- production model evidence ---------- \*/([\s\S]*?)"
+        r"/\* ---------- matrix ---------- \*/",
+        html,
+    )
+    assert match, "production evidence renderer is missing"
+    script = (
+        'const esc=s=>String(s).replace(/[&<>]/g,c=>'
+        '({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));\n'
+        + match.group(1)
+        + "\nprocess.stdout.write(productionEvidenceHtml(JSON.parse(process.argv[1])));"
+    )
+    result = subprocess.run(
+        [node, "-e", script, json.dumps(payload)],
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    return result.stdout
 
 
 def test_dashboard_inline_javascript_parses() -> None:
@@ -94,3 +121,114 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "No active picks remain today" in html
     assert 'id="todayShowSettled"' in html
     assert 'if(p.status!=="open")' in html
+
+
+def test_dashboard_wires_live_production_evidence_tab_into_refresh() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+
+    assert 'data-tab="evidence"' in html
+    assert 'id="tab-evidence"' in html
+    assert 'id="productionEvidenceGenerated"' in html
+    assert 'id="productionEvidence"' in html
+    assert 'api("/api/production-evidence")' in html
+    assert "renderProductionEvidence(evidence)" in html
+    assert "ACTIVE MODEL · scope: exact model version only" in html
+    assert "P&amp;L is shadow/hypothetical" in html
+    assert "Predecessor rows excluded" in html
+    assert "PROFITABILITY NOT ESTABLISHED" in html
+    assert "@media(max-width:600px)" in html
+
+
+def test_production_evidence_renders_exact_version_metrics_and_escapes_text() -> None:
+    rendered = _render_production_evidence(
+        {
+            "generated_at": "2026-07-22T09:00:00Z",
+            "models": [
+                {
+                    "sport": "mlb<script>",
+                    "model_version": "mlb-v5<&",
+                    "status": "active_production",
+                    "features": {
+                        "feature_names": ["elo_probability", "trend_gap<script>"],
+                        "coefficients": [3.5, -0.25],
+                        "elo_parameters": {"k": 20, "home_advantage": 35},
+                    },
+                    "backfill": {
+                        "observations": 120,
+                        "calls": 80,
+                        "hit_rate": 0.625,
+                        "brier_score": 0.21234,
+                        "qualified": True,
+                    },
+                    "main_ledger": {
+                        "settled": 12,
+                        "wins": 7,
+                        "losses": 5,
+                        "pushes": 0,
+                        "hit_rate": 7 / 12,
+                        "pnl_units": 1.25,
+                        "predecessor_rows_excluded": 9,
+                    },
+                    "flat_ledger": {
+                        "settled": 20,
+                        "wins": 11,
+                        "losses": 8,
+                        "pushes": 1,
+                        "hit_rate": 11 / 19,
+                        "pnl_units": -0.5,
+                        "predecessor_rows_excluded": 4,
+                    },
+                    "artifact": {
+                        "path": "config/models/mlb-v5.json",
+                        "health": "healthy",
+                        "sha256": "abc123",
+                        "hash_verified": True,
+                        "lineage": {"status": "healthy", "parent_version": "mlb-v4"},
+                    },
+                    "profitability": {
+                        "status": "not_established",
+                        "blockers": ["missing executable <BBO>"],
+                    },
+                    "warnings": ["warning <unsafe>"],
+                }
+            ],
+        }
+    )
+
+    assert "MLB&lt;SCRIPT&gt; · mlb-v5&lt;&amp;" in rendered
+    assert "trend_gap&lt;script&gt;" in rendered
+    assert "62.5%" in rendered
+    assert "0.2123" in rendered
+    assert "QUALIFIED" in rendered
+    assert "Main ledger" in rendered and "Flat ledger" in rendered
+    assert "1.25" in rendered and "-0.50" in rendered
+    assert "abc123" in rendered and "VERIFIED" in rendered
+    assert "missing executable &lt;BBO&gt;" in rendered
+    assert "warning &lt;unsafe&gt;" in rendered
+    assert "<script>" not in rendered
+
+
+def test_production_evidence_missing_values_are_dashes_not_zero_percent() -> None:
+    rendered = _render_production_evidence(
+        {
+            "generated_at": None,
+            "models": [
+                {
+                    "sport": "wnba",
+                    "model_version": "wnba-v4",
+                    "status": None,
+                    "artifact": {},
+                    "features": [],
+                    "backfill": {},
+                    "main_ledger": {},
+                    "flat_ledger": {},
+                    "profitability": {},
+                    "warnings": [],
+                }
+            ],
+        }
+    )
+
+    assert "--" in rendered
+    assert "0.0%" not in rendered
+    assert "PROFITABILITY NOT ESTABLISHED" in rendered
