@@ -2039,5 +2039,5 @@
     "Dual-threshold: flat=0.00 (research), main=0.20 (qualified)",
     "5.2% Brier improvement over v2 on holdout"
   ],
-  "artifact_hash": "98da4a80b7f318a7919e5e7e0ea665d52be3fd1d2c2ae7cd25aead8acbac7a16"
+  "artifact_hash": "48424b79d75fc1173c9c465d95feb6fc041a2ccfbc64455058b3f74905ce28d5"
 }
