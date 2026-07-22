@@ -237,8 +237,8 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: cs2-neutral-series-elo-v2
-    production_artifact: config/models/cs2-neutral-series-elo-v2.json
+    active_production_version: cs2-tiered-elo-v3
+    production_artifact: config/models/cs2-tiered-elo-v3.json
     market_target: esports_match_winner
     min_edge: 0.02
   DOTA2:
