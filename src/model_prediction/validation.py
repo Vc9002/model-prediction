@@ -18,6 +18,8 @@ from typing import Any, Mapping, Sequence
 
 from sklearn.linear_model import LogisticRegression
 
+from .config import PROJECT_ROOT
+
 from .calibration import calibration_metrics
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
@@ -973,27 +975,15 @@ def evaluate_variant_3way(
     hit_rate = hits / calls if calls else 0.0
     units = hits * (10/11) - (calls - hits) if calls else 0.0
 
-    # Monthly breakdown
-    monthly = {}
-    for conf, sel, row in zip(ho_confidences, ho_selections, holdout):
-        if conf < threshold:
-            continue
-        m = row.date[:7]
-        if m not in monthly:
-            monthly[m] = {"calls": 0, "hits": 0}
-        monthly[m]["calls"] += 1
-        monthly[m]["hits"] += 1 if sel == row.outcome_3way else 0
-
-    monthly_list = []
-    for m in sorted(monthly):
-        mc = monthly[m]
-        hr = mc["hits"] / mc["calls"] if mc["calls"] else 0
-        status = "qualifying" if mc["calls"] >= MINIMUM_MONTHLY_CALLS else "insufficient_calls"
-        monthly_list.append({
-            "month": m, "calls": mc["calls"], "hits": mc["hits"],
-            "hit_rate": round(hr, 6), "units_at_minus_110": round(mc["hits"] * (10/11) - (mc["calls"] - mc["hits"]), 6),
-            "qualification_status": status,
-        })
+    # Monthly breakdown — shared helper so 3-way gets partial_month on incomplete
+    # final months just like the binary path does.
+    selected_for_grade = [
+        (float(conf), 1 if sel == row.outcome_3way else 0, row.date)
+        for conf, sel, row in zip(ho_confidences, ho_selections, holdout)
+        if conf >= threshold
+    ]
+    holdout_end = max(row.date for _, _, row in zip(ho_confidences, ho_selections, holdout)) if holdout else date.today()
+    monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
 
     every_month_positive = all(m["units_at_minus_110"] > 0 for m in monthly_list if m["qualification_status"] == "qualifying")
     qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
@@ -1408,10 +1398,9 @@ def _lookup_weather(home_team: str, game_date: str) -> dict:
     """Look up historical weather for a ballpark on a given date."""
     global _WEATHER_DB
     import json as _json
-    from pathlib import Path as _Path
     
     if _WEATHER_DB is None:
-        db_path = _Path("data/features/historical_weather.json")
+        db_path = PROJECT_ROOT / "data/features/historical_weather.json"
         if db_path.exists():
             _WEATHER_DB = _json.loads(db_path.read_text())
         else:
@@ -1449,10 +1438,9 @@ def _load_starter_era_map() -> dict[str, float]:
         return _STARTER_ERA_MAP
     
     import json as _json
-    from pathlib import Path as _Path
     
-    snap_path = _Path("data/mlb_statsapi/game_snapshots.jsonl")
-    crosswalk_path = _Path("data/processed/mlb/games.jsonl")
+    snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
+    crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
     if not snap_path.exists() or not crosswalk_path.exists():
         _STARTER_ERA_MAP = {}
         return _STARTER_ERA_MAP

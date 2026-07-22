@@ -1,0 +1,278 @@
+{
+  "schema_version": "1",
+  "purpose": "Durable record of every feature that has been evaluated, with its verdict and the evidence behind it. Check this file BEFORE proposing or testing a feature. A feature listed with verdict 'reject' or 'exclude' must not be re-tested unless the 'retest_when' condition is met.",
+  "last_updated": "2026-07-22",
+  "evidence_grades": {
+    "A": "Independently verified against production artifacts in this repo by reading config/models/*.json or running the split.",
+    "B": "Reported by a prior evaluation session following docs/EVAL_METHODOLOGY_BRIEF.md, artifacts exist but not re-verified.",
+    "C": "Claimed by a prior session, evidence not located or not reproduced. Treat as unconfirmed."
+  },
+  "features": [
+    {
+      "name": "elo_probability",
+      "file": "src/model_prediction/features/elo_ratings.py",
+      "sports": ["MLB", "NBA", "WNBA", "NFL", "SOCCER"],
+      "verdict": "keep",
+      "status": "production",
+      "evidence_grade": "A",
+      "fitted_coefficients": {"MLB": 3.319, "NBA": 3.564, "WNBA": 3.134, "NFL": 2.615, "SOCCER": 5.562},
+      "notes": "The only load-bearing signal in every production model. All five models are functionally Elo plus a logistic rescaling.",
+      "open_question": "NBA v4 hits 73.66% calling 88.2% of games on Elo alone, above the NBA favorite base rate. Leakage vs chalky holdout window is UNRESOLVED and under active investigation. Do not build on top of Elo until answered.",
+      "tested_on": "2026-07-22"
+    },
+    {
+      "name": "trend_gap",
+      "file": "src/model_prediction/features/trends.py",
+      "sports": ["MLB", "NBA", "WNBA", "NFL", "SOCCER"],
+      "verdict": "pending",
+      "status": "production_but_inert",
+      "evidence_grade": "A",
+      "fitted_coefficients": {"MLB": -0.030, "NBA": -0.004, "WNBA": -0.007, "NFL": 0.050, "SOCCER": -0.151},
+      "notes": "Wired into all five production models and contributes approximately nothing. Coefficients are near zero and mostly negative. Likely already absorbed by Elo, since both are opponent-adjusted recent-form measures.",
+      "retest_when": "Never as-is. If retested it must be as a RESIDUAL trend orthogonalized against elo_probability, not the raw EWMA difference.",
+      "tested_on": "2026-07-22"
+    },
+    {
+      "name": "defensive_trend_gap",
+      "file": "src/model_prediction/features/trends.py",
+      "sports": ["NBA", "WNBA"],
+      "verdict": "pending",
+      "status": "production_but_inert",
+      "evidence_grade": "A",
+      "fitted_coefficients": {"NBA": -0.013, "WNBA": -0.003},
+      "notes": "CORRECTION OF A PRIOR CLAIM: this feature does NOT explain NBA/WNBA performance. An earlier session asserted NBA/WNBA 'figured out the secret' with defensive_trend_gap. Its fitted coefficients are -0.013 and -0.003, i.e. zero. Do not repeat that claim.",
+      "tested_on": "2026-07-22"
+    },
+    {
+      "name": "park_factor",
+      "file": "src/model_prediction/features/park_factors.py",
+      "sports": ["MLB"],
+      "verdict": "keep",
+      "status": "production",
+      "evidence_grade": "A",
+      "fitted_coefficients": {"MLB": -1.050},
+      "notes": "The ONLY non-Elo feature anywhere in production with a materially non-zero coefficient. Not in the feature registry but wired via provider.",
+      "tested_on": "2026-07-22"
+    },
+    {
+      "name": "weather_factor",
+      "file": "src/model_prediction/features/weather.py",
+      "sports": ["MLB"],
+      "verdict": "pending",
+      "status": "production",
+      "evidence_grade": "A",
+      "fitted_coefficients": {"MLB": -0.318},
+      "notes": "Small but non-trivial weight. Needs a leave-one-out to establish whether it survives its own standard error.",
+      "tested_on": "2026-07-22"
+    },
+    {
+      "name": "pitcher_era_gap",
+      "file": "src/model_prediction/features/team_runs.py",
+      "sports": ["MLB"],
+      "verdict": "under_test",
+      "status": "production_but_inert",
+      "evidence_grade": "A",
+      "fitted_coefficients": {"MLB": 0.022},
+      "notes": "In MLB v5 with a near-zero coefficient. Currently in a head-to-head against starter_era_gap.",
+      "tested_on": "2026-07-22"
+    },
+    {
+      "name": "starter_era_gap",
+      "file": "src/model_prediction/validation.py",
+      "sports": ["MLB"],
+      "verdict": "remove",
+      "status": "shipped_in_v4_then_removed_in_v5",
+      "evidence_grade": "A",
+      "fitted_coefficients": {"MLB_v4": -0.0179},
+      "notes": "UNSERVABLE — do not reinstate under any name. validation.py:1509 _starter_era_gap() reads _load_starter_era_map(), a dict built by replaying HISTORICAL box scores keyed by event_id. An unplayed game is never in that map, so it returns the 0.0 default at serve time. It therefore trains on real ERA and serves as a constant zero: textbook train/serve skew. learned_forward.py:104-112 already documents this and deliberately provides NO provider, failing closed instead.",
+      "production_incident": "mlb-elo-trend-lr-v4 SHIPPED this feature (feature_names: elo_probability, trend_gap, park_factor, starter_era_gap; coefficient -0.0179) and made 100% of the settled live MLB picks in both ledgers. Every one of those 59 predictions was produced by a model whose fourth feature was silently 0.0 at prediction time. Practical damage is small because the coefficient is near zero, but the mechanism is exactly the failure mode. v5 removed it and substituted the servable pitcher_era_gap — so the v4 to v5 change was a BUG FIX, not feature bloat.",
+      "retest_when": "Never. Remove elo_trend_park_starter from FEATURE_VARIANTS so it cannot be selected again.",
+      "tested_on": "2026-07-22"
+    },
+    {
+      "name": "starting_pitcher_fip",
+      "file": "src/model_prediction/features/starting_pitcher.py",
+      "sports": ["MLB"],
+      "verdict": "reject",
+      "status": "orphan",
+      "evidence_grade": "B",
+      "measured_effect": "84% data coverage, zero measurable effect on locked holdout",
+      "notes": "Collinear with the existing pitcher_era_gap. Rejected on evidence, not neglect.",
+      "retest_when": "Only if pitcher_era_gap is removed from the model, which would break the collinearity.",
+      "tested_on": "2026-07-21",
+      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py"
+    },
+    {
+      "name": "head_to_head",
+      "file": "src/model_prediction/features/head_to_head.py",
+      "sports": ["MLB", "NBA", "WNBA", "NFL", "SOCCER"],
+      "verdict": "reject",
+      "status": "registered_orphan",
+      "evidence_grade": "B",
+      "measured_effect": "+0.11pp to +0.61pp accuracy across all five sports, every result within ~1 standard error",
+      "notes": "Registered in the feature registry and imported by features/__init__.py but never requested by learned_forward.py. Tested and found to be noise. NFL was untestable at only 10% non-zero coverage.",
+      "retest_when": "NFL only, and only after H2H coverage exceeds 50%. Never retest the other four sports.",
+      "tested_on": "2026-07-21",
+      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py"
+    },
+    {
+      "name": "lineup_strength",
+      "file": "src/model_prediction/features/lineup_strength.py",
+      "sports": ["NBA", "WNBA"],
+      "verdict": "reject",
+      "status": "registered_orphan",
+      "evidence_grade": "B",
+      "measured_effect": "+0.05pp (NBA), 0.00pp (WNBA)",
+      "notes": "Pure noise. Registered but never wired. Leaving it unwired is empirically correct.",
+      "retest_when": "Never in this form.",
+      "tested_on": "2026-07-21",
+      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py"
+    },
+    {
+      "name": "player_availability",
+      "file": "src/model_prediction/features/player_availability.py",
+      "sports": ["WNBA"],
+      "verdict": "keep",
+      "status": "production",
+      "evidence_grade": "B",
+      "measured_effect": "142-game WNBA cohort May 14 - Jul 20: accuracy 71.8% -> 73.2% (+1.4pp), Brier 0.21278 -> 0.20799 (-2.3%), units at -110 +52.73 -> +56.55, zero harmful selection flips",
+      "notes": "Applied as a post-hoc probit adjustment gated at a 5pp threshold, not as a regression feature. Below threshold, v3 predictions pass through unchanged. The single best-evidenced non-Elo improvement in the project.",
+      "open_question": "Whether the same availability mechanism transfers to NBA. Untested.",
+      "tested_on": "2026-07-20"
+    },
+    {
+      "name": "market_signals",
+      "file": "src/model_prediction/features/market_signals.py",
+      "sports": [],
+      "verdict": "exclude",
+      "status": "dead_stub",
+      "evidence_grade": "A",
+      "notes": "ARCHITECTURAL EXCLUSION, not an empirical rejection. The independent outcome model must never consume market price. Wiring this into a sport model would violate market isolation and invalidate every edge calculation downstream.",
+      "retest_when": "Only inside a separately labeled market-residual or decision layer, never in the outcome model.",
+      "tested_on": "n/a"
+    },
+    {
+      "name": "guaranteed_signal",
+      "file": "src/model_prediction/features/guaranteed_signal.py",
+      "sports": [],
+      "verdict": "exclude",
+      "status": "dead_stub",
+      "evidence_grade": "A",
+      "notes": "Not a numeric feature. It is a post-hoc classification tag applied after a prediction exists. Cannot be ablated because it is not an input.",
+      "tested_on": "n/a"
+    },
+    {
+      "name": "tennis_surface",
+      "file": "src/model_prediction/features/tennis_surface.py",
+      "sports": ["TENNIS"],
+      "verdict": "exclude",
+      "status": "registered_orphan",
+      "evidence_grade": "A",
+      "notes": "No active tennis model exists. Tennis is deferred per docs/PROJECT_STATUS.md. Untestable, not rejected.",
+      "retest_when": "If and only if a tennis model is revived.",
+      "tested_on": "n/a"
+    },
+    {
+      "name": "confidence_gate",
+      "file": "src/model_prediction/features/confidence_gate.py",
+      "sports": [],
+      "verdict": "exclude",
+      "status": "infrastructure",
+      "evidence_grade": "A",
+      "notes": "Selection/threshold infrastructure, not a model input. Governs called_rate. Not ablatable.",
+      "tested_on": "n/a"
+    },
+    {
+      "name": "bullpen",
+      "file": "src/model_prediction/features/bullpen.py",
+      "sports": ["MLB"],
+      "verdict": "untested",
+      "status": "half_wired",
+      "evidence_grade": "A",
+      "notes": "One import, never reaches a production feature vector. Genuinely untested.",
+      "tested_on": null
+    },
+    {
+      "name": "schedule_load",
+      "file": "src/model_prediction/features/schedule_load.py",
+      "sports": ["NBA", "WNBA"],
+      "verdict": "untested",
+      "status": "half_wired",
+      "evidence_grade": "A",
+      "notes": "Two imports, not in any production feature vector. Rest/travel is a plausible NBA/WNBA signal and this is the most promising genuinely untested feature in the repo.",
+      "tested_on": null
+    },
+    {
+      "name": "team_runs",
+      "file": "src/model_prediction/features/team_runs.py",
+      "sports": ["MLB"],
+      "verdict": "untested",
+      "status": "half_wired",
+      "evidence_grade": "A",
+      "notes": "Two imports. Supplies pitcher_era_gap. Its other outputs are unused.",
+      "tested_on": null
+    },
+    {
+      "name": "consistency_gap",
+      "file": "src/model_prediction/features/trends.py",
+      "sports": [],
+      "verdict": "untested",
+      "status": "variant_only",
+      "evidence_grade": "A",
+      "notes": "Defined in the elo_trend_full FEATURE_VARIANT but that variant is not selected for any production model.",
+      "tested_on": null
+    },
+    {
+      "name": "hot_cold_gap",
+      "file": "src/model_prediction/features/trends.py",
+      "sports": [],
+      "verdict": "untested",
+      "status": "variant_only",
+      "evidence_grade": "A",
+      "notes": "Defined in the elo_trend_full FEATURE_VARIANT, not selected for production.",
+      "tested_on": null
+    },
+    {
+      "name": "trailing_home_win_rate_30d",
+      "file": "src/model_prediction/validation.py",
+      "sports": ["MLB"],
+      "verdict": "untested",
+      "status": "variant_only",
+      "evidence_grade": "B",
+      "notes": "Part of the elo_trend_adaptive_hfa variant alongside elo_neutral_probability. Research output exists at outputs/latest/mlb-adaptive-hfa-research.json but was not promoted.",
+      "tested_on": null
+    }
+  ],
+  "corrected_claims": [
+    {
+      "claim": "MLB is underconfident; 60% predictions win 75% of the time; Platt scaling would fix it.",
+      "status": "FALSE",
+      "correction": "The load-bearing locked-holdout reliability bucket holds 237 of 254 calls at mean-predicted 63.4% vs actual 55.3% — overconfident by roughly 8pp, the opposite direction. No bucket anywhere shows 60% predicted resolving to 75% actual.",
+      "date": "2026-07-21"
+    },
+    {
+      "claim": "Esports and international baseball have artifacts but were never validated.",
+      "status": "FALSE",
+      "correction": "Both have substantial locked-test results already. CS2 alone has n=7578 in its locked test window (2026-01-22 to 2026-07-18). The artifacts report qualified_for_betting: false and units: 0 because they are deliberately research-only, not because validation was skipped.",
+      "date": "2026-07-21"
+    },
+    {
+      "claim": "NBA and WNBA outperform because they added defensive_trend_gap as a third feature.",
+      "status": "FALSE",
+      "correction": "Fitted coefficients are -0.013 (NBA) and -0.003 (WNBA), i.e. zero. Their performance comes from Elo and from a high called_rate in leagues where favorites are strong.",
+      "date": "2026-07-22"
+    },
+    {
+      "claim": "Zero calibration exists anywhere in the project.",
+      "status": "MISLEADING",
+      "correction": "Every production artifact records calibration DIAGNOSTICS under qualification.calibration (slope, intercept, expected_calibration_error). What is absent is an APPLIED calibrator — the serving path uses identity. NBA slope 1.785 and WNBA 1.270 indicate underconfidence; SOCCER slope 0.776 indicates overconfidence; NFL has the worst ECE at 0.1009.",
+      "date": "2026-07-22"
+    },
+    {
+      "claim": "soccer_form.py, rest_travel.py, and data_sources/pitchers.py are dead code.",
+      "status": "FALSE",
+      "correction": "None of those files exist. They were misremembered.",
+      "date": "2026-07-21"
+    }
+  ]
+}

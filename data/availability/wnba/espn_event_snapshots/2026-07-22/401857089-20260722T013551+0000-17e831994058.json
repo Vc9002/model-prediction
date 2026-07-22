@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5220104",
+      "current_status": "Out",
+      "player_name": "Mai Yamamoto",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-21T21:11:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4433633",
+      "current_status": "Out",
+      "player_name": "Kierstan Bell",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-21T21:06:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4565501",
+      "current_status": "Out",
+      "player_name": "Janiah Barker",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-15T23:46:00+00:00",
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "event_id": "401857089",
+  "observed_at_utc": "2026-07-22T01:35:51.284681+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "17e8319940586afcababc13a820edf225ca8f9e5fe0238fbb01406c1522a64cc",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433795",
+      "current_status": "Out",
+      "player_name": "Sania Feagin",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-09T23:15:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "3913881",
+      "current_status": "Out",
+      "player_name": "Alanna Smith",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-22T00:11:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4433730",
+      "current_status": "Questionable",
+      "player_name": "Paige Bueckers",
+      "raw_status": "Day-To-Day",
+      "reason": "Rest",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-22T00:08:00+00:00",
+      "team": "Dallas Wings"
+    }
+  ],
+  "event_id": "401857091",
+  "observed_at_utc": "2026-07-22T05:16:16.750933+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "63cc108eb0bc9c19b986b012b8f0e1435b4ee1516c844ea6c2b4d39c14f02427",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

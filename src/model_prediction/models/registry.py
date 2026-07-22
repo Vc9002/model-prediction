@@ -110,11 +110,65 @@ MODEL_SPECS = {
         ("point-in-time team Elo", "home field", "league tie rate"),
         status=ModelState.RESEARCH,
     ),
+    League.DOTA2: ModelSpec(
+        League.DOTA2,
+        "venue-neutral series Elo baseline",
+        "best-of match/series winner probability",
+        "binary Elo expectation",
+        ("point-in-time team Elo",),
+        status=ModelState.RESEARCH,
+    ),
+    League.VALORANT: ModelSpec(
+        League.VALORANT,
+        "venue-neutral series Elo baseline",
+        "best-of match/series winner probability",
+        "binary Elo expectation",
+        ("point-in-time team Elo",),
+        status=ModelState.RESEARCH,
+    ),
 }
+
+_CONFIG_STATUS_CACHE: dict[str, dict[str, ModelState]] = {}
+
+
+def _status_from_config(league: League) -> ModelState | None:
+    """Read a league's model state from config/model.yaml, if present."""
+    from pathlib import Path
+
+    cache_key = "main"
+    if cache_key not in _CONFIG_STATUS_CACHE:
+        config_path = Path("config/model.yaml")
+        if config_path.exists():
+            try:
+                import yaml
+                raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+                models = raw.get("models") or {}
+                _CONFIG_STATUS_CACHE[cache_key] = {
+                    lk: ModelState(v.get("status", "research"))
+                    for lk, v in models.items()
+                    if lk in League.__members__
+                }
+            except Exception:
+                _CONFIG_STATUS_CACHE[cache_key] = {}
+        else:
+            _CONFIG_STATUS_CACHE[cache_key] = {}
+    return _CONFIG_STATUS_CACHE[cache_key].get(league.value)
 
 
 def model_spec(league: League) -> ModelSpec:
-    return MODEL_SPECS[league]
+    spec = MODEL_SPECS[league]
+    config_status = _status_from_config(league)
+    if config_status is not None and config_status != spec.status:
+        return ModelSpec(
+            league=spec.league,
+            family=spec.family,
+            target=spec.target,
+            distribution=spec.distribution,
+            trend_features=spec.trend_features,
+            status=config_status,
+            origin=spec.origin,
+        )
+    return spec
 
 
 def get_model(sport: str) -> Any:
