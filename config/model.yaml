@@ -136,6 +136,7 @@ models:
     production_artifact: config/models/mlb-elo-trend-lr-v5.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
+    min_edge: 0.00
     legacy_research_rollback: legacy-measured-edge
     iteration_policy:
       status: continuous
@@ -174,6 +175,7 @@ models:
     - nba-elo-trend-lr-v3
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
+    min_edge: 0.00
     spread_research_artifact: config/models/nba-spread-baseline-v1.json
     total_research_artifact: config/models/nba-spread-baseline-v1.json
   WNBA:
@@ -192,6 +194,7 @@ models:
     - wnba-elo-trend-lr-v3
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
+    min_edge: 0.00
     spread_research_artifact: config/models/wnba-spread-baseline-v1.json
     total_research_artifact: config/models/wnba-spread-baseline-v1.json
   SOCCER:
@@ -219,6 +222,7 @@ models:
     production_artifact: config/models/nfl-elo-trend-lr-v4.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
+    min_edge: 0.00
     spread_research_artifact: config/models/nfl-spread-baseline-v1.json
     total_research_artifact: config/models/nfl-spread-baseline-v1.json
   TENNIS:
@@ -236,7 +240,7 @@ models:
     active_production_version: lol-tiered-elo-v3
     production_artifact: config/models/lol-tiered-elo-v3.json
     market_target: esports_match_winner
-    min_edge: 0.02
+    min_edge: 0.00
   CS2:
     family: neutral_series_elo
     status: shadow_qualified
@@ -244,7 +248,7 @@ models:
     active_production_version: cs2-tiered-elo-v3
     production_artifact: config/models/cs2-tiered-elo-v3.json
     market_target: esports_match_winner
-    min_edge: 0.02
+    min_edge: 0.01
   DOTA2:
     family: neutral_series_elo
     status: shadow_qualified
