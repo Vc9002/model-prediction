@@ -32,6 +32,9 @@ def _configure(monkeypatch, tmp_path: Path, models: dict) -> tuple[Path, Path, P
     config.write_text(yaml.safe_dump({"models": models}), encoding="utf-8")
     monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
     monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config)
+    monkeypatch.setattr(
+        dashboard_server, "FEATURE_REGISTRY_FILE", tmp_path / "config" / "tested_features.json"
+    )
     monkeypatch.setattr(dashboard_server, "DATA", data)
     monkeypatch.setattr(dashboard_server, "OUTPUTS", outputs)
     return config, data, outputs
@@ -40,62 +43,73 @@ def _configure(monkeypatch, tmp_path: Path, models: dict) -> tuple[Path, Path, P
 def test_production_evidence_enumerates_artifacts_and_uses_exact_metric_sources(
     monkeypatch, tmp_path: Path
 ) -> None:
-    logistic = _hashed({
-        "schema_version": "1",
-        "sport": "mlb",
-        "method": "logistic_regression",
-        "model_version": "mlb-v2",
-        "market_models": {
-            "moneyline": {
-                "feature_names": ["elo_probability", "trend_gap"],
-                "coefficients": [2.5, -0.1],
-                "intercept": -1.2,
-                "confidence_threshold": 0.6,
-                "positive_class": "home",
-            }
+    logistic = _hashed(
+        {
+            "schema_version": "1",
+            "sport": "mlb",
+            "method": "logistic_regression",
+            "model_version": "mlb-v2",
+            "market_models": {
+                "moneyline": {
+                    "feature_names": ["elo_probability", "trend_gap"],
+                    "coefficients": [2.5, -0.1],
+                    "intercept": -1.2,
+                    "confidence_threshold": 0.6,
+                    "positive_class": "home",
+                }
+            },
+            "qualification": {
+                "locked_holdout": True,
+                "qualified": False,
+                "calls": 51,
+                "hit_rate": 0.61,
+            },
+        }
+    )
+    esports = _hashed(
+        {
+            "schema_version": "esports-neutral-elo-v1",
+            "title": "lol",
+            "model_version": "lol-v2",
+            "initial_rating": 1500.0,
+            "k": 48.0,
+            "home_or_order_advantage": 0.0,
+            "confidence_threshold": 0.05,
+            "target": "series winner",
+            "qualified_for_betting": False,
+        }
+    )
+    _, _, outputs = _configure(
+        monkeypatch,
+        tmp_path,
+        {
+            "MLB": {
+                "status": "shadow_qualified",
+                "active_production_version": "mlb-v2",
+                "production_artifact": "config/models/mlb-v2.json",
+            },
+            "LOL": {
+                "status": "shadow_qualified",
+                "active_production_version": "lol-v2",
+                "production_artifact": "config/models/lol-v2.json",
+            },
+            "TENNIS": {"status": "deferred"},
         },
-        "qualification": {
-            "locked_holdout": True,
-            "qualified": False,
-            "calls": 51,
-            "hit_rate": 0.61,
-        },
-    })
-    esports = _hashed({
-        "schema_version": "esports-neutral-elo-v1",
-        "title": "lol",
-        "model_version": "lol-v2",
-        "initial_rating": 1500.0,
-        "k": 48.0,
-        "home_or_order_advantage": 0.0,
-        "confidence_threshold": 0.05,
-        "target": "series winner",
-        "qualified_for_betting": False,
-    })
-    _, _, outputs = _configure(monkeypatch, tmp_path, {
-        "MLB": {
-            "status": "shadow_qualified",
-            "active_production_version": "mlb-v2",
-            "production_artifact": "config/models/mlb-v2.json",
-        },
-        "LOL": {
-            "status": "shadow_qualified",
-            "active_production_version": "lol-v2",
-            "production_artifact": "config/models/lol-v2.json",
-        },
-        "TENNIS": {"status": "deferred"},
-    })
+    )
     _write_json(tmp_path / "config" / "models" / "mlb-v2.json", logistic)
     _write_json(tmp_path / "config" / "models" / "lol-v2.json", esports)
-    _write_json(outputs / "esports-baseline-validation.json", {
-        "titles": {
-            "lol": {
-                "model_version": "lol-v2",
-                "artifact_hash": esports["artifact_hash"],
-                "locked_test": {"selected_matches": {"calls": 70, "accuracy": 0.66}},
+    _write_json(
+        outputs / "esports-baseline-validation.json",
+        {
+            "titles": {
+                "lol": {
+                    "model_version": "lol-v2",
+                    "artifact_hash": esports["artifact_hash"],
+                    "locked_test": {"selected_matches": {"calls": 70, "accuracy": 0.66}},
+                }
             }
-        }
-    })
+        },
+    )
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
 
     result = dashboard_server.production_evidence()
@@ -114,74 +128,91 @@ def test_production_evidence_enumerates_artifacts_and_uses_exact_metric_sources(
         {"name": "trend_gap", "coefficient": -0.1},
     ]
     assert by_sport["mlb"]["locked_backfill"]["metrics"]["calls"] == 51
-    assert by_sport["mlb"]["backfill"] | {
-        "observations": None,
-        "calls": 51,
-        "hit_rate": 0.61,
-        "brier_score": None,
-        "qualified": False,
-    } == by_sport["mlb"]["backfill"]
+    assert (
+        by_sport["mlb"]["backfill"]
+        | {
+            "observations": None,
+            "calls": 51,
+            "hit_rate": 0.61,
+            "brier_score": None,
+            "qualified": False,
+        }
+        == by_sport["mlb"]["backfill"]
+    )
     assert by_sport["lol"]["model_spec"]["parameters"]["k"] == 48.0
     assert by_sport["lol"]["locked_backfill"]["metrics"]["selected_matches"]["calls"] == 70
     for model in by_sport.values():
         assert {
-            "model_version", "status", "features", "backfill", "main_ledger",
-            "flat_ledger", "artifact", "profitability", "warnings",
+            "model_version",
+            "status",
+            "features",
+            "backfill",
+            "main_ledger",
+            "flat_ledger",
+            "artifact",
+            "profitability",
+            "warnings",
         } <= model.keys()
         assert model["main_ledger"]["settled"] is None
         assert model["main_ledger"]["wins"] is None
         assert model["main_ledger"]["brier"] is None
         assert model["main_ledger"]["pnl"]["shadow"]["pnl_units"] is None
     assert any(
-        warning["code"] == "config_artifact_qualification_mismatch"
-        for warning in by_sport["mlb"]["warnings"]
+        warning["code"] == "config_artifact_qualification_mismatch" for warning in by_sport["mlb"]["warnings"]
     )
     assert any(
-        warning["code"] == "config_artifact_qualification_mismatch"
-        for warning in by_sport["lol"]["warnings"]
+        warning["code"] == "config_artifact_qualification_mismatch" for warning in by_sport["lol"]["warnings"]
     )
 
 
 def test_production_evidence_deduplicates_exact_versions_and_separates_predecessors(
     monkeypatch, tmp_path: Path
 ) -> None:
-    active = _hashed({
-        "schema_version": "1",
-        "sport": "mlb",
-        "method": "logistic_regression",
-        "model_version": "mlb-v2",
-        "market_models": {
-            "moneyline": {
-                "feature_names": ["elo_probability"],
-                "coefficients": [2.0],
-                "intercept": -1.0,
-                "confidence_threshold": 0.55,
-            }
-        },
-        "qualification": {"locked_holdout": True, "calls": 60},
-    })
-    predecessor = _hashed({
-        "schema_version": "1",
-        "sport": "mlb",
-        "method": "logistic_regression",
-        "model_version": "mlb-v1",
-        "market_models": {
-            "moneyline": {
-                "feature_names": ["elo_probability"],
-                "coefficients": [1.5],
-                "intercept": -0.8,
-                "confidence_threshold": 0.54,
-            }
-        },
-        "qualification": {"locked_holdout": True, "calls": 55},
-    })
-    _, _, _ = _configure(monkeypatch, tmp_path, {
-        "MLB": {
-            "status": "shadow_qualified",
-            "active_production_version": "mlb-v2",
-            "production_artifact": "config/models/mlb-v2.json",
+    active = _hashed(
+        {
+            "schema_version": "1",
+            "sport": "mlb",
+            "method": "logistic_regression",
+            "model_version": "mlb-v2",
+            "market_models": {
+                "moneyline": {
+                    "feature_names": ["elo_probability"],
+                    "coefficients": [2.0],
+                    "intercept": -1.0,
+                    "confidence_threshold": 0.55,
+                }
+            },
+            "qualification": {"locked_holdout": True, "calls": 60},
         }
-    })
+    )
+    predecessor = _hashed(
+        {
+            "schema_version": "1",
+            "sport": "mlb",
+            "method": "logistic_regression",
+            "model_version": "mlb-v1",
+            "market_models": {
+                "moneyline": {
+                    "feature_names": ["elo_probability"],
+                    "coefficients": [1.5],
+                    "intercept": -0.8,
+                    "confidence_threshold": 0.54,
+                }
+            },
+            "qualification": {"locked_holdout": True, "calls": 55},
+        }
+    )
+    _, _, _ = _configure(
+        monkeypatch,
+        tmp_path,
+        {
+            "MLB": {
+                "status": "shadow_qualified",
+                "active_production_version": "mlb-v2",
+                "production_artifact": "config/models/mlb-v2.json",
+            }
+        },
+    )
     _write_json(tmp_path / "config" / "models" / "mlb-v2.json", active)
     _write_json(tmp_path / "config" / "models" / "mlb-v1.json", predecessor)
     common = {
@@ -195,23 +226,54 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
         "pnl_units": 1.0,
     }
     main = [
-        {**common, "pick_id": "main-id", "event_id": "event-1", "model_version": "mlb-v2",
-         "result": "win", "model_probability": 0.7,
-         "model_artifact_hash": active["artifact_hash"], "probability_clv": 0.01},
+        {
+            **common,
+            "pick_id": "main-id",
+            "event_id": "event-1",
+            "model_version": "mlb-v2",
+            "result": "win",
+            "model_probability": 0.7,
+            "model_artifact_hash": active["artifact_hash"],
+            "probability_clv": 0.01,
+        },
     ]
     flat = [
         dict(main[0]),
         {**dict(main[0]), "pick_id": "different-pick-id-same-evidence", "line": "1.5000"},
-        {**common, "pick_id": "active-loss", "event_id": "event-2",
-         "model_version": "mlb-v2", "result": "loss", "model_probability": 0.6,
-         "pnl_units": -1.0},
-        {**common, "pick_id": "old", "event_id": "event-old", "model_version": "mlb-v1",
-         "result": "win", "model_artifact_hash": predecessor["artifact_hash"],
-         "probability_clv": 0.02},
-        {**common, "pick_id": "push", "event_id": "event-push", "model_version": "mlb-v2",
-         "result": "push", "model_artifact_hash": active["artifact_hash"]},
-        {**common, "pick_id": "open", "event_id": "event-open", "model_version": "mlb-v2",
-         "status": "open", "result": "win"},
+        {
+            **common,
+            "pick_id": "active-loss",
+            "event_id": "event-2",
+            "model_version": "mlb-v2",
+            "result": "loss",
+            "model_probability": 0.6,
+            "pnl_units": -1.0,
+        },
+        {
+            **common,
+            "pick_id": "old",
+            "event_id": "event-old",
+            "model_version": "mlb-v1",
+            "result": "win",
+            "model_artifact_hash": predecessor["artifact_hash"],
+            "probability_clv": 0.02,
+        },
+        {
+            **common,
+            "pick_id": "push",
+            "event_id": "event-push",
+            "model_version": "mlb-v2",
+            "result": "push",
+            "model_artifact_hash": active["artifact_hash"],
+        },
+        {
+            **common,
+            "pick_id": "open",
+            "event_id": "event-open",
+            "model_version": "mlb-v2",
+            "status": "open",
+            "result": "win",
+        },
     ]
     monkeypatch.setattr(
         dashboard_server,
@@ -256,30 +318,39 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
 
 
 def test_artifact_or_external_version_mismatch_fails_closed(monkeypatch, tmp_path: Path) -> None:
-    wrong_version = _hashed({
-        "schema_version": "esports-neutral-elo-v1",
-        "title": "lol",
-        "model_version": "lol-v1",
-        "initial_rating": 1500.0,
-        "k": 32.0,
-    })
-    _, _, outputs = _configure(monkeypatch, tmp_path, {
-        "LOL": {
-            "status": "shadow_qualified",
-            "active_production_version": "lol-v2",
-            "production_artifact": "config/models/lol-v2.json",
+    wrong_version = _hashed(
+        {
+            "schema_version": "esports-neutral-elo-v1",
+            "title": "lol",
+            "model_version": "lol-v1",
+            "initial_rating": 1500.0,
+            "k": 32.0,
         }
-    })
-    _write_json(tmp_path / "config" / "models" / "lol-v2.json", wrong_version)
-    _write_json(outputs / "esports-baseline-validation.json", {
-        "titles": {
-            "lol": {
-                "model_version": "lol-v2",
-                "artifact_hash": wrong_version["artifact_hash"],
-                "locked_test": {"selected_matches": {"calls": 99}},
+    )
+    _, _, outputs = _configure(
+        monkeypatch,
+        tmp_path,
+        {
+            "LOL": {
+                "status": "shadow_qualified",
+                "active_production_version": "lol-v2",
+                "production_artifact": "config/models/lol-v2.json",
             }
-        }
-    })
+        },
+    )
+    _write_json(tmp_path / "config" / "models" / "lol-v2.json", wrong_version)
+    _write_json(
+        outputs / "esports-baseline-validation.json",
+        {
+            "titles": {
+                "lol": {
+                    "model_version": "lol-v2",
+                    "artifact_hash": wrong_version["artifact_hash"],
+                    "locked_test": {"selected_matches": {"calls": 99}},
+                }
+            }
+        },
+    )
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
 
     model = dashboard_server.production_evidence()["models"][0]
@@ -292,30 +363,39 @@ def test_artifact_or_external_version_mismatch_fails_closed(monkeypatch, tmp_pat
 
 
 def test_external_esports_metrics_require_exact_report_version(monkeypatch, tmp_path: Path) -> None:
-    artifact = _hashed({
-        "schema_version": "esports-neutral-elo-v1",
-        "title": "lol",
-        "model_version": "lol-v2",
-        "initial_rating": 1500.0,
-        "k": 48.0,
-    })
-    _, _, outputs = _configure(monkeypatch, tmp_path, {
-        "LOL": {
-            "status": "shadow_qualified",
-            "active_production_version": "lol-v2",
-            "production_artifact": "config/models/lol-v2.json",
+    artifact = _hashed(
+        {
+            "schema_version": "esports-neutral-elo-v1",
+            "title": "lol",
+            "model_version": "lol-v2",
+            "initial_rating": 1500.0,
+            "k": 48.0,
         }
-    })
-    _write_json(tmp_path / "config" / "models" / "lol-v2.json", artifact)
-    _write_json(outputs / "esports-baseline-validation.json", {
-        "titles": {
-            "lol": {
-                "model_version": "lol-v1",
-                "artifact_hash": artifact["artifact_hash"],
-                "locked_test": {"selected_matches": {"calls": 999}},
+    )
+    _, _, outputs = _configure(
+        monkeypatch,
+        tmp_path,
+        {
+            "LOL": {
+                "status": "shadow_qualified",
+                "active_production_version": "lol-v2",
+                "production_artifact": "config/models/lol-v2.json",
             }
-        }
-    })
+        },
+    )
+    _write_json(tmp_path / "config" / "models" / "lol-v2.json", artifact)
+    _write_json(
+        outputs / "esports-baseline-validation.json",
+        {
+            "titles": {
+                "lol": {
+                    "model_version": "lol-v1",
+                    "artifact_hash": artifact["artifact_hash"],
+                    "locked_test": {"selected_matches": {"calls": 999}},
+                }
+            }
+        },
+    )
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
 
     model = dashboard_server.production_evidence()["models"][0]
@@ -327,28 +407,34 @@ def test_external_esports_metrics_require_exact_report_version(monkeypatch, tmp_
 
 
 def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path: Path) -> None:
-    artifact = _hashed({
-        "schema_version": "1",
-        "sport": "mlb",
-        "method": "logistic_regression",
-        "model_version": "mlb-v2",
-        "market_models": {
-            "moneyline": {
-                "feature_names": ["elo_probability"],
-                "coefficients": [2.0],
-                "intercept": -1.0,
+    artifact = _hashed(
+        {
+            "schema_version": "1",
+            "sport": "mlb",
+            "method": "logistic_regression",
+            "model_version": "mlb-v2",
+            "market_models": {
+                "moneyline": {
+                    "feature_names": ["elo_probability"],
+                    "coefficients": [2.0],
+                    "intercept": -1.0,
+                }
+            },
+            "qualification": {"locked_holdout": True, "calls": 999},
+        }
+    )
+    artifact["market_models"]["moneyline"]["coefficients"] = [999.0]
+    _configure(
+        monkeypatch,
+        tmp_path,
+        {
+            "MLB": {
+                "status": "shadow_qualified",
+                "active_production_version": "mlb-v2",
+                "production_artifact": "config/models/mlb-v2.json",
             }
         },
-        "qualification": {"locked_holdout": True, "calls": 999},
-    })
-    artifact["market_models"]["moneyline"]["coefficients"] = [999.0]
-    _configure(monkeypatch, tmp_path, {
-        "MLB": {
-            "status": "shadow_qualified",
-            "active_production_version": "mlb-v2",
-            "production_artifact": "config/models/mlb-v2.json",
-        }
-    })
+    )
     _write_json(tmp_path / "config" / "models" / "mlb-v2.json", artifact)
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
 
@@ -374,6 +460,9 @@ def test_current_configured_production_artifacts_fail_closed_when_invalid(monkey
 
     assert {model["sport"]: model["active_model_version"] for model in result["models"]} == configured
     assert result["all_model_definitions_and_backfills_valid"] is False
+    assert result["feature_registry"]["valid"] is True
+    assert len(result["feature_registry"]["features"]) == 22
+    assert len(result["feature_registry"]["production_ablation_summary"]) == 15
     invalid_sports = {"cs2", "dota2", "lol", "valorant"}
     for model in result["models"]:
         assert model["artifact"]["version_matches_config"] is True
@@ -386,6 +475,83 @@ def test_current_configured_production_artifacts_fail_closed_when_invalid(monkey
             assert model["artifact"]["hash_valid"] is True
             assert model["locked_backfill"]["status"] == "verified"
             assert model["model_definition_and_backfill_valid"] is True
+
+
+def test_feature_registry_is_validated_and_joined_to_exact_active_features(
+    monkeypatch, tmp_path: Path
+) -> None:
+    artifact = _hashed(
+        {
+            "schema_version": "1",
+            "sport": "nba",
+            "method": "logistic_regression",
+            "model_version": "nba-v2",
+            "market_models": {
+                "moneyline": {
+                    "feature_names": ["elo_probability", "trend_gap"],
+                    "coefficients": [3.0, 0.01],
+                    "intercept": -1.5,
+                }
+            },
+            "qualification": {"locked_holdout": True, "qualified": True},
+        }
+    )
+    _configure(
+        monkeypatch,
+        tmp_path,
+        {
+            "NBA": {
+                "status": "shadow_qualified",
+                "active_production_version": "nba-v2",
+                "production_artifact": "config/models/nba-v2.json",
+            }
+        },
+    )
+    _write_json(tmp_path / "config" / "models" / "nba-v2.json", artifact)
+    _write_json(
+        tmp_path / "config" / "tested_features.json",
+        {
+            "schema_version": "1",
+            "last_updated": "2026-07-22",
+            "retention_policy": {"name": "keep_any_positive", "keep_when": "any positive"},
+            "features": [
+                {
+                    "name": "elo_probability",
+                    "verdict": "keep",
+                    "status": "production",
+                    "evidence_grade": "A",
+                    "sports": ["NBA"],
+                },
+                {
+                    "name": "trend_gap",
+                    "verdict": "keep",
+                    "status": "production",
+                    "evidence_grade": "A",
+                    "sports": ["NBA"],
+                },
+            ],
+            "production_ablation_summary": [
+                {
+                    "sport": "nba",
+                    "model_version": "nba-v2",
+                    "feature": "trend_gap",
+                    "strict_decision": "INCONCLUSIVE",
+                    "retention_decision": "KEEP",
+                    "production_safe": True,
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+
+    result = dashboard_server.production_evidence()
+
+    assert result["feature_registry"]["status"] == "verified"
+    assert result["feature_registry"]["counts_by_verdict"] == {"keep": 2}
+    joined = {item["name"]: item for item in result["models"][0]["feature_registry"]}
+    assert joined["elo_probability"]["registered"] is True
+    assert joined["elo_probability"]["sport_evidence"] is None
+    assert joined["trend_gap"]["sport_evidence"]["retention_decision"] == "KEEP"
 
 
 def _render_model_card(model: dict) -> dict[str, str]:

@@ -214,6 +214,11 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="evidence-grid" id="productionEvidence">
       <div class="card dim">Loading production evidence...</div>
     </div>
+    <div class="card">
+      <h2>Feature Registry</h2>
+      <div class="small dim">Every tracked feature, its current retention verdict, strict ablation result, and production-safety status. The retention policy keeps any positive out-of-sample contribution; provenance blockers still force research-only use.</div>
+      <div id="featureRegistry" style="margin-top:9px"><div class="dim">Loading feature registry...</div></div>
+    </div>
   </section>
 
   <div class="filters" style="padding:0 16px;margin-bottom:12px">
@@ -640,6 +645,34 @@ function evidenceHealth(value,positive="HEALTHY",negative="BLOCKED"){
   if(!evidencePresent(value))return EVIDENCE_MISSING;
   return typeof value==="boolean"?(value?positive:negative):evidenceText(value);
 }
+function featureRegistryHtml(registry){
+  if(!registry||typeof registry!=="object")return '<div class="red">Feature registry missing.</div>';
+  const errors=Array.isArray(registry.errors)?registry.errors:[];
+  const status=registry.valid===true?'<span class="green">VERIFIED</span>':'<span class="red">INVALID</span>';
+  const counts=Object.entries(registry.counts_by_verdict||{}).map(([key,value])=>`${key}: ${value}`).join(" · ");
+  const policy=registry.retention_policy&&registry.retention_policy.keep_when;
+  const ablations=Array.isArray(registry.production_ablation_summary)?registry.production_ablation_summary:[];
+  const byFeature={};
+  ablations.forEach(item=>{(byFeature[item.feature]=byFeature[item.feature]||[]).push(item);});
+  const rows=(registry.features||[]).map(feature=>{
+    const evidence=(byFeature[feature.name]||[]).sort((a,b)=>String(a.sport).localeCompare(String(b.sport)));
+    const decisions=evidence.length?evidence.map(item=>{
+      const provenance=evidenceText(item.point_in_time_provenance).toUpperCase().replaceAll("_"," ");
+      const safe=item.production_safe===true?' <span class="green">PIT VERIFIED</span>':
+        ` <span class="red">PIT ${esc(provenance)}</span>`;
+      const strict=item.strict_decision&&item.strict_decision!==item.retention_decision?
+        ` <span class="dim">(strict: ${esc(item.strict_decision)})</span>`:"";
+      return `<div><b>${esc(String(item.sport||"").toUpperCase())}</b>: ${esc(item.retention_decision)}${strict}${safe}</div>`;
+    }).join(""):'<span class="dim">No exact active-artifact ablation</span>';
+    const sports=Array.isArray(feature.sports)&&feature.sports.length?feature.sports.join(", "):"--";
+    return `<tr><td class="mono">${esc(feature.name)}</td><td>${esc(sports)}</td><td><b>${esc(feature.verdict)}</b></td>`+
+      `<td>${esc(feature.status)}</td><td>${esc(feature.evidence_grade)}</td><td>${decisions}</td></tr>`;
+  }).join("");
+  const errorHtml=errors.length?`<div class="alert warn"><b>Registry errors:</b> ${errors.map(esc).join(" · ")}</div>`:"";
+  return `<div class="small" style="margin-bottom:8px">${status} · updated ${esc(evidenceText(registry.last_updated))} · SHA-256 ${esc(evidenceText(registry.sha256))}</div>`+
+    `<div class="small dim" style="margin-bottom:8px">${esc(policy||"Retention policy missing")}<br>${esc(counts)}</div>${errorHtml}`+
+    `<div class="evidence-table-wrap"><table class="data evidence-table"><tr><th>Feature</th><th>Sports</th><th>Registry verdict</th><th>Status</th><th>Grade</th><th>Production ablation by active model</th></tr>${rows}</table></div>`;
+}
 function productionEvidenceHtml(payload){
   const groups=uniqueEvidenceModels(payload);
   if(!groups.length)return '<div class="card dim">No production model evidence returned.</div>';
@@ -663,6 +696,17 @@ function productionEvidenceHtml(payload){
     const featureHtml=featureRows.length?featureRows.map(([name,value])=>
       `<tr><td>${esc(name)}</td><td>${esc(value)}</td></tr>`).join(""):
       `<tr><td>${EVIDENCE_MISSING}</td><td>${EVIDENCE_MISSING}</td></tr>`;
+    const registryFeatureRows=Array.isArray(model.feature_registry)?model.feature_registry:[];
+    const registryFeatureHtml=registryFeatureRows.length?registryFeatureRows.map(item=>{
+      const sportEvidence=item.sport_evidence&&typeof item.sport_evidence==="object"?item.sport_evidence:{};
+      const retention=evidenceText(sportEvidence.retention_decision);
+      const strict=evidenceText(sportEvidence.strict_decision);
+      const provenance=evidenceText(sportEvidence.point_in_time_provenance).toUpperCase().replaceAll("_"," ");
+      const safety=evidencePresent(sportEvidence.production_safe)?
+        (sportEvidence.production_safe?"PIT VERIFIED":`PIT ${provenance}`):EVIDENCE_MISSING;
+      return `<tr><td>${esc(item.name)}</td><td>${esc(evidenceText(item.verdict))}</td>`+
+        `<td>${esc(retention)}</td><td>${esc(strict)}</td><td>${esc(safety)}</td><td>${esc(evidenceText(item.evidence_grade))}</td></tr>`;
+    }).join(""):`<tr><td colspan="6">${EVIDENCE_MISSING}</td></tr>`;
     const ledgerRow=(label,ledger)=>{
       const item=ledger&&typeof ledger==="object"?ledger:{};
       const settled=evidenceFirst(item,["settled","settled_rows","calls"]);
@@ -711,7 +755,8 @@ function productionEvidenceHtml(payload){
         <div class="k"><b>${esc(evidenceQualification(qualification))}</b><span>qualification</span></div>
       </div></div>
       <div class="evidence-block"><h3>Features / Elo parameters</h3><div class="evidence-table-wrap"><table class="data evidence-table">
-        <tr><th>Feature or parameter</th><th>Coefficient / value</th></tr>${featureHtml}</table></div></div>
+        <tr><th>Feature or parameter</th><th>Coefficient / value</th></tr>${featureHtml}</table></div>
+        <div class="evidence-table-wrap" style="margin-top:7px"><table class="data evidence-table"><tr><th>Active feature</th><th>Registry verdict</th><th>Retention decision</th><th>Strict decision</th><th>Production safety</th><th>Evidence grade</th></tr>${registryFeatureHtml}</table></div></div>
       <div class="evidence-block"><h3>Exact-version ledger evidence</h3><div class="small dim" style="margin-bottom:6px">Both sources are scoped to ${versionEsc}. P&amp;L is shadow/hypothetical.</div>
         <div class="evidence-table-wrap"><table class="data evidence-table"><tr><th>Source</th><th>Exact version</th><th>Settled</th><th>W / L / P</th><th>Hit rate</th><th>Shadow/hypothetical P&amp;L (units)</th><th>Predecessor rows excluded</th></tr>
         ${ledgerRow("Main ledger",model.main_ledger)}${ledgerRow("Flat ledger",model.flat_ledger)}</table></div></div>
@@ -732,6 +777,7 @@ function renderProductionEvidence(payload){
   state.productionEvidence=payload;
   $("#productionEvidenceGenerated").textContent=`Generated: ${evidenceText(payload&&payload.generated_at)}`;
   $("#productionEvidence").innerHTML=productionEvidenceHtml(payload);
+  $("#featureRegistry").innerHTML=featureRegistryHtml(payload&&payload.feature_registry);
 }
 
 /* ---------- matrix ---------- */

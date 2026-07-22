@@ -24,10 +24,36 @@ def _render_production_evidence(payload: dict) -> str:
     )
     assert match, "production evidence renderer is missing"
     script = (
-        'const esc=s=>String(s).replace(/[&<>]/g,c=>'
+        "const esc=s=>String(s).replace(/[&<>]/g,c=>"
         '({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));\n'
         + match.group(1)
         + "\nprocess.stdout.write(productionEvidenceHtml(JSON.parse(process.argv[1])));"
+    )
+    result = subprocess.run(
+        [node, "-e", script, json.dumps(payload)],
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    return result.stdout
+
+
+def _render_feature_registry(payload: dict) -> str:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    match = re.search(
+        r"/\* ---------- production model evidence ---------- \*/([\s\S]*?)"
+        r"/\* ---------- matrix ---------- \*/",
+        html,
+    )
+    assert match, "production evidence renderer is missing"
+    script = (
+        "const esc=s=>String(s).replace(/[&<>]/g,c=>"
+        '({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));\n'
+        + match.group(1)
+        + "\nprocess.stdout.write(featureRegistryHtml(JSON.parse(process.argv[1])));"
     )
     result = subprocess.run(
         [node, "-e", script, json.dumps(payload)],
@@ -83,7 +109,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "shortDate" in html
     assert '"Game (ET)"' in html
     assert "gameTimeET(p.event_start_utc)" in html
-    assert 'timeZone:ET_ZONE' in html
+    assert "timeZone:ET_ZONE" in html
     assert "Scan Open Ledger Prices" in html
     assert "Scan Today’s Prices" not in html
     assert "Validated model variants" in html
@@ -105,7 +131,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert '"cancel pending"' in html
     assert 'canceled:"CXL"' in html
     assert 'rejected:"REJ"' in html
-    assert '`B ${cents(bid)} / A ${cents(ask)} · `' in html
+    assert "`B ${cents(bid)} / A ${cents(ask)} · `" in html
     assert "holdout games" in html
     assert "TOTAL VALIDATION" in html
     assert "Validation cohorts" in html
@@ -117,7 +143,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "Current ask buys immediately" in html
     assert "immediate-or-cancel buy" in html
     assert 'value="open" selected>active only' in html
-    assert "Settled (<span id=\"settledCount\">0</span>)" in html
+    assert 'Settled (<span id="settledCount">0</span>)' in html
     assert "No active picks remain today" in html
     assert 'id="todayShowSettled"' in html
     assert 'if(p.status!=="open")' in html
@@ -130,13 +156,55 @@ def test_dashboard_wires_live_production_evidence_tab_into_refresh() -> None:
     assert 'id="tab-evidence"' in html
     assert 'id="productionEvidenceGenerated"' in html
     assert 'id="productionEvidence"' in html
+    assert 'id="featureRegistry"' in html
     assert 'api("/api/production-evidence")' in html
     assert "renderProductionEvidence(evidence)" in html
+    assert "featureRegistryHtml" in html
     assert "ACTIVE MODEL · scope: exact model version only" in html
     assert "P&amp;L is shadow/hypothetical" in html
     assert "Predecessor rows excluded" in html
     assert "PROFITABILITY NOT ESTABLISHED" in html
+    assert "keeps any positive out-of-sample contribution" in html
     assert "@media(max-width:600px)" in html
+
+
+def test_feature_registry_renders_retention_strict_decision_and_safety() -> None:
+    rendered = _render_feature_registry(
+        {
+            "valid": True,
+            "last_updated": "2026-07-22",
+            "sha256": "abc123",
+            "errors": [],
+            "counts_by_verdict": {"keep": 1},
+            "retention_policy": {"keep_when": "keep any positive contribution"},
+            "features": [
+                {
+                    "name": "weather_factor<script>",
+                    "sports": ["MLB"],
+                    "verdict": "keep",
+                    "status": "research_keep_provenance_blocked",
+                    "evidence_grade": "A",
+                }
+            ],
+            "production_ablation_summary": [
+                {
+                    "sport": "mlb",
+                    "feature": "weather_factor<script>",
+                    "retention_decision": "KEEP",
+                    "strict_decision": "REMOVE CANDIDATE",
+                    "point_in_time_provenance": "blocked",
+                    "production_safe": False,
+                }
+            ],
+        }
+    )
+
+    assert "VERIFIED" in rendered
+    assert "weather_factor&lt;script&gt;" in rendered
+    assert "KEEP" in rendered
+    assert "strict: REMOVE CANDIDATE" in rendered
+    assert "PIT BLOCKED" in rendered
+    assert "<script>" not in rendered
 
 
 def test_production_evidence_renders_exact_version_metrics_and_escapes_text() -> None:
@@ -342,9 +410,7 @@ def test_production_evidence_collapses_identical_duplicate_models() -> None:
         "artifact": {"path": "config/models/mlb-v5.json", "hash_verified": True},
     }
 
-    rendered = _render_production_evidence(
-        {"models": [model, json.loads(json.dumps(model))]}
-    )
+    rendered = _render_production_evidence({"models": [model, json.loads(json.dumps(model))]})
 
     assert rendered.count('class="card evidence-card"') == 1
     assert rendered.count("identical-marker") == 1

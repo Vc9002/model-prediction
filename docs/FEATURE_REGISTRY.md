@@ -11,18 +11,25 @@ A feature with verdict `reject` or `exclude` must not be re-tested unless its
 rejections. A rejection backed by numbers is a result worth keeping — it is the only
 thing that stops the same dead end being explored a fourth time.
 
-## Current state: 20 features tracked, 4 keep, 3 reject, 4 exclude, 6 untested, 3 pending/under-test
+Retention uses Vincent's zero-threshold directional policy: keep a feature when its
+omission worsens validation Brier or both locked-holdout proper scores by any positive
+amount. The registry also preserves the stricter multiplicity-adjusted decision.
+`KEEP` with blocked point-in-time provenance means research retention only; it does not
+make the feature production-safe or establish profitability.
+
+## Current state: 22 features tracked, 5 keep, 3 remove candidates, 3 reject, 4 exclude, 7 untested
 
 | Feature | Sports | Verdict | Why |
 |---|---|---|---|
-| `elo_probability` | all 5 | **keep** | The only load-bearing signal anywhere. Coefficients 2.6–5.6. |
-| `park_factor` | MLB | **keep** | Coefficient −1.05. The only non-Elo feature in production with real weight. |
-| `player_availability` | WNBA | **keep** | +1.4pp accuracy, −2.3% Brier, +3.82U on a 142-game cohort. Best-evidenced non-Elo win in the project. |
-| `weather_factor` | MLB | pending | Coefficient −0.318. Needs a leave-one-out to survive its own SE. |
-| `trend_gap` | all 5 | pending | Coefficients −0.004 to −0.151. Inert. Retest only as an Elo-orthogonalized residual. |
-| `defensive_trend_gap` | NBA/WNBA | pending | Coefficients −0.013 / −0.003. Inert. |
-| `pitcher_era_gap` | MLB | under test | Coefficient 0.022. In head-to-head vs `starter_era_gap`. |
-| `starter_era_gap` | MLB | under test | Variant exists; source file has zero imports. Verify coverage first. |
+| `elo_probability` | all 5 | **keep** | Strict KEEP for NBA/SOCCER; directional KEEP for MLB/NFL/WNBA under the zero-threshold policy. |
+| `trend_gap` | all 5 | **keep** | Directional KEEP for NBA/NFL/WNBA; directional removal candidate for MLB/SOCCER. Strict decisions remain inconclusive. |
+| `park_factor` | MLB | **keep, research only** | Tiny positive holdout contribution, but static cross-season provenance is blocked. Not production-safe. |
+| `weather_factor` | MLB | **keep, research only** | Tiny positive validation/holdout contribution, but forecast timestamps are missing. Not production-safe. |
+| `player_availability` | WNBA | **keep** | Grade-B post-hoc research evidence; not part of the current exact-artifact strict ablation. |
+| `neutral_elo_rating_difference` | LOL/CS2/Dota2/Valorant | untested | Current v3 artifacts are hash-invalid and lack locked metrics; do not inherit v2 evidence. |
+| `defensive_trend_gap` | NBA/WNBA | remove candidate | Removal improves both validation and holdout proper scores in both leagues. |
+| `pitcher_era_gap` | MLB | remove candidate | Removal improves validation and both holdout proper scores. |
+| `starter_era_gap` | MLB | **remove** | Unservable train/serve skew; removed in MLB v5. Never reinstate as-is. |
 | `starting_pitcher_fip` | MLB | **reject** | 84% coverage, zero effect. Collinear with `pitcher_era_gap`. |
 | `head_to_head` | all 5 | **reject** | +0.11pp to +0.61pp, all inside 1 SE. NFL untestable at 10% coverage. |
 | `lineup_strength` | NBA/WNBA | **reject** | +0.05pp / 0.00pp. Noise. |
@@ -40,8 +47,9 @@ thing that stops the same dead end being explored a fourth time.
 
 1. **"MLB is underconfident, 60% → 75%."** False, and backwards. The bucket holding 237 of
    254 calls sits at 63.4% predicted vs 55.3% actual — *over*confident by ~8pp.
-2. **"Esports/international baseball were never validated."** False. CS2 alone has n=7,578
-   in its locked test. `units: 0` is the research-only design, not a missing step.
+2. **"Current esports v3 inherits the validated v2 evidence."** False. The v2 baselines
+   have locked-test results; current LOL/CS2/Dota2/Valorant v3 artifacts are hash-invalid,
+   research-state, unqualified, and missing locked metrics.
 3. **"NBA/WNBA win because of `defensive_trend_gap`."** False. Coefficients −0.013 and −0.003.
 4. **"Zero calibration anywhere."** Misleading. Diagnostics are recorded in every artifact;
    what is missing is an *applied* calibrator at serving time.

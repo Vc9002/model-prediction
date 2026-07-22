@@ -61,6 +61,7 @@ ARCHIVE_FILE = DASH_DIR / "archive.json"
 ORDERS_FILE = DASH_DIR / "orders.json"
 PORTFOLIO_HISTORY_FILE = DASH_DIR / "portfolio_history.json"
 CONFIG_FILE = ROOT / "config" / "model.yaml"
+FEATURE_REGISTRY_FILE = ROOT / "config" / "tested_features.json"
 
 
 def _log(message: str) -> None:
@@ -71,6 +72,8 @@ def _log(message: str) -> None:
             handle.write(f"{stamp} {message}\n")
     except OSError:
         pass
+
+
 EASTERN = ZoneInfo("America/New_York")
 SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
 GATEWAY = "https://gateway.polymarket.us"
@@ -110,7 +113,10 @@ def _resolve_runner() -> list[str]:
         try:
             probe = subprocess.run(
                 [python, "-c", "import model_prediction"],
-                cwd=ROOT, capture_output=True, text=True, timeout=30,
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=30,
                 env=_runner_env(),
             )
         except (OSError, subprocess.TimeoutExpired):
@@ -137,6 +143,8 @@ def _runner_env() -> dict[str, str]:
     src = str(ROOT / "src")
     env["PYTHONPATH"] = src + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     return env
+
+
 # ── SECTION: Cache Layer ────────────────────────────────────────────
 
 
@@ -204,9 +212,7 @@ def _set_unit_value_usd(raw_value: object) -> dict:
         if not math.isclose(persisted, value, rel_tol=0, abs_tol=0.000001):
             raise RuntimeError("unit value failed configuration validation")
 
-        temporary = CONFIG_FILE.with_name(
-            f".{CONFIG_FILE.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
-        )
+        temporary = CONFIG_FILE.with_name(f".{CONFIG_FILE.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
         try:
             with temporary.open("w", encoding="utf-8") as handle:
                 handle.write(updated)
@@ -242,7 +248,7 @@ def _config_payload() -> dict:
         payload = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         return {}
-# ── SECTION: Configuration ──────────────────────────────────────────
+    # ── SECTION: Configuration ──────────────────────────────────────────
     return payload if isinstance(payload, dict) else {}
 
 
@@ -268,8 +274,7 @@ def _row_has_banned_team(row: dict) -> bool:
             else:
                 banned_names.add(str(alias or "").strip().casefold())
     return any(
-        str(row.get(key) or "").strip().casefold() in banned_names
-        for key in ("away_team", "home_team")
+        str(row.get(key) or "").strip().casefold() in banned_names for key in ("away_team", "home_team")
     )
 
 
@@ -281,15 +286,11 @@ def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
     if not execution.get("allow_manual_research_orders", False):
         return False, "manual research orders are disabled"
     league = str(row.get("league") or "").upper()
-    active_version = (config.get("models", {}).get(league, {}) or {}).get(
-        "active_production_version"
-    )
+    active_version = (config.get("models", {}).get(league, {}) or {}).get("active_production_version")
     if execution.get("manual_research_require_active_model", True):
         if not active_version or row.get("model_version") != active_version:
             return False, "pick is not from the active production model"
-    edge = _number(row.get("model_probability")) - _number(
-        row.get("market_implied_probability")
-    )
+    edge = _number(row.get("model_probability")) - _number(row.get("market_implied_probability"))
     if execution.get("manual_research_require_positive_edge", True) and edge <= 0:
         return False, "model has no positive edge at the logged market price"
     if _row_has_banned_team(row):
@@ -341,14 +342,38 @@ def _parse_picks(path: Path) -> list[dict]:
     except StopIteration:
         return []
     keep = [
-        "pick_id", "created_at_utc", "event_start_utc", "event_id", "league",
-        "away_team", "home_team", "market_type", "selection", "line",
-        "american_odds", "market_implied_probability", "model_probability",
-        "model_uncertainty", "edge", "confidence_score", "units",
-        "model_version", "status", "result", "away_score", "home_score",
-        "probability_clv", "pnl_units", "settled_at_utc", "record_type",
-        "decision", "reason_code", "research_score_units", "research_pnl_units",
-        "sportsbook", "decision_no_vig_probability",
+        "pick_id",
+        "created_at_utc",
+        "event_start_utc",
+        "event_id",
+        "league",
+        "away_team",
+        "home_team",
+        "market_type",
+        "selection",
+        "line",
+        "american_odds",
+        "market_implied_probability",
+        "model_probability",
+        "model_uncertainty",
+        "edge",
+        "confidence_score",
+        "units",
+        "model_version",
+        "status",
+        "result",
+        "away_score",
+        "home_score",
+        "probability_clv",
+        "pnl_units",
+        "settled_at_utc",
+        "record_type",
+        "decision",
+        "reason_code",
+        "research_score_units",
+        "research_pnl_units",
+        "sportsbook",
+        "decision_no_vig_probability",
     ]
     index = {name: headers.index(name) for name in keep if name in headers}
     picks = []
@@ -386,24 +411,30 @@ def _pick_pnl(row) -> float:
 
 
 def performance(picks: list[dict]) -> dict:
-    settled = [row for row in picks if row.get("status") == "settled"
-               and row.get("result") in ("win", "loss")]
+    settled = [
+        row for row in picks if row.get("status") == "settled" and row.get("result") in ("win", "loss")
+    ]
     settled.sort(key=lambda row: str(row.get("settled_at_utc") or ""))
     wins = sum(1 for row in settled if row["result"] == "win")
     cumulative, curve = 0.0, []
     for row in settled:
         cumulative += _pick_pnl(row)
-        curve.append({
-            "t": str(row.get("settled_at_utc") or "")[:16],
-            "pnl": round(cumulative, 4),
-        })
+        curve.append(
+            {
+                "t": str(row.get("settled_at_utc") or "")[:16],
+                "pnl": round(cumulative, 4),
+            }
+        )
     by_sport, by_market, by_bucket, by_month = {}, {}, {}, {}
-    buckets = (("0.50-0.55", 0.50, 0.55), ("0.55-0.60", 0.55, 0.60),
-               ("0.60-0.65", 0.60, 0.65), ("0.65+", 0.65, 1.01))
+    buckets = (
+        ("0.50-0.55", 0.50, 0.55),
+        ("0.55-0.60", 0.55, 0.60),
+        ("0.60-0.65", 0.60, 0.65),
+        ("0.65+", 0.65, 1.01),
+    )
     for row in settled:
         won = row["result"] == "win"
-        for table, key in ((by_sport, str(row.get("league"))),
-                           (by_market, str(row.get("market_type")))):
+        for table, key in ((by_sport, str(row.get("league"))), (by_market, str(row.get("market_type")))):
             entry = table.setdefault(key, {"wins": 0, "calls": 0, "pnl": 0.0})
             entry["calls"] += 1
             entry["wins"] += won
@@ -426,15 +457,20 @@ def performance(picks: list[dict]) -> dict:
     calibration = []
     for index in range(10):
         lo, hi = index / 10, (index + 1) / 10
-        members = [row for row in settled if (p := _pick_probability(row)) is not None
-                   and (lo <= p < hi or (hi == 1.0 and p == 1.0))]
+        members = [
+            row
+            for row in settled
+            if (p := _pick_probability(row)) is not None and (lo <= p < hi or (hi == 1.0 and p == 1.0))
+        ]
         if members:
-            calibration.append({
-                "bucket": f"{lo:.1f}-{hi:.1f}",
-                "mean_p": round(sum(_pick_probability(m) for m in members) / len(members), 4),
-                "hit_rate": round(sum(1 for m in members if m["result"] == "win") / len(members), 4),
-                "count": len(members),
-            })
+            calibration.append(
+                {
+                    "bucket": f"{lo:.1f}-{hi:.1f}",
+                    "mean_p": round(sum(_pick_probability(m) for m in members) / len(members), 4),
+                    "hit_rate": round(sum(1 for m in members if m["result"] == "win") / len(members), 4),
+                    "count": len(members),
+                }
+            )
     # streaks
     current = longest_w = longest_l = 0
     run_w = run_l = 0
@@ -445,11 +481,13 @@ def performance(picks: list[dict]) -> dict:
             run_l, run_w = run_l + 1, 0
         longest_w, longest_l = max(longest_w, run_w), max(longest_l, run_l)
     current = run_w if run_w else -run_l
-    clv = [_number(row.get("probability_clv"), None) for row in settled
-           if row.get("probability_clv") not in (None, "")]
+    clv = [
+        _number(row.get("probability_clv"), None)
+        for row in settled
+        if row.get("probability_clv") not in (None, "")
+    ]
     clv = [value for value in clv if value is not None]
-    staked = sum(max(_number(row.get("units")), _number(row.get("research_score_units")))
-                 for row in settled)
+    staked = sum(max(_number(row.get("units")), _number(row.get("research_score_units"))) for row in settled)
     total_pnl = round(sum(_pick_pnl(row) for row in settled), 4)
     return {
         "total_picks": len(picks),
@@ -483,23 +521,26 @@ def _artifact_hash(payload: dict) -> str:
 def _artifact_evidence(path: Path, expected_version: str, expected_sport: str) -> tuple[dict, dict]:
     raw = _read_json(path)
     if not isinstance(raw, dict):
-        return ({
-            "path": str(path),
-            "available": False,
-            "valid": False,
-            "health": "MISSING",
-            "sha256": None,
-            "hash_verified": False,
-            "lineage": "UNVERIFIED",
-            "declared_hash": None,
-            "computed_hash": None,
-            "hash_valid": False,
-            "artifact_model_version": None,
-            "version_matches_config": False,
-            "artifact_identity": None,
-            "lineage_matches_config": False,
-            "mismatches": ["artifact_missing_or_invalid_json"],
-        }, {})
+        return (
+            {
+                "path": str(path),
+                "available": False,
+                "valid": False,
+                "health": "MISSING",
+                "sha256": None,
+                "hash_verified": False,
+                "lineage": "UNVERIFIED",
+                "declared_hash": None,
+                "computed_hash": None,
+                "hash_valid": False,
+                "artifact_model_version": None,
+                "version_matches_config": False,
+                "artifact_identity": None,
+                "lineage_matches_config": False,
+                "mismatches": ["artifact_missing_or_invalid_json"],
+            },
+            {},
+        )
 
     declared_hash = raw.get("artifact_hash")
     computed_hash = _artifact_hash(raw)
@@ -517,23 +558,26 @@ def _artifact_evidence(path: Path, expected_version: str, expected_sport: str) -
         mismatches.append("artifact_model_version_mismatch")
     if not lineage_valid:
         mismatches.append("artifact_sport_or_title_mismatch")
-    return ({
-        "path": str(path),
-        "available": True,
-        "valid": hash_valid and version_valid and lineage_valid,
-        "health": "VERIFIED" if hash_valid and version_valid and lineage_valid else "FAILED",
-        "sha256": declared_hash,
-        "hash_verified": hash_valid,
-        "lineage": "VERIFIED" if version_valid and lineage_valid else "MISMATCH",
-        "declared_hash": declared_hash,
-        "computed_hash": computed_hash,
-        "hash_valid": hash_valid,
-        "artifact_model_version": artifact_version or None,
-        "version_matches_config": version_valid,
-        "artifact_identity": artifact_identity or None,
-        "lineage_matches_config": lineage_valid,
-        "mismatches": mismatches,
-    }, raw)
+    return (
+        {
+            "path": str(path),
+            "available": True,
+            "valid": hash_valid and version_valid and lineage_valid,
+            "health": "VERIFIED" if hash_valid and version_valid and lineage_valid else "FAILED",
+            "sha256": declared_hash,
+            "hash_verified": hash_valid,
+            "lineage": "VERIFIED" if version_valid and lineage_valid else "MISMATCH",
+            "declared_hash": declared_hash,
+            "computed_hash": computed_hash,
+            "hash_valid": hash_valid,
+            "artifact_model_version": artifact_version or None,
+            "version_matches_config": version_valid,
+            "artifact_identity": artifact_identity or None,
+            "lineage_matches_config": lineage_valid,
+            "mismatches": mismatches,
+        },
+        raw,
+    )
 
 
 def _production_model_spec(raw: dict) -> dict:
@@ -557,9 +601,9 @@ def _production_model_spec(raw: dict) -> dict:
         }
     return {
         "kind": "neutral_series_elo",
-        "feature_schema_status": "not_declared_in_artifact",
-        "features": [],
-        "feature_names": [],
+        "feature_schema_status": "model_family_declared",
+        "features": [{"name": "neutral_elo_rating_difference", "coefficient": None}],
+        "feature_names": ["neutral_elo_rating_difference"],
         "coefficients": [],
         "coefficient_count_matches_features": True,
         "parameters": {
@@ -804,8 +848,7 @@ def _pnl_evidence(rows: list[dict]) -> dict:
             "rows": len(hypothetical),
             "staked_units": round(hypothetical_staked, 6),
             "pnl_units": round(hypothetical_pnl, 6),
-            "roi": round(hypothetical_pnl / hypothetical_staked, 6)
-            if hypothetical_staked else None,
+            "roi": round(hypothetical_pnl / hypothetical_staked, 6) if hypothetical_staked else None,
         },
         "executed": {
             "label": "executed",
@@ -915,8 +958,7 @@ def _version_ledger_evidence(
             "total_exact_version_rows": len(rows),
             "coverage": round(len(clv_values) / len(rows), 6) if rows else None,
             "complete": clv_complete,
-            "mean_probability_clv": round(sum(clv_values) / len(clv_values), 6)
-            if clv_values else None,
+            "mean_probability_clv": round(sum(clv_values) / len(clv_values), 6) if clv_values else None,
         },
         "profitability_claim": {
             "allowed": profitability_allowed,
@@ -942,14 +984,8 @@ def _ledger_evidence_for_source(
         and _model_owns_row(sport, model_config, row)
     ]
     deduplicated, _all_duplicates_removed = _deduplicate_ledger_rows(relevant)
-    exact_settled = [
-        row for row in deduplicated if str(row.get("model_version") or "") == version
-    ]
-    exact_rows = [
-        row
-        for row in exact_settled
-        if str(row.get("result") or "").casefold() in {"win", "loss"}
-    ]
+    exact_settled = [row for row in deduplicated if str(row.get("model_version") or "") == version]
+    exact_rows = [row for row in exact_settled if str(row.get("result") or "").casefold() in {"win", "loss"}]
     pushes = sum(str(row.get("result") or "").casefold() == "push" for row in exact_settled)
     exact_source_rows = sum(
         str(row.get("model_version") or "") == version
@@ -975,15 +1011,105 @@ def _ledger_evidence_for_source(
     )
 
 
+def _feature_registry_evidence() -> dict:
+    """Return a validated, read-only view of the durable feature registry."""
+    path = FEATURE_REGISTRY_FILE
+    raw = _read_json(path)
+    errors: list[str] = []
+    if not isinstance(raw, dict):
+        return {
+            "status": "missing_or_invalid",
+            "valid": False,
+            "path": str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path),
+            "sha256": None,
+            "errors": ["registry_missing_or_invalid_json"],
+            "features": [],
+            "production_ablation_summary": [],
+            "counts_by_verdict": {},
+        }
+    features = raw.get("features")
+    if not isinstance(features, list):
+        errors.append("features_not_list")
+        features = []
+    normalized: list[dict] = []
+    names: set[str] = set()
+    for index, item in enumerate(features):
+        if not isinstance(item, dict):
+            errors.append(f"feature_{index}_not_object")
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            errors.append(f"feature_{index}_missing_name")
+            continue
+        if name in names:
+            errors.append(f"duplicate_feature:{name}")
+            continue
+        names.add(name)
+        if not str(item.get("verdict") or "").strip():
+            errors.append(f"feature_missing_verdict:{name}")
+        normalized.append(dict(item))
+    ablations = raw.get("production_ablation_summary")
+    if not isinstance(ablations, list):
+        errors.append("production_ablation_summary_not_list")
+        ablations = []
+    valid_ablations: list[dict] = []
+    seen_ablations: set[tuple[str, str, str]] = set()
+    for index, item in enumerate(ablations):
+        if not isinstance(item, dict):
+            errors.append(f"ablation_{index}_not_object")
+            continue
+        identity = (
+            str(item.get("sport") or "").casefold(),
+            str(item.get("model_version") or ""),
+            str(item.get("feature") or ""),
+        )
+        if not all(identity):
+            errors.append(f"ablation_{index}_missing_identity")
+            continue
+        if identity in seen_ablations:
+            errors.append("duplicate_ablation:" + ":".join(identity))
+            continue
+        seen_ablations.add(identity)
+        if identity[2] not in names:
+            errors.append(f"ablation_feature_not_registered:{identity[2]}")
+        valid_ablations.append(dict(item))
+    counts: dict[str, int] = {}
+    for item in normalized:
+        verdict = str(item.get("verdict") or "missing")
+        counts[verdict] = counts.get(verdict, 0) + 1
+    return {
+        "status": "verified" if not errors else "invalid",
+        "valid": not errors,
+        "path": str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "schema_version": raw.get("schema_version"),
+        "last_updated": raw.get("last_updated"),
+        "authoritative_evidence": raw.get("authoritative_evidence") or {},
+        "retention_policy": raw.get("retention_policy") or {},
+        "evidence_grades": raw.get("evidence_grades") or {},
+        "errors": errors,
+        "features": normalized,
+        "production_ablation_summary": valid_ablations,
+        "counts_by_verdict": dict(sorted(counts.items())),
+    }
+
+
 def production_evidence() -> dict:
     """Read-only, fail-closed evidence for every configured production artifact."""
     config = _config_payload()
     configured_models = config.get("models") or {}
     esports_validation = _read_json(OUTPUTS / "esports-baseline-validation.json") or {}
     ledger_paths = (DATA / "picks.xlsx", DATA / "flat_picks.xlsx")
-    rows_by_source = {
-        str(path.relative_to(ROOT)): _read_evidence_ledger(path)
-        for path in ledger_paths
+    rows_by_source = {str(path.relative_to(ROOT)): _read_evidence_ledger(path) for path in ledger_paths}
+    feature_registry = _feature_registry_evidence()
+    registry_by_name = {str(item.get("name")): item for item in feature_registry["features"]}
+    ablation_by_identity = {
+        (
+            str(item.get("sport") or "").casefold(),
+            str(item.get("model_version") or ""),
+            str(item.get("feature") or ""),
+        ): item
+        for item in feature_registry["production_ablation_summary"]
     }
     models = []
     for sport, model_config in configured_models.items():
@@ -995,20 +1121,43 @@ def production_evidence() -> dict:
         artifact, raw = _artifact_evidence(artifact_path, version, str(sport))
         spec = _production_model_spec(raw)
         locked = _backfill_aliases(
-            _locked_backfill_evidence(
-                str(sport), version, raw, artifact, esports_validation
-            ),
+            _locked_backfill_evidence(str(sport), version, raw, artifact, esports_validation),
             raw,
         )
 
         feature_names = list(spec.get("feature_names") or [])
+        registry_features = []
+        for feature_name in feature_names:
+            registry_record = registry_by_name.get(str(feature_name))
+            registry_features.append(
+                {
+                    "name": str(feature_name),
+                    "registered": registry_record is not None,
+                    "verdict": registry_record.get("verdict") if registry_record else None,
+                    "status": registry_record.get("status") if registry_record else None,
+                    "evidence_grade": registry_record.get("evidence_grade") if registry_record else None,
+                    "sport_evidence": ablation_by_identity.get(
+                        (str(sport).casefold(), version, str(feature_name))
+                    ),
+                }
+            )
         main_ledger = _ledger_evidence_for_source(
-            str(sport), model_config, version, "data/picks.xlsx",
-            rows_by_source.get("data/picks.xlsx", []), artifact, feature_names,
+            str(sport),
+            model_config,
+            version,
+            "data/picks.xlsx",
+            rows_by_source.get("data/picks.xlsx", []),
+            artifact,
+            feature_names,
         )
         flat_ledger = _ledger_evidence_for_source(
-            str(sport), model_config, version, "data/flat_picks.xlsx",
-            rows_by_source.get("data/flat_picks.xlsx", []), artifact, feature_names,
+            str(sport),
+            model_config,
+            version,
+            "data/flat_picks.xlsx",
+            rows_by_source.get("data/flat_picks.xlsx", []),
+            artifact,
+            feature_names,
         )
 
         warnings = [{"code": code, "scope": "artifact"} for code in artifact["mismatches"]]
@@ -1016,9 +1165,22 @@ def production_evidence() -> dict:
             warnings.append({"code": locked["status"], "scope": "backfill"})
         if spec.get("coefficient_count_matches_features") is False:
             warnings.append({"code": "feature_coefficient_length_mismatch", "scope": "features"})
+        if not feature_registry["valid"]:
+            warnings.append({"code": "feature_registry_invalid", "scope": "features"})
+        for feature in registry_features:
+            if not feature["registered"]:
+                warnings.append(
+                    {
+                        "code": "active_feature_not_registered",
+                        "scope": "features",
+                        "feature": feature["name"],
+                    }
+                )
 
         config_qualified = str(model_config.get("status") or "").casefold() in {
-            "qualified", "shadow_qualified", "production",
+            "qualified",
+            "shadow_qualified",
+            "production",
         }
         artifact_qualified = (
             (raw.get("qualification") or {}).get("qualified")
@@ -1026,25 +1188,31 @@ def production_evidence() -> dict:
             else raw.get("qualified_for_betting")
         )
         if isinstance(artifact_qualified, bool) and config_qualified != artifact_qualified:
-            warnings.append({
-                "code": "config_artifact_qualification_mismatch",
-                "scope": "qualification",
-                "config_status": model_config.get("status"),
-                "artifact_qualified": artifact_qualified,
-            })
+            warnings.append(
+                {
+                    "code": "config_artifact_qualification_mismatch",
+                    "scope": "qualification",
+                    "config_status": model_config.get("status"),
+                    "artifact_qualified": artifact_qualified,
+                }
+            )
 
         for ledger_name, ledger in (("main_ledger", main_ledger), ("flat_ledger", flat_ledger)):
             if not ledger["exact_version_rows"]:
-                warnings.append({
-                    "code": "no_exact_version_settled_decisive_rows",
-                    "scope": ledger_name,
-                })
+                warnings.append(
+                    {
+                        "code": "no_exact_version_settled_decisive_rows",
+                        "scope": ledger_name,
+                    }
+                )
                 continue
             if ledger["artifact_lineage"]["status"] != "exact":
-                warnings.append({
-                    "code": "ledger_artifact_lineage_missing_or_mismatched",
-                    "scope": ledger_name,
-                })
+                warnings.append(
+                    {
+                        "code": "ledger_artifact_lineage_missing_or_mismatched",
+                        "scope": ledger_name,
+                    }
+                )
             if ledger["feature_value_attribution"]["status"] != "complete":
                 warnings.append({"code": "feature_value_attribution_missing", "scope": ledger_name})
 
@@ -1054,8 +1222,7 @@ def production_evidence() -> dict:
             and spec.get("coefficient_count_matches_features") is not False
         )
         performance_complete = (
-            main_ledger["profitability_claim"]["allowed"]
-            and flat_ledger["profitability_claim"]["allowed"]
+            main_ledger["profitability_claim"]["allowed"] and flat_ledger["profitability_claim"]["allowed"]
         )
         profitability = {
             "claim_allowed": False,
@@ -1065,40 +1232,45 @@ def production_evidence() -> dict:
                 "executed_roi",
                 "complete_clv",
             ],
-            "blockers": sorted({
-                blocker
-                for ledger in (main_ledger, flat_ledger)
-                for blocker in ledger["profitability_claim"]["blockers"]
-            }),
+            "blockers": sorted(
+                {
+                    blocker
+                    for ledger in (main_ledger, flat_ledger)
+                    for blocker in ledger["profitability_claim"]["blockers"]
+                }
+            ),
             "main_ledger_claim_allowed": main_ledger["profitability_claim"]["allowed"],
             "flat_ledger_claim_allowed": flat_ledger["profitability_claim"]["allowed"],
         }
 
-        models.append({
-            "sport": str(sport).lower(),
-            "model_version": version or None,
-            "status": model_config.get("status"),
-            "features": spec.get("features") or [],
-            "backfill": locked,
-            "main_ledger": main_ledger,
-            "flat_ledger": flat_ledger,
-            "profitability": profitability,
-            "warnings": warnings,
-            "configured_status": model_config.get("status"),
-            "active_model_version": version or None,
-            "production_artifact": str(model_config["production_artifact"]),
-            "artifact": artifact,
-            "model_spec": spec,
-            "locked_backfill": locked,
-            "ledger_evidence": {
+        models.append(
+            {
+                "sport": str(sport).lower(),
+                "model_version": version or None,
+                "status": model_config.get("status"),
+                "features": spec.get("features") or [],
+                "feature_registry": registry_features,
+                "backfill": locked,
                 "main_ledger": main_ledger,
                 "flat_ledger": flat_ledger,
-            },
-            "model_definition_and_backfill_valid": definition_valid,
-            "production_performance_evidence_complete": performance_complete,
-            "evidence_valid": definition_valid and performance_complete,
-            "issues": warnings,
-        })
+                "profitability": profitability,
+                "warnings": warnings,
+                "configured_status": model_config.get("status"),
+                "active_model_version": version or None,
+                "production_artifact": str(model_config["production_artifact"]),
+                "artifact": artifact,
+                "model_spec": spec,
+                "locked_backfill": locked,
+                "ledger_evidence": {
+                    "main_ledger": main_ledger,
+                    "flat_ledger": flat_ledger,
+                },
+                "model_definition_and_backfill_valid": definition_valid,
+                "production_performance_evidence_complete": performance_complete,
+                "evidence_valid": definition_valid and performance_complete,
+                "issues": warnings,
+            }
+        )
 
     generated_at = datetime.now(timezone.utc).isoformat()
     return {
@@ -1115,21 +1287,21 @@ def production_evidence() -> dict:
         },
         "sources": {
             "config": str(CONFIG_FILE.relative_to(ROOT)),
+            "feature_registry": feature_registry["path"],
             "ledgers": list(rows_by_source),
             "esports_validation": "outputs/latest/esports-baseline-validation.json",
         },
         "configured_production_models": len(models),
-        "all_model_definitions_and_backfills_valid": bool(models) and all(
-            model["model_definition_and_backfill_valid"] for model in models
-        ),
-        "all_production_performance_evidence_complete": bool(models) and all(
-            model["production_performance_evidence_complete"] for model in models
-        ),
-        "all_production_evidence_valid": bool(models) and all(
-            model["evidence_valid"] for model in models
-        ),
+        "feature_registry": feature_registry,
+        "all_model_definitions_and_backfills_valid": bool(models)
+        and all(model["model_definition_and_backfill_valid"] for model in models),
+        "all_production_performance_evidence_complete": bool(models)
+        and all(model["production_performance_evidence_complete"] for model in models),
+        "all_production_evidence_valid": bool(models) and all(model["evidence_valid"] for model in models),
         "models": models,
     }
+
+
 # ── SECTION: Status & Health ────────────────────────────────────────
 
 
@@ -1180,33 +1352,54 @@ def status() -> dict:
         if day:
             age = (today - datetime.strptime(day, "%Y-%m-%d").date()).days
             if age > 30:
-                alerts.append({"level": "warn", "kind": "data_stale",
-                               "text": f"{sport.upper()} data is {age} days old"})
+                alerts.append(
+                    {"level": "warn", "kind": "data_stale", "text": f"{sport.upper()} data is {age} days old"}
+                )
 
     # Check qualification using the same artifact fallback as _ml_cell and matrix().
     # kbo/npb are zero-unit research baselines tracked via baseball_grid, checked
     # separately below. lol/cs2 are now shadow_qualified production.
-    sports_meta = (validation.get("sports") or {})
+    sports_meta = validation.get("sports") or {}
     for sport in ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant"):
         meta = sports_meta.get(sport) or {}
         artifact = _production_artifact(validation, sport)
         ml = _ml_cell(meta, artifact)
         if ml.get("state") == "tested_not_qualified":
-            alerts.append({"level": "warn", "kind": "not_qualified",
-                           "text": f"{sport.upper()} moneyline below qualification gate"})
+            alerts.append(
+                {
+                    "level": "warn",
+                    "kind": "not_qualified",
+                    "text": f"{sport.upper()} moneyline below qualification gate",
+                }
+            )
         if ml.get("state") == "no_data":
-            alerts.append({"level": "info", "kind": "no_data",
-                           "text": f"{sport.upper()} moneyline has no validation data"})
+            alerts.append(
+                {
+                    "level": "info",
+                    "kind": "no_data",
+                    "text": f"{sport.upper()} moneyline has no validation data",
+                }
+            )
 
     for sport, grid_key in (("kbo", "baseball_grid"), ("npb", "baseball_grid")):
         research_ml = ((validation.get(grid_key) or {}).get(sport) or {}).get("moneyline") or {}
         if not research_ml or research_ml.get("state") == "no_data":
-            alerts.append({"level": "info", "kind": "no_data",
-                           "text": f"{sport.upper()} moneyline has no validation data"})
+            alerts.append(
+                {
+                    "level": "info",
+                    "kind": "no_data",
+                    "text": f"{sport.upper()} moneyline has no validation data",
+                }
+            )
 
     if not os.environ.get("POLYMARKET_KEY_ID") or not os.environ.get("POLYMARKET_SECRET_KEY"):
-        alerts.append({"level": "error", "kind": "no_api_key",
-                       "text": "Polymarket API key not configured — execution disabled"})
+        alerts.append(
+            {
+                "level": "error",
+                "kind": "no_api_key",
+                "text": "Polymarket API key not configured — execution disabled",
+            }
+        )
 
     daily_pipeline = _daily_pipeline_status()
     if daily_pipeline["stale"]:
@@ -1215,8 +1408,9 @@ def status() -> dict:
             if daily_pipeline["age_hours"] is not None
             else "no daily log found"
         )
-        alerts.append({"level": "warn", "kind": "daily_pipeline_stale",
-                       "text": f"Daily pipeline is stale — {detail}"})
+        alerts.append(
+            {"level": "warn", "kind": "daily_pipeline_stale", "text": f"Daily pipeline is stale — {detail}"}
+        )
 
     tests = _LAST_ACTION.get("run_tests") or _latest_persisted_action("run_tests")
     return {
@@ -1264,9 +1458,9 @@ def _newest_validation() -> tuple[dict, str]:
     soccer_candidates: list[tuple[float, Path, dict]] = []
     for path in OUTPUTS.glob("soccer-*.json"):
         payload = _read_json(path) or {}
-        if (payload.get("sports") or {}).get("soccer") and (
-            payload.get("production_artifacts") or {}
-        ).get("soccer"):
+        if (payload.get("sports") or {}).get("soccer") and (payload.get("production_artifacts") or {}).get(
+            "soccer"
+        ):
             soccer_candidates.append((path.stat().st_mtime, path, payload))
     if soccer_candidates:
         _, path, soccer = max(soccer_candidates, key=lambda item: item[0])
@@ -1300,9 +1494,7 @@ def _newest_validation() -> tuple[dict, str]:
         sources.append("esports-baseline-validation.json")
 
     baseball_grid = dict(newest.get("baseball_grid") or {})
-    baseball_validation = (
-        _read_json(OUTPUTS / "international-baseball-baseline-validation.json") or {}
-    )
+    baseball_validation = _read_json(OUTPUTS / "international-baseball-baseline-validation.json") or {}
     for sport, result in (baseball_validation.get("leagues") or {}).items():
         locked = result.get("locked_test") or {}
         if not locked:
@@ -1349,6 +1541,7 @@ def _config_production_artifact_path(sport: str) -> str:
     """Read model.yaml and return the production_artifact path for a sport."""
     try:
         import yaml
+
         if CONFIG_FILE.exists():
             config = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
             models = config.get("models") or {}
@@ -1379,7 +1572,7 @@ def _configured_research_cell(sport: str, market: str) -> dict | None:
         config = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         config = {}
-    model = ((config.get("models") or {}).get(sport.upper()) or {})
+    model = (config.get("models") or {}).get(sport.upper()) or {}
     key = f"{market}_research_artifact"
     raw_path = str(model.get(key) or "")
     if not raw_path:
@@ -1425,7 +1618,7 @@ def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
     for name, candidate in variants.items():
         if not isinstance(candidate, dict) or tuple(candidate.get("features") or ()) != artifact_features:
             continue
-        holdout = ((candidate.get("primary_65") or {}).get("locked_holdout") or {})
+        holdout = (candidate.get("primary_65") or {}).get("locked_holdout") or {}
         calls_match = artifact_qualification.get("calls") in (None, holdout.get("calls"))
         artifact_rate = artifact_qualification.get("hit_rate")
         holdout_rate = holdout.get("hit_rate")
@@ -1530,36 +1723,36 @@ def matrix() -> dict:
         if isinstance(total_readiness, dict) and total_readiness.get("state") == "research_active":
             row["total"] = total_readiness
         else:
-             score_model = total_results.get(sport) or {}
-             holdout = score_model.get("locked_holdout") or {}
-             if score_model.get("status") == "research_score_model_candidate":
-                 qual = (score_model.get("market_qualification") or {}).get("reason", "")
-                 state = "qualified" if qual == "qualified" else "research_total_candidate"
-                 called_holdout = score_model.get("holdout") or {}
-                 row["total"] = {
-                     "state": state,
-                     "mae": holdout.get("mae"),
-                     "baseline_mae": holdout.get("baseline_mae"),
-                     "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
-                     "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
-                     "holdout_rows": score_model.get("holdout_observations")
-                     or (score_model.get("training") or {}).get("holdout_rows"),
-                     "train_rows": score_model.get("train_observations"),
-                     "validation_rows": score_model.get("validation_observations"),
-                     "readiness": total_readiness,
-                     "qualification": qual,
-                     "calls": called_holdout.get("calls"),
-                     "hit_rate": called_holdout.get("hit_rate"),
-                     "brier": called_holdout.get("brier"),
-                     "reference_line": score_model.get("reference_line"),
-                     "threshold": score_model.get("threshold"),
-                     "model": score_model.get("model"),
-                 }
-             else:
-                 row["total"] = {
-                     "state": "blocked" if total_readiness else "no_data",
-                     "readiness": total_readiness,
-                 }
+            score_model = total_results.get(sport) or {}
+            holdout = score_model.get("locked_holdout") or {}
+            if score_model.get("status") == "research_score_model_candidate":
+                qual = (score_model.get("market_qualification") or {}).get("reason", "")
+                state = "qualified" if qual == "qualified" else "research_total_candidate"
+                called_holdout = score_model.get("holdout") or {}
+                row["total"] = {
+                    "state": state,
+                    "mae": holdout.get("mae"),
+                    "baseline_mae": holdout.get("baseline_mae"),
+                    "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
+                    "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
+                    "holdout_rows": score_model.get("holdout_observations")
+                    or (score_model.get("training") or {}).get("holdout_rows"),
+                    "train_rows": score_model.get("train_observations"),
+                    "validation_rows": score_model.get("validation_observations"),
+                    "readiness": total_readiness,
+                    "qualification": qual,
+                    "calls": called_holdout.get("calls"),
+                    "hit_rate": called_holdout.get("hit_rate"),
+                    "brier": called_holdout.get("brier"),
+                    "reference_line": score_model.get("reference_line"),
+                    "threshold": score_model.get("threshold"),
+                    "model": score_model.get("model"),
+                }
+            else:
+                row["total"] = {
+                    "state": "blocked" if total_readiness else "no_data",
+                    "readiness": total_readiness,
+                }
         mlb_special_readiness = {
             "f5_spread": readiness.get("first_five_spread"),
             "f5_total": readiness.get("first_five_total"),
@@ -1586,7 +1779,7 @@ def matrix() -> dict:
     mlb_row["moneyline"] = _ml_cell(mlb_meta, _production_artifact(validation, "mlb"))
     mlb_readiness = mlb_meta.get("multi_market_readiness") or {}
     for mk in ["spread", "total", "f5_spread", "f5_total", "yrfi_nrfi"]:
-        key = f"full_game_{mk}" if mk in ("spread","total") else mk
+        key = f"full_game_{mk}" if mk in ("spread", "total") else mk
         rd = mlb_readiness.get(key) or mlb_readiness.get(mk)
         if isinstance(rd, dict) and rd.get("state"):
             mlb_row[mk] = rd
@@ -1608,7 +1801,17 @@ def matrix() -> dict:
             else:
                 bball_row[mk] = _readiness_cell(rd)
         basketball[sport] = bball_row
-    return {"markets": markets, "grid": grid, "esports": esports, "baseball": baseball, "basketball": basketball, "source": source, "gate": gate}
+    return {
+        "markets": markets,
+        "grid": grid,
+        "esports": esports,
+        "baseball": baseball,
+        "basketball": basketball,
+        "source": source,
+        "gate": gate,
+    }
+
+
 # ── SECTION: Backtests & Odds ───────────────────────────────────────
 
 
@@ -1617,15 +1820,18 @@ def backtests() -> list[dict]:
     if OUTPUTS.exists():
         for path in sorted(OUTPUTS.glob("*.json")):
             payload = _read_json(path) or {}
-            items.append({
-                "file": path.name,
-                "modified": datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
-                .isoformat()[:16],
-                "status": payload.get("status"),
-                "sport": payload.get("sport") or ",".join(payload.get("sports_scope", [])[:4]),
-                "keys": sorted(payload)[:12],
-                "size_kb": round(path.stat().st_size / 1024, 1),
-            })
+            items.append(
+                {
+                    "file": path.name,
+                    "modified": datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()[
+                        :16
+                    ],
+                    "status": payload.get("status"),
+                    "sport": payload.get("sport") or ",".join(payload.get("sports_scope", [])[:4]),
+                    "keys": sorted(payload)[:12],
+                    "size_kb": round(path.stat().st_size / 1024, 1),
+                }
+            )
     return items
 
 
@@ -1651,9 +1857,11 @@ def odds_summary(sport: str | None = None) -> dict:
         moneyline = [s for s in snaps if s.get("market_type") == "moneyline"]
         spread = [s for s in snaps if s.get("market_type") == "spread"]
         total = [s for s in snaps if s.get("market_type") == "total"]
-        with_bbo = [s for s in snaps
-                    if (s.get("long") or {}).get("ask") is not None
-                    and (s.get("short") or {}).get("ask") is not None]
+        with_bbo = [
+            s
+            for s in snaps
+            if (s.get("long") or {}).get("ask") is not None and (s.get("short") or {}).get("ask") is not None
+        ]
         result[s] = {
             "snapshots": len(snaps),
             "moneyline": len(moneyline),
@@ -1697,7 +1905,7 @@ def market_snapshots(sport: str, day: str) -> dict:
                         observed_at = event_start = None
                     if observed_at is not None and observed_at >= event_start:
                         continue
-                ask = ((snap.get("long") or {}).get("ask"))
+                ask = (snap.get("long") or {}).get("ask")
                 if slug not in first_ask and ask is not None:
                     first_ask[slug] = ask
                 latest[slug] = snap
@@ -1705,21 +1913,24 @@ def market_snapshots(sport: str, day: str) -> dict:
     for slug, snap in sorted(latest.items()):
         long_side = snap.get("long") or {}
         ask, bid = long_side.get("ask"), long_side.get("bid")
-        rows.append({
-            "market_slug": slug,
-            "market_name": _human_market_name(str(slug)),
-            "market_type": snap.get("market_type"),
-            "line": snap.get("line"),
-            "league": snap.get("league"),
-            "event_start_utc": snap.get("event_start_utc"),
-            "description": long_side.get("description"),
-            "bid": bid, "ask": ask,
-            "spread": round(ask - bid, 4) if ask is not None and bid is not None else None,
-            "ask_size": long_side.get("ask_size"), "bid_size": long_side.get("bid_size"),
-            "move": round(ask - first_ask[slug], 4)
-            if ask is not None and slug in first_ask else None,
-            "observed_at_utc": snap.get("observed_at_utc"),
-        })
+        rows.append(
+            {
+                "market_slug": slug,
+                "market_name": _human_market_name(str(slug)),
+                "market_type": snap.get("market_type"),
+                "line": snap.get("line"),
+                "league": snap.get("league"),
+                "event_start_utc": snap.get("event_start_utc"),
+                "description": long_side.get("description"),
+                "bid": bid,
+                "ask": ask,
+                "spread": round(ask - bid, 4) if ask is not None and bid is not None else None,
+                "ask_size": long_side.get("ask_size"),
+                "bid_size": long_side.get("bid_size"),
+                "move": round(ask - first_ask[slug], 4) if ask is not None and slug in first_ask else None,
+                "observed_at_utc": snap.get("observed_at_utc"),
+            }
+        )
     return {"sport": sport, "date": day, "markets": rows, "count": len(rows)}
 
 
@@ -1730,9 +1941,7 @@ def _team_matches(team_name: str, side_description: str) -> bool:
         return False
     if team == description:
         return True
-    shorter, longer = (
-        (description, team) if len(description) <= len(team) else (team, description)
-    )
+    shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
     return f" {shorter} " in f" {longer} "
 
 
@@ -1744,9 +1953,7 @@ def _pick_quote(row: dict) -> dict | None:
     if sport not in SPORTS:
         return None
     try:
-        event_start = datetime.fromisoformat(
-            str(row.get("event_start_utc") or "").replace("Z", "+00:00")
-        )
+        event_start = datetime.fromisoformat(str(row.get("event_start_utc") or "").replace("Z", "+00:00"))
     except ValueError:
         return None
     day = event_start.astimezone(EASTERN).date().isoformat()
@@ -1776,8 +1983,7 @@ def _pick_quote(row: dict) -> dict | None:
                 continue
             slug = str(snapshot.get("market_slug") or "")
             if not slug or any(
-                marker in slug.casefold()
-                for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")
+                marker in slug.casefold() for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")
             ):
                 continue
             long_description = str((snapshot.get("long") or {}).get("description") or "")
@@ -1800,12 +2006,8 @@ def _pick_quote(row: dict) -> dict | None:
         if str(row.get("selection") or "").casefold() == "home"
         else str(row.get("away_team") or "")
     )
-    matches_long = _team_matches(
-        selected_team, str((snapshot.get("long") or {}).get("description") or "")
-    )
-    matches_short = _team_matches(
-        selected_team, str((snapshot.get("short") or {}).get("description") or "")
-    )
+    matches_long = _team_matches(selected_team, str((snapshot.get("long") or {}).get("description") or ""))
+    matches_short = _team_matches(selected_team, str((snapshot.get("short") or {}).get("description") or ""))
     if matches_long == matches_short:
         return None  # ambiguous side (same-city names) — never default to long
     side_name = "long" if matches_long else "short"
@@ -1833,6 +2035,8 @@ def _pick_quote(row: dict) -> dict | None:
         "price_role": "pregame_close",
         "seconds_before_start": max(0, int((event_start - observed_at).total_seconds())),
     }
+
+
 # ── SECTION: Orders & Execution ─────────────────────────────────────
 
 
@@ -1922,10 +2126,7 @@ def _filled_entry_for_pick(
         for order in (orders or _load_orders())["orders"]
         if str(order.get("pick_id") or "") == pick_id
         and order.get("action", "buy") == "buy"
-        and (
-            order.get("status") == "filled"
-            or _number(order.get("cum_quantity"), 0) > 0
-        )
+        and (order.get("status") == "filled" or _number(order.get("cum_quantity"), 0) > 0)
     ]
     if not filled:
         return None
@@ -1946,11 +2147,7 @@ def _filled_entry_for_pick(
         if submitted and occurred and occurred < submitted:
             continue
         trade_quantity = _number(activity.get("quantity"), None)
-        if (
-            quantity is not None
-            and trade_quantity is not None
-            and abs(quantity - trade_quantity) > 0.01
-        ):
+        if quantity is not None and trade_quantity is not None and abs(quantity - trade_quantity) > 0.01:
             continue
         raw_price = _number(activity.get("exchange_price", activity.get("price")), None)
         if raw_price is None or not 0 < raw_price < 1:
@@ -1993,9 +2190,7 @@ def _reconcile_orders() -> None:
     """Replace local submission state with the exchange's current order state."""
     payload = _load_orders()
     active = [
-        order
-        for order in payload["orders"]
-        if order.get("status") == "submitted" and order.get("order_id")
+        order for order in payload["orders"] if order.get("status") == "submitted" and order.get("order_id")
     ]
     if not active:
         return
@@ -2022,11 +2217,7 @@ def _reconcile_orders() -> None:
     result = _cached("order-states:" + ",".join(order_ids), 10, fetch_order_states)
     if result.get("status") != "live":
         return
-    by_id = {
-        str(item.get("order_id")): item
-        for item in result.get("orders", [])
-        if item.get("order_id")
-    }
+    by_id = {str(item.get("order_id")): item for item in result.get("orders", []) if item.get("order_id")}
     changed = False
     for order in active:
         snapshot = by_id.get(str(order["order_id"]))
@@ -2075,11 +2266,7 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
             return False, "game has already started"
     except (ValueError, TypeError):
         pass
-    missing = [
-        name
-        for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY")
-        if not os.environ.get(name)
-    ]
+    missing = [name for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY") if not os.environ.get(name)]
     if missing:
         return False, f"missing {' and '.join(missing)}"
     return True, "ready"
@@ -2120,9 +2307,7 @@ def _net_position_quantity(slug: str, portfolio_history: dict) -> float | None:
     return net
 
 
-def _decorate_pick(
-    row: dict, orders: dict | None = None, portfolio_history: dict | None = None
-) -> dict:
+def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dict | None = None) -> dict:
     quote = _pick_quote(row)
     ready, reason = _order_readiness(row, quote)
     order = _latest_order_for_pick(row, quote, orders)
@@ -2143,9 +2328,7 @@ def _decorate_pick(
         "buy_ready": ready,
         "buy_block_reason": reason,
         "unit_value_usd": _unit_value_usd(),
-        "order_authorization": (
-            "manual_research_override" if manual else "qualified_model"
-        ),
+        "order_authorization": ("manual_research_override" if manual else "qualified_model"),
     }
 
 
@@ -2337,13 +2520,20 @@ def submit_order(payload: dict) -> dict:
             }
     command = _resolve_runner() + [
         "execute",
-        "--pick-id", ticket["pick_id"],
-        "--size-shares", str(ticket["size_shares"]),
-        "--price", str(ticket["price"]),
-        "--side", ticket["side"],
-        "--action", action,
-        "--order-type", ticket.get("order_type", "limit_gtc"),
-        "--market-slug", ticket["market_slug"],
+        "--pick-id",
+        ticket["pick_id"],
+        "--size-shares",
+        str(ticket["size_shares"]),
+        "--price",
+        str(ticket["price"]),
+        "--side",
+        ticket["side"],
+        "--action",
+        action,
+        "--order-type",
+        ticket.get("order_type", "limit_gtc"),
+        "--market-slug",
+        ticket["market_slug"],
         "--execute",
     ]
     if ticket.get("manual_research_order"):
@@ -2386,6 +2576,7 @@ def _live_bbo(market_slug: str) -> dict | None:
     """Fetch a fresh BBO for one market slug from the public gateway."""
     try:
         from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+
         return PolymarketUSClient().snapshot(market_slug)
     except Exception:  # noqa: BLE001 - any failure => no quote, caller handles
         return None
@@ -2438,11 +2629,17 @@ def preview_position_sell(payload: dict) -> dict:
         }
     nonce = secrets.token_urlsafe(24)
     ticket = {
-        "nonce": nonce, "kind": "position_sell",
-        "market_slug": slug, "side": side, "price": price, "size_shares": size_shares,
+        "nonce": nonce,
+        "kind": "position_sell",
+        "market_slug": slug,
+        "side": side,
+        "price": price,
+        "size_shares": size_shares,
         "estimated_proceeds_usd": round(price * size_shares, 2),
-        "current_bid": bid, "verified_available_quantity": held,
-        "created_at": time.time(), "expires_at": time.time() + 300,
+        "current_bid": bid,
+        "verified_available_quantity": held,
+        "created_at": time.time(),
+        "expires_at": time.time() + 300,
     }
     with _ORDER_LOCK:
         _ORDER_PREVIEWS[nonce] = ticket
@@ -2460,8 +2657,7 @@ def submit_position_sell(payload: dict) -> dict:
         (
             item
             for item in (portfolio.get("open") or {}).get("positions", [])
-            if item.get("market_slug") == ticket["market_slug"]
-            and item.get("side") == ticket["side"]
+            if item.get("market_slug") == ticket["market_slug"] and item.get("side") == ticket["side"]
         ),
         None,
     )
@@ -2476,14 +2672,23 @@ def submit_position_sell(payload: dict) -> dict:
             return {"status": "refused", "error": "bid moved above your limit; preview the sell again"}
     command = _resolve_runner() + [
         "sell-position",
-        "--market-slug", ticket["market_slug"],
-        "--side", ticket["side"],
-        "--price", str(ticket["price"]),
-        "--size-shares", str(ticket["size_shares"]),
+        "--market-slug",
+        ticket["market_slug"],
+        "--side",
+        ticket["side"],
+        "--price",
+        str(ticket["price"]),
+        "--size-shares",
+        str(ticket["size_shares"]),
         "--execute",
     ]
     process = subprocess.run(
-        command, cwd=ROOT, input="Y\n", capture_output=True, text=True, timeout=30,
+        command,
+        cwd=ROOT,
+        input="Y\n",
+        capture_output=True,
+        text=True,
+        timeout=30,
         env=_runner_env(),
     )
     raw = process.stdout if process.returncode == 0 else process.stderr
@@ -2545,12 +2750,21 @@ def live_gateway_slate(sport: str, day: str) -> dict:
                 except (TypeError, ValueError):
                     quote = None
                 sides.append({"description": side.get("description"), "quote": quote})
-            markets.append({"slug": market.get("slug"),
-                            "type": market.get("sportsMarketTypeV2") or market.get("sportsMarketType"),
-                            "line": market.get("line"), "sides": sides})
-        events.append({"title": event.get("title"), "start_utc": start,
-                       "slug": event.get("slug"), "markets": markets})
-    return {"events": events, "note": "indicative discovery quotes; decision prices come from stored BBO asks"}
+            markets.append(
+                {
+                    "slug": market.get("slug"),
+                    "type": market.get("sportsMarketTypeV2") or market.get("sportsMarketType"),
+                    "line": market.get("line"),
+                    "sides": sides,
+                }
+            )
+        events.append(
+            {"title": event.get("title"), "start_utc": start, "slug": event.get("slug"), "markets": markets}
+        )
+    return {
+        "events": events,
+        "note": "indicative discovery quotes; decision prices come from stored BBO asks",
+    }
 
 
 def _action_command(name: str, payload: dict) -> list[str]:
@@ -2576,9 +2790,12 @@ def _action_command(name: str, payload: dict) -> list[str]:
             sport = str(row.get("league") or "").strip().lower()
             slug = str(quote.get("market_slug") or "").strip()
             try:
-                game_day = datetime.fromisoformat(
-                    str(row.get("event_start_utc") or "").replace("Z", "+00:00")
-                ).astimezone(EASTERN).date().isoformat()
+                game_day = (
+                    datetime.fromisoformat(str(row.get("event_start_utc") or "").replace("Z", "+00:00"))
+                    .astimezone(EASTERN)
+                    .date()
+                    .isoformat()
+                )
             except ValueError:
                 continue
             target = (sport, game_day, slug)
@@ -2591,8 +2808,11 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return cli + ["settle", "--all-unsettled"]
     if name == "bootstrap":
         command = cli + [
-            "bootstrap", "--sport", _safe_sport(payload.get("sport")),
-            "--from", str(payload.get("from_date") or _today()),
+            "bootstrap",
+            "--sport",
+            _safe_sport(payload.get("sport")),
+            "--from",
+            str(payload.get("from_date") or _today()),
         ]
         if payload.get("to_date"):
             command += ["--to", str(payload["to_date"])]
@@ -2612,6 +2832,8 @@ def _safe_sport(value) -> str:
     if value not in SPORTS:
         raise InvalidSportError(f"unsupported sport: {value}")
     return str(value)
+
+
 # ── SECTION: Jobs & Actions ─────────────────────────────────────────
 
 
@@ -2625,9 +2847,11 @@ def start_action(name: str, payload: dict) -> dict:
     """
     if not _ACTION_LOCK.acquire(blocking=False):
         running = next((j for j in _JOBS.values() if j["status"] == "running"), None)
-        return {"status": "busy",
-                "error": "another action is already running",
-                "job_id": running["job_id"] if running else None}
+        return {
+            "status": "busy",
+            "error": "another action is already running",
+            "job_id": running["job_id"] if running else None,
+        }
     try:
         command = _action_command(name, payload)
     except (ValueError, RuntimeError) as error:
@@ -2635,10 +2859,14 @@ def start_action(name: str, payload: dict) -> dict:
         return {"status": "failed", "error": str(error)}
     job_id = f"{name}-{int(time.time())}"
     job = {
-        "job_id": job_id, "action": name, "status": "running",
-        "command": " ".join(command[-8:]), "output_tail": "",
+        "job_id": job_id,
+        "action": name,
+        "status": "running",
+        "command": " ".join(command[-8:]),
+        "output_tail": "",
         "started_at": datetime.now(timezone.utc).isoformat()[:19],
-        "started_monotonic": time.time(), "seconds": 0.0,
+        "started_monotonic": time.time(),
+        "seconds": 0.0,
     }
     with _JOBS_LOCK:
         _JOBS[job_id] = job
@@ -2653,8 +2881,12 @@ def start_action(name: str, payload: dict) -> dict:
         process = None
         try:
             process = subprocess.Popen(
-                command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, env=_runner_env(),
+                command,
+                cwd=ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=_runner_env(),
             )
             assert process.stdout is not None
             for line in process.stdout:
@@ -2682,11 +2914,14 @@ def start_action(name: str, payload: dict) -> dict:
                 if process.stdout is not None:
                     process.stdout.close()
         with _JOBS_LOCK:
-            job.update({
-                "status": status, "returncode": returncode,
-                "seconds": round(time.time() - started, 1),
-                "output_tail": "".join(chunks)[-12000:],
-            })
+            job.update(
+                {
+                    "status": status,
+                    "returncode": returncode,
+                    "seconds": round(time.time() - started, 1),
+                    "output_tail": "".join(chunks)[-12000:],
+                }
+            )
         _LAST_ACTION[name] = dict(job)
         _log(f"job finished: {job_id} :: {status} in {job['seconds']}s")
         _persist_jobs()
@@ -2758,14 +2993,13 @@ def _latest_persisted_action(action: str) -> dict | None:
 
 class Handler(BaseHTTPRequestHandler):
     def _send(self, payload, content_type="application/json", code=200) -> None:
-        body = payload if isinstance(payload, bytes) else json.dumps(
-            payload, default=str).encode()
+        body = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-# ── SECTION: HTTP Server ────────────────────────────────────────────
+        # ── SECTION: HTTP Server ────────────────────────────────────────────
         self.wfile.write(body)
 
     def log_message(self, fmt, *args):  # quiet
@@ -2777,7 +3011,7 @@ class Handler(BaseHTTPRequestHandler):
         route = parsed.path
         try:
             if route in ("/", "/dashboard.html"):
-                page = (ROOT / "dashboard.html")
+                page = ROOT / "dashboard.html"
                 if page.exists():
                     self._send(page.read_bytes(), "text/html; charset=utf-8")
                 else:
@@ -2791,11 +3025,15 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/picks":
                 self._send(_cached("picks", 30, dashboard_picks))
             elif route == "/api/flat-picks":
+
                 def _flat_picks_decorated():
-                    flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
+                    flat = (
+                        _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
+                    )
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
                     return [_decorate_pick(row, orders, portfolio) for row in flat]
+
                 self._send(_cached("flat-picks", 30, _flat_picks_decorated))
             elif route == "/api/performance":
                 self._send(_cached("performance", 30, lambda: performance(read_picks())))
@@ -2814,13 +3052,11 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/market":
                 sport = _safe_sport(query.get("sport", "mlb"))
                 day = query.get("date") or _today()
-                self._send(_cached(f"market:{sport}:{day}", 60,
-                                   lambda: market_snapshots(sport, day)))
+                self._send(_cached(f"market:{sport}:{day}", 60, lambda: market_snapshots(sport, day)))
             elif route == "/api/live":
                 sport = _safe_sport(query.get("sport", "mlb"))
                 day = query.get("date") or _today()
-                self._send(_cached(f"live:{sport}:{day}", 120,
-                                   lambda: live_gateway_slate(sport, day)))
+                self._send(_cached(f"live:{sport}:{day}", 120, lambda: live_gateway_slate(sport, day)))
             elif route == "/api/audit":
                 self._send(_cached("audit", 60, _audit_tail))
             elif route == "/api/job":
@@ -2830,15 +3066,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached(f"today:{day}", 20, lambda: today_picks(day)))
             elif route == "/api/odds":
                 sport = query.get("sport")
-                self._send(_cached(f"odds:{sport or 'all'}", 30,
-                                   lambda: odds_summary(sport if sport else None)))
+                self._send(
+                    _cached(f"odds:{sport or 'all'}", 30, lambda: odds_summary(sport if sport else None))
+                )
             elif route == "/api/open":
                 self._send(_cached("open", 15, open_picks))
             elif route == "/api/history":
                 days = int(query.get("days", "30"))
                 sport = query.get("sport")
-                self._send(_cached(f"history:{days}:{sport or 'all'}", 30,
-                                   lambda: history_picks(days, sport)))
+                self._send(
+                    _cached(f"history:{days}:{sport or 'all'}", 30, lambda: history_picks(days, sport))
+                )
             elif route == "/api/bets":
                 self._send(_cached("bets", 15, bets_view))
             elif route == "/api/orders":
@@ -2875,8 +3113,9 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             payload = {}
         if payload.get("confirm") is not True:
-            self._send({"status": "refused",
-                        "error": "confirmation required: resend with confirm=true"}, code=400)
+            self._send(
+                {"status": "refused", "error": "confirmation required: resend with confirm=true"}, code=400
+            )
             return
         if parsed.path == "/api/archive":
             action = str(payload.get("action"))
@@ -2969,9 +3208,14 @@ def today_picks(day: str) -> dict:
         start_et = start_dt.astimezone(EASTERN)
         if start_et.date().isoformat() != day:
             continue
-        rows.append({**_decorate_pick(row, orders, portfolio_history), "start_et": start_et.strftime("%I:%M %p ET"),
-                     "start_sort": start_dt.isoformat(),
-                     "suggested_paper_units": _suggested_units(row)})
+        rows.append(
+            {
+                **_decorate_pick(row, orders, portfolio_history),
+                "start_et": start_et.strftime("%I:%M %p ET"),
+                "start_sort": start_dt.isoformat(),
+                "suggested_paper_units": _suggested_units(row),
+            }
+        )
     rows.sort(key=lambda r: (r["start_sort"], str(r.get("league")), str(r.get("market_type"))))
     return {
         "date": day,
@@ -2991,23 +3235,25 @@ def open_picks() -> dict:
         model_p = _number(row.get("model_probability"))
         market_p = _number(row.get("market_implied_probability"))
         edge = model_p - market_p if model_p and market_p else None
-        rows.append({
-            "pick_id": str(row.get("pick_id", "")),
-            "league": str(row.get("league", "")),
-            "away_team": str(row.get("away_team", "")),
-            "home_team": str(row.get("home_team", "")),
-            "selection": str(row.get("selection", "")),
-            "market_type": str(row.get("market_type", "")),
-            "event_start_utc": str(row.get("event_start_utc", "")),
-            "model_probability": round(model_p, 4) if model_p else None,
-            "market_implied_probability": round(market_p, 4) if market_p else None,
-            "edge": round(edge, 4) if edge is not None else None,
-            "american_odds": row.get("american_odds"),
-            "units": _number(row.get("units")),
-            "record_type": str(row.get("record_type", "")),
-            "model_version": str(row.get("model_version", "")),
-            "reason_code": str(row.get("reason_code", "")),
-        })
+        rows.append(
+            {
+                "pick_id": str(row.get("pick_id", "")),
+                "league": str(row.get("league", "")),
+                "away_team": str(row.get("away_team", "")),
+                "home_team": str(row.get("home_team", "")),
+                "selection": str(row.get("selection", "")),
+                "market_type": str(row.get("market_type", "")),
+                "event_start_utc": str(row.get("event_start_utc", "")),
+                "model_probability": round(model_p, 4) if model_p else None,
+                "market_implied_probability": round(market_p, 4) if market_p else None,
+                "edge": round(edge, 4) if edge is not None else None,
+                "american_odds": row.get("american_odds"),
+                "units": _number(row.get("units")),
+                "record_type": str(row.get("record_type", "")),
+                "model_version": str(row.get("model_version", "")),
+                "reason_code": str(row.get("reason_code", "")),
+            }
+        )
     # Sort: earliest game first
     rows.sort(key=lambda r: r["event_start_utc"])
     qualified = [r for r in rows if r["record_type"] == "QUALIFIED_SHADOW_CALL"]
@@ -3040,25 +3286,27 @@ def history_picks(days: int = 30, sport: str | None = None) -> dict:
                 continue
         model_p = _number(row.get("model_probability"))
         market_p = _number(row.get("market_implied_probability"))
-        rows.append({
-            "pick_id": str(row.get("pick_id", "")),
-            "league": str(row.get("league", "")),
-            "away_team": str(row.get("away_team", "")),
-            "home_team": str(row.get("home_team", "")),
-            "selection": str(row.get("selection", "")),
-            "market_type": str(row.get("market_type", "")),
-            "result": str(row.get("result", "")),
-            "away_score": row.get("away_score"),
-            "home_score": row.get("home_score"),
-            "model_probability": round(model_p, 4) if model_p else None,
-            "market_implied_probability": round(market_p, 4) if market_p else None,
-            "pnl_units": _number(row.get("pnl_units")),
-            "units": _number(row.get("units")),
-            "settled_at_utc": str(row.get("settled_at_utc", "")),
-            "event_start_utc": str(row.get("event_start_utc", "")),
-            "record_type": str(row.get("record_type", "")),
-            "american_odds": row.get("american_odds"),
-        })
+        rows.append(
+            {
+                "pick_id": str(row.get("pick_id", "")),
+                "league": str(row.get("league", "")),
+                "away_team": str(row.get("away_team", "")),
+                "home_team": str(row.get("home_team", "")),
+                "selection": str(row.get("selection", "")),
+                "market_type": str(row.get("market_type", "")),
+                "result": str(row.get("result", "")),
+                "away_score": row.get("away_score"),
+                "home_score": row.get("home_score"),
+                "model_probability": round(model_p, 4) if model_p else None,
+                "market_implied_probability": round(market_p, 4) if market_p else None,
+                "pnl_units": _number(row.get("pnl_units")),
+                "units": _number(row.get("units")),
+                "settled_at_utc": str(row.get("settled_at_utc", "")),
+                "event_start_utc": str(row.get("event_start_utc", "")),
+                "record_type": str(row.get("record_type", "")),
+                "american_odds": row.get("american_odds"),
+            }
+        )
     rows.sort(key=lambda r: r["settled_at_utc"], reverse=True)
     wins = sum(1 for r in rows if r["result"] == "win")
     losses = sum(1 for r in rows if r["result"] == "loss")
@@ -3148,11 +3396,7 @@ def _activity_link(
     """Resolve a side, inferring it only when exactly one linked side exists."""
     if explicit_side:
         return explicit_side, links.get((slug, explicit_side))
-    candidates = [
-        (side, link)
-        for (market_slug, side), link in links.items()
-        if market_slug == slug
-    ]
+    candidates = [(side, link) for (market_slug, side), link in links.items() if market_slug == slug]
     if len(candidates) == 1:
         return candidates[0]
     return None, None
@@ -3171,11 +3415,7 @@ def _selected_short_pnl(exchange_price: float | None, exchange_pnl: float | None
 
 def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> dict | None:
     trade = item.get("trade") if isinstance(item.get("trade"), dict) else None
-    resolution = (
-        item.get("positionResolution")
-        if isinstance(item.get("positionResolution"), dict)
-        else None
-    )
+    resolution = item.get("positionResolution") if isinstance(item.get("positionResolution"), dict) else None
     if trade:
         slug = str(trade.get("marketSlug") or "")
         occurred = str(trade.get("updateTime") or trade.get("createTime") or "")
@@ -3196,19 +3436,13 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
             "occurred_at_utc": occurred,
             "price": selected_price,
             "exchange_price": exchange_price,
-            "price_basis": (
-                "selected_short_probability"
-                if outcome_side == "short"
-                else "long_probability"
-            ),
+            "price_basis": ("selected_short_probability" if outcome_side == "short" else "long_probability"),
             "quantity": _number(trade.get("qtyDecimal") or trade.get("qty"), None),
             "cost_basis_usd": _amount_value(trade.get("costBasis")),
             "realized_pnl_usd": selected_pnl,
             "exchange_realized_pnl_usd": exchange_pnl,
             "pnl_basis": (
-                "terminal_short_outcome_adjustment"
-                if selected_pnl != exchange_pnl
-                else "exchange_reported"
+                "terminal_short_outcome_adjustment" if selected_pnl != exchange_pnl else "exchange_reported"
             ),
             "state": str(trade.get("state") or ""),
             "is_aggressor": trade.get("isAggressor"),
@@ -3235,16 +3469,10 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
             "title": str(metadata.get("title") or slug),
             "outcome": str(metadata.get("outcome") or ""),
             "occurred_at_utc": occurred,
-            "resolution_side": str(resolution.get("side") or "").removeprefix(
-                "POSITION_RESOLUTION_SIDE_"
-            ),
+            "resolution_side": str(resolution.get("side") or "").removeprefix("POSITION_RESOLUTION_SIDE_"),
             "outcome_side": outcome_side,
-            "before_quantity": _number(
-                before.get("netPositionDecimal") or before.get("netPosition"), None
-            ),
-            "after_quantity": _number(
-                after.get("netPositionDecimal") or after.get("netPosition"), None
-            ),
+            "before_quantity": _number(before.get("netPositionDecimal") or before.get("netPosition"), None),
+            "after_quantity": _number(after.get("netPositionDecimal") or after.get("netPosition"), None),
             "realized_pnl_usd": realized_delta,
             "cumulative_realized_pnl_usd": after_realized,
             "pnl_basis": "position_realized_delta",
@@ -3257,9 +3485,7 @@ def _load_portfolio_history() -> dict:
     payload = _read_json(PORTFOLIO_HISTORY_FILE) or {}
     activities = payload.get("activities") if isinstance(payload, dict) else None
     history_start = (
-        str(payload.get("history_start_date") or _today())
-        if isinstance(payload, dict)
-        else _today()
+        str(payload.get("history_start_date") or _today()) if isinstance(payload, dict) else _today()
     )
     rows = [
         item
@@ -3275,9 +3501,7 @@ def _load_portfolio_history() -> dict:
 
 def _activity_on_or_after(item: dict, history_start: str) -> bool:
     try:
-        occurred = datetime.fromisoformat(
-            str(item.get("occurred_at_utc") or "").replace("Z", "+00:00")
-        )
+        occurred = datetime.fromisoformat(str(item.get("occurred_at_utc") or "").replace("Z", "+00:00"))
         return occurred.astimezone(EASTERN).date().isoformat() >= history_start
     except ValueError:
         return False
@@ -3292,9 +3516,9 @@ def _save_portfolio_history(activities: list[dict], observed_at: str) -> list[di
         for item in [*prior, *activities]
         if item.get("activity_id") and _activity_on_or_after(item, history_start)
     }
-    rows = sorted(
-        merged.values(), key=lambda item: str(item.get("occurred_at_utc") or ""), reverse=True
-    )[:2000]
+    rows = sorted(merged.values(), key=lambda item: str(item.get("occurred_at_utc") or ""), reverse=True)[
+        :2000
+    ]
     DASH_DIR.mkdir(exist_ok=True)
     temporary = PORTFOLIO_HISTORY_FILE.with_suffix(".json.tmp")
     temporary.write_text(
@@ -3401,12 +3625,8 @@ def _human_market_name(slug: str, title: str = "") -> str:
         question = _public_market_question(slug)
         if question:
             clean = question.removesuffix("?")
-            clean = re.sub(
-                r"\s+in\s+[A-Z0-9 .'-]+\s+vs\.?\s+[A-Z0-9 .'-]+$", "", clean
-            )
-            hrr = re.fullmatch(
-                r"Will (.+?) record at least (\d+) hits \+ runs \+ RBIs", clean
-            )
+            clean = re.sub(r"\s+in\s+[A-Z0-9 .'-]+\s+vs\.?\s+[A-Z0-9 .'-]+$", "", clean)
+            hrr = re.fullmatch(r"Will (.+?) record at least (\d+) hits \+ runs \+ RBIs", clean)
             if hrr:
                 clean = f"{hrr.group(1)} · {hrr.group(2)}+ hits + runs + RBIs"
             return f"{clean} · {matchup}"
@@ -3425,9 +3645,7 @@ def _portfolio_history_summary(
         if item.get("type") != "trade":
             return item
         slug = str(item.get("market_slug") or "")
-        outcome_side, linked = _activity_link(
-            slug, str(item.get("outcome_side") or "") or None, links
-        )
+        outcome_side, linked = _activity_link(slug, str(item.get("outcome_side") or "") or None, links)
         if outcome_side != "short":
             return {**item, "outcome_side": outcome_side, "model_pick": linked}
         exchange_price = _number(item.get("exchange_price"), None)
@@ -3480,9 +3698,7 @@ def _portfolio_history_summary(
     trades = [item for item in decorated if item.get("type") == "trade"]
     settlements = [item for item in decorated if item.get("type") == "settlement"]
     realized = sum(
-        value
-        for item in decorated
-        if (value := _number(item.get("realized_pnl_usd"), None)) is not None
+        value for item in decorated if (value := _number(item.get("realized_pnl_usd"), None)) is not None
     )
     return {
         "activities": decorated,
@@ -3504,11 +3720,7 @@ def live_portfolio_view() -> dict:
         "cash_value_usd": 0.0,
         "realized_pnl_usd": 0.0,
     }
-    missing = [
-        name
-        for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY")
-        if not os.environ.get(name)
-    ]
+    missing = [name for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY") if not os.environ.get(name)]
     if missing:
         return {
             "status": "unavailable",
@@ -3565,9 +3777,7 @@ def live_portfolio_view() -> dict:
             {
                 "market_slug": str(slug),
                 "title": str(metadata.get("title") or slug),
-                "market_name": _human_market_name(
-                    str(slug), str(metadata.get("title") or "")
-                ),
+                "market_name": _human_market_name(str(slug), str(metadata.get("title") or "")),
                 "outcome": str(metadata.get("outcome") or ""),
                 "side": side,
                 "quantity": abs(net),
@@ -3581,9 +3791,7 @@ def live_portfolio_view() -> dict:
                 "exit_limit_default": exit_default,
                 "realized_pnl_usd": _amount_value(item.get("realized")),
                 "unrealized_pnl_usd": (
-                    round(cash_value - cost, 2)
-                    if cash_value is not None and cost is not None
-                    else None
+                    round(cash_value - cost, 2) if cash_value is not None and cost is not None else None
                 ),
                 "expired": bool(item.get("expired")),
                 "updated_at_utc": str(item.get("updateTime") or ""),
@@ -3607,19 +3815,11 @@ def live_portfolio_view() -> dict:
         "open": {
             "positions": positions,
             "count": len(positions),
-            "cost_basis_usd": round(
-                sum(_number(item.get("cost_basis_usd")) for item in positions), 2
-            ),
-            "cash_value_usd": round(
-                sum(_number(item.get("cash_value_usd")) for item in positions), 2
-            ),
-            "realized_pnl_usd": round(
-                sum(_number(item.get("realized_pnl_usd")) for item in positions), 2
-            ),
+            "cost_basis_usd": round(sum(_number(item.get("cost_basis_usd")) for item in positions), 2),
+            "cash_value_usd": round(sum(_number(item.get("cash_value_usd")) for item in positions), 2),
+            "realized_pnl_usd": round(sum(_number(item.get("realized_pnl_usd")) for item in positions), 2),
         },
-        "recent_history": _portfolio_history_summary(
-            history, "exchange_and_persisted", links
-        ),
+        "recent_history": _portfolio_history_summary(history, "exchange_and_persisted", links),
         "balance": {
             "current_usd": _number((usd or {}).get("currentBalance"), None),
             "buying_power_usd": _number((usd or {}).get("buyingPower"), None),
@@ -3679,12 +3879,9 @@ def dedupe_ledger() -> dict:
         if not unstaked:
             continue
         survivor = max(unstaked, key=_model_version_rank)
-        to_remove.extend(
-            str(m.get("pick_id") or "") for m in unstaked if m is not survivor
-        )
+        to_remove.extend(str(m.get("pick_id") or "") for m in unstaked if m is not survivor)
     if not to_remove:
-        return {"status": "ok", "removed": 0, "kept": len(rows),
-                "note": "No open duplicate contracts found."}
+        return {"status": "ok", "removed": 0, "kept": len(rows), "note": "No open duplicate contracts found."}
     backup = path.with_suffix(f".xlsx.dedupe-bak-{int(time.time())}")
     import shutil
 
@@ -3694,23 +3891,28 @@ def dedupe_ledger() -> dict:
     surviving = {str(r.get("pick_id")) for r in ledger.rows()}
     archive = _load_archive()
     archive["pick_ids"] = sorted(pid for pid in archive["pick_ids"] if pid in surviving)
-    archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
-                               "action": "dedupe", "rows": len(removed_ids)})
+    archive["history"].append(
+        {"at": datetime.now(timezone.utc).isoformat()[:19], "action": "dedupe", "rows": len(removed_ids)}
+    )
     _save_archive(archive)
     with _CACHE_LOCK:
         _CACHE.clear()
         _PICKS_CACHE["mtime"] = None
     _log(f"dedupe: removed {len(removed_ids)} open duplicate rows, backup {backup.name}")
-    return {"status": "ok", "removed": len(removed_ids), "kept": len(surviving),
-            "backup": backup.name, "removed_pick_ids": removed_ids[:50],
-            "note": f"Removed {len(removed_ids)} open duplicates via the audited ledger path. Backup: {backup.name}."}
+    return {
+        "status": "ok",
+        "removed": len(removed_ids),
+        "kept": len(surviving),
+        "backup": backup.name,
+        "removed_pick_ids": removed_ids[:50],
+        "note": f"Removed {len(removed_ids)} open duplicates via the audited ledger path. Backup: {backup.name}.",
+    }
 
 
 def _load_archive() -> dict:
     try:
         payload = json.loads(ARCHIVE_FILE.read_text(encoding="utf-8"))
-        return {"pick_ids": list(payload.get("pick_ids", [])),
-                "history": list(payload.get("history", []))}
+        return {"pick_ids": list(payload.get("pick_ids", [])), "history": list(payload.get("history", []))}
     except (OSError, json.JSONDecodeError):
         return {"pick_ids": [], "history": []}
 
@@ -3731,8 +3933,9 @@ def archive_action(action: str, scope: str) -> dict:
     if action == "restore":
         restored = len(archive["pick_ids"])
         archive["pick_ids"] = []
-        archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
-                                   "action": "restore", "rows": restored})
+        archive["history"].append(
+            {"at": datetime.now(timezone.utc).isoformat()[:19], "action": "restore", "rows": restored}
+        )
         _save_archive(archive)
         with _CACHE_LOCK:
             _CACHE.clear()
@@ -3770,19 +3973,26 @@ def archive_action(action: str, scope: str) -> dict:
         allowed = expanded - exposed
         existing = set(archive["pick_ids"]) | allowed
         archive["pick_ids"] = sorted(existing)
-        archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
-                                   "action": "clear_ids", "rows": len(allowed)})
+        archive["history"].append(
+            {"at": datetime.now(timezone.utc).isoformat()[:19], "action": "clear_ids", "rows": len(allowed)}
+        )
         _save_archive(archive)
         with _CACHE_LOCK:
             _CACHE.clear()
-        return {"status": "ok", "action": "clear_ids",
-                "archived_now": len(allowed), "rows_selected": len(requested),
-                "blocked_open_staked": blocked,
-                "archived_total": len(existing),
-                "note": "View-only: rows remain in picks.xlsx and keep feeding research metrics."}
+        return {
+            "status": "ok",
+            "action": "clear_ids",
+            "archived_now": len(allowed),
+            "rows_selected": len(requested),
+            "blocked_open_staked": blocked,
+            "archived_total": len(existing),
+            "note": "View-only: rows remain in picks.xlsx and keep feeding research metrics.",
+        }
     if action != "clear" or scope not in ("day", "week", "month", "all"):
-        return {"status": "refused",
-                "error": "action must be clear(day|week|month|all), clear_ids, or restore"}
+        return {
+            "status": "refused",
+            "error": "action must be clear(day|week|month|all), clear_ids, or restore",
+        }
     today = datetime.now(timezone.utc).astimezone(EASTERN).date()
     days = {"day": 0, "week": 6, "month": 29}.get(scope)
     existing = set(archive["pick_ids"])
@@ -3809,15 +4019,20 @@ def archive_action(action: str, scope: str) -> dict:
         existing.add(pick_id)
         added += 1
     archive["pick_ids"] = sorted(existing)
-    archive["history"].append({"at": datetime.now(timezone.utc).isoformat()[:19],
-                               "action": f"clear:{scope}", "rows": added})
+    archive["history"].append(
+        {"at": datetime.now(timezone.utc).isoformat()[:19], "action": f"clear:{scope}", "rows": added}
+    )
     _save_archive(archive)
     with _CACHE_LOCK:
         _CACHE.clear()
-    return {"status": "ok", "action": f"clear:{scope}", "archived_now": added,
-            "protected_open_staked": protected,
-            "archived_total": len(existing),
-            "note": "View-only: all rows remain in picks.xlsx and keep feeding research metrics."}
+    return {
+        "status": "ok",
+        "action": f"clear:{scope}",
+        "archived_now": added,
+        "protected_open_staked": protected,
+        "archived_total": len(existing),
+        "note": "View-only: all rows remain in picks.xlsx and keep feeding research metrics.",
+    }
 
 
 def _suggested_units(row: dict) -> float | None:
@@ -3853,13 +4068,19 @@ def _audit_tail() -> dict:
         for line in lines[-25:]:
             try:
                 item = json.loads(line)
-                events.append({"at": str(item.get("occurred_at_utc", ""))[:19],
-                               "type": item.get("event_type"),
-                               "subject": str(item.get("subject_id", ""))[:24]})
+                events.append(
+                    {
+                        "at": str(item.get("occurred_at_utc", ""))[:19],
+                        "type": item.get("event_type"),
+                        "subject": str(item.get("subject_id", ""))[:24],
+                    }
+                )
             except json.JSONDecodeError:
                 continue
         return {"total_events": len(lines), "tail": list(reversed(events))}
     return {"total_events": 0, "tail": []}
+
+
 # ── SECTION: Main Entry Point ───────────────────────────────────────
 
 
