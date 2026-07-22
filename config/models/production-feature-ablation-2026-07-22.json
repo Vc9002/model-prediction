@@ -1,10 +1,10 @@
 {
-  "artifact_hash": "e036d3ef399651ef020a9b43a325e247de9f4b74198330ad6dae85c41ac2a9fc",
+  "artifact_hash": "df39ceaa58b0cc09166f36f0bc3d03a236e40f3e052c83fa42f808c5bf204d3b",
   "as_of_date": "2026-07-22",
   "diagnostic_units": "flat one-unit staking at synthetic -110; non-executable",
   "economic_claims_allowed": false,
   "explicit_score_data_root": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data",
-  "generated_at_utc": "2026-07-22T00:56:11.504495Z",
+  "generated_at_utc": "2026-07-22T01:02:37.129568Z",
   "holdout_status": "reused_locked_holdouts_development_evidence",
   "market_prices_used": false,
   "models": {
@@ -24,7 +24,7 @@
       },
       "source_evidence": {
         "loaded_modeling_games": 37887,
-        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/cs2/matches.jsonl",
+        "path": "data/esports/cs2/matches.jsonl",
         "raw_nonempty_rows": 37887,
         "sha256": "383a6c10ed3f9c6ec7ddf099ebbb0c19d224fe690dcdfa9bf62a07bb9f399109",
         "walk_forward_rows": 37887
@@ -47,7 +47,7 @@
       },
       "source_evidence": {
         "loaded_modeling_games": 14509,
-        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/dota2/matches.jsonl",
+        "path": "data/esports/dota2/matches.jsonl",
         "raw_nonempty_rows": 14509,
         "sha256": "969da1b7eeaa62a4c64dfe35383ea2484de36080690cccc3fbc924ac816e5bbd",
         "walk_forward_rows": 14509
@@ -70,7 +70,7 @@
       },
       "source_evidence": {
         "loaded_modeling_games": 11916,
-        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/lol/matches.jsonl",
+        "path": "data/esports/lol/matches.jsonl",
         "raw_nonempty_rows": 11916,
         "sha256": "c4f16d0c8b9420ace0d33ef315ddabfd83b6c91aa752a204d637a02a5e4e96e6",
         "walk_forward_rows": 11916
@@ -1571,7 +1571,7 @@
       },
       "source_evidence": {
         "loaded_modeling_games": 10842,
-        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/valorant/matches.jsonl",
+        "path": "data/esports/valorant/matches.jsonl",
         "raw_nonempty_rows": 10842,
         "sha256": "ee7b8bfa77bd8e3fd7b267405864838253cdbeba5c8d32f51c521db487394d9f",
         "walk_forward_rows": 10842

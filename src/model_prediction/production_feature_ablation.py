@@ -395,7 +395,7 @@ def _esports_model(config: Mapping[str, Any], title: str) -> dict[str, Any]:
         raise ValueError(f"{title} match data drifted from production artifact")
     rows = _load_matches(matches_path)
     source_evidence = {
-        "path": str(matches_path.resolve()),
+        "path": matches_path.as_posix(),
         "sha256": hashlib.sha256(matches_path.read_bytes()).hexdigest(),
         "raw_nonempty_rows": len(rows),
         "loaded_modeling_games": len(rows),
