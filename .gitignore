@@ -10,3 +10,7 @@ dashboard/orders.json
 data/*.lock
 data/processed/
 data/raw/
+.claude/worktrees/
+.worktrees/
+data/*.bak-*
+data/logs/*.log

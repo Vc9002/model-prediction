@@ -145,10 +145,6 @@ models:
       require_walk_forward_ablation: true
       require_locked_holdout_before_promotion: true
       research_outputs_zero_units: true
-    active_production_version: npb-tie-aware-elo-v1
-    production_artifact: config/models/npb-tie-aware-elo-v1.json
-    active_production_version: kbo-tie-aware-elo-v1
-    production_artifact: config/models/kbo-tie-aware-elo-v1.json
     problem_cohorts:
       totals:
         status: active_research

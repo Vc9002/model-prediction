@@ -134,7 +134,7 @@ def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_p
     assert result["chronological_split"]["locked_test"]["n"] == 120
     assert result["promotion_eligible"] is False
     assert result["units"] == 0
-    artifact = json.loads((tmp_path / "artifacts/lol-neutral-series-elo-v2.json").read_text())
+    artifact = json.loads((tmp_path / "artifacts/lol-tiered-elo-v3.json").read_text())
     assert artifact["qualified_for_betting"] is False
     assert artifact["model_state"] == "research"
     assert artifact["artifact_hash"] == result["artifact_hash"]
@@ -153,10 +153,10 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
             }
         )
     )
-    (artifacts / "lol-neutral-series-elo-v2.json").write_text(
+    (artifacts / "lol-tiered-elo-v3.json").write_text(
         json.dumps(
             {
-                "model_version": "lol-neutral-series-elo-v2",
+                "model_version": "lol-tiered-elo-v3",
                 "trained_through_utc": "2026-07-18T00:00:00Z",
                 "artifact_hash": "hash",
                 "k": 20,
