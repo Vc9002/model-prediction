@@ -144,6 +144,10 @@ models:
       require_walk_forward_ablation: true
       require_locked_holdout_before_promotion: true
       research_outputs_zero_units: true
+    active_production_version: npb-tie-aware-elo-v1
+    production_artifact: config/models/npb-tie-aware-elo-v1.json
+    active_production_version: kbo-tie-aware-elo-v1
+    production_artifact: config/models/kbo-tie-aware-elo-v1.json
     problem_cohorts:
       totals:
         status: active_research
@@ -223,7 +227,7 @@ models:
     origin: statistical_model
   WORLD_CUP:
     family: poisson_dixon_coles
-    status: research
+    status: shadow_qualified
     origin: statistical_model
   LOL:
     family: neutral_series_elo
@@ -259,20 +263,24 @@ models:
     min_edge: 0.02
   KBO:
     family: tie_aware_home_elo
-    status: research
+    status: shadow_qualified
     origin: statistical_model
     active_research_version: kbo-tie-aware-elo-v1
     research_artifact: config/models/kbo-tie-aware-elo-v1.json
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
+    active_production_version: kbo-tie-aware-elo-v1
+    production_artifact: config/models/kbo-tie-aware-elo-v1.json
   NPB:
     family: tie_aware_home_elo
-    status: research
+    status: shadow_qualified
     origin: statistical_model
     active_research_version: npb-tie-aware-elo-v1
     research_artifact: config/models/npb-tie-aware-elo-v1.json
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
+    active_production_version: npb-tie-aware-elo-v1
+    production_artifact: config/models/npb-tie-aware-elo-v1.json
   market_residual:
     method: logistic_regression
     rolling_window_days: 90
