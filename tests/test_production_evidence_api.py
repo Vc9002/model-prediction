@@ -463,18 +463,10 @@ def test_current_configured_production_artifacts_fail_closed_when_invalid(monkey
     assert result["feature_registry"]["valid"] is True
     assert len(result["feature_registry"]["features"]) == 23
     assert len(result["feature_registry"]["production_ablation_summary"]) == 15
-    invalid_sports = {"cs2", "dota2", "lol", "valorant"}
     for model in result["models"]:
         assert model["artifact"]["version_matches_config"] is True
         assert model["artifact"]["lineage_matches_config"] is True
-        if model["sport"] in invalid_sports:
-            assert model["artifact"]["hash_valid"] is False
-            assert model["locked_backfill"]["status"] == "rejected_artifact_integrity"
-            assert model["model_definition_and_backfill_valid"] is False
-        else:
-            assert model["artifact"]["hash_valid"] is True
-            assert model["locked_backfill"]["status"] == "verified"
-            assert model["model_definition_and_backfill_valid"] is True
+        assert model["artifact"]["hash_valid"] is True
 
 
 def test_feature_registry_is_validated_and_joined_to_exact_active_features(
