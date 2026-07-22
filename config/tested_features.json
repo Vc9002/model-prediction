@@ -14,202 +14,202 @@
     "safety_override": "A retained feature with blocked point-in-time provenance is research-only until provenance is repaired; retention is not a profitability or promotion claim."
   },
   "production_ablation_summary": [
-  {
-    "sport": "mlb",
-    "model_version": "mlb-elo-trend-lr-v5",
-    "feature": "elo_probability",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": 0.002609,
-    "holdout_brier_delta": -0.00028645,
-    "holdout_log_loss_delta": -0.00069373,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "mlb",
-    "model_version": "mlb-elo-trend-lr-v5",
-    "feature": "park_factor",
-    "strict_decision": "REMOVE CANDIDATE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": -0.000074,
-    "holdout_brier_delta": 0.000034,
-    "holdout_log_loss_delta": 0.00005368,
-    "point_in_time_provenance": "blocked",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "mlb",
-    "model_version": "mlb-elo-trend-lr-v5",
-    "feature": "pitcher_era_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "REMOVE CANDIDATE",
-    "validation_brier_delta": -0.000338,
-    "holdout_brier_delta": -0.00024557,
-    "holdout_log_loss_delta": -0.00050005,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "mlb",
-    "model_version": "mlb-elo-trend-lr-v5",
-    "feature": "trend_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "REMOVE CANDIDATE",
-    "validation_brier_delta": -0.000583,
-    "holdout_brier_delta": -0.0000743,
-    "holdout_log_loss_delta": -0.00016749,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "mlb",
-    "model_version": "mlb-elo-trend-lr-v5",
-    "feature": "weather_factor",
-    "strict_decision": "REMOVE CANDIDATE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": 0.000034,
-    "holdout_brier_delta": 0.00000625,
-    "holdout_log_loss_delta": 0.00001604,
-    "point_in_time_provenance": "blocked",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "nba",
-    "model_version": "nba-elo-trend-lr-v4",
-    "feature": "defensive_trend_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "REMOVE CANDIDATE",
-    "validation_brier_delta": -0.000627,
-    "holdout_brier_delta": -0.00063397,
-    "holdout_log_loss_delta": -0.00164595,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "nba",
-    "model_version": "nba-elo-trend-lr-v4",
-    "feature": "elo_probability",
-    "strict_decision": "KEEP",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": 0.019779,
-    "holdout_brier_delta": 0.04827885,
-    "holdout_log_loss_delta": 0.10395419,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "nba",
-    "model_version": "nba-elo-trend-lr-v4",
-    "feature": "trend_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": -0.000039,
-    "holdout_brier_delta": 0.00012005,
-    "holdout_log_loss_delta": 0.00027915,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "nfl",
-    "model_version": "nfl-elo-trend-lr-v4",
-    "feature": "elo_probability",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": 0.021561,
-    "holdout_brier_delta": 0.01958539,
-    "holdout_log_loss_delta": 0.0423277,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "nfl",
-    "model_version": "nfl-elo-trend-lr-v4",
-    "feature": "trend_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": -0.002535,
-    "holdout_brier_delta": 0.00334246,
-    "holdout_log_loss_delta": 0.00775928,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "soccer",
-    "model_version": "soccer-elo-trend-lr-v2",
-    "feature": "elo_probability",
-    "strict_decision": "KEEP",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": 0.024524,
-    "holdout_brier_delta": 0.02212732,
-    "holdout_log_loss_delta": 0.04419437,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "soccer",
-    "model_version": "soccer-elo-trend-lr-v2",
-    "feature": "trend_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "REMOVE CANDIDATE",
-    "validation_brier_delta": -0.000377,
-    "holdout_brier_delta": -0.00001824,
-    "holdout_log_loss_delta": -0.0002271,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "wnba",
-    "model_version": "wnba-elo-trend-lr-v4",
-    "feature": "defensive_trend_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "REMOVE CANDIDATE",
-    "validation_brier_delta": -0.000036,
-    "holdout_brier_delta": -0.00001741,
-    "holdout_log_loss_delta": -0.00003173,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "wnba",
-    "model_version": "wnba-elo-trend-lr-v4",
-    "feature": "elo_probability",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": 0.030371,
-    "holdout_brier_delta": 0.03090384,
-    "holdout_log_loss_delta": 0.06445063,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  },
-  {
-    "sport": "wnba",
-    "model_version": "wnba-elo-trend-lr-v4",
-    "feature": "trend_gap",
-    "strict_decision": "INCONCLUSIVE",
-    "retention_decision": "KEEP",
-    "validation_brier_delta": 0.000038,
-    "holdout_brier_delta": 0.00032338,
-    "holdout_log_loss_delta": 0.00059961,
-    "point_in_time_provenance": "development_only",
-    "production_safe": false,
-    "economic_claim_allowed": false
-  }
-],
+    {
+      "sport": "mlb",
+      "model_version": "mlb-elo-trend-lr-v5",
+      "feature": "elo_probability",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": 0.002609,
+      "holdout_brier_delta": -0.00028645,
+      "holdout_log_loss_delta": -0.00069373,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "mlb",
+      "model_version": "mlb-elo-trend-lr-v5",
+      "feature": "park_factor",
+      "strict_decision": "REMOVE CANDIDATE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": -7.4e-05,
+      "holdout_brier_delta": 3.4e-05,
+      "holdout_log_loss_delta": 5.368e-05,
+      "point_in_time_provenance": "blocked",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "mlb",
+      "model_version": "mlb-elo-trend-lr-v5",
+      "feature": "pitcher_era_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "REMOVE CANDIDATE",
+      "validation_brier_delta": -0.000338,
+      "holdout_brier_delta": -0.00024557,
+      "holdout_log_loss_delta": -0.00050005,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "mlb",
+      "model_version": "mlb-elo-trend-lr-v5",
+      "feature": "trend_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "REMOVE CANDIDATE",
+      "validation_brier_delta": -0.000583,
+      "holdout_brier_delta": -7.43e-05,
+      "holdout_log_loss_delta": -0.00016749,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "mlb",
+      "model_version": "mlb-elo-trend-lr-v5",
+      "feature": "weather_factor",
+      "strict_decision": "REMOVE CANDIDATE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": 3.4e-05,
+      "holdout_brier_delta": 6.25e-06,
+      "holdout_log_loss_delta": 1.604e-05,
+      "point_in_time_provenance": "blocked",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "nba",
+      "model_version": "nba-elo-trend-lr-v4",
+      "feature": "defensive_trend_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "REMOVE CANDIDATE",
+      "validation_brier_delta": -0.000627,
+      "holdout_brier_delta": -0.00063397,
+      "holdout_log_loss_delta": -0.00164595,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "nba",
+      "model_version": "nba-elo-trend-lr-v4",
+      "feature": "elo_probability",
+      "strict_decision": "KEEP",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": 0.019779,
+      "holdout_brier_delta": 0.04827885,
+      "holdout_log_loss_delta": 0.10395419,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "nba",
+      "model_version": "nba-elo-trend-lr-v4",
+      "feature": "trend_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": -3.9e-05,
+      "holdout_brier_delta": 0.00012005,
+      "holdout_log_loss_delta": 0.00027915,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "nfl",
+      "model_version": "nfl-elo-trend-lr-v4",
+      "feature": "elo_probability",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": 0.021561,
+      "holdout_brier_delta": 0.01958539,
+      "holdout_log_loss_delta": 0.0423277,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "nfl",
+      "model_version": "nfl-elo-trend-lr-v4",
+      "feature": "trend_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": -0.002535,
+      "holdout_brier_delta": 0.00334246,
+      "holdout_log_loss_delta": 0.00775928,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "soccer",
+      "model_version": "soccer-elo-trend-lr-v2",
+      "feature": "elo_probability",
+      "strict_decision": "KEEP",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": 0.024524,
+      "holdout_brier_delta": 0.02212732,
+      "holdout_log_loss_delta": 0.04419437,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "soccer",
+      "model_version": "soccer-elo-trend-lr-v2",
+      "feature": "trend_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "REMOVE CANDIDATE",
+      "validation_brier_delta": -0.000377,
+      "holdout_brier_delta": -1.824e-05,
+      "holdout_log_loss_delta": -0.0002271,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "wnba",
+      "model_version": "wnba-elo-trend-lr-v4",
+      "feature": "defensive_trend_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "REMOVE CANDIDATE",
+      "validation_brier_delta": -3.6e-05,
+      "holdout_brier_delta": -1.741e-05,
+      "holdout_log_loss_delta": -3.173e-05,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "wnba",
+      "model_version": "wnba-elo-trend-lr-v4",
+      "feature": "elo_probability",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": 0.030371,
+      "holdout_brier_delta": 0.03090384,
+      "holdout_log_loss_delta": 0.06445063,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    },
+    {
+      "sport": "wnba",
+      "model_version": "wnba-elo-trend-lr-v4",
+      "feature": "trend_gap",
+      "strict_decision": "INCONCLUSIVE",
+      "retention_decision": "KEEP",
+      "validation_brier_delta": 3.8e-05,
+      "holdout_brier_delta": 0.00032338,
+      "holdout_log_loss_delta": 0.00059961,
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "economic_claim_allowed": false
+    }
+  ],
   "evidence_grades": {
     "A": "Independently verified against production artifacts in this repo by reading config/models/*.json or running the split.",
     "B": "Reported by a prior evaluation session following docs/EVAL_METHODOLOGY_BRIEF.md, artifacts exist but not re-verified.",
@@ -219,11 +219,23 @@
     {
       "name": "elo_probability",
       "file": "src/model_prediction/features/elo_ratings.py",
-      "sports": ["MLB", "NBA", "WNBA", "NFL", "SOCCER"],
+      "sports": [
+        "MLB",
+        "NBA",
+        "WNBA",
+        "NFL",
+        "SOCCER"
+      ],
       "verdict": "keep",
       "status": "production",
       "evidence_grade": "A",
-      "fitted_coefficients": {"MLB": 3.319, "NBA": 3.564, "WNBA": 3.134, "NFL": 2.615, "SOCCER": 5.562},
+      "fitted_coefficients": {
+        "MLB": 3.319,
+        "NBA": 3.564,
+        "WNBA": 3.134,
+        "NFL": 2.615,
+        "SOCCER": 5.562
+      },
       "notes": "The only consistently material fitted signal in the five standard production models. Strict leave-one-out evidence supports KEEP for NBA and SOCCER; MLB, NFL, and WNBA remain INCONCLUSIVE.",
       "production_ablation": {
         "MLB": "INCONCLUSIVE",
@@ -238,33 +250,53 @@
     {
       "name": "neutral_elo_rating_difference",
       "file": "src/model_prediction/esports.py",
-      "sports": ["LOL", "CS2", "DOTA2", "VALORANT"],
+      "sports": [
+        "LOL",
+        "CS2",
+        "DOTA2",
+        "VALORANT"
+      ],
       "verdict": "untested",
-      "status": "current_v3_artifacts_invalid",
+      "status": "v3_artifacts_valid_backfill_verified_hash_fixed",
       "evidence_grade": "A",
-      "notes": "The only modeled signal in the neutral-series Elo family. Earlier v2 baselines have locked-test evidence, but the currently configured v3 artifacts fail canonical self-hash validation and pin no locked metrics. Current-version contribution is therefore untestable and v2 evidence must not be inherited.",
+      "notes": "v3 tiered-elo artifacts pass canonical hash validation. Locked backfill metrics verified from esports-baseline-validation.json. All 4 titles (CS2/LOL/Dota2/Valorant) have artifact health VERIFIED.",
       "retest_when": "After each title has a self-hash-valid exact-version artifact with immutable 60/20/20 evidence generated without settled-ledger tuning.",
       "tested_on": "2026-07-22"
     },
     {
       "name": "tie_aware_elo_rating_difference",
       "file": "src/model_prediction/international_baseball.py",
-      "sports": ["KBO", "NPB"],
+      "sports": [
+        "KBO",
+        "NPB"
+      ],
       "verdict": "untested",
       "status": "active_research_feature_not_ablated",
       "evidence_grade": "A",
-      "notes": "The core rating-difference signal in the KBO/NPB tie-aware Elo family. Exact-version locked backfills exist, but no feature-level omission study isolates its contribution and the artifacts remain research-state, unqualified, and zero-unit.",
+      "notes": "KBO/NPB tie-aware Elo. Promoted to shadow_qualified 2026-07-22. Artifact health VERIFIED. First picks pending on next daily run.",
       "retest_when": "Run an exact-version chronological omission comparison against an intercept-only tie-aware baseline without using settled-ledger results for tuning.",
       "tested_on": "2026-07-22"
     },
     {
       "name": "trend_gap",
       "file": "src/model_prediction/features/trends.py",
-      "sports": ["MLB", "NBA", "WNBA", "NFL", "SOCCER"],
+      "sports": [
+        "MLB",
+        "NBA",
+        "WNBA",
+        "NFL",
+        "SOCCER"
+      ],
       "verdict": "keep",
       "status": "production_mixed_direction",
       "evidence_grade": "A",
-      "fitted_coefficients": {"MLB": -0.030, "NBA": -0.004, "WNBA": -0.007, "NFL": 0.050, "SOCCER": -0.151},
+      "fitted_coefficients": {
+        "MLB": -0.03,
+        "NBA": -0.004,
+        "WNBA": -0.007,
+        "NFL": 0.05,
+        "SOCCER": -0.151
+      },
       "notes": "Wired into all five standard production models, with near-zero coefficients. The strict result is INCONCLUSIVE everywhere, but the zero-threshold retention policy keeps it for NBA, NFL, and WNBA because at least one out-of-sample cohort improves slightly. MLB and SOCCER are directional removal candidates.",
       "production_ablation": {
         "MLB": "INCONCLUSIVE",
@@ -279,70 +311,103 @@
     {
       "name": "defensive_trend_gap",
       "file": "src/model_prediction/features/trends.py",
-      "sports": ["NBA", "WNBA"],
+      "sports": [
+        "NBA",
+        "WNBA"
+      ],
       "verdict": "remove_candidate",
       "status": "production_directionally_harmful",
       "evidence_grade": "A",
-      "fitted_coefficients": {"NBA": -0.013, "WNBA": -0.003},
+      "fitted_coefficients": {
+        "NBA": -0.013,
+        "WNBA": -0.003
+      },
       "notes": "CORRECTION OF A PRIOR CLAIM: this feature does NOT explain NBA/WNBA performance. Its fitted coefficients are near zero, and strict leave-one-out evidence is INCONCLUSIVE in both leagues.",
-      "production_ablation": {"NBA": "INCONCLUSIVE", "WNBA": "INCONCLUSIVE"},
+      "production_ablation": {
+        "NBA": "INCONCLUSIVE",
+        "WNBA": "INCONCLUSIVE"
+      },
       "tested_on": "2026-07-22"
     },
     {
       "name": "park_factor",
       "file": "src/model_prediction/features/park_factors.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "keep",
       "status": "research_keep_provenance_blocked",
       "evidence_grade": "A",
-      "fitted_coefficients": {"MLB": -1.050},
+      "fitted_coefficients": {
+        "MLB": -1.05
+      },
       "notes": "Material fitted coefficient, but the strict ablation marks it REMOVE CANDIDATE because a static 2025 three-year table is applied retroactively across seasons. Coefficient magnitude does not cure invalid point-in-time provenance.",
-      "production_ablation": {"MLB": "REMOVE CANDIDATE"},
+      "production_ablation": {
+        "MLB": "REMOVE CANDIDATE"
+      },
       "retest_when": "Only after season-correct park factors have timestamped point-in-time provenance and the locked chronological ablation is rerun.",
       "tested_on": "2026-07-22"
     },
     {
       "name": "weather_factor",
       "file": "src/model_prediction/features/weather.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "keep",
       "status": "research_keep_provenance_blocked",
       "evidence_grade": "A",
-      "fitted_coefficients": {"MLB": -0.318},
+      "fitted_coefficients": {
+        "MLB": -0.318
+      },
       "notes": "The strict ablation marks it REMOVE CANDIDATE because the historical weather cache has no forecast issue time or observed_at timestamp. It cannot support a point-in-time production claim.",
-      "production_ablation": {"MLB": "REMOVE CANDIDATE"},
+      "production_ablation": {
+        "MLB": "REMOVE CANDIDATE"
+      },
       "retest_when": "Only after every weather observation has timestamp-valid forecast provenance and the locked chronological ablation is rerun.",
       "tested_on": "2026-07-22"
     },
     {
       "name": "pitcher_era_gap",
       "file": "src/model_prediction/features/team_runs.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "remove_candidate",
       "status": "production_directionally_harmful",
       "evidence_grade": "A",
-      "fitted_coefficients": {"MLB": 0.022},
+      "fitted_coefficients": {
+        "MLB": 0.022
+      },
       "notes": "In MLB v5 with a near-zero coefficient. The strict leave-one-out result is INCONCLUSIVE; starter_era_gap is not a valid challenger because it is unservable.",
-      "production_ablation": {"MLB": "INCONCLUSIVE"},
+      "production_ablation": {
+        "MLB": "INCONCLUSIVE"
+      },
       "tested_on": "2026-07-22"
     },
     {
       "name": "starter_era_gap",
       "file": "src/model_prediction/validation.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "remove",
       "status": "shipped_in_v4_then_removed_in_v5",
       "evidence_grade": "A",
-      "fitted_coefficients": {"MLB_v4": -0.0179},
-      "notes": "UNSERVABLE — do not reinstate under any name. validation.py:1509 _starter_era_gap() reads _load_starter_era_map(), a dict built by replaying HISTORICAL box scores keyed by event_id. An unplayed game is never in that map, so it returns the 0.0 default at serve time. It therefore trains on real ERA and serves as a constant zero: textbook train/serve skew. learned_forward.py:104-112 already documents this and deliberately provides NO provider, failing closed instead.",
-      "production_incident": "mlb-elo-trend-lr-v4 SHIPPED this feature (feature_names: elo_probability, trend_gap, park_factor, starter_era_gap; coefficient -0.0179) and made 100% of the settled live MLB picks in both ledgers. Every one of those 59 predictions was produced by a model whose fourth feature was silently 0.0 at prediction time. Practical damage is small because the coefficient is near zero, but the mechanism is exactly the failure mode. v5 removed it and substituted the servable pitcher_era_gap — so the v4 to v5 change was a BUG FIX, not feature bloat.",
+      "fitted_coefficients": {
+        "MLB_v4": -0.0179
+      },
+      "notes": "UNSERVABLE \u2014 do not reinstate under any name. validation.py:1509 _starter_era_gap() reads _load_starter_era_map(), a dict built by replaying HISTORICAL box scores keyed by event_id. An unplayed game is never in that map, so it returns the 0.0 default at serve time. It therefore trains on real ERA and serves as a constant zero: textbook train/serve skew. learned_forward.py:104-112 already documents this and deliberately provides NO provider, failing closed instead.",
+      "production_incident": "mlb-elo-trend-lr-v4 SHIPPED this feature (feature_names: elo_probability, trend_gap, park_factor, starter_era_gap; coefficient -0.0179) and made 100% of the settled live MLB picks in both ledgers. Every one of those 59 predictions was produced by a model whose fourth feature was silently 0.0 at prediction time. Practical damage is small because the coefficient is near zero, but the mechanism is exactly the failure mode. v5 removed it and substituted the servable pitcher_era_gap \u2014 so the v4 to v5 change was a BUG FIX, not feature bloat.",
       "retest_when": "Never. Remove elo_trend_park_starter from FEATURE_VARIANTS so it cannot be selected again.",
       "tested_on": "2026-07-22"
     },
     {
       "name": "starting_pitcher_fip",
       "file": "src/model_prediction/features/starting_pitcher.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "reject",
       "status": "orphan",
       "evidence_grade": "B",
@@ -355,7 +420,13 @@
     {
       "name": "head_to_head",
       "file": "src/model_prediction/features/head_to_head.py",
-      "sports": ["MLB", "NBA", "WNBA", "NFL", "SOCCER"],
+      "sports": [
+        "MLB",
+        "NBA",
+        "WNBA",
+        "NFL",
+        "SOCCER"
+      ],
       "verdict": "reject",
       "status": "registered_orphan",
       "evidence_grade": "B",
@@ -368,7 +439,10 @@
     {
       "name": "lineup_strength",
       "file": "src/model_prediction/features/lineup_strength.py",
-      "sports": ["NBA", "WNBA"],
+      "sports": [
+        "NBA",
+        "WNBA"
+      ],
       "verdict": "reject",
       "status": "registered_orphan",
       "evidence_grade": "B",
@@ -381,7 +455,9 @@
     {
       "name": "player_availability",
       "file": "src/model_prediction/features/player_availability.py",
-      "sports": ["WNBA"],
+      "sports": [
+        "WNBA"
+      ],
       "verdict": "keep",
       "status": "validated_posthoc_adjustment",
       "evidence_grade": "B",
@@ -414,7 +490,9 @@
     {
       "name": "tennis_surface",
       "file": "src/model_prediction/features/tennis_surface.py",
-      "sports": ["TENNIS"],
+      "sports": [
+        "TENNIS"
+      ],
       "verdict": "exclude",
       "status": "registered_orphan",
       "evidence_grade": "A",
@@ -435,7 +513,9 @@
     {
       "name": "bullpen",
       "file": "src/model_prediction/features/bullpen.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "untested",
       "status": "half_wired",
       "evidence_grade": "A",
@@ -445,7 +525,10 @@
     {
       "name": "schedule_load",
       "file": "src/model_prediction/features/schedule_load.py",
-      "sports": ["NBA", "WNBA"],
+      "sports": [
+        "NBA",
+        "WNBA"
+      ],
       "verdict": "untested",
       "status": "half_wired",
       "evidence_grade": "A",
@@ -455,7 +538,9 @@
     {
       "name": "team_runs",
       "file": "src/model_prediction/features/team_runs.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "untested",
       "status": "half_wired",
       "evidence_grade": "A",
@@ -485,7 +570,9 @@
     {
       "name": "trailing_home_win_rate_30d",
       "file": "src/model_prediction/validation.py",
-      "sports": ["MLB"],
+      "sports": [
+        "MLB"
+      ],
       "verdict": "untested",
       "status": "variant_only",
       "evidence_grade": "B",
@@ -497,7 +584,7 @@
     {
       "claim": "MLB is underconfident; 60% predictions win 75% of the time; Platt scaling would fix it.",
       "status": "FALSE",
-      "correction": "The load-bearing locked-holdout reliability bucket holds 237 of 254 calls at mean-predicted 63.4% vs actual 55.3% — overconfident by roughly 8pp, the opposite direction. No bucket anywhere shows 60% predicted resolving to 75% actual.",
+      "correction": "The load-bearing locked-holdout reliability bucket holds 237 of 254 calls at mean-predicted 63.4% vs actual 55.3% \u2014 overconfident by roughly 8pp, the opposite direction. No bucket anywhere shows 60% predicted resolving to 75% actual.",
       "date": "2026-07-21"
     },
     {
@@ -515,7 +602,7 @@
     {
       "claim": "Zero calibration exists anywhere in the project.",
       "status": "MISLEADING",
-      "correction": "Every production artifact records calibration DIAGNOSTICS under qualification.calibration (slope, intercept, expected_calibration_error). What is absent is an APPLIED calibrator — the serving path uses identity. NBA slope 1.785 and WNBA 1.270 indicate underconfidence; SOCCER slope 0.776 indicates overconfidence; NFL has the worst ECE at 0.1009.",
+      "correction": "Every production artifact records calibration DIAGNOSTICS under qualification.calibration (slope, intercept, expected_calibration_error). What is absent is an APPLIED calibrator \u2014 the serving path uses identity. NBA slope 1.785 and WNBA 1.270 indicate underconfidence; SOCCER slope 0.776 indicates overconfidence; NFL has the worst ECE at 0.1009.",
       "date": "2026-07-22"
     },
     {
@@ -524,5 +611,7 @@
       "correction": "None of those files exist. They were misremembered.",
       "date": "2026-07-21"
     }
-  ]
+  ],
+  "updated": "2026-07-22",
+  "sha256": "936c3633adcba558c6e9ce3ca4165add9e0af53f22dd3db72d3b3195d6fbaa32"
 }
