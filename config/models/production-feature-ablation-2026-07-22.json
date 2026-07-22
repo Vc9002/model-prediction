@@ -1,0 +1,1959 @@
+{
+  "artifact_hash": "e036d3ef399651ef020a9b43a325e247de9f4b74198330ad6dae85c41ac2a9fc",
+  "as_of_date": "2026-07-22",
+  "diagnostic_units": "flat one-unit staking at synthetic -110; non-executable",
+  "economic_claims_allowed": false,
+  "explicit_score_data_root": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data",
+  "generated_at_utc": "2026-07-22T00:56:11.504495Z",
+  "holdout_status": "reused_locked_holdouts_development_evidence",
+  "market_prices_used": false,
+  "models": {
+    "cs2": {
+      "artifact_hash": "aecf7cf2eb87747d080cdeb2d965dd5ff2623edf9dd710aa9c771daa61d0a885",
+      "artifact_path": "config/models/cs2-neutral-series-elo-v2.json",
+      "artifact_version": "cs2-neutral-series-elo-v2",
+      "production_features": [
+        "neutral_elo_rating_difference"
+      ],
+      "reason": "active artifact does not pin locked-test metrics and calls",
+      "reproduction_gate": {
+        "failures": [
+          "active artifact does not pin locked-test metrics and calls"
+        ],
+        "passed": false
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 37887,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/cs2/matches.jsonl",
+        "raw_nonempty_rows": 37887,
+        "sha256": "383a6c10ed3f9c6ec7ddf099ebbb0c19d224fe690dcdfa9bf62a07bb9f399109",
+        "walk_forward_rows": 37887
+      },
+      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+    },
+    "dota2": {
+      "artifact_hash": "60cc774ad3002a7529570909940337a5af5782c2461438910bdcad9e470f34dd",
+      "artifact_path": "config/models/dota2-neutral-series-elo-v2.json",
+      "artifact_version": "dota2-neutral-series-elo-v2",
+      "production_features": [
+        "neutral_elo_rating_difference"
+      ],
+      "reason": "active artifact does not pin locked-test metrics and calls",
+      "reproduction_gate": {
+        "failures": [
+          "active artifact does not pin locked-test metrics and calls"
+        ],
+        "passed": false
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 14509,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/dota2/matches.jsonl",
+        "raw_nonempty_rows": 14509,
+        "sha256": "969da1b7eeaa62a4c64dfe35383ea2484de36080690cccc3fbc924ac816e5bbd",
+        "walk_forward_rows": 14509
+      },
+      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+    },
+    "lol": {
+      "artifact_hash": "daa3fc90ca4593e2a301d3702bff6f84e813dc20ca7f7c0733d1637d80aeadf8",
+      "artifact_path": "config/models/lol-neutral-series-elo-v2.json",
+      "artifact_version": "lol-neutral-series-elo-v2",
+      "production_features": [
+        "neutral_elo_rating_difference"
+      ],
+      "reason": "active artifact does not pin locked-test metrics and calls",
+      "reproduction_gate": {
+        "failures": [
+          "active artifact does not pin locked-test metrics and calls"
+        ],
+        "passed": false
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 11916,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/lol/matches.jsonl",
+        "raw_nonempty_rows": 11916,
+        "sha256": "c4f16d0c8b9420ace0d33ef315ddabfd83b6c91aa752a204d637a02a5e4e96e6",
+        "walk_forward_rows": 11916
+      },
+      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+    },
+    "mlb": {
+      "artifact_hash": "bb6331f9ae39a7346e90a5f33f6b4e07168a5805b49be25c6e6134d413c081de",
+      "artifact_path": "config/models/mlb-elo-trend-lr-v5.json",
+      "artifact_version": "mlb-elo-trend-lr-v5",
+      "exact_active_artifact": {
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.54246,
+            "brier_score": 0.249407,
+            "log_loss": 0.692076,
+            "observations": 1366
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.250872,
+            "calls": 254,
+            "confidence_threshold": 0.59980208,
+            "diagnostic_units_at_minus_110": 19.0,
+            "hit_rate": 0.562992,
+            "hits": 143,
+            "log_loss": 0.695408
+          }
+        },
+        "validation": {
+          "accuracy": 0.560264,
+          "brier_score": 0.245502,
+          "log_loss": 0.684,
+          "observations": 1062
+        }
+      },
+      "frozen_threshold": 0.59980208,
+      "leave_one_out": {
+        "elo_probability": {
+          "comparison_key": "mlb:elo_probability",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "park_factor": -1.9502588021,
+              "pitcher_era_gap": -0.0137138798,
+              "trend_gap": -0.0337118293,
+              "weather_factor": -0.1653197696
+            },
+            "features": [
+              "trend_gap",
+              "park_factor",
+              "weather_factor",
+              "pitcher_era_gap"
+            ],
+            "intercept": 2.2455192116
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.520498,
+              "brier_score": 0.249121,
+              "log_loss": 0.691382,
+              "observations": 1366
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": null,
+              "calls": 0,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 0.0,
+              "hit_rate": null,
+              "hits": 0,
+              "log_loss": null
+            }
+          },
+          "omitted_feature": "elo_probability",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00380321,
+                0.00305108
+              ],
+              "brier_score": -0.00028645,
+              "log_loss": -0.00069373,
+              "log_loss_ci_95": [
+                -0.00790144,
+                0.00618524
+              ]
+            },
+            "dates": 103,
+            "paired_date_sign_flip_p_value": 0.87462507,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.87462507,
+          "remaining_features": [
+            "trend_gap",
+            "park_factor",
+            "weather_factor",
+            "pitcher_era_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.541431,
+              "brier_score": 0.248111,
+              "log_loss": 0.689359,
+              "observations": 1062
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": null,
+              "calls": 0,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 0.0,
+              "hit_rate": null,
+              "hits": 0,
+              "log_loss": null
+            }
+          },
+          "validation_brier_delta": 0.002609
+        },
+        "park_factor": {
+          "comparison_key": "mlb:park_factor",
+          "decision": "REMOVE CANDIDATE",
+          "decision_reason": "2025-three-year static table is applied retroactively across seasons",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 3.3901858623,
+              "pitcher_era_gap": 0.0210751958,
+              "trend_gap": -0.0293689004,
+              "weather_factor": -0.1534452192
+            },
+            "features": [
+              "elo_probability",
+              "trend_gap",
+              "weather_factor",
+              "pitcher_era_gap"
+            ],
+            "intercept": -1.5224965821
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.541728,
+              "brier_score": 0.249441,
+              "log_loss": 0.692129,
+              "observations": 1366
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.249864,
+              "calls": 245,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 20.363636,
+              "hit_rate": 0.567347,
+              "hits": 139,
+              "log_loss": 0.693288
+            }
+          },
+          "omitted_feature": "park_factor",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00034877,
+                0.00042194
+              ],
+              "brier_score": 3.4e-05,
+              "log_loss": 5.368e-05,
+              "log_loss_ci_95": [
+                -0.0007483,
+                0.00084941
+              ]
+            },
+            "dates": 103,
+            "paired_date_sign_flip_p_value": 0.87202559,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "2025-three-year static table is applied retroactively across seasons",
+            "status": "blocked"
+          },
+          "raw_p_value": 0.87202559,
+          "remaining_features": [
+            "elo_probability",
+            "trend_gap",
+            "weather_factor",
+            "pitcher_era_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.548023,
+              "brier_score": 0.245428,
+              "log_loss": 0.683862,
+              "observations": 1062
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.234506,
+              "calls": 189,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 32.454545,
+              "hit_rate": 0.613757,
+              "hits": 116,
+              "log_loss": 0.661452
+            }
+          },
+          "validation_brier_delta": -7.4e-05
+        },
+        "pitcher_era_gap": {
+          "comparison_key": "mlb:pitcher_era_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 3.1773490444,
+              "park_factor": -1.0030523448,
+              "trend_gap": -0.0380421387,
+              "weather_factor": -0.3002292554
+            },
+            "features": [
+              "elo_probability",
+              "trend_gap",
+              "park_factor",
+              "weather_factor"
+            ],
+            "intercept": -0.2602952773
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.546852,
+              "brier_score": 0.249162,
+              "log_loss": 0.691576,
+              "observations": 1366
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.252091,
+              "calls": 265,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 15.636364,
+              "hit_rate": 0.554717,
+              "hits": 147,
+              "log_loss": 0.697836
+            }
+          },
+          "omitted_feature": "pitcher_era_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00077772,
+                0.00026152
+              ],
+              "brier_score": -0.00024557,
+              "log_loss": -0.00050005,
+              "log_loss_ci_95": [
+                -0.00159794,
+                0.00055364
+              ]
+            },
+            "dates": 103,
+            "paired_date_sign_flip_p_value": 0.3815237,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.3815237,
+          "remaining_features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor",
+            "weather_factor"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.552731,
+              "brier_score": 0.245164,
+              "log_loss": 0.68329,
+              "observations": 1062
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.231917,
+              "calls": 207,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 39.272727,
+              "hit_rate": 0.623188,
+              "hits": 129,
+              "log_loss": 0.656067
+            }
+          },
+          "validation_brier_delta": -0.000338
+        },
+        "trend_gap": {
+          "comparison_key": "mlb:trend_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 3.3210856076,
+              "park_factor": -1.0464595384,
+              "pitcher_era_gap": 0.024915335,
+              "weather_factor": -0.3194190173
+            },
+            "features": [
+              "elo_probability",
+              "park_factor",
+              "weather_factor",
+              "pitcher_era_gap"
+            ],
+            "intercept": -0.2745516564
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.545388,
+              "brier_score": 0.249333,
+              "log_loss": 0.691908,
+              "observations": 1366
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.252914,
+              "calls": 249,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 12.545455,
+              "hit_rate": 0.550201,
+              "hits": 137,
+              "log_loss": 0.699456
+            }
+          },
+          "omitted_feature": "trend_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00052049,
+                0.00036864
+              ],
+              "brier_score": -7.43e-05,
+              "log_loss": -0.00016749,
+              "log_loss_ci_95": [
+                -0.00108514,
+                0.0007441
+              ]
+            },
+            "dates": 103,
+            "paired_date_sign_flip_p_value": 0.73805239,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.73805239,
+          "remaining_features": [
+            "elo_probability",
+            "park_factor",
+            "weather_factor",
+            "pitcher_era_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.553672,
+              "brier_score": 0.244919,
+              "log_loss": 0.682798,
+              "observations": 1062
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.221876,
+              "calls": 185,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 51.727273,
+              "hit_rate": 0.67027,
+              "hits": 124,
+              "log_loss": 0.635675
+            }
+          },
+          "validation_brier_delta": -0.000583
+        },
+        "weather_factor": {
+          "comparison_key": "mlb:weather_factor",
+          "decision": "REMOVE CANDIDATE",
+          "decision_reason": "historical weather cache has no forecast issue or observed_at timestamp",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 3.2964166716,
+              "park_factor": -1.2118402769,
+              "pitcher_era_gap": 0.0220056612,
+              "trend_gap": -0.0305781262
+            },
+            "features": [
+              "elo_probability",
+              "trend_gap",
+              "park_factor",
+              "pitcher_era_gap"
+            ],
+            "intercept": -0.4163469499
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.540996,
+              "brier_score": 0.249413,
+              "log_loss": 0.692092,
+              "observations": 1366
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.251445,
+              "calls": 255,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 18.0,
+              "hit_rate": 0.560784,
+              "hits": 143,
+              "log_loss": 0.696595
+            }
+          },
+          "omitted_feature": "weather_factor",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -6.671e-05,
+                7.648e-05
+              ],
+              "brier_score": 6.25e-06,
+              "log_loss": 1.604e-05,
+              "log_loss_ci_95": [
+                -0.00013514,
+                0.0001588
+              ]
+            },
+            "dates": 103,
+            "paired_date_sign_flip_p_value": 0.86642671,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "historical weather cache has no forecast issue or observed_at timestamp",
+            "status": "blocked"
+          },
+          "raw_p_value": 0.86642671,
+          "remaining_features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor",
+            "pitcher_era_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.553672,
+              "brier_score": 0.245536,
+              "log_loss": 0.684066,
+              "observations": 1062
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.228357,
+              "calls": 196,
+              "confidence_threshold": 0.59980208,
+              "diagnostic_units_at_minus_110": 44.545455,
+              "hit_rate": 0.642857,
+              "hits": 126,
+              "log_loss": 0.64895
+            }
+          },
+          "validation_brier_delta": 3.4e-05
+        }
+      },
+      "matched_refit_baseline": {
+        "fit": {
+          "coefficients": {
+            "elo_probability": 3.3192298736,
+            "park_factor": -1.0500160548,
+            "pitcher_era_gap": 0.021979464,
+            "trend_gap": -0.0304329386,
+            "weather_factor": -0.3178361649
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "park_factor",
+            "weather_factor",
+            "pitcher_era_gap"
+          ],
+          "intercept": -0.2719511151
+        },
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.54246,
+            "brier_score": 0.249407,
+            "log_loss": 0.692076,
+            "observations": 1366
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.250872,
+            "calls": 254,
+            "confidence_threshold": 0.59980208,
+            "diagnostic_units_at_minus_110": 19.0,
+            "hit_rate": 0.562992,
+            "hits": 143,
+            "log_loss": 0.695408
+          }
+        },
+        "validation": {
+          "accuracy": 0.560264,
+          "brier_score": 0.245502,
+          "log_loss": 0.684,
+          "observations": 1062
+        }
+      },
+      "model_family": "logistic_regression",
+      "production_features": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "pitcher_era_gap"
+      ],
+      "reproduction_gate": {
+        "coefficient_deltas_matched_refit_minus_artifact": {
+          "elo_probability": 0.0,
+          "park_factor": 0.0,
+          "pitcher_era_gap": 0.0,
+          "trend_gap": 0.0,
+          "weather_factor": 0.0
+        },
+        "coefficient_tolerance": 1e-08,
+        "failures": [],
+        "holdout_metric_deltas_matched_refit_minus_artifact": {
+          "brier_score": 0.0,
+          "calls": 0,
+          "hits": 0,
+          "log_loss": -3.8817e-08
+        },
+        "intercept_delta_matched_refit_minus_artifact": 0.0,
+        "metric_tolerance": 1e-06,
+        "passed": true
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 6257,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data/processed/mlb/games.jsonl",
+        "raw_nonempty_rows": 7816,
+        "sha256": "154ce14648773c03934807517d46d634c647e4dbb66149ee76c20718aff50261",
+        "walk_forward_rows": 6198
+      },
+      "split": {
+        "locked_holdout": {
+          "end": "2026-07-18",
+          "observations": 1366,
+          "start": "2026-04-04"
+        },
+        "method": "artifact_frozen_complete_date_60_20_20",
+        "train": {
+          "end": "2025-07-15",
+          "observations": 3739,
+          "start": "2024-04-06"
+        },
+        "validation": {
+          "end": "2026-04-03",
+          "observations": 1062,
+          "start": "2025-07-18"
+        }
+      },
+      "status": "evaluated",
+      "target": "home_win_binary"
+    },
+    "nba": {
+      "artifact_hash": "79618accee5a07fd472001ea010870f3cd86bf77869ddceb10d1d633eb834c0c",
+      "artifact_path": "config/models/nba-elo-trend-lr-v4.json",
+      "artifact_version": "nba-elo-trend-lr-v4",
+      "exact_active_artifact": {
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.703364,
+            "brier_score": 0.193223,
+            "log_loss": 0.571952,
+            "observations": 654
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.18541,
+            "calls": 577,
+            "confidence_threshold": 0.54443676,
+            "diagnostic_units_at_minus_110": 234.363636,
+            "hit_rate": 0.736568,
+            "hits": 425,
+            "log_loss": 0.555305
+          }
+        },
+        "validation": {
+          "accuracy": 0.625498,
+          "brier_score": 0.226986,
+          "log_loss": 0.645067,
+          "observations": 753
+        }
+      },
+      "frozen_threshold": 0.54443676,
+      "leave_one_out": {
+        "defensive_trend_gap": {
+          "comparison_key": "nba:defensive_trend_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 3.5178021226,
+              "trend_gap": -0.0010687266
+            },
+            "features": [
+              "elo_probability",
+              "trend_gap"
+            ],
+            "intercept": -1.8806957728
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.703364,
+              "brier_score": 0.192589,
+              "log_loss": 0.570306,
+              "observations": 654
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.184507,
+              "calls": 575,
+              "confidence_threshold": 0.54443676,
+              "diagnostic_units_at_minus_110": 236.363636,
+              "hit_rate": 0.73913,
+              "hits": 425,
+              "log_loss": 0.55304
+            }
+          },
+          "omitted_feature": "defensive_trend_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00148153,
+                0.00016099
+              ],
+              "brier_score": -0.00063397,
+              "log_loss": -0.00164595,
+              "log_loss_ci_95": [
+                -0.00350294,
+                0.00012325
+              ]
+            },
+            "dates": 120,
+            "paired_date_sign_flip_p_value": 0.15156969,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.15156969,
+          "remaining_features": [
+            "elo_probability",
+            "trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.62417,
+              "brier_score": 0.226359,
+              "log_loss": 0.643726,
+              "observations": 753
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.222166,
+              "calls": 640,
+              "confidence_threshold": 0.54443676,
+              "diagnostic_units_at_minus_110": 150.363636,
+              "hit_rate": 0.646875,
+              "hits": 414,
+              "log_loss": 0.634964
+            }
+          },
+          "validation_brier_delta": -0.000627
+        },
+        "elo_probability": {
+          "comparison_key": "nba:elo_probability",
+          "decision": "KEEP",
+          "decision_reason": "removal worsened validation and holdout proper scores with multiplicity-adjusted paired evidence",
+          "fit": {
+            "coefficients": {
+              "defensive_trend_gap": 0.0205112899,
+              "trend_gap": 0.0473437661
+            },
+            "features": [
+              "trend_gap",
+              "defensive_trend_gap"
+            ],
+            "intercept": 0.163790946
+          },
+          "holm_adjusted_p_value": 0.0029994,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.571865,
+              "brier_score": 0.241502,
+              "log_loss": 0.675906,
+              "observations": 654
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.234902,
+              "calls": 347,
+              "confidence_threshold": 0.54443676,
+              "diagnostic_units_at_minus_110": 67.272727,
+              "hit_rate": 0.62536,
+              "hits": 217,
+              "log_loss": 0.662489
+            }
+          },
+          "omitted_feature": "elo_probability",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                0.03865552,
+                0.05765752
+              ],
+              "brier_score": 0.04827885,
+              "log_loss": 0.10395419,
+              "log_loss_ci_95": [
+                0.0830121,
+                0.12430698
+              ]
+            },
+            "dates": 120,
+            "paired_date_sign_flip_p_value": 0.00019996,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.00019996,
+          "remaining_features": [
+            "trend_gap",
+            "defensive_trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.559097,
+              "brier_score": 0.246765,
+              "log_loss": 0.686654,
+              "observations": 753
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.246592,
+              "calls": 401,
+              "confidence_threshold": 0.54443676,
+              "diagnostic_units_at_minus_110": 28.545455,
+              "hit_rate": 0.561097,
+              "hits": 225,
+              "log_loss": 0.686296
+            }
+          },
+          "validation_brier_delta": 0.019779
+        },
+        "trend_gap": {
+          "comparison_key": "nba:trend_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "defensive_trend_gap": -0.0123363946,
+              "elo_probability": 3.5430667125
+            },
+            "features": [
+              "elo_probability",
+              "defensive_trend_gap"
+            ],
+            "intercept": -1.8948452731
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.701835,
+              "brier_score": 0.193343,
+              "log_loss": 0.572231,
+              "observations": 654
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.185384,
+              "calls": 578,
+              "confidence_threshold": 0.54443676,
+              "diagnostic_units_at_minus_110": 237.181818,
+              "hit_rate": 0.738754,
+              "hits": 427,
+              "log_loss": 0.555311
+            }
+          },
+          "omitted_feature": "trend_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00013447,
+                0.00036259
+              ],
+              "brier_score": 0.00012005,
+              "log_loss": 0.00027915,
+              "log_loss_ci_95": [
+                -0.00026586,
+                0.00080079
+              ]
+            },
+            "dates": 120,
+            "paired_date_sign_flip_p_value": 0.36452709,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.36452709,
+          "remaining_features": [
+            "elo_probability",
+            "defensive_trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.62417,
+              "brier_score": 0.226947,
+              "log_loss": 0.644937,
+              "observations": 753
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.222569,
+              "calls": 638,
+              "confidence_threshold": 0.54443676,
+              "diagnostic_units_at_minus_110": 150.454545,
+              "hit_rate": 0.647335,
+              "hits": 413,
+              "log_loss": 0.635802
+            }
+          },
+          "validation_brier_delta": -3.9e-05
+        }
+      },
+      "matched_refit_baseline": {
+        "fit": {
+          "coefficients": {
+            "defensive_trend_gap": -0.013059643,
+            "elo_probability": 3.5640800015,
+            "trend_gap": -0.0035535722
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "defensive_trend_gap"
+          ],
+          "intercept": -1.9071845069
+        },
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.703364,
+            "brier_score": 0.193223,
+            "log_loss": 0.571952,
+            "observations": 654
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.18541,
+            "calls": 577,
+            "confidence_threshold": 0.54443676,
+            "diagnostic_units_at_minus_110": 234.363636,
+            "hit_rate": 0.736568,
+            "hits": 425,
+            "log_loss": 0.555305
+          }
+        },
+        "validation": {
+          "accuracy": 0.625498,
+          "brier_score": 0.226986,
+          "log_loss": 0.645067,
+          "observations": 753
+        }
+      },
+      "model_family": "logistic_regression",
+      "production_features": [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap"
+      ],
+      "reproduction_gate": {
+        "coefficient_deltas_matched_refit_minus_artifact": {
+          "defensive_trend_gap": 0.0,
+          "elo_probability": 0.0,
+          "trend_gap": 0.0
+        },
+        "coefficient_tolerance": 1e-08,
+        "failures": [],
+        "holdout_metric_deltas_matched_refit_minus_artifact": {
+          "brier_score": 0.0,
+          "calls": 0,
+          "hits": 0,
+          "log_loss": -8.1504e-08
+        },
+        "intercept_delta_matched_refit_minus_artifact": 0.0,
+        "metric_tolerance": 1e-06,
+        "passed": true
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 3633,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data/processed/nba/games.jsonl",
+        "raw_nonempty_rows": 3633,
+        "sha256": "198b418ec7da2ff81c3f4dc5a8f799f1e03133556fd31e24c3ff063f3ef92b2b",
+        "walk_forward_rows": 3578
+      },
+      "split": {
+        "locked_holdout": {
+          "end": "2026-06-13",
+          "observations": 654,
+          "start": "2026-01-24"
+        },
+        "method": "artifact_frozen_complete_date_60_20_20",
+        "train": {
+          "end": "2025-05-27",
+          "observations": 2171,
+          "start": "2024-01-08"
+        },
+        "validation": {
+          "end": "2026-01-23",
+          "observations": 753,
+          "start": "2025-05-28"
+        }
+      },
+      "status": "evaluated",
+      "target": "home_win_binary"
+    },
+    "nfl": {
+      "artifact_hash": "5cb5857519c32e04c895a3220afdc208e3d717ba0793e8d4a6946b1332f11654",
+      "artifact_path": "config/models/nfl-elo-trend-lr-v4.json",
+      "artifact_version": "nfl-elo-trend-lr-v4",
+      "exact_active_artifact": {
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.639344,
+            "brier_score": 0.217894,
+            "log_loss": 0.625581,
+            "observations": 122
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.204736,
+            "calls": 87,
+            "confidence_threshold": 0.54411292,
+            "diagnostic_units_at_minus_110": 31.363636,
+            "hit_rate": 0.712644,
+            "hits": 62,
+            "log_loss": 0.597916
+          }
+        },
+        "validation": {
+          "accuracy": 0.60274,
+          "brier_score": 0.2295,
+          "log_loss": 0.650355,
+          "observations": 146
+        }
+      },
+      "frozen_threshold": 0.54411292,
+      "leave_one_out": {
+        "elo_probability": {
+          "comparison_key": "nfl:elo_probability",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "trend_gap": 0.1140335113
+            },
+            "features": [
+              "trend_gap"
+            ],
+            "intercept": 0.1821537705
+          },
+          "holm_adjusted_p_value": 0.88062384,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.598361,
+              "brier_score": 0.23748,
+              "log_loss": 0.667908,
+              "observations": 122
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.230359,
+              "calls": 78,
+              "confidence_threshold": 0.54411292,
+              "diagnostic_units_at_minus_110": 19.363636,
+              "hit_rate": 0.653846,
+              "hits": 51,
+              "log_loss": 0.653555
+            }
+          },
+          "omitted_feature": "elo_probability",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                0.00017803,
+                0.03662272
+              ],
+              "brier_score": 0.01958539,
+              "log_loss": 0.0423277,
+              "log_loss_ci_95": [
+                0.00231446,
+                0.0780042
+              ]
+            },
+            "dates": 31,
+            "paired_date_sign_flip_p_value": 0.07338532,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.07338532,
+          "remaining_features": [
+            "trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.554795,
+              "brier_score": 0.251061,
+              "log_loss": 0.695627,
+              "observations": 146
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.253381,
+              "calls": 94,
+              "confidence_threshold": 0.54411292,
+              "diagnostic_units_at_minus_110": 3.363636,
+              "hit_rate": 0.542553,
+              "hits": 51,
+              "log_loss": 0.700471
+            }
+          },
+          "validation_brier_delta": 0.021561
+        },
+        "trend_gap": {
+          "comparison_key": "nfl:trend_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 2.7378182616
+            },
+            "features": [
+              "elo_probability"
+            ],
+            "intercept": -1.4040009264
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.655738,
+              "brier_score": 0.221237,
+              "log_loss": 0.63334,
+              "observations": 122
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.208872,
+              "calls": 86,
+              "confidence_threshold": 0.54411292,
+              "diagnostic_units_at_minus_110": 28.545455,
+              "hit_rate": 0.697674,
+              "hits": 60,
+              "log_loss": 0.607654
+            }
+          },
+          "omitted_feature": "trend_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00394415,
+                0.01028908
+              ],
+              "brier_score": 0.00334246,
+              "log_loss": 0.00775928,
+              "log_loss_ci_95": [
+                -0.0074226,
+                0.02190789
+              ]
+            },
+            "dates": 31,
+            "paired_date_sign_flip_p_value": 0.35872825,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.35872825,
+          "remaining_features": [
+            "elo_probability"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.630137,
+              "brier_score": 0.226965,
+              "log_loss": 0.645643,
+              "observations": 146
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.218997,
+              "calls": 103,
+              "confidence_threshold": 0.54411292,
+              "diagnostic_units_at_minus_110": 24.909091,
+              "hit_rate": 0.650485,
+              "hits": 67,
+              "log_loss": 0.629111
+            }
+          },
+          "validation_brier_delta": -0.002535
+        }
+      },
+      "matched_refit_baseline": {
+        "fit": {
+          "coefficients": {
+            "elo_probability": 2.6154014596,
+            "trend_gap": 0.0502116986
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap"
+          ],
+          "intercept": -1.330143552
+        },
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.639344,
+            "brier_score": 0.217894,
+            "log_loss": 0.625581,
+            "observations": 122
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.204736,
+            "calls": 87,
+            "confidence_threshold": 0.54411292,
+            "diagnostic_units_at_minus_110": 31.363636,
+            "hit_rate": 0.712644,
+            "hits": 62,
+            "log_loss": 0.597916
+          }
+        },
+        "validation": {
+          "accuracy": 0.60274,
+          "brier_score": 0.2295,
+          "log_loss": 0.650355,
+          "observations": 146
+        }
+      },
+      "model_family": "logistic_regression",
+      "production_features": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "reproduction_gate": {
+        "coefficient_deltas_matched_refit_minus_artifact": {
+          "elo_probability": 0.0,
+          "trend_gap": 0.0
+        },
+        "coefficient_tolerance": 1e-08,
+        "failures": [],
+        "holdout_metric_deltas_matched_refit_minus_artifact": {
+          "brier_score": 0.0,
+          "calls": 0,
+          "hits": 0,
+          "log_loss": -6.4281e-08
+        },
+        "intercept_delta_matched_refit_minus_artifact": 0.0,
+        "metric_tolerance": 1e-06,
+        "passed": true
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 700,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data/processed/nfl/games.jsonl",
+        "raw_nonempty_rows": 700,
+        "sha256": "17f7961cb8172be8abe3b0ca74ef2f7ddae55231f83adbee3d51c772b65f2cb2",
+        "walk_forward_rows": 634
+      },
+      "split": {
+        "locked_holdout": {
+          "end": "2026-02-08",
+          "observations": 122,
+          "start": "2025-11-20"
+        },
+        "method": "artifact_frozen_complete_date_60_20_20",
+        "train": {
+          "end": "2025-09-11",
+          "observations": 366,
+          "start": "2024-08-18"
+        },
+        "validation": {
+          "end": "2025-11-17",
+          "observations": 146,
+          "start": "2025-09-14"
+        }
+      },
+      "status": "evaluated",
+      "target": "home_win_binary"
+    },
+    "soccer": {
+      "artifact_hash": "65f2de8e0775e5cddb542440598cf8cc6c14adeb4cab295d32b5d8756c8862a9",
+      "artifact_path": "config/models/soccer-elo-trend-lr-v2.json",
+      "artifact_version": "soccer-elo-trend-lr-v2",
+      "exact_active_artifact": {
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.62461,
+            "brier_score": 0.224417,
+            "log_loss": 0.642026,
+            "observations": 1601
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.220149,
+            "calls": 1381,
+            "confidence_threshold": 0.53841851,
+            "diagnostic_units_at_minus_110": 329.545455,
+            "hit_rate": 0.648805,
+            "hits": 896,
+            "log_loss": 0.633497
+          }
+        },
+        "validation": {
+          "accuracy": 0.630164,
+          "brier_score": 0.222399,
+          "log_loss": 0.633875,
+          "observations": 2009
+        }
+      },
+      "frozen_threshold": 0.53841851,
+      "leave_one_out": {
+        "elo_probability": {
+          "comparison_key": "soccer:elo_probability",
+          "decision": "KEEP",
+          "decision_reason": "removal worsened validation and holdout proper scores with multiplicity-adjusted paired evidence",
+          "fit": {
+            "coefficients": {
+              "trend_gap": 0.0205441182
+            },
+            "features": [
+              "trend_gap"
+            ],
+            "intercept": -0.2720373357
+          },
+          "holm_adjusted_p_value": 0.0029994,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.559026,
+              "brier_score": 0.246545,
+              "log_loss": 0.686221,
+              "observations": 1601
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.246545,
+              "calls": 1601,
+              "confidence_threshold": 0.53841851,
+              "diagnostic_units_at_minus_110": 107.636364,
+              "hit_rate": 0.559026,
+              "hits": 895,
+              "log_loss": 0.686221
+            }
+          },
+          "omitted_feature": "elo_probability",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                0.01427618,
+                0.02997634
+              ],
+              "brier_score": 0.02212732,
+              "log_loss": 0.04419437,
+              "log_loss_ci_95": [
+                0.02578188,
+                0.06233426
+              ]
+            },
+            "dates": 128,
+            "paired_date_sign_flip_p_value": 0.00019996,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.00019996,
+          "remaining_features": [
+            "trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.555998,
+              "brier_score": 0.246923,
+              "log_loss": 0.686982,
+              "observations": 2009
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.246923,
+              "calls": 2009,
+              "confidence_threshold": 0.53841851,
+              "diagnostic_units_at_minus_110": 123.454545,
+              "hit_rate": 0.555998,
+              "hits": 1117,
+              "log_loss": 0.686982
+            }
+          },
+          "validation_brier_delta": 0.024524
+        },
+        "trend_gap": {
+          "comparison_key": "soccer:trend_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 5.5340896074
+            },
+            "features": [
+              "elo_probability"
+            ],
+            "intercept": -3.5208978392
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.627108,
+              "brier_score": 0.224399,
+              "log_loss": 0.641799,
+              "observations": 1601
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.219894,
+              "calls": 1374,
+              "confidence_threshold": 0.53841851,
+              "diagnostic_units_at_minus_110": 336.545455,
+              "hit_rate": 0.652111,
+              "hits": 896,
+              "log_loss": 0.632765
+            }
+          },
+          "omitted_feature": "trend_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.0006553,
+                0.00058309
+              ],
+              "brier_score": -1.824e-05,
+              "log_loss": -0.0002271,
+              "log_loss_ci_95": [
+                -0.0016115,
+                0.00112018
+              ]
+            },
+            "dates": 128,
+            "paired_date_sign_flip_p_value": 0.9490102,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.9490102,
+          "remaining_features": [
+            "elo_probability"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.63116,
+              "brier_score": 0.222022,
+              "log_loss": 0.632986,
+              "observations": 2009
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.217414,
+              "calls": 1721,
+              "confidence_threshold": 0.53841851,
+              "diagnostic_units_at_minus_110": 417.181818,
+              "hit_rate": 0.650784,
+              "hits": 1120,
+              "log_loss": 0.623066
+            }
+          },
+          "validation_brier_delta": -0.000377
+        }
+      },
+      "matched_refit_baseline": {
+        "fit": {
+          "coefficients": {
+            "elo_probability": 5.5624945626,
+            "trend_gap": -0.1507014663
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap"
+          ],
+          "intercept": -3.5389203491
+        },
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.62461,
+            "brier_score": 0.224417,
+            "log_loss": 0.642026,
+            "observations": 1601
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.220149,
+            "calls": 1381,
+            "confidence_threshold": 0.53841851,
+            "diagnostic_units_at_minus_110": 329.545455,
+            "hit_rate": 0.648805,
+            "hits": 896,
+            "log_loss": 0.633497
+          }
+        },
+        "validation": {
+          "accuracy": 0.630164,
+          "brier_score": 0.222399,
+          "log_loss": 0.633875,
+          "observations": 2009
+        }
+      },
+      "model_family": "logistic_regression",
+      "production_features": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "reproduction_gate": {
+        "coefficient_deltas_matched_refit_minus_artifact": {
+          "elo_probability": 0.0,
+          "trend_gap": 0.0
+        },
+        "coefficient_tolerance": 1e-08,
+        "failures": [],
+        "holdout_metric_deltas_matched_refit_minus_artifact": {
+          "brier_score": 0.0,
+          "calls": 0,
+          "hits": 0,
+          "log_loss": 3.8286e-08
+        },
+        "intercept_delta_matched_refit_minus_artifact": 0.0,
+        "metric_tolerance": 1e-06,
+        "passed": true
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 9137,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data/processed/soccer/games.jsonl",
+        "raw_nonempty_rows": 9137,
+        "sha256": "957be12bef72b572f506116af49b2926e7d2a14721fc445de4e2a6ca2ec015ad",
+        "walk_forward_rows": 9087
+      },
+      "split": {
+        "locked_holdout": {
+          "end": "2026-07-17",
+          "observations": 1601,
+          "start": "2026-01-30"
+        },
+        "method": "artifact_frozen_complete_date_60_20_20",
+        "train": {
+          "end": "2025-08-08",
+          "observations": 5476,
+          "start": "2024-01-13"
+        },
+        "validation": {
+          "end": "2026-01-28",
+          "observations": 2009,
+          "start": "2025-08-09"
+        }
+      },
+      "status": "evaluated",
+      "target": "home_win_vs_draw_or_away_binary"
+    },
+    "valorant": {
+      "artifact_hash": "bca151f1308efb5a41c3061fe4dbd66907bc54cdc43e0cd5bac46cec0d118af4",
+      "artifact_path": "config/models/valorant-neutral-series-elo-v2.json",
+      "artifact_version": "valorant-neutral-series-elo-v2",
+      "production_features": [
+        "neutral_elo_rating_difference"
+      ],
+      "reason": "active artifact does not pin locked-test metrics and calls",
+      "reproduction_gate": {
+        "failures": [
+          "active artifact does not pin locked-test metrics and calls"
+        ],
+        "passed": false
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 10842,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.worktrees/feature-agent-prod-feature-ablation-1722/data/esports/valorant/matches.jsonl",
+        "raw_nonempty_rows": 10842,
+        "sha256": "ee7b8bfa77bd8e3fd7b267405864838253cdbeba5c8d32f51c521db487394d9f",
+        "walk_forward_rows": 10842
+      },
+      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+    },
+    "wnba": {
+      "artifact_hash": "7afd5274214b58b7efd7f7febc7be3ab33b92351cda5cc6403c0a39faea0cc8c",
+      "artifact_path": "config/models/wnba-elo-trend-lr-v4.json",
+      "artifact_version": "wnba-elo-trend-lr-v4",
+      "exact_active_artifact": {
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.674847,
+            "brier_score": 0.214138,
+            "log_loss": 0.618737,
+            "observations": 163
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.214138,
+            "calls": 163,
+            "confidence_threshold": 0.50013272,
+            "diagnostic_units_at_minus_110": 47.0,
+            "hit_rate": 0.674847,
+            "hits": 110,
+            "log_loss": 0.618737
+          }
+        },
+        "validation": {
+          "accuracy": 0.678322,
+          "brier_score": 0.216415,
+          "log_loss": 0.62324,
+          "observations": 143
+        }
+      },
+      "frozen_threshold": 0.50013272,
+      "leave_one_out": {
+        "defensive_trend_gap": {
+          "comparison_key": "wnba:defensive_trend_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "elo_probability": 3.1193452245,
+              "trend_gap": -0.0064227894
+            },
+            "features": [
+              "elo_probability",
+              "trend_gap"
+            ],
+            "intercept": -1.5629931328
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.674847,
+              "brier_score": 0.21412,
+              "log_loss": 0.618705,
+              "observations": 163
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.21412,
+              "calls": 163,
+              "confidence_threshold": 0.50013272,
+              "diagnostic_units_at_minus_110": 47.0,
+              "hit_rate": 0.674847,
+              "hits": 110,
+              "log_loss": 0.618705
+            }
+          },
+          "omitted_feature": "defensive_trend_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00037751,
+                0.00034103
+              ],
+              "brier_score": -1.741e-05,
+              "log_loss": -3.173e-05,
+              "log_loss_ci_95": [
+                -0.00083697,
+                0.00075924
+              ]
+            },
+            "dates": 59,
+            "paired_date_sign_flip_p_value": 0.9280144,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.9280144,
+          "remaining_features": [
+            "elo_probability",
+            "trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.685315,
+              "brier_score": 0.216379,
+              "log_loss": 0.623132,
+              "observations": 143
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.216379,
+              "calls": 143,
+              "confidence_threshold": 0.50013272,
+              "diagnostic_units_at_minus_110": 44.090909,
+              "hit_rate": 0.685315,
+              "hits": 98,
+              "log_loss": 0.623132
+            }
+          },
+          "validation_brier_delta": -3.6e-05
+        },
+        "elo_probability": {
+          "comparison_key": "wnba:elo_probability",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "defensive_trend_gap": 0.0437698262,
+              "trend_gap": 0.0126126039
+            },
+            "features": [
+              "trend_gap",
+              "defensive_trend_gap"
+            ],
+            "intercept": 0.2155176804
+          },
+          "holm_adjusted_p_value": 0.06758648,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.564417,
+              "brier_score": 0.245041,
+              "log_loss": 0.683188,
+              "observations": 163
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.245041,
+              "calls": 163,
+              "confidence_threshold": 0.50013272,
+              "diagnostic_units_at_minus_110": 12.636364,
+              "hit_rate": 0.564417,
+              "hits": 92,
+              "log_loss": 0.683188
+            }
+          },
+          "omitted_feature": "elo_probability",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                0.01162111,
+                0.04908431
+              ],
+              "brier_score": 0.03090384,
+              "log_loss": 0.06445063,
+              "log_loss_ci_95": [
+                0.023939,
+                0.10257975
+              ]
+            },
+            "dates": 59,
+            "paired_date_sign_flip_p_value": 0.00519896,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.00519896,
+          "remaining_features": [
+            "trend_gap",
+            "defensive_trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.531469,
+              "brier_score": 0.246786,
+              "log_loss": 0.686612,
+              "observations": 143
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.246786,
+              "calls": 143,
+              "confidence_threshold": 0.50013272,
+              "diagnostic_units_at_minus_110": 2.090909,
+              "hit_rate": 0.531469,
+              "hits": 76,
+              "log_loss": 0.686612
+            }
+          },
+          "validation_brier_delta": 0.030371
+        },
+        "trend_gap": {
+          "comparison_key": "wnba:trend_gap",
+          "decision": "INCONCLUSIVE",
+          "decision_reason": "predeclared removal or retention gate not cleared",
+          "fit": {
+            "coefficients": {
+              "defensive_trend_gap": -0.0022069882,
+              "elo_probability": 3.1205964962
+            },
+            "features": [
+              "elo_probability",
+              "defensive_trend_gap"
+            ],
+            "intercept": -1.5635047048
+          },
+          "holm_adjusted_p_value": 1.0,
+          "locked_holdout": {
+            "all_predictions": {
+              "accuracy": 0.656442,
+              "brier_score": 0.214461,
+              "log_loss": 0.619337,
+              "observations": 163
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.214461,
+              "calls": 163,
+              "confidence_threshold": 0.50013272,
+              "diagnostic_units_at_minus_110": 41.272727,
+              "hit_rate": 0.656442,
+              "hits": 107,
+              "log_loss": 0.619337
+            }
+          },
+          "omitted_feature": "trend_gap",
+          "paired_uncertainty": {
+            "bootstrap_resamples": 2000,
+            "candidate_minus_baseline": {
+              "brier_ci_95": [
+                -0.00043955,
+                0.00110989
+              ],
+              "brier_score": 0.00032338,
+              "log_loss": 0.00059961,
+              "log_loss_ci_95": [
+                -0.00109556,
+                0.00231284
+              ]
+            },
+            "dates": 59,
+            "paired_date_sign_flip_p_value": 0.42071586,
+            "randomization_resamples": 5000,
+            "unit": "event_date_cluster"
+          },
+          "provenance": {
+            "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
+            "status": "development_only"
+          },
+          "raw_p_value": 0.42071586,
+          "remaining_features": [
+            "elo_probability",
+            "defensive_trend_gap"
+          ],
+          "validation": {
+            "all_predictions": {
+              "accuracy": 0.685315,
+              "brier_score": 0.216453,
+              "log_loss": 0.623333,
+              "observations": 143
+            },
+            "at_frozen_production_threshold": {
+              "brier_score": 0.216453,
+              "calls": 143,
+              "confidence_threshold": 0.50013272,
+              "diagnostic_units_at_minus_110": 44.090909,
+              "hit_rate": 0.685315,
+              "hits": 98,
+              "log_loss": 0.623333
+            }
+          },
+          "validation_brier_delta": 3.8e-05
+        }
+      },
+      "matched_refit_baseline": {
+        "fit": {
+          "coefficients": {
+            "defensive_trend_gap": -0.0029373676,
+            "elo_probability": 3.1343561088,
+            "trend_gap": -0.0067554948
+          },
+          "features": [
+            "elo_probability",
+            "trend_gap",
+            "defensive_trend_gap"
+          ],
+          "intercept": -1.5717634496
+        },
+        "locked_holdout": {
+          "all_predictions": {
+            "accuracy": 0.674847,
+            "brier_score": 0.214138,
+            "log_loss": 0.618737,
+            "observations": 163
+          },
+          "at_frozen_production_threshold": {
+            "brier_score": 0.214138,
+            "calls": 163,
+            "confidence_threshold": 0.50013272,
+            "diagnostic_units_at_minus_110": 47.0,
+            "hit_rate": 0.674847,
+            "hits": 110,
+            "log_loss": 0.618737
+          }
+        },
+        "validation": {
+          "accuracy": 0.678322,
+          "brier_score": 0.216415,
+          "log_loss": 0.62324,
+          "observations": 143
+        }
+      },
+      "model_family": "logistic_regression",
+      "production_features": [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap"
+      ],
+      "reproduction_gate": {
+        "coefficient_deltas_matched_refit_minus_artifact": {
+          "defensive_trend_gap": 0.0,
+          "elo_probability": 0.0,
+          "trend_gap": 0.0
+        },
+        "coefficient_tolerance": 1e-08,
+        "failures": [],
+        "holdout_metric_deltas_matched_refit_minus_artifact": {
+          "brier_score": 0.0,
+          "calls": 0,
+          "hits": 0,
+          "log_loss": 8.0821e-08
+        },
+        "intercept_delta_matched_refit_minus_artifact": 0.0,
+        "metric_tolerance": 1e-06,
+        "passed": true
+      },
+      "source_evidence": {
+        "loaded_modeling_games": 813,
+        "path": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data/processed/wnba/games.jsonl",
+        "raw_nonempty_rows": 813,
+        "sha256": "660385e75a42acc13ca33455e9d9c6bfaaaa9831c46078ce63ba5862ae8c020f",
+        "walk_forward_rows": 763
+      },
+      "split": {
+        "locked_holdout": {
+          "end": "2026-07-19",
+          "observations": 163,
+          "start": "2026-05-19"
+        },
+        "method": "artifact_frozen_complete_date_60_20_20",
+        "train": {
+          "end": "2025-08-15",
+          "observations": 457,
+          "start": "2024-05-31"
+        },
+        "validation": {
+          "end": "2026-05-18",
+          "observations": 143,
+          "start": "2025-08-16"
+        }
+      },
+      "status": "evaluated",
+      "target": "home_win_binary"
+    }
+  },
+  "predeclared_gates": {
+    "keep": "validation delta > 0, holdout Brier delta >= 0.001, holdout log-loss delta > 0, Brier 95% CI > 0, Holm p <= 0.05",
+    "minimum_meaningful_absolute_brier_delta": 0.001,
+    "multiplicity": "Holm family across all 15 production-feature omissions",
+    "otherwise": "INCONCLUSIVE",
+    "primary_metric": "all-prediction locked-holdout Brier candidate minus matched-refit baseline",
+    "remove_candidate": "symmetric evidence favoring removal, or a point-in-time provenance blocker",
+    "reproduction_prerequisite": "matched full-feature refit must reproduce artifact coefficients/intercept within 1e-8, stored selected-holdout Brier/log loss within 1e-6, and calls/hits exactly"
+  },
+  "promotion_eligible": false,
+  "schema_version": "production-feature-ablation-v1",
+  "scope": "configured production_artifact entries only; leave one active feature out at a time"
+}
