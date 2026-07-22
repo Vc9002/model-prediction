@@ -754,6 +754,22 @@ function productionEvidenceHtml(payload){
         <div class="k"><b>${esc(evidenceMetric(brier,4))}</b><span>Brier</span></div>
         <div class="k"><b>${esc(evidenceQualification(qualification))}</b><span>qualification</span></div>
       </div></div>
+      ${(function(){
+        const hb=backfill.holdout_backfill;
+        if(!hb||typeof hb!=="object")return"";
+        const ac=hb.all_calls&&typeof hb.all_calls==="object"?hb.all_calls:{};
+        const sc=hb.selection_calls&&typeof hb.selection_calls==="object"?hb.selection_calls:{};
+        const row=(label,all,sel)=>`<tr><td>${label}</td><td>${esc(evidenceMetric(all))}</td><td>${esc(evidenceMetric(sel))}</td></tr>`;
+        return `<div class="evidence-block"><h3>Holdout Backfill</h3><div class="small dim" style="margin-bottom:6px">All calls vs selection (gate-passed) calls from locked holdout</div>
+          <div class="evidence-table-wrap"><table class="data evidence-table">
+          <tr><th></th><th>All Calls</th><th>Selection Calls</th></tr>
+          ${row("Observations",ac.observations,sc.observations)}
+          ${row("Calls",ac.calls,sc.calls)}
+          ${row("Hit Rate",ac.hit_rate!=null?pct(ac.hit_rate):EVIDENCE_MISSING,sc.hit_rate!=null?pct(sc.hit_rate):EVIDENCE_MISSING)}
+          ${row("Brier",ac.brier!=null?ac.brier.toFixed(4):EVIDENCE_MISSING,sc.brier!=null?sc.brier.toFixed(4):EVIDENCE_MISSING)}
+          ${row("Units @ -110",ac.units_at_minus_110!=null?ac.units_at_minus_110.toFixed(2):EVIDENCE_MISSING,sc.units_at_minus_110!=null?sc.units_at_minus_110.toFixed(2):EVIDENCE_MISSING)}
+          </table></div></div>`;
+      })()}
       <div class="evidence-block"><h3>Features / Elo parameters</h3><div class="evidence-table-wrap"><table class="data evidence-table">
         <tr><th>Feature or parameter</th><th>Coefficient / value</th></tr>${featureHtml}</table></div>
         <div class="evidence-table-wrap" style="margin-top:7px"><table class="data evidence-table"><tr><th>Active feature</th><th>Registry verdict</th><th>Retention decision</th><th>Strict decision</th><th>Production safety</th><th>Evidence grade</th></tr>${registryFeatureHtml}</table></div></div>
