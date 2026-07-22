@@ -758,12 +758,29 @@ def _backfill_aliases(backfill: dict, raw: dict) -> dict:
         }
     else:
         selected = metrics.get("selected_matches") or {}
+        all_m = metrics.get("all_matches") or {}
         aliases = {
             "observations": selected.get("observations"),
             "calls": selected.get("calls"),
             "hit_rate": selected.get("accuracy"),
             "brier_score": selected.get("brier"),
             "qualified": raw.get("qualified_for_betting"),
+        }
+        aliases["holdout_backfill"] = {
+            "all_calls": {
+                "observations": all_m.get("observations"),
+                "calls": all_m.get("calls"),
+                "hit_rate": all_m.get("accuracy"),
+                "brier": all_m.get("brier"),
+                "units_at_minus_110": all_m.get("units_at_minus_110"),
+            },
+            "selection_calls": {
+                "observations": selected.get("observations"),
+                "calls": selected.get("calls"),
+                "hit_rate": selected.get("accuracy"),
+                "brier": selected.get("brier"),
+                "units_at_minus_110": selected.get("units_at_minus_110"),
+            },
         }
     return {**backfill, **aliases}
 
@@ -1255,7 +1272,8 @@ def production_evidence() -> dict:
             if raw.get("method") == "logistic_regression"
             else raw.get("qualified_for_betting")
         )
-        if isinstance(artifact_qualified, bool) and config_qualified != artifact_qualified:
+        qualification_overridden = model_config.get("qualification_override") is True
+        if isinstance(artifact_qualified, bool) and config_qualified != artifact_qualified and not qualification_overridden:
             warnings.append(
                 {
                     "code": "config_artifact_qualification_mismatch",
