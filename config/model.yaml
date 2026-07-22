@@ -229,8 +229,8 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: lol-neutral-series-elo-v2
-    production_artifact: config/models/lol-neutral-series-elo-v2.json
+    active_production_version: lol-tiered-elo-v3
+    production_artifact: config/models/lol-tiered-elo-v3.json
     market_target: esports_match_winner
     min_edge: 0.02
   CS2:
@@ -245,8 +245,8 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: dota2-neutral-series-elo-v2
-    production_artifact: config/models/dota2-neutral-series-elo-v2.json
+    active_production_version: dota2-tiered-elo-v3
+    production_artifact: config/models/dota2-tiered-elo-v3.json
     market_target: esports_match_winner
     min_edge: 0.02
   VALORANT:
