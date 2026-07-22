@@ -362,7 +362,7 @@ def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path
     assert model["model_definition_and_backfill_valid"] is False
 
 
-def test_current_configured_production_artifacts_are_verified(monkeypatch) -> None:
+def test_current_configured_production_artifacts_fail_closed_when_invalid(monkeypatch) -> None:
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
 
     result = dashboard_server.production_evidence()
@@ -373,12 +373,19 @@ def test_current_configured_production_artifacts_are_verified(monkeypatch) -> No
     }
 
     assert {model["sport"]: model["active_model_version"] for model in result["models"]} == configured
-    assert result["all_model_definitions_and_backfills_valid"] is True
+    assert result["all_model_definitions_and_backfills_valid"] is False
+    invalid_sports = {"cs2", "dota2", "lol", "valorant"}
     for model in result["models"]:
-        assert model["artifact"]["hash_valid"] is True
         assert model["artifact"]["version_matches_config"] is True
         assert model["artifact"]["lineage_matches_config"] is True
-        assert model["locked_backfill"]["status"] == "verified"
+        if model["sport"] in invalid_sports:
+            assert model["artifact"]["hash_valid"] is False
+            assert model["locked_backfill"]["status"] == "rejected_artifact_integrity"
+            assert model["model_definition_and_backfill_valid"] is False
+        else:
+            assert model["artifact"]["hash_valid"] is True
+            assert model["locked_backfill"]["status"] == "verified"
+            assert model["model_definition_and_backfill_valid"] is True
 
 
 def _render_model_card(model: dict) -> dict[str, str]:
