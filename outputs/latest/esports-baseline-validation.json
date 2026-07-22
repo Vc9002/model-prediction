@@ -5,7 +5,7 @@
   "titles": {
     "cs2": {
       "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.claude/worktrees/fix-waves-1-4/config/models/cs2-neutral-series-elo-v2.json",
-      "artifact_hash": "aecf7cf2eb87747d080cdeb2d965dd5ff2623edf9dd710aa9c771daa61d0a885",
+      "artifact_hash": "48424b79d75fc1173c9c465d95feb6fc041a2ccfbc64455058b3f74905ce28d5",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 96.0
@@ -257,7 +257,7 @@
         }
       },
       "model_state": "research",
-      "model_version": "cs2-neutral-series-elo-v2",
+      "model_version": "cs2-tiered-elo-v3",
       "observations": 37887,
       "point_in_time": "ratings use completed matches strictly before each prediction",
       "profitability": "not_established_no_point_in_time_market_prices",
@@ -268,7 +268,7 @@
     },
     "dota2": {
       "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.claude/worktrees/fix-waves-1-4/config/models/dota2-neutral-series-elo-v2.json",
-      "artifact_hash": "60cc774ad3002a7529570909940337a5af5782c2461438910bdcad9e470f34dd",
+      "artifact_hash": "a799fd6b531f6a50433d392237bace95036714f80bb3516384271ef275ed7763",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 96.0
@@ -520,7 +520,7 @@
         }
       },
       "model_state": "research",
-      "model_version": "dota2-neutral-series-elo-v2",
+      "model_version": "dota2-tiered-elo-v3",
       "observations": 14509,
       "point_in_time": "ratings use completed matches strictly before each prediction",
       "profitability": "not_established_no_point_in_time_market_prices",
@@ -531,7 +531,7 @@
     },
     "lol": {
       "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.claude/worktrees/fix-waves-1-4/config/models/lol-neutral-series-elo-v2.json",
-      "artifact_hash": "daa3fc90ca4593e2a301d3702bff6f84e813dc20ca7f7c0733d1637d80aeadf8",
+      "artifact_hash": "dbc38ecdb090b63690db810d40eb29d0a69435c83dfbf24eb00d22aa42c177ae",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 96.0
@@ -783,7 +783,7 @@
         }
       },
       "model_state": "research",
-      "model_version": "lol-neutral-series-elo-v2",
+      "model_version": "lol-tiered-elo-v3",
       "observations": 11916,
       "point_in_time": "ratings use completed matches strictly before each prediction",
       "profitability": "not_established_no_point_in_time_market_prices",
@@ -794,7 +794,7 @@
     },
     "valorant": {
       "artifact": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.claude/worktrees/fix-waves-1-4/config/models/valorant-neutral-series-elo-v2.json",
-      "artifact_hash": "bca151f1308efb5a41c3061fe4dbd66907bc54cdc43e0cd5bac46cec0d118af4",
+      "artifact_hash": "df5a226c64918a54c70b8af3e0cd4abb6c4f42b67acb5547da319458502b0ed4",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 96.0
@@ -1046,7 +1046,7 @@
         }
       },
       "model_state": "research",
-      "model_version": "valorant-neutral-series-elo-v2",
+      "model_version": "valorant-tiered-elo-v3",
       "observations": 10842,
       "point_in_time": "ratings use completed matches strictly before each prediction",
       "profitability": "not_established_no_point_in_time_market_prices",
