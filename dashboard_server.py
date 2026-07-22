@@ -748,7 +748,8 @@ def _backfill_aliases(backfill: dict, raw: dict) -> dict:
             "observations": obs, "calls": calls, "hit_rate": hr,
             "brier_score": br, "qualified": q,
         }
-        hb = {"observations": obs, "calls": calls, "hit_rate": hr, "brier": br}
+        units = metrics.get("units_at_minus_110")
+        hb = {"observations": obs, "calls": calls, "hit_rate": hr, "brier": br, "units_at_minus_110": units}
         aliases["holdout_backfill"] = {"all_calls": hb, "selection_calls": hb}
     elif raw.get("league"):
         calls = metrics.get("calls")
@@ -761,7 +762,8 @@ def _backfill_aliases(backfill: dict, raw: dict) -> dict:
             "observations": obs, "calls": calls, "hit_rate": hr,
             "brier_score": br, "qualified": q,
         }
-        hb = {"observations": obs, "calls": calls, "hit_rate": hr, "brier": br}
+        units = metrics.get("units_at_minus_110")
+        hb = {"observations": obs, "calls": calls, "hit_rate": hr, "brier": br, "units_at_minus_110": units}
         aliases["holdout_backfill"] = {"all_calls": hb, "selection_calls": hb}
     else:
         selected = metrics.get("selected_matches") or {}
