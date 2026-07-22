@@ -739,23 +739,30 @@ def _backfill_aliases(backfill: dict, raw: dict) -> dict:
     metrics = backfill.get("metrics") or {}
     if raw.get("method") == "logistic_regression":
         locked_training = (raw.get("training") or {}).get("locked_holdout") or {}
+        obs = metrics.get("total_predictions", locked_training.get("observations"))
+        calls = metrics.get("calls")
+        hr = metrics.get("hit_rate")
+        br = metrics.get("brier_score")
+        q = metrics.get("qualified")
         aliases = {
-            "observations": metrics.get("total_predictions", locked_training.get("observations")),
-            "calls": metrics.get("calls"),
-            "hit_rate": metrics.get("hit_rate"),
-            "brier_score": metrics.get("brier_score"),
-            "qualified": metrics.get("qualified"),
+            "observations": obs, "calls": calls, "hit_rate": hr,
+            "brier_score": br, "qualified": q,
         }
+        hb = {"observations": obs, "calls": calls, "hit_rate": hr, "brier": br}
+        aliases["holdout_backfill"] = {"all_calls": hb, "selection_calls": hb}
     elif raw.get("league"):
         calls = metrics.get("calls")
         hits = metrics.get("hits")
+        obs = metrics.get("observations")
+        hr = hits / calls if calls and hits is not None else None
+        br = metrics.get("brier_settlement")
+        q = raw.get("qualified_for_betting")
         aliases = {
-            "observations": metrics.get("observations"),
-            "calls": calls,
-            "hit_rate": hits / calls if calls and hits is not None else None,
-            "brier_score": metrics.get("brier_settlement"),
-            "qualified": raw.get("qualified_for_betting"),
+            "observations": obs, "calls": calls, "hit_rate": hr,
+            "brier_score": br, "qualified": q,
         }
+        hb = {"observations": obs, "calls": calls, "hit_rate": hr, "brier": br}
+        aliases["holdout_backfill"] = {"all_calls": hb, "selection_calls": hb}
     else:
         selected = metrics.get("selected_matches") or {}
         all_m = metrics.get("all_matches") or {}
