@@ -53,9 +53,9 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
         "minimum_date": "2020-01-01",
     },
 }
-# v2 lineage (2026-07-21): rating updates use the raw Elo expectation
-# (previously the shrunk prediction, which inflated favorites).
-ESPORTS_MODEL_LINEAGE = "v2"
+# v3 lineage (2026-07-22): tiered-elo with dual-threshold gating
+# Flat=0.0 (research, call all), Main=gated (confidence + edge >= 0.02)
+ESPORTS_MODEL_LINEAGE = "v3"
 K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0, 80.0, 96.0)
 CONFIDENCE_CANDIDATES = (0.0, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15)
 
@@ -450,7 +450,7 @@ def validate_esports_baseline(
     source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     artifact = {
         "schema_version": "esports-neutral-elo-v1",
-        "model_version": f"{title}-neutral-series-elo-{ESPORTS_MODEL_LINEAGE}",
+        "model_version": f"{title}-tiered-elo-{ESPORTS_MODEL_LINEAGE}",
         "model_state": "research",
         "title": title,
         "target": "best-of match/series winner",
@@ -470,7 +470,7 @@ def validate_esports_baseline(
     artifact["artifact_hash"] = artifact_hash
     artifact_path = None
     if artifact_dir is not None:
-        artifact_path = Path(artifact_dir) / f"{title}-neutral-series-elo-{ESPORTS_MODEL_LINEAGE}.json"
+        artifact_path = Path(artifact_dir) / f"{title}-tiered-elo-{ESPORTS_MODEL_LINEAGE}.json"
         _atomic_write(artifact_path, json.dumps(artifact, indent=2, sort_keys=True) + "\n")
     return {
         "status": "ok",
@@ -581,7 +581,7 @@ def forecast_esports_slate(
     if title not in TITLE_SPECS:
         raise ValueError(f"unsupported baseline title: {title}")
     directory = Path(data_root) / "esports" / title
-    artifact_path = Path(artifact_dir) / f"{title}-neutral-series-elo-{ESPORTS_MODEL_LINEAGE}.json"
+    artifact_path = Path(artifact_dir) / f"{title}-tiered-elo-{ESPORTS_MODEL_LINEAGE}.json"
     if not artifact_path.exists():
         raise FileNotFoundError(f"missing research artifact: {artifact_path}")
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
