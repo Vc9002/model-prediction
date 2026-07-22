@@ -17,10 +17,10 @@ A model is excluded when the full-feature refit does not reproduce the artifact 
 
 | Model | Status | Explicit source | SHA-256 | Raw / loaded / walk-forward rows | Reason |
 |---|---|---|---|---:|---|
-| LOL | `UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING` | `data/esports/lol/matches.jsonl` | `c4f16d0c8b9420ace0d33ef315ddabfd83b6c91aa752a204d637a02a5e4e96e6` | 11916 / 11916 / 11916 | active artifact does not pin locked-test metrics and calls |
-| CS2 | `UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING` | `data/esports/cs2/matches.jsonl` | `383a6c10ed3f9c6ec7ddf099ebbb0c19d224fe690dcdfa9bf62a07bb9f399109` | 37887 / 37887 / 37887 | active artifact does not pin locked-test metrics and calls |
-| DOTA2 | `UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING` | `data/esports/dota2/matches.jsonl` | `969da1b7eeaa62a4c64dfe35383ea2484de36080690cccc3fbc924ac816e5bbd` | 14509 / 14509 / 14509 | active artifact does not pin locked-test metrics and calls |
-| VALORANT | `UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING` | `data/esports/valorant/matches.jsonl` | `ee7b8bfa77bd8e3fd7b267405864838253cdbeba5c8d32f51c521db487394d9f` | 10842 / 10842 / 10842 | active artifact does not pin locked-test metrics and calls |
+| LOL | `UNTESTABLE_ARTIFACT_INTEGRITY` | `data/esports/lol/matches.jsonl` | `—` | — / — / — | artifact_hash does not match canonical artifact content |
+| CS2 | `UNTESTABLE_ARTIFACT_INTEGRITY` | `data/esports/cs2/matches.jsonl` | `—` | — / — / — | artifact_hash does not match canonical artifact content |
+| DOTA2 | `UNTESTABLE_ARTIFACT_INTEGRITY` | `data/esports/dota2/matches.jsonl` | `—` | — / — / — | artifact_hash does not match canonical artifact content |
+| VALORANT | `UNTESTABLE_ARTIFACT_INTEGRITY` | `data/esports/valorant/matches.jsonl` | `—` | — / — / — | artifact_hash does not match canonical artifact content |
 
 ## Feature decisions
 
@@ -116,4 +116,4 @@ Reproduction gate: **PASS**. Maximum absolute coefficient delta `0`; intercept d
 
 Holm correction covers all 15 feature omissions. These reused holdouts can rank removal hypotheses, but they cannot certify a promoted model. No ROI, EV, profitability, or tradability claim is made; that requires point-in-time executable asks on both sides, fees/friction, and CLV on a fresh prospective cohort.
 
-Reproducibility hash: `df39ceaa58b0cc09166f36f0bc3d03a236e40f3e052c83fa42f808c5bf204d3b`.
+Reproducibility hash: `6e449b57e37c03f562a966d3a4cac3e27aa04cf47b59ca5c91c13c0fff9f01e5`.

@@ -17,7 +17,7 @@ amount. The registry also preserves the stricter multiplicity-adjusted decision.
 `KEEP` with blocked point-in-time provenance means research retention only; it does not
 make the feature production-safe or establish profitability.
 
-## Current state: 22 features tracked, 5 keep, 3 remove candidates, 3 reject, 4 exclude, 7 untested
+## Current state: 23 features tracked, 5 keep, 3 remove candidates, 3 reject, 4 exclude, 8 untested
 
 | Feature | Sports | Verdict | Why |
 |---|---|---|---|
@@ -27,6 +27,7 @@ make the feature production-safe or establish profitability.
 | `weather_factor` | MLB | **keep, research only** | Tiny positive validation/holdout contribution, but forecast timestamps are missing. Not production-safe. |
 | `player_availability` | WNBA | **keep** | Grade-B post-hoc research evidence; not part of the current exact-artifact strict ablation. |
 | `neutral_elo_rating_difference` | LOL/CS2/Dota2/Valorant | untested | Current v3 artifacts are hash-invalid and lack locked metrics; do not inherit v2 evidence. |
+| `tie_aware_elo_rating_difference` | KBO/NPB | untested | Exact-version locked backfills exist, but the feature has no omission test and artifacts remain research-only. |
 | `defensive_trend_gap` | NBA/WNBA | remove candidate | Removal improves both validation and holdout proper scores in both leagues. |
 | `pitcher_era_gap` | MLB | remove candidate | Removal improves validation and both holdout proper scores. |
 | `starter_era_gap` | MLB | **remove** | Unservable train/serve skew; removed in MLB v5. Never reinstate as-is. |

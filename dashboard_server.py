@@ -545,7 +545,7 @@ def _artifact_evidence(path: Path, expected_version: str, expected_sport: str) -
     declared_hash = raw.get("artifact_hash")
     computed_hash = _artifact_hash(raw)
     artifact_version = str(raw.get("model_version") or "")
-    artifact_identity = str(raw.get("sport") or raw.get("title") or "")
+    artifact_identity = str(raw.get("sport") or raw.get("title") or raw.get("league") or "")
     hash_valid = bool(declared_hash) and declared_hash == computed_hash
     version_valid = bool(expected_version) and artifact_version == expected_version
     lineage_valid = artifact_identity.casefold() == expected_sport.casefold()
@@ -599,6 +599,22 @@ def _production_model_spec(raw: dict) -> dict:
             "confidence_threshold": moneyline.get("confidence_threshold"),
             "positive_class": moneyline.get("positive_class"),
         }
+    if raw.get("league") and "tie_probability" in raw:
+        return {
+            "kind": "tie_aware_elo",
+            "feature_schema_status": "model_family_declared",
+            "features": [{"name": "tie_aware_elo_rating_difference", "coefficient": None}],
+            "feature_names": ["tie_aware_elo_rating_difference"],
+            "coefficients": [],
+            "coefficient_count_matches_features": True,
+            "parameters": {
+                "initial_rating": raw.get("initial_rating"),
+                "k": raw.get("k"),
+                "home_advantage": raw.get("home_advantage"),
+                "tie_probability": raw.get("tie_probability"),
+                "target": raw.get("target"),
+            },
+        }
     return {
         "kind": "neutral_series_elo",
         "feature_schema_status": "model_family_declared",
@@ -622,6 +638,7 @@ def _locked_backfill_evidence(
     raw: dict,
     artifact: dict,
     esports_validation: dict,
+    international_validation: dict,
 ) -> dict:
     if not artifact.get("valid"):
         return {
@@ -648,6 +665,37 @@ def _locked_backfill_evidence(
             "source": artifact.get("path"),
             "model_version": version,
             "metrics": metrics,
+            "pnl_label": "hypothetical_at_minus_110",
+            "profitability_claim": False,
+        }
+
+    if raw.get("league"):
+        league = str(raw.get("league") or sport).casefold()
+        report = (international_validation.get("leagues") or {}).get(league) or {}
+        locked = report.get("locked_test") or {}
+        report_version = str(report.get("model_version") or "")
+        report_hash = str(report.get("artifact_hash") or "")
+        exact = (
+            bool(locked)
+            and report_version == version
+            and report_hash == artifact.get("declared_hash")
+        )
+        if not exact:
+            return {
+                "status": "rejected_missing_or_mismatched_locked_metrics",
+                "source": str(OUTPUTS / "international-baseball-baseline-validation.json"),
+                "model_version": report_version or None,
+                "artifact_hash": report_hash or None,
+                "metrics": None,
+                "pnl_label": None,
+                "profitability_claim": False,
+            }
+        return {
+            "status": "verified",
+            "source": str(OUTPUTS / "international-baseball-baseline-validation.json"),
+            "model_version": report_version,
+            "artifact_hash": report_hash,
+            "metrics": locked,
             "pnl_label": "hypothetical_at_minus_110",
             "profitability_claim": False,
         }
@@ -697,6 +745,16 @@ def _backfill_aliases(backfill: dict, raw: dict) -> dict:
             "hit_rate": metrics.get("hit_rate"),
             "brier_score": metrics.get("brier_score"),
             "qualified": metrics.get("qualified"),
+        }
+    elif raw.get("league"):
+        calls = metrics.get("calls")
+        hits = metrics.get("hits")
+        aliases = {
+            "observations": metrics.get("observations"),
+            "calls": calls,
+            "hit_rate": hits / calls if calls and hits is not None else None,
+            "brier_score": metrics.get("brier_settlement"),
+            "qualified": raw.get("qualified_for_betting"),
         }
     else:
         selected = metrics.get("selected_matches") or {}
@@ -1099,6 +1157,9 @@ def production_evidence() -> dict:
     config = _config_payload()
     configured_models = config.get("models") or {}
     esports_validation = _read_json(OUTPUTS / "esports-baseline-validation.json") or {}
+    international_validation = (
+        _read_json(OUTPUTS / "international-baseball-baseline-validation.json") or {}
+    )
     ledger_paths = (DATA / "picks.xlsx", DATA / "flat_picks.xlsx")
     rows_by_source = {str(path.relative_to(ROOT)): _read_evidence_ledger(path) for path in ledger_paths}
     feature_registry = _feature_registry_evidence()
@@ -1121,7 +1182,14 @@ def production_evidence() -> dict:
         artifact, raw = _artifact_evidence(artifact_path, version, str(sport))
         spec = _production_model_spec(raw)
         locked = _backfill_aliases(
-            _locked_backfill_evidence(str(sport), version, raw, artifact, esports_validation),
+            _locked_backfill_evidence(
+                str(sport),
+                version,
+                raw,
+                artifact,
+                esports_validation,
+                international_validation,
+            ),
             raw,
         )
 
@@ -1290,6 +1358,7 @@ def production_evidence() -> dict:
             "feature_registry": feature_registry["path"],
             "ledgers": list(rows_by_source),
             "esports_validation": "outputs/latest/esports-baseline-validation.json",
+            "international_validation": "outputs/latest/international-baseball-baseline-validation.json",
         },
         "configured_production_models": len(models),
         "feature_registry": feature_registry,

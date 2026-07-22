@@ -1,81 +1,90 @@
 {
-  "artifact_hash": "df39ceaa58b0cc09166f36f0bc3d03a236e40f3e052c83fa42f808c5bf204d3b",
+  "artifact_hash": "6e449b57e37c03f562a966d3a4cac3e27aa04cf47b59ca5c91c13c0fff9f01e5",
   "as_of_date": "2026-07-22",
   "diagnostic_units": "flat one-unit staking at synthetic -110; non-executable",
   "economic_claims_allowed": false,
   "explicit_score_data_root": "/Users/vincentc9002/Documents/Poly & Kalshi/model prediction/data",
-  "generated_at_utc": "2026-07-22T01:02:37.129568Z",
+  "generated_at_utc": "2026-07-22T01:34:40.818633Z",
   "holdout_status": "reused_locked_holdouts_development_evidence",
   "market_prices_used": false,
   "models": {
     "cs2": {
-      "artifact_hash": "aecf7cf2eb87747d080cdeb2d965dd5ff2623edf9dd710aa9c771daa61d0a885",
-      "artifact_path": "config/models/cs2-neutral-series-elo-v2.json",
-      "artifact_version": "cs2-neutral-series-elo-v2",
+      "artifact_hash": "98da4a80b7f318a7919e5e7e0ea665d52be3fd1d2c2ae7cd25aead8acbac7a16",
+      "artifact_integrity": {
+        "artifact_title": "cs2",
+        "artifact_version": "cs2-tiered-elo-v3",
+        "computed_hash": "48424b79d75fc1173c9c465d95feb6fc041a2ccfbc64455058b3f74905ce28d5",
+        "expected_title": "cs2",
+        "expected_version": "cs2-tiered-elo-v3",
+        "failures": [
+          "artifact_hash does not match canonical artifact content"
+        ],
+        "passed": false,
+        "stored_hash": "98da4a80b7f318a7919e5e7e0ea665d52be3fd1d2c2ae7cd25aead8acbac7a16"
+      },
+      "artifact_path": "config/models/cs2-tiered-elo-v3.json",
+      "artifact_version": "cs2-tiered-elo-v3",
       "production_features": [
         "neutral_elo_rating_difference"
       ],
-      "reason": "active artifact does not pin locked-test metrics and calls",
-      "reproduction_gate": {
-        "failures": [
-          "active artifact does not pin locked-test metrics and calls"
-        ],
-        "passed": false
-      },
+      "reason": "artifact_hash does not match canonical artifact content",
       "source_evidence": {
-        "loaded_modeling_games": 37887,
-        "path": "data/esports/cs2/matches.jsonl",
-        "raw_nonempty_rows": 37887,
-        "sha256": "383a6c10ed3f9c6ec7ddf099ebbb0c19d224fe690dcdfa9bf62a07bb9f399109",
-        "walk_forward_rows": 37887
+        "inspection_status": "not_inspected_due_to_artifact_integrity",
+        "path": "data/esports/cs2/matches.jsonl"
       },
-      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+      "status": "UNTESTABLE_ARTIFACT_INTEGRITY"
     },
     "dota2": {
-      "artifact_hash": "60cc774ad3002a7529570909940337a5af5782c2461438910bdcad9e470f34dd",
-      "artifact_path": "config/models/dota2-neutral-series-elo-v2.json",
-      "artifact_version": "dota2-neutral-series-elo-v2",
+      "artifact_hash": "3978385b31164759247162c7ab9f7accdbca5740063a66cd20c8e7695a695dcc",
+      "artifact_integrity": {
+        "artifact_title": "dota2",
+        "artifact_version": "dota2-tiered-elo-v3",
+        "computed_hash": "a799fd6b531f6a50433d392237bace95036714f80bb3516384271ef275ed7763",
+        "expected_title": "dota2",
+        "expected_version": "dota2-tiered-elo-v3",
+        "failures": [
+          "artifact_hash does not match canonical artifact content"
+        ],
+        "passed": false,
+        "stored_hash": "3978385b31164759247162c7ab9f7accdbca5740063a66cd20c8e7695a695dcc"
+      },
+      "artifact_path": "config/models/dota2-tiered-elo-v3.json",
+      "artifact_version": "dota2-tiered-elo-v3",
       "production_features": [
         "neutral_elo_rating_difference"
       ],
-      "reason": "active artifact does not pin locked-test metrics and calls",
-      "reproduction_gate": {
-        "failures": [
-          "active artifact does not pin locked-test metrics and calls"
-        ],
-        "passed": false
-      },
+      "reason": "artifact_hash does not match canonical artifact content",
       "source_evidence": {
-        "loaded_modeling_games": 14509,
-        "path": "data/esports/dota2/matches.jsonl",
-        "raw_nonempty_rows": 14509,
-        "sha256": "969da1b7eeaa62a4c64dfe35383ea2484de36080690cccc3fbc924ac816e5bbd",
-        "walk_forward_rows": 14509
+        "inspection_status": "not_inspected_due_to_artifact_integrity",
+        "path": "data/esports/dota2/matches.jsonl"
       },
-      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+      "status": "UNTESTABLE_ARTIFACT_INTEGRITY"
     },
     "lol": {
-      "artifact_hash": "daa3fc90ca4593e2a301d3702bff6f84e813dc20ca7f7c0733d1637d80aeadf8",
-      "artifact_path": "config/models/lol-neutral-series-elo-v2.json",
-      "artifact_version": "lol-neutral-series-elo-v2",
+      "artifact_hash": "e0cd9cffa8d11f894fd13b69be474bf2e4371b29db5e62888aec7b8f44f78946",
+      "artifact_integrity": {
+        "artifact_title": "lol",
+        "artifact_version": "lol-tiered-elo-v3",
+        "computed_hash": "dbc38ecdb090b63690db810d40eb29d0a69435c83dfbf24eb00d22aa42c177ae",
+        "expected_title": "lol",
+        "expected_version": "lol-tiered-elo-v3",
+        "failures": [
+          "artifact_hash does not match canonical artifact content"
+        ],
+        "passed": false,
+        "stored_hash": "e0cd9cffa8d11f894fd13b69be474bf2e4371b29db5e62888aec7b8f44f78946"
+      },
+      "artifact_path": "config/models/lol-tiered-elo-v3.json",
+      "artifact_version": "lol-tiered-elo-v3",
       "production_features": [
         "neutral_elo_rating_difference"
       ],
-      "reason": "active artifact does not pin locked-test metrics and calls",
-      "reproduction_gate": {
-        "failures": [
-          "active artifact does not pin locked-test metrics and calls"
-        ],
-        "passed": false
-      },
+      "reason": "artifact_hash does not match canonical artifact content",
       "source_evidence": {
-        "loaded_modeling_games": 11916,
-        "path": "data/esports/lol/matches.jsonl",
-        "raw_nonempty_rows": 11916,
-        "sha256": "c4f16d0c8b9420ace0d33ef315ddabfd83b6c91aa752a204d637a02a5e4e96e6",
-        "walk_forward_rows": 11916
+        "inspection_status": "not_inspected_due_to_artifact_integrity",
+        "path": "data/esports/lol/matches.jsonl"
       },
-      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+      "status": "UNTESTABLE_ARTIFACT_INTEGRITY"
     },
     "mlb": {
       "artifact_hash": "bb6331f9ae39a7346e90a5f33f6b4e07168a5805b49be25c6e6134d413c081de",
@@ -1556,27 +1565,30 @@
       "target": "home_win_vs_draw_or_away_binary"
     },
     "valorant": {
-      "artifact_hash": "bca151f1308efb5a41c3061fe4dbd66907bc54cdc43e0cd5bac46cec0d118af4",
-      "artifact_path": "config/models/valorant-neutral-series-elo-v2.json",
-      "artifact_version": "valorant-neutral-series-elo-v2",
+      "artifact_hash": "0b800f7f83f95a61136990c0ecbcf13d3ae7cfa27f788b601a6b899f9fa6b995",
+      "artifact_integrity": {
+        "artifact_title": "valorant",
+        "artifact_version": "valorant-tiered-elo-v3",
+        "computed_hash": "df5a226c64918a54c70b8af3e0cd4abb6c4f42b67acb5547da319458502b0ed4",
+        "expected_title": "valorant",
+        "expected_version": "valorant-tiered-elo-v3",
+        "failures": [
+          "artifact_hash does not match canonical artifact content"
+        ],
+        "passed": false,
+        "stored_hash": "0b800f7f83f95a61136990c0ecbcf13d3ae7cfa27f788b601a6b899f9fa6b995"
+      },
+      "artifact_path": "config/models/valorant-tiered-elo-v3.json",
+      "artifact_version": "valorant-tiered-elo-v3",
       "production_features": [
         "neutral_elo_rating_difference"
       ],
-      "reason": "active artifact does not pin locked-test metrics and calls",
-      "reproduction_gate": {
-        "failures": [
-          "active artifact does not pin locked-test metrics and calls"
-        ],
-        "passed": false
-      },
+      "reason": "artifact_hash does not match canonical artifact content",
       "source_evidence": {
-        "loaded_modeling_games": 10842,
-        "path": "data/esports/valorant/matches.jsonl",
-        "raw_nonempty_rows": 10842,
-        "sha256": "ee7b8bfa77bd8e3fd7b267405864838253cdbeba5c8d32f51c521db487394d9f",
-        "walk_forward_rows": 10842
+        "inspection_status": "not_inspected_due_to_artifact_integrity",
+        "path": "data/esports/valorant/matches.jsonl"
       },
-      "status": "UNTESTABLE_REPRODUCTION_EVIDENCE_MISSING"
+      "status": "UNTESTABLE_ARTIFACT_INTEGRITY"
     },
     "wnba": {
       "artifact_hash": "7afd5274214b58b7efd7f7febc7be3ab33b92351cda5cc6403c0a39faea0cc8c",

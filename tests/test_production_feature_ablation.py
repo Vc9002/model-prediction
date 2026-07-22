@@ -1,5 +1,9 @@
+import json
+
+from model_prediction.config import load_config
 from model_prediction.models.learned_market import artifact_hash
 from model_prediction.production_feature_ablation import (
+    _esports_model,
     _frozen_score_split,
     _decision,
     _holm,
@@ -91,3 +95,23 @@ def test_reproduction_gate_requires_exact_calls_and_tight_coefficients() -> None
         {"calls": 10, "hits": 7, "brier_score": 0.2, "log_loss": 0.6},
     )
     assert result["passed"] is True
+
+
+def test_current_cs2_artifact_hash_failure_precedes_source_claims() -> None:
+    config = load_config()
+    artifact_path = config["models"]["CS2"]["production_artifact"]
+    artifact = json.loads(open(artifact_path, encoding="utf-8").read())
+
+    result = _esports_model(config, "cs2")
+
+    assert result["status"] == "UNTESTABLE_ARTIFACT_INTEGRITY"
+    assert result["artifact_integrity"]["stored_hash"] == artifact["artifact_hash"]
+    assert result["artifact_integrity"]["computed_hash"] == artifact_hash(artifact)
+    assert result["artifact_integrity"]["stored_hash"] != result["artifact_integrity"]["computed_hash"]
+    assert result["artifact_integrity"]["failures"] == [
+        "artifact_hash does not match canonical artifact content"
+    ]
+    assert result["source_evidence"] == {
+        "path": "data/esports/cs2/matches.jsonl",
+        "inspection_status": "not_inspected_due_to_artifact_integrity",
+    }

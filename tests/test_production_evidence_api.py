@@ -461,7 +461,7 @@ def test_current_configured_production_artifacts_fail_closed_when_invalid(monkey
     assert {model["sport"]: model["active_model_version"] for model in result["models"]} == configured
     assert result["all_model_definitions_and_backfills_valid"] is False
     assert result["feature_registry"]["valid"] is True
-    assert len(result["feature_registry"]["features"]) == 22
+    assert len(result["feature_registry"]["features"]) == 23
     assert len(result["feature_registry"]["production_ablation_summary"]) == 15
     invalid_sports = {"cs2", "dota2", "lol", "valorant"}
     for model in result["models"]:

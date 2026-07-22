@@ -388,9 +388,93 @@ def _score_sport(config: Mapping[str, Any], sport: str, store: FeatureStore) -> 
 
 
 def _esports_model(config: Mapping[str, Any], title: str) -> dict[str, Any]:
-    artifact_path = Path(config["models"][title.upper()]["production_artifact"])
-    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    model_config = config["models"][title.upper()]
+    artifact_path = Path(model_config["production_artifact"])
     matches_path = Path("data") / "esports" / title / "matches.jsonl"
+    expected_version = model_config.get("active_production_version")
+    source_not_inspected = {
+        "path": matches_path.as_posix(),
+        "inspection_status": "not_inspected_due_to_artifact_integrity",
+    }
+    try:
+        decoded = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        return {
+            "status": "UNTESTABLE_ARTIFACT_INTEGRITY",
+            "artifact_path": str(artifact_path),
+            "artifact_version": None,
+            "artifact_hash": None,
+            "production_features": ["neutral_elo_rating_difference"],
+            "source_evidence": source_not_inspected,
+            "artifact_integrity": {
+                "passed": False,
+                "stored_hash": None,
+                "computed_hash": None,
+                "expected_title": title,
+                "artifact_title": None,
+                "expected_version": expected_version,
+                "artifact_version": None,
+                "failures": [f"artifact JSON invalid or unreadable: {error}"],
+            },
+            "reason": f"artifact JSON invalid or unreadable: {error}",
+        }
+    if not isinstance(decoded, Mapping):
+        failures = ["artifact JSON root must be an object"]
+        return {
+            "status": "UNTESTABLE_ARTIFACT_INTEGRITY",
+            "artifact_path": str(artifact_path),
+            "artifact_version": None,
+            "artifact_hash": None,
+            "production_features": ["neutral_elo_rating_difference"],
+            "source_evidence": source_not_inspected,
+            "artifact_integrity": {
+                "passed": False,
+                "stored_hash": None,
+                "computed_hash": None,
+                "expected_title": title,
+                "artifact_title": None,
+                "expected_version": expected_version,
+                "artifact_version": None,
+                "failures": failures,
+            },
+            "reason": "; ".join(failures),
+        }
+    artifact = dict(decoded)
+    stored_hash = artifact.get("artifact_hash")
+    computed_hash = artifact_hash(artifact)
+    artifact_title = artifact.get("title")
+    artifact_version = artifact.get("model_version")
+    failures = []
+    if not stored_hash:
+        failures.append("artifact_hash is missing")
+    elif stored_hash != computed_hash:
+        failures.append("artifact_hash does not match canonical artifact content")
+    if artifact_title != title:
+        failures.append(f"artifact title {artifact_title!r} does not match configured title {title!r}")
+    if artifact_version != expected_version:
+        failures.append(
+            f"artifact version {artifact_version!r} does not match configured active version {expected_version!r}"
+        )
+    if failures:
+        return {
+            "status": "UNTESTABLE_ARTIFACT_INTEGRITY",
+            "artifact_path": str(artifact_path),
+            "artifact_version": artifact_version,
+            "artifact_hash": stored_hash,
+            "production_features": ["neutral_elo_rating_difference"],
+            "source_evidence": source_not_inspected,
+            "artifact_integrity": {
+                "passed": False,
+                "stored_hash": stored_hash,
+                "computed_hash": computed_hash,
+                "expected_title": title,
+                "artifact_title": artifact_title,
+                "expected_version": expected_version,
+                "artifact_version": artifact_version,
+                "failures": failures,
+            },
+            "reason": "; ".join(failures),
+        }
     if hashlib.sha256(matches_path.read_bytes()).hexdigest() != artifact["matches_sha256"]:
         raise ValueError(f"{title} match data drifted from production artifact")
     rows = _load_matches(matches_path)

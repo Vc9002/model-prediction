@@ -247,6 +247,17 @@
       "tested_on": "2026-07-22"
     },
     {
+      "name": "tie_aware_elo_rating_difference",
+      "file": "src/model_prediction/international_baseball.py",
+      "sports": ["KBO", "NPB"],
+      "verdict": "untested",
+      "status": "active_research_feature_not_ablated",
+      "evidence_grade": "A",
+      "notes": "The core rating-difference signal in the KBO/NPB tie-aware Elo family. Exact-version locked backfills exist, but no feature-level omission study isolates its contribution and the artifacts remain research-state, unqualified, and zero-unit.",
+      "retest_when": "Run an exact-version chronological omission comparison against an intercept-only tie-aware baseline without using settled-ledger results for tuning.",
+      "tested_on": "2026-07-22"
+    },
+    {
       "name": "trend_gap",
       "file": "src/model_prediction/features/trends.py",
       "sports": ["MLB", "NBA", "WNBA", "NFL", "SOCCER"],
