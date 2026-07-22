@@ -13,6 +13,7 @@ Then open http://127.0.0.1:8765/
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -467,6 +468,486 @@ def performance(picks: list[dict]) -> dict:
         "calibration": calibration,
         "streaks": {"longest_win": longest_w, "longest_loss": longest_l, "current": current},
         "mean_clv": round(sum(clv) / len(clv), 6) if clv else None,
+    }
+
+
+# ── SECTION: Production Evidence ───────────────────────────────────
+
+
+def _artifact_hash(payload: dict) -> str:
+    canonical = {key: value for key, value in payload.items() if key != "artifact_hash"}
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _artifact_evidence(path: Path, expected_version: str, expected_sport: str) -> tuple[dict, dict]:
+    raw = _read_json(path)
+    if not isinstance(raw, dict):
+        return ({
+            "path": str(path),
+            "available": False,
+            "valid": False,
+            "declared_hash": None,
+            "computed_hash": None,
+            "hash_valid": False,
+            "artifact_model_version": None,
+            "version_matches_config": False,
+            "artifact_identity": None,
+            "lineage_matches_config": False,
+            "mismatches": ["artifact_missing_or_invalid_json"],
+        }, {})
+
+    declared_hash = raw.get("artifact_hash")
+    computed_hash = _artifact_hash(raw)
+    artifact_version = str(raw.get("model_version") or "")
+    artifact_identity = str(raw.get("sport") or raw.get("title") or "")
+    hash_valid = bool(declared_hash) and declared_hash == computed_hash
+    version_valid = bool(expected_version) and artifact_version == expected_version
+    lineage_valid = artifact_identity.casefold() == expected_sport.casefold()
+    mismatches = []
+    if not declared_hash:
+        mismatches.append("artifact_hash_missing")
+    elif not hash_valid:
+        mismatches.append("artifact_hash_mismatch")
+    if not version_valid:
+        mismatches.append("artifact_model_version_mismatch")
+    if not lineage_valid:
+        mismatches.append("artifact_sport_or_title_mismatch")
+    return ({
+        "path": str(path),
+        "available": True,
+        "valid": hash_valid and version_valid and lineage_valid,
+        "declared_hash": declared_hash,
+        "computed_hash": computed_hash,
+        "hash_valid": hash_valid,
+        "artifact_model_version": artifact_version or None,
+        "version_matches_config": version_valid,
+        "artifact_identity": artifact_identity or None,
+        "lineage_matches_config": lineage_valid,
+        "mismatches": mismatches,
+    }, raw)
+
+
+def _production_model_spec(raw: dict) -> dict:
+    moneyline = (raw.get("market_models") or {}).get("moneyline") or {}
+    if moneyline:
+        names = list(moneyline.get("feature_names") or [])
+        coefficients = list(moneyline.get("coefficients") or [])
+        return {
+            "kind": "logistic_regression",
+            "feature_schema_status": "declared",
+            "features": [
+                {"name": name, "coefficient": coefficient}
+                for name, coefficient in zip(names, coefficients, strict=False)
+            ],
+            "feature_names": names,
+            "coefficients": coefficients,
+            "coefficient_count_matches_features": len(names) == len(coefficients),
+            "intercept": moneyline.get("intercept"),
+            "confidence_threshold": moneyline.get("confidence_threshold"),
+            "positive_class": moneyline.get("positive_class"),
+        }
+    return {
+        "kind": "neutral_series_elo",
+        "feature_schema_status": "not_declared_in_artifact",
+        "features": [],
+        "feature_names": [],
+        "coefficients": [],
+        "coefficient_count_matches_features": True,
+        "parameters": {
+            "initial_rating": raw.get("initial_rating"),
+            "k": raw.get("k"),
+            "home_or_order_advantage": raw.get("home_or_order_advantage"),
+            "confidence_threshold": raw.get("confidence_threshold"),
+            "target": raw.get("target"),
+        },
+    }
+
+
+def _locked_backfill_evidence(
+    sport: str,
+    version: str,
+    raw: dict,
+    artifact: dict,
+    esports_validation: dict,
+) -> dict:
+    if not artifact.get("valid"):
+        return {
+            "status": "rejected_artifact_integrity",
+            "source": None,
+            "model_version": version,
+            "metrics": None,
+            "pnl_label": None,
+            "profitability_claim": False,
+        }
+    if raw.get("method") == "logistic_regression":
+        metrics = raw.get("qualification") or {}
+        if not metrics or metrics.get("locked_holdout") is not True:
+            return {
+                "status": "rejected_missing_locked_holdout_metrics",
+                "source": artifact.get("path"),
+                "model_version": version,
+                "metrics": None,
+                "pnl_label": None,
+                "profitability_claim": False,
+            }
+        return {
+            "status": "verified",
+            "source": artifact.get("path"),
+            "model_version": version,
+            "metrics": metrics,
+            "pnl_label": "hypothetical_at_minus_110",
+            "profitability_claim": False,
+        }
+
+    report = (esports_validation.get("titles") or {}).get(sport.lower()) or {}
+    report_version = str(report.get("model_version") or "")
+    report_hash = report.get("artifact_hash")
+    exact_version = report_version == version
+    exact_hash = bool(report_hash) and report_hash == artifact.get("declared_hash")
+    locked = report.get("locked_test") or {}
+    if not exact_version or not exact_hash or not locked:
+        reasons = []
+        if not exact_version:
+            reasons.append("validation_model_version_mismatch")
+        if not exact_hash:
+            reasons.append("validation_artifact_hash_mismatch_or_missing")
+        if not locked:
+            reasons.append("locked_test_metrics_missing")
+        return {
+            "status": "rejected_external_validation_mismatch",
+            "source": str(OUTPUTS / "esports-baseline-validation.json"),
+            "model_version": report_version or None,
+            "metrics": None,
+            "mismatches": reasons,
+            "pnl_label": None,
+            "profitability_claim": False,
+        }
+    return {
+        "status": "verified",
+        "source": str(OUTPUTS / "esports-baseline-validation.json"),
+        "model_version": report_version,
+        "artifact_hash": report_hash,
+        "metrics": locked,
+        "pnl_label": "hypothetical_at_minus_110",
+        "profitability_claim": False,
+    }
+
+
+def _read_evidence_ledger(path: Path) -> list[dict]:
+    if load_workbook is None or not path.exists():
+        return []
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    sheet = workbook["Picks"] if "Picks" in workbook.sheetnames else workbook.active
+    values = sheet.iter_rows(values_only=True)
+    try:
+        headers = [str(value) if value is not None else "" for value in next(values)]
+    except StopIteration:
+        workbook.close()
+        return []
+    rows = []
+    for raw_row in values:
+        if not raw_row or all(value is None for value in raw_row):
+            continue
+        row = {header: raw_row[index] for index, header in enumerate(headers) if header}
+        if row.get("pick_id") or row.get("event_id"):
+            rows.append(row)
+    workbook.close()
+    return rows
+
+
+def _row_identity(row: dict) -> tuple:
+    pick_id = str(row.get("pick_id") or "").strip()
+    version = str(row.get("model_version") or "").strip()
+    if pick_id:
+        return ("pick_id", pick_id, version)
+    return (
+        "composite",
+        str(row.get("event_id") or ""),
+        str(row.get("market_type") or ""),
+        str(row.get("selection") or ""),
+        version,
+    )
+
+
+def _model_owns_row(sport: str, model_config: dict, row: dict) -> bool:
+    version = str(row.get("model_version") or "").casefold()
+    league = str(row.get("league") or "").casefold()
+    configured_leagues = {str(value).casefold() for value in model_config.get("leagues") or []}
+    return version.startswith(f"{sport.casefold()}-") or league in {
+        sport.casefold(),
+        *configured_leagues,
+    }
+
+
+def _feature_attribution(rows: list[dict], feature_names: list[str]) -> dict:
+    if not feature_names:
+        return {
+            "status": "unavailable_artifact_has_no_explicit_feature_schema",
+            "rows_with_complete_values": 0,
+            "rows_missing_values": len(rows),
+            "missing_by_feature": {},
+        }
+    missing_by_feature = {name: 0 for name in feature_names}
+    complete = 0
+    for row in rows:
+        feature_values = row.get("feature_values")
+        if isinstance(feature_values, str):
+            try:
+                feature_values = json.loads(feature_values)
+            except json.JSONDecodeError:
+                feature_values = {}
+        feature_values = feature_values if isinstance(feature_values, dict) else {}
+        missing = []
+        for name in feature_names:
+            value = row.get(name, row.get(f"feature_{name}", feature_values.get(name)))
+            if value in (None, ""):
+                missing.append(name)
+                missing_by_feature[name] += 1
+        if not missing:
+            complete += 1
+    return {
+        "status": "complete" if complete == len(rows) and rows else "missing",
+        "rows_with_complete_values": complete,
+        "rows_missing_values": len(rows) - complete,
+        "missing_by_feature": missing_by_feature,
+    }
+
+
+def _pnl_evidence(rows: list[dict]) -> dict:
+    shadow = [row for row in rows if row.get("record_type") == "QUALIFIED_SHADOW_CALL"]
+    shadow_staked = sum(_number(row.get("units")) for row in shadow)
+    shadow_pnl = sum(_number(row.get("pnl_units")) for row in shadow)
+    hypothetical = [row for row in rows if _number(row.get("research_score_units")) > 0]
+    hypothetical_staked = sum(_number(row.get("research_score_units")) for row in hypothetical)
+    hypothetical_pnl = sum(_number(row.get("research_pnl_units")) for row in hypothetical)
+    return {
+        "shadow": {
+            "label": "shadow_not_executed",
+            "rows": len(shadow),
+            "staked_units": round(shadow_staked, 6),
+            "pnl_units": round(shadow_pnl, 6),
+            "roi": round(shadow_pnl / shadow_staked, 6) if shadow_staked else None,
+        },
+        "hypothetical": {
+            "label": "hypothetical_fixed_unit_research",
+            "rows": len(hypothetical),
+            "staked_units": round(hypothetical_staked, 6),
+            "pnl_units": round(hypothetical_pnl, 6),
+            "roi": round(hypothetical_pnl / hypothetical_staked, 6)
+            if hypothetical_staked else None,
+        },
+        "executed": {
+            "label": "executed",
+            "rows": 0,
+            "staked_units": None,
+            "pnl_units": None,
+            "roi": None,
+            "status": "not_available_no_execution_attribution_in_ledgers",
+        },
+    }
+
+
+def _version_ledger_evidence(
+    version: str,
+    relationship: str,
+    rows: list[dict],
+    source_counts: dict[str, int],
+    duplicates_removed: int,
+    artifact: dict,
+    feature_names: list[str],
+) -> dict:
+    wins = sum(str(row.get("result") or "").casefold() == "win" for row in rows)
+    clv_values = [
+        _number(row.get("probability_clv"), None)
+        for row in rows
+        if row.get("probability_clv") not in (None, "")
+    ]
+    clv_values = [value for value in clv_values if value is not None]
+    expected_hash = artifact.get("declared_hash") if artifact.get("valid") else None
+    row_hashes = [str(row.get("model_artifact_hash") or "") for row in rows]
+    matching_hash_rows = sum(bool(expected_hash) and value == expected_hash for value in row_hashes)
+    mismatching_hash_rows = sum(bool(value) and value != expected_hash for value in row_hashes)
+    missing_hash_rows = sum(not value for value in row_hashes)
+    pnl = _pnl_evidence(rows)
+    clv_complete = bool(rows) and len(clv_values) == len(rows)
+    profitability_allowed = bool(rows) and pnl["executed"]["roi"] is not None and clv_complete
+    blockers = []
+    if not rows:
+        blockers.append("no_exact_model_version_settled_decisive_rows")
+    if pnl["executed"]["roi"] is None:
+        blockers.append("executed_roi_unavailable")
+    if not clv_complete:
+        blockers.append("clv_missing_or_incomplete")
+    return {
+        "model_version": version,
+        "relationship": relationship,
+        "settled_decisive_rows": len(rows),
+        "wins": wins,
+        "losses": len(rows) - wins,
+        "hit_rate": round(wins / len(rows), 6) if rows else None,
+        "source_rows_before_deduplication": source_counts,
+        "duplicates_removed": duplicates_removed,
+        "artifact_lineage": {
+            "artifact_path": artifact.get("path"),
+            "expected_hash": expected_hash,
+            "artifact_valid": bool(artifact.get("valid")),
+            "matching_hash_rows": matching_hash_rows,
+            "mismatching_hash_rows": mismatching_hash_rows,
+            "missing_hash_rows": missing_hash_rows,
+            "status": (
+                "exact"
+                if rows and expected_hash and matching_hash_rows == len(rows)
+                else "missing_or_mismatched"
+            ),
+        },
+        "feature_value_attribution": _feature_attribution(rows, feature_names),
+        "pnl": pnl,
+        "clv": {
+            "rows": len(clv_values),
+            "complete": clv_complete,
+            "mean_probability_clv": round(sum(clv_values) / len(clv_values), 6)
+            if clv_values else None,
+        },
+        "profitability_claim": {
+            "allowed": profitability_allowed,
+            "blockers": blockers,
+        },
+    }
+
+
+def _version_artifact(version: str, sport: str) -> tuple[dict, dict]:
+    if not version or Path(version).name != version:
+        return _artifact_evidence(ROOT / "config" / "models" / "invalid.json", version, sport)
+    return _artifact_evidence(ROOT / "config" / "models" / f"{version}.json", version, sport)
+
+
+def production_evidence() -> dict:
+    """Read-only, fail-closed evidence for every configured production artifact."""
+    config = _config_payload()
+    configured_models = config.get("models") or {}
+    esports_validation = _read_json(OUTPUTS / "esports-baseline-validation.json") or {}
+    ledger_paths = (DATA / "picks.xlsx", DATA / "flat_picks.xlsx")
+    rows_by_source = {
+        str(path.relative_to(ROOT)): _read_evidence_ledger(path)
+        for path in ledger_paths
+    }
+    models = []
+    for sport, model_config in configured_models.items():
+        if not isinstance(model_config, dict) or not model_config.get("production_artifact"):
+            continue
+        version = str(model_config.get("active_production_version") or "")
+        configured_path = Path(str(model_config["production_artifact"]))
+        artifact_path = configured_path if configured_path.is_absolute() else ROOT / configured_path
+        artifact, raw = _artifact_evidence(artifact_path, version, str(sport))
+        spec = _production_model_spec(raw)
+        locked = _locked_backfill_evidence(
+            str(sport), version, raw, artifact, esports_validation
+        )
+
+        relevant_by_source: dict[str, list[dict]] = {}
+        for source, source_rows in rows_by_source.items():
+            relevant_by_source[source] = [
+                row
+                for row in source_rows
+                if str(row.get("status") or "").casefold() == "settled"
+                and str(row.get("result") or "").casefold() in {"win", "loss"}
+                and _model_owns_row(str(sport), model_config, row)
+            ]
+        deduplicated: dict[tuple, dict] = {}
+        for source in ("data/picks.xlsx", "data/flat_picks.xlsx"):
+            for row in relevant_by_source.get(source, []):
+                deduplicated.setdefault(_row_identity(row), row)
+
+        versions = {version}
+        versions.update(str(row.get("model_version") or "") for row in deduplicated.values())
+        versions.discard("")
+        version_evidence = []
+        for row_version in sorted(versions, key=lambda value: (value != version, value)):
+            version_rows = [
+                row for row in deduplicated.values()
+                if str(row.get("model_version") or "") == row_version
+            ]
+            source_counts = {
+                source: sum(
+                    str(row.get("model_version") or "") == row_version for row in source_rows
+                )
+                for source, source_rows in relevant_by_source.items()
+            }
+            duplicates_removed = sum(source_counts.values()) - len(version_rows)
+            if row_version == version:
+                version_artifact, version_raw = artifact, raw
+                feature_names = list(spec.get("feature_names") or [])
+                relationship = "active"
+            else:
+                version_artifact, version_raw = _version_artifact(row_version, str(sport))
+                feature_names = list(_production_model_spec(version_raw).get("feature_names") or [])
+                relationship = "predecessor"
+            version_evidence.append(_version_ledger_evidence(
+                row_version,
+                relationship,
+                version_rows,
+                source_counts,
+                duplicates_removed,
+                version_artifact,
+                feature_names,
+            ))
+
+        active_ledger = next(item for item in version_evidence if item["relationship"] == "active")
+        issues = [{"code": code, "scope": "artifact"} for code in artifact["mismatches"]]
+        if locked.get("status") != "verified":
+            issues.append({"code": locked["status"], "scope": "locked_backfill"})
+        if spec.get("coefficient_count_matches_features") is False:
+            issues.append({"code": "feature_coefficient_length_mismatch", "scope": "model_spec"})
+        if active_ledger["artifact_lineage"]["status"] != "exact":
+            issues.append({"code": "ledger_artifact_lineage_missing_or_mismatched", "scope": "ledger"})
+        if active_ledger["feature_value_attribution"]["status"] != "complete":
+            issues.append({"code": "feature_value_attribution_missing", "scope": "ledger"})
+
+        models.append({
+            "sport": str(sport).lower(),
+            "configured_status": model_config.get("status"),
+            "active_model_version": version or None,
+            "production_artifact": str(model_config["production_artifact"]),
+            "artifact": artifact,
+            "model_spec": spec,
+            "locked_backfill": locked,
+            "ledger_evidence": {
+                "active_version": active_ledger,
+                "predecessor_versions": [
+                    item for item in version_evidence if item["relationship"] == "predecessor"
+                ],
+                "all_versions": version_evidence,
+            },
+            "evidence_valid": (
+                artifact["valid"]
+                and locked.get("status") == "verified"
+                and spec.get("coefficient_count_matches_features") is not False
+            ),
+            "issues": issues,
+        })
+
+    return {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "read_only": True,
+        "claim_policy": {
+            "profitability_requires": [
+                "exact_model_version_settled_decisive_rows",
+                "executed_roi",
+                "complete_clv",
+            ],
+            "shadow_and_hypothetical_pnl_are_not_profitability_evidence": True,
+        },
+        "sources": {
+            "config": str(CONFIG_FILE.relative_to(ROOT)),
+            "ledgers": list(rows_by_source),
+            "esports_validation": "outputs/latest/esports-baseline-validation.json",
+        },
+        "configured_production_models": len(models),
+        "all_production_evidence_valid": bool(models) and all(
+            model["evidence_valid"] for model in models
+        ),
+        "models": models,
     }
 # ── SECTION: Status & Health ────────────────────────────────────────
 
@@ -2124,6 +2605,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("status", 30, status))
             elif route == "/api/matrix":
                 self._send(_cached("matrix", 60, matrix))
+            elif route == "/api/production-evidence":
+                self._send(_cached("production-evidence", 30, production_evidence))
             elif route == "/api/picks":
                 self._send(_cached("picks", 30, dashboard_picks))
             elif route == "/api/flat-picks":
