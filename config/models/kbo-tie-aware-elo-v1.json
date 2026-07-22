@@ -1,5 +1,4 @@
 {
-  "artifact_hash": "c83e12bf5e834073969ca0718b3fd7cab65a771c8a34c0298755754707f7f068",
   "games_sha256": "ad274c0a7b679c244772fb23d6d1625bbe1c4a76359fd2444d798f9516c5ed59",
   "home_advantage": 20.0,
   "initial_rating": 1500.0,
@@ -26,5 +25,6 @@
   "tie_probability": 0.01928873,
   "trained_through_date": "2026-07-18",
   "training_observations": 3318,
-  "units": 0
+  "units": 0,
+  "artifact_hash": "c83e12bf5e834073969ca0718b3fd7cab65a771c8a34c0298755754707f7f068"
 }

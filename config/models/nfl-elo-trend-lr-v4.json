@@ -1,5 +1,4 @@
 {
-  "artifact_hash": "5cb5857519c32e04c895a3220afdc208e3d717ba0793e8d4a6946b1332f11654",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -121,5 +120,6 @@
     },
     "threshold_source": "later validation cohort; never locked holdout",
     "walk_forward_features": true
-  }
+  },
+  "artifact_hash": "5cb5857519c32e04c895a3220afdc208e3d717ba0793e8d4a6946b1332f11654"
 }
