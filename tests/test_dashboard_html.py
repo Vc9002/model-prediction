@@ -234,6 +234,104 @@ def test_production_evidence_missing_values_are_dashes_not_zero_percent() -> Non
     assert "PROFITABILITY NOT ESTABLISHED" in rendered
 
 
+def test_production_evidence_renders_neutral_elo_model_spec_when_feature_alias_is_empty() -> None:
+    rendered = _render_production_evidence(
+        {
+            "models": [
+                {
+                    "sport": "lol",
+                    "model_version": "lol-neutral-series-elo-v2",
+                    "status": "shadow_qualified",
+                    "features": [],
+                    "model_spec": {
+                        "kind": "neutral_series_elo",
+                        "feature_schema_status": "not_declared_in_artifact",
+                        "features": [],
+                        "parameters": {
+                            "initial_rating": 1500.0,
+                            "k": 48.0,
+                            "home_or_order_advantage": 0.0,
+                            "confidence_threshold": 0.05,
+                            "target": "series winner",
+                        },
+                    },
+                    "backfill": {},
+                    "main_ledger": {},
+                    "flat_ledger": {},
+                    "artifact": {},
+                    "profitability": {},
+                }
+            ]
+        }
+    )
+
+    assert "model_kind" in rendered and "neutral_series_elo" in rendered
+    assert "feature_schema_status" in rendered and "not_declared_in_artifact" in rendered
+    assert "initial_rating" in rendered and "1500" in rendered
+    assert "home_or_order_advantage" in rendered and "0" in rendered
+    assert "confidence_threshold" in rendered and "0.05" in rendered
+    assert "series winner" in rendered
+
+
+def test_production_evidence_formats_nested_pnl_and_warning_objects_concisely() -> None:
+    empty_pnl = {
+        "shadow": {"label": "shadow_not_executed", "rows": 0, "pnl_units": None},
+        "hypothetical": {
+            "label": "hypothetical_fixed_unit_research",
+            "rows": 0,
+            "pnl_units": None,
+        },
+        "executed": {
+            "label": "executed",
+            "pnl_units": None,
+            "status": "not_available_no_execution_attribution_in_ledgers",
+        },
+    }
+    rendered = _render_production_evidence(
+        {
+            "models": [
+                {
+                    "sport": "cs2",
+                    "model_version": "cs2-neutral-series-elo-v2",
+                    "status": "shadow_qualified",
+                    "features": [{"name": "neutral_elo_probability", "coefficient": None}],
+                    "backfill": {},
+                    "main_ledger": {"pnl_units": None, "pnl_basis": None, "pnl": empty_pnl},
+                    "flat_ledger": {
+                        "pnl_units": None,
+                        "pnl_basis": "shadow",
+                        "pnl": {
+                            **empty_pnl,
+                            "shadow": {
+                                "label": "shadow_not_executed",
+                                "rows": 2,
+                                "pnl_units": -0.5,
+                            },
+                        },
+                    },
+                    "artifact": {},
+                    "profitability": {},
+                    "warnings": [
+                        {
+                            "code": "config_artifact_qualification_mismatch",
+                            "scope": "qualification",
+                            "artifact_qualified": False,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert ">-0.50</td>" in rendered
+    assert "not_available_no_execution_attribution_in_ledgers" not in rendered
+    assert '{"shadow"' not in rendered
+    assert '"pnl_units"' not in rendered
+    assert "config artifact qualification mismatch (qualification)" in rendered
+    assert "config_artifact_qualification_mismatch" not in rendered
+    assert '"artifact_qualified"' not in rendered
+
+
 def test_production_evidence_collapses_identical_duplicate_models() -> None:
     model = {
         "sport": "mlb",

@@ -557,6 +557,44 @@ function evidenceFeatureRows(features){
   });
   return rows;
 }
+function evidenceModelFeatureRows(model){
+  const rows=evidenceFeatureRows(model&&model.features);
+  if(rows.length)return rows;
+  const spec=model&&model.model_spec&&typeof model.model_spec==="object"?model.model_spec:{};
+  const add=(name,value)=>{
+    if(!evidencePresent(value))return;
+    rows.push([evidenceText(name),evidenceText(value)]);
+  };
+  add("model_kind",spec.kind);
+  add("feature_schema_status",spec.feature_schema_status);
+  evidenceFeatureRows(spec.features).forEach(row=>rows.push(row));
+  evidenceFeatureRows({parameters:spec.parameters}).forEach(row=>rows.push(row));
+  return rows;
+}
+function evidenceLedgerPnl(item){
+  const direct=item&&item.pnl_units;
+  if(evidencePresent(direct)&&typeof direct!=="object"){
+    const number=Number(direct);
+    if(Number.isFinite(number))return {text:number.toFixed(2),number};
+  }
+  const basis=String(item&&item.pnl_basis||"").toLowerCase();
+  const pnl=item&&item.pnl&&typeof item.pnl==="object"?item.pnl:{};
+  const bucket=(basis==="shadow"||basis==="hypothetical")&&pnl[basis]&&typeof pnl[basis]==="object"?pnl[basis]:{};
+  const nested=bucket.pnl_units;
+  if(evidencePresent(nested)&&typeof nested!=="object"){
+    const number=Number(nested);
+    if(Number.isFinite(number))return {text:number.toFixed(2),number};
+  }
+  return {text:EVIDENCE_MISSING,number:null};
+}
+function evidenceWarningText(warning){
+  if(!warning||typeof warning!=="object"||Array.isArray(warning))return evidenceText(warning);
+  const code=evidenceFirst(warning,["code","message","warning"]);
+  if(!evidencePresent(code))return "warning details unavailable";
+  const label=String(code).replaceAll("_"," ");
+  const scope=evidenceFirst(warning,["scope"]);
+  return evidencePresent(scope)?`${label} (${String(scope).replaceAll("_"," ")})`:label;
+}
 function evidenceModels(payload){
   const models=payload&&payload.models;
   if(Array.isArray(models))return models;
@@ -621,7 +659,7 @@ function productionEvidenceHtml(payload){
     const hitRate=evidenceFirst(backfill,["hit_rate","accuracy"]);
     const brier=evidenceFirst(backfill,["brier","brier_score"]);
     const qualification=evidenceFirst(backfill,["qualification","qualification_status","qualified","status"]);
-    const featureRows=evidenceFeatureRows(model.features);
+    const featureRows=evidenceModelFeatureRows(model);
     const featureHtml=featureRows.length?featureRows.map(([name,value])=>
       `<tr><td>${esc(name)}</td><td>${esc(value)}</td></tr>`).join(""):
       `<tr><td>${EVIDENCE_MISSING}</td><td>${EVIDENCE_MISSING}</td></tr>`;
@@ -630,12 +668,12 @@ function productionEvidenceHtml(payload){
       const settled=evidenceFirst(item,["settled","settled_rows","calls"]);
       const wins=evidenceFirst(item,["wins","won"]),losses=evidenceFirst(item,["losses","lost"]);
       const pushes=evidenceFirst(item,["pushes","push"]),rate=evidenceFirst(item,["hit_rate","win_rate"]);
-      const pnl=evidenceFirst(item,["pnl_units","pnl","units"]);
+      const pnl=evidenceLedgerPnl(item);
       const excluded=evidenceFirst(item,["predecessor_rows_excluded","excluded_predecessor_rows","predecessor_excluded"]);
-      const pnlNumber=Number(pnl),pnlClass=evidencePresent(pnl)&&Number.isFinite(pnlNumber)?(pnlNumber>=0?"green":"red"):"";
+      const pnlClass=pnl.number==null?"":(pnl.number>=0?"green":"red");
       return `<tr><td>${label}</td><td>${esc(version)}</td><td>${esc(evidenceMetric(settled))}</td>`+
         `<td>${esc(evidenceMetric(wins))} / ${esc(evidenceMetric(losses))} / ${esc(evidenceMetric(pushes))}</td>`+
-        `<td>${esc(evidencePct(rate))}</td><td class="${pnlClass}">${esc(evidenceMetric(pnl,2))}</td>`+
+        `<td>${esc(evidencePct(rate))}</td><td class="${pnlClass}">${esc(pnl.text)}</td>`+
         `<td>${esc(evidenceMetric(excluded))}</td></tr>`;
     };
     const artifact=typeof model.artifact==="string"?{path:model.artifact}:
@@ -658,7 +696,7 @@ function productionEvidenceHtml(payload){
     const blockerItems=blockers.length?blockers:(fallbackBlocker?[fallbackBlocker]:[]);
     const blockersHtml=blockerItems.length?`<ul class="evidence-list">${blockerItems.map(item=>`<li>${esc(item)}</li>`).join("")}</ul>`:
       `<div class="dim">${profitEstablished?"No blockers reported.":EVIDENCE_MISSING}</div>`;
-    const warnings=evidenceList(model.warnings);
+    const warnings=Array.isArray(model.warnings)?model.warnings.map(evidenceWarningText):evidenceList(model.warnings);
     const warningsHtml=warnings.length?`<div class="evidence-block"><h3>Warnings</h3><ul class="evidence-list yellow">${warnings.map(item=>`<li>${esc(item)}</li>`).join("")}</ul></div>`:"";
     const conflictHtml=group.signatures.size>1?`<div class="alert warn evidence-conflict" role="alert"><b>Conflicting production evidence for ${sport} · ${versionEsc}.</b> Received ${group.duplicateCount} records. Displaying the first artifact-hash-verified record; metrics were not merged.</div>`:"";
     return `<article class="card evidence-card">${conflictHtml}
