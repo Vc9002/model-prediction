@@ -267,6 +267,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
          <div><table class="data" id="perfSport"></table></div>
        </div>
        <div style="margin-top:16px"><table class="data" id="perfBucket"></table></div>
+       <div style="margin-top:16px" class="two-col">
+         <div><table class="data" id="perfMarket"></table></div>
+         <div><table class="data" id="perfCal"></table></div>
+       </div>
        <div class="small dim" style="margin-top:8px" id="perfMonthly"></div>
      </div>
    </section>
@@ -346,6 +350,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <div><table class="data" id="flatPerfSport"></table></div>
       </div>
       <div style="margin-top:16px"><table class="data" id="flatPerfBucket"></table></div>
+      <div style="margin-top:16px" class="two-col">
+        <div><table class="data" id="flatPerfMarket"></table></div>
+        <div><table class="data" id="flatPerfCal"></table></div>
+      </div>
       <div class="small dim" style="margin-top:8px" id="flatPerfMonthly"></div>
     </div>
   </section>
@@ -1311,6 +1319,12 @@ function renderPerf(p){
   const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
   const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
   $("#perfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
+  const bm=Object.entries(p.by_market||{});
+  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#perfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
+  const cal=p.calibration||[];
+  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
+  $("#perfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
   const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
   $("#perfMonthly").textContent=mm.join(" · ");
 }
@@ -1332,7 +1346,13 @@ async function renderFlatPerf(){
   const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
   const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
   $("#flatPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
-  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
+  const bm=Object.entries(p.by_market||{});
+  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#flatPerfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
+  const cal=p.calibration||[];
+  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
+  $("#flatPerfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
+  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
   $("#flatPerfMonthly").textContent=mm.join(" · ");
 }
 
