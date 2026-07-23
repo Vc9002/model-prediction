@@ -6,7 +6,7 @@
 # Re-running is safe: clears and replaces today's picks on each run.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 RUNNER_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-cd "$RUNNER_DIR" || exit 1
+cd "$RUNNER_DIR/.." || exit 1
 
 RUN_DATE=$(TZ=America/New_York date +%Y-%m-%d)
 LOG="data/logs/daily_${RUN_DATE}.log"
