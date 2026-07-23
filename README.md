@@ -3,21 +3,29 @@
 Shadow-first multi-sport prediction, research, ledger, and local dashboard
 system with Polymarket US market-data integration.
 
-## Read this first
+**Last updated**: 2026-07-23
 
-The current checkout is **not release-ready**. Tests, artifact qualification,
-the audit chain, packaging, and documentation had drifted apart. Do not use old
-README tables or flat `-110` units as proof of a live betting edge.
+## Current State
 
-See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the verified health
-snapshot, current model evidence, architecture, safety boundaries, and repair
-order. That document supersedes historical metrics elsewhere when they conflict.
+| Metric | Value |
+|--------|-------|
+| Active models | MLB v5 + WNBA v4 (production), CS2/DOTA2/LOL/VALORANT v3 (esports) |
+| Edge gate | 5% minimum for MLB/WNBA qualified calls |
+| Model P&L (main) | 38 calls, 29-9 (76%), +17.59U (real Polymarket closing prices) |
+| Flat P&L | 111 settled, 62.2%, +21.99U |
+| Tests | 321 pass, 0 fail |
 
-See [`docs/ENGINEERING_ROADMAP.md`](docs/ENGINEERING_ROADMAP.md) for the
-software-side punch list: dead code, oversized files worth splitting, a
-verified broken dashboard route, missing CI, and non-model/dashboard/
-portfolio-layer feature ideas. `model_improvements.md` stays scoped to
-per-sport modeling research only.
+## Ledger Structure
+
+Three ledgers with distinct purposes:
+
+| Ledger | File | Purpose |
+|--------|------|---------|
+| **Main** | `data/picks.xlsx` | Production qualified calls only (edge ≥ 5%). These are the bets. |
+| **Flat** | `data/flat_picks.xlsx` | All games with production model decisions. Research/diagnostic only. |
+| **Research** | `data/research.xlsx` | Research and development models. Feature ablation, challengers, experiments. |
+
+Main and flat use production models. Research is for everything else — new features, model variants, alternative calibrations.
 
 The project uses complete-date chronological 60/20/20 validation. Model
 accuracy, calibration, diagnostic units, and executable profitability are
