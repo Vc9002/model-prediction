@@ -16,3 +16,11 @@ Traceback (most recent call last):
 OSError: [Errno 48] Address already in use
 2026-07-23T15:03:00 job started: daily-1784818980 :: /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/.venv/bin/python -m model_prediction.cli daily --date 2026-07-23
 2026-07-23T15:07:19 job finished: daily-1784818980 :: ok in 259.0s
+2026-07-23T16:12:19 job started: daily-1784823139 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/run_daily.sh
+2026-07-23T16:12:19 job finished: daily-1784823139 :: failed in 0.0s
+2026-07-23T16:13:18 job started: daily-1784823198 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
+2026-07-23T16:13:18 job finished: daily-1784823198 :: ok in 0.0s
+2026-07-23T16:13:25 job started: daily-1784823205 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
+2026-07-23T16:13:26 job finished: daily-1784823205 :: ok in 0.1s
+2026-07-23T16:20:09 job started: daily-1784823609 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
+2026-07-23T16:20:09 job finished: daily-1784823609 :: ok in 0.0s

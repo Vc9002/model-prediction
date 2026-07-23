@@ -1,32 +1,9 @@
 #!/bin/bash
-# dash — start the dashboard (kills old instance if running)
-set -euo pipefail
-
-PROJECT_DIR="$HOME/Documents/Poly & Kalshi/model prediction"
-PID_FILE="$PROJECT_DIR/dashboard/server.pid"
-PORT=8765
-
-cd "$PROJECT_DIR" || exit 1
-
-# Kill old instance via PID file
-if [ -f "$PID_FILE" ]; then
-    old_pid=$(cat "$PID_FILE" 2>/dev/null || true)
-    [ -n "$old_pid" ] && kill "$old_pid" 2>/dev/null || true
-    sleep 1
-    rm -f "$PID_FILE"
-fi
-
-# Start
-PYTHONPATH=src .venv/bin/python dashboard_server.py --port "$PORT" &
-echo $! > "$PID_FILE"
-
-# Wait for readiness
+# dash — start dashboard
+cd "$HOME/Documents/Poly & Kalshi/model prediction" || exit 1
+PYTHONPATH=src .venv/bin/python dashboard_server.py --port 8765 &
 for _ in $(seq 1 20); do
-    if curl -sf "http://localhost:$PORT/api/status" > /dev/null 2>&1; then
-        echo "Dashboard: http://localhost:$PORT/"
-        exit 0
-    fi
+    curl -sf http://localhost:8765/api/status >/dev/null 2>&1 && echo "Dashboard: http://localhost:8765/" && exit 0
     sleep 0.5
 done
-echo "Dashboard failed to start — check data/logs/dashboard.err" >&2
-exit 1
+echo "Dashboard failed to start" >&2; exit 1

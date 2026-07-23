@@ -2451,10 +2451,24 @@ def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dic
         if slug:
             net = _net_position_quantity(slug, portfolio_history or _load_portfolio_history())
             position_closed = net is not None and abs(net) < 1e-6
-    display_units = _number(row.get("units")) or _number(row.get("research_score_units"))
+    display_units = _number(row.get("units")) or _number(row.get("research_score_units")) or _suggested_units(row) or 0
+    display_pnl = _number(row.get("pnl_units")) or _number(row.get("research_pnl_units"))
+    # Fallback: compute P&L from american_odds when research_pnl_units is absent
+    if display_pnl == 0 and row.get("result") in ("win", "loss") and row.get("american_odds"):
+        try:
+            odds = int(row["american_odds"])
+            if odds > 0:
+                display_pnl = display_units * odds / 100
+            else:
+                display_pnl = display_units * 100 / abs(odds)
+            if row["result"] == "loss":
+                display_pnl = -display_units
+        except (ValueError, TypeError):
+            pass
     return {
         **row,
         "units": display_units,
+        "pnl_units": display_pnl,
         "quote": quote,
         "order": order,
         "filled_entry": filled_entry,
@@ -2912,7 +2926,7 @@ def _action_command(name: str, payload: dict) -> list[str]:
     if name == "daily":
         # Split pipeline: settle → flat forecast → main forecast
         # Uses run_daily.sh which handles the three-step flow
-        return ["bash", str(ROOT / "run_daily.sh")]
+        return ["bash", str(ROOT / "scripts" / "run_daily.sh")]
     if name == "flat_forecast":
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
     if name == "refresh_prices":
@@ -3169,6 +3183,7 @@ class Handler(BaseHTTPRequestHandler):
                     flat = (
                         _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
                     )
+                    flat = [r for r in flat if str(r.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES]
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
                     return [_decorate_pick(row, orders, portfolio) for row in flat]
@@ -3178,7 +3193,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("performance", 30, lambda: performance(read_picks())))
             elif route == "/api/flat-performance":
                 flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
+                flat = [r for r in flat if str(r.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES]
                 self._send(_cached("flat-performance", 30, lambda: performance(flat)))
+            elif route == "/api/research-performance":
+                research = _parse_picks(DATA / "research.xlsx") if (DATA / "research.xlsx").exists() else []
+                self._send(_cached("research-performance", 30, lambda: performance(research)))
             elif route == "/api/research-picks":
                 research = _parse_picks(DATA / "research.xlsx") if (DATA / "research.xlsx").exists() else []
                 decorated = [_decorate_pick(r) for r in research]
@@ -4232,34 +4251,20 @@ def main() -> None:
     arguments.add_argument("--port", type=int, default=DASHBOARD_PORT)
     options = arguments.parse_args()
 
-    # ── Single-instance enforcement via PID file ──────────────────────────
     DASH_DIR.mkdir(exist_ok=True)
-    if PID_FILE.exists():
-        try:
-            stale_pid = int(PID_FILE.read_text().strip())
-        except (ValueError, OSError):
-            stale_pid = None
-        if stale_pid is not None:
-            try:
-                os.kill(stale_pid, 0)
-                print(f"dashboard: already running (pid {stale_pid}) — refusing to start second instance", file=sys.stderr)
-                sys.exit(1)
-            except OSError:
-                # Stale PID — process is gone, remove the file
-                PID_FILE.unlink(missing_ok=True)
-
-    # Write our PID before bind so the file exists even if bind fails
     PID_FILE.write_text(str(os.getpid()))
-
     server = None
     try:
-        # daemon_threads: request threads die with the server instead of lingering;
-        # allow_reuse_address: instant restarts without TIME_WAIT bind errors.
         ThreadingHTTPServer.daemon_threads = True
         ThreadingHTTPServer.allow_reuse_address = True
         server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
         print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
         server.serve_forever()
+    except OSError as exc:
+        if exc.errno == 48:  # Address already in use
+            print(f"dashboard: port {options.port} busy — is another instance running?", file=sys.stderr)
+        else:
+            raise
     except KeyboardInterrupt:
         print("\ndashboard stopped")
     finally:

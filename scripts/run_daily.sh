@@ -46,6 +46,15 @@ PYTHONPATH=src .venv/bin/python -m model_prediction.cli forecast \
 MAIN_EXIT=$?
 echo "Main forecast exit code: $MAIN_EXIT" >> "$LOG"
 
+# ── Step 4: Esports forecast ─────────────────────────────────────────
+# Esports picks → research.xlsx only (never main or flat ledger)
+echo "--- Step 4: Esports forecast (research ledger) ---" >> "$LOG"
+PYTHONPATH=src .venv/bin/python -m model_prediction.cli esports-forecast \
+    --all --log --date "$RUN_DATE" \
+    >> "$LOG" 2>&1
+ESPORTS_EXIT=$?
+echo "Esports forecast exit code: $ESPORTS_EXIT" >> "$LOG"
+
 echo "Finished: $(TZ=America/New_York date)" >> "$LOG"
 echo "Exit codes — settle: $SETTLE_EXIT, flat: $FLAT_EXIT, main: $MAIN_EXIT" >> "$LOG"
 

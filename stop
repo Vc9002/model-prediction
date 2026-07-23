@@ -1,0 +1,3 @@
+#!/bin/bash
+# stop — kill all dashboard processes
+kill $(pgrep -f dashboard_server.py 2>/dev/null) 2>/dev/null && echo "Dashboard stopped" || echo "No dashboard running"

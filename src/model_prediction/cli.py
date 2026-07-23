@@ -293,10 +293,12 @@ def parser() -> argparse.ArgumentParser:
         "esports-forecast",
         help="zero-unit exact-identity LoL/CS2 prices for Polymarket US match-winner contracts",
     )
-    esports_forecast.add_argument("--title", required=True, choices=tuple(TITLE_SPECS))
+    esports_forecast.add_argument("--title", choices=tuple(TITLE_SPECS))
+    esports_forecast.add_argument("--all", action="store_true", help="forecast all esports titles")
     esports_forecast.add_argument("--date", default=eastern_today().isoformat(),
         help="ISO date; defaults to today in US-Eastern time")
     esports_forecast.add_argument("--timezone", default="America/New_York")
+    esports_forecast.add_argument("--log", action="store_true", help="log forecast to research ledger")
 
     international_backfill = commands.add_parser(
         "international-baseball-backfill",
@@ -1789,13 +1791,21 @@ def main(argv: list[str] | None = None) -> None:
             )
             output["report_path"] = str(destination)
         elif args.command == "esports-forecast":
-            output = forecast_esports_slate(
-                data_root,
-                PROJECT_ROOT / "config/models",
-                args.title,
-                args.date,
-                args.timezone,
-            )
+            titles = list(TITLE_SPECS) if getattr(args, "all", False) else [args.title]
+            output = {}
+            research_ledger = PickLedger(Path(ledger_path(config)).parent / "research.xlsx")
+            for title in titles:
+                forecast = forecast_esports_slate(
+                    data_root,
+                    PROJECT_ROOT / "config/models",
+                    title,
+                    args.date,
+                    args.timezone,
+                )
+                if getattr(args, "log", False):
+                    logged = _log_esports_forecast(forecast, config, research_ledger, flat_mode=False)
+                    forecast["logged"] = logged
+                output[title] = forecast
         elif args.command == "international-baseball-backfill":
             if args.all:
                 leagues = tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS)

@@ -170,15 +170,16 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 <div class="wrap">
   <div class="tabs" id="tabs">
     <button data-tab="matrix" class="on">Matrix</button>
-    <button data-tab="evidence">Production Evidence</button>
     <button data-tab="picks">Ledger</button>
+    <button data-tab="flat">Flat</button>
+    <button data-tab="research">Research</button>
     <button data-tab="perf">Performance</button>
-    <button data-tab="folio">Portfolio</button>
+    <button data-tab="flat-perf">Flat Perf</button>
+    <button data-tab="research-perf">Research Perf</button>
     <button data-tab="today">Today</button>
     <button data-tab="market">Market</button>
-    <button data-tab="research">Research</button>
-    <button data-tab="flat">Flat</button>
-    <button data-tab="flat-perf">Flat Perf</button>
+    <button data-tab="folio">Portfolio</button>
+    <button data-tab="evidence">Evidence</button>
     <button data-tab="settings">Settings</button>
   </div>
 
@@ -367,6 +368,23 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small dim" style="margin-top:8px" id="flatPerfMonthly"></div>
     </div>
   </section>
+  <section id="tab-research-perf" style="display:none">
+    <div class="card">
+      <h2>Research Performance — Esports, International Baseball</h2>
+      <div class="small dim" style="margin-bottom:8px">Settled picks from research.xlsx. Same metrics as main Performance tab.</div>
+      <div id="researchPerfKpis" class="kpis" style="margin-bottom:16px"></div>
+      <div class="two-col">
+        <div><canvas id="researchPerfChart" height="180"></canvas></div>
+        <div><table class="data" id="researchPerfSport"></table></div>
+      </div>
+      <div style="margin-top:16px"><table class="data" id="researchPerfBucket"></table></div>
+      <div style="margin-top:16px" class="two-col">
+        <div><table class="data" id="researchPerfMarket"></table></div>
+        <div><table class="data" id="researchPerfCal"></table></div>
+      </div>
+      <div class="small dim" style="margin-top:8px" id="researchPerfMonthly"></div>
+    </div>
+  </section>
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -411,7 +429,8 @@ const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
 $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
   $("#tab-"+b.dataset.tab).style.display=""; updateCounts();
-  if(b.dataset.tab==="flat-perf")renderFlatPerf(); });
+  if(b.dataset.tab==="flat-perf")renderFlatPerf();
+  if(b.dataset.tab==="research-perf")renderResearchPerf(); });
 
 /* ---------- settings ---------- */
 function applySettings(){
@@ -1366,6 +1385,33 @@ async function renderFlatPerf(){
   $("#flatPerfMonthly").textContent=mm.join(" · ");
 }
 
+async function renderResearchPerf(){
+  let p;
+  try{p=await api("/api/research-performance");}catch(e){$("#researchPerfKpis").innerHTML='<div class="red small">server unreachable</div>';return;}
+  if(!p||!p.settled){$("#researchPerfKpis").innerHTML='<div class="dim">No settled research picks yet.</div>';return;}
+  const wr=p.settled>0?p.wins/p.settled*100:0;
+  $("#researchPerfKpis").innerHTML=`
+    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
+    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
+    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
+    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>`;
+  lineChart("#researchPerfChart",p.pnl_curve||[]);
+  const bs=Object.entries(p.by_sport||{});
+  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#researchPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
+  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
+  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
+  $("#researchPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
+  const bm=Object.entries(p.by_market||{});
+  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#researchPerfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
+  const cal=p.calibration||[];
+  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
+  $("#researchPerfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
+  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
+  $("#researchPerfMonthly").textContent=mm.join(" · ");
+}
+
 /* ---------- Today tab ---------- */
 async function renderToday(){
   let t;
@@ -1759,7 +1805,8 @@ async function renderResearch(){
       rp.forEach(p=>{
         const t=p.event_start_utc?new Date(p.event_start_utc).toLocaleString("en-US",{timeZone:"America/New_York",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:true}):"";
         const edge=p.edge!=null?((p.edge>0?"+":"")+(p.edge*100).toFixed(1)+"pp"):"—";
-        const size=p.units>0?p.units.toFixed(2)+"U":(p.research_score_units>0?p.research_score_units.toFixed(2)+"U":"—");
+        const size=p.units>0?p.units.toFixed(2)+"U":"—";
+        const mktProb=p.market_implied_probability!=null?(p.market_implied_probability*100).toFixed(1)+"%":"—";
         const pnl=p.pnl_units!=null?((p.pnl_units>0?"+":"")+p.pnl_units.toFixed(2)):"—";
         const cls=p.result==="win"?"green":p.result==="loss"?"red":p.result==="push"?"yellow":"";
         html+=`<tr>
@@ -1767,7 +1814,7 @@ async function renderResearch(){
           <td>${p.league||""}</td>
           <td>${(p.away_team||"")} ${p.selection==="away"?"ML":p.selection==="home"?"ML":""}</td>
           <td class="dim">${(p.model_probability*100).toFixed(1)}%</td>
-          <td class="dim">${p.market_type||""}</td>
+          <td class="dim">${mktProb}</td>
           <td>${edge}</td>
           <td>${size}</td>
           <td class="${cls}"><b>${p.result||"—"}</b></td>
