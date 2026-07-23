@@ -444,9 +444,10 @@ def performance(picks: list[dict]) -> dict:
             p_side = max(p, 1 - p)
             for name, lo, hi in buckets:
                 if lo <= p_side < hi:
-                    entry = by_bucket.setdefault(name, {"wins": 0, "calls": 0})
+                    entry = by_bucket.setdefault(name, {"wins": 0, "calls": 0, "pnl": 0.0})
                     entry["calls"] += 1
                     entry["wins"] += won
+                    entry["pnl"] = round(entry["pnl"] + _pick_pnl(row), 4)
         month = str(row.get("settled_at_utc") or "")[:7]
         if month:
             entry = by_month.setdefault(month, {"pnl": 0.0, "calls": 0, "wins": 0})

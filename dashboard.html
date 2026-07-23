@@ -257,19 +257,19 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
   </section>
 
-  <section id="tab-perf" style="display:none">
-    <div class="card"><h2>Cumulative P&amp;L (units)</h2><canvas id="cPnl" height="180"></canvas></div>
-    <div class="grid3">
-      <div class="card"><h2>Win rate by sport</h2><canvas id="cSport"></canvas></div>
-      <div class="card"><h2>Win rate by market</h2><canvas id="cMarket"></canvas></div>
-      <div class="card"><h2>Win rate by confidence</h2><canvas id="cConf"></canvas></div>
-    </div>
-    <div class="grid3">
-      <div class="card"><h2>Monthly P&amp;L</h2><canvas id="cMonth"></canvas></div>
-      <div class="card"><h2>Calibration</h2><canvas id="cCal"></canvas></div>
-      <div class="card"><h2>Streaks &amp; CLV</h2><div id="streaks" class="mono" style="padding-top:14px;line-height:2"></div></div>
-    </div>
-  </section>
+   <section id="tab-perf" style="display:none">
+     <div class="card">
+       <h2>Performance — Qualified Calls Only</h2>
+       <div class="small dim" style="margin-bottom:8px">Settled qualified calls from picks.xlsx. Only picks that passed the edge gate.</div>
+       <div id="perfKpis" class="kpis" style="margin-bottom:16px"></div>
+       <div class="two-col">
+         <div><canvas id="cPnl" height="180"></canvas></div>
+         <div><table class="data" id="perfSport"></table></div>
+       </div>
+       <div style="margin-top:16px"><table class="data" id="perfBucket"></table></div>
+       <div class="small dim" style="margin-top:8px" id="perfMonthly"></div>
+     </div>
+   </section>
 
   <section id="tab-folio" style="display:none">
     <div class="card">
@@ -1291,23 +1291,28 @@ async function renderFlat(){
 }
 function renderPerf(p){
   state.perf=p;
+  if(!p||!p.settled){$("#perfKpis").innerHTML='<div class="dim">No settled qualified calls yet.</div>';return;}
+  const wr=p.settled>0?p.wins/p.settled*100:0;
+  const s=p.streaks||{};
+  const clv=p.mean_clv?Number(p.mean_clv).toFixed(2)+"%":"—";
+  $("#perfKpis").innerHTML=`
+    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
+    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
+    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
+    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>
+    <div class="k"><b>${s.longest_win??"—"}</b><span>longest W streak</span></div>
+    <div class="k"><b class="red">${s.longest_loss??"—"}</b><span>longest L streak</span></div>
+    <div class="k"><b>${s.current>0?"W"+s.current:s.current<0?"L"+(-s.current):"—"}</b><span>current streak</span></div>
+    <div class="k"><b>${clv}</b><span>mean CLV</span></div>`;
   lineChart("#cPnl",p.pnl_curve||[]);
   const bs=Object.entries(p.by_sport||{});
-  barChart("#cSport",bs.map(([k])=>k),bs.map(([,v])=>v.calls?v.wins/v.calls:0),{pct:true,max:1});
-  const bm=Object.entries(p.by_market||{});
-  barChart("#cMarket",bm.map(([k])=>k),bm.map(([,v])=>v.calls?v.wins/v.calls:0),{pct:true,max:1});
+  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#perfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
   const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
-  const bc=order.filter(k=>(p.by_confidence||{})[k]);
-  barChart("#cConf",bc,bc.map(k=>{const v=p.by_confidence[k];return v.calls?v.wins/v.calls:0;}),{pct:true,max:1});
-  const mo=Object.entries(p.by_month||{});
-  barChart("#cMonth",mo.map(([k])=>k),mo.map(([,v])=>v.pnl),{signed:true});
-  calChart("#cCal",p.calibration||[]);
-  const s=p.streaks||{};
-  $("#streaks").innerHTML=`longest win streak <b class="green">${s.longest_win??"—"}</b><br>
-    longest losing streak <b class="red">${s.longest_loss??"—"}</b><br>
-    current <b>${s.current>0?"W"+s.current:s.current<0?"L"+(-s.current):"—"}</b><br>
-    mean probability CLV <b>${p.mean_clv??"—"}</b><br>
-    settled sample <b>${p.settled??0}</b>`;
+  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
+  $("#perfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
+  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
+  $("#perfMonthly").textContent=mm.join(" · ");
 }
 
 async function renderFlatPerf(){
