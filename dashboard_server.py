@@ -4252,16 +4252,17 @@ def main() -> None:
     options = arguments.parse_args()
 
     DASH_DIR.mkdir(exist_ok=True)
-    PID_FILE.write_text(str(os.getpid()))
     server = None
+    my_pid = os.getpid()
     try:
         ThreadingHTTPServer.daemon_threads = True
         ThreadingHTTPServer.allow_reuse_address = True
         server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
+        PID_FILE.write_text(str(my_pid))  # Write only after successful bind
         print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
         server.serve_forever()
     except OSError as exc:
-        if exc.errno == 48:  # Address already in use
+        if exc.errno == 48:
             print(f"dashboard: port {options.port} busy — is another instance running?", file=sys.stderr)
         else:
             raise
@@ -4270,7 +4271,12 @@ def main() -> None:
     finally:
         if server is not None:
             server.server_close()
-        PID_FILE.unlink(missing_ok=True)
+        if PID_FILE.exists():
+            try:
+                if PID_FILE.read_text().strip() == str(my_pid):
+                    PID_FILE.unlink()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":
