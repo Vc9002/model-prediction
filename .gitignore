@@ -3,6 +3,7 @@ __pycache__/
 .env
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 .venv/
 *.py[cod]
 artifacts/models/
@@ -14,4 +15,6 @@ data/raw/
 .claude/worktrees/
 .worktrees/
 data/*.bak-*
+data/*.before-backtest-cleanup-*
+data/*.pre-fix-*
 data/logs/*.log

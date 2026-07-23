@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 import unicodedata
+from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
@@ -291,15 +292,12 @@ def matchup_player_availability(
     root = Path(data_root)
     snapshot = _latest_snapshot(root, observed, game_date)
     if event_id is not None:
-        try:
+        with suppress(ValueError, KeyError, TypeError, OSError):
             snapshot = merge_availability_sources(
                 snapshot,
                 _latest_espn_snapshot(root, event_id, observed),
                 game_date=game_date,
             )
-        except (ValueError, KeyError, TypeError, OSError):
-            # ESPN snapshot unavailable; proceed with official report only
-            pass
     priors = _load_priors(root, game_date, observed, maximum_age_hours=maximum_prior_age_hours)
     return matchup_player_availability_from_payloads(
         snapshot=snapshot,

@@ -141,7 +141,7 @@ class MarketResidualModel:
 
 def _solve_3x3(matrix: list[list[float]], vector: list[float]) -> list[float] | None:
     """Gaussian elimination with partial pivoting."""
-    a = [row[:] + [v] for row, v in zip(matrix, vector, strict=True)]
+    a = [[*row[:], v] for row, v in zip(matrix, vector, strict=True)]
     for col in range(3):
         pivot = max(range(col, 3), key=lambda r: abs(a[r][col]))
         if abs(a[pivot][col]) < 1e-12:

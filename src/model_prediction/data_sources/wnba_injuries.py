@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import re
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -254,10 +255,8 @@ def _parse_coordinate_table(
                     if not value:
                         continue
                     if kind == "date":
-                        try:
+                        with suppress(ValueError):
                             current_date = datetime.strptime(value, "%m/%d/%Y").date().isoformat()
-                        except ValueError:
-                            pass
                     elif kind == "time":
                         current_time = value
                     elif kind == "matchup":

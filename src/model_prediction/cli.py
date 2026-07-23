@@ -14,6 +14,7 @@ import os
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import suppress
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -54,7 +55,9 @@ from .data_sources.the_odds_api import TheOddsAPIClient
 from .data_sources.wnba_injuries import capture_latest_report
 from .domain import (
     EASTERN,
+    LEARNED_PRODUCTION_SPORTS,
     LOSS_CLASSIFICATIONS,
+    PRODUCTION_SPORTS,
     League,
     MarketType,
     ModelOrigin,
@@ -94,11 +97,7 @@ from .validation import run_validation_audit, write_production_artifacts
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
-LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
 ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant")
-# Only MLB and WNBA produce qualified calls in the production ledgers.
-# Everything else (esports, NBA, NFL, soccer, KBO, NPB, etc.) goes to research.
-PRODUCTION_SPORTS = ("mlb", "wnba")
 
 _LEDGER_LOCK = threading.Lock()
 
@@ -735,8 +734,16 @@ def _forecast_learned_sport(
     if log and to_log and registry is not None and bans is not None and ledger is not None:
         data_root = Path(ledger_path(config)).parent
         observed_at = utc_now()
-        # Main ledger: units come from evaluate_eligibility (fail-closed).
+        # Main ledger: ONLY production sports (MLB, WNBA) — everything else goes to flat/research.
         # Flat ledger: every game gets diagnostic edge-scaled units.
+        if not flat_mode and sport not in PRODUCTION_SPORTS:
+            return {
+                "sport": sport,
+                "status": "skipped_non_production_sport",
+                "logged": 0,
+                "candidates": candidates,
+                "note": f"{sport} is research-only — not logged to main ledger",
+            }
         configured_state = str(model_config.get("status", "research"))
         for candidate in to_log:
             quote = match_executable_quote(data_root, sport, args_date, candidate)
@@ -991,9 +998,10 @@ def _log_esports_forecast(
                     config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                 ),
             )
-            if flat_mode and eligibility.units <= 0:
-                # Flat ledger: diagnostic edge-scaled sizing, same as the
-                # learned-sport flat path.
+            if eligibility.units <= 0:
+                # All ledgers: apply diagnostic edge-scaled sizing when eligibility
+                # produces zero units (research observations, below-gate picks).
+                # This ensures every pick across all 3 ledgers has a unit size.
                 from .eligibility import EligibilityResult as _ER
                 eligibility = _ER(
                     eligibility.record_type,
@@ -1346,7 +1354,7 @@ def _summary(config, ledger) -> dict:
         "research_progress": {
             "measured_edge_forward_picks": len(measured_edge_rows),
             "measured_edge_settled": len(measured_edge_settled),
-            "iteration_policy": "continuous_no_parameter_freezes",
+            "iteration_policy": "continuous",
             "promotion_requires": "versioned walk-forward ablation and locked holdout",
         },
         "model_drift": _drift_check(settled_qualified, config),
@@ -1564,7 +1572,7 @@ def main(argv: list[str] | None = None) -> None:
             wnba_priors_result = {"status": "skipped"}
             soccer_collection = {}
             def _capture_wnba():
-                try:
+                with suppress(Exception):
                     from .data_sources.espn import ESPNClient
                     wnba_scoreboard = ESPNClient().scoreboard("WNBA", args.date)
                     wnba_event_ids = [
@@ -1573,15 +1581,11 @@ def main(argv: list[str] | None = None) -> None:
                     if wnba_event_ids:
                         capture_latest_report(data_root, observed_at=utc_now())
                         for event_id in wnba_event_ids:
-                            try:
+                            with suppress(Exception):
                                 capture_espn_event_injuries(
                                     data_root, event_id=event_id,
                                     client=ESPNClient(), observed_at=utc_now(),
                                 )
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
             def _build_priors():
                 nonlocal wnba_priors_result
                 try:
@@ -1598,10 +1602,8 @@ def main(argv: list[str] | None = None) -> None:
                     pass
             def _collect_soccer():
                 nonlocal soccer_collection
-                try:
+                with suppress(Exception):
                     soccer_collection = collect_soccer_scores(days_from=3)
-                except Exception:
-                    pass
             with ThreadPoolExecutor(max_workers=3) as io_pool:
                 f1 = io_pool.submit(_capture_wnba)
                 f2 = io_pool.submit(_build_priors)
@@ -1653,11 +1655,10 @@ def main(argv: list[str] | None = None) -> None:
                         )] = sport
                 for future in as_completed(flat_futures):
                     sport = flat_futures[future]
-                    try:
+                    with suppress(Exception):
                         forecast_result[f"_flat_{sport}"] = future.result()
-                    except Exception:
-                        pass
-            # Esports run serially
+            # Esports run serially — logged to research ledger only (never main ledger)
+            research_ledger = PickLedger(Path(ledger_path(config)).parent / "research.xlsx")
             for title in ESPORTS_TITLES:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=Path(ledger_path(config)).parent,
@@ -1665,8 +1666,7 @@ def main(argv: list[str] | None = None) -> None:
                     title=title,
                     game_date=args.date,
                 )
-                _log_esports_forecast(forecast_result[title], config, ledger, flat_mode=False)
-                _log_esports_forecast(forecast_result[title], config, flat_ledger, flat_mode=True)
+                _log_esports_forecast(forecast_result[title], config, research_ledger, flat_mode=False)
             flat_result = {sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {})) for sport in LEARNED_SPORTS}
             for title in ESPORTS_TITLES:
                 flat_result[title] = forecast_result[title]
@@ -1710,7 +1710,7 @@ def main(argv: list[str] | None = None) -> None:
                 result.pop("candidates", None)
             flat_settlement = _settle_all_unsettled(settle_args, config, flat_ledger)
             research_ledger = PickLedger(Path(ledger_path(config)).parent / "research.xlsx")
-            research_settlement = _settle_all_unsettled(settle_args, config, research_ledger)
+            _research_settlement = _settle_all_unsettled(settle_args, config, research_ledger)
 
             output = {
                 "date": args.date,

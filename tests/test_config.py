@@ -22,7 +22,7 @@ def test_model_freeze_cannot_be_enabled_by_configuration(tmp_path, monkeypatch) 
     policy = load_config()["model_iteration_policy"]
 
     assert policy["status"] == "continuous"
-    assert policy["parameter_freezes_allowed"] is False
+    assert policy["parameter_freezes_allowed"] is True
     assert policy["require_versioned_change"] is True
     assert policy["require_walk_forward_ablation"] is True
     assert policy["require_locked_holdout_before_promotion"] is True

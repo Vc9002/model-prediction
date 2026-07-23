@@ -40,6 +40,7 @@ except ImportError:  # pragma: no cover
 # ── SECTION: Paths & Constants ───────────────────────────────────────────
 
 ROOT = Path(__file__).resolve().parent
+DASHBOARD_PORT = 8765
 
 # Load .env file so subprocess CLI commands inherit Polymarket keys
 _ENV_PATH = ROOT / ".env"
@@ -55,6 +56,7 @@ if _ENV_PATH.exists():
 DATA = ROOT / "data"
 OUTPUTS = ROOT / "outputs" / "latest"
 DASH_DIR = ROOT / "dashboard"
+PID_FILE = DASH_DIR / "server.pid"
 LOG_FILE = DASH_DIR / "server.log"
 JOBS_FILE = DASH_DIR / "jobs.json"
 ARCHIVE_FILE = DASH_DIR / "archive.json"
@@ -74,9 +76,13 @@ def _log(message: str) -> None:
         pass
 
 
+# EASTERN and SPORTS defined here for self-contained startup, but the canonical
+# source of truth is src/model_prediction/domain.py (League enum, EASTERN zone).
+# Keep these in sync with domain.py.
 EASTERN = ZoneInfo("America/New_York")
 SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
 GATEWAY = "https://gateway.polymarket.us"
+RESEARCH_ONLY_LEAGUES = frozenset({"LOL", "CS2", "DOTA2", "VALORANT", "KBO", "NPB"})
 
 _CACHE: dict[str, tuple[float, object]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -1187,7 +1193,7 @@ def production_evidence() -> dict:
     international_validation = (
         _read_json(OUTPUTS / "international-baseball-baseline-validation.json") or {}
     )
-    ledger_paths = (DATA / "picks.xlsx", DATA / "flat_picks.xlsx")
+    ledger_paths = (DATA / "picks.xlsx", DATA / "flat_picks.xlsx", DATA / "research.xlsx")
     rows_by_source = {str(path.relative_to(ROOT)): _read_evidence_ledger(path) for path in ledger_paths}
     feature_registry = _feature_registry_evidence()
     registry_by_name = {str(item.get("name")): item for item in feature_registry["features"]}
@@ -1255,6 +1261,16 @@ def production_evidence() -> dict:
             feature_names,
         )
 
+        research_ledger = _ledger_evidence_for_source(
+            str(sport),
+            model_config,
+            version,
+            "data/research.xlsx",
+            rows_by_source.get("data/research.xlsx", []),
+            artifact,
+            feature_names,
+        )
+
         warnings = [{"code": code, "scope": "artifact"} for code in artifact["mismatches"]]
         if locked.get("status") != "verified":
             warnings.append({"code": locked["status"], "scope": "backfill"})
@@ -1293,7 +1309,7 @@ def production_evidence() -> dict:
                 }
             )
 
-        for ledger_name, ledger in (("main_ledger", main_ledger), ("flat_ledger", flat_ledger)):
+        for ledger_name, ledger in (("main_ledger", main_ledger), ("flat_ledger", flat_ledger), ("research_ledger", research_ledger)):
             if not ledger["exact_version_rows"]:
                 warnings.append(
                     {
@@ -1331,7 +1347,7 @@ def production_evidence() -> dict:
             "blockers": sorted(
                 {
                     blocker
-                    for ledger in (main_ledger, flat_ledger)
+                    for ledger in (main_ledger, flat_ledger, research_ledger)
                     for blocker in ledger["profitability_claim"]["blockers"]
                 }
             ),
@@ -1349,6 +1365,7 @@ def production_evidence() -> dict:
                 "backfill": locked,
                 "main_ledger": main_ledger,
                 "flat_ledger": flat_ledger,
+                "research_ledger": research_ledger,
                 "profitability": profitability,
                 "warnings": warnings,
                 "configured_status": model_config.get("status"),
@@ -2434,8 +2451,10 @@ def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dic
         if slug:
             net = _net_position_quantity(slug, portfolio_history or _load_portfolio_history())
             position_closed = net is not None and abs(net) < 1e-6
+    display_units = _number(row.get("units")) or _number(row.get("research_score_units"))
     return {
         **row,
+        "units": display_units,
         "quote": quote,
         "order": order,
         "filled_entry": filled_entry,
@@ -2493,6 +2512,7 @@ def dashboard_picks() -> list[dict]:
             "suggested_paper_units": _suggested_units(row),
         }
         for row in _dedupe_picks(read_picks())
+        if str(row.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES
     ]
 
 
@@ -3111,13 +3131,15 @@ def _latest_persisted_action(action: str) -> dict | None:
 class Handler(BaseHTTPRequestHandler):
     def _send(self, payload, content_type="application/json", code=200) -> None:
         body = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        # ── SECTION: HTTP Server ────────────────────────────────────────────
-        self.wfile.write(body)
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # client disconnected — nothing to do
 
     def log_message(self, fmt, *args):  # quiet
         pass
@@ -3157,6 +3179,10 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/flat-performance":
                 flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
                 self._send(_cached("flat-performance", 30, lambda: performance(flat)))
+            elif route == "/api/research-picks":
+                research = _parse_picks(DATA / "research.xlsx") if (DATA / "research.xlsx").exists() else []
+                decorated = [_decorate_pick(r) for r in research]
+                self._send(_cached("research-picks", 30, lambda: decorated))
             elif route == "/api/backtests":
                 self._send(_cached("backtests", 60, backtests))
             elif route == "/api/backtest":
@@ -3417,7 +3443,7 @@ def history_picks(days: int = 30, sport: str | None = None) -> dict:
                 "model_probability": round(model_p, 4) if model_p else None,
                 "market_implied_probability": round(market_p, 4) if market_p else None,
                 "pnl_units": _number(row.get("pnl_units")),
-                "units": _number(row.get("units")),
+                "units": _number(row.get("units")) or _number(row.get("research_score_units")),
                 "settled_at_utc": str(row.get("settled_at_utc", "")),
                 "event_start_utc": str(row.get("event_start_utc", "")),
                 "record_type": str(row.get("record_type", "")),
@@ -4203,20 +4229,43 @@ def _audit_tail() -> dict:
 
 def main() -> None:
     arguments = argparse.ArgumentParser()
-    arguments.add_argument("--port", type=int, default=8765)
+    arguments.add_argument("--port", type=int, default=DASHBOARD_PORT)
     options = arguments.parse_args()
-    # daemon_threads: request threads die with the server instead of lingering;
-    # allow_reuse_address: instant restarts without TIME_WAIT bind errors.
-    ThreadingHTTPServer.daemon_threads = True
-    ThreadingHTTPServer.allow_reuse_address = True
-    server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
-    print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
+
+    # ── Single-instance enforcement via PID file ──────────────────────────
+    DASH_DIR.mkdir(exist_ok=True)
+    if PID_FILE.exists():
+        try:
+            stale_pid = int(PID_FILE.read_text().strip())
+        except (ValueError, OSError):
+            stale_pid = None
+        if stale_pid is not None:
+            try:
+                os.kill(stale_pid, 0)
+                print(f"dashboard: already running (pid {stale_pid}) — refusing to start second instance", file=sys.stderr)
+                sys.exit(1)
+            except OSError:
+                # Stale PID — process is gone, remove the file
+                PID_FILE.unlink(missing_ok=True)
+
+    # Write our PID before bind so the file exists even if bind fails
+    PID_FILE.write_text(str(os.getpid()))
+
+    server = None
     try:
+        # daemon_threads: request threads die with the server instead of lingering;
+        # allow_reuse_address: instant restarts without TIME_WAIT bind errors.
+        ThreadingHTTPServer.daemon_threads = True
+        ThreadingHTTPServer.allow_reuse_address = True
+        server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
+        print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
         server.serve_forever()
     except KeyboardInterrupt:
         print("\ndashboard stopped")
     finally:
-        server.server_close()
+        if server is not None:
+            server.server_close()
+        PID_FILE.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

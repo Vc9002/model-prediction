@@ -1,6 +1,6 @@
 # DEBUG.md — System Audit & Repair Protocol
 
-> **Run ALL checks in order. Fix every failure. Update input/TODO.md after each fix.**
+> **Run ALL checks in order. Fix every failure. Update docs/TODO.md after each fix.**
 > **Tests + ruff must pass before and after every change.**
 
 Current verified failures are tracked in `docs/PROJECT_STATUS.md`. This protocol
@@ -217,12 +217,12 @@ assert not off_season, 'Spring Training or off-season game reached FeatureStore 
 
 ## POST-SCAN DOCUMENTATION UPDATE
 
-After every scan, update `docs/PROJECT_STATUS.md` and `input/TODO.md`:
+After every scan, update `docs/PROJECT_STATUS.md` and `docs/TODO.md`:
 1. Add any new failures found
 2. Mark any fixed items as ✅ DONE
 3. Update model metrics only from a report reproduced by the current checkout
 4. Record scan timestamp in the "Scan record" section
-5. Update `input/CHANGELOG.md` with a dated entry for meaningful changes
+5. Update `docs/CHANGELOG.md` with a dated entry for meaningful changes
 
 Do not append an unverified issue count.
 

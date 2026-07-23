@@ -99,10 +99,7 @@ def validate_observation(observation: FeatureObservation | dict) -> list[str]:
     """
     if isinstance(observation, FeatureObservation):
         return []
-    violations = []
-    for field_name in REQUIRED_FIELDS:
-        if field_name not in observation:
-            violations.append(f"missing required field: {field_name}")
+    violations = [f"missing required field: {fn}" for fn in REQUIRED_FIELDS if fn not in observation]
     if violations:
         return violations
     try:

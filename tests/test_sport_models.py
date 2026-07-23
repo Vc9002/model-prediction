@@ -58,20 +58,18 @@ def test_basketball_model_prefers_the_stronger_team_and_covers_markets() -> None
 
 
 def soccer_history() -> list[GameRecord]:
-    games = []
-    for index in range(16):
-        games.append(
-            GameRecord(
-                event_id=f"s{index}",
-                event_start_utc=f"2026-04-{index % 28 + 1:02d}T15:00:00Z",
-                league="EPL",
-                away_team="Relegation FC",
-                home_team="Champions FC",
-                away_score=0 if index % 3 else 1,
-                home_score=2 + index % 2,
-            )
+    return [
+        GameRecord(
+            event_id=f"s{index}",
+            event_start_utc=f"2026-04-{index % 28 + 1:02d}T15:00:00Z",
+            league="EPL",
+            away_team="Relegation FC",
+            home_team="Champions FC",
+            away_score=0 if index % 3 else 1,
+            home_score=2 + index % 2,
         )
-    return games
+        for index in range(16)
+    ]
 
 
 def test_soccer_model_three_way_and_totals_are_coherent() -> None:

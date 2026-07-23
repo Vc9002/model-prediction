@@ -22,9 +22,8 @@ def _write_history(root, *, home_team="Home Team", away_team="Away Team",
                    game_count=60, start_month=5, extra_rows=None) -> None:
     path = root / "processed/mlb/games.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
-    rows = []
-    for index in range(game_count):
-        rows.append({
+    rows = [
+        {
             "event_id": f"history-{index}",
             "event_start_utc": f"2026-{start_month:02d}-{index % 28 + 1:02d}T12:00:00Z",
             "league": "MLB",
@@ -32,7 +31,9 @@ def _write_history(root, *, home_team="Home Team", away_team="Away Team",
             "home_team": home_team,
             "away_score": 2 + index % 2,
             "home_score": 5,
-        })
+        }
+        for index in range(game_count)
+    ]
     if extra_rows:
         rows.extend(extra_rows)
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")

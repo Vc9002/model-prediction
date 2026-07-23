@@ -30,6 +30,12 @@ class League(StrEnum):
     KBO = "KBO"
     NPB = "NPB"
 
+# Canonical sport tuples — single source of truth for iteration and CLI choices.
+# When adding a sport, update League, these tuples, and config/model.yaml together.
+PRODUCTION_SPORTS: tuple[str, ...] = ("mlb", "wnba")
+LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
+ALL_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis")
+
 
 class MarketType(StrEnum):
     MONEYLINE = "moneyline"

@@ -192,11 +192,8 @@ class MLBGameSnapshotStore:
     def rows(self) -> list[dict[str, Any]]:
         if not self.path.exists():
             return []
-        rows = []
         with self.path.open(encoding="utf-8") as handle:
-            for line in handle:
-                if line.strip():
-                    rows.append(json.loads(line))
+            rows = [json.loads(line) for line in handle if line.strip()]
         return rows
 
     def merge(self, snapshots: Iterable[dict[str, Any]]) -> None:

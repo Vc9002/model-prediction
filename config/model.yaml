@@ -98,7 +98,7 @@ execution:
   - audit chain entry for every order
 model_iteration_policy:
   status: continuous
-  parameter_freezes_allowed: false
+  parameter_freezes_allowed: true
   require_versioned_change: true
   require_walk_forward_ablation: true
   require_locked_holdout_before_promotion: true

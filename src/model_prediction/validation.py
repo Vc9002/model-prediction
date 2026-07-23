@@ -1459,11 +1459,8 @@ def _load_starter_era_map() -> dict[str, float]:
             crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
     
     # Load snapshots, build point-in-time ERA history
-    snaps = []
     with snap_path.open(encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                snaps.append(_json.loads(line))
+        snaps = [_json.loads(line) for line in f if line.strip()]
     snaps.sort(key=lambda r: r["game_start_utc"])
     
     history: dict[int, list[dict]] = {}

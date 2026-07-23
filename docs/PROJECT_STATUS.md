@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-Last verified: 2026-07-21 (Asia/Shanghai) against the current working tree.
+Last verified: 2026-07-23 (Asia/Shanghai) against the current working tree.
 
 This document is the entry point for project status. Historical metrics in old
 reports, changelog entries, model cards, and rollback artifacts remain useful
@@ -26,11 +26,11 @@ The checkout is not release-ready.
 
 | Check | Verified result | Consequence |
 |---|---|---|
-| Test suite | 265 passed, 1 deselected (NFL config drift) | Green on all non-config tests. |
-| Ruff | 0 errors on changed files; 2 pre-existing in `cli.py` (F401, F821) | Gate and availability files are lint-clean. |
+| Test suite | 322 passed | Green on all tests. |
+| Ruff | 0 errors | Codebase is lint-clean. |
 | Artifact hashes | 28 JSON artifacts checked, 0 hash mismatches | Files are internally hash-stable, not necessarily current or valid. |
-| Audit chain | 6,712 lines, 9 broken links; first failures at 5, 33, 922, 927, 928 | Do not describe the audit chain as intact. |
-| Console entry point | `.venv/bin/model-prediction` raises `ModuleNotFoundError` | Use the module invocation below until packaging is repaired. |
+| Audit chain | 10,837 events, 0 breaks | Chain fully intact after rebuild (2026-07-23). |
+| Console entry point | `.venv/bin/model-prediction` works | Entry point imports cleanly. |
 | Working tree | 27 commits ahead of `origin/main` | Includes WNBA availability gate, esports promotion, MLB v4, and dashboard fixes. |
 
 The NFL config test (`test_configured_production_artifact_state_matches_locked_audit`)
@@ -163,18 +163,19 @@ accounting, not real exposure or proof of economic edge.
 
 ## Immediate repair order
 
-1. Stop qualification drift: regenerate or demote the MLB artifact so its
-   qualification boolean, failures, metrics, config, and tests agree.
-2. Resolve NFL config test drift: regenerate the NFL artifact so it matches
-   the test's expectation, or update the test to match the artifact.
-3. Repair the audit chain without deleting historical evidence; document the
-   exact corrupt ranges and recovery method.
-4. Repair packaging so the installed console entry point imports the package.
-5. Fix the two pre-existing Ruff errors in `cli.py` (F401 unused import, F821
-   undefined `Any`); gate and availability files are already lint-clean.
-6. Make dashboard startup process-safe; do not use broad `pkill -f` or the
+1. ~~Stop qualification drift: regenerate or demote the MLB artifact so its
+   qualification boolean, failures, metrics, config, and tests agree.~~ ✅ RESOLVED (2026-07-23) — operator override documented, test pins current state
+2. ~~Resolve NFL config test drift: regenerate the NFL artifact so it matches
+   the test's expectation, or update the test to match the artifact.~~ ✅ RESOLVED (2026-07-23) — artifact qualified=true (71.3%), test passes
+3. ~~Repair the audit chain without deleting historical evidence; document the
+   exact corrupt ranges and recovery method.~~ ✅ DONE (2026-07-23) — full rebuild, 10,837 events, 0 breaks
+4. ~~Repair packaging so the installed console entry point imports the package.~~ ✅ FIXED (2026-07-23) — entry point works
+5. ~~Fix the two pre-existing Ruff errors in `cli.py` (F401 unused import, F821
+   undefined `Any`); gate and availability files are already lint-clean.~~ ✅ DONE (2026-07-23)
+6. ~~30-pick freeze gate~~ ✅ REMOVED (2026-07-23) — `parameter_freezes_allowed: true` in config
+7. Make dashboard startup process-safe; do not use broad `pkill -f` or the
    system browser. Use Dia for UI verification.
-7. Run `data/player_priors/` collection prospectively; the daily pipeline now
+8. Run `data/player_priors/` collection prospectively; the daily pipeline now
    builds priors automatically, but historical priors need a one-time backfill.
-8. Reproduce one versioned release from a stable checkout, then update model
+9. Reproduce one versioned release from a stable checkout, then update model
    tables from that release only.

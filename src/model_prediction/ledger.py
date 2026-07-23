@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
@@ -75,7 +75,7 @@ LEGACY_FIELDNAMES = [
     "corrective_action",
     "call_type",
 ]
-FIELDNAMES = LEGACY_FIELDNAMES + [
+FIELDNAMES = [*LEGACY_FIELDNAMES,
     "ledger_schema_version",
     "record_type",
     "decision",
@@ -196,10 +196,8 @@ def _market_duplicate_key(
 ) -> tuple[str, str, str, str, str]:
     normalized_line = line
     if line:
-        try:
+        with suppress(ValueError):
             normalized_line = str(abs(float(line)))
-        except ValueError:
-            pass
     return (event_id, market_type, normalized_line, sportsbook.casefold(), model_version)
 
 

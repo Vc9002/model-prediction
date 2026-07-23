@@ -316,6 +316,16 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <section id="tab-research" style="display:none">
     <div class="secgrid">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Research Picks (esports, international baseball)</h2>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+          <span>Active: <b id="researchActive">0</b></span>
+          <span>Settled: <b id="researchSettled">0</b></span>
+        </div>
+        <table class="data" id="researchTable"><thead><tr>
+          <th>Game (ET)</th><th>Sport</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Size</th><th>Result</th><th>P&amp;L</th><th>Matchup</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
       <div class="card">
         <h2>Backtest &amp; validation history (outputs/latest)</h2>
         <table class="data" id="btTable"></table>
@@ -1737,6 +1747,39 @@ async function loadMarket(){
 
 /* ---------- research ---------- */
 async function renderResearch(){
+  // Research picks table (same style as main Ledger)
+  try{
+    const rp=await api("/api/research-picks");
+    if(rp&&rp.length){
+      const active=rp.filter(p=>p.status==="open").length;
+      const settled=rp.filter(p=>p.status==="settled").length;
+      $("#researchActive").textContent=active;
+      $("#researchSettled").textContent=settled;
+      let html="";
+      rp.forEach(p=>{
+        const t=p.event_start_utc?new Date(p.event_start_utc).toLocaleString("en-US",{timeZone:"America/New_York",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:true}):"";
+        const edge=p.edge!=null?((p.edge>0?"+":"")+(p.edge*100).toFixed(1)+"pp"):"—";
+        const size=p.units>0?p.units.toFixed(2)+"U":(p.research_score_units>0?p.research_score_units.toFixed(2)+"U":"—");
+        const pnl=p.pnl_units!=null?((p.pnl_units>0?"+":"")+p.pnl_units.toFixed(2)):"—";
+        const cls=p.result==="win"?"green":p.result==="loss"?"red":p.result==="push"?"yellow":"";
+        html+=`<tr>
+          <td class="dim">${t}</td>
+          <td>${p.league||""}</td>
+          <td>${(p.away_team||"")} ${p.selection==="away"?"ML":p.selection==="home"?"ML":""}</td>
+          <td class="dim">${(p.model_probability*100).toFixed(1)}%</td>
+          <td class="dim">${p.market_type||""}</td>
+          <td>${edge}</td>
+          <td>${size}</td>
+          <td class="${cls}"><b>${p.result||"—"}</b></td>
+          <td class="${cls}">${pnl}</td>
+          <td class="dim">${(p.away_team||"")} @ ${(p.home_team||"")}</td>
+        </tr>`;
+      });
+      $("#researchTable tbody").innerHTML=html;
+    }
+  }catch(e){$("#researchTable tbody").innerHTML='<tr><td colspan=10 class="dim">No research picks loaded.</td></tr>';}
+
+  // Existing backtest/audit/pipeline content
   const bt=await api("/api/backtests");
   let html="<tr><th>File</th><th>Modified</th><th>Status / sport</th><th>kB</th></tr>";
   bt.forEach(b=>{html+=`<tr onclick="openBacktest('${b.file}')" style="cursor:pointer">

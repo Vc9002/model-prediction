@@ -39,19 +39,18 @@ class FakeESPN:
 def _write_history(root) -> None:
     path = root / "processed/mlb/games.jsonl"
     path.parent.mkdir(parents=True)
-    rows = []
-    for index in range(60):
-        rows.append(
-            {
-                "event_id": f"history-{index}",
-                "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
-                "league": "MLB",
-                "away_team": "Away Team",
-                "home_team": "Home Team",
-                "away_score": 2 + index % 2,
-                "home_score": 5,
-            }
-        )
+    rows = [
+        {
+            "event_id": f"history-{index}",
+            "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+            "league": "MLB",
+            "away_team": "Away Team",
+            "home_team": "Home Team",
+            "away_score": 2 + index % 2,
+            "home_score": 5,
+        }
+        for index in range(60)
+    ]
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
 
 

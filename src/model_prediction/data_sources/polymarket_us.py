@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -232,10 +233,8 @@ class PolymarketUSClient:
                 if market_type in {"moneyline", "spread"}:
                     selection = team.get("ordering") or team.get("name") or selection
                 if market_type == "spread":
-                    try:
+                    with suppress(ValueError):
                         line = float(side["description"])
-                    except ValueError:
-                        pass
                 sides.append(
                     {
                         "side_id": str(side["id"]),

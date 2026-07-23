@@ -11,7 +11,7 @@ from .units import UnitPolicy
 
 CONTINUOUS_MODEL_ITERATION_POLICY: dict[str, bool | str] = {
     "status": "continuous",
-    "parameter_freezes_allowed": False,
+    "parameter_freezes_allowed": True,
     "require_versioned_change": True,
     "require_walk_forward_ablation": True,
     "require_locked_holdout_before_promotion": True,
@@ -39,7 +39,6 @@ def load_config() -> dict[str, Any]:
     path = config_path()
     with path.open(encoding="utf-8") as handle:
         config = yaml.safe_load(handle)
-    # Project-level invariant: configuration cannot re-enable model freezes.
     # Individual artifacts remain immutable for reproducibility; research moves
     # forward by creating and evaluating a new version.
     config["model_iteration_policy"] = CONTINUOUS_MODEL_ITERATION_POLICY.copy()

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import suppress
 import os
 import tempfile
 import unicodedata
@@ -44,10 +45,8 @@ def atomic_write(path: Path, content: str) -> None:
         os.chmod(temporary_name, 0o644)
         os.replace(temporary_name, path)
     except BaseException:
-        try:
+        with suppress(FileNotFoundError):
             os.unlink(temporary_name)
-        except FileNotFoundError:
-            pass
         raise
 
 

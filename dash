@@ -1,49 +1,32 @@
 #!/bin/bash
-# dash — start the model-prediction dashboard and print the URL
+# dash — start the dashboard (kills old instance if running)
 set -euo pipefail
 
 PROJECT_DIR="$HOME/Documents/Poly & Kalshi/model prediction"
 PID_FILE="$PROJECT_DIR/dashboard/server.pid"
+PORT=8765
 
 cd "$PROJECT_DIR" || exit 1
 
-# ── Stop existing server ─────────────────────────────────────────────────
+# Kill old instance via PID file
 if [ -f "$PID_FILE" ]; then
-    old_pid=$(cat "$PID_FILE")
-    if kill -0 "$old_pid" 2>/dev/null; then
-        kill "$old_pid" 2>/dev/null || true
-        sleep 0.3
-    fi
+    old_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    [ -n "$old_pid" ] && kill "$old_pid" 2>/dev/null || true
+    sleep 1
     rm -f "$PID_FILE"
 fi
-# Fallback: clean up any orphaned server not tracked by PID file
-pkill -f "dashboard_server.py" 2>/dev/null || true
-sleep 0.5
 
-# ── Start server ─────────────────────────────────────────────────────────
-PYTHONPATH=src .venv/bin/python dashboard_server.py --port 8765 &
-server_pid=$!
-echo "$server_pid" > "$PID_FILE"
+# Start
+PYTHONPATH=src .venv/bin/python dashboard_server.py --port "$PORT" &
+echo $! > "$PID_FILE"
 
-# ── Wait for readiness ───────────────────────────────────────────────────
-started=false
+# Wait for readiness
 for _ in $(seq 1 20); do
-    if curl -sf http://localhost:8765/api/status > /dev/null 2>&1; then
-        started=true
-        break
-    fi
-    if ! kill -0 "$server_pid" 2>/dev/null; then
-        rm -f "$PID_FILE"
-        echo "Dashboard process died unexpectedly — check data/logs/dashboard.err" >&2
-        exit 1
+    if curl -sf "http://localhost:$PORT/api/status" > /dev/null 2>&1; then
+        echo "Dashboard: http://localhost:$PORT/"
+        exit 0
     fi
     sleep 0.5
 done
-
-if [ "$started" = true ]; then
-    echo "Dashboard running — http://localhost:8765/ (pid $server_pid)"
-else
-    rm -f "$PID_FILE"
-    echo "Dashboard failed to start after 10s — check data/logs/dashboard.err" >&2
-    exit 1
-fi
+echo "Dashboard failed to start — check data/logs/dashboard.err" >&2
+exit 1
