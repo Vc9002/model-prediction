@@ -31,7 +31,7 @@ echo "Settlement exit code: $SETTLE_EXIT" >> "$LOG"
 # Clears and replaces today's flat picks on re-run.
 echo "--- Step 2: Flat forecast (all picks) ---" >> "$LOG"
 PYTHONPATH=src .venv/bin/python -m model_prediction.cli flat-forecast \
-    --all --log --date "$RUN_DATE" --model learned \
+    --all --log --date "$RUN_DATE" \
     >> "$LOG" 2>&1
 FLAT_EXIT=$?
 echo "Flat forecast exit code: $FLAT_EXIT" >> "$LOG"
