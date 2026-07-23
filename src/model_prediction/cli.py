@@ -96,6 +96,9 @@ SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
 LEARNED_PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
 ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant")
+# Only MLB and WNBA produce qualified calls in the production ledgers.
+# Everything else (esports, NBA, NFL, soccer, KBO, NPB, etc.) goes to research.
+PRODUCTION_SPORTS = ("mlb", "wnba")
 
 _LEDGER_LOCK = threading.Lock()
 
@@ -1484,8 +1487,8 @@ def main(argv: list[str] | None = None) -> None:
                         game_date=args.date,
                     )
                     if log and ledger is not None:
-                        use_ledger = flat_ledger if is_flat else ledger
-                        _log_esports_forecast(results[sport], config, use_ledger, flat_mode=is_flat)
+                        research_ledger = PickLedger(Path(ledger_path(config)).parent / "research.xlsx")
+                        _log_esports_forecast(results[sport], config, research_ledger, flat_mode=is_flat)
                 elif sport in LEARNED_PRODUCTION_SPORTS:
                     use_ledger = flat_ledger if is_flat else ledger
                     results[sport] = _forecast_learned_sport(
@@ -1509,6 +1512,12 @@ def main(argv: list[str] | None = None) -> None:
                     flat_ledger = PickLedger(flat_ledger_path)
                     _settle_all_unsettled(args, config, flat_ledger)
                     output["flat_settlement"] = "completed"
+                # Also settle the research ledger
+                research_ledger_path = Path(ledger_path(config)).parent / "research.xlsx"
+                if research_ledger_path.exists():
+                    research_ledger = PickLedger(research_ledger_path)
+                    _settle_all_unsettled(args, config, research_ledger)
+                    output["research_settlement"] = "completed"
             else:
                 if not args.pick_id or args.away_score is None or args.home_score is None:
                     raise ValueError("provide --pick-id with --away-score/--home-score, or --all-unsettled")
@@ -1700,6 +1709,8 @@ def main(argv: list[str] | None = None) -> None:
             for result in flat_result.values():
                 result.pop("candidates", None)
             flat_settlement = _settle_all_unsettled(settle_args, config, flat_ledger)
+            research_ledger = PickLedger(Path(ledger_path(config)).parent / "research.xlsx")
+            research_settlement = _settle_all_unsettled(settle_args, config, research_ledger)
 
             output = {
                 "date": args.date,
