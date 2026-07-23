@@ -1,1 +1,1 @@
-{"daily-1784823905": {"job_id": "daily-1784823905", "action": "daily", "status": "running", "command": "bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh", "output_tail": "", "started_at": "2026-07-23T16:25:05", "seconds": 0.0}}
+{"daily-1784824575": {"job_id": "daily-1784824575", "action": "daily", "status": "ok", "command": "bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh", "output_tail": "", "started_at": "2026-07-23T16:36:15", "seconds": 340.7, "returncode": 0}}

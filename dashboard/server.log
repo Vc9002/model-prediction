@@ -29,3 +29,6 @@ OSError: [Errno 48] Address already in use
 2026-07-23T16:24:27 job started: daily-1784823867 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
 2026-07-23T16:24:27 job finished: daily-1784823867 :: ok in 0.1s
 2026-07-23T16:25:05 job started: daily-1784823905 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
+2026-07-23T16:28:55 job finished: daily-1784823905 :: ok in 230.6s
+2026-07-23T16:36:15 job started: daily-1784824575 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
+2026-07-23T16:41:56 job finished: daily-1784824575 :: ok in 340.7s
