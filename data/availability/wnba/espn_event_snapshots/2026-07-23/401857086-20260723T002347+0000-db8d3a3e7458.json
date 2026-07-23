@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4565515",
+      "current_status": "Out",
+      "player_name": "Tonie Morgan",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-22T18:04:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "5105752",
+      "current_status": "Out",
+      "player_name": "Alissa Pili",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-22T18:03:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "3065570",
+      "current_status": "Out",
+      "player_name": "Kelsey Plum",
+      "raw_status": "Out",
+      "reason": "Lower Leg",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-06-24T16:05:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4688629",
+      "current_status": "Out",
+      "player_name": "Shay Ciezki",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-07-22",
+      "status_at_utc": "2026-07-22T18:20:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "5107404",
+      "current_status": "Out",
+      "player_name": "Quionche Carter",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-29",
+      "status_at_utc": "2026-07-22T18:20:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "event_id": "401857086",
+  "observed_at_utc": "2026-07-23T00:23:47.884077+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "db8d3a3e7458481a5c9de75885c9ca9d908ff8e777318d0dc0015f534c5c1816",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

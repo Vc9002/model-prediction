@@ -153,7 +153,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span class="chip"><span class="dot gray" id="testDot"></span><span id="testTxt">Tests: not run</span></span>
   <span class="chip"><span class="dot g"></span><span id="modelsTxt">Models: …</span></span>
   <span class="chip mono dim" id="dataTxt">Data: …</span>
-  <span class="chip"><span class="dot gray" id="dailyDot"></span><span id="dailyTxt" title="Last successful com.modelprediction.daily launchd run">Daily: …</span></span>
+  <span class="chip"><span class="dot gray" id="dailyDot"></span><span id="dailyTxt" title="Split pipeline: settle → flat forecast → main forecast">Pipeline: …</span></span>
+  <span class="chip dim mono" id="pipelineSteps" style="font-size:10px"></span>
   <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
   <span class="chip dim" id="updatedTxt">Updated: —</span>
   <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
@@ -163,7 +164,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button onclick="bootstrapDialog()">Bootstrap</button>
   <button onclick="confirmAction('refresh_prices','Refresh executable bid/ask prices for every unique open pick in the ledger?')">Scan Open Ledger Prices</button>
-  <button class="primary" onclick="confirmAction('daily','Run the full daily loop (slate → forecast+log → settle → summary) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
+  <button class="primary" onclick="confirmAction('daily','Run the split daily pipeline (settle → flat forecast → main forecast) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
 </div>
 
 <div class="wrap">
@@ -466,9 +467,19 @@ function renderStatus(s){
   $("#dataTxt").textContent="Data: "+Object.entries(s.data_counts).map(([k,v])=>`${k.toUpperCase()} ${v.toLocaleString()}`).join(" · ");
   const dp=s.daily_pipeline||{};
   const dailyDot=$("#dailyDot"), dailyTxt=$("#dailyTxt");
-  if(dp.age_hours==null){dailyDot.className="dot gray";dailyTxt.textContent="Daily: no log found";}
-  else if(dp.stale){dailyDot.className="dot r";dailyTxt.textContent=`Daily: STALE (${dp.age_hours}h ago)`;}
-  else {dailyDot.className="dot g";dailyTxt.textContent=`Daily: ${dp.age_hours}h ago`;}
+  const stepsEl=$("#pipelineSteps");
+  if(dp.age_hours==null){dailyDot.className="dot gray";dailyTxt.textContent="Pipeline: no log found";stepsEl.textContent="";}
+  else if(dp.stale){dailyDot.className="dot r";dailyTxt.textContent=`Pipeline: STALE (${dp.age_hours}h ago)`;}
+  else {dailyDot.className="dot g";dailyTxt.textContent=`Pipeline: ${dp.age_hours}h ago`;}
+  // Show per-step status from split pipeline logs
+  const steps=dp.steps||{};
+  if(Object.keys(steps).length){
+    const settle=steps.settle_ok===true?"✓":"settle_ok"in steps?"✗":"?";
+    const flat=steps.flat_ok===true?"✓":"flat_ok"in steps?"✗":"?";
+    const main=steps.main_ok===true?"✓":"main_ok"in steps?"✗":"?";
+    stepsEl.textContent=`settle ${settle} · flat ${flat} · main ${main}`;
+    stepsEl.style.color=((steps.settle_ok&&steps.flat_ok&&steps.main_ok)||Object.keys(steps).length===0)?"var(--green)":"var(--red)";
+  }
   const n=(s.alerts||[]).length + (t.status==="failed"?1:0);
   $("#alertTxt").textContent=`Alerts: ${n}`;
   $("#alertDot").className="dot "+(n? (s.alerts.some(a=>a.level==="warn")?"y":"g"):"g");
@@ -1381,6 +1392,53 @@ async function renderToday(){
       box.appendChild(d);
     });
   }
+  // ── Flat ledger picks (all model candidates, no edge gate) ──
+  loadFlatToday();
+}
+async function loadFlatToday(){
+  const todayET=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset()-300);return d.toISOString().slice(0,10);};
+  try{
+    const flat=await api("/api/flat-picks");
+    const today=flat.filter(p=>{
+      const start=p.event_start_utc||p.start_et||"";
+      return start.startsWith(todayET());
+    });
+    if(!today.length)return;
+    const box=$("#todayPicks");
+    const sep=document.createElement("h2");
+    sep.textContent=`Flat Ledger — All ${today.length} model candidates (no edge gate)`;
+    sep.style.cssText="margin-top:20px;padding-top:12px;border-top:2px dashed var(--accent);color:var(--dim)";
+    box.appendChild(sep);
+    const note=document.createElement("div");
+    note.className="small dim";note.style.marginBottom="8px";
+    note.textContent="Every game the model evaluated today — no confidence filter. Use to cross-check missed opportunities.";
+    box.appendChild(note);
+    const bySport={};
+    today.forEach(p=>{(bySport[p.league||"?"]=bySport[p.league||"?"]||[]).push(p);});
+    for(const [sport,rows] of Object.entries(bySport)){
+      const h=document.createElement("h3");h.textContent=sport+" — "+rows.length+" games";h.style.color="var(--dim)";
+      box.appendChild(h);
+      rows.forEach(p=>{
+        const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
+        const market=pregamePrice(p);
+        const edge=edgePoints(p);
+        const evBadge=edge==null?"":
+          edge>0.02?'<span class="pill win">+EV</span>':
+          edge>0?'<span class="pill open">thin</span>':
+          '<span class="pill push">—EV</span>';
+        const d=document.createElement("div");d.className="pick";
+        d.innerHTML=`<div class="pick-row"><div class="pick-copy">
+          <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et||""} · ${p.market_type}</span>${evBadge}</div>
+          <div class="pick-metrics"><span>pick <b>${esc(pickLabel(p))}</b></span>
+          <span>model <b>${conf?pct(conf):"—"}</b></span>
+          <span>market <b>${cents(market)}</b></span>
+          <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
+          <span class="dim">${p.model_version||""}</span></div>
+        </div></div>`;
+        box.appendChild(d);
+      });
+    }
+  }catch(e){/* flat picks unavailable */ }
 }
 function pickLabel(p){
   const sel=String(p.selection||"").toLowerCase();

@@ -1,0 +1,100 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-23T00:01:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4281930",
+      "current_status": "Out",
+      "player_name": "Anneli Maley",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-22T22:45:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4038379",
+      "current_status": "Out",
+      "player_name": "Marine Johannes",
+      "raw_status": "Out",
+      "reason": "Ankle",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-22T21:08:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-17T14:45:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4280877",
+      "current_status": "Out",
+      "player_name": "Chloe Bibby",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-22T23:47:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433424",
+      "current_status": "Out",
+      "player_name": "Maddy Westbeld",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-22T22:21:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4066548",
+      "current_status": "Out",
+      "player_name": "DiJonai Carrington",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-22T21:47:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-14T19:40:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    }
+  ],
+  "event_id": "401857088",
+  "observed_at_utc": "2026-07-23T00:23:49.224848+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "b16276ae559419e8e2c033db9b223ec540ea27f1286f7ebeb0bbb1e83fa8389b",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

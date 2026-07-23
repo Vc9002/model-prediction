@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5106222",
+      "current_status": "Out",
+      "player_name": "Taina Mair",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-22T18:14:00+00:00",
+      "team": "Seattle Storm"
+    },
+    {
+      "athlete_id": "4420318",
+      "current_status": "Out",
+      "player_name": "Ezi Magbegor",
+      "raw_status": "Out",
+      "reason": "Face",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-12T17:31:00+00:00",
+      "team": "Seattle Storm"
+    },
+    {
+      "athlete_id": "4596309",
+      "current_status": "Out",
+      "player_name": "Liatu King",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-22T17:48:00+00:00",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "athlete_id": "5345322",
+      "current_status": "Out",
+      "player_name": "Emma Cechova",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-15T23:36:00+00:00",
+      "team": "Minnesota Lynx"
+    }
+  ],
+  "event_id": "401857087",
+  "observed_at_utc": "2026-07-23T00:23:48.658034+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "d09d1d74f7747b9a908072da50811ec9107bd569c03c9b5d044bbee85ad4b957",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

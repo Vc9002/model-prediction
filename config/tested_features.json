@@ -1,213 +1,38 @@
 {
-  "schema_version": "1",
-  "purpose": "Durable record of every feature that has been evaluated, with its verdict and the evidence behind it. Check this file BEFORE proposing or testing a feature. A feature listed with verdict 'reject' or 'exclude' must not be re-tested unless the 'retest_when' condition is met.",
-  "last_updated": "2026-07-22",
   "authoritative_evidence": {
-    "production_ablation": "config/models/production-feature-ablation-2026-07-22.json",
-    "policy": "Retain a feature when its omission worsens validation Brier or both locked-holdout proper scores by any positive amount. This zero-threshold directional policy is intentionally more permissive than the strict statistical decision. Strict decisions, uncertainty, point-in-time provenance, and production eligibility remain separately visible."
+    "policy": "Retain a feature when its omission worsens validation Brier or both locked-holdout proper scores by any positive amount. This zero-threshold directional policy is intentionally more permissive than the strict statistical decision. Strict decisions, uncertainty, point-in-time provenance, and production eligibility remain separately visible.",
+    "production_ablation": "config/models/production-feature-ablation-2026-07-22.json"
   },
-  "retention_policy": {
-    "name": "keep_any_positive_out_of_sample_contribution",
-    "threshold": 0.0,
-    "keep_when": "validation candidate-minus-baseline Brier is positive, or locked-holdout candidate-minus-baseline Brier and log loss are both positive",
-    "remove_candidate_when": "removal improves validation and both locked-holdout proper scores",
-    "safety_override": "A retained feature with blocked point-in-time provenance is research-only until provenance is repaired; retention is not a profitability or promotion claim."
-  },
-  "production_ablation_summary": [
+  "corrected_claims": [
     {
-      "sport": "mlb",
-      "model_version": "mlb-elo-trend-lr-v5",
-      "feature": "elo_probability",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": 0.002609,
-      "holdout_brier_delta": -0.00028645,
-      "holdout_log_loss_delta": -0.00069373,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
+      "claim": "MLB is underconfident; 60% predictions win 75% of the time; Platt scaling would fix it.",
+      "correction": "The load-bearing locked-holdout reliability bucket holds 237 of 254 calls at mean-predicted 63.4% vs actual 55.3% \u2014 overconfident by roughly 8pp, the opposite direction. No bucket anywhere shows 60% predicted resolving to 75% actual.",
+      "date": "2026-07-21",
+      "status": "FALSE"
     },
     {
-      "sport": "mlb",
-      "model_version": "mlb-elo-trend-lr-v5",
-      "feature": "park_factor",
-      "strict_decision": "REMOVE CANDIDATE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": -7.4e-05,
-      "holdout_brier_delta": 3.4e-05,
-      "holdout_log_loss_delta": 5.368e-05,
-      "point_in_time_provenance": "blocked",
-      "production_safe": false,
-      "economic_claim_allowed": false
+      "claim": "Esports and international baseball have artifacts but were never validated.",
+      "correction": "The earlier v2 esports baselines have substantial locked-test results, but the currently configured LOL, CS2, Dota2, and Valorant v3 artifacts fail canonical self-hash validation, are research-state, unqualified, and have no locked metrics. Validation of v2 must not be attributed to v3.",
+      "date": "2026-07-22",
+      "status": "FALSE"
     },
     {
-      "sport": "mlb",
-      "model_version": "mlb-elo-trend-lr-v5",
-      "feature": "pitcher_era_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "REMOVE CANDIDATE",
-      "validation_brier_delta": -0.000338,
-      "holdout_brier_delta": -0.00024557,
-      "holdout_log_loss_delta": -0.00050005,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
+      "claim": "NBA and WNBA outperform because they added defensive_trend_gap as a third feature.",
+      "correction": "Fitted coefficients are -0.013 (NBA) and -0.003 (WNBA), i.e. zero. Their performance comes from Elo and from a high called_rate in leagues where favorites are strong.",
+      "date": "2026-07-22",
+      "status": "FALSE"
     },
     {
-      "sport": "mlb",
-      "model_version": "mlb-elo-trend-lr-v5",
-      "feature": "trend_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "REMOVE CANDIDATE",
-      "validation_brier_delta": -0.000583,
-      "holdout_brier_delta": -7.43e-05,
-      "holdout_log_loss_delta": -0.00016749,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
+      "claim": "Zero calibration exists anywhere in the project.",
+      "correction": "Every production artifact records calibration DIAGNOSTICS under qualification.calibration (slope, intercept, expected_calibration_error). What is absent is an APPLIED calibrator \u2014 the serving path uses identity. NBA slope 1.785 and WNBA 1.270 indicate underconfidence; SOCCER slope 0.776 indicates overconfidence; NFL has the worst ECE at 0.1009.",
+      "date": "2026-07-22",
+      "status": "MISLEADING"
     },
     {
-      "sport": "mlb",
-      "model_version": "mlb-elo-trend-lr-v5",
-      "feature": "weather_factor",
-      "strict_decision": "REMOVE CANDIDATE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": 3.4e-05,
-      "holdout_brier_delta": 6.25e-06,
-      "holdout_log_loss_delta": 1.604e-05,
-      "point_in_time_provenance": "blocked",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "nba",
-      "model_version": "nba-elo-trend-lr-v4",
-      "feature": "defensive_trend_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "REMOVE CANDIDATE",
-      "validation_brier_delta": -0.000627,
-      "holdout_brier_delta": -0.00063397,
-      "holdout_log_loss_delta": -0.00164595,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "nba",
-      "model_version": "nba-elo-trend-lr-v4",
-      "feature": "elo_probability",
-      "strict_decision": "KEEP",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": 0.019779,
-      "holdout_brier_delta": 0.04827885,
-      "holdout_log_loss_delta": 0.10395419,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "nba",
-      "model_version": "nba-elo-trend-lr-v4",
-      "feature": "trend_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": -3.9e-05,
-      "holdout_brier_delta": 0.00012005,
-      "holdout_log_loss_delta": 0.00027915,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "nfl",
-      "model_version": "nfl-elo-trend-lr-v4",
-      "feature": "elo_probability",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": 0.021561,
-      "holdout_brier_delta": 0.01958539,
-      "holdout_log_loss_delta": 0.0423277,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "nfl",
-      "model_version": "nfl-elo-trend-lr-v4",
-      "feature": "trend_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": -0.002535,
-      "holdout_brier_delta": 0.00334246,
-      "holdout_log_loss_delta": 0.00775928,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "soccer",
-      "model_version": "soccer-elo-trend-lr-v2",
-      "feature": "elo_probability",
-      "strict_decision": "KEEP",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": 0.024524,
-      "holdout_brier_delta": 0.02212732,
-      "holdout_log_loss_delta": 0.04419437,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "soccer",
-      "model_version": "soccer-elo-trend-lr-v2",
-      "feature": "trend_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "REMOVE CANDIDATE",
-      "validation_brier_delta": -0.000377,
-      "holdout_brier_delta": -1.824e-05,
-      "holdout_log_loss_delta": -0.0002271,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "wnba",
-      "model_version": "wnba-elo-trend-lr-v4",
-      "feature": "defensive_trend_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "REMOVE CANDIDATE",
-      "validation_brier_delta": -3.6e-05,
-      "holdout_brier_delta": -1.741e-05,
-      "holdout_log_loss_delta": -3.173e-05,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "wnba",
-      "model_version": "wnba-elo-trend-lr-v4",
-      "feature": "elo_probability",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": 0.030371,
-      "holdout_brier_delta": 0.03090384,
-      "holdout_log_loss_delta": 0.06445063,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
-    },
-    {
-      "sport": "wnba",
-      "model_version": "wnba-elo-trend-lr-v4",
-      "feature": "trend_gap",
-      "strict_decision": "INCONCLUSIVE",
-      "retention_decision": "KEEP",
-      "validation_brier_delta": 3.8e-05,
-      "holdout_brier_delta": 0.00032338,
-      "holdout_log_loss_delta": 0.00059961,
-      "point_in_time_provenance": "development_only",
-      "production_safe": false,
-      "economic_claim_allowed": false
+      "claim": "soccer_form.py, rest_travel.py, and data_sources/pitchers.py are dead code.",
+      "correction": "None of those files exist. They were misremembered.",
+      "date": "2026-07-21",
+      "status": "FALSE"
     }
   ],
   "evidence_grades": {
@@ -217,8 +42,25 @@
   },
   "features": [
     {
-      "name": "elo_probability",
+      "evidence_grade": "A",
       "file": "src/model_prediction/features/elo_ratings.py",
+      "fitted_coefficients": {
+        "MLB": 3.319,
+        "NBA": 3.564,
+        "NFL": 2.615,
+        "SOCCER": 5.562,
+        "WNBA": 3.134
+      },
+      "name": "elo_probability",
+      "notes": "The only consistently material fitted signal in the five standard production models. Strict leave-one-out evidence supports KEEP for NBA and SOCCER; MLB, NFL, and WNBA remain INCONCLUSIVE.",
+      "open_question": "NBA v4 hits 73.66% calling 88.2% of games on Elo alone, above the NBA favorite base rate. Leakage vs chalky holdout window is UNRESOLVED and under active investigation. Do not build on top of Elo until answered.",
+      "production_ablation": {
+        "MLB": "INCONCLUSIVE",
+        "NBA": "KEEP",
+        "NFL": "INCONCLUSIVE",
+        "SOCCER": "KEEP",
+        "WNBA": "INCONCLUSIVE"
+      },
       "sports": [
         "MLB",
         "NBA",
@@ -226,60 +68,60 @@
         "NFL",
         "SOCCER"
       ],
-      "verdict": "keep",
       "status": "production",
-      "evidence_grade": "A",
-      "fitted_coefficients": {
-        "MLB": 3.319,
-        "NBA": 3.564,
-        "WNBA": 3.134,
-        "NFL": 2.615,
-        "SOCCER": 5.562
-      },
-      "notes": "The only consistently material fitted signal in the five standard production models. Strict leave-one-out evidence supports KEEP for NBA and SOCCER; MLB, NFL, and WNBA remain INCONCLUSIVE.",
-      "production_ablation": {
-        "MLB": "INCONCLUSIVE",
-        "NBA": "KEEP",
-        "WNBA": "INCONCLUSIVE",
-        "NFL": "INCONCLUSIVE",
-        "SOCCER": "KEEP"
-      },
-      "open_question": "NBA v4 hits 73.66% calling 88.2% of games on Elo alone, above the NBA favorite base rate. Leakage vs chalky holdout window is UNRESOLVED and under active investigation. Do not build on top of Elo until answered.",
-      "tested_on": "2026-07-22"
+      "tested_on": "2026-07-22",
+      "verdict": "keep"
     },
     {
-      "name": "neutral_elo_rating_difference",
+      "evidence_grade": "A",
       "file": "src/model_prediction/esports.py",
+      "name": "neutral_elo_rating_difference",
+      "notes": "v3 tiered-elo artifacts pass canonical hash validation. Locked backfill metrics verified from esports-baseline-validation.json. All 4 titles (CS2/LOL/Dota2/Valorant) have artifact health VERIFIED.",
+      "retest_when": "After each title has a self-hash-valid exact-version artifact with immutable 60/20/20 evidence generated without settled-ledger tuning.",
       "sports": [
         "LOL",
         "CS2",
         "DOTA2",
         "VALORANT"
       ],
-      "verdict": "untested",
       "status": "v3_artifacts_valid_backfill_verified_hash_fixed",
-      "evidence_grade": "A",
-      "notes": "v3 tiered-elo artifacts pass canonical hash validation. Locked backfill metrics verified from esports-baseline-validation.json. All 4 titles (CS2/LOL/Dota2/Valorant) have artifact health VERIFIED.",
-      "retest_when": "After each title has a self-hash-valid exact-version artifact with immutable 60/20/20 evidence generated without settled-ledger tuning.",
-      "tested_on": "2026-07-22"
+      "tested_on": "2026-07-22",
+      "verdict": "untested"
     },
     {
-      "name": "tie_aware_elo_rating_difference",
+      "evidence_grade": "A",
       "file": "src/model_prediction/international_baseball.py",
+      "name": "tie_aware_elo_rating_difference",
+      "notes": "KBO/NPB tie-aware Elo. Promoted to shadow_qualified 2026-07-22. Artifact health VERIFIED. First picks pending on next daily run.",
+      "retest_when": "Run an exact-version chronological omission comparison against an intercept-only tie-aware baseline without using settled-ledger results for tuning.",
       "sports": [
         "KBO",
         "NPB"
       ],
-      "verdict": "untested",
       "status": "active_research_feature_not_ablated",
-      "evidence_grade": "A",
-      "notes": "KBO/NPB tie-aware Elo. Promoted to shadow_qualified 2026-07-22. Artifact health VERIFIED. First picks pending on next daily run.",
-      "retest_when": "Run an exact-version chronological omission comparison against an intercept-only tie-aware baseline without using settled-ledger results for tuning.",
-      "tested_on": "2026-07-22"
+      "tested_on": "2026-07-22",
+      "verdict": "untested"
     },
     {
-      "name": "trend_gap",
+      "evidence_grade": "A",
       "file": "src/model_prediction/features/trends.py",
+      "fitted_coefficients": {
+        "MLB": -0.03,
+        "NBA": -0.004,
+        "NFL": 0.05,
+        "SOCCER": -0.151,
+        "WNBA": -0.007
+      },
+      "name": "trend_gap",
+      "notes": "Wired into all five standard production models, with near-zero coefficients. The strict result is INCONCLUSIVE everywhere, but the zero-threshold retention policy keeps it for NBA, NFL, and WNBA because at least one out-of-sample cohort improves slightly. MLB and SOCCER are directional removal candidates.",
+      "production_ablation": {
+        "MLB": "INCONCLUSIVE",
+        "NBA": "INCONCLUSIVE",
+        "NFL": "INCONCLUSIVE",
+        "SOCCER": "INCONCLUSIVE",
+        "WNBA": "INCONCLUSIVE"
+      },
+      "retest_when": "Never as-is. If retested it must be as a RESIDUAL trend orthogonalized against elo_probability, not the raw EWMA difference.",
       "sports": [
         "MLB",
         "NBA",
@@ -287,139 +129,127 @@
         "NFL",
         "SOCCER"
       ],
-      "verdict": "keep",
       "status": "production_mixed_direction",
-      "evidence_grade": "A",
-      "fitted_coefficients": {
-        "MLB": -0.03,
-        "NBA": -0.004,
-        "WNBA": -0.007,
-        "NFL": 0.05,
-        "SOCCER": -0.151
-      },
-      "notes": "Wired into all five standard production models, with near-zero coefficients. The strict result is INCONCLUSIVE everywhere, but the zero-threshold retention policy keeps it for NBA, NFL, and WNBA because at least one out-of-sample cohort improves slightly. MLB and SOCCER are directional removal candidates.",
-      "production_ablation": {
-        "MLB": "INCONCLUSIVE",
-        "NBA": "INCONCLUSIVE",
-        "WNBA": "INCONCLUSIVE",
-        "NFL": "INCONCLUSIVE",
-        "SOCCER": "INCONCLUSIVE"
-      },
-      "retest_when": "Never as-is. If retested it must be as a RESIDUAL trend orthogonalized against elo_probability, not the raw EWMA difference.",
-      "tested_on": "2026-07-22"
+      "tested_on": "2026-07-22",
+      "verdict": "keep"
     },
     {
-      "name": "defensive_trend_gap",
-      "file": "src/model_prediction/features/trends.py",
-      "sports": [
-        "NBA",
-        "WNBA"
-      ],
-      "verdict": "remove_candidate",
-      "status": "production_directionally_harmful",
       "evidence_grade": "A",
+      "file": "src/model_prediction/features/trends.py",
       "fitted_coefficients": {
         "NBA": -0.013,
         "WNBA": -0.003
       },
+      "name": "defensive_trend_gap",
       "notes": "CORRECTION OF A PRIOR CLAIM: this feature does NOT explain NBA/WNBA performance. Its fitted coefficients are near zero, and strict leave-one-out evidence is INCONCLUSIVE in both leagues.",
       "production_ablation": {
         "NBA": "INCONCLUSIVE",
         "WNBA": "INCONCLUSIVE"
       },
-      "tested_on": "2026-07-22"
+      "sports": [
+        "NBA",
+        "WNBA"
+      ],
+      "status": "production_directionally_harmful",
+      "tested_on": "2026-07-22",
+      "verdict": "remove_candidate"
     },
     {
-      "name": "park_factor",
-      "file": "src/model_prediction/features/park_factors.py",
-      "sports": [
-        "MLB"
-      ],
-      "verdict": "keep",
-      "status": "research_keep_provenance_blocked",
       "evidence_grade": "A",
+      "file": "src/model_prediction/features/park_factors.py",
       "fitted_coefficients": {
         "MLB": -1.05
       },
+      "name": "park_factor",
       "notes": "Material fitted coefficient, but the strict ablation marks it REMOVE CANDIDATE because a static 2025 three-year table is applied retroactively across seasons. Coefficient magnitude does not cure invalid point-in-time provenance.",
       "production_ablation": {
         "MLB": "REMOVE CANDIDATE"
       },
       "retest_when": "Only after season-correct park factors have timestamped point-in-time provenance and the locked chronological ablation is rerun.",
-      "tested_on": "2026-07-22"
-    },
-    {
-      "name": "weather_factor",
-      "file": "src/model_prediction/features/weather.py",
       "sports": [
         "MLB"
       ],
-      "verdict": "keep",
       "status": "research_keep_provenance_blocked",
+      "tested_on": "2026-07-22",
+      "verdict": "keep"
+    },
+    {
       "evidence_grade": "A",
+      "file": "src/model_prediction/features/weather.py",
       "fitted_coefficients": {
         "MLB": -0.318
       },
+      "name": "weather_factor",
       "notes": "The strict ablation marks it REMOVE CANDIDATE because the historical weather cache has no forecast issue time or observed_at timestamp. It cannot support a point-in-time production claim.",
       "production_ablation": {
         "MLB": "REMOVE CANDIDATE"
       },
       "retest_when": "Only after every weather observation has timestamp-valid forecast provenance and the locked chronological ablation is rerun.",
-      "tested_on": "2026-07-22"
-    },
-    {
-      "name": "pitcher_era_gap",
-      "file": "src/model_prediction/features/team_runs.py",
       "sports": [
         "MLB"
       ],
-      "verdict": "remove_candidate",
-      "status": "production_directionally_harmful",
+      "status": "research_keep_provenance_blocked",
+      "tested_on": "2026-07-22",
+      "verdict": "keep"
+    },
+    {
       "evidence_grade": "A",
+      "file": "src/model_prediction/features/team_runs.py",
       "fitted_coefficients": {
         "MLB": 0.022
       },
+      "name": "pitcher_era_gap",
       "notes": "In MLB v5 with a near-zero coefficient. The strict leave-one-out result is INCONCLUSIVE; starter_era_gap is not a valid challenger because it is unservable.",
       "production_ablation": {
         "MLB": "INCONCLUSIVE"
       },
-      "tested_on": "2026-07-22"
-    },
-    {
-      "name": "starter_era_gap",
-      "file": "src/model_prediction/validation.py",
       "sports": [
         "MLB"
       ],
-      "verdict": "remove",
-      "status": "shipped_in_v4_then_removed_in_v5",
+      "status": "production_directionally_harmful",
+      "tested_on": "2026-07-22",
+      "verdict": "remove_candidate"
+    },
+    {
       "evidence_grade": "A",
+      "file": "src/model_prediction/validation.py",
       "fitted_coefficients": {
         "MLB_v4": -0.0179
       },
+      "name": "starter_era_gap",
       "notes": "UNSERVABLE \u2014 do not reinstate under any name. validation.py:1509 _starter_era_gap() reads _load_starter_era_map(), a dict built by replaying HISTORICAL box scores keyed by event_id. An unplayed game is never in that map, so it returns the 0.0 default at serve time. It therefore trains on real ERA and serves as a constant zero: textbook train/serve skew. learned_forward.py:104-112 already documents this and deliberately provides NO provider, failing closed instead.",
       "production_incident": "mlb-elo-trend-lr-v4 SHIPPED this feature (feature_names: elo_probability, trend_gap, park_factor, starter_era_gap; coefficient -0.0179) and made 100% of the settled live MLB picks in both ledgers. Every one of those 59 predictions was produced by a model whose fourth feature was silently 0.0 at prediction time. Practical damage is small because the coefficient is near zero, but the mechanism is exactly the failure mode. v5 removed it and substituted the servable pitcher_era_gap \u2014 so the v4 to v5 change was a BUG FIX, not feature bloat.",
       "retest_when": "Never. Remove elo_trend_park_starter from FEATURE_VARIANTS so it cannot be selected again.",
-      "tested_on": "2026-07-22"
-    },
-    {
-      "name": "starting_pitcher_fip",
-      "file": "src/model_prediction/features/starting_pitcher.py",
       "sports": [
         "MLB"
       ],
-      "verdict": "reject",
-      "status": "orphan",
-      "evidence_grade": "B",
-      "measured_effect": "84% data coverage, zero measurable effect on locked holdout",
-      "notes": "Collinear with the existing pitcher_era_gap. Rejected on evidence, not neglect.",
-      "retest_when": "Only if pitcher_era_gap is removed from the model, which would break the collinearity.",
-      "tested_on": "2026-07-21",
-      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py"
+      "status": "shipped_in_v4_then_removed_in_v5",
+      "tested_on": "2026-07-22",
+      "verdict": "remove"
     },
     {
-      "name": "head_to_head",
+      "evidence_grade": "B",
+      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py",
+      "file": "src/model_prediction/features/starting_pitcher.py",
+      "measured_effect": "84% data coverage, zero measurable effect on locked holdout",
+      "name": "starting_pitcher_fip",
+      "notes": "Collinear with the existing pitcher_era_gap. Rejected on evidence, not neglect.",
+      "retest_when": "Only if pitcher_era_gap is removed from the model, which would break the collinearity.",
+      "sports": [
+        "MLB"
+      ],
+      "status": "orphan",
+      "tested_on": "2026-07-21",
+      "verdict": "reject"
+    },
+    {
+      "evidence_grade": "B",
+      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py",
       "file": "src/model_prediction/features/head_to_head.py",
+      "measured_effect": "+0.11pp to +0.61pp accuracy across all five sports, every result within ~1 standard error",
+      "name": "head_to_head",
+      "notes": "Registered in the feature registry and imported by features/__init__.py but never requested by learned_forward.py. Tested and found to be noise. NFL was untestable at only 10% non-zero coverage.",
+      "retest_when": "NFL only, and only after H2H coverage exceeds 50%. Never retest the other four sports.",
       "sports": [
         "MLB",
         "NBA",
@@ -427,191 +257,428 @@
         "NFL",
         "SOCCER"
       ],
-      "verdict": "reject",
       "status": "registered_orphan",
-      "evidence_grade": "B",
-      "measured_effect": "+0.11pp to +0.61pp accuracy across all five sports, every result within ~1 standard error",
-      "notes": "Registered in the feature registry and imported by features/__init__.py but never requested by learned_forward.py. Tested and found to be noise. NFL was untestable at only 10% non-zero coverage.",
-      "retest_when": "NFL only, and only after H2H coverage exceeds 50%. Never retest the other four sports.",
       "tested_on": "2026-07-21",
-      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py"
+      "verdict": "reject"
     },
     {
-      "name": "lineup_strength",
+      "evidence_grade": "B",
+      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py",
       "file": "src/model_prediction/features/lineup_strength.py",
+      "measured_effect": "+0.05pp (NBA), 0.00pp (WNBA)",
+      "name": "lineup_strength",
+      "notes": "Pure noise. Registered but never wired. Leaving it unwired is empirically correct.",
+      "retest_when": "Never in this form.",
       "sports": [
         "NBA",
         "WNBA"
       ],
-      "verdict": "reject",
       "status": "registered_orphan",
-      "evidence_grade": "B",
-      "measured_effect": "+0.05pp (NBA), 0.00pp (WNBA)",
-      "notes": "Pure noise. Registered but never wired. Leaving it unwired is empirically correct.",
-      "retest_when": "Never in this form.",
       "tested_on": "2026-07-21",
-      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py"
+      "verdict": "reject"
     },
     {
-      "name": "player_availability",
+      "evidence_grade": "B",
       "file": "src/model_prediction/features/player_availability.py",
+      "measured_effect": "142-game WNBA cohort May 14 - Jul 20: accuracy 71.8% -> 73.2% (+1.4pp), Brier 0.21278 -> 0.20799 (-2.3%), units at -110 +52.73 -> +56.55, zero harmful selection flips",
+      "name": "player_availability",
+      "notes": "Applied as a post-hoc probit adjustment gated at a 5pp threshold, not as a regression feature. Evidence is grade B and was not part of the current exact-artifact strict ablation, so it remains a research KEEP rather than proof of production profitability.",
+      "open_question": "Whether the same availability mechanism transfers to NBA. Untested.",
       "sports": [
         "WNBA"
       ],
-      "verdict": "keep",
       "status": "validated_posthoc_adjustment",
-      "evidence_grade": "B",
-      "measured_effect": "142-game WNBA cohort May 14 - Jul 20: accuracy 71.8% -> 73.2% (+1.4pp), Brier 0.21278 -> 0.20799 (-2.3%), units at -110 +52.73 -> +56.55, zero harmful selection flips",
-      "notes": "Applied as a post-hoc probit adjustment gated at a 5pp threshold, not as a regression feature. Evidence is grade B and was not part of the current exact-artifact strict ablation, so it remains a research KEEP rather than proof of production profitability.",
-      "open_question": "Whether the same availability mechanism transfers to NBA. Untested.",
-      "tested_on": "2026-07-20"
+      "tested_on": "2026-07-20",
+      "verdict": "keep"
     },
     {
-      "name": "market_signals",
-      "file": "src/model_prediction/features/market_signals.py",
-      "sports": [],
-      "verdict": "exclude",
-      "status": "dead_stub",
       "evidence_grade": "A",
+      "file": "src/model_prediction/features/market_signals.py",
+      "name": "market_signals",
       "notes": "ARCHITECTURAL EXCLUSION, not an empirical rejection. The independent outcome model must never consume market price. Wiring this into a sport model would violate market isolation and invalidate every edge calculation downstream.",
       "retest_when": "Only inside a separately labeled market-residual or decision layer, never in the outcome model.",
-      "tested_on": "n/a"
-    },
-    {
-      "name": "guaranteed_signal",
-      "file": "src/model_prediction/features/guaranteed_signal.py",
       "sports": [],
-      "verdict": "exclude",
       "status": "dead_stub",
-      "evidence_grade": "A",
-      "notes": "Not a numeric feature. It is a post-hoc classification tag applied after a prediction exists. Cannot be ablated because it is not an input.",
-      "tested_on": "n/a"
+      "tested_on": "n/a",
+      "verdict": "exclude"
     },
     {
-      "name": "tennis_surface",
+      "evidence_grade": "A",
+      "file": "src/model_prediction/features/guaranteed_signal.py",
+      "name": "guaranteed_signal",
+      "notes": "Not a numeric feature. It is a post-hoc classification tag applied after a prediction exists. Cannot be ablated because it is not an input.",
+      "sports": [],
+      "status": "dead_stub",
+      "tested_on": "n/a",
+      "verdict": "exclude"
+    },
+    {
+      "evidence_grade": "A",
       "file": "src/model_prediction/features/tennis_surface.py",
+      "name": "tennis_surface",
+      "notes": "No active tennis model exists. Tennis is deferred per docs/PROJECT_STATUS.md. Untestable, not rejected.",
+      "retest_when": "If and only if a tennis model is revived.",
       "sports": [
         "TENNIS"
       ],
-      "verdict": "exclude",
       "status": "registered_orphan",
-      "evidence_grade": "A",
-      "notes": "No active tennis model exists. Tennis is deferred per docs/PROJECT_STATUS.md. Untestable, not rejected.",
-      "retest_when": "If and only if a tennis model is revived.",
-      "tested_on": "n/a"
+      "tested_on": "n/a",
+      "verdict": "exclude"
     },
     {
-      "name": "confidence_gate",
+      "evidence_grade": "A",
       "file": "src/model_prediction/features/confidence_gate.py",
-      "sports": [],
-      "verdict": "exclude",
-      "status": "infrastructure",
-      "evidence_grade": "A",
+      "name": "confidence_gate",
       "notes": "Selection/threshold infrastructure, not a model input. Governs called_rate. Not ablatable.",
-      "tested_on": "n/a"
+      "sports": [],
+      "status": "infrastructure",
+      "tested_on": "n/a",
+      "verdict": "exclude"
     },
     {
-      "name": "bullpen",
+      "evidence_grade": "A",
       "file": "src/model_prediction/features/bullpen.py",
+      "name": "bullpen",
+      "notes": "One import, never reaches a feature vector. Feature code in features/bullpen.py computes bullpen_era, bullpen_weakness_index, and fatigue_innings_last3 from StatsAPI data. The data source (espn.py:233) passes None because StatsAPI game snapshots are not yet cached. Returns neutral defaults (1.0). Blocked on: StatsAPI integration for bullpen usage snapshots with observed_at_utc timestamps.",
       "sports": [
         "MLB"
       ],
-      "verdict": "untested",
       "status": "half_wired",
-      "evidence_grade": "A",
-      "notes": "One import, never reaches a production feature vector. Genuinely untested.",
-      "tested_on": null
+      "tested_on": null,
+      "verdict": "untested"
     },
     {
-      "name": "schedule_load",
+      "evidence_grade": "A",
+      "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
       "file": "src/model_prediction/features/schedule_load.py",
+      "name": "schedule_load",
+      "notes": "Sub-features (rest_disparity, back_to_back_gap, games_last_7_gap, schedule_missingness) tested in factorial roadmap challenger (v3 incumbents). MLB: rest_disparity alone improves holdout by -0.0004 but validation regresses (+0.0004). NBA: best variant (consistency+hot_cold+rest_disparity+schedule_density+schedule_missingness) improves holdout by -0.0012 and validation by -0.0010. NFL: largest gains \u2014 rest_disparity+schedule_density improves holdout by -0.0038. WNBA: holdout improves (-0.0010) but validation regresses. NBA is the most promising target for schedule features. Currently wired in learned_forward.py but not in any active model config.",
       "sports": [
         "NBA",
         "WNBA"
       ],
-      "verdict": "untested",
-      "status": "half_wired",
-      "evidence_grade": "A",
-      "notes": "Two imports, not in any production feature vector. Rest/travel is a plausible NBA/WNBA signal and this is the most promising genuinely untested feature in the repo.",
-      "tested_on": null
+      "status": "tested_via_roadmap_challenger_v3_incumbent",
+      "tested_on": "2026-07-22",
+      "verdict": "tested_borderline"
     },
     {
-      "name": "team_runs",
+      "evidence_grade": "A",
       "file": "src/model_prediction/features/team_runs.py",
+      "name": "team_runs",
+      "notes": "Supplies pitcher_era_gap to the active MLB model. Other outputs (team_runs_scored, team_runs_allowed, run_differential) are computed but never reach a feature vector. Could be expanded to provide additional features: home_runs_scored_30d, away_runs_allowed_30d, etc. Not tested as standalone features because the roadmap challenger focused on schedule/momentum additions.",
       "sports": [
         "MLB"
       ],
-      "verdict": "untested",
       "status": "half_wired",
-      "evidence_grade": "A",
-      "notes": "Two imports. Supplies pitcher_era_gap. Its other outputs are unused.",
-      "tested_on": null
+      "tested_on": null,
+      "verdict": "untested"
     },
     {
+      "evidence_grade": "A",
+      "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
+      "file": "src/model_prediction/features/trends.py",
       "name": "consistency_gap",
-      "file": "src/model_prediction/features/trends.py",
+      "notes": "Tested in factorial roadmap challenger (v3 incumbents). NBA: both validation (-0.0010) and holdout (-0.0012) Brier improve with consistency+hot_cold+schedule. NFL: both improve (-0.0025 val, -0.0038 hold). MLB: holdout improves (-0.0003) but validation regresses (+0.0007). WNBA: holdout improves (-0.0010) but validation regresses (+0.0006). Directionally promising for NBA/NFL; overfitting concern for MLB/WNBA. Retest with current (v4/v5) artifacts before promoting.",
       "sports": [],
-      "verdict": "untested",
-      "status": "variant_only",
-      "evidence_grade": "A",
-      "notes": "Defined in the elo_trend_full FEATURE_VARIANT but that variant is not selected for any production model.",
-      "tested_on": null
+      "status": "tested_via_roadmap_challenger_v3_incumbent",
+      "tested_on": "2026-07-22",
+      "verdict": "tested_borderline"
     },
     {
+      "evidence_grade": "A",
+      "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
+      "file": "src/model_prediction/features/trends.py",
       "name": "hot_cold_gap",
-      "file": "src/model_prediction/features/trends.py",
+      "notes": "Tested in factorial roadmap challenger (v3 incumbents). Same pattern as consistency_gap: NBA/NFL benefit, MLB/WNBA show holdout improvement but validation regression. Best NBA combo (consistency+hot_cold+schedule_density+schedule_missingness) improves holdout Brier by -0.0012. Retest with current artifacts.",
       "sports": [],
-      "verdict": "untested",
-      "status": "variant_only",
-      "evidence_grade": "A",
-      "notes": "Defined in the elo_trend_full FEATURE_VARIANT, not selected for production.",
-      "tested_on": null
+      "status": "tested_via_roadmap_challenger_v3_incumbent",
+      "tested_on": "2026-07-22",
+      "verdict": "tested_borderline"
     },
     {
-      "name": "trailing_home_win_rate_30d",
+      "evidence_grade": "B",
       "file": "src/model_prediction/validation.py",
+      "name": "trailing_home_win_rate_30d",
+      "notes": "Adaptive-HFA variant implemented in validation.py as elo_trend_adaptive_hfa variant. Uses trailing 30-day home win rate as an alternative to static park factors. Tested as part of the elo_trend_adaptive_hfa ablation in validation.py but not in the factorial roadmap challenger. Ablation results from elo_trend vs elo_trend_adaptive_hfa should be extracted and documented here. Status: variant only, never promoted to production.",
       "sports": [
         "MLB"
       ],
-      "verdict": "untested",
       "status": "variant_only",
-      "evidence_grade": "B",
-      "notes": "Part of the elo_trend_adaptive_hfa variant alongside elo_neutral_probability. Research output exists at outputs/latest/mlb-adaptive-hfa-research.json but was not promoted.",
-      "tested_on": null
+      "tested_on": null,
+      "verdict": "untested"
+    },
+    {
+      "evidence_grade": "A",
+      "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
+      "file": "src/model_prediction/features/schedule_load.py",
+      "name": "rest_disparity",
+      "notes": "Home-minus-away rest days (capped). Tested in factorial roadmap challenger. NBA: combined with consistency+hot_cold+schedule_density improves holdout by -0.0012. NFL: combined with schedule_density improves holdout by -0.0038. MLB: improves holdout by -0.0004 but validation regresses. Currently wired in learned_forward.py but not in any active model config.",
+      "sports": [
+        "MLB",
+        "NBA",
+        "WNBA",
+        "NFL"
+      ],
+      "status": "tested_via_roadmap_challenger_v3_incumbent",
+      "tested_on": "2026-07-22",
+      "verdict": "tested_borderline"
+    },
+    {
+      "evidence_grade": "A",
+      "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
+      "file": "src/model_prediction/features/schedule_load.py",
+      "name": "back_to_back_gap",
+      "notes": "Home-minus-away back-to-back indicator. Tested in factorial roadmap challenger. Adds marginal improvement (+0.0001 Brier) on top of rest_disparity+schedule_density combos. NFL has no variance (all games have similar rest). Currently wired in learned_forward.py.",
+      "sports": [
+        "MLB",
+        "NBA",
+        "WNBA",
+        "NFL"
+      ],
+      "status": "tested_via_roadmap_challenger_v3_incumbent",
+      "tested_on": "2026-07-22",
+      "verdict": "tested_marginal"
+    },
+    {
+      "evidence_grade": "A",
+      "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
+      "file": "src/model_prediction/features/schedule_load.py",
+      "name": "games_last_7_gap",
+      "notes": "Home-minus-away games played in last 7 days (schedule density). Tested in factorial roadmap challenger. Strongest in combination with rest_disparity+consistency+hot_cold. Currently wired in learned_forward.py.",
+      "sports": [
+        "MLB",
+        "NBA",
+        "WNBA",
+        "NFL"
+      ],
+      "status": "tested_via_roadmap_challenger_v3_incumbent",
+      "tested_on": "2026-07-22",
+      "verdict": "tested_borderline"
+    },
+    {
+      "evidence_grade": "A",
+      "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
+      "file": "src/model_prediction/features/schedule_load.py",
+      "name": "schedule_missingness",
+      "notes": "Indicator for whether schedule data was available. Tested in factorial roadmap challenger. Consistently appears in top-performing variants across all sports, suggesting it helps the model distinguish between real zeros and missing data. Currently wired in learned_forward.py.",
+      "sports": [
+        "MLB",
+        "NBA",
+        "WNBA",
+        "NFL"
+      ],
+      "status": "tested_via_roadmap_challenger_v3_incumbent",
+      "tested_on": "2026-07-22",
+      "verdict": "tested_marginal"
     }
   ],
-  "corrected_claims": [
+  "last_updated": "2026-07-22",
+  "production_ablation_summary": [
     {
-      "claim": "MLB is underconfident; 60% predictions win 75% of the time; Platt scaling would fix it.",
-      "status": "FALSE",
-      "correction": "The load-bearing locked-holdout reliability bucket holds 237 of 254 calls at mean-predicted 63.4% vs actual 55.3% \u2014 overconfident by roughly 8pp, the opposite direction. No bucket anywhere shows 60% predicted resolving to 75% actual.",
-      "date": "2026-07-21"
+      "economic_claim_allowed": false,
+      "feature": "elo_probability",
+      "holdout_brier_delta": -0.00028645,
+      "holdout_log_loss_delta": -0.00069373,
+      "model_version": "mlb-elo-trend-lr-v5",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "mlb",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": 0.002609
     },
     {
-      "claim": "Esports and international baseball have artifacts but were never validated.",
-      "status": "FALSE",
-      "correction": "The earlier v2 esports baselines have substantial locked-test results, but the currently configured LOL, CS2, Dota2, and Valorant v3 artifacts fail canonical self-hash validation, are research-state, unqualified, and have no locked metrics. Validation of v2 must not be attributed to v3.",
-      "date": "2026-07-22"
+      "economic_claim_allowed": false,
+      "feature": "park_factor",
+      "holdout_brier_delta": 3.4e-05,
+      "holdout_log_loss_delta": 5.368e-05,
+      "model_version": "mlb-elo-trend-lr-v5",
+      "point_in_time_provenance": "blocked",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "mlb",
+      "strict_decision": "REMOVE CANDIDATE",
+      "validation_brier_delta": -7.4e-05
     },
     {
-      "claim": "NBA and WNBA outperform because they added defensive_trend_gap as a third feature.",
-      "status": "FALSE",
-      "correction": "Fitted coefficients are -0.013 (NBA) and -0.003 (WNBA), i.e. zero. Their performance comes from Elo and from a high called_rate in leagues where favorites are strong.",
-      "date": "2026-07-22"
+      "economic_claim_allowed": false,
+      "feature": "pitcher_era_gap",
+      "holdout_brier_delta": -0.00024557,
+      "holdout_log_loss_delta": -0.00050005,
+      "model_version": "mlb-elo-trend-lr-v5",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "REMOVE CANDIDATE",
+      "sport": "mlb",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": -0.000338
     },
     {
-      "claim": "Zero calibration exists anywhere in the project.",
-      "status": "MISLEADING",
-      "correction": "Every production artifact records calibration DIAGNOSTICS under qualification.calibration (slope, intercept, expected_calibration_error). What is absent is an APPLIED calibrator \u2014 the serving path uses identity. NBA slope 1.785 and WNBA 1.270 indicate underconfidence; SOCCER slope 0.776 indicates overconfidence; NFL has the worst ECE at 0.1009.",
-      "date": "2026-07-22"
+      "economic_claim_allowed": false,
+      "feature": "trend_gap",
+      "holdout_brier_delta": -7.43e-05,
+      "holdout_log_loss_delta": -0.00016749,
+      "model_version": "mlb-elo-trend-lr-v5",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "REMOVE CANDIDATE",
+      "sport": "mlb",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": -0.000583
     },
     {
-      "claim": "soccer_form.py, rest_travel.py, and data_sources/pitchers.py are dead code.",
-      "status": "FALSE",
-      "correction": "None of those files exist. They were misremembered.",
-      "date": "2026-07-21"
+      "economic_claim_allowed": false,
+      "feature": "weather_factor",
+      "holdout_brier_delta": 6.25e-06,
+      "holdout_log_loss_delta": 1.604e-05,
+      "model_version": "mlb-elo-trend-lr-v5",
+      "point_in_time_provenance": "blocked",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "mlb",
+      "strict_decision": "REMOVE CANDIDATE",
+      "validation_brier_delta": 3.4e-05
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "defensive_trend_gap",
+      "holdout_brier_delta": -0.00063397,
+      "holdout_log_loss_delta": -0.00164595,
+      "model_version": "nba-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "REMOVE CANDIDATE",
+      "sport": "nba",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": -0.000627
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "elo_probability",
+      "holdout_brier_delta": 0.04827885,
+      "holdout_log_loss_delta": 0.10395419,
+      "model_version": "nba-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "nba",
+      "strict_decision": "KEEP",
+      "validation_brier_delta": 0.019779
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "trend_gap",
+      "holdout_brier_delta": 0.00012005,
+      "holdout_log_loss_delta": 0.00027915,
+      "model_version": "nba-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "nba",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": -3.9e-05
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "elo_probability",
+      "holdout_brier_delta": 0.01958539,
+      "holdout_log_loss_delta": 0.0423277,
+      "model_version": "nfl-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "nfl",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": 0.021561
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "trend_gap",
+      "holdout_brier_delta": 0.00334246,
+      "holdout_log_loss_delta": 0.00775928,
+      "model_version": "nfl-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "nfl",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": -0.002535
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "elo_probability",
+      "holdout_brier_delta": 0.02212732,
+      "holdout_log_loss_delta": 0.04419437,
+      "model_version": "soccer-elo-trend-lr-v2",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "soccer",
+      "strict_decision": "KEEP",
+      "validation_brier_delta": 0.024524
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "trend_gap",
+      "holdout_brier_delta": -1.824e-05,
+      "holdout_log_loss_delta": -0.0002271,
+      "model_version": "soccer-elo-trend-lr-v2",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "REMOVE CANDIDATE",
+      "sport": "soccer",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": -0.000377
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "defensive_trend_gap",
+      "holdout_brier_delta": -1.741e-05,
+      "holdout_log_loss_delta": -3.173e-05,
+      "model_version": "wnba-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "REMOVE CANDIDATE",
+      "sport": "wnba",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": -3.6e-05
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "elo_probability",
+      "holdout_brier_delta": 0.03090384,
+      "holdout_log_loss_delta": 0.06445063,
+      "model_version": "wnba-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "wnba",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": 0.030371
+    },
+    {
+      "economic_claim_allowed": false,
+      "feature": "trend_gap",
+      "holdout_brier_delta": 0.00032338,
+      "holdout_log_loss_delta": 0.00059961,
+      "model_version": "wnba-elo-trend-lr-v4",
+      "point_in_time_provenance": "development_only",
+      "production_safe": false,
+      "retention_decision": "KEEP",
+      "sport": "wnba",
+      "strict_decision": "INCONCLUSIVE",
+      "validation_brier_delta": 3.8e-05
     }
   ],
-  "updated": "2026-07-22",
-  "sha256": "936c3633adcba558c6e9ce3ca4165add9e0af53f22dd3db72d3b3195d6fbaa32"
+  "purpose": "Durable record of every feature that has been evaluated, with its verdict and the evidence behind it. Check this file BEFORE proposing or testing a feature. A feature listed with verdict 'reject' or 'exclude' must not be re-tested unless the 'retest_when' condition is met.",
+  "retention_policy": {
+    "keep_when": "validation candidate-minus-baseline Brier is positive, or locked-holdout candidate-minus-baseline Brier and log loss are both positive",
+    "name": "keep_any_positive_out_of_sample_contribution",
+    "remove_candidate_when": "removal improves validation and both locked-holdout proper scores",
+    "safety_override": "A retained feature with blocked point-in-time provenance is research-only until provenance is repaired; retention is not a profitability or promotion claim.",
+    "threshold": 0.0
+  },
+  "schema_version": "1",
+  "sha256": "936c3633adcba558c6e9ce3ca4165add9e0af53f22dd3db72d3b3195d6fbaa32",
+  "updated": "2026-07-22"
 }

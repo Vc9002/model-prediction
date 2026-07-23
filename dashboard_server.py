@@ -1402,18 +1402,36 @@ def production_evidence() -> dict:
 
 
 def _daily_pipeline_status() -> dict:
-    """Staleness of the launchd daily pipeline, from data/logs/daily_*.log mtimes."""
+    """Split-pipeline staleness from data/logs/daily_*.log.
+
+    The split pipeline runs: settle → flat forecast → main forecast.
+    Each step writes its own exit code to the log. Parses the latest
+    log to extract per-step status and overall staleness.
+    """
     logs = sorted((DATA / "logs").glob("daily_*.log"))
     if not logs:
-        return {"last_run_at_utc": None, "age_hours": None, "stale": True}
-    mtime = datetime.fromtimestamp(logs[-1].stat().st_mtime, tz=timezone.utc)
+        return {"last_run_at_utc": None, "age_hours": None, "stale": True, "steps": {}}
+    latest = logs[-1]
+    mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
     age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
-    # The daily job runs every 3 hours (com.modelprediction.daily); two missed
-    # runs in a row is a meaningful signal something is wrong, not just late.
+    # Parse exit codes from the log
+    steps = {}
+    try:
+        text = latest.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            if "Settlement exit code:" in line:
+                steps["settle_ok"] = "0" in line.split(":")[-1].strip()
+            elif "Flat forecast exit code:" in line:
+                steps["flat_ok"] = "0" in line.split(":")[-1].strip()
+            elif "Main forecast exit code:" in line:
+                steps["main_ok"] = "0" in line.split(":")[-1].strip()
+    except OSError:
+        pass
     return {
         "last_run_at_utc": mtime.isoformat(),
         "age_hours": round(age_hours, 1),
         "stale": age_hours > 6,
+        "steps": steps,
     }
 
 
@@ -2871,7 +2889,9 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return [python, "-m", "pytest", "tests/", "-q", "--no-header"]
     cli = runner if len(runner) > 1 else runner  # module or console-script form
     if name == "daily":
-        return cli + ["daily", "--date", str(payload.get("date") or _today())]
+        # Split pipeline: settle → flat forecast → main forecast
+        # Uses run_daily.sh which handles the three-step flow
+        return ["bash", str(ROOT / "run_daily.sh")]
     if name == "flat_forecast":
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
     if name == "refresh_prices":

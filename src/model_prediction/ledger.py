@@ -121,6 +121,20 @@ FIELDNAMES = LEGACY_FIELDNAMES + [
     # Original model_version when a migration rewrote lineage in place
     # (e.g. the 2026-07 v3->v4 MLB migration). Empty for native rows.
     "migrated_from_version",
+    # Feature value columns — one per active model feature, populated at prediction time
+    # Added 2026-07-22 for dashboard feature attribution
+    "elo_probability",
+    "trend_gap",
+    "park_factor",
+    "weather_factor",
+    "pitcher_era_gap",
+    "defensive_trend_gap",
+    "neutral_elo_rating_difference",
+    # Schedule / roadmap challenger feature columns
+    "rest_disparity",
+    "back_to_back_gap",
+    "games_last_7_gap",
+    "schedule_missingness",
 ]
 DECISION_FIELDS = {
     "pick_id",

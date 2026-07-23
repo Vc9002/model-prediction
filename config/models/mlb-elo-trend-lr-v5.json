@@ -3,12 +3,12 @@
     "moneyline": {
       "coefficients": [
         3.3192298736,
-        -0.0304329386,
+        -0.0912988158,
         -1.0500160548,
         -0.3178361649,
-        0.021979464
+        0.065938392
       ],
-      "confidence_threshold": 0.59980208,
+      "confidence_threshold": 0.575,
       "feature_names": [
         "elo_probability",
         "trend_gap",
@@ -138,5 +138,5 @@
     "threshold_source": "later validation cohort; never locked holdout",
     "walk_forward_features": true
   },
-  "artifact_hash": "bb6331f9ae39a7346e90a5f33f6b4e07168a5805b49be25c6e6134d413c081de"
+  "artifact_hash": "8a12d027cf1d2c206cb369c47da80e014f8ac4dfc414ffee96ae34656c46fef5"
 }

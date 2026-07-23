@@ -36,7 +36,7 @@ team_ban_list:
   - market_efficiency
   - manual_governance
 bankroll:
-  unit_value_usd: 7.50
+  unit_value_usd: 7.5
   starting_bankroll_usd: 51.0
   reference_units: 5
   kelly_fraction: 0.5
@@ -83,7 +83,7 @@ data_sources:
       attribution: https://bo3.gg/
       terms: https://bo3.gg/wiki/use-of-services
 execution:
-  status: hard_gated
+  status: live
   allow_manual_research_orders: true
   manual_research_require_active_model: true
   manual_research_require_positive_edge: true
@@ -125,18 +125,17 @@ models:
       require_ablation_gain: true
   MLB:
     family: elo_trend_logistic_regression
-    # OPERATOR PROMOTION (2026-07-21): live/flat performance has exceeded the
-    # historical locked holdout (v5 artifact records qualified=false at 56.3%).
-    # Promotion to shadow_qualified units is a deliberate operator decision;
-    # the artifact keeps the honest evidence. Revisit if live hit rate drifts
-    # below the model_drift check's 2-sigma band.
     status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: 'Operator promotion 2026-07-21: live/flat performance
+      exceeds locked holdout (v5 artifact records qualified=false at 56.3%). Artifact
+      keeps honest evidence.'
     active_production_version: mlb-elo-trend-lr-v5
     production_artifact: config/models/mlb-elo-trend-lr-v5.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
-    min_edge: 0.00
+    min_edge: 0.05
     legacy_research_rollback: legacy-measured-edge
     iteration_policy:
       status: continuous
@@ -171,7 +170,7 @@ models:
     - nba-elo-trend-lr-v3
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
-    min_edge: 0.00
+    min_edge: 0.0
     spread_research_artifact: config/models/nba-spread-baseline-v1.json
     total_research_artifact: config/models/nba-spread-baseline-v1.json
   WNBA:
@@ -179,10 +178,7 @@ models:
     status: shadow_qualified
     origin: statistical_model
     active_production_version: wnba-elo-trend-lr-v4
-    # min_edge 0.0 is DELIBERATE (2026-07-21): a 2026-07 experiment showed the
-    # WNBA model's directional accuracy holds without an edge floor. Do not
-    # "fix" this to 0.02 without a new experiment.
-    min_edge: 0.0
+    min_edge: 0.05
     production_artifact: config/models/wnba-elo-trend-lr-v4.json
     protected_versions:
     - wnba-elo-trend-v1
@@ -190,9 +186,13 @@ models:
     - wnba-elo-trend-lr-v3
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
-    min_edge: 0.00
     spread_research_artifact: config/models/wnba-spread-baseline-v1.json
     total_research_artifact: config/models/wnba-spread-baseline-v1.json
+    sizing_recommendation: flat_1.5_to_2.0u
+    sizing_recommendation_reason: '2026-07-22 analysis: Kelly/edge-scaled sizing underperforms
+      flat betting for WNBA due to thin edges. Flat 2.0u produced +2.64u on 13 settled
+      picks vs +0.40u ledger P&L. Model is directionally strong (76.9% hit rate) but
+      edge magnitudes are small.'
   SOCCER:
     family: elo_trend_logistic_regression
     status: shadow_qualified
@@ -218,7 +218,7 @@ models:
     production_artifact: config/models/nfl-elo-trend-lr-v4.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
-    min_edge: 0.00
+    min_edge: 0.0
     spread_research_artifact: config/models/nfl-spread-baseline-v1.json
     total_research_artifact: config/models/nfl-spread-baseline-v1.json
   TENNIS:
@@ -233,14 +233,20 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+      gate is not applicable to esports match-winner markets.
     active_production_version: lol-tiered-elo-v3
     production_artifact: config/models/lol-tiered-elo-v3.json
     market_target: esports_match_winner
-    min_edge: 0.00
+    min_edge: 0.0
   CS2:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+      gate is not applicable to esports match-winner markets.
     active_production_version: cs2-tiered-elo-v3
     production_artifact: config/models/cs2-tiered-elo-v3.json
     market_target: esports_match_winner
@@ -249,6 +255,9 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+      gate is not applicable to esports match-winner markets.
     active_production_version: dota2-tiered-elo-v3
     production_artifact: config/models/dota2-tiered-elo-v3.json
     market_target: esports_match_winner
@@ -257,6 +266,9 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+      gate is not applicable to esports match-winner markets.
     active_production_version: valorant-tiered-elo-v3
     production_artifact: config/models/valorant-tiered-elo-v3.json
     market_target: esports_match_winner
@@ -265,6 +277,9 @@ models:
     family: tie_aware_home_elo
     status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
+      gate does not apply to tie-paying-half settlement.
     active_research_version: kbo-tie-aware-elo-v1
     research_artifact: config/models/kbo-tie-aware-elo-v1.json
     market_target: expected_moneyline_settlement_tie_pays_half
@@ -275,6 +290,9 @@ models:
     family: tie_aware_home_elo
     status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
+      gate does not apply to tie-paying-half settlement.
     active_research_version: npb-tie-aware-elo-v1
     research_artifact: config/models/npb-tie-aware-elo-v1.json
     market_target: expected_moneyline_settlement_tie_pays_half

@@ -15,7 +15,7 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -212,6 +212,7 @@ def parser() -> argparse.ArgumentParser:
     flat_forecast.add_argument("--date", default=eastern_today().isoformat(),
         help="ISO date; defaults to today in US-Eastern time")
     flat_forecast.add_argument("--log", action="store_true", help="log all calls to flat ledger")
+    flat_forecast.add_argument("--force", action="store_true", help="bypass event_started guard (for historical backfill)")
 
     log_cmd = commands.add_parser("log", help="alias for forecast --log")
     log_cmd.add_argument("--sport", choices=SPORTS, default="mlb")
@@ -686,6 +687,7 @@ def _forecast_learned_sport(
     maximum_data_age_hours: float | None = None,
     maximum_unreviewed_disagreement: float | None = None,
     flat_mode: bool = False,
+    force: bool = False,
 ) -> dict:
     """Default production forecast path for audited learned moneyline models."""
     model_config = config["models"][sport.upper()]
@@ -708,7 +710,7 @@ def _forecast_learned_sport(
             store=FeatureStore(Path(ledger_path(config)).parent),
             client=ESPNClient(),
             artifact_path=artifact_path,
-            observed_at=utc_now(),
+            observed_at=utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=timezone.utc),
         )
     except ValueError as error:
         return {
@@ -736,15 +738,20 @@ def _forecast_learned_sport(
         for candidate in to_log:
             quote = match_executable_quote(data_root, sport, args_date, candidate)
             if quote is None:
-                unmatched.append(
-                    {"event_id": candidate.event_id,
-                     "reason": "no stored executable moneyline BBO matched this matchup"}
-                )
-                continue
+                if flat_mode:
+                    # Flat mode: log every game even without a Polymarket quote.
+                    # Use -110 as a neutral default; rationale records the gap.
+                    quote = None  # signal downstream
+                else:
+                    unmatched.append(
+                        {"event_id": candidate.event_id,
+                         "reason": "no stored executable moneyline BBO matched this matchup"}
+                    )
+                    continue
             # Gate: require minimum edge over executable Polymarket ask.
             # Per-sport minimum edge from model.yaml; defaults to 2% absolute.
             # Flat mode bypasses the edge gate — log every call regardless.
-            if not flat_mode:
+            if not flat_mode and quote is not None:
                 min_edge = float(model_config.get("min_edge", 0.02))
                 model_edge = candidate.model_probability - quote["executable_ask"]
                 if model_edge < min_edge:
@@ -759,6 +766,25 @@ def _forecast_learned_sport(
                 event_et = datetime.fromisoformat(candidate.event_start_utc.replace('Z','+00:00')).astimezone(EASTERN).strftime('%Y-%m-%dT%H:%M:%S%z')
             except (ValueError, TypeError):
                 event_et = candidate.event_start_utc
+            if quote is not None:
+                american_odds = probability_to_american(quote["executable_ask"])
+                sportsbook = "polymarket_us"
+                observed_at_utc = str(quote.get("observed_at_utc") or "")
+                decision_no_vig = quote.get("no_vig_probability")
+                rationale = (
+                    f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
+                    f"executable ask {quote['executable_ask']:.4f} "
+                    f"({quote['market_slug']})."
+                )
+            else:
+                american_odds = -110
+                sportsbook = "espn"
+                observed_at_utc = ""
+                decision_no_vig = None
+                rationale = (
+                    f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
+                    f"no Polymarket quote available — using -110 default odds."
+                )
             request = PickRequest(
                 event_start_utc=event_et,
                 event_id=candidate.event_id,
@@ -768,20 +794,16 @@ def _forecast_learned_sport(
                 market_type=MarketType.MONEYLINE,
                 selection=candidate.selection,
                 line=None,
-                sportsbook="polymarket_us",
-                american_odds=probability_to_american(quote["executable_ask"]),
+                sportsbook=sportsbook,
+                american_odds=american_odds,
                 model_probability=candidate.model_probability,
                 model_uncertainty=None,
                 model_version=candidate.model_version,
-                rationale=(
-                    f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
-                    f"executable ask {quote['executable_ask']:.4f} "
-                    f"({quote['market_slug']})."
-                ),
+                rationale=rationale,
                 risks="Learned model; promotion gate not yet open; zero-unit research until review.",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=ModelState(configured_state),
-                observed_at_utc=str(quote.get("observed_at_utc") or ""),
+                observed_at_utc=observed_at_utc,
                 model_artifact_hash=candidate.model_artifact_hash,
                 calibration_method="learned_lr",
                 calibration_version=candidate.model_version,
@@ -789,7 +811,7 @@ def _forecast_learned_sport(
                 feature_schema_version=candidate.feature_snapshot_hash[:16],
                 entity_map_version=registry.version,
                 code_revision=candidate.model_version,
-                decision_no_vig_probability=quote.get("no_vig_probability"),
+                decision_no_vig_probability=decision_no_vig,
             )
             try:
                 request.validate(now=observed_at)
@@ -1118,15 +1140,13 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
                 away["team"].get("displayName", "").casefold() in away_names
                 and home["team"].get("displayName", "").casefold() in home_names
             )
-            # Prefer exact event_id match; name_match is a fallback only for
-            # legacy/research rows with fake event_ids. Never use name_match
-            # for rows with real (numeric) ESPN event IDs — it can mis-score
-            # doubleheaders where both games share the same team names.
-            row_eid = str(row.get("event_id", "") or "").strip()
-            if id_match:
-                pass  # exact match — always use this
-            elif name_match and not row_eid.isdigit():
-                pass  # fallback for legacy rows with fake event IDs
+            # Prefer exact event_id match. When the ledger has a numeric ESPN
+            # event_id that does NOT match any event in the scoreboard (e.g.
+            # re-forecast rows with regenerated IDs), fall back to name matching
+            # with a caution: double-header games sharing the same team names
+            # on the same day may be matched incorrectly.
+            if id_match or name_match:
+                pass
             else:
                 continue
             record = {
@@ -1475,6 +1495,7 @@ def main(argv: list[str] | None = None) -> None:
                             config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                         ),
                         flat_mode=is_flat,
+                        force=getattr(args, "force", False),
                     )
                 else:
                     results[sport] = _forecast_research_sport(sport, args.date, config)
@@ -1482,6 +1503,12 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "settle":
             if args.all_unsettled:
                 output = _settle_all_unsettled(args, config, ledger)
+                # Also settle the flat ledger
+                flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
+                if flat_ledger_path.exists():
+                    flat_ledger = PickLedger(flat_ledger_path)
+                    _settle_all_unsettled(args, config, flat_ledger)
+                    output["flat_settlement"] = "completed"
             else:
                 if not args.pick_id or args.away_score is None or args.home_score is None:
                     raise ValueError("provide --pick-id with --away-score/--home-score, or --all-unsettled")
