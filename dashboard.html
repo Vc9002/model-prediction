@@ -1327,11 +1327,11 @@ async function renderFlatPerf(){
     <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>`;
   lineChart("#flatPerfChart",p.pnl_curve||[]);
   const bs=Object.entries(p.by_sport||{});
-  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#flatPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Win%</th><th>PnL</th></tr>${rows}`;
+  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#flatPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
   const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
-  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td></tr>`;}).join("");
-  $("#flatPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Win%</th></tr>${bb}`;
+  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
+  $("#flatPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
   const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
   $("#flatPerfMonthly").textContent=mm.join(" · ");
 }
