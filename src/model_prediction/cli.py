@@ -791,7 +791,7 @@ def _forecast_learned_sport(
             else:
                 american_odds = -110
                 sportsbook = "espn"
-                observed_at_utc = ""
+                observed_at_utc = None
                 decision_no_vig = None
                 rationale = (
                     f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "

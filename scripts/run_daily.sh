@@ -26,29 +26,39 @@ PYTHONPATH=src .venv/bin/python -m model_prediction.cli settle --all-unsettled >
 SETTLE_EXIT=$?
 echo "Settlement exit code: $SETTLE_EXIT" >> "$LOG"
 
-# ── Step 2: Flat forecast ───────────────────────────────────────────
+# ── Step 2: Polymarket slate capture ──────────────────────────────────
+# Capture executable BBO snapshots for every Polymarket sport contract.
+# Forecast steps read these snapshots to match picks against real prices.
+echo "--- Step 2: Polymarket slate snapshot ---" >> "$LOG"
+PYTHONPATH=src .venv/bin/python -m model_prediction.cli polymarket-slate \
+    --all --date "$RUN_DATE" \
+    >> "$LOG" 2>&1
+SLATE_EXIT=$?
+echo "Polymarket slate exit code: $SLATE_EXIT" >> "$LOG"
+
+# ── Step 3: Flat forecast ───────────────────────────────────────────
 # ALL model candidates → flat_picks.xlsx (no edge/confidence gate).
 # Clears and replaces today's flat picks on re-run.
-echo "--- Step 2: Flat forecast (all picks) ---" >> "$LOG"
+echo "--- Step 3: Flat forecast (all picks) ---" >> "$LOG"
 PYTHONPATH=src .venv/bin/python -m model_prediction.cli flat-forecast \
     --all --log --date "$RUN_DATE" \
     >> "$LOG" 2>&1
 FLAT_EXIT=$?
 echo "Flat forecast exit code: $FLAT_EXIT" >> "$LOG"
 
-# ── Step 3: Main forecast ───────────────────────────────────────────
+# ── Step 4: Main forecast ───────────────────────────────────────────
 # Edge-gated picks → main ledger (only picks that pass confidence gate).
 # Clears and replaces today's main picks on re-run.
-echo "--- Step 3: Main forecast (edge-gated picks) ---" >> "$LOG"
+echo "--- Step 4: Main forecast (edge-gated picks) ---" >> "$LOG"
 PYTHONPATH=src .venv/bin/python -m model_prediction.cli forecast \
     --all --log --date "$RUN_DATE" --replace-today --model learned \
     >> "$LOG" 2>&1
 MAIN_EXIT=$?
 echo "Main forecast exit code: $MAIN_EXIT" >> "$LOG"
 
-# ── Step 4: Esports forecast ─────────────────────────────────────────
+# ── Step 5: Esports forecast ─────────────────────────────────────────
 # Esports picks → research.xlsx only (never main or flat ledger)
-echo "--- Step 4: Esports forecast (research ledger) ---" >> "$LOG"
+echo "--- Step 5: Esports forecast (research ledger) ---" >> "$LOG"
 PYTHONPATH=src .venv/bin/python -m model_prediction.cli esports-forecast \
     --all --log --date "$RUN_DATE" \
     >> "$LOG" 2>&1
