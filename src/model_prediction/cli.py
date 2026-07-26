@@ -16,7 +16,7 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import suppress
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -36,6 +36,7 @@ from .config import (
     unit_policy,
 )
 from .data_sources.espn import SPORT_LEAGUES, ESPNClient, ESPNMLBClient
+from .data_sources.espn_probables import capture_probable_starter_snapshot
 from .data_sources.espn_wnba_injuries import capture_espn_event_injuries
 from .data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
 from .data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
@@ -66,6 +67,7 @@ from .domain import (
     PickRequest,
     RecordType,
     eastern_today,
+    iso_utc,
     parse_utc,
     utc_now,
 )
@@ -93,6 +95,7 @@ from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError, PickLedger
 from .models import MODEL_SPECS
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
 from .models.mlb import load_formula_spec
+from .soccer_forward import build_soccer_total_slate
 from .total_score import validate_all_total_score_models
 from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
@@ -100,6 +103,14 @@ from .validation import run_validation_audit, write_production_artifacts
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
 ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant")
+DAILY_LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl")
+DAILY_INTERNATIONAL_BASEBALL_SPORTS = ("kbo", "npb")
+FLAT_LEDGER_SPORTS = DAILY_LEARNED_SPORTS
+RESEARCH_ONLY_DAILY_SPORTS = (
+    "soccer",
+    *ESPORTS_TITLES,
+    *DAILY_INTERNATIONAL_BASEBALL_SPORTS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +257,11 @@ def parser() -> argparse.ArgumentParser:
     daily = commands.add_parser("daily", help="slate + forecast + log + settle + summary in one run")
     daily.add_argument("--date", default=eastern_today().isoformat(),
         help="ISO date; defaults to today in US-Eastern time")
+    daily.add_argument(
+        "--skip-settlement",
+        action="store_true",
+        help="skip settlement when the caller already completed it",
+    )
 
     ingest = commands.add_parser("ingest", help="cache one date of ESPN scores locally")
     ingest.add_argument("--sport", required=True, choices=ESPN_SPORTS)
@@ -706,6 +722,7 @@ def _forecast_learned_sport(
     research_ledger=None,
     gated_ledger=None,
     exposure_ledger=None,
+    observed_at: datetime | None = None,
 ) -> dict:
     """Default production forecast path for audited learned moneyline models.
 
@@ -717,6 +734,11 @@ def _forecast_learned_sport(
     size differently in the main vs. flat view of the identical decision —
     confusing, since main's rows are always a subset of flat's candidates.
     """
+    decision_observed_at = observed_at or (
+        utc_now()
+        if not force
+        else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
+    )
     model_config = config["models"][sport.upper()]
     artifact_value = model_config.get("production_artifact")
     if not artifact_value:
@@ -742,7 +764,7 @@ def _forecast_learned_sport(
             store=FeatureStore(Path(ledger_path(config)).parent),
             client=ESPNClient(),
             artifact_path=artifact_path,
-            observed_at=utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC),
+            observed_at=decision_observed_at,
             leagues=tuple(configured_leagues) if configured_leagues else None,
         )
     except ValueError as error:
@@ -770,7 +792,6 @@ def _forecast_learned_sport(
         # "cannot create a call after the event has started" check needs this
         # same frozen timestamp, not real wall-clock time, or every game that
         # has since started gets rejected regardless of --force.
-        observed_at = utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
         # Main ledger: ONLY production sports (MLB, WNBA) — everything else goes to flat/research.
         # Flat ledger: every game gets diagnostic edge-scaled units.
         research_routed = False
@@ -789,15 +810,50 @@ def _forecast_learned_sport(
         configured_state = str(model_config.get("status", "research"))
         for candidate in to_log:
             quote = match_executable_quote(data_root, sport, args_date, candidate)
+            quote_warning: str | None = None
             if quote is None:
                 if flat_mode:
                     # Flat mode: log every game even without a Polymarket quote.
                     # Use -110 as a neutral default; rationale records the gap.
                     quote = None  # signal downstream
+                elif sport in PRODUCTION_SPORTS:
+                    quote_warning = "executable_quote_missing_or_unmatched"
+                    unmatched.append(
+                        {
+                            "event_id": candidate.event_id,
+                            "reason": (
+                                "model call retained for Today visibility; "
+                                "execution blocked because no exact executable quote matched"
+                            ),
+                        }
+                    )
                 else:
                     unmatched.append(
                         {"event_id": candidate.event_id,
                          "reason": "no stored executable moneyline BBO matched this matchup"}
+                    )
+                    continue
+            elif not bool(quote.get("timestamp_valid", False)):
+                if flat_mode:
+                    quote = None
+                elif sport in PRODUCTION_SPORTS:
+                    quote_warning = "executable_quote_timestamp_invalid"
+                    unmatched.append(
+                        {
+                            "event_id": candidate.event_id,
+                            "reason": (
+                                "model call retained for Today visibility; "
+                                "execution blocked because quote timestamp is invalid"
+                            ),
+                        }
+                    )
+                    quote = None
+                else:
+                    unmatched.append(
+                        {
+                            "event_id": candidate.event_id,
+                            "reason": "quote timestamp is invalid",
+                        }
                     )
                     continue
             # Gate: require minimum edge over executable Polymarket ask.
@@ -830,19 +886,33 @@ def _forecast_learned_sport(
                 )
             else:
                 american_odds = -110
-                sportsbook = "espn"
-                observed_at_utc = None
+                sportsbook = (
+                    "model_opinion_no_executable_quote"
+                    if quote_warning
+                    else "espn"
+                )
+                observed_at_utc = iso_utc(decision_observed_at) if quote_warning else None
                 decision_no_vig = None
                 rationale = (
                     f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
                     f"no Polymarket quote available — using -110 default odds."
                 )
-            if candidate.unavailable_features:
+                if quote_warning:
+                    rationale += (
+                        f" WARNING: {quote_warning}; model opinion remains visible, "
+                        "but this row is not executable or price-qualified."
+                    )
+            row_unavailable_features = tuple(candidate.unavailable_features)
+            if quote_warning:
+                row_unavailable_features = tuple(
+                    dict.fromkeys((*row_unavailable_features, quote_warning))
+                )
+            if row_unavailable_features:
                 # Never a reason to drop the game — just a visible note that
                 # one input defaulted to neutral instead of using its real
                 # value (e.g. ESPN hasn't posted both starters yet).
                 rationale += (
-                    f" NOTE: {', '.join(candidate.unavailable_features)} unavailable for "
+                    f" NOTE: {', '.join(row_unavailable_features)} unavailable for "
                     f"this game — defaulted to neutral, other features used normally."
                 )
             request = PickRequest(
@@ -880,14 +950,16 @@ def _forecast_learned_sport(
                 pitcher_era_gap=candidate.feature_basis.get("pitcher_era_gap"),
                 probable_starter_era_gap=candidate.feature_basis.get("probable_starter_era_gap"),
                 unavailable_features=(
-                    ",".join(candidate.unavailable_features) if candidate.unavailable_features else None
+                    ",".join(row_unavailable_features)
+                    if row_unavailable_features
+                    else None
                 ),
             )
             try:
-                request.validate(now=observed_at)
+                request.validate(now=decision_observed_at)
                 away = registry.resolve(request.league, request.away_team, request.event_start_utc)
                 home = registry.resolve(request.league, request.home_team, request.event_start_utc)
-                eligibility_kwargs: dict = {"now": observed_at}
+                eligibility_kwargs: dict = {"now": decision_observed_at}
                 if maximum_data_age_hours is not None:
                     eligibility_kwargs["maximum_age_hours"] = maximum_data_age_hours
                 if maximum_unreviewed_disagreement is not None:
@@ -895,11 +967,19 @@ def _forecast_learned_sport(
                 eligibility = evaluate_eligibility(
                     request, registry, bans,
                     (exposure_ledger or ledger).exposure(
-                        request, now=observed_at,
+                        request, now=decision_observed_at,
                         canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
                     ),
                     unit_policy(config), **eligibility_kwargs,
                 )
+                if quote_warning and eligibility.decision == "CALL":
+                    eligibility = replace(
+                        eligibility,
+                        record_type=RecordType.RESEARCH_OBSERVATION,
+                        decision="NO_CALL",
+                        reason_code="NO_CALL_MARKET_UNAVAILABLE",
+                        units=0,
+                    )
                 # evaluate_eligibility now returns a real QUALIFIED_SHADOW_CALL
                 # for every candidate that clears the trust-boundary checks
                 # (banned team, stale/missing data, unvalidated model) --
@@ -914,11 +994,20 @@ def _forecast_learned_sport(
                 # information that still belongs in flat_picks.xlsx (which
                 # already logs every game every day) rather than muddying main.
                 skip_main_no_call = (
-                    not flat_mode and not research_routed and eligibility.decision != "CALL"
+                    not flat_mode
+                    and not research_routed
+                    and eligibility.decision != "CALL"
+                    and quote_warning is None
                 )
                 with _LEDGER_LOCK:
                     if not skip_main_no_call:
-                        logged.append(ledger.append_evaluated(request, eligibility, now=observed_at))
+                        logged.append(
+                            ledger.append_evaluated(
+                                request,
+                                eligibility,
+                                now=decision_observed_at,
+                            )
+                        )
                     # gated_ledger mirrors research_ledger but only for rows
                     # evaluate_eligibility genuinely approved as a real call —
                     # a curated subset ledger, same relationship
@@ -926,7 +1015,11 @@ def _forecast_learned_sport(
                     # sports.
                     if gated_ledger is not None and research_routed and genuinely_eligible:
                         with suppress(DuplicatePickError):
-                            gated_ledger.append_evaluated(request, eligibility, now=observed_at)
+                            gated_ledger.append_evaluated(
+                                request,
+                                eligibility,
+                                now=decision_observed_at,
+                            )
             except DuplicatePickError as error:
                 duplicates.append(error.pick_id)
             except (EntityResolutionError, ValueError) as error:
@@ -1012,18 +1105,19 @@ def _log_esports_forecast(
         ask = float(best_side["executable_ask"])
         edge = model_prob - ask
 
-        # Edge gate for main ledger
-        if not flat_mode and edge < min_edge:
-            continue
-
-        # Confidence gate: skip picks where the model has no real opinion.
-        # Research ledger (flat_mode=False, threshold≈0) previously called
-        # everything, including 50.0% coin flips on unknown teams. A modest
-        # gate filters pure noise while keeping most signal.
+        # Research preserves every safely priced candidate. Gated research is
+        # the curated subset: positive executable edge, a real model opinion,
+        # and both teams resolved to ratings learned by this exact artifact.
+        # Exposure and model/market disagreement deliberately remain relaxed
+        # for shadow research; provenance and input validity do not.
         confidence = abs(model_prob - 0.5)
         research_confidence_gate = float(model_config.get("research_confidence_gate", 0.05))
-        if confidence < research_confidence_gate:
-            continue
+        model_inputs_valid = bool(contract.get("gated_research_eligible", False))
+        passes_selection_gate = (
+            edge >= min_edge
+            and confidence >= research_confidence_gate
+            and model_inputs_valid
+        )
 
         selected_team = str(best_side["team"])
         # Polymarket side ordering is arbitrary for venue-neutral esports;
@@ -1076,12 +1170,23 @@ def _log_esports_forecast(
                     config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                 ),
             )
-            # evaluate_esports_eligibility now assigns a real diagnostic size
-            # to every NO_CALL reason that still reflects a genuine model
-            # opinion, and hard-zeroes only structurally-untrustworthy
-            # reasons -- see eligibility._research. gated_ledger must still
-            # only receive TRUE qualified calls, so it keys off decision.
-            genuinely_eligible = eligibility.decision == "CALL"
+            genuinely_eligible = (
+                not flat_mode
+                and passes_selection_gate
+                and eligibility.decision == "CALL"
+            )
+            if eligibility.decision == "CALL" and not genuinely_eligible:
+                eligibility = replace(
+                    eligibility,
+                    record_type=RecordType.RESEARCH_OBSERVATION,
+                    decision="NO_CALL",
+                    reason_code=(
+                        "NO_CALL_MODEL_UNVALIDATED"
+                        if not model_inputs_valid
+                        else "NO_CALL_LOW_EDGE"
+                    ),
+                    units=0,
+                )
             with _LEDGER_LOCK:
                 ledger.append_evaluated(request, eligibility, now=observed_now)
                 # gated_ledger: curated subset of rows evaluate_esports_eligibility
@@ -1127,6 +1232,11 @@ def _forecast_international_sport(
     forecast = forecast_international_baseball_slate(
         data_root, artifact_dir, league, args_date,
     )
+    if research_ledger is None:
+        forecast["logged"] = 0
+        forecast["logging_note"] = "Preview only; no ledger was supplied and no rows were written."
+        return forecast
+
     logged = 0
     for contract in forecast.get("priced_contracts", []):
         sides = contract.get("sides", [])
@@ -1141,11 +1251,7 @@ def _forecast_international_sport(
         edge = model_prob - ask
         confidence = abs(model_prob - 0.5)
         research_confidence_gate = float(model_config.get("research_confidence_gate", 0.0))
-        if confidence < research_confidence_gate:
-            continue
-        # Edge gate for gated ledger (research ledger logs everything)
-        if edge < min_edge:
-            continue
+        passes_strategy_gate = edge >= min_edge and confidence >= research_confidence_gate
         selected_team = str(best_side["team"])
         teams = list(contract["teams"])
         # Polymarket orders teams [away, home] in event metadata; the forecast
@@ -1200,7 +1306,15 @@ def _forecast_international_sport(
                     config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                 ),
             )
-            genuinely_eligible = eligibility.decision == "CALL"
+            genuinely_eligible = passes_strategy_gate and eligibility.decision == "CALL"
+            if eligibility.decision == "CALL" and not passes_strategy_gate:
+                eligibility = replace(
+                    eligibility,
+                    record_type=RecordType.RESEARCH_OBSERVATION,
+                    decision="NO_CALL",
+                    reason_code="NO_CALL_LOW_EDGE",
+                    units=0,
+                )
             with _LEDGER_LOCK:
                 research_ledger.append_evaluated(request, eligibility, now=observed_now)
                 if gated_ledger is not None and genuinely_eligible:
@@ -1212,6 +1326,115 @@ def _forecast_international_sport(
         except (ValueError, KeyError):
             continue
     forecast["logged"] = logged
+    forecast["logging_note"] = (
+        "Every model-favored priced contract was evaluated for the research ledger; "
+        "only trust-valid contracts clearing edge and confidence gates were mirrored "
+        "to the gated ledger."
+    )
+    return forecast
+
+
+def _forecast_soccer_sport(
+    *,
+    data_root,
+    args_date: str,
+    config: dict,
+    research_ledger,
+    gated_ledger=None,
+) -> dict:
+    """Price the draw-aware soccer score model into full-game 2.5 totals."""
+    from .data_sources.polymarket_us import probability_to_american
+    from .eligibility import evaluate_esports_eligibility
+
+    model_config = config["models"].get("SOCCER", {})
+    forecast = build_soccer_total_slate(
+        data_root=data_root,
+        game_date=args_date,
+        client=ESPNClient(),
+        leagues=tuple(model_config.get("leagues") or ()),
+        observed_at=utc_now(),
+    )
+    if research_ledger is None:
+        forecast["logged"] = 0
+        return forecast
+
+    min_edge = float(model_config.get("min_edge", 0.05))
+    configured_state = str(model_config.get("status", "research"))
+    observed_now = utc_now()
+    logged = 0
+    gated = 0
+    for contract in forecast.get("priced_contracts", []):
+        ask = float(contract["executable_ask"])
+        edge = float(contract["model_probability"]) - ask
+        request = PickRequest(
+            event_start_utc=str(contract["event_start_utc"]),
+            event_id=str(contract["event_id"]),
+            league=League.SOCCER,
+            away_team=str(contract["away_team"]),
+            home_team=str(contract["home_team"]),
+            market_type=MarketType.TOTAL,
+            selection=str(contract["selection"]),
+            line=float(contract["line"]),
+            sportsbook="polymarket_us",
+            american_odds=probability_to_american(ask),
+            model_probability=float(contract["model_probability"]),
+            model_uncertainty=float(contract["model_uncertainty"]),
+            model_version=str(contract["model_version"]),
+            rationale=(
+                f"{contract['rationale']} Executable ask {ask:.4f} "
+                f"({contract['market_slug']})."
+            ),
+            risks=(
+                "Research-only soccer score model; draw-aware, but not yet "
+                "locked-holdout qualified."
+            ),
+            model_origin=ModelOrigin.STATISTICAL_MODEL,
+            model_state=ModelState(configured_state),
+            observed_at_utc=str(contract["observed_at_utc"]),
+            model_artifact_hash=str(forecast["model_code_hash"]),
+            calibration_method="poisson_dixon_coles",
+            calibration_version=str(contract["model_version"]),
+            calibration_artifact_hash=str(forecast["model_code_hash"]),
+            feature_schema_version="soccer-poisson-dc-v1",
+            code_revision=str(forecast["model_code_hash"]),
+        )
+        try:
+            request.validate(now=observed_now)
+            eligibility = evaluate_esports_eligibility(
+                request,
+                research_ledger.exposure(request, now=observed_now),
+                unit_policy(config),
+                now=observed_now,
+                maximum_age_hours=float(
+                    config["project"].get("maximum_data_age_hours", 12)
+                ),
+                maximum_unreviewed_disagreement=float(
+                    config["project"].get(
+                        "maximum_unreviewed_market_disagreement",
+                        0.10,
+                    )
+                ),
+            )
+            genuinely_eligible = eligibility.decision == "CALL" and edge >= min_edge
+            with _LEDGER_LOCK:
+                research_ledger.append_evaluated(
+                    request,
+                    eligibility,
+                    now=observed_now,
+                )
+                if gated_ledger is not None and genuinely_eligible:
+                    with suppress(DuplicatePickError):
+                        gated_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
+                        gated += 1
+            logged += 1
+        except (DuplicatePickError, KeyError, ValueError):
+            continue
+    forecast["logged"] = logged
+    forecast["gated_logged"] = gated
     return forecast
 
 
@@ -1487,7 +1710,15 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
         return None
     away_score, home_score = result
     try:
-        settled = ledger.settle(row["pick_id"], away_score, home_score, None, None)
+        settlement_value = 0.5 if away_score == home_score else None
+        settled = ledger.settle(
+            row["pick_id"],
+            away_score,
+            home_score,
+            None,
+            None,
+            binary_contract_settlement_value=settlement_value,
+        )
         return {"pick_id": row["pick_id"], "result": settled["result"], "settled": True}
     except (KeyError, ValueError) as error:
         return {"pick_id": row["pick_id"], "reason": str(error)}
@@ -1807,7 +2038,15 @@ def main(argv: list[str] | None = None) -> None:
             log = args.command == "log" or getattr(args, "log", False) or args.command == "flat-forecast"
             replace_today = getattr(args, "replace_today", False) or args.command == "flat-forecast"
             is_flat = args.command == "flat-forecast"
-            sports = list(SPORTS) + list(ESPORTS_TITLES) if getattr(args, "all", False) else [args.sport or "mlb"]
+            sports = (
+                list(FLAT_LEDGER_SPORTS)
+                if is_flat and getattr(args, "all", False)
+                else (
+                    list(SPORTS) + list(ESPORTS_TITLES)
+                    if getattr(args, "all", False)
+                    else [args.sport or "mlb"]
+                )
+            )
             if is_flat:
                 # Flat forecast: separate ledger, no edge gate
                 flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
@@ -1823,7 +2062,7 @@ def main(argv: list[str] | None = None) -> None:
             # so this routing must live here, not only in the "daily" command.
             research_ledger = PickLedger(Path(ledger_path(config)).parent / "research.xlsx")
             gated_ledger = PickLedger(Path(ledger_path(config)).parent / "gated_research.xlsx")
-            if replace_today and log:
+            if replace_today and log and not is_flat:
                 # All 4 ledgers refresh on re-forecast, not just main/flat —
                 # a research/gated pick is exactly as replaceable as any
                 # other until its game starts.
@@ -1859,6 +2098,14 @@ def main(argv: list[str] | None = None) -> None:
                         research_ledger=research_ledger if log else None,
                         gated_ledger=gated_ledger if log else None,
                     )
+                elif sport == "soccer":
+                    results[sport] = _forecast_soccer_sport(
+                        data_root=Path(ledger_path(config)).parent,
+                        args_date=args.date,
+                        config=config,
+                        research_ledger=research_ledger if log else None,
+                        gated_ledger=gated_ledger if log else None,
+                    )
                 elif sport in LEARNED_PRODUCTION_SPORTS:
                     use_ledger = flat_ledger if is_flat else ledger
                     results[sport] = _forecast_learned_sport(
@@ -1883,21 +2130,22 @@ def main(argv: list[str] | None = None) -> None:
                 flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
                 if flat_ledger_path.exists():
                     flat_ledger = PickLedger(flat_ledger_path)
-                    _settle_all_unsettled(args, config, flat_ledger)
-                    output["flat_settlement"] = "completed"
+                    output["flat_settlement"] = _settle_all_unsettled(args, config, flat_ledger)
                 # Also settle the research ledger
                 research_ledger_path = Path(ledger_path(config)).parent / "research.xlsx"
                 if research_ledger_path.exists():
                     research_ledger = PickLedger(research_ledger_path)
-                    _settle_all_unsettled(args, config, research_ledger)
-                    output["research_settlement"] = "completed"
+                    output["research_settlement"] = _settle_all_unsettled(
+                        args, config, research_ledger
+                    )
                 # Also settle the gated research ledger (esports/soccer picks
                 # that genuinely cleared eligibility)
                 gated_ledger_path = Path(ledger_path(config)).parent / "gated_research.xlsx"
                 if gated_ledger_path.exists():
                     gated_ledger = PickLedger(gated_ledger_path)
-                    _settle_all_unsettled(args, config, gated_ledger)
-                    output["gated_research_settlement"] = "completed"
+                    output["gated_research_settlement"] = _settle_all_unsettled(
+                        args, config, gated_ledger
+                    )
             else:
                 if not args.pick_id or args.away_score is None or args.home_score is None:
                     raise ValueError("provide --pick-id with --away-score/--home-score, or --all-unsettled")
@@ -1937,11 +2185,11 @@ def main(argv: list[str] | None = None) -> None:
                 timezone="America/New_York",
                 no_snapshot_bbo=False,
             )
-            slate = _polymarket_slate(slate_args, config)
-            # Run WNBA availability capture, prior build, and soccer collection
-            # in parallel with the slate (all I/O-bound).
+            # Run slate/BBO capture, WNBA availability, priors, soccer scores,
+            # and MLB probables concurrently. These are independent I/O tasks.
             from .data_sources.odds_soccer_scores import collect_soccer_scores
             wnba_priors_result = {"status": "skipped"}
+            mlb_probables_result: dict[str, Any] = {}
             soccer_collection = {}
             def _capture_wnba():
                 try:
@@ -1982,21 +2230,44 @@ def main(argv: list[str] | None = None) -> None:
                     soccer_collection = collect_soccer_scores(days_from=3)
                 except Exception:
                     logger.warning("Soccer score collection failed", exc_info=True)
-            with ThreadPoolExecutor(max_workers=3) as io_pool:
+            def _capture_mlb_probables():
+                nonlocal mlb_probables_result
+                try:
+                    mlb_probables_result = capture_probable_starter_snapshot(
+                        args.date,
+                    )
+                except (OSError, TypeError, ValueError):
+                    logger.warning(
+                        "MLB probable-starter capture failed for %s",
+                        args.date,
+                        exc_info=True,
+                    )
+            with ThreadPoolExecutor(max_workers=5) as io_pool:
+                f0 = io_pool.submit(_polymarket_slate, slate_args, config)
                 f1 = io_pool.submit(_capture_wnba)
                 f2 = io_pool.submit(_build_priors)
                 f3 = io_pool.submit(_collect_soccer)
-                for f in (f1, f2, f3):
+                f4 = io_pool.submit(_capture_mlb_probables)
+                for f in (f1, f2, f3, f4):
                     f.result()  # Wait for all, surface exceptions
+                slate = f0.result()
             _clear_today_open(ledger, args.date, by_event_date=True)
             # Also clear and forecast for flat ledger
             flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
             flat_ledger = PickLedger(flat_ledger_path)
             _clear_today_open(flat_ledger, args.date, by_event_date=True)
-            LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer")
-            NON_PRODUCTION_LEARNED = tuple(s for s in LEARNED_SPORTS if s not in PRODUCTION_SPORTS)
+            NON_PRODUCTION_LEARNED = tuple(
+                sport
+                for sport in DAILY_LEARNED_SPORTS
+                if sport not in PRODUCTION_SPORTS
+            )
             max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
             max_disagreement = float(config["project"].get("maximum_unreviewed_market_disagreement", 0.10))
+            # A single decision timestamp makes the learned-slate cache reusable
+            # when the same candidates are re-logged to the flat ledger. Before
+            # this, two calls a few milliseconds apart rebuilt every feature
+            # and repeated upstream reads for no decision-quality benefit.
+            forecast_observed_at = utc_now()
             # Research/gated ledgers: created early so non-production learned
             # sports can log here.
             research_ledger = PickLedger(Path(ledger_path(config)).parent / "research.xlsx")
@@ -2006,10 +2277,10 @@ def main(argv: list[str] | None = None) -> None:
             _clear_today_open(gated_ledger, args.date, by_event_date=True)
             # Compute forecasts once, log to both ledgers (compute > log main > log research > log flat)
             forecast_result = {}
-            workers = min(len(LEARNED_SPORTS), 5)
+            workers = min(len(DAILY_LEARNED_SPORTS), 5)
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 futures = {}
-                for sport in LEARNED_SPORTS:
+                for sport in DAILY_LEARNED_SPORTS:
                     futures[pool.submit(
                         _forecast_learned_sport,
                         sport, args.date, True, config, registry, bans, ledger,
@@ -2017,6 +2288,7 @@ def main(argv: list[str] | None = None) -> None:
                         maximum_unreviewed_disagreement=max_disagreement,
                         research_ledger=research_ledger if sport in NON_PRODUCTION_LEARNED else None,
                         gated_ledger=gated_ledger if sport in NON_PRODUCTION_LEARNED else None,
+                        observed_at=forecast_observed_at,
                     )] = sport
                 for future in as_completed(futures):
                     sport = futures[future]
@@ -2030,7 +2302,7 @@ def main(argv: list[str] | None = None) -> None:
             # Re-log computed candidates to flat ledger (flat mode, no edge gate)
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 flat_futures = {}
-                for sport in LEARNED_SPORTS:
+                for sport in DAILY_LEARNED_SPORTS:
                     result = forecast_result.get(sport, {})
                     candidates = result.get("candidates", [])
                     if candidates:
@@ -2041,6 +2313,7 @@ def main(argv: list[str] | None = None) -> None:
                             maximum_unreviewed_disagreement=max_disagreement,
                             flat_mode=True,
                             exposure_ledger=ledger,
+                            observed_at=forecast_observed_at,
                         )] = sport
                 for future in as_completed(flat_futures):
                     sport = flat_futures[future]
@@ -2049,6 +2322,13 @@ def main(argv: list[str] | None = None) -> None:
                     except Exception:
                         logger.warning("Flat forecast failed for sport %s", sport, exc_info=True)
             # Esports run serially — logged to research ledger only (never main ledger)
+            forecast_result["soccer"] = _forecast_soccer_sport(
+                data_root=Path(ledger_path(config)).parent,
+                args_date=args.date,
+                config=config,
+                research_ledger=research_ledger,
+                gated_ledger=gated_ledger,
+            )
             for title in ESPORTS_TITLES:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=Path(ledger_path(config)).parent,
@@ -2060,7 +2340,7 @@ def main(argv: list[str] | None = None) -> None:
                     forecast_result[title], config, research_ledger, flat_mode=False, gated_ledger=gated_ledger
                 )
             # International baseball — logged to research/gated ledgers (never main)
-            for league in ("kbo", "npb"):
+            for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS:
                 forecast_result[league] = _forecast_international_sport(
                     data_root=Path(ledger_path(config)).parent,
                     artifact_dir=PROJECT_ROOT / "config/models",
@@ -2070,10 +2350,16 @@ def main(argv: list[str] | None = None) -> None:
                     research_ledger=research_ledger,
                     gated_ledger=gated_ledger,
                 )
-            flat_result = {sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {})) for sport in LEARNED_SPORTS}
+            flat_result = {
+                sport: forecast_result.get(
+                    f"_flat_{sport}", forecast_result.get(sport, {})
+                )
+                for sport in DAILY_LEARNED_SPORTS
+            }
+            flat_result["soccer"] = forecast_result["soccer"]
             for title in ESPORTS_TITLES:
                 flat_result[title] = forecast_result[title]
-            for league in ("kbo", "npb"):
+            for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS:
                 flat_result[league] = forecast_result.get(league, {})
             for result in forecast_result.values():
                 result.pop("candidates", None)
@@ -2108,14 +2394,34 @@ def main(argv: list[str] | None = None) -> None:
                             and s.get("short", {}).get("ask") is not None
                         ),
                     }
-            settle_args = argparse.Namespace(all_unsettled=True, void_postponed=False)
-            settlement = _settle_all_unsettled(settle_args, config, ledger)
-
             for result in flat_result.values():
                 result.pop("candidates", None)
-            flat_settlement = _settle_all_unsettled(settle_args, config, flat_ledger)
-            _research_settlement = _settle_all_unsettled(settle_args, config, research_ledger)
-            _gated_settlement = _settle_all_unsettled(settle_args, config, gated_ledger)
+            if args.skip_settlement:
+                settlement = {"status": "skipped", "reason": "caller_settled_before daily"}
+                flat_settlement = settlement
+                _research_settlement = settlement
+                _gated_settlement = settlement
+            else:
+                settle_args = argparse.Namespace(
+                    all_unsettled=True,
+                    void_postponed=False,
+                )
+                settlement = _settle_all_unsettled(settle_args, config, ledger)
+                flat_settlement = _settle_all_unsettled(
+                    settle_args,
+                    config,
+                    flat_ledger,
+                )
+                _research_settlement = _settle_all_unsettled(
+                    settle_args,
+                    config,
+                    research_ledger,
+                )
+                _gated_settlement = _settle_all_unsettled(
+                    settle_args,
+                    config,
+                    gated_ledger,
+                )
 
             output = {
                 "date": args.date,
@@ -2130,12 +2436,18 @@ def main(argv: list[str] | None = None) -> None:
                 "step3b_polymarket_odds_snapshots": odds_by_sport,
                 "step4_settlement": settlement,
                 "step1b_soccer_scores": soccer_collection,
+                "step1c_mlb_probable_starters": {
+                    "captured_events": len(mlb_probables_result),
+                    "archive": "data/point_in_time/mlb_probable_starters.jsonl",
+                },
                 "step5_summary": _summary(config, ledger),
                 "step5b_wnba_availability": {
                     "priors": wnba_priors_result,
                 },
                 "step6_flat_forecast_and_log": flat_result,
                 "step7_flat_settlement": flat_settlement,
+                "step8_research_settlement": _research_settlement,
+                "step9_gated_research_settlement": _gated_settlement,
             }
         elif args.command == "ingest":
             output = Ingestor(data_root, audit=audit).ingest_scores(args.sport, args.date)

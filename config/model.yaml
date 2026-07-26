@@ -201,12 +201,14 @@ models:
       picks vs +0.40u ledger P&L. Model is directionally strong (76.9% hit rate) but
       edge magnitudes are small.'
   SOCCER:
-    family: elo_trend_logistic_regression
-    status: shadow_qualified
+    family: poisson_dixon_coles
+    status: research
     origin: statistical_model
     model_type: multinomial_3way
-    active_production_version: soccer-elo-trend-lr-v2
-    production_artifact: config/models/soccer-elo-trend-lr-v2.json
+    active_research_version: soccer-poisson-dc-v1
+    legacy_binary_research_version: soccer-elo-trend-lr-v2
+    legacy_binary_research_artifact: config/models/soccer-elo-trend-lr-v2.json
+    min_edge: 0.05
     leagues:
     - EPL
     - LA_LIGA
@@ -215,7 +217,7 @@ models:
     - MLS
     - UCL
     markets:
-    - moneyline
+    - full_game_total_2_5
   NFL:
     family: elo_trend_normal_approximation
     status: shadow_qualified

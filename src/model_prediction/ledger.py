@@ -525,6 +525,7 @@ class PickLedger:
         closing_consensus_probability: float | None = None,
         closing_consensus_line: float | None = None,
         closing_raw_probability: float | None = None,
+        binary_contract_settlement_value: float | None = None,
     ) -> dict[str, str]:
         self.initialize()
         if away_score < 0 or home_score < 0:
@@ -544,6 +545,15 @@ class PickLedger:
             result = grade_pick(
                 MarketType(row["market_type"]), row["selection"], line, away_score, home_score
             )
+            if binary_contract_settlement_value is not None:
+                if not 0 <= binary_contract_settlement_value <= 1:
+                    raise ValueError("binary contract settlement value must be between 0 and 1")
+                if MarketType(row["market_type"]) is not MarketType.MONEYLINE:
+                    raise ValueError("binary contract settlement value is moneyline-only")
+                if result is not PickResult.PUSH:
+                    raise ValueError(
+                        "partial binary contract settlement is only valid for a tied outcome"
+                    )
             closing_decimal = (
                 american_to_decimal(closing_american_odds) if closing_american_odds is not None else None
             )
@@ -559,7 +569,19 @@ class PickLedger:
             # a ledger's P&L represents actually-staked money is a property of
             # the ledger itself (main only), not something settle() decides.
             units = float(row["units"] or 0)
-            pnl = profit_units(result, units, float(row["decision_decimal_odds"] or row["decimal_odds"]))
+            entry_probability = float(
+                row["decision_raw_implied_probability"]
+                or row["market_implied_probability"]
+            )
+            pnl = (
+                units * (binary_contract_settlement_value / entry_probability - 1)
+                if binary_contract_settlement_value is not None
+                else profit_units(
+                    result,
+                    units,
+                    float(row["decision_decimal_odds"] or row["decimal_odds"]),
+                )
+            )
             research_units = None
             if (
                 row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
@@ -579,15 +601,18 @@ class PickLedger:
                             float(raw_uncertainty),
                             int(row["decision_american_odds"] or row["american_odds"]),
                         )
-            research_pnl = (
-                profit_units(
+            if research_units is None:
+                research_pnl = None
+            elif binary_contract_settlement_value is not None:
+                research_pnl = research_units * (
+                    binary_contract_settlement_value / entry_probability - 1
+                )
+            else:
+                research_pnl = profit_units(
                     result,
                     research_units,
                     float(row["decision_decimal_odds"] or row["decimal_odds"]),
                 )
-                if research_units is not None
-                else None
-            )
             settled_at_utc = iso_utc(settled_at or utc_now())
             row.update(
                 {
@@ -644,6 +669,7 @@ class PickLedger:
                 "pnl_units": pnl,
                 "research_score_units": research_units,
                 "research_pnl_units": research_pnl,
+                "binary_contract_settlement_value": binary_contract_settlement_value,
             },
         )
         return row

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from model_prediction import cli
 from model_prediction.cli import _clear_today_open, _verify_chain
 from model_prediction.domain import (
     League,
@@ -22,7 +23,9 @@ from model_prediction.domain import (
 )
 from model_prediction.eligibility import EligibilityResult, RecordType
 from model_prediction.entities import CanonicalTeam
+from model_prediction.learned_forward import LearnedForwardCandidate
 from model_prediction.ledger import PickLedger
+from model_prediction.units import Exposure
 
 AWAY = CanonicalTeam("mlb-bos", League.MLB, "Boston Red Sox", "BOS", True, None, None, ())
 HOME = CanonicalTeam("mlb-nyy", League.MLB, "New York Yankees", "NYY", True, None, None, ())
@@ -30,6 +33,335 @@ HOME = CanonicalTeam("mlb-nyy", League.MLB, "New York Yankees", "NYY", True, Non
 
 def _ledger(tmp_path) -> PickLedger:
     return PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+
+
+class _CaptureLedger:
+    def __init__(self) -> None:
+        self.appended = []
+
+    def exposure(self, request, now=None, **kwargs):
+        return Exposure()
+
+    def append_evaluated(self, request, eligibility, now=None):
+        self.appended.append((request, eligibility))
+        return {"pick_id": f"pick-{len(self.appended)}"}
+
+
+def _international_config(*, min_edge: float) -> dict:
+    return {
+        "models": {
+            "KBO": {
+                "min_edge": min_edge,
+                "research_confidence_gate": 0.0,
+                "status": "shadow_qualified",
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+
+
+def _international_forecast() -> dict:
+    return {
+        "model_version": "kbo-tie-aware-elo-v2",
+        "priced_contracts": [
+            {
+                "event_start_utc": "2026-07-27T10:00:00Z",
+                "event_id": "kbo-game-1",
+                "market_slug": "kbo-game-1",
+                "teams": ["Hanwha", "Doosan"],
+                "observed_at_utc": "2026-07-26T10:00:00Z",
+                "artifact_hash": "artifact-hash",
+                "sides": [
+                    {
+                        "team": "Hanwha",
+                        "model_fair_settlement_value": 0.40,
+                        "executable_ask": 0.45,
+                        "tie_probability": 0.04,
+                    },
+                    {
+                        "team": "Doosan",
+                        "model_fair_settlement_value": 0.60,
+                        "executable_ask": 0.55,
+                        "tie_probability": 0.04,
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def _esports_forecast() -> dict:
+    base = {
+        "event_start_utc": "2026-07-27T10:00:00Z",
+        "teams": ["Team A", "Team B"],
+        "observed_at_utc": "2026-07-26T10:00:00Z",
+        "artifact_hash": "artifact-hash",
+    }
+    return {
+        "title": "lol",
+        "model_version": "lol-tiered-elo-v4",
+        "priced_contracts": [
+            {
+                **base,
+                "event_id": "valid",
+                "market_slug": "valid",
+                "gated_research_eligible": True,
+                "sides": [
+                    {"team": "Team A", "model_probability": 0.60, "executable_ask": 0.55},
+                    {"team": "Team B", "model_probability": 0.40, "executable_ask": 0.45},
+                ],
+            },
+            {
+                **base,
+                "event_id": "negative-edge",
+                "market_slug": "negative-edge",
+                "gated_research_eligible": True,
+                "sides": [
+                    {"team": "Team A", "model_probability": 0.60, "executable_ask": 0.62},
+                    {"team": "Team B", "model_probability": 0.40, "executable_ask": 0.38},
+                ],
+            },
+            {
+                **base,
+                "event_id": "untrained-team",
+                "market_slug": "untrained-team",
+                "gated_research_eligible": False,
+                "sides": [
+                    {"team": "Team A", "model_probability": 0.65, "executable_ask": 0.55},
+                    {"team": "Team B", "model_probability": 0.35, "executable_ask": 0.45},
+                ],
+            },
+        ],
+    }
+
+
+def test_esports_research_logs_all_priced_but_gated_keeps_only_valid_positive_edge(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    config = {
+        "models": {
+            "LOL": {
+                "min_edge": 0.02,
+                "research_confidence_gate": 0.0,
+                "status": "shadow_qualified",
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+
+    logged = cli._log_esports_forecast(
+        _esports_forecast(), config, research, gated_ledger=gated
+    )
+
+    assert logged == 3
+    assert len(research.appended) == 3
+    assert len(gated.appended) == 1
+    assert gated.appended[0][0].event_id == "valid"
+    by_event = {request.event_id: eligibility for request, eligibility in research.appended}
+    assert by_event["negative-edge"].reason_code == "NO_CALL_LOW_EDGE"
+    assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
+
+
+def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_leagues() -> None:
+    assert "soccer" not in cli.DAILY_LEARNED_SPORTS
+    assert "soccer" in cli.SPORTS
+    assert set(cli.DAILY_INTERNATIONAL_BASEBALL_SPORTS) == {"kbo", "npb"}
+    assert set(cli.FLAT_LEDGER_SPORTS) == {"mlb", "nba", "wnba", "nfl"}
+    assert set(cli.RESEARCH_ONLY_DAILY_SPORTS) == {
+        "soccer",
+        "lol",
+        "cs2",
+        "dota2",
+        "valorant",
+        "kbo",
+        "npb",
+    }
+    assert not set(cli.FLAT_LEDGER_SPORTS) & set(cli.RESEARCH_ONLY_DAILY_SPORTS)
+
+
+def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executable(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
+    candidate = LearnedForwardCandidate(
+        event_id="mlb-1",
+        event_start_utc="2026-07-27T00:00:00Z",
+        away_team="Boston Red Sox",
+        home_team="New York Yankees",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.62,
+        home_probability=0.62,
+        confidence_threshold=0.55,
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="CALL_LEARNED_CONFIDENCE",
+        model_version="mlb-test",
+        model_artifact_hash="artifact-hash",
+        model_qualified=True,
+        feature_basis={"elo_probability": 0.60, "trend_gap": 0.1},
+        feature_snapshot_hash="feature-hash",
+    )
+    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(
+        cli,
+        "build_learned_moneyline_slate",
+        lambda **kwargs: ([candidate], [], 1),
+    )
+    monkeypatch.setattr(
+        cli,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.55,
+            "market_slug": "mlb-1",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": False,
+        },
+    )
+
+    class Registry:
+        version = "1"
+
+        @staticmethod
+        def resolve(league, team, event_start):
+            return AWAY if team == "Boston Red Sox" else HOME
+
+    monkeypatch.setattr(
+        cli,
+        "evaluate_eligibility",
+        lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
+            RecordType.QUALIFIED_SHADOW_CALL,
+            "CALL",
+            "QUALIFIED",
+            1.0,
+            60,
+            0.07,
+            0.02,
+            AWAY,
+            HOME,
+        ),
+    )
+    ledger = _CaptureLedger()
+    config = {
+        "models": {
+            "MLB": {
+                "production_artifact": str(tmp_path / "artifact.json"),
+                "status": "shadow_qualified",
+                "min_edge": 0.05,
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+        },
+        "bankroll": {},
+    }
+
+    result = cli._forecast_learned_sport(
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        ledger,
+    )
+
+    assert result["logged"] == 1
+    request, eligibility = ledger.appended[0]
+    assert request.sportsbook == "model_opinion_no_executable_quote"
+    assert "executable_quote_timestamp_invalid" in request.unavailable_features
+    assert eligibility.record_type is RecordType.RESEARCH_OBSERVATION
+    assert eligibility.reason_code == "NO_CALL_MARKET_UNAVAILABLE"
+    assert eligibility.units == 0
+
+
+def test_international_forecast_preview_never_requires_or_writes_a_ledger(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.forecast_international_baseball_slate",
+        lambda *args, **kwargs: _international_forecast(),
+    )
+
+    result = cli._forecast_international_sport(
+        tmp_path,
+        tmp_path,
+        "kbo",
+        "2026-07-27",
+        _international_config(min_edge=0.10),
+        None,
+    )
+
+    assert result["logged"] == 0
+    assert result["priced_contracts"]
+    assert "Preview only" in result["logging_note"]
+
+
+def test_international_forecast_logs_low_edge_to_research_but_not_gated(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.forecast_international_baseball_slate",
+        lambda *args, **kwargs: _international_forecast(),
+    )
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+
+    result = cli._forecast_international_sport(
+        tmp_path,
+        tmp_path,
+        "kbo",
+        "2026-07-27",
+        _international_config(min_edge=0.10),
+        research,
+        gated,
+    )
+
+    assert result["logged"] == 1
+    assert len(research.appended) == 1
+    assert research.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert research.appended[0][1].reason_code == "NO_CALL_LOW_EDGE"
+    assert gated.appended == []
+
+
+def test_international_forecast_mirrors_only_strategy_qualified_calls(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.forecast_international_baseball_slate",
+        lambda *args, **kwargs: _international_forecast(),
+    )
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+
+    result = cli._forecast_international_sport(
+        tmp_path,
+        tmp_path,
+        "kbo",
+        "2026-07-27",
+        _international_config(min_edge=0.02),
+        research,
+        gated,
+    )
+
+    assert result["logged"] == 1
+    assert research.appended[0][1].decision == "CALL"
+    assert gated.appended[0][1].decision == "CALL"
 
 
 def _log_pick(ledger: PickLedger, *, event_start_utc: str, created_at, units: float = 1.0) -> dict:

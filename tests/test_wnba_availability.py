@@ -259,7 +259,10 @@ def test_conflicting_sources_can_be_resolved_conservatively_for_research() -> No
     ]
 
 
-def test_learned_forward_artifact_consumes_availability_feature(tmp_path) -> None:
+def test_learned_forward_artifact_consumes_availability_feature(
+    tmp_path,
+    monkeypatch,
+) -> None:
     _write_inputs(tmp_path)
     history_path = tmp_path / "processed/wnba/games.jsonl"
     history_path.parent.mkdir(parents=True)
@@ -333,6 +336,27 @@ def test_learned_forward_artifact_consumes_availability_feature(tmp_path) -> Non
     assert candidates[0].feature_basis["availability_points_gap"] == pytest.approx(-2.8)
     assert candidates[0].selection == "away"
     assert candidates[0].home_probability < 0.1
+
+    from model_prediction import learned_forward
+
+    learned_forward._slate_cache.clear()
+
+    def unavailable(**kwargs):
+        raise ValueError("NO_CALL_AVAILABILITY_SOURCE_CONFLICT: test conflict")
+
+    monkeypatch.setattr(learned_forward, "matchup_player_availability", unavailable)
+    warned, warned_skipped, _ = build_learned_moneyline_slate(
+        sport="wnba",
+        game_date="2026-07-19",
+        store=FeatureStore(tmp_path),
+        client=FakeWNBA(),
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 19, 20, 1, tzinfo=UTC),
+    )
+
+    assert warned_skipped == []
+    assert warned[0].call is True
+    assert "NO_CALL_AVAILABILITY_SOURCE_CONFLICT" in warned[0].unavailable_features
 
 
 def test_gate_fires_when_delta_exceeds_threshold() -> None:

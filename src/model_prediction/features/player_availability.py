@@ -283,7 +283,7 @@ def matchup_player_availability(
     event_id: str | None = None,
     maximum_report_age_hours: float = 12.0,
     maximum_prior_age_hours: float = 168.0,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Build home-oriented WNBA availability features or fail closed."""
     observed = parse_utc(observed_at.isoformat())
     start = parse_utc(event_start.isoformat())
@@ -299,7 +299,7 @@ def matchup_player_availability(
                 game_date=game_date,
             )
     priors = _load_priors(root, game_date, observed, maximum_age_hours=maximum_prior_age_hours)
-    return matchup_player_availability_from_payloads(
+    result = matchup_player_availability_from_payloads(
         snapshot=snapshot,
         priors=priors,
         home_team=home_team,
@@ -309,6 +309,10 @@ def matchup_player_availability(
         event_start=start,
         maximum_report_age_hours=maximum_report_age_hours,
     )
+    conflicts = list(snapshot.get("source_conflicts", []))
+    result["availability_source_conflict_count"] = len(conflicts)
+    result["availability_source_conflicts"] = conflicts
+    return result
 
 
 def matchup_player_availability_from_payloads(
@@ -321,7 +325,7 @@ def matchup_player_availability_from_payloads(
     observed_at: datetime,
     event_start: datetime,
     maximum_report_age_hours: float = 12.0,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Pure calculator used by forward inference and labeled retrospective tests."""
     observed = parse_utc(observed_at.isoformat())
     start = parse_utc(event_start.isoformat())

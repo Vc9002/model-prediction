@@ -53,10 +53,11 @@ MODEL_SPECS = {
     ),
     League.SOCCER: ModelSpec(
         League.SOCCER,
-        "Elo + opponent-adjusted trend logistic regression",
-        "moneyline home-win probability",
-        "binary logistic regression",
-        ("Elo home-win probability", "offensive momentum gap"),
+        "Poisson goal model with Dixon-Coles low-score correction",
+        "three-way result, O/U 2.5, BTTS",
+        "correlated Poisson score matrix",
+        ("EWMA attack/defense strength", "home-goal boost", "low-score dependence"),
+        status=ModelState.RESEARCH,
     ),
     League.TENNIS: ModelSpec(
         League.TENNIS,

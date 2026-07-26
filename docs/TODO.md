@@ -12,13 +12,13 @@ config, reports, ledgers, and audit state disagree.
   recomputed and verified server-side.
 - [ ] Make ledger mutation and audit append recoverable as one transaction;
   add failure-injection tests for create, settle, void, and removal.
-- [ ] Remove present-day probable-starter responses from historical MLB
+- [x] Remove present-day probable-starter responses from historical MLB
   validation unless each record proves pregame `observed_at_utc`; retain MLB
-  v6 as unqualified research.
+  v6 as unqualified research. Prospective archive started 2026-07-26.
 - [ ] Enforce `artifact.qualified` and quote `timestamp_valid` before a learned
   candidate can be classified, priced, or logged.
-- [ ] Make WNBA availability conflicts and malformed/missing required inputs
-  fail closed with operator-visible diagnostics.
+- [x] Keep WNBA model opinions visible when availability fails, default the
+  affected inputs neutral, and record operator-visible diagnostics in Today.
 
 ## P1 — current regressions and artifact alignment
 
@@ -37,12 +37,16 @@ config, reports, ledgers, and audit state disagree.
 
 ## P1 — routing, settlement, and concurrency
 
-- [ ] Make KBO/NPB forecast preview work without a ledger or writes.
-- [ ] Log all intended KBO/NPB research rows before gated-subset filtering.
-- [ ] Grade KBO/NPB `$0.50` tie settlement using entry price, not ordinary
+- [x] Make KBO/NPB forecast preview work without a ledger or writes.
+- [x] Log all intended KBO/NPB research rows before gated-subset filtering.
+- [x] Grade KBO/NPB `$0.50` tie settlement using entry price, not ordinary
   moneyline push economics.
-- [ ] Include flat/research/gated settlement results and failures in `settle`
+- [x] Include flat/research/gated settlement results and failures in `settle`
   and `daily` output.
+- [x] Keep flat isolated to MLB/NBA/WNBA/NFL; route soccer, esports, KBO, and
+  NPB only to research plus the valid gated subset.
+- [x] Run daily forecasts in one process, share learned-slate caches, overlap
+  independent captures, and propagate stage failures.
 - [ ] Make exposure-check-plus-append atomic across processes and preserve
   research/gated paired-ledger consistency.
 - [ ] Keep the cross-process singleton guard for all daily/forecast writers.
@@ -51,8 +55,8 @@ config, reports, ledgers, and audit state disagree.
 
 - [ ] Redact The Odds API credentials from all returned/logged errors.
 - [ ] Reject future `observed_at_utc` values in freshness checks.
-- [ ] Treat soccer draws as draws in head-to-head features.
-- [ ] Repair MLB weather payload shape, wind contribution, and event-hour
+- [x] Treat soccer draws as draws in head-to-head features.
+- [x] Repair MLB weather payload shape, wind contribution, and event-hour
   selection.
 - [ ] Validate a row before adding its event ID to feature-ingest dedup state.
 - [ ] Paginate Polymarket discovery and distinguish provider failure from an
@@ -68,8 +72,9 @@ config, reports, ledgers, and audit state disagree.
   side-effect-controlled tests.
 - [ ] Add direct tests for execution-ticket binding/cap recomputation.
 - [ ] Add audit-failure recovery and multiprocess ledger serialization tests.
-- [ ] Add `timestamp_valid=false`, WNBA conflict, KBO/NPB tie-price, provider
-  secret-redaction, future-timestamp, soccer-draw, and weather-hour tests.
+- [ ] Add provider secret-redaction and future-timestamp tests.
+- [x] Add `timestamp_valid=false`, WNBA conflict, KBO/NPB tie-price,
+  soccer-draw, and weather-hour regression tests.
 - [ ] Resolve the unused/non-conformant `SportModel` protocol and unwired model
   registry, or remove those abstractions.
 - [ ] Clear the 117 Ruff findings, separating executable-bit metadata from

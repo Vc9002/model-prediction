@@ -21,7 +21,7 @@ from sklearn.linear_model import LogisticRegression
 
 from .calibration import calibration_metrics
 from .config import PROJECT_ROOT
-from .data_sources.espn_probables import espn_pitcher_era_gap
+from .data_sources.espn_probables import point_in_time_pitcher_era_gap
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
 from .features.elo_ratings import build_elo
@@ -194,18 +194,16 @@ def build_walk_forward_rows(
                 # Real starter ERA gap from MLB Stats API snapshots (point-in-time)
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
 
-                # Live-servable starter ERA gap: ESPN's own probables endpoint,
-                # the SAME function used at forecast time (learned_forward.py),
-                # so backtest and serve never diverge. Unlike starter_gap above
-                # (a frozen historical map that can't cover a future game),
-                # this can genuinely serve live — fails closed per-game when
-                # ESPN hasn't announced both starters yet.
+                # Probable starter ERA is usable in historical validation only
+                # when an append-only observation proves it existed before
+                # first pitch. The legacy retroactive ESPN date cache is
+                # deliberately excluded from this path.
                 probable_gap, probable_available = 0.0, False
                 if sport.lower() == "mlb":
                     try:
-                        probable_gap = espn_pitcher_era_gap(
-                            game.event_id, game.home_team, game.away_team,
-                            game.start.astimezone(EASTERN).strftime("%Y%m%d"),
+                        probable_gap = point_in_time_pitcher_era_gap(
+                            game.event_id,
+                            game.start,
                         )
                         probable_available = True
                     except ValueError:

@@ -794,7 +794,16 @@ def forecast_esports_slate(
             if team_ids[0] == team_ids[1]:
                 no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
                 continue
-            # Unknown teams default to 1500 Elo in NeutralElo.probability — safe to proceed.
+            # Unknown or newly catalogued teams may still be priced into the
+            # complete research ledger with the neutral 1500 prior. They are
+            # not valid inputs for the curated gated-research ledger until
+            # both identities have learned ratings in the pinned artifact.
+            source_teams_resolved = all(
+                not team_id.startswith("unknown:") for team_id in team_ids
+            )
+            source_teams_trained = source_teams_resolved and all(
+                team_id in ratings for team_id in team_ids
+            )
             probability1 = book.probability(team_ids[0], team_ids[1])
             probabilities_by_name = {
                 _identity_key(descriptions[0]): probability1,
@@ -840,6 +849,14 @@ def forecast_esports_slate(
                     **base,
                     "title": title,
                     "source_team_ids": team_ids,
+                    "source_teams_resolved": source_teams_resolved,
+                    "source_teams_trained": source_teams_trained,
+                    "gated_research_eligible": source_teams_trained,
+                    "gated_research_ineligibility_reason": (
+                        None
+                        if source_teams_trained
+                        else "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"
+                    ),
                     "model_version": artifact["model_version"],
                     "model_state": "research",
                     "artifact_hash": artifact["artifact_hash"],

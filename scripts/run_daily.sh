@@ -1,15 +1,12 @@
 #!/bin/bash
 # model-prediction daily runner — split pipeline
 # Step 1: Settle ALL open picks from previous days (both ledgers)
-# Step 2: Main forecast — edge-gated picks promoted to main ledger
-# Step 3: Flat forecast — ALL model picks, no edge gate
-# Main runs BEFORE flat so that when flat snapshots main's exposure to size
-# its own picks (exposure_ledger=main, always), it sees today's real main
-# calls already logged rather than a stale pre-run picture — otherwise flat's
-# unit sizes for shared games could drift from main's own (main sizes each
-# pick against exposure accumulated so far within its own run; flat, running
-# first, would size against an exposure state from before any of today's
-# main calls existed).
+# Step 2: Unified slate + forecast:
+#   - MLB/WNBA qualified calls -> main
+#   - all learned US-sport candidates -> flat
+#   - soccer/esports/KBO/NPB -> research, valid subset -> gated research
+# The unified command computes each learned slate once and reuses it for flat,
+# avoiding the old second full forecast process and duplicate upstream reads.
 # Re-running is safe: clears and replaces today's picks on each run.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 RUNNER_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -55,44 +52,20 @@ for sport in mlb nba wnba nfl; do
 done
 echo "Ingestion exit code: $INGEST_EXIT" >> "$LOG"
 
-# ── Step 2: Polymarket slate capture ──────────────────────────────────
-# Capture executable BBO snapshots for every Polymarket sport contract.
-# Forecast steps read these snapshots to match picks against real prices.
-echo "--- Step 2: Polymarket slate snapshot ---" >> "$LOG"
-PYTHONPATH=src .venv/bin/python -m model_prediction.cli polymarket-slate \
-    --all --date "$RUN_DATE" \
+# ── Step 2: Unified daily forecast ───────────────────────────────────
+echo "--- Step 2: Unified slate + main/flat/research forecasts ---" >> "$LOG"
+PYTHONPATH=src .venv/bin/python -m model_prediction.cli daily \
+    --date "$RUN_DATE" --skip-settlement \
     >> "$LOG" 2>&1
-SLATE_EXIT=$?
-echo "Polymarket slate exit code: $SLATE_EXIT" >> "$LOG"
-
-# ── Step 3: Main forecast ───────────────────────────────────────────
-# Edge-gated picks → main ledger (MLB/WNBA); esports + soccer/nba/nfl route
-# to research.xlsx / gated_research.xlsx internally (see _forecast_learned_sport
-# and _log_esports_forecast, both invoked per-title/sport by --all below).
-# There is no separate "esports-forecast" step: it was a fully redundant
-# second invocation of the same esports logging this step already does,
-# and running both produced near-simultaneous duplicate research rows for
-# the same contract. Clears and replaces today's main picks on re-run.
-echo "--- Step 3: Main forecast (edge-gated + research-routed picks) ---" >> "$LOG"
-PYTHONPATH=src .venv/bin/python -m model_prediction.cli forecast \
-    --all --log --date "$RUN_DATE" --replace-today --model learned \
-    >> "$LOG" 2>&1
-MAIN_EXIT=$?
-echo "Main forecast exit code: $MAIN_EXIT" >> "$LOG"
-
-# ── Step 4: Flat forecast ───────────────────────────────────────────
-# ALL model candidates → flat_picks.xlsx (no edge/confidence gate). Runs
-# after main so its exposure snapshot of the main ledger (see comment above)
-# reflects today's real calls. Clears and replaces today's flat picks on re-run.
-echo "--- Step 4: Flat forecast (all picks) ---" >> "$LOG"
-PYTHONPATH=src .venv/bin/python -m model_prediction.cli flat-forecast \
-    --all --log --date "$RUN_DATE" \
-    >> "$LOG" 2>&1
-FLAT_EXIT=$?
-echo "Flat forecast exit code: $FLAT_EXIT" >> "$LOG"
+DAILY_EXIT=$?
+echo "Unified daily exit code: $DAILY_EXIT" >> "$LOG"
 
 echo "Finished: $(TZ=America/New_York date)" >> "$LOG"
-echo "Exit codes — settle: $SETTLE_EXIT, ingest: $INGEST_EXIT, slate: $SLATE_EXIT, main: $MAIN_EXIT, flat: $FLAT_EXIT" >> "$LOG"
+echo "Exit codes — settle: $SETTLE_EXIT, ingest: $INGEST_EXIT, daily: $DAILY_EXIT" >> "$LOG"
 
 # Cleanup old logs
 find data/logs -name "daily_*.log" -mtime +30 -delete
+
+if [ "$SETTLE_EXIT" -ne 0 ] || [ "$INGEST_EXIT" -ne 0 ] || [ "$DAILY_EXIT" -ne 0 ]; then
+    exit 1
+fi

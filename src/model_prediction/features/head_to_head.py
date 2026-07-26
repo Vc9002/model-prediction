@@ -18,11 +18,18 @@ def head_to_head(games: Iterable[GameRecord], team_a: str, team_b: str, limit: i
         key=lambda game: game.start,
     )[-limit:]
     a_wins = 0
+    b_wins = 0
+    draws = 0
     totals: list[int] = []
     for game in matchups:
-        winner = game.home_team if game.home_score > game.away_score else game.away_team
-        if winner == team_a:
-            a_wins += 1
+        if game.home_score == game.away_score:
+            draws += 1
+        else:
+            winner = game.home_team if game.home_score > game.away_score else game.away_team
+            if winner == team_a:
+                a_wins += 1
+            else:
+                b_wins += 1
         totals.append(game.total)
     count = len(matchups)
     return {
@@ -30,8 +37,11 @@ def head_to_head(games: Iterable[GameRecord], team_a: str, team_b: str, limit: i
         "team_a": team_a,
         "team_b": team_b,
         "team_a_wins": a_wins,
-        "team_b_wins": count - a_wins,
+        "team_b_wins": b_wins,
+        "draws": draws,
         "team_a_win_rate": round(a_wins / count, 6) if count else None,
+        "team_b_win_rate": round(b_wins / count, 6) if count else None,
+        "draw_rate": round(draws / count, 6) if count else None,
         "average_total": round(sum(totals) / count, 6) if count else None,
         "last_meeting_utc": matchups[-1].event_start_utc if matchups else None,
     }

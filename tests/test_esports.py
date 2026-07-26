@@ -202,3 +202,6 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
     assert result["priced_count"] == 1
     assert result["priced_contracts"][0]["qualification"] == "NO_CALL_MODEL_UNVALIDATED"
     assert result["priced_contracts"][0]["units"] == 0
+    assert result["priced_contracts"][0]["source_teams_resolved"] is True
+    assert result["priced_contracts"][0]["source_teams_trained"] is True
+    assert result["priced_contracts"][0]["gated_research_eligible"] is True

@@ -6,6 +6,7 @@ Fallback: ESPN gameInfo.weather from summaries.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -47,7 +48,12 @@ def weather_profile(home_team: str, espn_game_info: dict[str, Any] | None = None
             "weather_run_factor": 1.0,
             "status": "dome",
         }
-    weather = (espn_game_info or {}).get("weather") or {}
+    payload = espn_game_info or {}
+    weather = payload.get("weather") or {}
+    if not weather and any(
+        key in payload for key in ("temperature", "windSpeed", "gust", "humidity")
+    ):
+        weather = payload
     temperature = weather.get("temperature")
     wind = weather.get("windSpeed") or weather.get("gust")
     if temperature is None and wind is None:
@@ -59,19 +65,19 @@ def weather_profile(home_team: str, espn_game_info: dict[str, Any] | None = None
             "weather_run_factor": 1.0,
             "status": "unavailable_from_source",
         }
-    factor = 1.0
     try:
-        if temperature is not None:
-            # Roughly +1% runs per 10F above 70F, symmetric below.
-            factor *= 1.0 + (float(temperature) - 70.0) / 1000.0
+        factor = run_factor_from_conditions(
+            float(temperature) if temperature is not None else None,
+            float(wind) if wind is not None else None,
+        )
     except (TypeError, ValueError):
-        pass
+        factor = 1.0
     return {
         "dome_or_retractable": False,
         "temperature_f": temperature,
         "wind_mph": wind,
         "humidity_pct": weather.get("humidity"),
-        "weather_run_factor": round(max(0.9, min(1.1, factor)), 6),
+        "weather_run_factor": factor,
         "status": "available",
     }
 
@@ -133,8 +139,8 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
         url = (f"https://api.open-meteo.com/v1/forecast?"
                f"latitude={lat}&longitude={lon}"
                f"&hourly=temperature_2m,wind_speed_10m,relative_humidity_2m"
-               f"&forecast_hours=6&temperature_unit=fahrenheit&wind_speed_unit=mph"
-               f"&timezone=auto")
+               f"&forecast_days=7&temperature_unit=fahrenheit&wind_speed_unit=mph"
+               f"&timezone=UTC")
         resp = httpx.get(url, timeout=10)
         if resp.status_code != 200:
             return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
@@ -144,14 +150,31 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
         temps = hourly.get("temperature_2m", [])
         winds = hourly.get("wind_speed_10m", [])
         humids = hourly.get("relative_humidity_2m", [])
+        times = hourly.get("time", [])
         
         if not temps:
             return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
                     "weather_run_factor": 1.0, "status": "no_data", "source": "open-meteo"}
         
-        temp = float(temps[0])
-        wind = float(winds[0]) if winds else None
-        humid = float(humids[0]) if humids else None
+        hour_index = 0
+        if game_start_utc and times:
+            game_start = datetime.fromisoformat(
+                game_start_utc.replace("Z", "+00:00")
+            ).astimezone(UTC)
+            parsed_hours = [
+                datetime.fromisoformat(str(value)).replace(tzinfo=UTC)
+                for value in times
+            ]
+            hour_index = min(
+                range(min(len(parsed_hours), len(temps))),
+                key=lambda index: abs(
+                    (parsed_hours[index] - game_start).total_seconds()
+                ),
+            )
+
+        temp = float(temps[hour_index])
+        wind = float(winds[hour_index]) if len(winds) > hour_index else None
+        humid = float(humids[hour_index]) if len(humids) > hour_index else None
         
         return {
             "temperature_f": round(temp, 1),
@@ -161,6 +184,6 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
             "status": "available",
             "source": "open-meteo",
         }
-    except Exception:
+    except (httpx.HTTPError, IndexError, KeyError, TypeError, ValueError):
         return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
                 "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo"}

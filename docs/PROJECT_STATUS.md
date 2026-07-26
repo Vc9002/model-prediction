@@ -79,24 +79,24 @@ matching event, and idempotent retry may not repair the gap.
 
 ### MLB v6 provenance
 
-The active MLB v6 experiment uses probable-starter data obtained from current
-ESPN responses for historical dates without historical `observed_at_utc`.
-That is not point-in-time validation. The artifact correctly says
-`qualified=false`; the config override is an operator research override, not a
-promotion-quality evidence substitute.
+Historical validation now accepts probable-starter inputs only from the
+append-only archive when `observed_at_utc` predates both the decision and first
+pitch. The real prospective archive began on 2026-07-26. The existing MLB v6
+artifact remains unqualified because its old validation did not have that PIT
+evidence; new capture does not retroactively validate it.
 
-### WNBA availability fail-open behavior
+### WNBA availability diagnostics
 
-The availability path suppresses common conflict/parsing failures and continues
-with an unadjusted or partial-source probability. That contradicts the
-fail-closed contract for missing or conflicting player availability.
+Per operator policy, missing/conflicting availability no longer suppresses the
+WNBA model opinion. The affected inputs default neutral and the Today row
+records the conflict/error rationale and unavailable-feature code.
 
 ### Qualification and quote semantics
 
 The learned forward layer labels a confidence-threshold call
-`QUALIFIED_SHADOW_CALL` even when the artifact is unqualified. Quote matching
-returns `timestamp_valid`, but the CLI does not enforce it before pricing a
-call.
+`QUALIFIED_SHADOW_CALL` even when the artifact is unqualified. Missing or
+timestamp-invalid quotes now retain the MLB/WNBA model opinion in Today as a
+zero-unit `NO_CALL_MARKET_UNAVAILABLE`; they cannot become executable calls.
 
 ## Active learned artifacts
 
@@ -109,13 +109,14 @@ executable profitability.
 | NBA | `nba-elo-trend-lr-v4` | Yes | 577 | 73.66% | Predictor gate pass; executable economics remain separate. |
 | WNBA | `wnba-elo-trend-lr-v4` | Yes | 163 | 67.48% | Predictor gate pass; availability fail-open path remains a blocker. |
 | NFL | `nfl-elo-trend-lr-v4` | Yes | 87 | 71.26% | Predictor gate pass; spread research artifact hash is corrupt. |
-| Soccer | `soccer-elo-trend-lr-v2` | Yes | 1,381 | 64.88% | Artifact/config pass, but the CLI registry still reports research. |
+| Soccer | `soccer-poisson-dc-v1` | No production artifact | — | — | Draw-aware full-game 2.5 total research; executable-BBO matched and research-only. |
 
 The active esports, KBO, and NPB config entries use qualification overrides,
 while the dashboard evidence surface still labels those markets
 `research_only`/`qualified_for_betting=false`. KBO/NPB filenames remain `v1`
 even though the artifact and config version strings say `v2`. Treat them as
-research until semantics, routing, settlement, and naming are reconciled.
+research until separate promotion evidence exists. Preview, daily routing,
+gated-subset selection, and half-value tie settlement are now wired.
 
 ## Release alignment
 
@@ -171,12 +172,6 @@ is unqualified.
 
 ## Additional correctness blockers
 
-- KBO/NPB read-only forecast preview can dereference a missing ledger.
-- KBO/NPB ties are graded as pushes instead of a `$0.50` settlement payoff.
-- KBO/NPB early edge filtering contradicts the documented research/gated
-  routing contract.
-- Secondary-ledger settlement results are hidden from `settle` and `daily`
-  output.
 - Exposure is checked outside the append transaction; concurrent writers can
   approve from the same stale snapshot.
 - The Odds API error path can return a URL containing the API key.

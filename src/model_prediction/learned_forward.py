@@ -49,6 +49,7 @@ def _compute_features(
     data_root: Path,
     observed_at: datetime,
 ) -> tuple[dict[str, float], tuple[str, ...]]:
+    unavailable: list[str] = []
     features: dict[str, float] = {
         "elo_probability": elo.expected_home_win(home_team, away_team),
         "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
@@ -80,20 +81,27 @@ def _compute_features(
             raise ValueError(
                 "NO_CALL_AVAILABILITY_UNSUPPORTED: official player-availability feature is WNBA-only"
             )
-        availability = matchup_player_availability(
-            data_root=data_root,
-            home_team=home_team,
-            away_team=away_team,
-            game_date=game_date,
-            observed_at=observed_at,
-            event_start=event_start,
-            event_id=event_id,
-        )
-        features.update(
-            {name: value for name, value in availability.items() if name in wanted}
-        )
+        try:
+            availability = matchup_player_availability(
+                data_root=data_root,
+                home_team=home_team,
+                away_team=away_team,
+                game_date=game_date,
+                observed_at=observed_at,
+                event_start=event_start,
+                event_id=event_id,
+            )
+            features.update(
+                {name: value for name, value in availability.items() if name in wanted}
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            for name in wanted & AVAILABILITY_FEATURE_NAMES:
+                features[name] = 0.0
+            unavailable.append(
+                str(error).split(":", 1)[0].strip()
+                or "wnba_availability_unavailable"
+            )
     _init_providers()
-    unavailable: list[str] = []
     for name in wanted:
         if name in features:
             continue
@@ -266,6 +274,7 @@ def build_learned_moneyline_slate(
             confidence_threshold = artifact.raw.get("market_models", {}).get("moneyline", {}).get("confidence_threshold", 0.50)
 
             # ── WNBA availability gate (5pp threshold) ──────────────────────
+            availability_notes: list[str] = []
             if key == "wnba":
                 try:
                     avail = matchup_player_availability(
@@ -288,15 +297,25 @@ def build_learned_moneyline_slate(
                     sigma = cache[sigma_key]
                     adjusted_home = adjust_home_probability(home_probability, points_gap, sigma)
                     delta = abs(adjusted_home - home_probability)
+                    if int(avail.get("availability_source_conflict_count", 0)) > 0:
+                        availability_notes.append("wnba_availability_source_conflict")
                     if delta >= 0.05:
                         features["availability_points_gap"] = points_gap
                         features["availability_adjusted"] = 1.0
                         home_probability = adjusted_home
                 except (ValueError, KeyError, TypeError) as exc:
-                    logger.debug(
-                        "WNBA availability gate skipped for %s @ %s on %s: %s",
+                    warning_code = str(exc).split(":", 1)[0].strip()
+                    availability_notes.append(
+                        warning_code or "wnba_availability_unavailable"
+                    )
+                    logger.warning(
+                        "WNBA availability context unavailable for %s @ %s on %s; "
+                        "model call retained with Today warning: %s",
                         away_team, home_team, game_date, exc,
                     )
+            unavailable_features = tuple(
+                dict.fromkeys((*unavailable_features, *availability_notes))
+            )
 
             # Recompute selection/call/action/reason from (possibly adjusted) probability
             selection = "home" if home_probability >= 0.5 else "away"

@@ -211,6 +211,23 @@ def test_settlement_and_void_are_idempotent(tmp_path) -> None:
     assert ledger.void(second["pick_id"], "postponed") == voided
 
 
+def test_tied_binary_contract_uses_half_value_instead_of_zero_pnl(tmp_path) -> None:
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    row = ledger.append_call(request("half-value-tie"), 1.0, 60, now=NOW)
+
+    settled = ledger.settle(
+        row["pick_id"],
+        3,
+        3,
+        binary_contract_settlement_value=0.5,
+    )
+
+    entry_probability = float(row["decision_raw_implied_probability"])
+    assert settled["result"] == "push"
+    assert float(settled["pnl_units"]) == round(0.5 / entry_probability - 1, 4)
+    assert ledger.audit.events()[-1]["payload"]["binary_contract_settlement_value"] == 0.5
+
+
 def test_report_filters_are_version_aware(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     ledger.append_call(request("one"), 0.25, 60, now=NOW)

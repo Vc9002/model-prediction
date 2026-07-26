@@ -401,7 +401,7 @@ def capture_slate_snapshots(
         ]
         skipped_summer_league += len(all_contracts) - len(contracts)
 
-        def _fetch(entry):
+        def _fetch(entry, league_name=league):
             slug, event, market = entry
             try:
                 snapshot = client.snapshot(slug)
@@ -409,8 +409,10 @@ def capture_slate_snapshots(
                 event_start = parse_utc(snapshot["event_start_utc"])
                 snapshot.update(
                     {
-                        "league": league.upper(),
+                        "league": league_name.upper(),
                         "event_id": str(event.get("event_id", "")),
+                        "event_slug": str(event.get("event_slug", "")),
+                        "event_title": str(event.get("title", "")),
                         "market_type": market.get("market_type"),
                         "line": market.get("line"),
                         "timestamp_valid": observed <= event_start,
@@ -418,17 +420,23 @@ def capture_slate_snapshots(
                     }
                 )
                 return slug, snapshot, None
-            except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
-                return slug, None, str(error)[:200]
+            except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as exc:
+                return slug, None, str(exc)[:200]
 
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(_fetch, contracts))
-        for slug, snapshot, error in results:
+        for slug, snapshot, fetch_error in results:
             if snapshot is None:
                 failures += 1
-                failure_details.append({"league": league, "market_slug": slug, "reason": error or ""})
+                failure_details.append(
+                    {
+                        "league": league,
+                        "market_slug": slug,
+                        "reason": fetch_error or "",
+                    }
+                )
                 continue
             store.append(snapshot)
             captured += 1

@@ -18,6 +18,27 @@ the operator separately authorizes that state change.
 The source tree was changing during this audit. Re-run the checks before acting
 on any line number or count.
 
+## 2026-07-27 remediation note
+
+The historical findings below remain useful audit context, but the approved
+forecast scope is now repaired in this working tree:
+
+- MLB historical validation uses only pregame-observed starter archive rows;
+  the first real prospective rows were captured 2026-07-26. MLB v6 remains
+  unqualified.
+- Missing/invalid MLB or WNBA executable quotes retain a zero-unit Today model
+  opinion with `NO_CALL_MARKET_UNAVAILABLE`; the 5% valid-quote edge gate is
+  unchanged.
+- WNBA availability conflicts/errors default affected inputs neutral and are
+  surfaced in Today rather than suppressing the model opinion.
+- Soccer runs a draw-aware Poisson/Dixon-Coles full-game 2.5-total research
+  path. KBO/NPB preview, research/gated routing, daily coverage, settlement
+  output, and `$0.50` tie-contract P&L are wired.
+- Flat is isolated from soccer/esports/KBO/NPB. The unified runner no longer
+  lets a flat phase clear or overwrite research/gated ledgers.
+- Focused verification passes 71 tests. The full suite passes 424 and retains
+  four pre-existing dashboard order-preview failures outside this edit scope.
+
 ## Verified audit result — 2026-07-26
 
 The checkout is **not release-ready**.

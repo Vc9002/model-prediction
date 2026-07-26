@@ -15,10 +15,10 @@ defects are repaired.
 
 | Metric | Value |
 |--------|-------|
-| Active learned artifacts | MLB v6, NBA/WNBA/NFL v4, Soccer v2 |
-| Research/override artifacts | Esports v4, KBO/NPB v2 identifiers |
-| Tests | **410 pass, 4 fail** |
-| Audit chain | 16,387 events, 0 breaks, 0 hash mismatches |
+| Active learned artifacts | MLB v6, NBA/WNBA/NFL v4 |
+| Research/override artifacts | Soccer Poisson/DC v1, Esports v4, KBO/NPB v2 identifiers |
+| Tests | **424 pass, 4 pre-existing dashboard failures** |
+| Audit chain | 16,635 events, 0 breaks, 0 hash mismatches |
 | Artifact integrity | 31 valid, 2 mismatched, 33 total |
 | Ruff | 117 findings |
 | Release status | **Blocked** |
@@ -47,12 +47,13 @@ artifact, current report, tests, and point-in-time evidence agree.
 
 | League | Model | Status |
 |--------|-------|--------|
-| MLB | v6 probable-starter experiment + spread/total research | Unqualified; historical starter provenance is not point-in-time |
+| MLB | v6 probable-starter experiment + spread/total research | Unqualified; prospective starter archive began 2026-07-26, but old validation remains non-PIT |
 | NBA | spread-baseline-v1 | Research |
 | WNBA | spread-baseline-v1 | Research |
 | NFL | spread-baseline-v1 | Research |
 | LoL/CS2/DOTA2/Valorant | neutral-series Elo v4 | Config override; dashboard evidence remains research-only |
-| KBO/NPB | tie-aware Elo v2 identifiers | Research; preview/routing/tie-settlement semantics need repair |
+| Soccer | Poisson/Dixon-Coles full-game 2.5 totals | Research-only; draw-aware and executable-BBO matched |
+| KBO/NPB | tie-aware Elo v2 identifiers | Research-only; preview, paired-ledger routing, daily wiring, and `$0.50` tie settlement are active |
 
 Spread, total, F5, and other derivative models remain research-only unless exact
 historical contract lines and decision-horizon inputs exist. Never infer
@@ -84,10 +85,10 @@ env PYTHONPATH=src:. .venv/bin/python dashboard_server.py --port 8765
 .venv/bin/model-prediction summary
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli summary
 
-# Daily pipeline; this logs and settles rows, so inspect before running.
-# Runs the main forecast+log+settle steps AND the flat one-unit forecast+log+
-# settle steps against a separate flat ledger in the same invocation.
-env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli daily --date YYYY-MM-DD
+# Recommended daily pipeline. It settles/ingests first, then runs one unified
+# forecast process: learned US sports -> main/flat; soccer/esports/KBO/NPB ->
+# research, with only valid subsets mirrored to gated research.
+bash scripts/run_daily.sh
 
 # Bootstrap historical data
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli bootstrap --all --from 2024-01-01 --to YYYY-MM-DD
