@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -121,7 +120,12 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "Order shows exchange status only" in html
     assert "Model Bet Execution History" not in html
     assert ".filter(p=>p.model_pick)" not in html
-    assert 'join("")+"<th>Order</th><th>Matchup</th>' in html
+    # Ledger/Flat/Research/Gated Research share one row/header renderer
+    # (ledgerHeaderRow/ledgerRowHtml) so their columns and styling can never
+    # drift apart again.
+    assert '<th>Order</th><th>Matchup</th>' in html
+    assert "function ledgerHeaderRow" in html
+    assert "function ledgerRowHtml" in html
     assert "model picks are not shown here" in html
     assert "p.market_name||p.title||slugToTitle" in html
     assert 'id="posSellPrice-${i}"' in html
@@ -143,7 +147,12 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "Current ask buys immediately" in html
     assert "immediate-or-cancel buy" in html
     assert 'value="open" selected>active only' in html
-    assert 'Settled (<span id="settledCount">0</span>)' in html
+    # Ledger/Flat/Research each render their own independent filter bar
+    # (filterBarHTML(tab)) rather than sharing one global set of controls.
+    assert 'Settled (<span id="settledCount_${tab}">0</span>)' in html
+    assert 'id="filters_L"' in html
+    assert 'id="filters_F"' in html
+    assert 'id="filters_R"' in html
     assert "No active picks remain today" in html
     assert 'id="todayShowSettled"' in html
     assert 'if(p.status!=="open")' in html

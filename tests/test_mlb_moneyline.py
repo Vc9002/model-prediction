@@ -7,14 +7,13 @@ below-threshold no-calls, multi-game slates, and feature basis integrity.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from model_prediction.features.base import FeatureStore
 from model_prediction.learned_forward import build_learned_moneyline_slate
 from model_prediction.models.learned_market import build_artifact
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -103,7 +102,7 @@ def test_full_mlb_forward_slate_produces_home_call(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert scheduled == 1
@@ -132,7 +131,7 @@ def test_probability_is_between_zero_and_one(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     c = candidates[0]
@@ -153,7 +152,7 @@ def test_feature_basis_includes_all_required_features(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     basis = candidates[0].feature_basis
@@ -178,7 +177,7 @@ def test_already_started_event_is_skipped(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(event_time="2026-07-17T11:00:00Z"),  # before observed
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert scheduled == 1
@@ -200,7 +199,7 @@ def test_insufficient_history_raises(tmp_path):
             store=FeatureStore(tmp_path),
             client=_FakeESPN(),
             artifact_path=artifact_path,
-            observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+            observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
         )
 
 
@@ -233,7 +232,7 @@ def test_insufficient_team_history_skips_event(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(away="Rare Team"),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert scheduled == 1
@@ -257,7 +256,7 @@ def test_below_threshold_produces_no_call(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     c = candidates[0]
@@ -278,7 +277,7 @@ def test_unqualified_artifact_still_produces_candidates(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert candidates[0].model_qualified is False
@@ -308,7 +307,7 @@ def test_multi_game_slate_returns_all_candidates(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(events=events),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert scheduled == 3
@@ -330,7 +329,7 @@ def test_wnba_availability_gate_does_not_activate_for_mlb(tmp_path):
         store=FeatureStore(tmp_path),
         client=_FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert len(candidates) == 1

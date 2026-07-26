@@ -9,17 +9,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from contextlib import suppress
 import os
 import tempfile
 import unicodedata
-from datetime import datetime, timezone
+from contextlib import suppress
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def canonical_json(value: Any) -> str:

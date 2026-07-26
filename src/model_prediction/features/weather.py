@@ -7,8 +7,8 @@ Fallback: ESPN gameInfo.weather from summaries.
 from __future__ import annotations
 
 from typing import Any
-import httpx
 
+import httpx
 
 DOME_TEAMS = {
     "Tampa Bay Rays",

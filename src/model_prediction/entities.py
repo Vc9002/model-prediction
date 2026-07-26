@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 from .domain import League
 
@@ -58,7 +58,7 @@ class EntityRegistry:
                 )
 
     @classmethod
-    def from_json(cls, path: str | Path) -> "EntityRegistry":
+    def from_json(cls, path: str | Path) -> EntityRegistry:
         with Path(path).open(encoding="utf-8") as handle:
             payload = json.load(handle)
         teams = []
@@ -119,8 +119,8 @@ class EntityRegistry:
             return datetime.fromisoformat(value + suffix)
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return parsed.astimezone(timezone.utc)
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
 
     def by_id(self, canonical_team_id: str) -> CanonicalTeam:
         try:

@@ -11,11 +11,19 @@ versioned helper reused by the MLB Trend Engine.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from math import exp, log, sqrt
-from typing import Any, Iterable, Sequence
+from typing import Any, TypedDict
 
 from .base import FeatureContext, GameRecord, register_feature
+
+
+class _TeamGameRow(TypedDict):
+    opponent: str
+    scored: float
+    allowed: float
+    won: float
 
 
 HALF_LIVES = (3.0, 10.0, 25.0)
@@ -67,7 +75,7 @@ class TrendEngine:
         self.games = sorted(games, key=lambda game: game.start)
         self.half_lives = tuple(half_lives)
         self.prior_strength = prior_strength
-        self._by_team: dict[str, list[dict[str, float]]] = {}
+        self._by_team: dict[str, list[_TeamGameRow]] = {}
         self._league_points: list[float] = []
         self._index()
 

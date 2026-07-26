@@ -5,19 +5,20 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from .domain import parse_utc
 from .features.base import FeatureStore
 from .features.elo_ratings import build_elo
-from .features.schedule_load import matchup_schedule_load
-from .features.trends import TrendEngine
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
+from .features.schedule_load import matchup_schedule_load
 from .features.team_runs import pitcher_era_gap_from_history
+from .features.trends import TrendEngine
 from .models.learned_market import LearnedMarketArtifact
 from .wnba_availability_evaluation import adjust_home_probability, historical_margin_sigma
 
@@ -47,7 +48,7 @@ def _compute_features(
     away_trend: Any,
     data_root: Path,
     observed_at: datetime,
-) -> dict[str, float]:
+) -> tuple[dict[str, float], tuple[str, ...]]:
     features: dict[str, float] = {
         "elo_probability": elo.expected_home_win(home_team, away_team),
         "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
@@ -92,13 +93,27 @@ def _compute_features(
             {name: value for name, value in availability.items() if name in wanted}
         )
     _init_providers()
+    unavailable: list[str] = []
     for name in wanted:
         if name in features:
             continue
         provider = _FEATURE_PROVIDERS.get(name)
-        if provider:
+        if not provider:
+            continue
+        try:
             features[name] = provider(home_team, away_team, event_id, game_date)
-    return features
+        except ValueError:
+            # A per-game provider (e.g. probable_starter_era_gap: ESPN hasn't
+            # posted both starters yet) can genuinely fail for one game
+            # without the game itself being un-forecastable. Default to 0.0
+            # (neutral — no advantage either way, same convention as every
+            # other era-gap-style feature's "no data" case) and note it on
+            # the candidate so the ledger/rationale shows plainly that this
+            # one input was missing, rather than silently forecasting on an
+            # incomplete basis or dropping the game entirely.
+            features[name] = 0.0
+            unavailable.append(name)
+    return features, tuple(unavailable)
 
 
 def _init_providers() -> None:
@@ -109,6 +124,14 @@ def _init_providers() -> None:
     ``starter_era_gap`` provider: its only source is a historical map that can
     never contain a future event, so serving it would silently emit 0.0 —
     an artifact requiring it now fails closed instead.
+
+    ``probable_starter_era_gap`` is different: it reads ESPN's own probable-
+    starters endpoint (announced pre-game, real starter ERA), not a
+    historical map, so it can genuinely serve live. It raises ValueError when
+    a game's starters aren't announced yet — _compute_features catches that
+    per-provider, defaults the feature to a neutral 0.0, and records the name
+    in its returned unavailable-features tuple so the game still gets
+    forecast on every OTHER feature rather than being dropped entirely.
     """
     if _FEATURE_PROVIDERS:
         return
@@ -118,6 +141,11 @@ def _init_providers() -> None:
 
     from .features.weather import live_weather
     _FEATURE_PROVIDERS["weather_factor"] = lambda h, a, eid, gd: float(live_weather(h).get("weather_run_factor", 1.0))
+
+    from .data_sources.espn_probables import espn_pitcher_era_gap
+    _FEATURE_PROVIDERS["probable_starter_era_gap"] = (
+        lambda h, a, eid, gd: espn_pitcher_era_gap(eid, h, a, gd.replace("-", ""))
+    )
 
 
 def _build_basis(features: dict[str, float], home_trend: Any, away_trend: Any, history_games: int) -> dict[str, float | int]:
@@ -150,6 +178,7 @@ class LearnedForwardCandidate:
     model_qualified: bool
     feature_basis: dict[str, float | int]
     feature_snapshot_hash: str
+    unavailable_features: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -165,12 +194,18 @@ def build_learned_moneyline_slate(
     observed_at: datetime,
     minimum_history_games: int = 50,
     minimum_team_history_games: int = 10,
+    leagues: tuple[str, ...] | None = None,
 ) -> tuple[list[LearnedForwardCandidate], list[dict[str, str]], int]:
     """Build scheduled-game decisions with the exact validation feature basis.
 
     History is cut off at midnight before ``game_date``. This intentionally
     mirrors the complete-date walk-forward audit and prevents same-day leakage.
     Market prices are not inputs.
+
+    ``leagues`` is required for sports that span more than one ESPN league key
+    (soccer: EPL/LA_LIGA/BUNDESLIGA/.../WORLD_CUP). Every other learned sport
+    maps 1:1 to a single ESPN league equal to its own name (e.g. "mlb" ->
+    "MLB") and passes ``leagues=None`` to keep that single-scoreboard call.
     """
     key = sport.lower()
     # Cache: primary and flat forecasts call with identical params
@@ -186,8 +221,11 @@ def build_learned_moneyline_slate(
             f"{key} requires {minimum_history_games}+ cached games before {game_date}; "
             f"found {len(history)}"
         )
-    scoreboard = client.scoreboard(key.upper(), game_date)
-    events = scoreboard.get("events", [])
+    espn_leagues = leagues or (key.upper(),)
+    events: list[dict[str, Any]] = []
+    for league in espn_leagues:
+        scoreboard = client.scoreboard(league, game_date)
+        events.extend(scoreboard.get("events", []))
     elo = build_elo(history, key)
     trends = TrendEngine(history)
     candidates: list[LearnedForwardCandidate] = []
@@ -209,7 +247,7 @@ def build_learned_moneyline_slate(
                     f"{home_team}={home_trend.games_played}, "
                     f"required={minimum_team_history_games}"
                 )
-            features = _compute_features(
+            features, unavailable_features = _compute_features(
                 key,
                 artifact,
                 home_team,
@@ -292,6 +330,7 @@ def build_learned_moneyline_slate(
                     model_qualified=artifact.qualified,
                     feature_basis=basis,
                     feature_snapshot_hash=_feature_hash(key, game_date, event_id, basis),
+                    unavailable_features=unavailable_features,
                 )
             )
         except (KeyError, TypeError, ValueError) as error:
@@ -346,10 +385,19 @@ def match_executable_quote(
             )
             if not pairing:
                 continue
+            observed_at = str(snap.get("observed_at_utc", ""))
+            # Decision prices must be pregame. Without this check, capturing
+            # BBO snapshots more than once a day (needed so late-day games
+            # get a fresher line than a single morning snapshot) would let a
+            # later, in-game/post-game snapshot win the "latest wins" compare
+            # below for an earlier game that already started.
+            try:
+                if observed_at and parse_utc(observed_at) >= parse_utc(candidate.event_start_utc):
+                    continue
+            except ValueError:
+                continue
             matched_slugs.add(slug)
-            if best is None or str(snap.get("observed_at_utc", "")) > str(
-                best.get("observed_at_utc", "")
-            ):
+            if best is None or observed_at > str(best.get("observed_at_utc", "")):
                 best = snap
     if best is None:
         return None

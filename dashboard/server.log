@@ -32,3 +32,37 @@ OSError: [Errno 48] Address already in use
 2026-07-23T16:28:55 job finished: daily-1784823905 :: ok in 230.6s
 2026-07-23T16:36:15 job started: daily-1784824575 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
 2026-07-23T16:41:56 job finished: daily-1784824575 :: ok in 340.7s
+2026-07-23T23:19:04 job started: daily-1784848744 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
+2026-07-23T23:26:35 job finished: daily-1784848744 :: ok in 451.2s
+2026-07-24T10:48:22 job started: daily-1784890102 :: bash /Users/vincentc9002/Documents/Poly & Kalshi/model prediction/scripts/run_daily.sh
+2026-07-24T10:57:55 job finished: daily-1784890102 :: ok in 573.1s
+2026-07-24T15:42:43 job started: daily-1784907763 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-24T15:49:10 job finished: daily-1784907763 :: ok in 387.0s
+2026-07-24T16:24:41 job started: daily-1784910281 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-24T16:30:22 job finished: daily-1784910281 :: ok in 341.6s
+2026-07-24T23:39:29 job started: daily-1784936369 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-24T23:43:31 job finished: daily-1784936369 :: ok in 242.0s
+2026-07-25T02:24:59 job started: flat_forecast-1784946299 :: /Users/vincentc9002/model prediction/.venv/bin/python -m model_prediction.cli flat-forecast --all --date 2026-07-24 --log
+2026-07-25T02:27:41 job finished: flat_forecast-1784946299 :: ok in 162.3s
+2026-07-25T02:30:14 job started: refresh_prices-1784946614 :: model_prediction.cli polymarket-ledger-prices --date 2026-07-24 --contract mlb@2026-07-25=aec-mlb-sea-tex-2026-07-25 --contract mlb@2026-07-24=aec-mlb-sea-tex-2026-07-24
+2026-07-25T02:30:19 job finished: refresh_prices-1784946614 :: ok in 5.1s
+2026-07-25T04:00:33 job started: daily-1784952033 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-25T04:08:56 job finished: daily-1784952033 :: ok in 503.0s
+2026-07-25T15:18:36 job started: flat_forecast-1784992716 :: /Users/vincentc9002/model prediction/.venv/bin/python -m model_prediction.cli flat-forecast --all --date 2026-07-25 --log
+2026-07-25T15:21:28 job finished: flat_forecast-1784992716 :: ok in 171.3s
+2026-07-25T15:25:16 job started: daily-1784993116 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-25T15:33:33 job finished: daily-1784993116 :: ok in 496.7s
+2026-07-25T22:48:40 job started: daily-1785019720 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-25T22:53:47 job finished: daily-1785019720 :: ok in 306.5s
+2026-07-26T00:01:51 job started: daily-1785024111 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T00:07:10 job finished: daily-1785024111 :: ok in 319.0s
+2026-07-26T03:33:54 job started: daily-1785036834 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T03:38:04 job finished: daily-1785036834 :: ok in 250.4s
+2026-07-26T06:29:01 job started: daily-1785047341 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T06:41:31 job finished: daily-1785047341 :: ok in 750.0s
+2026-07-26T07:32:01 job started: daily-1785051121 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T07:37:36 job finished: daily-1785051121 :: ok in 335.1s
+2026-07-26T11:40:25 job started: daily-1785066025 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T11:50:33 job finished: daily-1785066025 :: ok in 608.1s
+2026-07-26T12:18:58 job started: daily-1785068338 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T12:27:32 job finished: daily-1785068338 :: ok in 513.4s

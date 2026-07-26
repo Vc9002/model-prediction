@@ -5,7 +5,6 @@ from pathlib import Path
 
 from model_prediction.models.learned_market import artifact_hash
 
-
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "config" / "tested_features.json"
 ABLATION_PATH = ROOT / "config" / "models" / "production-feature-ablation-2026-07-22.json"
@@ -21,7 +20,7 @@ def test_feature_registry_is_complete_unique_and_points_to_existing_code() -> No
     names = [feature["name"] for feature in features]
 
     assert registry["schema_version"] == "1"
-    assert registry["last_updated"] == "2026-07-22"
+    assert registry["last_updated"] == "2026-07-25"
     assert len(features) == 27
     assert len(names) == len(set(names))
     assert registry["retention_policy"]["threshold"] == 0.0

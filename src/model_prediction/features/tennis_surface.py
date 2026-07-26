@@ -13,7 +13,6 @@ from typing import Any
 
 from .base import FeatureContext, register_feature
 
-
 SURFACES = ("Hard", "Clay", "Grass", "Carpet")
 
 
@@ -60,9 +59,13 @@ def surface_profile(matches: list[dict[str, Any]], player: str) -> dict[str, Any
 @register_feature("tennis_surface")
 def tennis_surface_snapshot(context: FeatureContext) -> dict[str, Any]:
     matches = load_matches(context.data_root, context.as_of_date)
-    players = sorted(
-        {match.get("winner") for match in matches} | {match.get("loser") for match in matches} - {None}
-    )
+    player_names = {
+        name
+        for match in matches
+        for name in (match.get("winner"), match.get("loser"))
+        if name is not None
+    }
+    players = sorted(player_names)
     return {
         "matches": len(matches),
         "players": {player: surface_profile(matches, str(player)) for player in players},

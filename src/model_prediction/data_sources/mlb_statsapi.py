@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import subprocess
 import time
 import urllib.parse
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
-import fcntl
 STATS_API_BASE = "https://statsapi.mlb.com/api"
 SNAPSHOT_SCHEMA_VERSION = "mlb-statsapi-game-v1"
 _BATTING_FIELDS = (
@@ -145,7 +146,7 @@ def collect_game_snapshots(
     if snapshot_type == "historical_reconstruction":
         games = [game for game in games if game.get("status", {}).get("abstractGameState") == "Final"]
     else:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         games = [game for game in games if _parse_utc(game["gameDate"]) > now]
 
     store = MLBGameSnapshotStore(output_path)
@@ -282,7 +283,7 @@ def compact_game_snapshot(payload: dict[str, Any], *, snapshot_type: str) -> dic
     return {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
         "snapshot_type": snapshot_type,
-        "observed_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "observed_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "source": "MLB Stats API",
         "source_url": f"{STATS_API_BASE}/v1.1/game/{payload['gamePk']}/feed/live",
         "source_payload_hash": raw_hash,
@@ -341,4 +342,4 @@ def _number(value: Any) -> float | None:
 
 
 def _parse_utc(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -10,7 +10,7 @@ from model_prediction.total_score import TotalScoreArtifact, build_total_score_r
 
 def _games(count: int, final_total_delta: int = 0) -> list[GameRecord]:
     teams = ("A", "B", "C", "D")
-    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2024, 1, 1, tzinfo=UTC)
     games = []
     for index in range(count):
         away = teams[index % 4]

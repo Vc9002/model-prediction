@@ -19,7 +19,6 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-
 STATUS = "deferred"
 DEFERRED_MESSAGE = (
     "Kalshi integration is deferred: it requires US residency and CFTC-regulated "

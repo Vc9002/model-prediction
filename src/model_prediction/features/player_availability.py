@@ -10,13 +10,13 @@ from __future__ import annotations
 import json
 import math
 import unicodedata
+from collections.abc import Mapping
 from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from ..domain import parse_utc
-
 
 FEATURE_NAMES = {
     "availability_points_gap",

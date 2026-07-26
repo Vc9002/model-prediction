@@ -12,7 +12,6 @@ from typing import Any
 
 import httpx
 
-
 BASE_URL = "https://api.openligadb.de"
 
 # Leagues relevant to Polymarket US (German-speaking + nearby)

@@ -15,15 +15,26 @@ generated evidence.
 
 ## Current blockers
 
-- MLB and NFL do not clear the current locked qualification contract.
-- The active MLB artifact is internally inconsistent and fails the config test.
-- Soccer report/config/registry status is inconsistent.
-- The audit chain is broken, the installed CLI entry point is stale, and Ruff is not clean.
-- Spread, total, F5, YRFI/NRFI, and research-league economics remain blocked without exact point-in-time inputs and executable prices.
+- Real-money execution tickets are not bound to the exact qualified ledger row,
+  and ledger mutation is not atomic with audit append.
+- Active MLB v6 is unqualified and uses probable-starter history without
+  historical pregame provenance.
+- Four dashboard order-preview tests fail; Ruff reports 117 findings.
+- Two spread artifacts fail canonical hash verification, config has a missing
+  residual artifact and a wrong MLB total reference, and the latest learned
+  report is stale for the active checkout.
+- WNBA availability can fail open; learned artifact qualification and quote
+  `timestamp_valid` are not enforced at the first classification/pricing step.
+- KBO/NPB preview, research routing, and tie-settlement economics are wrong.
+- Spread, total, F5, YRFI/NRFI, and research-league economics remain blocked
+  without exact point-in-time inputs and executable prices.
 
 ## Required next evidence
 
-Repair release alignment first. Then prospectively collect observed-at source
-records, executable BBOs, confirmed starters/lineups, pitcher and bullpen state,
-and closing snapshots. Promote only a new version reproduced from a stable,
-green checkout.
+Repair capital/evidence integrity first: execution binding, ledger/audit
+recoverability, point-in-time starter provenance, artifact/timestamp
+enforcement, and fail-closed availability. Then restore a green checkout,
+reproduce the release, and continue prospective observed-at source records,
+executable BBOs, confirmed starters/lineups, pitcher and bullpen state, and
+closing snapshots. Promote only a new version reproduced from a stable, green
+checkout.

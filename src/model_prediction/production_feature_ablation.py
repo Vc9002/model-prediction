@@ -14,10 +14,11 @@ import json
 import math
 import random
 from collections import defaultdict
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from statistics import mean
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from sklearn.linear_model import LogisticRegression
 
@@ -611,7 +612,7 @@ def build_report(data_root: str | Path = "data") -> dict[str, Any]:
             result["decision"], result["decision_reason"] = _decision(result, result["holm_adjusted_p_value"])
     payload: dict[str, Any] = {
         "schema_version": "production-feature-ablation-v1",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "as_of_date": "2026-07-22",
         "scope": "configured production_artifact entries only; leave one active feature out at a time",
         "explicit_score_data_root": str(Path(data_root).resolve()),

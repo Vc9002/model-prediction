@@ -5,7 +5,7 @@ description: Forecast, log, settle, review, and diagnose sports picks in the mod
 
 # Forecast Model Picks
 
-Work from `/Users/vincentc9002/Documents/Poly & Kalshi/model prediction`.
+Work from `/Users/vincentc9002/model prediction`.
 
 ## Establish current truth
 

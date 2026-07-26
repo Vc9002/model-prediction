@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from ..domain import parse_utc, utc_now
-
 
 STATUS_MAP = {
     "Out": "Out",

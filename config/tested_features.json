@@ -138,17 +138,20 @@
       "file": "src/model_prediction/features/trends.py",
       "fitted_coefficients": {
         "NBA": -0.013,
+        "SOCCER": 0.141,
         "WNBA": -0.003
       },
       "name": "defensive_trend_gap",
-      "notes": "CORRECTION OF A PRIOR CLAIM: this feature does NOT explain NBA/WNBA performance. Its fitted coefficients are near zero, and strict leave-one-out evidence is INCONCLUSIVE in both leagues.",
+      "notes": "CORRECTION OF A PRIOR CLAIM: this feature does NOT explain NBA/WNBA performance. Its fitted coefficients are near zero, and strict leave-one-out evidence is INCONCLUSIVE in both leagues. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+defensive_trend_gap), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence.",
       "production_ablation": {
         "NBA": "INCONCLUSIVE",
+        "SOCCER": "INCONCLUSIVE",
         "WNBA": "INCONCLUSIVE"
       },
       "sports": [
         "NBA",
-        "WNBA"
+        "WNBA",
+        "SOCCER"
       ],
       "status": "production_directionally_harmful",
       "tested_on": "2026-07-22",
@@ -378,8 +381,10 @@
       "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
       "file": "src/model_prediction/features/trends.py",
       "name": "consistency_gap",
-      "notes": "Tested in factorial roadmap challenger (v3 incumbents). NBA: both validation (-0.0010) and holdout (-0.0012) Brier improve with consistency+hot_cold+schedule. NFL: both improve (-0.0025 val, -0.0038 hold). MLB: holdout improves (-0.0003) but validation regresses (+0.0007). WNBA: holdout improves (-0.0010) but validation regresses (+0.0006). Directionally promising for NBA/NFL; overfitting concern for MLB/WNBA. Retest with current (v4/v5) artifacts before promoting.",
-      "sports": [],
+      "notes": "Tested in factorial roadmap challenger (v3 incumbents). NBA: both validation (-0.0010) and holdout (-0.0012) Brier improve with consistency+hot_cold+schedule. NFL: both improve (-0.0025 val, -0.0038 hold). MLB: holdout improves (-0.0003) but validation regresses (+0.0007). WNBA: holdout improves (-0.0010) but validation regresses (+0.0006). Directionally promising for NBA/NFL; overfitting concern for MLB/WNBA. Retest with current (v4/v5) artifacts before promoting. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+consistency_gap), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence.",
+      "sports": [
+        "SOCCER"
+      ],
       "status": "tested_via_roadmap_challenger_v3_incumbent",
       "tested_on": "2026-07-22",
       "verdict": "tested_borderline"
@@ -389,8 +394,10 @@
       "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
       "file": "src/model_prediction/features/trends.py",
       "name": "hot_cold_gap",
-      "notes": "Tested in factorial roadmap challenger (v3 incumbents). Same pattern as consistency_gap: NBA/NFL benefit, MLB/WNBA show holdout improvement but validation regression. Best NBA combo (consistency+hot_cold+schedule_density+schedule_missingness) improves holdout Brier by -0.0012. Retest with current artifacts.",
-      "sports": [],
+      "notes": "Tested in factorial roadmap challenger (v3 incumbents). Same pattern as consistency_gap: NBA/NFL benefit, MLB/WNBA show holdout improvement but validation regression. Best NBA combo (consistency+hot_cold+schedule_density+schedule_missingness) improves holdout Brier by -0.0012. Retest with current artifacts. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+hot_cold_gap), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence.",
+      "sports": [
+        "SOCCER"
+      ],
       "status": "tested_via_roadmap_challenger_v3_incumbent",
       "tested_on": "2026-07-22",
       "verdict": "tested_borderline"
@@ -412,12 +419,13 @@
       "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
       "file": "src/model_prediction/features/schedule_load.py",
       "name": "rest_disparity",
-      "notes": "Home-minus-away rest days (capped). Tested in factorial roadmap challenger. NBA: combined with consistency+hot_cold+schedule_density improves holdout by -0.0012. NFL: combined with schedule_density improves holdout by -0.0038. MLB: improves holdout by -0.0004 but validation regresses. Currently wired in learned_forward.py but not in any active model config.",
+      "notes": "Home-minus-away rest days (capped). Tested in factorial roadmap challenger. NBA: combined with consistency+hot_cold+schedule_density improves holdout by -0.0012. NFL: combined with schedule_density improves holdout by -0.0038. MLB: improves holdout by -0.0004 but validation regresses. Currently wired in learned_forward.py but not in any active model config. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+schedule features (rest_disparity/back_to_back_gap/games_last_7_gap)), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence.",
       "sports": [
         "MLB",
         "NBA",
         "WNBA",
-        "NFL"
+        "NFL",
+        "SOCCER"
       ],
       "status": "tested_via_roadmap_challenger_v3_incumbent",
       "tested_on": "2026-07-22",
@@ -428,12 +436,13 @@
       "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
       "file": "src/model_prediction/features/schedule_load.py",
       "name": "back_to_back_gap",
-      "notes": "Home-minus-away back-to-back indicator. Tested in factorial roadmap challenger. Adds marginal improvement (+0.0001 Brier) on top of rest_disparity+schedule_density combos. NFL has no variance (all games have similar rest). Currently wired in learned_forward.py.",
+      "notes": "Home-minus-away back-to-back indicator. Tested in factorial roadmap challenger. Adds marginal improvement (+0.0001 Brier) on top of rest_disparity+schedule_density combos. NFL has no variance (all games have similar rest). Currently wired in learned_forward.py. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+schedule features (rest_disparity/back_to_back_gap/games_last_7_gap)), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence.",
       "sports": [
         "MLB",
         "NBA",
         "WNBA",
-        "NFL"
+        "NFL",
+        "SOCCER"
       ],
       "status": "tested_via_roadmap_challenger_v3_incumbent",
       "tested_on": "2026-07-22",
@@ -444,12 +453,13 @@
       "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
       "file": "src/model_prediction/features/schedule_load.py",
       "name": "games_last_7_gap",
-      "notes": "Home-minus-away games played in last 7 days (schedule density). Tested in factorial roadmap challenger. Strongest in combination with rest_disparity+consistency+hot_cold. Currently wired in learned_forward.py.",
+      "notes": "Home-minus-away games played in last 7 days (schedule density). Tested in factorial roadmap challenger. Strongest in combination with rest_disparity+consistency+hot_cold. Currently wired in learned_forward.py. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+schedule features (rest_disparity/back_to_back_gap/games_last_7_gap)), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence.",
       "sports": [
         "MLB",
         "NBA",
         "WNBA",
-        "NFL"
+        "NFL",
+        "SOCCER"
       ],
       "status": "tested_via_roadmap_challenger_v3_incumbent",
       "tested_on": "2026-07-22",
@@ -472,7 +482,7 @@
       "verdict": "tested_marginal"
     }
   ],
-  "last_updated": "2026-07-22",
+  "last_updated": "2026-07-25",
   "production_ablation_summary": [
     {
       "economic_claim_allowed": false,
@@ -680,5 +690,5 @@
   },
   "schema_version": "1",
   "sha256": "936c3633adcba558c6e9ce3ca4165add9e0af53f22dd3db72d3b3195d6fbaa32",
-  "updated": "2026-07-22"
+  "updated": "2026-07-25"
 }

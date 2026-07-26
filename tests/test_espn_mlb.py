@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from model_prediction.data_sources.espn import (
     parse_pitcher_form,
@@ -6,8 +6,7 @@ from model_prediction.data_sources.espn import (
     parse_team_form,
 )
 
-
-DECISION = datetime(2026, 7, 12, 18, tzinfo=timezone.utc)
+DECISION = datetime(2026, 7, 12, 18, tzinfo=UTC)
 
 
 def test_team_form_rejects_future_and_nonfinal_games() -> None:

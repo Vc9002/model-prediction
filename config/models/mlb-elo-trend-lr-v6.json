@@ -1,0 +1,66 @@
+{
+  "artifact_hash": "10a412e78306d1f4d1a66590dd7cd2087ed53520bfa3bb925889a6371153732f",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        0.3004240295,
+        -0.0575763408,
+        -0.2347151806,
+        -0.2868233769
+      ],
+      "confidence_threshold": 0.56901732,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "probable_starter_era_gap"
+      ],
+      "intercept": 0.1969213963,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "mlb-elo-trend-lr-v6",
+  "qualification": {
+    "brier_score": 0.201595,
+    "calls": 135,
+    "every_called_month_positive_at_minus_110": false,
+    "every_qualifying_month_positive_at_minus_110": false,
+    "failures": [
+      "no complete month reached the 10-call qualification minimum"
+    ],
+    "framework": "recency_restricted_90d_partial",
+    "hit_rate": 0.711111,
+    "hits": 96,
+    "locked_holdout": true,
+    "market_type": "moneyline",
+    "meets_primary_holdout_metrics": false,
+    "minimum_calls": 50,
+    "minimum_hit_rate": 0.6,
+    "monthly_minimum_calls": 10,
+    "qualification_eligible": true,
+    "qualified": false,
+    "selectivity": 0.557851,
+    "total_predictions": 242,
+    "units_at_minus_110": 48.272727
+  },
+  "schema_version": "1",
+  "sport": "mlb",
+  "training": {
+    "coefficient_fit": {
+      "note": "recency-restricted fit: last 90 days only, current-roster ESPN probables",
+      "observations": 657
+    },
+    "experimental_note": "LIVE PITCHER-FEATURE EXPERIMENT (2026-07-25, operator-directed). probable_starter_era_gap uses ESPN's probables endpoint, which returns CURRENT/live ERA regardless of query date -- verified 2026-07-25 (same pitcher, same ERA, 3 months apart) -- so it cannot be honestly backtested on historical dates. This fit is restricted to the last 90 days only (current rosters) to reduce that distortion, not eliminate it. Being run live for observation before any promotion decision, per explicit operator direction, not because it has passed this project's normal walk-forward + locked-holdout bar (it has not: single partial month, 242 holdout calls).",
+    "locked_holdout": {
+      "note": "single partial month (2026-07); too small/short to formally qualify",
+      "observations": 242
+    },
+    "market_inputs_used": false,
+    "threshold_selection": {
+      "observations": 217
+    },
+    "threshold_source": "validation cohort within the 90-day recency window; never a true multi-month locked holdout",
+    "walk_forward_features": true
+  }
+}

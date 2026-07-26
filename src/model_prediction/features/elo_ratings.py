@@ -5,13 +5,13 @@ Computed chronologically from cached completed games only — zero look-ahead.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from math import log
-from typing import Any, Iterable
+from typing import Any
 
 from .base import FeatureContext, GameRecord, register_feature
-
 
 DEFAULT_ELO = 1500.0
 

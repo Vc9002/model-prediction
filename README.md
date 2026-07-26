@@ -3,17 +3,28 @@
 Shadow-first multi-sport prediction, research, ledger, and local dashboard
 system with Polymarket US market-data integration.
 
-**Last updated**: 2026-07-23
+**Last updated**: 2026-07-26
+
+The current operational verdict and audit evidence live in
+[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`DEBUG.md`](DEBUG.md).
+The checkout is **not release-ready**, and its real-money execution surface
+should not be used until the P0 execution-binding and ledger/audit transaction
+defects are repaired.
 
 ## Current State
 
 | Metric | Value |
 |--------|-------|
-| Active models | MLB v5 + WNBA v4 (production), CS2/DOTA2/LOL/VALORANT v3 (esports) |
-| Edge gate | 5% minimum for MLB/WNBA qualified calls |
-| Model P&L (main) | 38 calls, 29-9 (76%), +17.59U (real Polymarket closing prices) |
-| Flat P&L | 111 settled, 62.2%, +21.99U |
-| Tests | 321 pass, 0 fail |
+| Active learned artifacts | MLB v6, NBA/WNBA/NFL v4, Soccer v2 |
+| Research/override artifacts | Esports v4, KBO/NPB v2 identifiers |
+| Tests | **410 pass, 4 fail** |
+| Audit chain | 16,387 events, 0 breaks, 0 hash mismatches |
+| Artifact integrity | 31 valid, 2 mismatched, 33 total |
+| Ruff | 117 findings |
+| Release status | **Blocked** |
+
+Do not infer executable profitability from artifact hit rates, synthetic
+`-110` units, shadow-ledger P&L, or a dashboard qualification badge.
 
 ## Ledger Structure
 
@@ -21,7 +32,7 @@ Three ledgers with distinct purposes:
 
 | Ledger | File | Purpose |
 |--------|------|---------|
-| **Main** | `data/picks.xlsx` | Production qualified calls only (edge ≥ 5%). These are the bets. |
+| **Main** | `data/picks.xlsx` | Main shadow-call ledger. A row label is not proof of artifact qualification or a placed order. |
 | **Flat** | `data/flat_picks.xlsx` | All games with production model decisions. Research/diagnostic only. |
 | **Research** | `data/research.xlsx` | Research and development models. Feature ablation, challengers, experiments. |
 
@@ -36,14 +47,12 @@ artifact, current report, tests, and point-in-time evidence agree.
 
 | League | Model | Status |
 |--------|-------|--------|
-| MLB | spread-baseline-v1 | Research — will improve as snapshots accumulate |
+| MLB | v6 probable-starter experiment + spread/total research | Unqualified; historical starter provenance is not point-in-time |
 | NBA | spread-baseline-v1 | Research |
 | WNBA | spread-baseline-v1 | Research |
 | NFL | spread-baseline-v1 | Research |
-| LoL | neutral-series-elo-v1 | Research — no market-profitability claim |
-| CS2 | neutral-series-elo-v1 | Research — legacy CS:GO excluded |
-| KBO | tie-aware-elo-v1 | Research — ties valued at 50¢; no profitability claim |
-| NPB | tie-aware-elo-v1 | Research — ties valued at 50¢; October omitted to prevent postseason leakage |
+| LoL/CS2/DOTA2/Valorant | neutral-series Elo v4 | Config override; dashboard evidence remains research-only |
+| KBO/NPB | tie-aware Elo v2 identifiers | Research; preview/routing/tie-settlement semantics need repair |
 
 Spread, total, F5, and other derivative models remain research-only unless exact
 historical contract lines and decision-horizon inputs exist. Never infer
@@ -71,7 +80,8 @@ python3 -m venv .venv
 # Dashboard (open and verify in Dia)
 env PYTHONPATH=src:. .venv/bin/python dashboard_server.py --port 8765
 
-# The installed console entry point is currently stale. Use the module form.
+# Both the installed entry point and module form currently import.
+.venv/bin/model-prediction summary
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli summary
 
 # Daily pipeline; this logs and settles rows, so inspect before running.
@@ -129,7 +139,7 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 │   ├── model.yaml              # Active model configuration
 │   └── models/                 # Immutable, hash-verified artifacts
 ├── src/model_prediction/
-│   ├── learned_forward.py      # Forward model + fail-closed feature hooks
+│   ├── learned_forward.py      # Forward model; current WNBA hook can degrade/fail open
 │   ├── validation.py           # Walk-forward validation pipeline
 │   ├── features/               # Elo, trends, park factors, player availability
 │   ├── data_sources/           # ESPN, markets, official WNBA injury reports
@@ -150,9 +160,15 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 
 ## Audit & Integrity
 
-- **Artifact hashes:** JSON artifacts carry SHA-256 hashes; hash integrity does not prove current qualification
-- **Audit chain:** `data/events.jsonl` is intended to be linked but is currently broken; see project status
-- **Validation:** `outputs/latest/learned-model-validation.json`
+- **Artifact hashes:** all 33 JSON artifacts carry SHA-256 fields, but the NBA
+  and NFL spread baselines currently mismatch their canonical contents.
+- **Audit chain:** `data/events.jsonl` is intact at 16,387 events, but
+  ledger/audit reconciliation remains false because 1,150 historical removals
+  predate audited removal events.
+- **Validation:** `outputs/latest/learned-model-validation.json` is stale for
+  this checkout and active MLB v6. It is not a release manifest.
+- **Execution:** the current order ticket is not structurally bound to the
+  qualified ledger row. Do not use real-money execution.
 
 Run the checks in `DEBUG.md`. Record failures as failures; never rewrite the
 documentation to say the scan passed until tests, Ruff, hashes, the chain, config,

@@ -22,7 +22,6 @@ from typing import Any
 
 from ..domain import parse_utc, utc_now
 
-
 HIGH_CONFIDENCE_TAG = "HIGH_CONFIDENCE"
 
 

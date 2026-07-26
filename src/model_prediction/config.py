@@ -8,7 +8,6 @@ import yaml
 
 from .units import UnitPolicy
 
-
 CONTINUOUS_MODEL_ITERATION_POLICY: dict[str, bool | str] = {
     "status": "continuous",
     "parameter_freezes_allowed": True,
@@ -94,5 +93,18 @@ def unit_policy(config: dict[str, Any]) -> UnitPolicy:
         **{
             field: values.get(field, getattr(defaults, field))
             for field in UnitPolicy.__dataclass_fields__
+        }
+    )
+
+
+def economic_gate_thresholds(config: dict[str, Any]):
+    from .economic_gate import EconomicGateThresholds
+
+    values = config.get("economic_gate") or {}
+    defaults = EconomicGateThresholds()
+    return EconomicGateThresholds(
+        **{
+            field: values.get(field, getattr(defaults, field))
+            for field in EconomicGateThresholds.__dataclass_fields__
         }
     )

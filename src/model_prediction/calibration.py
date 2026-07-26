@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, Sequence
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -92,7 +93,7 @@ class TrainablePlattCalibrator:
         base_model_version: str,
         version: str = "platt-rolling-v1",
         minimum_sample: int = 100,
-    ) -> "TrainablePlattCalibrator | IdentityCalibrator":
+    ) -> TrainablePlattCalibrator | IdentityCalibrator:
         if len(probabilities) != len(outcomes):
             raise ValueError("probabilities and outcomes must have equal length")
         if len(probabilities) < minimum_sample:
@@ -141,7 +142,7 @@ class IsotonicCalibrator:
         base_model_version: str,
         version: str = "isotonic-rolling-v1",
         minimum_sample: int = 200,
-    ) -> "IsotonicCalibrator | IdentityCalibrator":
+    ) -> IsotonicCalibrator | IdentityCalibrator:
         if len(probabilities) != len(outcomes):
             raise ValueError("probabilities and outcomes must have equal length")
         if len(probabilities) < minimum_sample:

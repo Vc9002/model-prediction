@@ -12,8 +12,8 @@ from datetime import datetime
 from model_prediction.features.base import FeatureStore
 from model_prediction.features.elo_ratings import build_elo
 from model_prediction.features.trends import TrendEngine
-from model_prediction.validation import ValidationRow, chronological_split
 from model_prediction.models.learned_market import LearnedMarketArtifact
+from model_prediction.validation import ValidationRow, chronological_split
 
 ARTIFACTS = {
     "mlb":  "config/models/mlb-elo-trend-lr-v3.json",
@@ -133,9 +133,7 @@ def apply(extra, rows, threshold, fname):
                 keep = False
 
         elif "both sides" in fname:
-            if side == "home" and disp <= -3:
-                keep = False
-            elif side == "away" and disp >= 3:
+            if side == "home" and disp <= -3 or side == "away" and disp >= 3:
                 keep = False
         if keep:
             outcome = row.outcome if prob >= 0.5 else 1 - row.outcome

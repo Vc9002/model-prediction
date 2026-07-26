@@ -12,11 +12,14 @@ import json
 import math
 import random
 from collections import deque
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from statistics import mean as _mean, pstdev
-from typing import Any, Sequence
+from statistics import mean as _mean
+from statistics import pstdev
+from typing import Any
 
+import numpy as np
 from sklearn.linear_model import Ridge
 
 from .features.base import FeatureStore, GameRecord
@@ -121,10 +124,14 @@ def build_total_score_rows(
             and scored_ewma.get(away) is not None
         ):
             baseline = _mean(league_totals)
-            away_run_rate = scored_ewma.get(away, baseline / 2)
-            away_allow_rate = allowed_ewma.get(away, baseline / 2)
-            home_run_rate = scored_ewma.get(home, baseline / 2)
-            home_allow_rate = allowed_ewma.get(home, baseline / 2)
+            away_scored = scored_ewma.get(away)
+            away_run_rate = away_scored if away_scored is not None else baseline / 2
+            away_allowed = allowed_ewma.get(away)
+            away_allow_rate = away_allowed if away_allowed is not None else baseline / 2
+            home_scored = scored_ewma.get(home)
+            home_run_rate = home_scored if home_scored is not None else baseline / 2
+            home_allowed = allowed_ewma.get(home)
+            home_allow_rate = home_allowed if home_allowed is not None else baseline / 2
             pf = PARK_FACTORS.get(home, 1.0)
             weather = 1.0  # Neutral — no live weather feed yet
             bullpen_rest = 3.0  # Default 3 days rest
@@ -206,8 +213,8 @@ def validate_total_score_model(store: FeatureStore, sport: str) -> dict[str, Any
     X_test = [list(r.features) for r in test_rows]
 
     model = Ridge(alpha=1.0, random_state=42)
-    model.fit(X_train, y_train)
-    predictions = model.predict(X_test).tolist()
+    model.fit(np.asarray(X_train), y_train)
+    predictions = model.predict(np.asarray(X_test)).tolist()
 
     baseline_preds = [r.baseline_total for r in test_rows]
     model_metrics = _metrics(predictions, test_rows)
@@ -278,7 +285,7 @@ class TotalScoreArtifact:
         return result
 
     @classmethod
-    def load(cls, path: str | Path) -> "TotalScoreArtifact":
+    def load(cls, path: str | Path) -> TotalScoreArtifact:
         return cls(json.loads(Path(path).read_text(encoding="utf-8")))
 
     def predict(self, features: dict[str, float]) -> float:

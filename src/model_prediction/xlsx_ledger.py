@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.styles.numbers import FORMAT_TEXT
-from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.utils import get_column_letter
-
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 SHEET_NAME = "Picks"
 TABLE_NAME = "PicksLedger"
@@ -138,6 +137,7 @@ def write_xlsx_rows_atomic(
 def _build_workbook(fieldnames: list[str], rows: list[dict[str, str]]) -> Workbook:
     workbook = Workbook()
     summary = workbook.active
+    assert summary is not None, "a freshly constructed Workbook always has an active sheet"
     summary.title = "Summary"
     sheet = workbook.create_sheet(SHEET_NAME)
     sheet.sheet_view.showGridLines = False
@@ -358,21 +358,27 @@ def _excel_value(text: str, field: str) -> str | int | float | None:
     return text
 
 
+def _as_float(value: object) -> float:
+    if isinstance(value, (int, float, str)):
+        return float(value)
+    raise TypeError(f"cannot convert {value!r} to float")
+
+
 def _cell_to_text(value: object, field: str) -> str:
     if value is None:
         return ""
     if field in _INTEGER_FIELDS:
-        return str(int(float(value)))
+        return str(int(_as_float(value)))
     if field in _GENERAL_NUMBER_FIELDS:
-        return format(float(value), ".15g")
+        return format(_as_float(value), ".15g")
     if field in _SIX_DECIMAL_FIELDS:
-        return f"{float(value):.6f}"
+        return f"{_as_float(value):.6f}"
     if field in _TWO_DECIMAL_FIELDS:
-        return f"{float(value):.2f}"
+        return f"{_as_float(value):.2f}"
     if field in _FOUR_DECIMAL_FIELDS:
-        return f"{float(value):.4f}"
+        return f"{_as_float(value):.4f}"
     if field in _SIX_DECIMAL_RESULT_FIELDS:
-        return f"{float(value):.6f}"
+        return f"{_as_float(value):.6f}"
     return str(value)
 
 

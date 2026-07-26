@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import shutil
+import time
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
-
-import fcntl
 
 from .audit import AuditLog
 from .calibration import calibration_metrics
@@ -30,10 +30,34 @@ from .pricing import american_to_decimal, grade_pick, implied_probability, profi
 from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
 
-
 # Exposure "day" boundaries follow US Eastern time, not UTC. A 10pm ET slate
 # would otherwise straddle two UTC cap windows and reset caps mid-slate.
 EXPOSURE_TIMEZONE = EASTERN
+
+# fcntl.flock(LOCK_EX) blocks indefinitely with no built-in timeout -- a
+# hung holder (not crashed; POSIX auto-releases on process death) would
+# otherwise wedge every other reader/writer forever with no diagnostic.
+LOCK_TIMEOUT_SECONDS = 30
+LOCK_POLL_INTERVAL_SECONDS = 0.1
+
+
+class LedgerLockTimeout(TimeoutError):
+    """Raised when a ledger file lock can't be acquired within the timeout."""
+
+
+def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEOUT_SECONDS) -> None:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fcntl.flock(fileno, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                raise LedgerLockTimeout(
+                    f"could not acquire lock on {path} within {timeout}s -- "
+                    "another process may be hung while holding it"
+                ) from None
+            time.sleep(LOCK_POLL_INTERVAL_SECONDS)
 
 LEDGER_SCHEMA_VERSION = "3"
 LEGACY_FIELDNAMES = [
@@ -128,6 +152,8 @@ FIELDNAMES = [*LEGACY_FIELDNAMES,
     "park_factor",
     "weather_factor",
     "pitcher_era_gap",
+    "probable_starter_era_gap",
+    "unavailable_features",
     "defensive_trend_gap",
     "neutral_elo_rating_difference",
     # Schedule / roadmap challenger feature columns
@@ -233,7 +259,7 @@ class PickLedger:
     def _lock(self) -> Iterator[None]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+") as lock:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            _acquire_exclusive_lock(lock.fileno(), self.lock_path)
             try:
                 yield
             finally:
@@ -277,12 +303,29 @@ class PickLedger:
         for row in self.rows():
             if row["record_type"] != RecordType.QUALIFIED_SHADOW_CALL.value or row["decision"] != "CALL":
                 continue
+            # An OPEN row for this exact same bet (event + market + selection)
+            # is this decision's own still-pending prior instance, not
+            # competing exposure -- e.g. flat re-evaluating a game main
+            # already logged a real open call for. Without this exclusion it
+            # double-counts against itself and collapses to a much smaller
+            # size than the same decision gets when sized fresh (main clears
+            # its own open row before re-forecasting the same event, so it
+            # never sees this self-collision; only a second ledger reading
+            # main's still-open row can). Settled rows are never excluded --
+            # audit/reporting queries for an already-decided bet expect its
+            # own settled exposure to still show up.
+            is_same_bet = (
+                row["status"] == PickStatus.OPEN.value
+                and row["event_id"] == request.event_id
+                and row["market_type"] == request.market_type.value
+                and row["selection"] == request.selection.lower()
+            )
             units = float(row["units"] or 0)
             try:
                 row_day = parse_utc(row["created_at_utc"]).astimezone(EXPOSURE_TIMEZONE).date().isoformat()
             except (KeyError, ValueError):
                 row_day = ""
-            if row_day == today:
+            if row_day == today and not is_same_bet:
                 daily += units
                 if row["league"] == request.league.value:
                     league_daily += units
@@ -296,7 +339,7 @@ class PickLedger:
                 }
                 if request_teams & row_teams:
                     team_daily += units
-            if row["event_id"] == request.event_id:
+            if row["event_id"] == request.event_id and not is_same_bet:
                 event += units
         return Exposure(daily, league_daily, event, team_daily)
 
@@ -509,6 +552,12 @@ class PickLedger:
             closing_probability = closing_raw_probability
             if closing_probability is None and closing_american_odds is not None:
                 closing_probability = implied_probability(closing_american_odds)
+            # Every logged pick — qualified or research/diagnostic — carries a
+            # real unit size (see cli._log_esports_forecast / _forecast_learned_sport:
+            # "every pick must have units"), and every ledger settles that size
+            # into a real pnl_units, main or flat or research or gated. Whether
+            # a ledger's P&L represents actually-staked money is a property of
+            # the ledger itself (main only), not something settle() decides.
             units = float(row["units"] or 0)
             pnl = profit_units(result, units, float(row["decision_decimal_odds"] or row["decimal_odds"]))
             research_units = None
@@ -599,14 +648,86 @@ class PickLedger:
         )
         return row
 
-    def remove_open_rows(self, pick_ids: list[str], reason: str) -> list[str]:
+    def recompute_research_sizing(self, policy=None) -> int:
+        """Recompute ``units`` (and ``pnl_units`` for already-settled rows)
+        for every RESEARCH_OBSERVATION row, from that row's own stored
+        decision-time fields, using the current sizing rule in
+        ``eligibility._research``: edge_scaled_units for reasons that still
+        reflect a genuine model opinion (LOW_EDGE, EXPOSURE_LIMIT,
+        LARGE_DISAGREEMENT_REVIEW), hard-zero for every other reason.
+
+        One-time backfill for rows logged under an earlier, buggier version
+        of that rule (a flat min_pick_units cap regardless of edge, or a
+        hardcoded zero) -- brings already-logged history in line with the
+        current rule without re-forecasting or touching decision/reason_code.
+        QUALIFIED_SHADOW_CALL rows are never touched: their sizing always
+        came from the real, validated, exposure-capped path, not this one.
+        """
+        from .config import load_config
+        from .config import unit_policy as _unit_policy
+
+        policy = policy or _unit_policy(load_config())
+        sizable_reasons = {
+            "NO_CALL_LOW_EDGE",
+            "NO_CALL_EXPOSURE_LIMIT",
+            "NO_CALL_LARGE_DISAGREEMENT_REVIEW",
+        }
+        changed = 0
+        with self._lock():
+            self._migrate_if_needed()
+            rows = self._read_unlocked()
+            for row in rows:
+                if row["record_type"] != RecordType.RESEARCH_OBSERVATION.value:
+                    continue
+                try:
+                    model_probability = float(row["model_probability"])
+                    american_odds = int(float(row["decision_american_odds"] or row["american_odds"]))
+                except (KeyError, ValueError, TypeError):
+                    continue
+                uncertainty_raw = row.get("model_uncertainty")
+                uncertainty = float(uncertainty_raw) if uncertainty_raw not in (None, "") else 0.05
+                new_units = (
+                    edge_scaled_units(model_probability, uncertainty or 0.05, american_odds, policy)
+                    if row.get("reason_code") in sizable_reasons
+                    else 0.0
+                )
+                old_units = float(row["units"] or 0)
+                if abs(new_units - old_units) < 1e-9:
+                    continue
+                row["units"] = f"{new_units:.4f}"
+                if row["status"] == PickStatus.SETTLED.value and row.get("result"):
+                    decimal_odds = float(row["decision_decimal_odds"] or row["decimal_odds"])
+                    pnl = profit_units(PickResult(row["result"]), new_units, decimal_odds)
+                    row["pnl_units"] = f"{pnl:.4f}"
+                changed += 1
+            if changed:
+                self._write_rows(rows)
+        if changed:
+            self.audit.append(
+                "ledger_units_recomputed",
+                str(self.path),
+                {"rows_changed": changed, "reason": "backfill fixed research-observation sizing rule"},
+            )
+        return changed
+
+    def remove_open_rows(
+        self, pick_ids: list[str], reason: str, allow_staked_removal: bool = False
+    ) -> list[str]:
         """Physically remove OPEN rows under the ledger lock, with audit events.
 
-        This is the ONLY sanctioned deletion path. Settled rows and rows with
-        positive units are refused — removal exists for re-forecast cleanup
-        and duplicate hygiene, never for erasing results or live exposure.
-        Every removal writes a ``pick_removed`` audit event so the chain and
-        the workbook can always be reconciled.
+        This is the ONLY sanctioned deletion path. Settled rows are always
+        refused. Rows with positive units AND record_type QUALIFIED_SHADOW_CALL
+        are refused too, UNLESS ``allow_staked_removal=True`` — that guard
+        means "real staked exposure" only on the MAIN ledger (picks.xlsx),
+        where QUALIFIED_SHADOW_CALL + units > 0 really does represent a bet
+        that was placed. On flat_picks.xlsx (and research/gated ledgers),
+        nothing is ever actually staked regardless of record_type — an MLB
+        candidate strong enough to independently clear real eligibility still
+        gets logged as QUALIFIED_SHADOW_CALL there, and without this override
+        that row would silently never be replaced by any future re-forecast,
+        permanently freezing its features/probability from whichever run
+        first produced it. Callers pass True only for ledgers that can never
+        hold real money.
         """
         if not reason.strip():
             raise ValueError("a removal reason is required")
@@ -620,7 +741,11 @@ class PickLedger:
             keep: list[dict[str, str]] = []
             for row in rows:
                 if row["pick_id"] in requested and row["status"] == PickStatus.OPEN.value:
-                    if float(row["units"] or 0) > 0 and row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value:
+                    if (
+                        not allow_staked_removal
+                        and float(row["units"] or 0) > 0
+                        and row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value
+                    ):
                         keep.append(row)  # never delete open staked exposure
                         continue
                     removed.append(row)

@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+import fcntl
 import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import fcntl
 import yaml
 
 from .audit import AuditLog
 from .domain import League
-from .entities import EntityResolutionError
-from .entities import CanonicalTeam, EntityRegistry
+from .entities import CanonicalTeam, EntityRegistry, EntityResolutionError
 
 
 @dataclass(frozen=True)

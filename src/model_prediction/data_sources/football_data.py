@@ -15,7 +15,6 @@ from typing import Any
 
 import httpx
 
-
 COMPETITIONS = {
     "EPL": "PL",
     "LA_LIGA": "PD",

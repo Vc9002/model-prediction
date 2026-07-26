@@ -1,18 +1,18 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from model_prediction.data_sources.wnba_injuries import (
-    _Token,
     _parse_coordinate_table,
+    _Token,
     available_report_links,
 )
+from model_prediction.features.base import FeatureStore
 from model_prediction.features.player_availability import (
     matchup_player_availability,
     merge_availability_sources,
 )
-from model_prediction.features.base import FeatureStore
 from model_prediction.learned_forward import build_learned_moneyline_slate
 from model_prediction.models.learned_market import build_artifact
 
@@ -143,8 +143,8 @@ def test_star_outage_moves_more_than_reserve_outage(tmp_path) -> None:
         home_team="Home Team",
         away_team="Away Team",
         game_date="2026-07-19",
-        observed_at=datetime(2026, 7, 19, 20, tzinfo=timezone.utc),
-        event_start=datetime(2026, 7, 19, 21, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 19, 20, tzinfo=UTC),
+        event_start=datetime(2026, 7, 19, 21, tzinfo=UTC),
     )
     assert values["availability_points_gap"] == pytest.approx(-2.8)
     assert values["home_available_minutes_share"] == pytest.approx(0.9)
@@ -159,8 +159,8 @@ def test_report_not_submitted_fails_closed(tmp_path) -> None:
             home_team="Home Team",
             away_team="Away Team",
             game_date="2026-07-19",
-            observed_at=datetime(2026, 7, 19, 20, tzinfo=timezone.utc),
-            event_start=datetime(2026, 7, 19, 21, tzinfo=timezone.utc),
+            observed_at=datetime(2026, 7, 19, 20, tzinfo=UTC),
+            event_start=datetime(2026, 7, 19, 21, tzinfo=UTC),
         )
 
 
@@ -172,8 +172,8 @@ def test_snapshot_observed_after_decision_is_not_backfilled(tmp_path) -> None:
             home_team="Home Team",
             away_team="Away Team",
             game_date="2026-07-19",
-            observed_at=datetime(2026, 7, 19, 20, tzinfo=timezone.utc),
-            event_start=datetime(2026, 7, 19, 21, tzinfo=timezone.utc),
+            observed_at=datetime(2026, 7, 19, 20, tzinfo=UTC),
+            event_start=datetime(2026, 7, 19, 21, tzinfo=UTC),
         )
 
 
@@ -327,7 +327,7 @@ def test_learned_forward_artifact_consumes_availability_feature(tmp_path) -> Non
         store=FeatureStore(tmp_path),
         client=FakeWNBA(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 19, 20, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 19, 20, tzinfo=UTC),
     )
     assert skipped == []
     assert candidates[0].feature_basis["availability_points_gap"] == pytest.approx(-2.8)
@@ -366,6 +366,7 @@ def test_adjust_home_probability_bounds_clamped() -> None:
 def test_gate_logs_on_skip(caplog) -> None:
     """Gate should log at DEBUG when availability data is unavailable."""
     import logging
+
     from model_prediction.learned_forward import logger as gate_logger
     gate_logger.setLevel(logging.DEBUG)
     # Trigger a debug log manually to verify the logging path exists

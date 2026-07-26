@@ -5,7 +5,7 @@ description: Design, implement, test, and document model or data-pipeline change
 
 # Develop Model Prediction
 
-Work from `/Users/vincentc9002/Documents/Poly & Kalshi/model prediction` and
+Work from `/Users/vincentc9002/model prediction` and
 preserve unrelated dirty-worktree changes.
 
 ## Define the change

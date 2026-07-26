@@ -11,27 +11,27 @@ import calendar
 import json
 import math
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from sklearn.linear_model import LogisticRegression
 
-from .config import PROJECT_ROOT
-
 from .calibration import calibration_metrics
+from .config import PROJECT_ROOT
+from .data_sources.espn_probables import espn_pitcher_era_gap
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
 from .features.elo_ratings import build_elo
 from .features.park_factors import park_factor
-from .features.team_runs import pitcher_era_gap_from_history
 from .features.schedule_load import matchup_schedule_load
+from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
 from .lifecycle import evaluate_locked_holdout
 from .models.learned_market import build_artifact, learn_confidence_threshold
 from .pricing import american_to_decimal
-
 
 PRIMARY_THRESHOLD_TARGET_HIT_RATE = 0.65
 DIAGNOSTIC_THRESHOLD_TARGET_HIT_RATE = 0.60
@@ -67,6 +67,8 @@ class ValidationRow:
     defensive_trend_gap: float = 0.0
     pitcher_era_gap: float = 0.0
     starter_era_gap: float = 0.0
+    probable_starter_era_gap: float = 0.0
+    probable_starter_available: bool = False
     consistency_gap: float = 0.0
     hot_cold_gap: float = 0.0
     rest_disparity: float = 0.0
@@ -118,7 +120,35 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "weather_factor",
         "pitcher_era_gap",
     ),
+    "elo_trend_park_probable_starter": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "probable_starter_era_gap",
+    ),
+    "elo_trend_park_weather_probable_starter": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "probable_starter_era_gap",
+    ),
     "soccer_3way": ("elo_probability", "trend_gap"),
+    "elo_trend_schedule": (
+        "elo_probability",
+        "trend_gap",
+        "rest_disparity",
+        "back_to_back_gap",
+        "games_last_7_gap",
+    ),
+    "elo_trend_defense_schedule": (
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap",
+        "rest_disparity",
+        "back_to_back_gap",
+        "games_last_7_gap",
+    ),
 }
 
 
@@ -163,11 +193,28 @@ def build_walk_forward_rows(
                 
                 # Real starter ERA gap from MLB Stats API snapshots (point-in-time)
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
-                
+
+                # Live-servable starter ERA gap: ESPN's own probables endpoint,
+                # the SAME function used at forecast time (learned_forward.py),
+                # so backtest and serve never diverge. Unlike starter_gap above
+                # (a frozen historical map that can't cover a future game),
+                # this can genuinely serve live — fails closed per-game when
+                # ESPN hasn't announced both starters yet.
+                probable_gap, probable_available = 0.0, False
+                if sport.lower() == "mlb":
+                    try:
+                        probable_gap = espn_pitcher_era_gap(
+                            game.event_id, game.home_team, game.away_team,
+                            game.start.astimezone(EASTERN).strftime("%Y%m%d"),
+                        )
+                        probable_available = True
+                    except ValueError:
+                        pass
+
                 # Historical weather from Open-Meteo DB
                 weather = _lookup_weather(game.home_team, game.start.astimezone(EASTERN).date().isoformat())
                 
-                park = (
+                park: dict[str, Any] = (
                     park_factor(game.home_team)
                     if sport.lower() == "mlb"
                     else {"park_factor": 1.0, "status": "not_applicable"}
@@ -200,6 +247,8 @@ def build_walk_forward_rows(
                         weather_factor=float(weather.get("run_factor", 1.0)),
                         pitcher_era_gap=pitcher_gap,
                         starter_era_gap=starter_gap,
+                        probable_starter_era_gap=probable_gap,
+                        probable_starter_available=probable_available,
                         park_available=park["status"] == "available",
                         weather_available=weather.get("available", False),
                         elo_neutral_probability=elo.expected_neutral_win(
@@ -262,7 +311,15 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
             "elo_trend_park_pitcher", "elo_trend_park_weather_pitcher",
         ])
     if sport.lower() == "soccer":
-        variants_to_run.append("soccer_3way")
+        # Tested 2026-07-25 via paired holdout ablation against the production
+        # elo_trend baseline (see config/tested_features.json): none of these
+        # beat it at a Holm-corrected significance level (p >= 0.37). Kept in
+        # the tracked variant set so re-tests as data grows are one command,
+        # not a from-scratch script — not because they're expected to win.
+        variants_to_run.extend([
+            "soccer_3way", "elo_trend_defense", "elo_trend_schedule",
+            "elo_trend_defense_schedule", "elo_trend_full",
+        ])
     variants = {}
     for name in variants_to_run:
         if name == "soccer_3way":
@@ -684,7 +741,7 @@ def run_validation_audit(
     sports: Sequence[str],
     reconstructed_mlb_prices: str | Path | None = None,
 ) -> dict[str, Any]:
-    report = {
+    report: dict[str, Any] = {
         "schema_version": "1",
         "primary_qualification": {
             "minimum_locked_holdout_calls": MINIMUM_CALLS,
@@ -982,7 +1039,11 @@ def evaluate_variant_3way(
         for conf, sel, row in zip(ho_confidences, ho_selections, holdout)
         if conf >= threshold
     ]
-    holdout_end = max(row.date for _, _, row in zip(ho_confidences, ho_selections, holdout)) if holdout else date.today()
+    holdout_end = (
+        max(date.fromisoformat(row.date) for _, _, row in zip(ho_confidences, ho_selections, holdout))
+        if holdout
+        else date.today()
+    )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
 
     every_month_positive = all(m["units_at_minus_110"] > 0 for m in monthly_list if m["qualification_status"] == "qualifying")
@@ -1017,6 +1078,174 @@ def evaluate_variant_3way(
                 "every_qualifying_month_positive_at_minus_110": every_month_positive,
                 "total_predictions": len(holdout),
                 "selectivity": round(calls / len(holdout), 6) if holdout else 0,
+            },
+        },
+    }
+
+
+def _learn_threshold_from_confidence_hit(
+    confidences: Sequence[float],
+    hits: Sequence[int],
+    *,
+    target_hit_rate: float,
+    minimum_calls: int,
+) -> tuple[float, dict[str, Any]]:
+    """Least-selective confidence threshold meeting a target hit rate.
+
+    Deliberately NOT models.learned_market.learn_confidence_threshold: that
+    helper assumes its ``probabilities`` argument is P(a specific class) and
+    internally takes ``max(value, 1 - value)``. evaluate_variant_3way passes
+    it an already-collapsed argmax confidence instead (which can be < 0.5 for
+    a 3-way split), silently corrupting the hit label on exactly those rows.
+    This operates directly on (confidence, hit) pairs, so it is correct
+    regardless of how many outcome classes the confidence was collapsed from.
+    """
+    if len(confidences) != len(hits):
+        raise ValueError("confidence/hit length mismatch")
+    if not 0.5 < target_hit_rate < 1:
+        raise ValueError("target_hit_rate must be between 0.5 and 1")
+    for threshold in sorted(set(confidences)):
+        selected = [hit for conf, hit in zip(confidences, hits, strict=True) if conf >= threshold]
+        if len(selected) < minimum_calls:
+            continue
+        hit_rate = sum(selected) / len(selected)
+        if hit_rate >= target_hit_rate:
+            return threshold, {
+                "validation_calls": len(selected),
+                "validation_hit_rate": round(hit_rate, 6),
+                "target_hit_rate": target_hit_rate,
+                "minimum_calls": minimum_calls,
+                "selectivity": round(len(selected) / len(confidences), 6) if confidences else 0,
+            }
+    raise ValueError(
+        f"no confidence threshold reaches {target_hit_rate:.0%} hit rate with >= {minimum_calls} calls"
+    )
+
+
+def qualify_soccer_poisson_model(store: FeatureStore, minimum_history_games: int = 200) -> dict[str, Any]:
+    """Walk-forward qualify the independent Poisson/Dixon-Coles 3-way soccer
+    model (models.soccer.SoccerModel) on the same locked 60/20/20 date split
+    and hit-rate/monthly-consistency gate as every other production model, so
+    it can be judged on equal terms before any promotion decision.
+
+    Unlike evaluate_variant/evaluate_variant_3way (a single sklearn .fit call
+    on static per-row features), SoccerModel is walked forward day by day:
+    it only ever sees games strictly before the day it is predicting, exactly
+    mirroring how it would run in the live forecast pipeline.
+    """
+    from .models.soccer import SoccerModel, UpcomingMatch
+
+    rows = build_walk_forward_rows(store, "soccer")
+    _train, validation, holdout, _split = chronological_split(rows)
+    validation_ids = {row.event_id for row in validation}
+    holdout_ids = {row.event_id for row in holdout}
+
+    games = store.load_games("soccer")
+    by_date: dict[str, list[GameRecord]] = defaultdict(list)
+    for game in games:
+        by_date[game.start.astimezone(EASTERN).date().isoformat()].append(game)
+    dates = sorted(by_date)
+
+    model = SoccerModel()
+    history: list[GameRecord] = []
+    val_confidences: list[float] = []
+    val_hits: list[int] = []
+    ho_confidences: list[float] = []
+    ho_hits: list[int] = []
+    ho_dates: list[str] = []
+
+    for day in dates:
+        day_games = by_date[day]
+        if len(history) >= minimum_history_games:
+            relevant = [game for game in day_games if game.event_id in validation_ids or game.event_id in holdout_ids]
+            if relevant:
+                upcoming = [
+                    UpcomingMatch(game.event_id, game.start.isoformat(), game.away_team, game.home_team, "SOCCER")
+                    for game in relevant
+                ]
+                predictions = {
+                    prediction.event_id: prediction
+                    for prediction in model.predict_games(history, upcoming)
+                    if prediction.market_type == "moneyline"
+                }
+                for game in relevant:
+                    prediction = predictions.get(game.event_id)
+                    if prediction is None:
+                        continue
+                    probabilities = prediction.probabilities
+                    if game.home_score > game.away_score:
+                        true_outcome = "home"
+                    elif game.home_score < game.away_score:
+                        true_outcome = "away"
+                    else:
+                        true_outcome = "draw"
+                    confidence = max(probabilities.values())
+                    selection = max(probabilities, key=probabilities.get)
+                    hit = 1 if selection == true_outcome else 0
+                    if game.event_id in validation_ids:
+                        val_confidences.append(confidence)
+                        val_hits.append(hit)
+                    else:
+                        ho_confidences.append(confidence)
+                        ho_hits.append(hit)
+                        ho_dates.append(day)
+        history.extend(day_games)
+
+    try:
+        threshold, val_stats = _learn_threshold_from_confidence_hit(
+            val_confidences, val_hits,
+            target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+            minimum_calls=MINIMUM_CALLS,
+        )
+    except ValueError as error:
+        return {
+            "model": SoccerModel.version,
+            "classes": ["away", "draw", "home"],
+            "primary_65": {"status": "no_validation_threshold", "reason": str(error)},
+        }
+
+    calls = hits = 0
+    selected_for_grade: list[tuple[float, int, str]] = []
+    for confidence, hit, day in zip(ho_confidences, ho_hits, ho_dates, strict=True):
+        if confidence < threshold:
+            continue
+        calls += 1
+        hits += hit
+        selected_for_grade.append((confidence, hit, day))
+    hit_rate = hits / calls if calls else 0.0
+    units = hits * (10 / 11) - (calls - hits) if calls else 0.0
+    holdout_end = (
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()
+    )
+    monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
+    every_month_positive = all(
+        month["units_at_minus_110"] > 0 for month in monthly_list if month["qualification_status"] == "qualifying"
+    )
+    qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
+
+    return {
+        "model": SoccerModel.version,
+        "classes": ["away", "draw", "home"],
+        "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": threshold,
+            "validation": val_stats,
+            "locked_holdout": {
+                "qualified": qualified,
+                "calls": calls,
+                "hits": hits,
+                "hit_rate": round(hit_rate, 6),
+                "units_at_minus_110": round(units, 6),
+                "called_rate": round(calls / len(ho_confidences), 6) if ho_confidences else 0,
+                "qualification_eligible": True,
+                "failures": [] if qualified else ["below qualification gate"],
+                "locked_holdout": True,
+                "monthly_at_minus_110": monthly_list,
+                "monthly_minimum_calls": MINIMUM_MONTHLY_CALLS,
+                "every_called_month_positive_at_minus_110": every_month_positive,
+                "every_qualifying_month_positive_at_minus_110": every_month_positive,
+                "total_predictions": len(ho_confidences),
+                "selectivity": round(calls / len(ho_confidences), 6) if ho_confidences else 0,
             },
         },
     }

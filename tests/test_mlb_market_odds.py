@@ -1,13 +1,12 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from model_prediction.data_sources.mlb_market_odds import (
-    MLBMarketOddsFeed,
     MarketOddsSnapshotStore,
+    MLBMarketOddsFeed,
 )
 
-
-OBSERVED = datetime(2026, 7, 17, 18, tzinfo=timezone.utc)
+OBSERVED = datetime(2026, 7, 17, 18, tzinfo=UTC)
 
 
 class FakePolymarket:

@@ -2,8 +2,8 @@ from model_prediction.features.base import GameRecord
 from model_prediction.models.basketball import UpcomingGame
 from model_prediction.models.nba import nba_model
 from model_prediction.models.soccer import UpcomingMatch, soccer_model
-from model_prediction.models.tennis import tennis_model
 from model_prediction.models.tennis import UpcomingMatch as TennisMatch
+from model_prediction.models.tennis import tennis_model
 
 
 def basketball_history() -> list[GameRecord]:
@@ -99,7 +99,7 @@ def test_tennis_model_flat_call_from_surface_elo() -> None:
         {"winner": "Ace", "loser": "Journeyman", "surface": "Clay", "match_date": f"2026-03-{d:02d}"}
         for d in range(1, 15)
     ]
-    predictions = tennis_model().predict_matches(
+    predictions = tennis_model().predict_games(
         matches,
         [
             TennisMatch(

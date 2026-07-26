@@ -15,13 +15,13 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Sequence
 
 from ..domain import parse_utc, utc_now
-
+from .learned_market import _sigmoid
 
 RESIDUAL_VERSION = "market-residual-logistic-v1"
 MINIMUM_SAMPLE = 100
@@ -31,10 +31,6 @@ ROLLING_WINDOW_DAYS = 90
 def _logit(probability: float) -> float:
     clipped = min(1 - 1e-9, max(1e-9, probability))
     return math.log(clipped / (1 - clipped))
-
-
-def _sigmoid(x: float) -> float:
-    return 1 / (1 + math.exp(-x))
 
 
 @dataclass(frozen=True)
@@ -70,7 +66,7 @@ class MarketResidualModel:
     # ------------------------------------------------------------- training
 
     @classmethod
-    def train(cls, rows: Sequence[ResidualTrainingRow], now=None) -> "MarketResidualModel":
+    def train(cls, rows: Sequence[ResidualTrainingRow], now=None) -> MarketResidualModel:
         current = now or utc_now()
         cutoff = current - timedelta(days=ROLLING_WINDOW_DAYS)
         usable = [
@@ -127,7 +123,7 @@ class MarketResidualModel:
         destination.write_text(json.dumps(self.to_artifact(), indent=2, sort_keys=True) + "\n")
 
     @classmethod
-    def load(cls, path: str | Path) -> "MarketResidualModel":
+    def load(cls, path: str | Path) -> MarketResidualModel:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
         canonical = {key: value for key, value in raw.items() if key != "artifact_hash"}
         expected = hashlib.sha256(

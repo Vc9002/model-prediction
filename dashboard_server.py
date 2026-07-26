@@ -380,6 +380,14 @@ def _parse_picks(path: Path) -> list[dict]:
         "research_pnl_units",
         "sportsbook",
         "decision_no_vig_probability",
+        "unavailable_features",
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap",
+        "park_factor",
+        "weather_factor",
+        "pitcher_era_gap",
+        "probable_starter_era_gap",
     ]
     index = {name: headers.index(name) for name in keep if name in headers}
     picks = []
@@ -407,7 +415,15 @@ def _pick_probability(row) -> float | None:
 
 
 def _pick_pnl(row) -> float:
-    """Unit P&L: real units if staked, else retrospective research scoring."""
+    """Unit P&L: real units if staked, else retrospective research scoring.
+
+    Every logged pick carries a real unit size regardless of record_type
+    (main, flat, research, and gated ledgers all settle pnl_units the same
+    way — see ledger.py:settle()), so units > 0 is enough here. Whether a
+    given ledger's P&L represents actually-staked money is a property of
+    which ledger you're looking at (main only), not something this helper
+    decides row by row.
+    """
     units = _number(row.get("units"))
     if units > 0:
         return _number(row.get("pnl_units"))
@@ -1422,9 +1438,12 @@ def production_evidence() -> dict:
 def _daily_pipeline_status() -> dict:
     """Split-pipeline staleness from data/logs/daily_*.log.
 
-    The split pipeline runs: settle → flat forecast → main forecast.
-    Each step writes its own exit code to the log. Parses the latest
-    log to extract per-step status and overall staleness.
+    The split pipeline runs: settle → polymarket slate → flat forecast →
+    main forecast (which also forecasts every esports title and any
+    non-production learned sport, routing them to research/gated_research
+    ledgers). Each step writes its own exit code to the log. Parses the
+    latest log to extract per-step status and
+    overall staleness.
     """
     logs = sorted((DATA / "logs").glob("daily_*.log"))
     if not logs:
@@ -1432,17 +1451,27 @@ def _daily_pipeline_status() -> dict:
     latest = logs[-1]
     mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
     age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
-    # Parse exit codes from the log
+    # Parse exit codes from the log. Matched on an exact "0", not a substring
+    # check, since e.g. exit code 130 (SIGINT) or 120 also contain the digit
+    # "0" and would otherwise be misreported as success.
     steps = {}
     try:
         text = latest.read_text(encoding="utf-8", errors="replace")
         for line in text.splitlines():
             if "Settlement exit code:" in line:
-                steps["settle_ok"] = "0" in line.split(":")[-1].strip()
+                steps["settle_ok"] = line.split(":")[-1].strip() == "0"
+            elif "Ingestion exit code:" in line:
+                steps["ingest_ok"] = line.split(":")[-1].strip() == "0"
+            elif "Polymarket slate exit code:" in line:
+                steps["slate_ok"] = line.split(":")[-1].strip() == "0"
             elif "Flat forecast exit code:" in line:
-                steps["flat_ok"] = "0" in line.split(":")[-1].strip()
+                steps["flat_ok"] = line.split(":")[-1].strip() == "0"
             elif "Main forecast exit code:" in line:
-                steps["main_ok"] = "0" in line.split(":")[-1].strip()
+                # Esports has no separate step: the dedicated "esports-forecast"
+                # step was removed (see run_daily.sh) since it fully duplicated
+                # what this main-forecast step already does per esports title,
+                # which produced near-simultaneous duplicate research rows.
+                steps["main_ok"] = line.split(":")[-1].strip() == "0"
     except OSError:
         pass
     return {
@@ -2924,11 +2953,20 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return [python, "-m", "pytest", "tests/", "-q", "--no-header"]
     cli = runner if len(runner) > 1 else runner  # module or console-script form
     if name == "daily":
-        # Split pipeline: settle → flat forecast → main forecast
-        # Uses run_daily.sh which handles the three-step flow
+        # Split pipeline: settle → main forecast → flat forecast
+        # Uses run_daily.sh which handles the multi-step flow
         return ["bash", str(ROOT / "scripts" / "run_daily.sh")]
     if name == "flat_forecast":
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
+    if name == "main_forecast":
+        # Same command as Step 3 of run_daily.sh: MLB/WNBA -> picks.xlsx,
+        # esports/soccer/nba/nfl -> research.xlsx + gated_research.xlsx. One
+        # shared forecast pass, not three independent ones — the Ledger,
+        # Research, and Gated Research tab buttons all trigger this.
+        return cli + [
+            "forecast", "--all", "--date", str(payload.get("date") or _today()),
+            "--log", "--replace-today", "--model", "learned",
+        ]
     if name == "refresh_prices":
         day = str(payload.get("date") or _today())
         command = cli + ["polymarket-ledger-prices", "--date", day]
@@ -3202,6 +3240,13 @@ class Handler(BaseHTTPRequestHandler):
                 research = _parse_picks(DATA / "research.xlsx") if (DATA / "research.xlsx").exists() else []
                 decorated = [_decorate_pick(r) for r in research]
                 self._send(_cached("research-picks", 30, lambda: decorated))
+            elif route == "/api/gated-research-performance":
+                gated = _parse_picks(DATA / "gated_research.xlsx") if (DATA / "gated_research.xlsx").exists() else []
+                self._send(_cached("gated-research-performance", 30, lambda: performance(gated)))
+            elif route == "/api/gated-research-picks":
+                gated = _parse_picks(DATA / "gated_research.xlsx") if (DATA / "gated_research.xlsx").exists() else []
+                decorated = [_decorate_pick(r) for r in gated]
+                self._send(_cached("gated-research-picks", 30, lambda: decorated))
             elif route == "/api/backtests":
                 self._send(_cached("backtests", 60, backtests))
             elif route == "/api/backtest":

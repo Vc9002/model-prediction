@@ -36,7 +36,7 @@ team_ban_list:
   - market_efficiency
   - manual_governance
 bankroll:
-  unit_value_usd: 7.5
+  unit_value_usd: 5.00
   starting_bankroll_usd: 51.0
   reference_units: 5
   kelly_fraction: 0.5
@@ -128,15 +128,22 @@ models:
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: 'Operator promotion 2026-07-21: live/flat performance
-      exceeds locked holdout (v5 artifact records qualified=false at 56.3%). Artifact
-      keeps honest evidence.'
-    active_production_version: mlb-elo-trend-lr-v5
-    production_artifact: config/models/mlb-elo-trend-lr-v5.json
+    qualification_override_reason: 'v6 (2026-07-25): live pitcher-feature experiment,
+      operator-directed. Replaces the team-level pitcher_era_gap proxy with
+      probable_starter_era_gap (ESPN probables, real announced starter ERA).
+      Fitted on a 90-day recency-restricted window only (242 holdout calls,
+      single partial month) since ESPN''s probables endpoint returns
+      current/live ERA regardless of query date -- verified same pitcher/same
+      ERA 3 months apart -- so it cannot be honestly backtested on older
+      dates. qualified=false in the artifact itself; running live for
+      observation over the coming days before any real promotion decision.
+      v5 remains available as legacy_research_rollback.'
+    active_production_version: mlb-elo-trend-lr-v6
+    production_artifact: config/models/mlb-elo-trend-lr-v6.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
     min_edge: 0.05
-    legacy_research_rollback: legacy-measured-edge
+    legacy_research_rollback: mlb-elo-trend-lr-v5
     iteration_policy:
       status: continuous
       parameter_freezes_allowed: true
@@ -207,7 +214,6 @@ models:
     - SERIE_A
     - MLS
     - UCL
-    - WORLD_CUP
     markets:
     - moneyline
   NFL:
@@ -234,57 +240,62 @@ models:
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: lol-tiered-elo-v3
-    production_artifact: config/models/lol-tiered-elo-v3.json
+    active_production_version: lol-tiered-elo-v4
+    production_artifact: config/models/lol-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.0
+    research_confidence_gate: 0.0
   CS2:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: cs2-tiered-elo-v3
-    production_artifact: config/models/cs2-tiered-elo-v3.json
+    active_production_version: cs2-tiered-elo-v4
+    production_artifact: config/models/cs2-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.01
+    research_confidence_gate: 0.0
   DOTA2:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: dota2-tiered-elo-v3
-    production_artifact: config/models/dota2-tiered-elo-v3.json
+    active_production_version: dota2-tiered-elo-v4
+    production_artifact: config/models/dota2-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.02
+    research_confidence_gate: 0.0
   VALORANT:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v3 artifacts use Elo-only model; qualification
+    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: valorant-tiered-elo-v3
-    production_artifact: config/models/valorant-tiered-elo-v3.json
+    active_production_version: valorant-tiered-elo-v4
+    production_artifact: config/models/valorant-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.02
+    research_confidence_gate: 0.0
   KBO:
     family: tie_aware_home_elo
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
-      gate does not apply to tie-paying-half settlement.
-    active_research_version: kbo-tie-aware-elo-v1
+      gate does not apply to tie-paying-half settlement. v2 adds margin-weighted K,
+      recency decay, and game-specific tie probability.
+    active_research_version: kbo-tie-aware-elo-v2
     research_artifact: config/models/kbo-tie-aware-elo-v1.json
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
-    active_production_version: kbo-tie-aware-elo-v1
+    active_production_version: kbo-tie-aware-elo-v2
     production_artifact: config/models/kbo-tie-aware-elo-v1.json
   NPB:
     family: tie_aware_home_elo
@@ -292,12 +303,13 @@ models:
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
-      gate does not apply to tie-paying-half settlement.
-    active_research_version: npb-tie-aware-elo-v1
+      gate does not apply to tie-paying-half settlement. v2 adds margin-weighted K (0.5),
+      recency decay (0.002/day), and game-specific tie probability (elo_gap).
+    active_research_version: npb-tie-aware-elo-v2
     research_artifact: config/models/npb-tie-aware-elo-v1.json
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
-    active_production_version: npb-tie-aware-elo-v1
+    active_production_version: npb-tie-aware-elo-v2
     production_artifact: config/models/npb-tie-aware-elo-v1.json
   market_residual:
     method: logistic_regression

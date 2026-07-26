@@ -16,10 +16,12 @@ import hashlib
 import html
 import json
 import re
+from collections.abc import Iterable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import httpx
 
@@ -29,7 +31,6 @@ from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
 from .research_io import sha256_file as _sha256
 from .research_io import utc_now as _utc_now
-
 
 KBO_SCHEDULE_PAGE = "https://www.koreabaseball.com/Schedule/Schedule.aspx"
 KBO_RESULTS_ENDPOINT = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList"
@@ -82,6 +83,9 @@ LEAGUE_SPECS: dict[str, dict[str, Any]] = {
 
 K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0)
 HOME_ADVANTAGE_CANDIDATES = (0.0, 20.0, 35.0, 50.0, 65.0, 80.0)
+MARGIN_WEIGHT_CANDIDATES = (0.0, 0.5, 1.0)
+DECAY_CANDIDATES = (0.0, 0.001, 0.002)
+TIE_MODEL_CANDIDATES = ("flat", "elo_gap")
 _TAG_RE = re.compile(r"<[^>]+>")
 _KBO_DATE_RE = re.compile(r"(?P<month>\d{2})\.(?P<day>\d{2})")
 _KBO_GAME_ID_RE = re.compile(r"gameId=(?P<id>[A-Za-z0-9]+)")
@@ -321,18 +325,95 @@ def backfill_international_baseball(
     }
 
 
+def find_international_baseball_result(
+    data_root: str | Path,
+    league: str,
+    game_date: str,
+    home_team: str,
+    away_team: str,
+    client: "OfficialInternationalBaseballClient | None" = None,
+) -> tuple[int, int] | None:
+    """Find (away_score, home_score) for a completed KBO/NPB game.
+
+    Ledger rows for these leagues carry Polymarket team-name strings and
+    Polymarket event ids (see forecast_international_baseball_slate), not
+    the official schedule's own game_id scheme -- so matching has to be by
+    game_date + team alias, the same way ``_team_alias_index`` already
+    matches teams when building the forecast slate. Checks the cached
+    games.jsonl first; if this date isn't covered yet (e.g. today's game
+    just finished and the cache predates it), refreshes this league's
+    current season from the official source once before giving up.
+    Returns None if the game can't be found (not yet played, or a genuine
+    lookup miss) -- callers should leave the pick open rather than guess.
+    """
+    league = league.lower()
+    directory = Path(data_root) / "international_baseball" / league
+    games_path = directory / "games.jsonl"
+    teams_path = directory / "teams.json"
+
+    def _match() -> tuple[int, int] | None:
+        if not games_path.exists() or not teams_path.exists():
+            return None
+        aliases = _team_alias_index(json.loads(teams_path.read_text(encoding="utf-8")))
+        home_ids = aliases.get(_identity_key(home_team), set())
+        away_ids = aliases.get(_identity_key(away_team), set())
+        if not home_ids or not away_ids:
+            return None
+        for row in _load_games(games_path):
+            if row["game_date"] != game_date:
+                continue
+            if row["home_team_id"] in home_ids and row["away_team_id"] in away_ids:
+                return int(row["away_score"]), int(row["home_score"])
+        return None
+
+    result = _match()
+    if result is not None:
+        return result
+
+    year = date.fromisoformat(game_date).year
+    source = client or OfficialInternationalBaseballClient()
+    with suppress(Exception):
+        backfill_international_baseball(data_root, league, f"{year}-01-01", client=source)
+    return _match()
+
+
 @dataclass
 class HomeElo:
     k: float
     home_advantage: float
     ratings: dict[str, float]
+    margin_weight: float = 0.0
+    decay_rate: float = 0.0
+    _last_active: dict[str, str] | None = None
 
     def decisive_home_probability(self, away_id: str, home_id: str) -> float:
         away = self.ratings.get(away_id, 1500.0)
         home = self.ratings.get(home_id, 1500.0) + self.home_advantage
         return 1.0 / (1.0 + 10.0 ** ((away - home) / 400.0))
 
+    def _apply_decay(self, game_date: str) -> None:
+        if self.decay_rate <= 0 or self._last_active is None:
+            return
+        from datetime import date
+        today = date.fromisoformat(game_date)
+        for team_id in list(self.ratings):
+            last = self._last_active.get(team_id)
+            if last is None:
+                continue
+            days = (today - date.fromisoformat(last)).days
+            if days > 0:
+                pull = (self.ratings[team_id] - 1500.0) * (1.0 - (1.0 - self.decay_rate) ** days)
+                self.ratings[team_id] -= pull
+
+    def _mark_active(self, team_ids: list[str], game_date: str) -> None:
+        if self._last_active is None:
+            self._last_active = {}
+        for tid in team_ids:
+            self._last_active[tid] = game_date
+
     def update(self, row: dict[str, Any], probability: float | None = None) -> None:
+        game_date = str(row["game_date"])
+        self._apply_decay(game_date)
         probability = (
             probability
             if probability is not None
@@ -342,15 +423,48 @@ class HomeElo:
             outcome = 0.5
         else:
             outcome = 1.0 if row["home_score"] > row["away_score"] else 0.0
-        delta = self.k * (outcome - probability)
+        # Margin-weighted K: blowouts teach the model more
+        margin = abs(int(row["home_score"]) - int(row["away_score"]))
+        k_eff = self.k
+        if self.margin_weight > 0 and margin > 1:
+            import math
+            k_eff = self.k * (1.0 + self.margin_weight * math.log(margin))
+        delta = k_eff * (outcome - probability)
         self.ratings[row["home_team_id"]] = self.ratings.get(row["home_team_id"], 1500.0) + delta
         self.ratings[row["away_team_id"]] = self.ratings.get(row["away_team_id"], 1500.0) - delta
+        self._mark_active([row["home_team_id"], row["away_team_id"]], game_date)
 
 
 def tie_aware_fair_values(decisive_home_probability: float, tie_probability: float) -> tuple[float, float]:
     """Return away/home expected $1 contract settlements; values sum to one."""
     home = (1.0 - tie_probability) * decisive_home_probability + 0.5 * tie_probability
     return 1.0 - home, home
+
+
+def _game_tie_probability(
+    away_id: str,
+    home_id: str,
+    book: HomeElo,
+    tie_method: str,
+    base_tie_rate: float,
+) -> float:
+    """Game-specific tie probability.
+
+    flat:      league-wide historical average (v1 default).
+    elo_gap:   evenly-matched teams tie more often; model fits a logistic
+               curve through the observed tie rate such that identical-rating
+               games get base_tie_rate * 1.5 and 200-point gaps get half.
+    """
+    if tie_method == "flat" or base_tie_rate <= 0:
+        return base_tie_rate
+    if tie_method == "elo_gap":
+        away_elo = book.ratings.get(away_id, 1500.0)
+        home_elo = book.ratings.get(home_id, 1500.0) + book.home_advantage
+        gap = abs(home_elo - away_elo)
+        # Peak at even matchups, decay to near-zero at large gaps
+        scale = max(0.0, 1.0 - gap / 200.0)
+        return min(base_tie_rate * (0.5 + 1.0 * scale), 0.10)
+    return base_tie_rate
 
 
 def _load_games(path: Path) -> list[dict[str, Any]]:
@@ -363,21 +477,26 @@ def _load_games(path: Path) -> list[dict[str, Any]]:
 def _batched_predictions(
     book: HomeElo,
     rows: Iterable[dict[str, Any]],
-    tie_probability: float,
+    base_tie_probability: float,
+    *,
+    tie_method: str = "flat",
 ) -> list[dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         groups.setdefault(str(row["game_date"]), []).append(row)
     output: list[dict[str, Any]] = []
     for game_date in sorted(groups):
-        pending: list[tuple[dict[str, Any], float]] = []
+        pending: list[tuple[dict[str, Any], float, float]] = []
         for row in groups[game_date]:
             decisive_home = book.decisive_home_probability(row["away_team_id"], row["home_team_id"])
-            _, fair_home = tie_aware_fair_values(decisive_home, tie_probability)
+            game_tie_p = _game_tie_probability(
+                row["away_team_id"], row["home_team_id"], book, tie_method, base_tie_probability,
+            )
+            _, fair_home = tie_aware_fair_values(decisive_home, game_tie_p)
             outcome = 0.5 if row["tie"] else float(row["home_score"] > row["away_score"])
             output.append({"probability": fair_home, "outcome": outcome, "tie": bool(row["tie"])})
-            pending.append((row, decisive_home))
-        for row, probability in pending:
+            pending.append((row, decisive_home, game_tie_p))
+        for row, probability, _tie_p in pending:
             book.update(row, probability)
     return output
 
@@ -424,11 +543,18 @@ def _fit_and_score(
     evaluation: Sequence[dict[str, Any]],
     k: float,
     home_advantage: float,
+    *,
+    margin_weight: float = 0.0,
+    decay_rate: float = 0.0,
+    tie_method: str = "flat",
 ) -> tuple[HomeElo, list[dict[str, Any]]]:
-    book = HomeElo(k=k, home_advantage=home_advantage, ratings={})
+    book = HomeElo(
+        k=k, home_advantage=home_advantage, ratings={},
+        margin_weight=margin_weight, decay_rate=decay_rate,
+    )
     tie_probability = _tie_rate(training)
-    _batched_predictions(book, training, tie_probability)
-    return book, _batched_predictions(book, evaluation, tie_probability)
+    _batched_predictions(book, training, tie_probability, tie_method=tie_method)
+    return book, _batched_predictions(book, evaluation, tie_probability, tie_method=tie_method)
 
 
 def _chronological_split(rows: Sequence[dict[str, Any]]) -> tuple[list[dict], list[dict], list[dict]]:
@@ -461,29 +587,54 @@ def validate_international_baseball_baseline(
             "promotion_eligible": False,
         }
     train, validation, test = _chronological_split(rows)
+    # Grid search: K × home_advantage × margin_weight × decay × tie_method
     candidates = []
     for k in K_CANDIDATES:
         for home_advantage in HOME_ADVANTAGE_CANDIDATES:
-            _, predictions = _fit_and_score(train, validation, k, home_advantage)
-            candidates.append({"k": k, "home_advantage": home_advantage, **_metrics(predictions)})
+            for margin_weight in MARGIN_WEIGHT_CANDIDATES:
+                for decay_rate in DECAY_CANDIDATES:
+                    for tie_method in TIE_MODEL_CANDIDATES:
+                        _, predictions = _fit_and_score(
+                            train, validation, k, home_advantage,
+                            margin_weight=margin_weight, decay_rate=decay_rate,
+                            tie_method=tie_method,
+                        )
+                        candidates.append({
+                            "k": k, "home_advantage": home_advantage,
+                            "margin_weight": margin_weight, "decay_rate": decay_rate,
+                            "tie_method": tie_method, **_metrics(predictions),
+                        })
     chosen = min(
         candidates,
         key=lambda row: (float(row["brier_settlement"]), float(row["mae_settlement"])),
     )
-    chosen_k, chosen_home = float(chosen["k"]), float(chosen["home_advantage"])
-    _, test_predictions = _fit_and_score([*train, *validation], test, chosen_k, chosen_home)
-    all_book = HomeElo(k=chosen_k, home_advantage=chosen_home, ratings={})
-    _batched_predictions(all_book, rows, _tie_rate(rows))
+    chosen_k = float(chosen["k"])
+    chosen_home = float(chosen["home_advantage"])
+    chosen_margin = float(chosen.get("margin_weight", 0))
+    chosen_decay = float(chosen.get("decay_rate", 0))
+    chosen_tie = str(chosen.get("tie_method", "flat"))
+    _, test_predictions = _fit_and_score(
+        [*train, *validation], test, chosen_k, chosen_home,
+        margin_weight=chosen_margin, decay_rate=chosen_decay, tie_method=chosen_tie,
+    )
+    all_book = HomeElo(
+        k=chosen_k, home_advantage=chosen_home, ratings={},
+        margin_weight=chosen_margin, decay_rate=chosen_decay,
+    )
+    _batched_predictions(all_book, rows, _tie_rate(rows), tie_method=chosen_tie)
     source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     artifact = {
-        "schema_version": "international-baseball-tie-aware-elo-v1",
-        "model_version": f"{league}-tie-aware-elo-v1",
+        "schema_version": "international-baseball-tie-aware-elo-v2",
+        "model_version": f"{league}-tie-aware-elo-v2",
         "model_state": "research",
         "league": league,
         "target": "expected moneyline settlement where a tie pays 0.50",
         "initial_rating": 1500.0,
         "k": chosen_k,
         "home_advantage": chosen_home,
+        "margin_weight": chosen_margin,
+        "decay_rate": chosen_decay,
+        "tie_method": chosen_tie,
         "tie_probability": round(_tie_rate(rows), 8),
         "training_observations": len(rows),
         "trained_through_date": rows[-1]["game_date"],
@@ -585,7 +736,13 @@ def forecast_international_baseball_slate(
         timezone_name,
     )
     ratings = {key: float(value) for key, value in artifact["ratings"].items()}
-    book = HomeElo(float(artifact["k"]), float(artifact["home_advantage"]), ratings)
+    margin_weight = float(artifact.get("margin_weight", 0))
+    decay_rate = float(artifact.get("decay_rate", 0))
+    tie_method = str(artifact.get("tie_method", "flat"))
+    book = HomeElo(
+        float(artifact["k"]), float(artifact["home_advantage"]), ratings,
+        margin_weight=margin_weight, decay_rate=decay_rate,
+    )
     tie_probability = float(artifact["tie_probability"])
     trained_through = date.fromisoformat(str(artifact["trained_through_date"]))
     observed_now = utc_now()
@@ -607,7 +764,7 @@ def forecast_international_baseball_slate(
             if event_start <= observed_now:
                 no_calls.append({**base, "reason": "NO_CALL_EVENT_STARTED"})
                 continue
-            if event_start <= datetime.combine(trained_through, datetime.min.time(), tzinfo=timezone.utc):
+            if event_start <= datetime.combine(trained_through, datetime.min.time(), tzinfo=UTC):
                 no_calls.append({**base, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
                 continue
             if any(len(candidates) != 1 for candidates in matches):
@@ -628,8 +785,9 @@ def forecast_international_baseball_slate(
             if any(team_id not in ratings for team_id in team_ids):
                 no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
                 continue
+            game_tie_p = _game_tie_probability(away_id, home_id, book, tie_method, tie_probability)
             away_fair, home_fair = tie_aware_fair_values(
-                book.decisive_home_probability(away_id, home_id), tie_probability
+                book.decisive_home_probability(away_id, home_id), game_tie_p
             )
             probabilities = {away_id: away_fair, home_id: home_fair}
             by_name = {
@@ -654,8 +812,8 @@ def forecast_international_baseball_slate(
                         "side": side_name,
                         "team": side["description"],
                         "model_fair_settlement_value": round(fair, 6),
-                        "win_probability_component": round(max(0.0, fair - 0.5 * tie_probability), 6),
-                        "tie_probability": round(tie_probability, 6),
+                        "win_probability_component": round(max(0.0, fair - 0.5 * game_tie_p), 6),
+                        "tie_probability": round(game_tie_p, 6),
                         "executable_ask": float(ask),
                         "edge_vs_executable_ask": round(fair - float(ask), 6),
                     }

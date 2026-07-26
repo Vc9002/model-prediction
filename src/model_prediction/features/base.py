@@ -12,13 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from ..domain import EASTERN, parse_utc
-
 
 FeatureFunction = Callable[["FeatureContext"], dict[str, Any]]
 

@@ -8,8 +8,14 @@ from model_prediction.data_sources import espn_probables
 
 
 @pytest.fixture(autouse=True)
-def _clear_probables_cache() -> None:
+def _clear_probables_cache(monkeypatch, tmp_path) -> None:
     espn_probables._pull_espn_probables.cache_clear()
+    # Isolate the on-disk cache from the real data/espn_probables_cache.jsonl:
+    # without this, a prior real backtest run's cached entry for a date this
+    # test also uses (e.g. a past date with a real, complete scoreboard)
+    # would short-circuit the monkeypatched httpx.get below and silently
+    # return production data instead of the test's simulated response.
+    monkeypatch.setattr(espn_probables, "_DISK_CACHE_PATH", tmp_path / "espn_probables_cache.jsonl")
 
 
 class _Response:

@@ -7,8 +7,10 @@ gated call is qualified shadow output or a zero-unit research observation.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from ..domain import League, ModelOrigin, ModelState
 
@@ -133,25 +135,32 @@ _CONFIG_STATUS_CACHE: dict[str, dict[str, ModelState]] = {}
 
 def _status_from_config(league: League) -> ModelState | None:
     """Read a league's model state from config/model.yaml, if present."""
-    from pathlib import Path
-
     cache_key = "main"
     if cache_key not in _CONFIG_STATUS_CACHE:
-        config_path = Path("config/model.yaml")
+        from ..config import PROJECT_ROOT
+
+        config_path = PROJECT_ROOT / "config/model.yaml"
+        statuses: dict[str, ModelState] = {}
         if config_path.exists():
             try:
                 import yaml
                 raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
                 models = raw.get("models") or {}
-                _CONFIG_STATUS_CACHE[cache_key] = {
-                    lk: ModelState(v.get("status", "research"))
-                    for lk, v in models.items()
-                    if lk in League.__members__
-                }
             except Exception:
-                _CONFIG_STATUS_CACHE[cache_key] = {}
-        else:
-            _CONFIG_STATUS_CACHE[cache_key] = {}
+                models = {}
+            for lk, v in models.items():
+                if lk not in League.__members__:
+                    continue
+                # One league using a non-ModelState status string (e.g.
+                # config's own "deferred" annotation for TENNIS, meaning
+                # "not actively pursued" rather than a real lifecycle state)
+                # must not silently blank out every OTHER league's status --
+                # a single bad/placeholder value here previously poisoned the
+                # whole cache via one blanket try/except around the entire
+                # dict comprehension.
+                with suppress(ValueError, AttributeError):
+                    statuses[lk] = ModelState(v.get("status", "research"))
+        _CONFIG_STATUS_CACHE[cache_key] = statuses
     return _CONFIG_STATUS_CACHE[cache_key].get(league.value)
 
 

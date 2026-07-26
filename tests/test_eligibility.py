@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -6,8 +6,7 @@ from model_prediction.domain import League, MarketType, ModelOrigin, ModelState,
 from model_prediction.eligibility import evaluate_eligibility
 from model_prediction.units import Exposure, UnitPolicy
 
-
-NOW = datetime(2026, 7, 13, 12, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
 
 
 def request(
@@ -107,7 +106,16 @@ def test_stale_missing_uncertainty_low_edge_and_exposure_become_research(registr
     )
     assert stale.reason_code == "NO_CALL_STALE_DATA"
     assert missing.reason_code == "QUALIFIED"  # uncertainty defaults to 0.05 — pick qualifies
-    assert low.reason_code == "NO_CALL_LOW_EDGE"
-    assert capped.reason_code == "NO_CALL_EXPOSURE_LIMIT"
-    assert all(result.units == 0 for result in (stale, low, capped))
+    # Low edge and exposure caps no longer gate CALL vs NO_CALL at all
+    # (operator directive, 2026-07-26): once a candidate clears the
+    # trust-boundary checks (model state, staleness, provenance), it's a
+    # real qualified call regardless of edge or today's exposure so far.
+    assert low.reason_code == "QUALIFIED"
+    assert capped.reason_code == "QUALIFIED"
+    assert low.units > 0
+    assert capped.units > 0
+    # Stale data still can't be trusted at all -- hard zero.
+    assert stale.units == 0
+    assert low.units > 0
+    assert capped.units > 0
     assert missing.units > 0  # qualified call gets positive units

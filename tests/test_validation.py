@@ -1,4 +1,5 @@
 import pytest
+from test_backtester import seed_games
 
 from model_prediction.validation import (
     ValidationRow,
@@ -10,8 +11,6 @@ from model_prediction.validation import (
     multi_market_readiness,
     run_sport_validation,
 )
-
-from test_backtester import seed_games
 
 
 def test_validation_uses_three_disjoint_chronological_cohorts(tmp_path) -> None:

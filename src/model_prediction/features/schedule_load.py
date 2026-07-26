@@ -8,9 +8,9 @@ carry a versioned venue-coordinate history.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Iterable
 
 from .base import GameRecord
 

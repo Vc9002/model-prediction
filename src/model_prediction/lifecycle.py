@@ -5,7 +5,6 @@ from typing import Any
 
 from .domain import ModelOrigin, ModelState
 
-
 QUALIFICATION_MINIMUM_HIT_RATE = 0.60
 QUALIFICATION_MINIMUM_CALLS = 50
 

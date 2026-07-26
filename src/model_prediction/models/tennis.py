@@ -6,11 +6,11 @@ Research state until validated through the backtester.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any
 
 from .base import GamePrediction
-
 
 TENNIS_MODEL_VERSION = "tennis-surface-elo-v1"
 DEFAULT_ELO = 1500.0
@@ -99,7 +99,7 @@ class TennisModel:
         )
         return 1.0 / (1.0 + 10.0 ** (-(blend_one - blend_two) / 400.0))
 
-    def predict_matches(
+    def predict_games(
         self,
         matches: Sequence[dict[str, Any]],
         upcoming: Sequence[UpcomingMatch],

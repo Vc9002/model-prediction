@@ -13,13 +13,19 @@ provider response
   -> versioned independent model artifact
   -> validation-learned confidence gate
   -> exact contract and executable-quote match
-  -> eligibility, exposure, and record classification
+  -> CLI executable-ask edge gate where configured
+  -> trust-boundary eligibility and record classification
   -> ledger, settlement, CLV, calibration, and review
 ```
 
 Dashboard view state and exchange order state are separate from model evidence.
-The audit chain is intended to make mutations traceable; a broken chain blocks
-integrity claims until repaired.
+The audit chain is intact, but ledger mutation and audit append are separate
+commits; chain integrity alone does not prove ledger/audit reconciliation.
+
+As of the 2026-07-26 operator directive, eligibility accepts but does not use
+exposure or market disagreement when deciding `CALL` versus `NO_CALL`.
+Post-uncertainty edge is also not a decision gate there. Older diagrams that
+show exposure/disagreement as enforced eligibility gates are stale.
 
 ## Validation contract
 
@@ -37,6 +43,8 @@ integrity claims until repaired.
 - A market residual/decision layer is separate and labeled.
 - No retrospective pick logging or postgame feature leakage.
 - No hardcoded fallback threshold when the named artifact is missing or invalid.
+- No candidate may be classified or priced from an unqualified artifact or a
+  snapshot with `timestamp_valid=false`.
 - No fabricated spread, total, F5, YRFI/NRFI, or three-way contract semantics.
 - Research baselines remain zero-unit.
 - Real-money order surfaces require a separate explicit request, CLI flag, credentials, exact confirmation, and audit record.
@@ -44,6 +52,6 @@ integrity claims until repaired.
 ## Current model status
 
 Do not duplicate volatile metrics here. Use the table in
-`docs/PROJECT_STATUS.md`, which currently records MLB and NFL as failed,
-NBA/WNBA as report-level passes pending release alignment, and Soccer as blocked
-by registry drift despite a report-level pass.
+`docs/PROJECT_STATUS.md`. The current operational blockers are execution-ticket
+binding, non-atomic ledger/audit writes, non-PIT MLB v6 starter data, WNBA
+fail-open behavior, artifact/report drift, and a non-green checkout.

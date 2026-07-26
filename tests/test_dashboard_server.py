@@ -6,8 +6,9 @@ import subprocess
 from pathlib import Path
 from unittest.mock import Mock
 
-import dashboard_server
 import pytest
+
+import dashboard_server
 
 
 def _configure_archive(monkeypatch, tmp_path: Path, rows: list[dict]) -> Path:

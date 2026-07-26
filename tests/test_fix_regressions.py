@@ -9,7 +9,7 @@ update semantics.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -31,7 +31,7 @@ from model_prediction.units import Exposure, UnitPolicy
 
 
 def _future_request(league=League.LOL, selection="home", **overrides) -> PickRequest:
-    start = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+    start = (datetime.now(UTC) + timedelta(hours=6)).isoformat()
     values = dict(
         event_start_utc=start,
         event_id=overrides.pop("event_id", "evt-1"),
@@ -50,7 +50,7 @@ def _future_request(league=League.LOL, selection="home", **overrides) -> PickReq
         risks="test",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
         model_state=ModelState.SHADOW_QUALIFIED,
-        observed_at_utc=datetime.now(timezone.utc).isoformat(),
+        observed_at_utc=datetime.now(UTC).isoformat(),
         model_artifact_hash="hash",
         calibration_method="neutral_elo",
         calibration_version="lol-neutral-series-elo-v2",
@@ -170,18 +170,22 @@ def test_esports_eligibility_qualifies_only_with_full_provenance():
 
 def test_esports_eligibility_fails_closed_on_stale_data():
     stale = _future_request(
-        observed_at_utc=(datetime.now(timezone.utc) - timedelta(hours=13)).isoformat()
+        observed_at_utc=(datetime.now(UTC) - timedelta(hours=13)).isoformat()
     )
     result = evaluate_esports_eligibility(stale, Exposure(), UnitPolicy())
     assert result.reason_code == "NO_CALL_STALE_DATA"
     assert result.units == 0
 
 
-def test_esports_eligibility_respects_exposure_caps():
+def test_esports_eligibility_no_longer_gates_on_exposure_caps():
+    """Exposure caps no longer block CALL at all (operator directive,
+    2026-07-26) -- a saturated exposure state still produces a real
+    qualified call, sized via the edge-scaled method."""
     saturated = Exposure(daily_units=5.0, league_daily_units=3.0)
     result = evaluate_esports_eligibility(_future_request(), saturated, UnitPolicy())
-    assert result.decision == "NO_CALL"
-    assert result.units == 0
+    assert result.decision == "CALL"
+    assert result.reason_code == "QUALIFIED"
+    assert result.units > 0
 
 
 # ------------------------------------------------------------- executor
@@ -284,6 +288,7 @@ def test_match_executable_quote_skips_doubleheaders_and_ambiguous_sides(tmp_path
         away_team = "New York Yankees"
         home_team = "New York Mets"
         selection = "home"
+        event_start_utc = "2026-07-17T19:00:00Z"
 
     # Doubleheader: two distinct contracts for the same pair -> no match
     (odds_dir / "polymarket_snapshots.jsonl").write_text(

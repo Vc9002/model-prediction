@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Protocol, TypedDict
 
 from ..domain import MarketType
 
@@ -25,7 +26,7 @@ class ScoreSimulation:
         wins = pushes = 0
         for away, home in zip(self.away_scores, self.home_scores, strict=True):
             if market_type is MarketType.MONEYLINE:
-                margin = home - away if selection == "home" else away - home
+                margin: float = home - away if selection == "home" else away - home
             elif market_type is MarketType.SPREAD:
                 if line is None:
                     raise ValueError("spread requires a selection-relative line")
@@ -78,8 +79,32 @@ class GamePrediction:
         return self.probabilities[selection.lower()]
 
 
+class GamePredictionBase(TypedDict):
+    """The fields of ``GamePrediction`` shared across a game's markets.
+
+    Sport models build one of these per game, then spread it into each
+    per-market ``GamePrediction(**base, market_type=..., ...)`` call.
+    """
+
+    event_id: str
+    event_start_utc: str
+    league: str
+    away_team: str
+    home_team: str
+    uncertainty: float
+    model_version: str
+    feature_basis: dict[str, object]
+
+
 class SportModel(Protocol):
-    """Interface every unified sport model implements."""
+    """Interface every unified sport model implements.
+
+    ``history``/``matches`` is each sport's chronological training data
+    (``Sequence[GameRecord]`` for basketball/soccer, raw match dicts for
+    tennis -- no single concrete type fits every sport's data shape, hence
+    ``object`` here); ``upcoming`` is the slate to predict, one
+    sport-specific "UpcomingX" type per implementation.
+    """
 
     @property
     def version(self) -> str: ...
@@ -88,5 +113,5 @@ class SportModel(Protocol):
     def sport(self) -> str: ...
 
     def predict_games(
-        self, as_of_date: str, games: Sequence[object]
+        self, history: Sequence[object], upcoming: Sequence[object]
     ) -> list[GamePrediction]: ...

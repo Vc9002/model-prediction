@@ -14,16 +14,16 @@ from __future__ import annotations
 
 import json
 import time as time_module
-from datetime import date, datetime, timedelta, timezone
+from collections.abc import Iterable
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterable, cast
+from typing import Any, cast
 
 import httpx
 
 from .audit import AuditLog
-from .data_sources.espn import ESPNClient, SPORT_LEAGUES, parse_pregame_and_closing_markets
+from .data_sources.espn import SPORT_LEAGUES, ESPNClient, parse_pregame_and_closing_markets
 from .domain import eastern_today
-
 
 SPORTS = tuple(SPORT_LEAGUES)
 
@@ -352,7 +352,7 @@ def _historical_market_row(event: dict[str, Any], parsed: dict[str, Any]) -> dic
     return {
         "event_id": str(event.get("id")),
         "event_start_utc": event.get("date"),
-        "observed_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "observed_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "timestamp_valid": False,
         "source": "espn_postgame_reconstructed_open",
         "provider": parsed.get("provider", "unknown"),

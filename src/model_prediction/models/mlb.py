@@ -13,17 +13,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
 from math import exp, log
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 import yaml
 
 from ..domain import MarketType
 from .base import ScoreSimulation
-
 
 ENGINE_VERSION = "mlb-analyst-poisson-trend-v0.2"
 MARGIN_MODEL_VERSION = "measured-edge-margin-v1"
@@ -410,7 +410,7 @@ class MeasuredEdgeMarginModel:
         self.raw = _load_artifact(model_path, MARGIN_MODEL_VERSION)
         if formula_spec.formula_version != ENGINE_VERSION:
             raise ValueError("margin model must use the configured Trend Engine score model")
-        scale, offset = float(self.raw["scale"]), float(self.raw["offset"])
+        scale, offset = _artifact_float(self.raw, "scale"), _artifact_float(self.raw, "offset")
         if not 0 < scale <= 1.5 or not -0.25 <= offset <= 0.25:
             raise ValueError("margin calibration scale/offset outside governance bounds")
         self.formula_spec = formula_spec
@@ -437,14 +437,14 @@ class MeasuredEdgeMarginModel:
             ),
             away_spread_line=away_spread_line,
             model_version=MARGIN_MODEL_VERSION,
-            model_artifact_hash=self.raw["artifact_hash"],
-            calibration_version=self.raw["calibration_version"],
+            model_artifact_hash=_artifact_str(self.raw, "artifact_hash"),
+            calibration_version=_artifact_str(self.raw, "calibration_version"),
         )
 
     def calibrate_selected_side(self, raw_probability: float) -> float:
         if not 0 < raw_probability < 1:
             raise ValueError("raw probability must be between 0 and 1")
-        return float(self.raw["scale"]) * raw_probability + float(self.raw["offset"])
+        return _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
 
 
 _TOTALS_OVERRIDE_FIELDS = {
@@ -495,14 +495,14 @@ class MeasuredEdgeTotalsModel:
             total=derive_market_distribution(simulation, MarketType.TOTAL, total_line),
             total_line=total_line,
             model_version=TOTALS_MODEL_VERSION,
-            model_artifact_hash=self.raw["artifact_hash"],
-            calibration_version=self.raw["calibration_version"],
+            model_artifact_hash=_artifact_str(self.raw, "artifact_hash"),
+            calibration_version=_artifact_str(self.raw, "calibration_version"),
         )
 
     def calibrate_selected_side(self, raw_probability: float) -> float:
         if not 0 < raw_probability < 1:
             raise ValueError("raw probability must be between 0 and 1")
-        return float(self.raw["scale"]) * raw_probability + float(self.raw["offset"])
+        return _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
 
     @staticmethod
     def _apply_feature_overrides(
@@ -515,7 +515,22 @@ class MeasuredEdgeTotalsModel:
         unsupported = set(feature_overrides) - _TOTALS_OVERRIDE_FIELDS
         if unsupported:
             raise ValueError(f"unsupported totals feature overrides: {sorted(unsupported)}")
-        return replace(features, **feature_overrides)
+        # dataclasses.replace can't type-check partial **kwargs against a
+        # heterogeneous dataclass; _TOTALS_OVERRIDE_FIELDS restricts the keys
+        # above to MLBGameFeatures' float-typed fields only.
+        return replace(features, **feature_overrides)  # type: ignore[arg-type]
+
+
+def _artifact_str(raw: dict[str, object], key: str) -> str:
+    value = raw[key]
+    assert isinstance(value, str), f"artifact field {key!r} must be a str, got {type(value).__name__}"
+    return value
+
+
+def _artifact_float(raw: dict[str, object], key: str) -> float:
+    value = raw[key]
+    assert isinstance(value, (int, float)), f"artifact field {key!r} must be numeric, got {type(value).__name__}"
+    return float(value)
 
 
 def _load_artifact(path: str | Path, expected_version: str) -> dict[str, object]:

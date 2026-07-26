@@ -11,17 +11,17 @@ from __future__ import annotations
 import json
 import math
 from collections import defaultdict
-from datetime import datetime
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from statistics import pstdev
-from typing import Any, Mapping
+from typing import Any
 
 from scipy.stats import norm
 
 from .data_sources.wnba_injuries import ParsedReport
 from .domain import parse_utc, utc_now
 from .features.base import FeatureStore, GameRecord
-
 
 LOOKBACK_TEAM_GAMES = 10
 PLUS_MINUS_PRIOR_MINUTES = 400.0
@@ -278,10 +278,10 @@ def build_and_save_priors(
     Returns a summary dict with per-event results.
     """
     import json as _json
-    from datetime import datetime as _datetime, timezone as _timezone
+    from datetime import datetime as _datetime
 
     root = Path(data_root)
-    observed = observed_at or _datetime.now(_timezone.utc)
+    observed = observed_at or _datetime.now(UTC)
     scoreboard = client.scoreboard("WNBA", game_date)
     events = scoreboard.get("events", [])
     if not events:

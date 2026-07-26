@@ -3,7 +3,7 @@
 import pandas as pd
 from pathlib import Path
 
-PROJECT = Path("/Users/vincentc9002/Documents/Poly & Kalshi/model prediction")
+PROJECT = Path("/Users/vincentc9002/model prediction")
 
 def clean_flat():
     """Flat ledger: ALL picks become research_observation. Call everything."""

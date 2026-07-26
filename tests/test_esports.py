@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
 import pytest
@@ -106,7 +106,7 @@ def test_cs2_backfill_excludes_legacy_csgo_game_version() -> None:
 def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_path) -> None:
     directory = tmp_path / "esports/lol"
     directory.mkdir(parents=True)
-    start = datetime(2023, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2023, 1, 1, tzinfo=UTC)
     rows = []
     for index in range(600):
         winner = "bo3:3:a" if index % 4 else "bo3:3:b"
@@ -134,7 +134,7 @@ def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_p
     assert result["chronological_split"]["locked_test"]["n"] == 120
     assert result["promotion_eligible"] is False
     assert result["units"] == 0
-    artifact = json.loads((tmp_path / "artifacts/lol-tiered-elo-v3.json").read_text())
+    artifact = json.loads((tmp_path / "artifacts/lol-tiered-elo-v4.json").read_text())
     assert artifact["qualified_for_betting"] is False
     assert artifact["model_state"] == "research"
     assert artifact["artifact_hash"] == result["artifact_hash"]
@@ -153,14 +153,17 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
             }
         )
     )
-    (artifacts / "lol-tiered-elo-v3.json").write_text(
+    (artifacts / "lol-tiered-elo-v4.json").write_text(
         json.dumps(
             {
-                "model_version": "lol-tiered-elo-v3",
+                "model_version": "lol-tiered-elo-v4",
                 "trained_through_utc": "2026-07-18T00:00:00Z",
                 "artifact_hash": "hash",
                 "k": 20,
                 "ratings": {"a": 1600, "b": 1400},
+                "platt_intercept": None,
+                "platt_slope": None,
+                "confidence_threshold": 0.10,
             }
         )
     )

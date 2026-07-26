@@ -8,14 +8,13 @@ Research state until validated through the backtester.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import exp
-from typing import Sequence
 
 from ..features.base import GameRecord
 from ..features.trends import ewm_level
-from .base import GamePrediction
-
+from .base import GamePrediction, GamePredictionBase
 
 SOCCER_MODEL_VERSION = "soccer-poisson-dc-v1"
 HOME_GOAL_BOOST = 1.15
@@ -122,7 +121,7 @@ class SoccerModel:
             )
             sample = min(home["games"], away["games"])
             uncertainty = max(0.04, min(0.20, 0.20 - 0.01 * sample))
-            base = {
+            base: GamePredictionBase = {
                 "event_id": match.event_id,
                 "event_start_utc": match.event_start_utc,
                 "league": match.league,

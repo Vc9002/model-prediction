@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 
 from ..models.tennis import TennisPlayerForm
-
 
 INVALID_SCORE_MARKERS = ("RET", "W/O", "DEF", "ABD")
 

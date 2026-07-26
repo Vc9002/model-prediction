@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 
 def _sigmoid(value: float) -> float:
@@ -50,7 +51,7 @@ class LearnedMarketArtifact:
         self.raw = raw
 
     @classmethod
-    def load(cls, path: str | Path) -> "LearnedMarketArtifact":
+    def load(cls, path: str | Path) -> LearnedMarketArtifact:
         return cls(json.loads(Path(path).read_text(encoding="utf-8")))
 
     @property

@@ -11,6 +11,7 @@ from model_prediction.international_baseball import (
     HomeElo,
     _chronological_split,
     _metrics,
+    find_international_baseball_result,
     forecast_international_baseball_slate,
     parse_kbo_rows,
     parse_npb_calendar,
@@ -287,8 +288,102 @@ def test_chronological_split_does_not_crash_with_one_unique_date() -> None:
 def test_home_elo_update_does_not_recompute_on_explicit_zero_probability() -> None:
     """A frozen probability of exactly 0.0 must be used as-is, not treated as unset."""
     book = HomeElo(k=20.0, home_advantage=50.0, ratings={"A": 1500.0, "B": 1500.0})
-    row = {"home_team_id": "A", "away_team_id": "B", "home_score": 5, "away_score": 3}
+    row = {"home_team_id": "A", "away_team_id": "B", "home_score": 5, "away_score": 3, "game_date": "2025-06-01"}
     book.update(row, probability=0.0)
     # outcome=1.0 (home won), probability=0.0 forced -> delta = k * (1.0 - 0.0) = k
     assert book.ratings["A"] == pytest.approx(1500.0 + 20.0)
     assert book.ratings["B"] == pytest.approx(1500.0 - 20.0)
+
+
+def _write_completed_games(tmp_path, league: str, rows: list[dict]) -> None:
+    """Minimal games.jsonl + teams.json for find_international_baseball_result.
+
+    Ledger rows for KBO/NPB carry Polymarket team-name strings, not the
+    official schedule's own team_id/game_id scheme, so lookups match by
+    game_date + team alias -- teams.json's alias list is what makes that
+    matching possible.
+    """
+    directory = tmp_path / "international_baseball" / league
+    directory.mkdir(parents=True)
+    (directory / "games.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+    )
+    team_ids = {row["home_team_id"] for row in rows} | {row["away_team_id"] for row in rows}
+    teams = {
+        team_id: {"team_id": team_id, "name": team_id.title(), "aliases": [team_id]}
+        for team_id in team_ids
+    }
+    (directory / "teams.json").write_text(json.dumps(teams), encoding="utf-8")
+
+
+def test_find_international_baseball_result_matches_by_date_and_team_alias(tmp_path) -> None:
+    _write_completed_games(
+        tmp_path,
+        "kbo",
+        [
+            {
+                "game_id": "kbo:1",
+                "league": "kbo",
+                "game_date": "2026-05-01",
+                "home_team_id": "DOOSAN",
+                "away_team_id": "HANWHA",
+                "home_score": 6,
+                "away_score": 4,
+                "tie": False,
+            }
+        ],
+    )
+    result = find_international_baseball_result(
+        tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha"
+    )
+    assert result == (4, 6)  # (away_score, home_score)
+
+
+def test_find_international_baseball_result_returns_none_for_unplayed_game(tmp_path) -> None:
+    _write_completed_games(
+        tmp_path,
+        "kbo",
+        [
+            {
+                "game_id": "kbo:1",
+                "league": "kbo",
+                "game_date": "2026-05-01",
+                "home_team_id": "DOOSAN",
+                "away_team_id": "HANWHA",
+                "home_score": 6,
+                "away_score": 4,
+                "tie": False,
+            }
+        ],
+    )
+    # Same teams, a different date the cache has no row for, and no live
+    # client passed -- must return None (pick stays open), never guess.
+    result = find_international_baseball_result(
+        tmp_path, "kbo", "2026-05-02", "Doosan", "Hanwha", client=object()
+    )
+    assert result is None
+
+
+def test_find_international_baseball_result_none_when_teams_json_missing(tmp_path) -> None:
+    directory = tmp_path / "international_baseball" / "kbo"
+    directory.mkdir(parents=True)
+    (directory / "games.jsonl").write_text(
+        json.dumps(
+            {
+                "game_id": "kbo:1",
+                "league": "kbo",
+                "game_date": "2026-05-01",
+                "home_team_id": "DOOSAN",
+                "away_team_id": "HANWHA",
+                "home_score": 6,
+                "away_score": 4,
+                "tie": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    result = find_international_baseball_result(
+        tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha", client=object()
+    )
+    assert result is None

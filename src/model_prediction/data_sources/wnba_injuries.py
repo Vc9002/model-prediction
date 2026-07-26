@@ -12,11 +12,12 @@ import hashlib
 import io
 import json
 import re
+from collections.abc import Iterable, Mapping
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -24,7 +25,6 @@ import httpx
 from pypdf import PdfReader
 
 from ..domain import parse_utc, utc_now
-
 
 REPORT_INDEX_URL = "https://www.wnba.com/api/injury-reports"
 REPORT_HOST = "ak-static.cms.nba.com"

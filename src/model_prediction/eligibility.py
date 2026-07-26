@@ -8,7 +8,7 @@ from .domain import ModelState, NoCallReason, PickRequest, RecordType, parse_utc
 from .entities import CanonicalTeam, EntityRegistry
 from .lifecycle import can_create_qualified_call
 from .pricing import implied_probability
-from .units import Exposure, UnitPolicy, recommend_units
+from .units import Exposure, UnitPolicy, edge_scaled_units, recommend_units
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,9 @@ def evaluate_eligibility(
     maximum_age_hours: float = 12,
     maximum_unreviewed_disagreement: float = 0.10,
 ) -> EligibilityResult:
+    # exposure and maximum_unreviewed_disagreement are accepted but unused --
+    # kept for call-site/API stability since disagreement/exposure no longer
+    # gate CALL vs NO_CALL (see _call_result).
     current = now or utc_now()
     away = registry.resolve(request.league, request.away_team, request.event_start_utc)
     home = registry.resolve(request.league, request.home_team, request.event_start_utc)
@@ -71,47 +74,17 @@ def evaluate_eligibility(
         or request.code_revision in {"", "unknown"}
     ):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
-    # Disagreement gate compares against the de-vigged probability when available;
-    # raw implied probability (with vig) is only a fallback.
-    market_probability_for_disagreement = (
-        request.decision_no_vig_probability
-        if request.decision_no_vig_probability is not None
-        else implied_probability(request.american_odds)
-    )
-    if abs(request.model_probability - market_probability_for_disagreement) > maximum_unreviewed_disagreement:
-        return _research(request, away, home, NoCallReason.LARGE_DISAGREEMENT, policy)
-    recommendation = recommend_units(
-        request.model_probability,
-        request.model_uncertainty,
-        request.american_odds,
-        exposure,
-        policy,
-        validated_model=True,
-    )
-    if not recommendation.is_call:
-        reason = NoCallReason.EXPOSURE_LIMIT if "exposure" in recommendation.reason else NoCallReason.LOW_EDGE
-        return EligibilityResult(
-            RecordType.RESEARCH_OBSERVATION,
-            "NO_CALL",
-            reason.value,
-            0,
-            recommendation.confidence_score,
-            recommendation.edge,
-            recommendation.adjusted_edge,
-            away,
-            home,
-        )
-    return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL,
-        "CALL",
-        "QUALIFIED",
-        recommendation.units,
-        recommendation.confidence_score,
-        recommendation.edge,
-        recommendation.adjusted_edge,
-        away,
-        home,
-    )
+    # Market/model disagreement, exposure caps, and thin post-uncertainty edge
+    # are no longer NO_CALL gates (operator directive, 2026-07-26): once a
+    # candidate clears model-state/staleness/provenance -- the checks above,
+    # which represent "can this decision be trusted at all" -- it becomes a
+    # real qualified call regardless of how far the model disagrees with the
+    # market, today's exposure so far, or how thin the edge is after the
+    # uncertainty haircut. _call_result below always sizes via the proven
+    # edge-scaled method rather than the exposure-aware Kelly engine, since
+    # that engine's only remaining job (deciding CALL vs NO_CALL on edge/
+    # exposure) no longer applies.
+    return _call_result(request, away, home, policy)
 
 
 def evaluate_esports_eligibility(
@@ -156,42 +129,42 @@ def evaluate_esports_eligibility(
         or request.code_revision in {"", "unknown"}
     ):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
-    market_probability = (
+    # See evaluate_eligibility's matching comment: disagreement/exposure/edge
+    # no longer gate CALL vs NO_CALL (operator directive, 2026-07-26).
+    return _call_result(request, away, home, policy)
+
+
+def _call_result(
+    request: PickRequest,
+    away: CanonicalTeam,
+    home: CanonicalTeam,
+    policy: UnitPolicy,
+) -> EligibilityResult:
+    """Build a QUALIFIED_SHADOW_CALL once every trust-boundary gate has
+    passed. Sizes via the proven edge-scaled method (edge_scaled_units,
+    "+34.1U vs +13.3U flat" walk-forward) rather than the exposure-aware
+    Kelly engine in recommend_units -- that engine's is_call decision isn't
+    consulted here at all, so its exposure-capped/edge-gated units would
+    otherwise silently reintroduce the very gates this function skips.
+    """
+    uncertainty = request.model_uncertainty or 0.05
+    edge = request.model_probability - implied_probability(request.american_odds)
+    market_no_vig = (
         request.decision_no_vig_probability
         if request.decision_no_vig_probability is not None
         else implied_probability(request.american_odds)
     )
-    if abs(request.model_probability - market_probability) > maximum_unreviewed_disagreement:
-        return _research(request, away, home, NoCallReason.LARGE_DISAGREEMENT, policy)
-    recommendation = recommend_units(
-        request.model_probability,
-        request.model_uncertainty,
-        request.american_odds,
-        exposure,
-        policy,
-        validated_model=True,
-    )
-    if not recommendation.is_call:
-        reason = NoCallReason.EXPOSURE_LIMIT if "exposure" in recommendation.reason else NoCallReason.LOW_EDGE
-        return EligibilityResult(
-            RecordType.RESEARCH_OBSERVATION,
-            "NO_CALL",
-            reason.value,
-            0,
-            recommendation.confidence_score,
-            recommendation.edge,
-            recommendation.adjusted_edge,
-            away,
-            home,
-        )
+    adjusted_edge = (request.model_probability - uncertainty) - market_no_vig
+    confidence = max(0, min(100, round(50 + 500 * adjusted_edge - 100 * uncertainty)))
+    units = edge_scaled_units(request.model_probability, uncertainty, request.american_odds, policy)
     return EligibilityResult(
         RecordType.QUALIFIED_SHADOW_CALL,
         "CALL",
         "QUALIFIED",
-        recommendation.units,
-        recommendation.confidence_score,
-        recommendation.edge,
-        recommendation.adjusted_edge,
+        units,
+        confidence,
+        edge,
+        adjusted_edge,
         away,
         home,
     )
@@ -204,6 +177,11 @@ def _research(
     reason: NoCallReason,
     policy: UnitPolicy,
 ) -> EligibilityResult:
+    """Hard-zero NO_CALL for reasons where the decision itself can't be
+    trusted (banned team, stale/missing data, unvalidated model). Disagreement,
+    exposure, and low-edge no longer route here at all -- see _call_result --
+    so every reason actually reaching this function stays zero-unit.
+    """
     uncertainty = request.model_uncertainty or 0
     recommendation = recommend_units(
         request.model_probability,

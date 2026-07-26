@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import httpx
 
@@ -145,7 +145,7 @@ def test_snapshot_uses_executable_asks_for_both_sides() -> None:
         return httpx.Response(200, json=market if "/market/slug/" in request.url.path else book)
 
     client = PolymarketUSClient("https://example.test", httpx.Client(transport=httpx.MockTransport(handler)))
-    snapshot = client.snapshot("market", datetime(2026, 7, 14, 22, tzinfo=timezone.utc))
+    snapshot = client.snapshot("market", datetime(2026, 7, 14, 22, tzinfo=UTC))
     assert snapshot["long"]["price"] == 0.46
     assert snapshot["short"]["price"] == 0.57
     assert snapshot["long"]["midpoint"] == 0.445
@@ -193,19 +193,27 @@ def test_slate_capture_stores_prospective_bbo_by_sport_and_date(tmp_path) -> Non
 
 
 def test_slate_capture_skips_sports_outside_qualification_scope(tmp_path) -> None:
-    class FailIfCalled:
+    # Soccer is now in BBO_CAPTURE_SPORTS (research pipeline); EPL contracts
+    # should be captured, not skipped.
+    class FakeClient:
         def snapshot(self, slug: str) -> dict:
-            raise AssertionError(f"unexpected snapshot call for {slug}")
+            return {
+                "market_slug": slug,
+                "event_start_utc": "2026-07-18T19:00:00Z",
+                "observed_at_utc": "2026-07-18T18:00:00Z",
+                "long": {"description": "home", "ask": 0.52, "bid": 0.50, "bid_size": 100, "ask_size": 100, "midpoint": 0.51},
+                "short": {"description": "away", "ask": 0.50, "bid": 0.48, "bid_size": 100, "ask_size": 100, "midpoint": 0.49},
+            }
 
     result = capture_slate_snapshots(
-        FailIfCalled(),
+        FakeClient(),
         {"EPL": [{"event_id": "event-1", "markets": [{"market_slug": "soccer-1"}]}]},
         tmp_path,
         "2026-07-18",
     )
 
-    assert result["captured"] == 0
-    assert result["skipped_nonqualification_contracts"] == 1
+    assert result["captured"] == 1
+    assert result["skipped_nonqualification_contracts"] == 0
 
 
 def test_ledger_price_refresh_deduplicates_and_never_discovers_a_broad_slate(tmp_path) -> None:

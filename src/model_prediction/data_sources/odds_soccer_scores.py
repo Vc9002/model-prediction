@@ -93,7 +93,7 @@ def collect_soccer_scores(
                 # Deterministic digest: Python's built-in hash() is randomized
                 # per process, which made every daily run mint a NEW id for the
                 # same game and re-append it (dedup never fired across runs).
-                digest = hashlib.sha1(f"{home}|{away}".encode("utf-8")).hexdigest()[:8]
+                digest = hashlib.sha1(f"{home}|{away}".encode()).hexdigest()[:8]
                 event_id = f"oddsapi:{odds_key}:{commence[:10]}:{digest}"
                 if event_id in existing_ids:
                     continue

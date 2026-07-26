@@ -6,8 +6,9 @@ import json
 import threading
 from pathlib import Path
 
-import dashboard_server
 import yaml
+
+import dashboard_server
 
 
 def _hashed(payload: dict) -> dict:

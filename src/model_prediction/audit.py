@@ -1,20 +1,45 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
+import time
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
-
-import fcntl
+from typing import Any
 
 from .domain import iso_utc, utc_now
 
-
 AUDIT_SCHEMA_VERSION = "1"
+
+# fcntl.flock(LOCK_EX) blocks indefinitely with no built-in timeout -- a hung
+# holder (not crashed; POSIX auto-releases on process death) would otherwise
+# wedge every other appender forever with no diagnostic.
+LOCK_TIMEOUT_SECONDS = 30
+LOCK_POLL_INTERVAL_SECONDS = 0.1
+
+
+class AuditLockTimeout(TimeoutError):
+    """Raised when the audit log lock can't be acquired within the timeout."""
+
+
+def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEOUT_SECONDS) -> None:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fcntl.flock(fileno, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                raise AuditLockTimeout(
+                    f"could not acquire lock on {path} within {timeout}s -- "
+                    "another process may be hung while holding it"
+                ) from None
+            time.sleep(LOCK_POLL_INTERVAL_SECONDS)
 
 
 class AuditLog:
@@ -26,7 +51,7 @@ class AuditLog:
     def _lock(self) -> Iterator[None]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+") as lock:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            _acquire_exclusive_lock(lock.fileno(), self.lock_path)
             try:
                 yield
             finally:

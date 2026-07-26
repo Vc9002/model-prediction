@@ -11,14 +11,14 @@ in config/model.yaml and the per-sport registration files.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import erf, sqrt
-from typing import Sequence
 
 from ..features.base import GameRecord
 from ..features.elo_ratings import build_elo
 from ..features.trends import TrendEngine
-from .base import GamePrediction
+from .base import GamePrediction, GamePredictionBase
 
 
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
@@ -82,7 +82,7 @@ class BasketballModel:
             expected_margin = home_points - away_points + 2.0  # small home-court points bump
             expected_total = away_points + home_points
             uncertainty = max(0.03, min(0.20, 0.20 - 0.005 * sample))
-            base = {
+            base: GamePredictionBase = {
                 "event_id": game.event_id,
                 "event_start_utc": game.event_start_utc,
                 "league": self.league,

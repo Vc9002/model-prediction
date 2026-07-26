@@ -1,15 +1,14 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from openpyxl import Workbook, load_workbook
 
 from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest, RecordType
 from model_prediction.eligibility import evaluate_eligibility
 from model_prediction.ledger import FIELDNAMES, LEGACY_FIELDNAMES, PickLedger
-from model_prediction.xlsx_ledger import read_xlsx_rows
 from model_prediction.units import Exposure, UnitPolicy
+from model_prediction.xlsx_ledger import read_xlsx_rows
 
-
-NOW = datetime(2026, 7, 13, 12, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
 
 
 def request(

@@ -7,7 +7,6 @@ from model_prediction.audit import AuditLog
 from model_prediction.bans import TeamBanList
 from model_prediction.entities import EntityRegistry
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 

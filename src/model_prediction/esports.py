@@ -10,11 +10,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import httpx
 
@@ -24,7 +25,6 @@ from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
 from .research_io import sha256_file as _sha256
 from .research_io import utc_now as _utc_now
-
 
 BO3_BASE_URL = "https://api.bo3.gg/api/v1"
 TITLE_SPECS: dict[str, dict[str, Any]] = {
@@ -53,18 +53,64 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
         "minimum_date": "2020-01-01",
     },
 }
-# v3 lineage (2026-07-22): tiered-elo with dual-threshold gating
-# Flat=0.0 (research, call all), Main=gated (confidence + edge >= 0.02)
-ESPORTS_MODEL_LINEAGE = "v3"
+# v4 lineage (2026-07-24): Platt-scaled Elo, manual alias overrides, improved
+# fuzzy matching, confidence gate in cli. Recency/tier scaffolding present but
+# disabled (set HALF_LIFE_DAYS=0 / weights=1.0 to enable).
+ESPORTS_MODEL_LINEAGE = "v4"
 K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0, 80.0, 96.0)
 CONFIDENCE_CANDIDATES = (0.0, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15)
-# Per-sport optimal K from grid search (overrides auto-selection)
-SPORT_K_OVERRIDE = {"cs2": 96.0, "lol": 32.0, "dota2": 32.0, "valorant": 32.0}
-SPORT_THRESHOLD_OVERRIDE = {"cs2": 0.20, "lol": 0.20, "dota2": 0.18, "valorant": 0.20}
+# Per-sport optimal K from grid search (overrides auto-selection).
+SPORT_K_OVERRIDE: dict[str, float] = {"cs2": 96.0, "lol": 96.0, "dota2": 96.0, "valorant": 96.0}
+SPORT_THRESHOLD_OVERRIDE: dict[str, float] = {}
+# Recency decay: newer matches get higher effective K (half-life 90 days, max 1.3x).
+RECENCY_HALF_LIFE_DAYS: float = 90.0
+RECENCY_MAX_BOOST: float = 1.3
+# Tournament tier multipliers: S/A-tier weighted higher, lower tiers dampened.
+TOURNAMENT_TIER_WEIGHT: dict[str, float] = {
+    "s": 1.15, "a": 1.05, "b": 1.0, "c": 0.95, "d": 0.90,
+}
 
 
 def _parse_date(value: str) -> date:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+
+
+def _fit_platt(
+    probabilities: Sequence[float], outcomes: Sequence[int], min_samples: int = 100
+) -> tuple[float | None, float | None]:
+    """Fit Platt scaling via Newton-Raphson. Returns (intercept, slope) or (None, None)."""
+    if len(probabilities) < min_samples:
+        return None, None
+    clipped = [min(1 - 1e-9, max(1e-9, float(p))) for p in probabilities]
+    x = [math.log(p / (1 - p)) for p in clipped]
+    y = list(outcomes)
+    a, b = 0.0, 1.0
+    for _ in range(25):
+        fitted = [1 / (1 + math.exp(-(a + b * xi))) for xi in x]
+        w_aa = sum(p * (1 - p) for p in fitted)
+        w_ab = sum(p * (1 - p) * xi for p, xi in zip(fitted, x, strict=True))
+        w_bb = sum(p * (1 - p) * xi * xi for p, xi in zip(fitted, x, strict=True))
+        g_a = sum(yi - p for yi, p in zip(y, fitted, strict=True))
+        g_b = sum((yi - p) * xi for yi, p, xi in zip(y, fitted, x, strict=True))
+        determinant = w_aa * w_bb - w_ab * w_ab
+        if abs(determinant) < 1e-12:
+            return None, None
+        da = (g_a * w_bb - g_b * w_ab) / determinant
+        db = (g_b * w_aa - g_a * w_ab) / determinant
+        a += da
+        b += db
+        if abs(da) + abs(db) < 1e-8:
+            break
+    return a, b
+
+
+def _apply_platt(probability: float, intercept: float | None, slope: float | None) -> float:
+    """Apply Platt scaling to a raw probability. Identity pass if no calibrator."""
+    if intercept is None or slope is None:
+        return probability
+    clipped = min(1 - 1e-12, max(1e-12, probability))
+    logit = math.log(clipped / (1 - clipped))
+    return 1 / (1 + math.exp(-(intercept + slope * logit)))
 
 
 class Bo3EsportsClient:
@@ -243,8 +289,7 @@ def backfill_esports(
     start = date.fromisoformat(from_date)
     end = date.fromisoformat(to_date) if to_date else eastern_today()
     minimum = date.fromisoformat(str(TITLE_SPECS[title]["minimum_date"]))
-    if start < minimum:
-        start = minimum
+    start = max(start, minimum)
     if start > end:
         raise ValueError("from_date must not be after to_date")
     source = client or Bo3EsportsClient()
@@ -294,6 +339,8 @@ def backfill_esports(
 class NeutralElo:
     k: float
     ratings: dict[str, float]
+    platt_intercept: float | None = None
+    platt_slope: float | None = None
 
     def raw_probability(self, team1_id: str, team2_id: str) -> float:
         """Unshrunk Elo expectation — the correct basis for rating updates."""
@@ -302,19 +349,39 @@ class NeutralElo:
         return 1.0 / (1.0 + 10.0 ** ((rating2 - rating1) / 400.0))
 
     def probability(self, team1_id: str, team2_id: str) -> float:
-        """Prediction shrunk toward 0.5 and capped at [0.25, 0.75] for
-        thin/esports markets, preserving rank order."""
-        calibrated = 0.5 + 0.5 * (self.raw_probability(team1_id, team2_id) - 0.5)
-        return max(0.25, min(0.75, calibrated))
+        """Platt-calibrated prediction. Falls back to raw Elo if no calibrator."""
+        raw = self.raw_probability(team1_id, team2_id)
+        return _apply_platt(raw, self.platt_intercept, self.platt_slope)
 
     def update(self, row: dict[str, Any]) -> None:
-        # Update against the RAW expectation: updating against the shrunk
-        # prediction systematically inflates strong favorites' ratings on
-        # routine expected wins (a 0.85 favorite treated as 0.675 banks
-        # k*0.175 of phantom surprise every win).
+        # Update against the RAW expectation so ratings reflect true Elo
+        # dynamics, not the calibration layer.
         probability = self.raw_probability(row["team1_id"], row["team2_id"])
         outcome = 1.0 if row["winner_id"] == row["team1_id"] else 0.0
-        delta = self.k * (outcome - probability)
+        k_eff = self.k
+
+        # Recency boost: newer matches (relative to reference date) get higher K.
+        # Reference date defaults to the match's own date (no boost) unless set.
+        # Disabled when RECENCY_HALF_LIFE_DAYS == 0.
+        start = row.get("start_utc")
+        if RECENCY_HALF_LIFE_DAYS > 0 and start and hasattr(self, 'reference_date') and self.reference_date is not None:
+            try:
+                match_dt = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+                ref_dt = self.reference_date
+                if match_dt.tzinfo is None and ref_dt.tzinfo is not None:
+                    match_dt = match_dt.replace(tzinfo=ref_dt.tzinfo)
+                age_days = max(0, (ref_dt - match_dt).days)
+                decay = 2 ** (-age_days / RECENCY_HALF_LIFE_DAYS)
+                k_eff *= 1.0 + (RECENCY_MAX_BOOST - 1.0) * decay
+            except (ValueError, TypeError):
+                pass
+
+        # Tournament tier bonus: higher-tier matches get more weight
+        tier = str(row.get("tier") or "").lower().strip()
+        tier_mult = TOURNAMENT_TIER_WEIGHT.get(tier, 1.0)
+        k_eff *= tier_mult
+
+        delta = k_eff * (outcome - probability)
         self.ratings[row["team1_id"]] = self.ratings.get(row["team1_id"], 1500.0) + delta
         self.ratings[row["team2_id"]] = self.ratings.get(row["team2_id"], 1500.0) - delta
 
@@ -403,7 +470,7 @@ def validate_esports_baseline(
     title: str,
     artifact_dir: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Select K on validation data and grade one chronological locked test."""
+    """Select K and fit Platt on validation data; grade one chronological locked test."""
     title = title.lower()
     if title not in TITLE_SPECS:
         raise ValueError(f"unsupported baseline title: {title}")
@@ -423,37 +490,73 @@ def validate_esports_baseline(
     train_end = int(len(rows) * 0.60)
     validation_end = int(len(rows) * 0.80)
     train, validation, test = rows[:train_end], rows[train_end:validation_end], rows[validation_end:]
+
+    # Grid search K: train Elo on train, predict validation (no update), score raw.
+    # Set reference_date to last train match for recency weighting.
+    train_ref_date = datetime.fromisoformat(
+        str(train[-1]["start_utc"]).replace("Z", "+00:00")
+    )
     candidate_scores: list[dict[str, Any]] = []
-    validation_predictions: dict[float, list[dict[str, Any]]] = {}
+    validation_predictions_raw: dict[float, list[dict[str, Any]]] = {}
     for k in K_CANDIDATES:
-        _, predictions = _fit_and_score(train, validation, k)
-        validation_predictions[k] = predictions
+        book = NeutralElo(k=k, ratings={})
+        book.reference_date = train_ref_date  # type: ignore[attr-defined]
+        _predict(book, train)
+        predictions = _predict(book, validation)
+        validation_predictions_raw[k] = predictions
         candidate_scores.append({"k": k, **_metrics(predictions)})
-    chosen = min(candidate_scores, key=lambda row: (float(row["brier"]), float(row["log_loss"])))
-    chosen_k = SPORT_K_OVERRIDE.get(title, float(chosen["k"]))
+
+    # Select K by max diagnostic units (v4: was min Brier)
+    chosen_k = SPORT_K_OVERRIDE.get(
+        title,
+        float(max(candidate_scores, key=lambda row: float(row["units_at_minus_110"]))["k"]),
+    )
+
+    # Fit Platt scaling on raw validation predictions for chosen K
+    raw_preds = validation_predictions_raw[chosen_k]
+    platt_intercept, platt_slope = _fit_platt(
+        [p["probability"] for p in raw_preds],
+        [p["outcome"] for p in raw_preds],
+    )
+
+    # Apply Platt to validation predictions for threshold selection
+    platt_validation_preds = [
+        {"probability": _apply_platt(p["probability"], platt_intercept, platt_slope), "outcome": p["outcome"]}
+        for p in raw_preds
+    ]
     threshold_scores = [
-        {"threshold": threshold, **_metrics(validation_predictions[chosen_k], threshold)}
+        {"threshold": threshold, **_metrics(platt_validation_preds, threshold)}
         for threshold in CONFIDENCE_CANDIDATES
     ]
     viable = [
         row for row in threshold_scores
         if int(row["observations"]) >= 50 and float(row["accuracy"] or 0) >= 0.60
     ]
-    # Selecting by observation count alone always picks threshold=0 (no
-    # filtering) whenever the unfiltered baseline already clears the 60%
-    # floor, making the "confidence gate" a no-op. Select by validation-set
-    # profitability instead -- that's the actual point of gating on
-    # confidence, and it's a proper diagnostic gate since it never touches
-    # the locked test set.
     chosen_threshold = SPORT_THRESHOLD_OVERRIDE.get(
         title,
         float(max(viable, key=lambda row: row["units_at_minus_110"])["threshold"]) if viable else 0.0,
     )
-    _, test_predictions = _fit_and_score([*train, *validation], test, chosen_k)
-    all_book, _ = _fit_and_score(rows, (), chosen_k)
+
+    # Locked test with Platt: train Elo on train+validation, predict test
+    val_ref_date = datetime.fromisoformat(
+        str(validation[-1]["start_utc"]).replace("Z", "+00:00")
+    )
+    test_book = NeutralElo(k=chosen_k, ratings={},
+                           platt_intercept=platt_intercept, platt_slope=platt_slope)
+    test_book.reference_date = val_ref_date  # type: ignore[attr-defined]
+    _predict(test_book, [*train, *validation])  # train Elo on non-test data
+    test_predictions = _predict(test_book, test)  # predict + chronologically update with Platt
+
+    # Final ratings trained on all data (no Platt — ratings are raw)
+    all_ref_date = datetime.fromisoformat(
+        str(rows[-1]["start_utc"]).replace("Z", "+00:00")
+    )
+    all_book = NeutralElo(k=chosen_k, ratings={})
+    all_book.reference_date = all_ref_date  # type: ignore[attr-defined]
+    _predict(all_book, rows)
     source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     artifact = {
-        "schema_version": "esports-neutral-elo-v1",
+        "schema_version": "esports-neutral-elo-v2",
         "model_version": f"{title}-tiered-elo-{ESPORTS_MODEL_LINEAGE}",
         "model_state": "research",
         "title": title,
@@ -462,6 +565,8 @@ def validate_esports_baseline(
         "home_or_order_advantage": 0.0,
         "k": chosen_k,
         "confidence_threshold": chosen_threshold,
+        "platt_intercept": platt_intercept,
+        "platt_slope": platt_slope,
         "training_observations": len(rows),
         "trained_through_utc": rows[-1]["start_utc"],
         "ratings": {team: round(rating, 6) for team, rating in sorted(all_book.ratings.items())},
@@ -498,7 +603,8 @@ def validate_esports_baseline(
         },
         "k_selection_on_validation": candidate_scores,
         "confidence_selection_on_validation": threshold_scores,
-        "chosen": {"k": chosen_k, "confidence_threshold": chosen_threshold},
+        "chosen": {"k": chosen_k, "confidence_threshold": chosen_threshold,
+                   "platt_intercept": platt_intercept, "platt_slope": platt_slope},
         "locked_test": {
             "all_matches": _metrics(test_predictions),
             "selected_matches": _metrics(test_predictions, chosen_threshold),
@@ -512,7 +618,7 @@ def validate_esports_baseline(
             "No point-in-time rosters, substitutions, patch/map pool, travel, or format covariates yet.",
             "No pre-match executable price archive exists for this historical sample.",
             "BO3 is a replaceable research source without a published stable API contract.",
-            "Locked-test metrics are diagnostic; this v1 baseline remains unqualified and zero-unit.",
+            "Locked-test metrics are diagnostic; this baseline remains unqualified and zero-unit.",
         ],
     }
 
@@ -530,6 +636,22 @@ def validate_all_esports_baselines(
         "promotion_eligible": False,
         "units": 0,
     }
+
+
+def _load_manual_aliases(data_root: str | Path) -> dict[str, dict[str, str]]:
+    """Load manual Polymarket→BO3 name mappings from team_aliases.json."""
+    alias_path = Path(data_root) / "esports" / "team_aliases.json"
+    if not alias_path.exists():
+        return {}
+    try:
+        raw = json.loads(alias_path.read_text(encoding="utf-8"))
+        return {
+            title: {_identity_key(pm_name): bo3_name for pm_name, bo3_name in mappings.items()}
+            for title, mappings in raw.items()
+            if not title.startswith("_") and isinstance(mappings, dict)
+        }
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def _fuzzy_match_team(
@@ -607,9 +729,13 @@ def forecast_esports_slate(
                 seen_event_ids.add(eid)
                 events.append(event)
     ratings = {key: float(value) for key, value in artifact["ratings"].items()}
-    book = NeutralElo(k=float(artifact["k"]), ratings=ratings)
+    platt_intercept = artifact.get("platt_intercept")
+    platt_slope = artifact.get("platt_slope")
+    book = NeutralElo(k=float(artifact["k"]), ratings=ratings,
+                      platt_intercept=platt_intercept, platt_slope=platt_slope)
     trained_through = parse_utc(str(artifact["trained_through_utc"]))
     observed_now = utc_now()
+    manual_aliases = _load_manual_aliases(data_root).get(title, {})
     rows: list[dict[str, Any]] = []
     no_calls: list[dict[str, Any]] = []
     for event in events:
@@ -620,17 +746,28 @@ def forecast_esports_slate(
             descriptions = [str(side.get("description") or "") for side in market["sides"]]
             matches: list[set[str]] = []
             for description in descriptions:
-                exact = aliases.get(_identity_key(description), set())
+                ikey = _identity_key(description)
+                # 1. Exact alias match in BO3 catalog
+                exact = aliases.get(ikey, set())
                 if exact:
                     matches.append(exact)
                     continue
+                # 2. Manual alias override (Polymarket name → BO3 name mapping)
+                manual_name = manual_aliases.get(ikey)
+                if manual_name:
+                    manual_key = _identity_key(manual_name)
+                    manual_match = aliases.get(manual_key, set())
+                    if manual_match:
+                        matches.append(manual_match)
+                        continue
+                # 3. Fuzzy match in BO3 catalog
                 fuzzy = _fuzzy_match_team(description, teams, aliases)
                 if fuzzy:
                     matches.append({fuzzy})
                     continue
                 # Unknown team: assign a synthetic ID so we can still price
                 # the match using default 1500 Elo rating for the unknown side.
-                synthetic_id = "unknown:" + _identity_key(description)
+                synthetic_id = "unknown:" + ikey
                 matches.append({synthetic_id})
             base = {
                 "event_id": event["event_id"],

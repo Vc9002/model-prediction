@@ -15,10 +15,11 @@ from __future__ import annotations
 import json
 import math
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from scipy.stats import poisson, skellam
 

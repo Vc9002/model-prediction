@@ -31,7 +31,14 @@ def grade_pick(
 ) -> PickResult:
     selection = selection.lower()
     if market_type is MarketType.MONEYLINE:
-        margin = home_score - away_score if selection == "home" else away_score - home_score
+        if selection == "draw":
+            # A draw pick is a binary yes/no on the scores tying, not a
+            # margin bet — there is no push case: either it ties or it
+            # doesn't. Without this branch a "draw" selection silently fell
+            # into the "not home" -> away-margin case above and got graded
+            # as a straight away-moneyline bet, which is a different market.
+            return PickResult.WIN if home_score == away_score else PickResult.LOSS
+        margin: float = home_score - away_score if selection == "home" else away_score - home_score
     elif market_type is MarketType.SPREAD:
         if line is None:
             raise ValueError("spread requires a line")

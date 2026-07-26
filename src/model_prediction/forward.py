@@ -8,6 +8,7 @@ must be evaluated walk-forward and on a locked holdout before promotion.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import replace as _replace
 from datetime import datetime
 from pathlib import Path
 
@@ -16,8 +17,6 @@ from .data_sources.mlb_market_odds import MLBGameOdds, MLBMarketOddsFeed
 from .domain import MarketType, parse_utc
 from .models.mlb import FormulaSpec, MeasuredEdgeMarginModel, MeasuredEdgeTotalsModel
 from .pricing import american_to_decimal, normalize_no_vig
-
-from dataclasses import replace as _replace
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,6 @@ import httpx
 from ..domain import League
 from ..entities import EntityRegistry
 
-
 SPORT_KEYS = {
     "MLB": "baseball_mlb",
     "NBA": "basketball_nba",

@@ -9,8 +9,9 @@ that silently marks manual items as passed is worse than no checklist.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any
 
 from .economic_gate import GateResult
 from .experiment_design import ExperimentLog
@@ -119,8 +120,7 @@ def run_checklist(
     ``not_checked`` rather than assuming success.
     """
     results: dict[str, ChecklistResult] = {
-        item.item_id: ChecklistResult(item.item_id, "not_checked" if item.kind == "manual" else "not_checked")
-        for item in CHECKLIST
+        item.item_id: ChecklistResult(item.item_id, "not_checked") for item in CHECKLIST
     }
 
     if source_keys is not None:

@@ -5,7 +5,7 @@ description: Start, inspect, test, troubleshoot, and safely modify the local mod
 
 # Operate Model Dashboard
 
-Work from `/Users/vincentc9002/Documents/Poly & Kalshi/model prediction`.
+Work from `/Users/vincentc9002/model prediction`.
 
 ## Diagnose before restarting
 

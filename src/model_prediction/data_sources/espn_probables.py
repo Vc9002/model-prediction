@@ -7,17 +7,57 @@ allowed proxy must never masquerade as a starting-pitcher feature.
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 
 import httpx
 
+from ..config import PROJECT_ROOT
 
-@lru_cache(maxsize=8)
+_DISK_CACHE_PATH = PROJECT_ROOT / "data" / "espn_probables_cache.jsonl"
+
+
+def _load_disk_cache() -> dict[str, dict]:
+    """One JSON line per date, keyed on ESPN's calendar date — the same
+    scoreboard response for a past date never changes, so once fetched it's
+    valid forever. Without this, re-running a walk-forward backtest (one
+    ESPN call per unique historical game date) costs 2+ hours of live HTTP
+    calls every single time; with it, only genuinely new dates hit ESPN.
+    """
+    if not _DISK_CACHE_PATH.exists():
+        return {}
+    cache: dict[str, dict] = {}
+    with _DISK_CACHE_PATH.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            cache[entry["date"]] = entry["probables"]
+    return cache
+
+
+def _append_disk_cache(date_str: str, probables: dict[str, dict]) -> None:
+    _DISK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _DISK_CACHE_PATH.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"date": date_str, "probables": probables}) + "\n")
+
+
+@lru_cache(maxsize=512)
 def _pull_espn_probables(date_str: str) -> dict[str, dict]:
     """Pull probable pitchers from ESPN scoreboard for a date.
 
     Returns dict of {event_id: {home_era, away_era, home_name, away_name}}.
+    Checks the on-disk cache first (see _load_disk_cache); only a genuine
+    cache miss reaches the network. The in-memory lru_cache above this still
+    matters within a single process (many rows share one game date).
     """
+    disk_cache = _load_disk_cache()
+    if date_str in disk_cache:
+        return disk_cache[date_str]
+
     # The public scoreboard accepts YYYYMMDD, while the forecasting pipeline
     # uses ISO dates. Passing YYYY-MM-DD returns HTTP 400 and previously caused
     # every game to fall through to an unrelated team runs-allowed proxy.
@@ -65,6 +105,22 @@ def _pull_espn_probables(date_str: str) -> dict[str, dict]:
                 "away_starter": eras["away"]["name"],
             }
 
+    # Only persist STRICTLY PAST dates. This function also serves live
+    # forecasting (default date_str = today), and ESPN announces probables
+    # progressively through game day — caching today's (possibly still
+    # incomplete) result forever would freeze it wrong for the rest of the
+    # day. A past date's scoreboard is genuinely final and safe to persist,
+    # even when ESPN returned zero probables for it (e.g. an off day).
+    # Compare normalized_date (always compact YYYYMMDD, computed above)
+    # against today in the same compact format -- comparing the raw,
+    # possibly-ISO date_str against a compact string is a lexicographic trap:
+    # "-" sorts below every digit, so any ISO "YYYY-MM-DD" input (a supported,
+    # tested calling convention for this function) would always compare as
+    # "less than" a compact today-string regardless of the actual date,
+    # silently caching today's incomplete result forever.
+    from ..domain import eastern_today
+    if normalized_date < eastern_today().strftime("%Y%m%d"):
+        _append_disk_cache(date_str, result)
     return result
 
 

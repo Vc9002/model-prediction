@@ -10,7 +10,7 @@ every existing artifact's feature_names.)
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 
 def rolling_runs_allowed(history: Sequence, team: str, n: int = 5) -> float | None:

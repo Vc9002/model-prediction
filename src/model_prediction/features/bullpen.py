@@ -7,7 +7,8 @@ are cached this computes real numbers; when they are not, it reports
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 
 def bullpen_profile(

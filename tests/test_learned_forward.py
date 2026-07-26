@@ -1,9 +1,9 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from model_prediction.features.base import FeatureStore
 from model_prediction import learned_forward
 from model_prediction.data_sources import espn_probables
+from model_prediction.features.base import FeatureStore
 from model_prediction.learned_forward import build_learned_moneyline_slate
 from model_prediction.models.learned_market import build_artifact
 
@@ -84,7 +84,7 @@ def test_forward_slate_uses_artifact_gate_and_point_in_time_features(tmp_path) -
         store=FeatureStore(tmp_path),
         client=FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert scheduled == 1
@@ -109,7 +109,7 @@ def test_unqualified_artifact_can_only_create_research_observation(tmp_path) -> 
         store=FeatureStore(tmp_path),
         client=FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     assert candidates[0].action == "QUALIFIED_SHADOW_CALL"  # All calls treated equally; user decides
@@ -153,7 +153,7 @@ def test_pitcher_gap_served_from_history_and_starter_gap_fails_closed(
         store=FeatureStore(tmp_path),
         client=FakeESPN(),
         artifact_path=artifact_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
     assert scheduled == 1
     assert len(candidates) == 1  # gap computed from history, no skip
@@ -183,7 +183,7 @@ def test_pitcher_gap_served_from_history_and_starter_gap_fails_closed(
         store=FeatureStore(tmp_path),
         client=FakeESPN(),
         artifact_path=starter_path,
-        observed_at=datetime(2026, 7, 17, 12, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
     learned_forward._FEATURE_PROVIDERS.clear()

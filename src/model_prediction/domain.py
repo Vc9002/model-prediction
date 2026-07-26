@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -109,23 +109,23 @@ LOSS_CLASSIFICATIONS = {
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def eastern_today() -> date:
     """Today's date in US-Eastern local time -- the canonical "today" for this project."""
-    return datetime.now(timezone.utc).astimezone(EASTERN).date()
+    return datetime.now(UTC).astimezone(EASTERN).date()
 
 
 def parse_utc(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         raise ValueError("timestamp must include a timezone")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def iso_utc(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True)
@@ -160,6 +160,26 @@ class PickRequest:
     decision_no_vig_probability: float | None = None
     decision_consensus_probability: float | None = None
     decision_consensus_line: float | None = None
+    # Diagnostic only: each feature's real value at decision time, for audit.
+    # The ledger has held columns for all of these since 2026-07-22 ("for
+    # dashboard feature attribution") but PickRequest never carried the
+    # values to populate them — every one of these was silently blank for
+    # every real pick until 2026-07-25, not just pitcher_era_gap. Whichever
+    # subset a given sport/artifact actually uses is populated from
+    # candidate.feature_basis; the rest stay None. Never read back by any
+    # code path — model_probability already has these baked in via the
+    # artifact's fitted coefficients.
+    elo_probability: float | None = None
+    trend_gap: float | None = None
+    defensive_trend_gap: float | None = None
+    park_factor: float | None = None
+    weather_factor: float | None = None
+    pitcher_era_gap: float | None = None
+    probable_starter_era_gap: float | None = None
+    # Comma-joined feature names that fell back to a neutral default for this
+    # specific game (e.g. ESPN hasn't posted both starters yet) — surfaced as
+    # a visible dashboard badge, not just buried in the rationale text.
+    unavailable_features: str | None = None
 
     def validate(self, now: datetime | None = None) -> None:
         current = now or utc_now()
@@ -170,7 +190,9 @@ class PickRequest:
         if self.away_team.strip().lower() == self.home_team.strip().lower():
             raise ValueError("away and home teams must differ")
         if self.market_type is MarketType.MONEYLINE:
-            allowed = {"away", "home"}
+            # "draw" is only meaningful for 3-way sports (soccer); grade_pick
+            # grades it as its own binary yes/no rather than a margin bet.
+            allowed = {"away", "home", "draw"}
             if self.line is not None:
                 raise ValueError("moneyline calls must not have a line")
         elif self.market_type is MarketType.SPREAD:
@@ -237,4 +259,11 @@ class PickRequest:
             "decision_no_vig_probability": self.decision_no_vig_probability,
             "decision_consensus_probability": self.decision_consensus_probability,
             "decision_consensus_line": self.decision_consensus_line,
+            "elo_probability": self.elo_probability,
+            "trend_gap": self.trend_gap,
+            "park_factor": self.park_factor,
+            "weather_factor": self.weather_factor,
+            "pitcher_era_gap": self.pitcher_era_gap,
+            "probable_starter_era_gap": self.probable_starter_era_gap,
+            "unavailable_features": self.unavailable_features,
         }

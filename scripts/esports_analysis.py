@@ -132,19 +132,29 @@ def grid_search(title: str) -> None:
         K, rec, sc, th, brier, called = best_cfg
         print(f"\n  Best: K={K}  recency={rec}  score={sc}  th={th:.2f}  Brier={brier:.6f}  Called={called}/{len(test)}")
 
+# ── Platt helper ────────────────────────────────────────────────────
+def _apply_platt_anal(prob, intercept, slope):
+    if intercept is None or slope is None:
+        return prob
+    clipped = min(1 - 1e-12, max(1e-12, prob))
+    logit = math.log(clipped / (1 - clipped))
+    return 1 / (1 + math.exp(-(intercept + slope * logit)))
+
+
 # ── backtest ───────────────────────────────────────────────────────
 def backtest(title: str) -> None:
-    model_file = MODELS / f"{title}-tiered-elo-v3.json"
+    model_file = MODELS / f"{title}-tiered-elo-v4.json"
     if not model_file.exists():
-        # Try neutral-series-elo-v2 as fallback
-        model_file = MODELS / f"{title}-neutral-series-elo-v2.json"
+        model_file = MODELS / f"{title}-tiered-elo-v3.json"
     if not model_file.exists():
         print(f"No model found for {title}")
         return
 
-    v3 = json.load(open(model_file))
-    ratings = v3.get("ratings", {})
-    threshold = v3.get("confidence_threshold", 0.20)
+    cfg = json.load(open(model_file))
+    ratings = cfg.get("ratings", {})
+    threshold = cfg.get("confidence_threshold", 0.10)
+    platt_intercept = cfg.get("platt_intercept")
+    platt_slope = cfg.get("platt_slope")
 
     for fname, label in [(PICKS_FLAT, "FLAT"), (PICKS_MAIN, "MAIN")]:
         if not fname.exists(): continue
@@ -154,24 +164,27 @@ def backtest(title: str) -> None:
 
         print(f"\n{'='*70}")
         print(f"  BACKTEST — {title.upper()} on {label} ({len(picks)} settled)")
+        print(f"  Model: {cfg.get('model_version', '?')}  K={cfg.get('k','?')}  th={threshold}")
         print(f"{'='*70}")
-        print(f"  {'Match':<45} {'Sd':>3} {'Prob':>7} {'Edge':>8} {'Call':>6} {'P&L':>7}")
-        print(f"  {'-'*82}")
+        print(f"  {'Match':<45} {'Sd':>3} {'Raw':>7} {'Platt':>7} {'Edge':>8} {'Call':>6} {'P&L':>7}")
+        print(f"  {'-'*90}")
 
         total_pnl, called_n, called_pnl = 0, 0, 0
         for _, r in picks.iterrows():
             away = find_team(title, r.get("away_team", ""))
             home = find_team(title, r.get("home_team", ""))
-            prob, edge, called = 0.5, 0.0, "?"
+            prob, prob_platt, edge, called = 0.5, 0.5, 0.0, "?"
             if away and home:
                 ra = ratings.get(away, 1500.0)
                 rh = ratings.get(home, 1500.0)
-                p_home = elo_prob(rh, ra)
+                p_home_raw = elo_prob(rh, ra)
+                p_home_platt = _apply_platt_anal(p_home_raw, platt_intercept, platt_slope)
                 sel = str(r.get("selection", "")).lower()
-                prob = p_home if "home" in sel else (1 - p_home)
+                prob = p_home_raw if "home" in sel else (1 - p_home_raw)
+                prob_platt = p_home_platt if "home" in sel else (1 - p_home_platt)
                 impl = r.get("market_implied_probability", 0.5) or 0.5
-                edge = prob - impl
-                called = "YES" if abs(prob - 0.5) >= threshold else "no"
+                edge = prob_platt - impl
+                called = "YES" if abs(prob_platt - 0.5) >= threshold else "no"
 
             matchup = f"{str(r['away_team'])[:22]} @ {str(r['home_team'])[:22]}"
             pnl = r["pnl_units"]
@@ -179,9 +192,9 @@ def backtest(title: str) -> None:
             if called == "YES":
                 called_n += 1
                 called_pnl += pnl
-            print(f"  {matchup:<45} {'H' if 'home' in str(r.get('selection','')).lower() else 'A':>3} {prob:>7.3f} {edge:>+8.3f} {called:>6} {pnl:>+7.2f}")
+            print(f"  {matchup:<45} {'H' if 'home' in str(r.get('selection','')).lower() else 'A':>3} {prob:>7.3f} {prob_platt:>7.3f} {edge:>+8.3f} {called:>6} {pnl:>+7.2f}")
 
-        print(f"  {'-'*82}")
+        print(f"  {'-'*90}")
         print(f"  Total: {total_pnl:+.2f}U  |  Called only: {called_pnl:+.2f}U ({called_n} picks)")
 
 # ── main ───────────────────────────────────────────────────────────

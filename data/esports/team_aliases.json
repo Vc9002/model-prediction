@@ -1,0 +1,11 @@
+{
+  "_description": "Manual Polymarket → BO3 team name mappings. Team Heretics + Natus Vincere now in Valorant catalog (3035 teams). PuckChamp from OpenDota (not BO3-compatible).",
+  "cs2": {
+    "justplayers": "Just Swing"
+  },
+  "valorant": {
+    "twistedmindsorchid": "Twisted Minds"
+  },
+  "dota2": {},
+  "lol": {}
+}

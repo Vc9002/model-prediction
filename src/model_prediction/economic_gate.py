@@ -19,8 +19,8 @@ validation pipelines already do that from timestamp-valid executable prices
 from __future__ import annotations
 
 import random
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Sequence
 
 
 @dataclass(frozen=True)
@@ -106,6 +106,23 @@ class GateResult:
     metrics: dict[str, object] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class EconomicGateThresholds:
+    """Config-sourceable defaults for economic_gate/promotion_gate.
+
+    Neither gate function is wired into a live promotion decision yet (see
+    module docstring) -- this dataclass exists so that when one is, the
+    thresholds come from config/model.yaml's ``economic_gate`` section
+    (config.economic_gate_thresholds) instead of being hand-edited literals
+    at whatever call site eventually invokes them.
+    """
+
+    minimum_calls: int = 50
+    minimum_roi: float = 0.0
+    require_positive_clv: bool = True
+    minimum_predictive_sample: int = 30
+
+
 def economic_gate(
     *,
     calls: int,
@@ -149,7 +166,7 @@ def economic_gate(
         roi_ci = bootstrap_ci(list(daily_pnl_for_bootstrap))
         if roi_ci[1] < 0:
             reasons.append(f"bootstrap 95% CI for daily P&L {roi_ci} does not exclude a loss")
-    metrics = {
+    metrics: dict[str, object] = {
         "calls": calls,
         "roi": roi,
         "mean_clv": mean_clv,
@@ -175,7 +192,8 @@ def promotion_gate(
     if predictive_metrics.get("status") != "ok":
         reasons.append(f"predictive gate not evaluable: {predictive_metrics.get('status', 'unknown')}")
     else:
-        sample_size = predictive_metrics.get("sample_size", 0)
+        raw_sample_size = predictive_metrics.get("sample_size", 0)
+        sample_size = raw_sample_size if isinstance(raw_sample_size, int) else 0
         if sample_size < minimum_predictive_sample:
             reasons.append(
                 f"predictive sample size {sample_size} below the {minimum_predictive_sample} minimum"

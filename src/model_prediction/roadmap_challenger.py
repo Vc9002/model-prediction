@@ -15,9 +15,10 @@ import json
 import math
 import random
 from collections import OrderedDict, defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from statistics import mean, pstdev
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from sklearn.linear_model import LogisticRegression
 
@@ -81,12 +82,18 @@ def _all_metrics(probabilities: Sequence[float], rows: Sequence[ValidationRow]) 
     outcomes = [row.outcome for row in rows]
     metrics = calibration_metrics(probabilities, outcomes)
     hits = sum((probability >= 0.5) == bool(outcome) for probability, outcome in zip(probabilities, outcomes, strict=True))
+    brier_score = metrics["brier_score"]
+    log_loss = metrics["log_loss"]
+    expected_calibration_error = metrics["expected_calibration_error"]
+    assert isinstance(brier_score, (int, float))
+    assert isinstance(log_loss, (int, float))
+    assert isinstance(expected_calibration_error, (int, float))
     return {
         "observations": len(rows),
         "accuracy": round(hits / len(rows), 6),
-        "brier_score": round(float(metrics["brier_score"]), 6),
-        "log_loss": round(float(metrics["log_loss"]), 6),
-        "expected_calibration_error": round(float(metrics["expected_calibration_error"]), 6),
+        "brier_score": round(float(brier_score), 6),
+        "log_loss": round(float(log_loss), 6),
+        "expected_calibration_error": round(float(expected_calibration_error), 6),
         "calibration_intercept": metrics.get("calibration_intercept"),
         "calibration_slope": metrics.get("calibration_slope"),
     }

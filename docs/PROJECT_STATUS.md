@@ -1,10 +1,23 @@
 # Project status and source of truth
 
-Last verified: 2026-07-23 (Asia/Shanghai) against the current working tree.
+**Last verified**: 2026-07-26 against the dirty `deepseek-phase5` checkout at
+`697d765`.
 
-This document is the entry point for project status. Historical metrics in old
-reports, changelog entries, model cards, and rollback artifacts remain useful
-evidence, but they are not current operational truth.
+This document is the operational status entry point. `DEBUG.md` contains the
+full audit evidence and reproduction commands. Historical metrics in old
+reports, changelog entries, model cards, and rollback artifacts are not current
+operational truth.
+
+## Release verdict
+
+The checkout is **not release-ready**, and the real-money execution surface
+should not be used.
+
+The blunt reason: the project currently has a plausible forecasting layer on
+top of an execution and evidence chain that is not yet trustworthy enough for
+capital. Model hit rates do not offset an order-ticket binding flaw,
+non-point-in-time MLB validation, non-atomic ledger/audit writes, failing tests,
+and stale release evidence.
 
 ## Source-of-truth order
 
@@ -12,170 +25,201 @@ When files disagree, use this order:
 
 1. Runnable tests and the current source path.
 2. `config/model.yaml` plus the exact artifact it names.
-3. The newest generated report for the same checkout and artifact version.
+3. A freshly reproduced report for the same checkout and artifact version.
 4. Point-in-time source records and executable-price snapshots.
 5. League contracts and architecture documentation.
 6. README tables, changelogs, prompt files, and historical model cards.
 
-Fail closed when the higher-ranked sources disagree. A YAML status label or a
-README metric cannot make an internally inconsistent artifact qualified.
+Fail closed when higher-ranked evidence disagrees. A config override, dashboard
+badge, or headline hit rate cannot repair missing provenance or inconsistent
+execution semantics.
 
 ## Current health
 
-The checkout is not release-ready.
-
 | Check | Verified result | Consequence |
 |---|---|---|
-| Test suite | 322 passed | Green on all tests. |
-| Ruff | 0 errors | Codebase is lint-clean. |
-| Artifact hashes | 28 JSON artifacts checked, 0 hash mismatches | Files are internally hash-stable, not necessarily current or valid. |
-| Audit chain | 10,837 events, 0 breaks | Chain fully intact after rebuild (2026-07-23). |
-| Console entry point | `.venv/bin/model-prediction` works | Entry point imports cleanly. |
-| Working tree | 27 commits ahead of `origin/main` | Includes WNBA availability gate, esports promotion, MLB v4, and dashboard fixes. |
+| Test suite | **410 passed, 4 failed** | Four dashboard order-preview tests drifted from the current `$5.00` unit cap. |
+| Focused critical tests | **84 passed** | Audit, CLI, domain, forward, and XLSX modules now have direct tests. |
+| Ruff | **117 findings** | Not lint-clean; 79 are executable-bit/shebang findings. |
+| Critical imports | Pass | Core modules and feature/data-source packages import. |
+| Python/package | Python 3.14.5; editable install resolves here | Packaging and console entry point work. |
+| Artifact hashes | **31 valid, 2 mismatched, 33 total** | NBA and NFL spread baselines fail canonical hash verification. |
+| Audit chain | **16,387 events, 0 breaks, 0 hash mismatches** | Cryptographic chain is intact. |
+| Ledger/audit reconciliation | **False** | 1,150 historical creation events lack audited removal events; current rows all have creation events. |
+| Config artifacts | One missing; one wrong semantic reference | Market-residual artifact is absent; MLB total research points to the spread artifact. |
+| Latest learned report | Stale | It names an old worktree and MLB v5, not active MLB v6/current checkout. |
+| Dashboard runtime | Healthy process, inconsistent governance state | `/api/status` reports `promotion_allowed=true` while warning MLB is below its qualification gate. |
+| Working tree | Heavily dirty | A release cannot be attributed to one stable, reviewable source state. |
 
-The NFL config test (`test_configured_production_artifact_state_matches_locked_audit`)
-expects `qualified=true` but the artifact reports `qualified=false`. This is a
-known pre-existing drift — the artifact and test disagree on NFL qualification
-status. The test is deselected in CI until the artifact is regenerated.
+The four failing tests are:
 
-## Current learned-model evidence
+- `test_resting_order_preview_and_submit_persist_exchange_id`
+- `test_submit_parses_success_after_interactive_prompt`
+- `test_buy_at_current_ask_submits_marketable_ioc_limit`
+- `test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled`
 
-The newest report is `outputs/latest/learned-model-validation.json` (file time
-2026-07-20 01:15 +0800). The active v3 artifacts are older (2026-07-19 18:13 to
-18:16 +0800), so the report and artifacts are not one reproduced release.
+Their fixed share counts now exceed the current config-derived dollar cap. The
+tests must explicitly pin their intended unit value or use cap-compliant sizes.
 
-The table below reports the selected current-report variants, not executable
-profitability:
+## P0 blockers
 
-| Sport | Selected variant | Locked calls | Hit rate | Report gate | Operational reading |
-|---|---|---:|---:|---|---|
-| MLB | `elo_trend_park_weather_pitcher` | 244 | 58.20% | Fail | Unqualified; active artifact is inconsistent and must not authorize calls. |
-| NBA | `elo_trend_defense` | 585 | 73.50% | Pass | Model-accuracy pass only; artifact/report alignment still needs reproduction. |
-| WNBA | `elo_trend_defense` | 170 | 68.24% | Pass | Model-accuracy pass only; current-context and prospective-price evidence remain separate. |
-| NFL | `elo_trend` | 110 | 62.73% | Fail | Unqualified because November 2025 is a losing complete qualifying month. |
-| Soccer | `soccer_3way` | 506 | 63.44% | Pass | Report/config say qualified, but `models` still reports research; resolve registry drift first. |
+### Real-money execution binding
 
-Flat one-unit results at synthetic `-110` are diagnostics. They are not
-Polymarket or Kalshi ROI. Executable claims require timestamp-valid decision
-BBOs, the correct contract side, fees/friction, and closing snapshots captured
-before the event.
+`PolymarketExecutor.execute()` does not bind the submitted market, side, price,
+quantity, and action to the exact qualified ledger row. It also trusts
+caller-supplied `estimated_cost_usd` instead of recomputing cost. Submission
+precedes audit append. Until those invariants are repaired and directly tested,
+do not use the execution surface.
 
-LoL, CS2, KBO, and NPB are research-only zero-unit baselines. Tennis is
-deferred. World Cup is research-only and requires exact score-basis semantics.
-Spread, total, F5, and derivative markets remain research-only unless their
-exact historical contract lines and decision-horizon inputs exist.
+### Ledger and audit are separate commits
 
-## WNBA player availability gate (v3 + 5pp threshold)
+Ledger mutations commit before audit events are appended. A crash or audit-lock
+failure can leave a created, settled, voided, or removed ledger row without its
+matching event, and idempotent retry may not repair the gap.
 
-The WNBA v3 model (`wnba-elo-trend-lr-v3`) includes a post-hoc player
-availability adjustment that activates when the probit-transformed points
-gap exceeds 5 percentage points. Below threshold, v3 predictions pass
-through unchanged.
+### MLB v6 provenance
 
-**Data sources (all wired into `daily`):**
-- Official WNBA injury PDFs → `data/availability/wnba/snapshots/`
-- ESPN event injury statuses → `data/availability/wnba/espn_event_snapshots/`
-- Player priors (projected minutes, shrunk +/- impact) → `data/player_priors/wnba/`
+The active MLB v6 experiment uses probable-starter data obtained from current
+ESPN responses for historical dates without historical `observed_at_utc`.
+That is not point-in-time validation. The artifact correctly says
+`qualified=false`; the config override is an operator research override, not a
+promotion-quality evidence substitute.
 
-**Pipeline (in `daily`):**
-1. `wnba-availability-capture` — fetch today's injury PDF, parse, snapshot
-2. `build_and_save_priors` — compute player minutes/impact from recent box scores
-3. Forecast — `build_learned_moneyline_slate` applies 5pp gate
+### WNBA availability fail-open behavior
 
-**Backtest (142-game WNBA cohort, May 14–Jul 20):**
-- Accuracy: 71.8% → 73.2% (+1.4pp)
-- Brier: 0.21278 → 0.20799 (−2.3%)
-- Units @ −110: +52.73 → +56.55 (+3.82U)
-- Harmful selection flips at 5pp threshold: 0
+The availability path suppresses common conflict/parsing failures and continues
+with an unadjusted or partial-source probability. That contradicts the
+fail-closed contract for missing or conflicting player availability.
 
-**Key files:**
-- `src/model_prediction/learned_forward.py` — gate logic (5pp threshold)
-- `src/model_prediction/features/player_availability.py` — feature computation
-- `src/model_prediction/wnba_availability_evaluation.py` — probit transform, priors
-- `src/model_prediction/data_sources/wnba_injuries.py` — PDF parser
-- `src/model_prediction/data_sources/espn_wnba_injuries.py` — ESPN injury adapter
+### Qualification and quote semantics
 
-**Gate behavior:**
-- ESPN merge falls back to official-only when ESPN unavailable
-- Gate failures logged at DEBUG, never block forecast
-- Prior freshness checked (168h max)
-- `margin_sigma` cached per `(game_date, observed_at)`
+The learned forward layer labels a confidence-threshold call
+`QUALIFIED_SHADOW_CALL` even when the artifact is unqualified. Quote matching
+returns `timestamp_valid`, but the CLI does not enforce it before pricing a
+call.
 
-## Architecture
+## Active learned artifacts
 
-```text
-provider data and immutable caches
-        -> canonical entities and point-in-time records
-        -> feature store
-        -> versioned model artifact and confidence gate
-        -> forecast candidate or fail-closed no-call
-        -> exact executable quote match
-        -> research/qualified ledger classification
-        -> settlement, calibration, CLV, and loss review
-```
+These are artifact-level predictor diagnostics. Synthetic `-110` units are not
+executable profitability.
 
-The independent outcome model must not consume market price. A separately
-labeled residual or decision layer may consume timestamp-valid prices. Dashboard
-display state is not model evidence, and local order state is not authoritative
-exchange state.
+| Sport | Active artifact | Artifact qualified | Locked calls | Hit rate | Operational reading |
+|---|---|---:|---:|---:|---|
+| MLB | `mlb-elo-trend-lr-v6` | **No** | 135 | 71.11% | Partial 90-day experiment with no complete qualifying month and invalid historical starter provenance; config override only. |
+| NBA | `nba-elo-trend-lr-v4` | Yes | 577 | 73.66% | Predictor gate pass; executable economics remain separate. |
+| WNBA | `wnba-elo-trend-lr-v4` | Yes | 163 | 67.48% | Predictor gate pass; availability fail-open path remains a blocker. |
+| NFL | `nfl-elo-trend-lr-v4` | Yes | 87 | 71.26% | Predictor gate pass; spread research artifact hash is corrupt. |
+| Soccer | `soccer-elo-trend-lr-v2` | Yes | 1,381 | 64.88% | Artifact/config pass, but the CLI registry still reports research. |
 
-Key paths:
+The active esports, KBO, and NPB config entries use qualification overrides,
+while the dashboard evidence surface still labels those markets
+`research_only`/`qualified_for_betting=false`. KBO/NPB filenames remain `v1`
+even though the artifact and config version strings say `v2`. Treat them as
+research until semantics, routing, settlement, and naming are reconciled.
 
-- `src/model_prediction/validation.py`: chronological model selection and locked grading.
-- `src/model_prediction/learned_forward.py`: active learned forecast path, WNBA 5pp availability gate, and quote matching.
-- `src/model_prediction/features/player_availability.py`: point-in-time injury report + player prior feature computation.
-- `src/model_prediction/wnba_availability_evaluation.py`: probit probability adjustment, prior building, and historical margin sigma.
-- `src/model_prediction/eligibility.py`: record type, edge, provenance, disagreement, and exposure gates.
-- `src/model_prediction/ledger.py`: append, settlement, closing-price, review, and reporting logic.
-- `src/model_prediction/data_sources/`: provider adapters, WNBA injury PDF parser, ESPN injury adapter, and the hard-gated Polymarket executor.
-- `dashboard_server.py` and `dashboard.html`: local operations UI and APIs.
-- `data/events.jsonl`: intended append-only audit chain; currently broken.
+## Release alignment
 
-## Safe command form
+`outputs/latest/learned-model-validation.json` is not a current release report:
 
-Run the CLI through the source module:
+- its embedded paths point to an old
+  `Documents/Poly & Kalshi/.../.claude/worktrees/fix-waves-1-4` checkout;
+- it names MLB v5 while config activates MLB v6;
+- it predates the current KBO/NPB artifacts and the latest source changes;
+- the current checkout has four failing tests and 117 Ruff findings.
 
-```sh
-env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli --help
-env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli forecast --sport mlb --date YYYY-MM-DD
+Two research artifacts contain invalid canonical hashes:
+
+- `config/models/nba-spread-baseline-v1.json`
+- `config/models/nfl-spread-baseline-v1.json`
+
+The config also points `models.MLB.total_research_artifact` to the MLB spread
+artifact and points `models.market_residual.artifact` to a nonexistent file.
+
+## Current decision policy
+
+The code no longer enforces the policy described in older documentation.
+
+The CLI can apply a sport-specific minimum edge against an executable ask before
+logging. After that, `eligibility.py` enforces bans, lifecycle state,
+staleness, and provenance, but it intentionally ignores market disagreement,
+exposure, and post-uncertainty edge when deciding `CALL` versus `NO_CALL`.
+Sizing uses `edge_scaled_units`, not the exposure-aware `recommend_units`
+decision.
+
+Therefore:
+
+- do not claim exposure caps or disagreement review are active eligibility
+  gates;
+- do not interpret a `QUALIFIED_SHADOW_CALL` label as proof of a qualified
+  artifact;
+- do not interpret config `status: shadow_qualified` as real-money approval.
+
+## Runtime snapshot
+
+The read-only `summary` command reported:
+
+- 4 open picks and 7.75 open units;
+- 4 picks logged on 2026-07-26;
+- 7.0931 qualified shadow P&L units all time;
+- no mean probability CLV;
+- an explicit shadow-research accounting note.
+
+The MLB dry forecast for 2026-07-26 found 15 games and 9
+confidence-threshold calls, wrote zero rows, and executed zero orders. Its
+aggregate correctly reported zero qualified calls because the active artifact
+is unqualified.
+
+## Additional correctness blockers
+
+- KBO/NPB read-only forecast preview can dereference a missing ledger.
+- KBO/NPB ties are graded as pushes instead of a `$0.50` settlement payoff.
+- KBO/NPB early edge filtering contradicts the documented research/gated
+  routing contract.
+- Secondary-ledger settlement results are hidden from `settle` and `daily`
+  output.
+- Exposure is checked outside the append transaction; concurrent writers can
+  approve from the same stale snapshot.
+- The Odds API error path can return a URL containing the API key.
+- Polymarket aggregate capture can falsely report global timestamp validity and
+  silently truncate discovery at 50 events.
+- Future timestamps can pass the guaranteed-signal freshness check.
+- Soccer head-to-head records draws as away wins.
+- MLB weather payload/hour semantics are wrong.
+- The economic ROI confidence-interval gate can pass an interval spanning
+  zero.
+
+Exact evidence and line references are in `DEBUG.md`.
+
+## Safe command forms
+
+```bash
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q
+.venv/bin/ruff check src/ tests/
+.venv/bin/model-prediction --help
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli verify-chain
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli summary
 ```
 
-Run verification with:
+Commands with `--write-artifacts`, `--log`, settlement, ledger cleanup, ban
+mutation, dashboard POST routes, `daily`, `execute`, or `sell-position` change
+state. They require separate authorization appropriate to the risk.
 
-```sh
-env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q
-.venv/bin/ruff check src/ tests/
-```
+## Repair order
 
-Commands with `--write-artifacts`, `--log`, settlement, ban mutations, archive
-updates, or dashboard POST routes change project state. `execute`,
-`sell-position`, cancellation paths, and dashboard order-submit routes are
-real-money surfaces. Never infer authorization for them from a forecast,
-dashboard, validation, or general maintenance request.
-
-## Ledger snapshot
-
-At the verification time, the primary ledger reported 38 records: 30 research
-observations, no qualified shadow calls, nine open rows, and zero open units.
-Twenty-one research rows had fixed-unit retrospective scoring. This is research
-accounting, not real exposure or proof of economic edge.
-
-## Immediate repair order
-
-1. ~~Stop qualification drift: regenerate or demote the MLB artifact so its
-   qualification boolean, failures, metrics, config, and tests agree.~~ ✅ RESOLVED (2026-07-23) — operator override documented, test pins current state
-2. ~~Resolve NFL config test drift: regenerate the NFL artifact so it matches
-   the test's expectation, or update the test to match the artifact.~~ ✅ RESOLVED (2026-07-23) — artifact qualified=true (71.3%), test passes
-3. ~~Repair the audit chain without deleting historical evidence; document the
-   exact corrupt ranges and recovery method.~~ ✅ DONE (2026-07-23) — full rebuild, 10,837 events, 0 breaks
-4. ~~Repair packaging so the installed console entry point imports the package.~~ ✅ FIXED (2026-07-23) — entry point works
-5. ~~Fix the two pre-existing Ruff errors in `cli.py` (F401 unused import, F821
-   undefined `Any`); gate and availability files are already lint-clean.~~ ✅ DONE (2026-07-23)
-6. ~~30-pick freeze gate~~ ✅ REMOVED (2026-07-23) — `parameter_freezes_allowed: true` in config
-7. Make dashboard startup process-safe; do not use broad `pkill -f` or the
-   system browser. Use Dia for UI verification.
-8. Run `data/player_priors/` collection prospectively; the daily pipeline now
-   builds priors automatically, but historical priors need a one-time backfill.
-9. Reproduce one versioned release from a stable checkout, then update model
-   tables from that release only.
+1. Disable or hard-block real-money execution until tickets are bound to the
+   exact ledger row and all economics are recomputed server-side.
+2. Make ledger mutation and audit append recoverable as one transaction; add
+   failure-injection and retry tests.
+3. Remove non-PIT probable-starter inputs from validation and keep MLB v6
+   unqualified until prospective evidence exists.
+4. Enforce artifact qualification, quote `timestamp_valid`, and fail-closed
+   WNBA availability semantics.
+5. Restore a green suite and correct the two artifact hashes plus config
+   references without overwriting rollback artifacts.
+6. Repair KBO/NPB preview, routing, half-settlement P&L, and settlement
+   visibility.
+7. Make exposure-check-plus-append transactional and enforce one writer across
+   all ledgers.
+8. Fix secret redaction, timestamp age, soccer draw, weather, discovery, and
+   economic-CI semantics.
+9. Reproduce one versioned report from a stable, green, reviewed checkout.

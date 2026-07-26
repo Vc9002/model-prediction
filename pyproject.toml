@@ -23,7 +23,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["mypy>=1.11,<2", "pytest>=8,<9", "ruff>=0.6,<1"]
+dev = [
+  "mypy>=1.11,<2",
+  "pytest>=8,<9",
+  "ruff>=0.6,<1",
+  "scipy-stubs",
+  "types-PyYAML",
+  "pandas-stubs",
+  "types-openpyxl",
+]
 
 [project.scripts]
 model-prediction = "model_prediction.cli:main"
@@ -44,3 +52,7 @@ packages = ["model_prediction"]
 warn_unused_ignores = true
 check_untyped_defs = true
 no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = "sklearn.*"
+ignore_missing_imports = true

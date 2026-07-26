@@ -32,15 +32,15 @@ from __future__ import annotations
 import base64
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from ..audit import AuditLog
 from ..domain import RecordType, iso_utc, utc_now
-
 
 KEY_ID_ENV = "POLYMARKET_KEY_ID"
 SECRET_KEY_ENV = "POLYMARKET_SECRET_KEY"

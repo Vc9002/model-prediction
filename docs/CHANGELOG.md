@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-26 — full DEBUG audit and documentation truth reset
+
+- Ran the current `DEBUG.md` health, integrity, runtime, lint, source, pipeline,
+  model, data-source, and test audit without applying code/config/model/ledger
+  fixes or executing orders.
+- Recorded 410 passing and 4 failing tests, 117 Ruff findings, 31 valid and 2
+  mismatched artifact hashes, and an intact 16,387-event audit chain with
+  unresolved historical ledger/audit reconciliation.
+- Verified the editable install, console entry point, critical imports, CLI
+  summary, live dashboard health/status/matrix APIs, and a no-log MLB dry
+  forecast.
+- Replaced the stale DEBUG baseline. The old guide incorrectly claimed 322
+  green tests, no artifact hashes, no KBO/NPB settlement, zero tests for
+  multiple critical modules, indefinite file locks, CWD-dependent registry
+  config, and a duplicate `_sigmoid`.
+- Documented new P0 blockers: execution tickets are not bound to the exact
+  qualified ledger row, ledger mutation is not atomic with audit append, MLB
+  probable-starter validation is not point-in-time, WNBA availability can fail
+  open, and artifact qualification/quote timestamp validity are not enforced
+  at the first classification/pricing step.
+- Updated README, project status, architecture, execution protocol, and repair
+  queue to distinguish predictor-quality metrics from executable economics and
+  to keep the checkout explicitly non-release-ready.
+
 ## 2026-07-20 — esports/KBO/NPB unit tracking, confidence-gate fix, BBO collection
 
 - Fixed a no-op confidence-gate selector in `esports.py`: threshold selection

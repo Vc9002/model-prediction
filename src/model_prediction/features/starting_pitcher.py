@@ -7,9 +7,9 @@ richer pipeline for subsequent versioned MLB experiments.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence
-
+from typing import Any
 
 # League-average FIP constant; updated annually, stored here as a named default.
 FIP_CONSTANT = 3.15

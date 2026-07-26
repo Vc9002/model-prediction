@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from .domain import parse_utc
 
@@ -27,7 +28,7 @@ class SourceRecord:
         endpoint: str,
         request_parameters: dict[str, Any],
         payload: dict[str, Any],
-    ) -> "SourceRecord":
+    ) -> SourceRecord:
         digest = hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()

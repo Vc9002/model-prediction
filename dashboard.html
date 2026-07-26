@@ -6,102 +6,141 @@
 <title>Model Prediction — Dashboard</title>
 <style>
 :root{
-  --bg:#1a1a2e; --card:#16213e; --accent:#0f3460; --green:#00ff88;
-  --red:#ff4444; --yellow:#ffaa00; --text:#e8e8f0; --dim:#8890a8;
+  --bg:#0a0c11; --surface:#12151d; --surface-2:#181c27; --border:#242938;
+  --text:#e7e9f0; --dim:#7d8496;
+  --accent:#5b8cff; --accent-dim:#2c4a8f;
+  --green:#33d17e; --red:#ff5c5c; --yellow:#f2a93c; --violet:#a48cf5;
+  --statusbar-h:53px;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 }
-[data-theme="light"]{--bg:#eef0f6;--card:#ffffff;--accent:#d7e0f2;--text:#15192b;--dim:#5a6178;}
+[data-theme="light"]{
+  --bg:#f3f4f8; --surface:#ffffff; --surface-2:#eceef4; --border:#dbdfea;
+  --text:#171a24; --dim:#5b6274;
+  --accent:#3a6ae8; --accent-dim:#c7d5fb;
+  --green:#1f9a5c; --red:#e0384b; --yellow:#c07c10; --violet:#7458d6;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;padding-bottom:60px}
-a{color:var(--green)}
-h2{font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
-.wrap{max-width:1400px;margin:0 auto;padding:14px}
-.card{background:var(--card);border:1px solid var(--accent);border-radius:10px;padding:14px;margin-bottom:14px;animation:fadein .35s ease}
-@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,170,0,.5)}50%{box-shadow:0 0 0 6px rgba(255,170,0,0)}}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;animation:fadein .3s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(242,169,60,.45)}50%{box-shadow:0 0 0 6px rgba(242,169,60,0)}}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
 @media(max-width:1000px){.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
 .mono{font-family:var(--mono)}
 .dim{color:var(--dim)} .green{color:var(--green)} .red{color:var(--red)} .yellow{color:var(--yellow)}
-/* status bar */
-#statusbar{position:sticky;top:0;z-index:50;background:var(--card);border-bottom:1px solid var(--accent);
-  padding:8px 16px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12.5px}
-#statusbar .chip{display:flex;gap:6px;align-items:center;white-space:nowrap}
-#statusbar #unitValueInput{width:72px;padding:4px 6px}
-.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
-.dot.g{background:var(--green)} .dot.r{background:var(--red)} .dot.y{background:var(--yellow)} .dot.gray{background:#555}
-button{background:var(--accent);border:1px solid #2a4a80;color:var(--text);border-radius:6px;
-  padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:12px}
-button:hover{border-color:var(--green)}
-button.primary{background:#0d4f35;border-color:var(--green)}
-button.sell{background:#4a1f2a;border-color:#c0506a;color:#ffd7de;margin-left:4px}
-button.sell:hover{border-color:#ff4466}
-button:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---------- app shell: status strip + left rail + content ---------- */
+#statusbar{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);
+  padding:9px 18px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12px;min-height:var(--statusbar-h)}
+#statusbar .chip{display:flex;gap:6px;align-items:center;white-space:nowrap;color:var(--dim)}
+#statusbar #unitValueInput{width:70px;padding:4px 6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.dot.g{background:var(--green);box-shadow:0 0 0 3px rgba(51,209,126,.18)}
+.dot.r{background:var(--red);box-shadow:0 0 0 3px rgba(255,92,92,.18)}
+.dot.y{background:var(--yellow);box-shadow:0 0 0 3px rgba(242,169,60,.18)}
+.dot.gray{background:#4a4f5e}
+.shell{display:flex;align-items:flex-start;max-width:1520px;margin:0 auto}
+#tabs{width:186px;flex:0 0 auto;position:sticky;top:var(--statusbar-h);align-self:flex-start;
+  max-height:calc(100vh - var(--statusbar-h));overflow-y:auto;padding:16px 10px 40px}
+#tabs .rail-group{margin-bottom:16px}
+#tabs .rail-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);
+  padding:0 10px;margin-bottom:5px}
+#tabs button{display:block;width:100%;text-align:left;background:transparent;border:none;border-left:2px solid transparent;
+  border-radius:0 6px 6px 0;color:var(--dim);padding:7px 10px;font-family:var(--sans);font-size:13px;margin-bottom:1px}
+#tabs button:hover{background:var(--surface-2);color:var(--text);border-color:var(--border)}
+#tabs button.on{background:var(--surface-2);color:var(--text);border-left-color:var(--accent);font-weight:600}
+.wrap{flex:1;min-width:0;max-width:1360px;margin:0 auto;padding:16px 20px 60px}
+@media(max-width:900px){
+  .shell{display:block}
+  #tabs{position:static;width:auto;max-height:none;padding:8px 12px;display:flex;gap:14px;overflow-x:auto;border-bottom:1px solid var(--border)}
+  #tabs .rail-group{margin-bottom:0;display:flex;align-items:center;gap:2px;flex:0 0 auto}
+  #tabs .rail-label{display:none}
+  #tabs button{white-space:nowrap;border-left:none;border-bottom:2px solid transparent;border-radius:6px 6px 0 0}
+  #tabs button.on{border-left-color:transparent;border-bottom-color:var(--accent)}
+  .wrap{padding:14px}
+}
+
+button{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:6px;
+  padding:6px 12px;cursor:pointer;font-family:var(--mono);font-size:12px;transition:border-color .15s ease}
+button:hover{border-color:var(--accent)}
+button.primary{background:linear-gradient(180deg,var(--accent),#4470dd);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.08)}
+button.sell{background:rgba(255,92,92,.12);border-color:rgba(255,92,92,.5);color:#ffb3b3;margin-left:4px}
+button.sell:hover{border-color:var(--red)}
+button:disabled{opacity:.4;cursor:not-allowed}
 input.order-price{width:62px;padding:5px 6px;font-family:var(--mono);font-size:12px}
 .order-wrap{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .order-note{font-size:10.5px;color:var(--dim)}
 .exit-wrap{display:grid;grid-template-columns:auto 62px auto 66px auto;align-items:center;gap:4px;white-space:nowrap}
 .exit-wrap input{width:62px;padding:5px 6px}.exit-wrap .shares{width:66px}
 .exit-wrap .order-note{grid-column:1/-1}
+
 /* matrix — heatmap cards: color intensity encodes magnitude within each
    qualified band, SVG glyphs replace emoji for consistent cross-platform
    rendering, sticky header/first column keep context while scrolling. */
-.matrix-scroll{overflow:auto;max-height:70vh;border-radius:8px}
+.matrix-scroll{overflow:auto;max-height:70vh;border-radius:8px;border:1px solid var(--border)}
 table.matrix{border-collapse:separate;border-spacing:0;width:100%;font-family:var(--mono);font-size:12.5px}
-table.matrix th,table.matrix td{border:1px solid var(--accent);padding:8px 10px;text-align:center}
-table.matrix th{color:var(--dim);font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
-table.matrix th:first-child,table.matrix td:first-child{position:sticky;left:0;z-index:1;background:var(--card)}
+table.matrix th,table.matrix td{border:1px solid var(--border);padding:8px 10px;text-align:center}
+table.matrix th{color:var(--dim);font-weight:600;background:var(--surface-2);position:sticky;top:0;z-index:2;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+table.matrix th:first-child,table.matrix td:first-child{position:sticky;left:0;z-index:1;background:var(--surface-2)}
 table.matrix th:first-child{z-index:3}
-td.cell{cursor:pointer;min-width:110px;vertical-align:middle;padding:9px 10px;position:relative;transition:filter .15s ease}
-td.cell:hover{filter:brightness(1.18)}
+td.cell{cursor:pointer;min-width:110px;vertical-align:middle;padding:9px 10px;position:relative;transition:filter .15s ease,transform .15s ease}
+td.cell:hover{filter:brightness(1.25);transform:translateY(-1px)}
 td.cell .c1{font-size:13px;font-weight:600;line-height:1.5;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:5px}
 td.cell .c2{font-size:11px;color:var(--dim);line-height:1.45;white-space:nowrap}
 td.cell .icon{width:12px;height:12px;flex:0 0 auto}
+td.cell.q{background:rgba(51,209,126,.09);border-color:rgba(51,209,126,.35)}
 td.cell.q .c1{color:var(--green)}
-td.cell.t{background:rgba(255,68,68,.10);border-color:rgba(255,68,68,.4)}
+td.cell.t{background:rgba(255,92,92,.09);border-color:rgba(255,92,92,.35)}
 td.cell.t .c1{color:var(--red)}
-td.cell.u{background:rgba(255,170,0,.10);border-color:rgba(255,170,0,.4)}
+td.cell.u{background:rgba(242,169,60,.09);border-color:rgba(242,169,60,.35)}
 td.cell.u .c1{color:var(--yellow)}
-td.cell.r{background:rgba(120,160,255,.08);border-color:rgba(120,160,255,.35)}
-td.cell.r .c1{color:#9db4ff}
-td.cell.b{background:rgba(255,255,255,.03)}
-td.cell.b .c1{color:#667}
-td.cell.n .c1{color:#556}
-td.cell.na .c1{color:#445}
+td.cell.r{background:rgba(164,140,245,.09);border-color:rgba(164,140,245,.32)}
+td.cell.r .c1{color:var(--violet)}
+td.cell.b{background:rgba(255,255,255,.02)}
+td.cell.b .c1{color:#5a6178}
+td.cell.n .c1{color:#4d5468}
+td.cell.na .c1{color:#3d4356}
 td.cell[data-tip]:hover:after{content:attr(data-tip);position:absolute;left:50%;bottom:100%;
   transform:translateX(-50%) translateY(-6px);background:#000;color:#fff;padding:6px 9px;
   border-radius:6px;font-size:11px;white-space:nowrap;z-index:10;box-shadow:0 4px 14px rgba(0,0,0,.4);
   pointer-events:none}
+
 /* tables */
 table.data{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
-table.data th{color:var(--dim);text-align:left;padding:5px 6px;border-bottom:1px solid var(--accent);cursor:pointer;white-space:nowrap}
-table.data td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap}
-table.data tr:hover td{background:rgba(255,255,255,.03)}
-.pill{padding:1px 8px;border-radius:10px;font-size:11px}
-.pill.win{background:rgba(0,255,136,.15);color:var(--green)}
-.pill.loss{background:rgba(255,68,68,.15);color:var(--red)}
-.pill.open{background:rgba(255,170,0,.15);color:var(--yellow)}
-.pill.push{background:rgba(255,255,255,.1);color:var(--dim)}
-input,select{background:var(--bg);color:var(--text);border:1px solid var(--accent);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px}
+table.data th{color:var(--dim);text-align:left;padding:6px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;font-weight:600}
+table.data td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap}
+table.data tr:hover td{background:var(--surface-2)}
+.pill{padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill.win{background:rgba(51,209,126,.15);color:var(--green)}
+.pill.loss{background:rgba(255,92,92,.15);color:var(--red)}
+.pill.open{background:rgba(242,169,60,.15);color:var(--yellow)}
+.pill.push{background:rgba(255,255,255,.08);color:var(--dim)}
+input,select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
 .view-tools{position:relative}
-.view-tools summary{list-style:none;background:var(--accent);border:1px solid #2a4a80;border-radius:6px;
+.view-tools summary{list-style:none;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
   padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:12px}
 .view-tools summary::-webkit-details-marker{display:none}
-.view-tools[open] summary{border-color:var(--green)}
+.view-tools[open] summary{border-color:var(--accent)}
 .view-tools .menu{position:absolute;z-index:20;top:34px;left:0;min-width:430px;display:flex;gap:7px;
-  flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--accent);border-radius:8px;
-  padding:10px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+  flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:10px;box-shadow:0 12px 32px rgba(0,0,0,.45)}
 @media(max-width:650px){.view-tools .menu{position:fixed;left:12px;right:12px;top:auto;min-width:0}}
 canvas{width:100%;height:180px;display:block}
-.kpis{display:flex;gap:22px;flex-wrap:wrap;font-family:var(--mono);margin-bottom:10px}
-.kpis .k{display:flex;flex-direction:column}
-.kpis .k b{font-size:19px}
-.kpis .k span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.kpis{display:flex;gap:26px;flex-wrap:wrap;font-family:var(--mono);margin-bottom:10px}
+.kpis .k{display:flex;flex-direction:column;gap:2px}
+.kpis .k b{font-size:22px;font-weight:700}
+.kpis .k span{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+
 /* live picks */
-.pick{border:1px solid var(--accent);border-left:4px solid transparent;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-family:var(--mono);font-size:12.5px}
+.pick{border:1px solid var(--border);border-left:3px solid transparent;border-radius:8px;padding:10px 13px;margin-bottom:8px;font-family:var(--mono);font-size:12.5px;background:var(--surface)}
 .pick.hi{border-left-color:var(--green)} .pick.med{border-left-color:var(--yellow)}
 .pick-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .pick-copy{min-width:0;line-height:1.45}
@@ -110,38 +149,39 @@ canvas{width:100%;height:180px;display:block}
 .pick-action{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end}
 .pick-action .order-wrap{display:grid;grid-template-columns:auto 62px auto;gap:4px;align-items:center}
 .pick-action .order-note{grid-column:1/-1;text-align:right}
-.edgebar{height:6px;background:rgba(255,255,255,.07);border-radius:4px;position:relative;overflow:hidden;margin-top:7px}
-.edgebar:after{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,255,255,.28)}
+.edgebar{height:6px;background:var(--surface-2);border-radius:4px;position:relative;overflow:hidden;margin-top:7px}
+.edgebar:after{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,255,255,.22)}
 .edgebar i{position:absolute;top:0;bottom:0;left:50%}
 @media(max-width:850px){.pick-row{align-items:flex-start;flex-direction:column}.pick-action{width:100%;justify-content:flex-start}.pick-action .order-note{text-align:left}}
+
 /* alerts */
-.alert{display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
-.alert.warn{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.4);animation:pulse 2.5s infinite}
-.alert.info{background:rgba(255,255,255,.04);border:1px solid var(--accent)}
+.alert{display:flex;gap:8px;align-items:center;padding:8px 11px;border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
+.alert.warn{background:rgba(242,169,60,.09);border:1px solid rgba(242,169,60,.4);animation:pulse 2.5s infinite}
+.alert.info{background:var(--surface-2);border:1px solid var(--border)}
+
 /* modal */
-#modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:100}
-#modal .box{background:var(--card);border:1px solid var(--accent);border-radius:12px;max-width:900px;width:92%;max-height:82vh;overflow:auto;padding:18px}
+#modal{position:fixed;inset:0;background:rgba(4,5,9,.72);display:none;align-items:center;justify-content:center;z-index:100}
+#modal .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:900px;width:92%;max-height:82vh;overflow:auto;padding:18px}
 pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px;border-radius:8px}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 14px}
-.tabs button.on{border-color:var(--green);color:var(--green)}
 .secgrid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
 @media(max-width:1100px){.secgrid{grid-template-columns:1fr}}
 .small{font-size:11.5px}
+
 /* production model evidence */
 .evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .evidence-card{min-width:0}
 .evidence-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .evidence-title{font-family:var(--mono);font-size:16px;font-weight:700;overflow-wrap:anywhere}
 .evidence-scope{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:3px}
-.evidence-status{border:1px solid var(--accent);border-radius:999px;padding:3px 9px;font-family:var(--mono);font-size:11px;text-transform:uppercase}
+.evidence-status{border:1px solid var(--border);border-radius:999px;padding:3px 9px;font-family:var(--mono);font-size:11px;text-transform:uppercase}
 .evidence-status.ok{border-color:var(--green);color:var(--green)}
 .evidence-status.warn{border-color:var(--yellow);color:var(--yellow)}
 .evidence-block{margin-top:14px;min-width:0}
 .evidence-block h3{font-size:11px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
 .evidence-table-wrap{overflow-x:auto}
 .evidence-table td:last-child{white-space:normal;overflow-wrap:anywhere}
-.evidence-profit{border:1px solid rgba(255,170,0,.45);background:rgba(255,170,0,.08);border-radius:8px;padding:10px}
-.evidence-profit.established{border-color:rgba(0,255,136,.45);background:rgba(0,255,136,.07)}
+.evidence-profit{border:1px solid rgba(242,169,60,.45);background:rgba(242,169,60,.08);border-radius:8px;padding:10px}
+.evidence-profit.established{border-color:rgba(51,209,126,.45);background:rgba(51,209,126,.07)}
 .evidence-list{padding-left:18px;line-height:1.55}
 @media(max-width:1000px){.evidence-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.evidence-head{display:block}.evidence-status{display:inline-block;margin-top:8px}.evidence-card{padding:11px}.evidence-table{min-width:540px}}
@@ -167,29 +207,47 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <button class="primary" onclick="confirmAction('daily','Run the split daily pipeline (settle → flat forecast → main forecast) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
 </div>
 
-<div class="wrap">
-  <div class="tabs" id="tabs">
-    <button data-tab="matrix" class="on">Matrix</button>
-    <button data-tab="picks">Ledger</button>
-    <button data-tab="flat">Flat</button>
-    <button data-tab="research">Research</button>
-    <button data-tab="perf">Performance</button>
-    <button data-tab="flat-perf">Flat Perf</button>
-    <button data-tab="research-perf">Research Perf</button>
-    <button data-tab="today">Today</button>
-    <button data-tab="market">Market</button>
-    <button data-tab="folio">Portfolio</button>
-    <button data-tab="evidence">Evidence</button>
-    <button data-tab="settings">Settings</button>
-  </div>
+<div class="shell">
+  <nav id="tabs">
+    <div class="rail-group">
+      <div class="rail-label">Monitor</div>
+      <button data-tab="matrix" class="on">Matrix</button>
+      <button data-tab="today">Today</button>
+      <button data-tab="market">Market</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">Ledger</div>
+      <button data-tab="picks">Ledger</button>
+      <button data-tab="flat">Flat</button>
+      <button data-tab="research">Research</button>
+      <button data-tab="gated-research">Gated Research</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">Performance</div>
+      <button data-tab="perf">Performance</button>
+      <button data-tab="flat-perf">Flat Perf</button>
+      <button data-tab="research-perf">Research Perf</button>
+      <button data-tab="gated-research-perf">Gated Research Perf</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">Portfolio</div>
+      <button data-tab="folio">Portfolio</button>
+      <button data-tab="evidence">Evidence</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">System</div>
+      <button data-tab="settings">Settings</button>
+    </div>
+  </nav>
 
+  <div class="wrap">
   <section id="tab-matrix">
     <div class="card">
       <h2>Sports × Market Matrix</h2>
       <div class="small dim" id="matrixGate" style="margin-bottom:8px"></div>
       <div class="matrix-scroll"><table class="matrix" id="matrixTable"></table></div>
       <div class="small dim" style="margin-top:8px">
-        <span class="green">qualified</span> · <span class="red">tested, below gate</span> · <span style="color:#9db4ff">research score model (shadow only)</span> · blocked, no valid contract lines · <span class="yellow">untested</span> · no data · — n/a — click a cell to drill down, hover for detail
+        <span class="green">qualified</span> · <span class="red">tested, below gate</span> · <span style="color:var(--violet)">research score model (shadow only)</span> · blocked, no valid contract lines · <span class="yellow">untested</span> · no data · — n/a — click a cell to drill down, hover for detail
       </div>
     </div>
     <div class="card" id="esportsCard" style="display:none">
@@ -223,36 +281,15 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
   </section>
 
-  <div class="filters" style="padding:0 16px;margin-bottom:12px">
-    <button class="primary" onclick="preset('open')">Active (<span id="openCount">0</span>)</button>
-    <button onclick="preset('settled')">Settled (<span id="settledCount">0</span>)</button>
-    <button onclick="preset('today')">Today active</button>
-    <button onclick="preset('7d')">Active 7d</button>
-    <button onclick="preset('all')">All picks</button>
-    <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
-    <details class="view-tools"><summary>Manage hidden rows</summary><div class="menu">
-      <span class="dim small">Hide from this dashboard:</span>
-      <button onclick="clearLedger('day')">Today</button>
-      <button onclick="clearLedger('week')">7 days</button>
-      <button onclick="clearLedger('month')">30 days</button>
-      <button onclick="clearLedger('all')">Everything</button>
-      <label class="small dim"><input type="checkbox" id="fArchived" onchange="onFilterChange()"> show hidden (<span id="archCount">0</span>)</label>
-      <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore hidden</button>
-    </div></details>
-    <span style="width:10px"></span>
-    <select id="fSport" onchange="onFilterChange()"><option value="">all sports</option></select>
-    <select id="fMarket" onchange="onFilterChange()"><option value="">all markets</option></select>
-    <select id="fStatus" onchange="onFilterChange()"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
-    <select id="fResult" onchange="onFilterChange()"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
-    <input id="fSearch" placeholder="search team / event id" size="22" oninput="onFilterChange()">
-    <input id="fFrom" type="date"><input id="fTo" type="date">
-    <button onclick="onFilterChange()">Apply</button>
-    <button onclick="exportCsv()">Export CSV</button>
-  </div>
   <section id="tab-picks" style="display:none">
     <div class="card">
-      <h2>Model Picks Ledger</h2>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+        <h2 style="margin:0">Model Picks Ledger</h2>
+        <span style="flex:1"></span>
+        <button class="primary" onclick="confirmAction('main_forecast','Run the main forecast for today? MLB/WNBA qualified calls go to this ledger; esports/soccer/nba/nfl route to Research and Gated Research in the same pass.')">Run Main Forecast</button>
+      </div>
       <div class="small dim" style="margin-bottom:8px">Paper model forecasts: Size and P&amp;L are hypothetical units. Order shows exchange status only; live positions and dollar P&amp;L appear in Portfolio.</div>
+      <div class="filters" id="filters_L" style="margin-bottom:12px"></div>
       <div class="kpis" id="pickKpis"></div>
       <div style="overflow:auto;max-height:520px"><table class="data" id="pickTable"></table></div>
     </div>
@@ -319,13 +356,13 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="secgrid">
       <div class="card" style="grid-column:1/-1">
         <h2>Research Picks (esports, international baseball)</h2>
+        <div class="filters" id="filters_R" style="margin-bottom:12px"></div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
           <span>Active: <b id="researchActive">0</b></span>
           <span>Settled: <b id="researchSettled">0</b></span>
+          <span>Shown: <b id="researchShown">0</b></span>
         </div>
-        <table class="data" id="researchTable"><thead><tr>
-          <th>Game (ET)</th><th>Sport</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Size</th><th>Result</th><th>P&amp;L</th><th>Matchup</th>
-        </tr></thead><tbody></tbody></table>
+        <table class="data" id="researchTable"></table>
       </div>
       <div class="card">
         <h2>Backtest &amp; validation history (outputs/latest)</h2>
@@ -339,6 +376,20 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
   </section>
 
+  <section id="tab-gated-research" style="display:none">
+    <div class="card">
+      <h2>Gated Research Picks (esports, soccer)</h2>
+      <div class="small dim" style="margin-bottom:8px">Curated subset of Research: only picks evaluate_eligibility genuinely approved units for (never the diagnostic edge-scaled fallback). Same relationship flat_picks.xlsx has to picks.xlsx, but for research-only sports.</div>
+      <div class="filters" id="filters_G" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <span>Active: <b id="gatedResearchActive">0</b></span>
+        <span>Settled: <b id="gatedResearchSettled">0</b></span>
+        <span>Shown: <b id="gatedResearchShown">0</b></span>
+      </div>
+      <table class="data" id="gatedResearchTable"></table>
+    </div>
+  </section>
+
   <section id="tab-flat" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <h2 style="margin:0">Flat Forecast — All Games (No Edge Gate)</h2>
@@ -346,6 +397,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <span style="flex:1"></span>
       <button class="primary" onclick="confirmAction('flat_forecast','Run flat forecast on all games for today?')">Run Flat Forecast</button>
     </div>
+    <div class="filters" id="filters_F" style="margin-bottom:12px"></div>
     <div id="flatKpis" class="kpis" style="margin-bottom:16px"></div>
     <div class="card">
       <table class="data" id="flatTable"><tr><td>Loading…</td></tr></table>
@@ -385,6 +437,23 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small dim" style="margin-top:8px" id="researchPerfMonthly"></div>
     </div>
   </section>
+  <section id="tab-gated-research-perf" style="display:none">
+    <div class="card">
+      <h2>Gated Research Performance — Esports, Soccer</h2>
+      <div class="small dim" style="margin-bottom:8px">Settled picks from gated_research.xlsx. Same metrics as main Performance tab.</div>
+      <div id="gatedResearchPerfKpis" class="kpis" style="margin-bottom:16px"></div>
+      <div class="two-col">
+        <div><canvas id="gatedResearchPerfChart" height="180"></canvas></div>
+        <div><table class="data" id="gatedResearchPerfSport"></table></div>
+      </div>
+      <div style="margin-top:16px"><table class="data" id="gatedResearchPerfBucket"></table></div>
+      <div style="margin-top:16px" class="two-col">
+        <div><table class="data" id="gatedResearchPerfMarket"></table></div>
+        <div><table class="data" id="gatedResearchPerfCal"></table></div>
+      </div>
+      <div class="small dim" style="margin-top:8px" id="gatedResearchPerfMonthly"></div>
+    </div>
+  </section>
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -412,6 +481,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small dim" style="margin-top:10px">Display preferences stay in this browser. The 1U control in the top bar updates the shared bankroll setting used by future dollar displays and order sizing; historical unit records and existing orders do not change.</div>
     </div>
   </section>
+  </div>
 </div>
 
 <div id="modal" onclick="if(event.target===this)this.style.display='none'">
@@ -430,7 +500,8 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.cl
   b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
   $("#tab-"+b.dataset.tab).style.display=""; updateCounts();
   if(b.dataset.tab==="flat-perf")renderFlatPerf();
-  if(b.dataset.tab==="research-perf")renderResearchPerf(); });
+  if(b.dataset.tab==="research-perf")renderResearchPerf();
+  if(b.dataset.tab==="gated-research-perf")renderGatedResearchPerf(); });
 
 /* ---------- settings ---------- */
 function applySettings(){
@@ -1061,18 +1132,105 @@ const entryPrice=p=>Number(p.filled_entry?.price)||null;
 const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
 const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))return stored;
   const m=pregamePrice(p),model=Number(p.model_probability);return m&&model?model-m:null;};
+// Single shared row/header renderer for all 4 ledger tabs (Ledger/Flat/
+// Research/Gated Research) so they can never visually drift apart again —
+// same columns, same pill/color classes, same labels, in one place. Only the
+// leading checkbox (bulk-clear/archive, a Ledger-only feature) and clickable
+// sort-header state differ; everything else — data columns, styling, colors
+// — is identical by construction.
+function ledgerHeaderRow(showCheckbox){
+  const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
+    ["model_probability","Model"],["market_implied_probability","Pregame close"],["filled_entry","Bought at"],["edge","Decision edge"],
+    ["units","Size"],["result","State"],["pnl_units","P&L"]];
+  const checkboxTh=showCheckbox?'<th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>':"";
+  const headCells=cols.map(([k,l])=>showCheckbox
+    ?`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`
+    :`<th>${l}</th>`).join("");
+  return `<tr>${checkboxTh}${headCells}<th>Order</th><th>Matchup</th></tr>`;
+}
+function ledgerRowHtml(p,showCheckbox){
+  const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
+  const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p),size=Number(p.units)||Number(p.suggested_paper_units)||0;
+  const checkboxTd=showCheckbox?`<td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td>`:"";
+  return `<tr${p.archived?' style="opacity:.45"':''}>${checkboxTd}<td title="Scheduled ${esc(String(p.event_start_utc||""))}">${gameTimeET(p.event_start_utc)}</td><td>${p.league||""}</td>
+    <td>${p.market_type||""}</td><td>${pickLabel(p)}${p.unavailable_features?` <span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠</span>`:""}</td>
+    <td>${p.model_probability?pct(p.model_probability):"—"}</td>
+    <td title="${escAttr(p.quote?.observed_at_utc?`Last valid quote before tipoff · ${p.quote.observed_at_utc}`:"Stored decision-time pregame quote")}">${cents(mp)} <span class="dim">${mp?pct(mp):"—"}</span></td>
+    <td title="${escAttr(p.filled_entry?.basis==="exchange_trade"?"Exchange-confirmed fill in the selected outcome coordinate":p.filled_entry?"Filled order limit; exact execution price unavailable":"No filled exchange buy")}">${cents(entry)}</td>
+    <td class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</td>
+    <td>${size?size.toFixed(2)+"U":"—"}</td><td>${res}</td>
+    <td class="${pnlClass(pickPnl(p))}">${fmt(pickPnl(p))}</td>
+    <td>${orderControl(p)}</td>
+    <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;
+}
+/* Each ledger view (Ledger=L, Flat=F, Research=R) gets its own independent
+   copy of the filter bar (own sport/market/status/result/search/date-range
+   state) so switching or filtering one never affects the others. Only the
+   Ledger bar gets the archive/hide-rows tools, since those act on pick_id
+   rows in the main ledger only. */
+const FILTER_TABS=["L","F","R","G"];
+function filterBarHTML(tab){
+  const archiveTools=tab==="L"?`
+    <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
+    <details class="view-tools"><summary>Manage hidden rows</summary><div class="menu">
+      <span class="dim small">Hide from this dashboard:</span>
+      <button onclick="clearLedger('day')">Today</button>
+      <button onclick="clearLedger('week')">7 days</button>
+      <button onclick="clearLedger('month')">30 days</button>
+      <button onclick="clearLedger('all')">Everything</button>
+      <label class="small dim"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden (<span id="archCount">0</span>)</label>
+      <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore hidden</button>
+    </div></details>`:"";
+  return `
+    <button class="primary" onclick="preset('open','${tab}')">Active (<span id="openCount_${tab}">0</span>)</button>
+    <button onclick="preset('settled','${tab}')">Settled (<span id="settledCount_${tab}">0</span>)</button>
+    <button onclick="preset('today','${tab}')">Today active</button>
+    <button onclick="preset('7d','${tab}')">Active 7d</button>
+    <button onclick="preset('all','${tab}')">All picks</button>
+    ${archiveTools}
+    <span style="width:10px"></span>
+    <select id="fSport_${tab}" onchange="onFilterChange('${tab}')"><option value="">all sports</option></select>
+    <select id="fMarket_${tab}" onchange="onFilterChange('${tab}')"><option value="">all markets</option></select>
+    <select id="fStatus_${tab}" onchange="onFilterChange('${tab}')"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
+    <select id="fResult_${tab}" onchange="onFilterChange('${tab}')"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
+    <input id="fSearch_${tab}" placeholder="search team / event id" size="22" oninput="onFilterChange('${tab}')">
+    <input id="fFrom_${tab}" type="date"><input id="fTo_${tab}" type="date">
+    <button onclick="onFilterChange('${tab}')">Apply</button>
+    <button onclick="exportCsv('${tab}')">Export CSV</button>`;
+}
+function mountFilterBars(){
+  $("#filters_L").innerHTML=filterBarHTML("L");
+  $("#filters_F").innerHTML=filterBarHTML("F");
+  $("#filters_R").innerHTML=filterBarHTML("R");
+  $("#filters_G").innerHTML=filterBarHTML("G");
+}
 function populateFilters(){
-  const flatLeagues=(_flatCache||[]).map(p=>p.league||p.Sport||'');
-  const flatMarkets=(_flatCache||[]).map(p=>p.market_type||p.Type||'moneyline');
-  const allLeagues=[...new Set([...state.picks.map(p=>p.league),...flatLeagues])].filter(Boolean).sort();
-  const allMarkets=[...new Set([...state.picks.map(p=>p.market_type),...flatMarkets])].filter(Boolean).sort();
-  $("#fSport").innerHTML='<option value="">all sports</option>'+allLeagues.map(s=>`<option>${s}</option>`).join("");
-  $("#fMarket").innerHTML='<option value="">all markets</option>'+allMarkets.map(s=>`<option>${s}</option>`).join("");
+  // Each tab's dropdowns list only what's actually in ITS OWN ledger — not a
+  // combined union across all 4. Research picking "MLB" from a dropdown that
+  // only exists because the Ledger tab has MLB rows would silently show zero
+  // results forever, since research.xlsx never contains MLB at all.
+  const perTabRows={
+    L: state.picks,
+    F: _flatCache||[],
+    R: _researchCache||[],
+    G: _gatedResearchCache||[],
+  };
+  FILTER_TABS.forEach(tab=>{
+    const sportSel=$("#fSport_"+tab), marketSel=$("#fMarket_"+tab);
+    if(!sportSel||!marketSel)return;
+    const curS=sportSel.value, curM=marketSel.value;
+    const rows=perTabRows[tab]||[];
+    const leagues=[...new Set(rows.map(p=>p.league||p.Sport||''))].filter(Boolean).sort();
+    const markets=[...new Set(rows.map(p=>p.market_type||p.Type||'moneyline'))].filter(Boolean).sort();
+    sportSel.innerHTML='<option value="">all sports</option>'+leagues.map(s=>`<option>${s}</option>`).join("");
+    marketSel.innerHTML='<option value="">all markets</option>'+markets.map(s=>`<option>${s}</option>`).join("");
+    sportSel.value=curS; marketSel.value=curM;
+  });
 }
 function filteredPicks(){
-  const s=$("#fSport").value,m=$("#fMarket").value,st=$("#fStatus").value,r=$("#fResult").value,
-        q=$("#fSearch").value.trim().toLowerCase(),from=$("#fFrom").value,to=$("#fTo").value;
-  const showArchived=$("#fArchived").checked;
+  const s=$("#fSport_L").value,m=$("#fMarket_L").value,st=$("#fStatus_L").value,r=$("#fResult_L").value,
+        q=$("#fSearch_L").value.trim().toLowerCase(),from=$("#fFrom_L").value,to=$("#fTo_L").value;
+  const showArchived=$("#fArchived_L").checked;
   return state.picks.filter(p=>{
     if(p.archived&&!showArchived)return false;
     if(s&&p.league!==s)return false;
@@ -1087,19 +1245,23 @@ function filteredPicks(){
     return true;
   });
 }
-function onFilterChange(){renderPicks();renderFlat();}
+function onFilterChange(tab){
+  // Filtering only ever re-slices already-fetched data (renderFlatTable /
+  // renderResearchTable), never re-fetches — see loadFlatCache/loadResearchCache.
+  // Filtering used to call renderFlat()/renderResearch(), which always
+  // re-fetched and re-decorated every row (orders + portfolio history) from
+  // the server on every keystroke/dropdown change: that was the 5-10s lag.
+  if(tab==="F"){renderFlatTable();return;}
+  if(tab==="R"){renderResearchTable();return;}
+  if(tab==="G"){renderGatedResearchTable();return;}
+  if(tab==="L"){renderPicks();return;}
+  renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();
+}
 let sortKey="event_start_utc",sortAsc=false;
 function updateCounts(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
-  const activeTab=$$("#tabs button.on")[0]?.dataset?.tab||'picks';
-  if(activeTab==='flat'){
-    const fd=_flatCache||[];
-    $("#openCount").textContent=fd.filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
-    $("#settledCount").textContent=fd.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
-  }else{
-    $("#openCount").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
-    $("#settledCount").textContent=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
-  }
+  $("#openCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
+  $("#settledCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
   $("#archCount").textContent=archivedCount;
   $("#restoreBtn").style.display=archivedCount?'':'none';
 }
@@ -1130,23 +1292,8 @@ function renderPicks(){
      <div class="k"><b class="${totalPnl>=0?"green":"red"}">${fmt(totalPnl)}</b><span>total P&amp;L (U)</span></div>
      <div class="k"><b>${pct(roi)}</b><span>ROI</span></div>
      <div class="k"><b>${streakLabel}</b><span>streak</span></div>`;
-  const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
-    ["model_probability","Model"],["market_implied_probability","Pregame close"],["filled_entry","Bought at"],["edge","Decision edge"],
-    ["units","Size"],["result","State"],["pnl_units","P&L"]];
-  let html=`<tr><th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>`+cols.map(([k,l])=>`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`).join("")+"<th>Order</th><th>Matchup</th></tr>";
-  rows.forEach(p=>{
-    const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
-    const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p),size=Number(p.units)||Number(p.suggested_paper_units)||0;
-    html+=`<tr${p.archived?' style="opacity:.45"':''}><td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td><td title="Scheduled ${esc(String(p.event_start_utc||""))}">${gameTimeET(p.event_start_utc)}</td><td>${p.league||""}</td>
-      <td>${p.market_type||""}</td><td>${pickLabel(p)}</td>
-      <td>${p.model_probability?pct(p.model_probability):"—"}</td>
-      <td title="${escAttr(p.quote?.observed_at_utc?`Last valid quote before tipoff · ${p.quote.observed_at_utc}`:"Stored decision-time pregame quote")}">${cents(mp)} <span class="dim">${mp?pct(mp):"—"}</span></td>
-      <td title="${escAttr(p.filled_entry?.basis==="exchange_trade"?"Exchange-confirmed fill in the selected outcome coordinate":p.filled_entry?"Filled order limit; exact execution price unavailable":"No filled exchange buy")}">${cents(entry)}</td>
-      <td class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</td>
-      <td>${size?size.toFixed(2)+"U":"—"}</td><td>${res}</td>
-      <td class="${pnlClass(pickPnl(p))}">${fmt(pickPnl(p))}</td>
-      <td>${orderControl(p)}</td>
-      <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;});
+  let html=ledgerHeaderRow(true);
+  rows.forEach(p=>{html+=ledgerRowHtml(p,true);});
   $("#pickTable").innerHTML=html;
   window.updateSelCount?.();
 }
@@ -1193,27 +1340,29 @@ async function clearSelected(){
 }
 window.clearSelected=clearSelected;
 window.clearLedger=clearLedger; window.restoreLedger=restoreLedger;
-window.preset=which=>{
+window.preset=(which,tab)=>{
+  tab=tab||"L";
   const today=todayET();
-  $("#fStatus").value="open";$("#fFrom").value="";$("#fTo").value="";$("#fResult").value="";
-  if(which==="today"){$("#fFrom").value=today;$("#fTo").value=today;}
-  else if(which==="settled"){$("#fStatus").value="settled";}
-  else if(which==="all"){$("#fStatus").value="";}
+  $("#fStatus_"+tab).value="open";$("#fFrom_"+tab).value="";$("#fTo_"+tab).value="";$("#fResult_"+tab).value="";
+  if(which==="today"){$("#fFrom_"+tab).value=today;$("#fTo_"+tab).value=today;}
+  else if(which==="settled"){$("#fStatus_"+tab).value="settled";}
+  else if(which==="all"){$("#fStatus_"+tab).value="";}
   else if(which==="7d"){
     const [year,month,day]=today.split("-").map(Number);
-    $("#fFrom").value=new Date(Date.UTC(year,month-1,day-6)).toISOString().slice(0,10);
+    $("#fFrom_"+tab).value=new Date(Date.UTC(year,month-1,day-6)).toISOString().slice(0,10);
   }
-  onFilterChange();
+  onFilterChange(tab);
 };
-function exportCsv(){
-  const rows=filteredPicks();
+function exportCsv(tab){
+  tab=tab||"L";
+  const rows=tab==="F"?filteredFlatRows():tab==="R"?filteredResearchRows():tab==="G"?filteredGatedResearchRows():filteredPicks();
   const cols=Object.keys(rows[0]||{});
   const csv=[cols.join(",")].concat(rows.map(r=>cols.map(c=>{
     let v=r[c]==null?"":String(r[c]).replace(/"/g,'""');
     return /[,"\n]/.test(v)?`"${v}"`:v;}).join(","))).join("\n");
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-  a.download="picks_export.csv"; a.click();
+  a.download=(tab==="F"?"flat":tab==="R"?"research":tab==="G"?"gated_research":"picks")+"_export.csv"; a.click();
 }
 
 /* ---------- charts (vanilla canvas) ---------- */
@@ -1229,8 +1378,8 @@ function lineChart(id,points,color){const {ctx,w,h}=canvasCtx(id);
   const Y=v=>h-pad-(h-2*pad)*((v-min)/((max-min)||1));
   ctx.strokeStyle="rgba(255,255,255,.15)";ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(w-pad,Y(0));ctx.stroke();
   ctx.beginPath();points.forEach((p,i)=>{const y=Y(vals[i]);i?ctx.lineTo(X(i),y):ctx.moveTo(X(0),y);});
-  ctx.strokeStyle=color||( vals[vals.length-1]>=0?"#00ff88":"#ff4444");ctx.lineWidth=2;ctx.stroke();
-  ctx.fillStyle="#8890a8";ctx.font="10px monospace";
+  ctx.strokeStyle=color||( vals[vals.length-1]>=0?"#33d17e":"#ff5c5c");ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle="#7d8496";ctx.font="10px monospace";
   ctx.fillText(fmt(max),4,Y(max)+4);ctx.fillText(fmt(min),4,Y(min));
   ctx.fillText(fmt(vals[vals.length-1]),w-pad-30,Y(vals[vals.length-1])-6);}
 function barChart(id,labels,values,opts={}){const {ctx,w,h}=canvasCtx(id);
@@ -1242,56 +1391,68 @@ function barChart(id,labels,values,opts={}){const {ctx,w,h}=canvasCtx(id);
     const v=values[i];
     const zero=opts.signed?w/2:90;
     const len=(opts.signed?(w/2-40):(w-zero-40))*Math.abs(v)/maxAbs;
-    ctx.fillStyle=v>=0?(opts.color||"#00ff88"):"#ff4444";
+    ctx.fillStyle=v>=0?(opts.color||"#33d17e"):"#ff5c5c";
     ctx.fillRect(opts.signed&&v<0?zero-len:zero,y,Math.max(2,len),bh);
-    ctx.fillStyle="#e8e8f0";ctx.font="10.5px monospace";
+    ctx.fillStyle="#e7e9f0";ctx.font="10.5px monospace";
     ctx.fillText(lab,4,y+bh-3);
-    ctx.fillStyle="#8890a8";
+    ctx.fillStyle="#7d8496";
     ctx.fillText(opts.pct?pct(v):fmt(v),(opts.signed&&v<0?zero-len-42:zero+len+6),y+bh-3);});}
 function calChart(id,buckets){const {ctx,w,h}=canvasCtx(id);
   if(!buckets.length){noData(ctx,w,h);return;}
   const pad=26,X=v=>pad+(w-2*pad)*v,Y=v=>h-pad-(h-2*pad)*v;
   ctx.strokeStyle="rgba(255,255,255,.2)";ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(X(0),Y(0));ctx.lineTo(X(1),Y(1));ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle="#00ff88";
+  ctx.fillStyle="#33d17e";
   buckets.forEach(b=>{ctx.beginPath();ctx.arc(X(b.mean_p),Y(b.hit_rate),3+Math.min(6,b.count/4),0,7);ctx.fill();});
-  ctx.fillStyle="#8890a8";ctx.font="10px monospace";
+  ctx.fillStyle="#7d8496";ctx.font="10px monospace";
   ctx.fillText("predicted →",w/2-30,h-6);ctx.save();ctx.translate(10,h/2+24);ctx.rotate(-Math.PI/2);ctx.fillText("actual →",0,0);ctx.restore();}
 function noData(ctx,w,h){ctx.fillStyle="#556";ctx.font="12px monospace";ctx.fillText("No data",w/2-24,h/2);}
 
 let _flatCache=[];
-async function renderFlat(){
+function filteredFlatRows(){
+  // Own filter bar (fSport_F etc.) — independent of the Ledger tab's fSport_L.
+  const fs=$("#fSport_F").value, fm=$("#fMarket_F").value, fst=$("#fStatus_F").value, fr=$("#fResult_F").value;
+  const fq=($("#fSearch_F").value||'').toLowerCase();
+  const ff=$("#fFrom_F").value, ft=$("#fTo_F").value;
+  return (_flatCache||[]).filter(p=>{
+    if(fs&&(p.league||p.Sport||'')!==fs)return false;
+    if(fm&&(p.market_type||p.Type||'moneyline')!==fm)return false;
+    const st=String(p.status||p.State||'').toLowerCase();
+    if(fst==='open'&&st!=='open')return false;
+    if(fst==='settled'&&st!=='settled')return false;
+    const res=String(p.result||p.Result||'').toLowerCase();
+    if(fr&&res!==fr)return false;
+    if(fq){
+      const hay=(p.away_team||p.Away||'')+' '+(p.home_team||p.Home||'')+' '+(p.event_id||'');
+      if(!hay.toLowerCase().includes(fq))return false;
+    }
+    if(ff||ft){
+      const d=(p.event_start_utc||'').slice(0,10);
+      if(ff&&d<ff)return false;
+      if(ft&&d>ft)return false;
+    }
+    return true;
+  });
+}
+let _flatLoaded=false;
+async function loadFlatCache(force){
+  if(_flatLoaded&&!force)return;
+  const resp=await fetch('/api/flat-picks');
+  const raw=await resp.json();
+  _flatCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
+  _flatLoaded=true;
+}
+// Pure render from the already-fetched cache — no network call, so filtering
+// (typing in search, flipping a dropdown) is instant instead of re-fetching
+// and re-decorating every row (orders + portfolio history) on each keystroke.
+function renderFlatTable(){
   try{
-    const resp=await fetch('/api/flat-picks');
-    const raw=await resp.json();
-    _flatCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
-    
-    // Apply filters (shared with Ledger tab)
-    const fs=$("#fSport").value, fm=$("#fMarket").value, fst=$("#fStatus").value, fr=$("#fResult").value;
-    const fq=($("#fSearch").value||'').toLowerCase();
-    const ff=$("#fFrom").value, ft=$("#fTo").value;
-    
-    let rows=_flatCache.filter(p=>{
-      if(fs&&(p.league||p.Sport||'')!==fs)return false;
-      if(fm&&(p.market_type||p.Type||'moneyline')!==fm)return false;
-      const st=String(p.status||p.State||'').toLowerCase();
-      if(fst==='open'&&st!=='open')return false;
-      if(fst==='settled'&&st!=='settled')return false;
-      const res=String(p.result||p.Result||'').toLowerCase();
-      if(fr&&res!==fr)return false;
-      if(fq){
-        const hay=(p.away_team||p.Away||'')+' '+(p.home_team||p.Home||'')+' '+(p.event_id||'');
-        if(!hay.toLowerCase().includes(fq))return false;
-      }
-      if(ff||ft){
-        const d=(p.event_start_utc||'').slice(0,10);
-        if(ff&&d<ff)return false;
-        if(ft&&d>ft)return false;
-      }
-      return true;
-    });
-    rows.sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
-    
+    $("#openCount_F").textContent=_flatCache.filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
+    $("#settledCount_F").textContent=_flatCache.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
+
+    let rows=filteredFlatRows();
+    rows.sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+
     // KPI
     const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
     const wins=settled.filter(p=>String(p.result||p.Result||'')==='win').length;
@@ -1304,27 +1465,15 @@ async function renderFlat(){
       <div class=\"k\"><b class=\"${pnl>=0?'green':'red'}\">${fmt(pnl)}</b><span>P&L (U)</span></div>
       <div class=\"k\"><b>${risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
     
-    let html='<tr><th>Game (ET)</th><th>Sport</th><th>Pick</th><th>Model</th><th>Market</th><th>Edge</th><th>Size</th><th>Result</th><th>P&L</th><th>Order</th><th>Matchup</th></tr>';
-    if(!rows.length){html+='<tr><td colspan=11>No matches.</td></tr>';}
-    rows.forEach(p=>{
-      const res=String(p.result||p.Result||'');
-      const st=String(p.status||p.State||'');
-      const resPill=res?`<span class=\"pill ${res}\">${res}</span>`:(st==='open'?'<span class=\"pill open\">open</span>':'');
-      const edge=Number(p.edge||p.Edge)||0;
-      const size=Number(p.units||p.Units)||0;
-      const mp=pregamePrice(p), bid=p.quote?.bid;
-      html+=`<tr>
-        <td>${gameTimeET(p.event_start_utc||p['Game (ET)'])}</td><td>${p.league||p.Sport||''}</td><td>${pickLabel(p)}</td>
-        <td>${Number(p.model_probability||p.Model)?pct(Number(p.model_probability||p.Model)):'—'}</td>
-        <td title=\"${bid!=null?'B '+cents(bid)+' / A '+cents(mp):''}\">${cents(mp)} <span class=\"dim\">${mp?pct(mp):'—'}</span></td>
-        <td class=\"${edge>=0?'green':'red'}\">${edge?(edge>=0?'+':'')+(edge*100).toFixed(1)+'pp':'—'}</td>
-        <td>${size?size.toFixed(2)+'U':'—'}</td>
-        <td>${resPill}</td><td class=\"${pnlClass(pickPnl(p))}\">${fmt(pickPnl(p))}</td>
-        <td>${orderControl(p)}</td>
-        <td class=\"dim\">${p.away_team||p.Away||''} @ ${p.home_team||p.Home||''}</td></tr>`;
-    });
+    let html=ledgerHeaderRow(false);
+    if(!rows.length){html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';}
+    rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
     document.getElementById('flatTable').innerHTML=html;
-  }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=11>Error: '+esc(String(e))+'</td></tr>';}
+  }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=12>Error: '+esc(String(e))+'</td></tr>';}
+}
+async function renderFlat(force){
+  await loadFlatCache(force);
+  renderFlatTable();
 }
 function renderPerf(p){
   state.perf=p;
@@ -1411,6 +1560,32 @@ async function renderResearchPerf(){
   const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
   $("#researchPerfMonthly").textContent=mm.join(" · ");
 }
+async function renderGatedResearchPerf(){
+  let p;
+  try{p=await api("/api/gated-research-performance");}catch(e){$("#gatedResearchPerfKpis").innerHTML='<div class="red small">server unreachable</div>';return;}
+  if(!p||!p.settled){$("#gatedResearchPerfKpis").innerHTML='<div class="dim">No settled gated research picks yet.</div>';return;}
+  const wr=p.settled>0?p.wins/p.settled*100:0;
+  $("#gatedResearchPerfKpis").innerHTML=`
+    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
+    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
+    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
+    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>`;
+  lineChart("#gatedResearchPerfChart",p.pnl_curve||[]);
+  const bs=Object.entries(p.by_sport||{});
+  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#gatedResearchPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
+  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
+  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
+  $("#gatedResearchPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
+  const bm=Object.entries(p.by_market||{});
+  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
+  $("#gatedResearchPerfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
+  const cal=p.calibration||[];
+  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
+  $("#gatedResearchPerfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
+  const gm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
+  $("#gatedResearchPerfMonthly").textContent=gm.join(" · ");
+}
 
 /* ---------- Today tab ---------- */
 async function renderToday(){
@@ -1466,7 +1641,8 @@ async function renderToday(){
         <span>model <b>${conf?pct(conf):"—"}</b></span>
         <span>market <b>${cents(market)}</b> <span class="dim">(${market?pct(market):"—"})</span></span>
         <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-        ${sizing?`<span>${sizing}</span>`:""}<span class="dim">${p.model_version||""}</span></div>
+        ${sizing?`<span>${sizing}</span>`:""}<span class="dim">${p.model_version||""}</span>
+        ${p.unavailable_features?`<span class="pill push" title="Fell back to a neutral default for this game — every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div><div class="pick-action">${orderControl(p,true)}</div></div>
         <div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`;
       d.onclick=()=>showModal(`<h2>${p.away_team} @ ${p.home_team}</h2><pre>${esc(JSON.stringify(p,null,1))}</pre>`);
@@ -1475,6 +1651,8 @@ async function renderToday(){
   }
   // ── Flat ledger picks (all model candidates, no edge gate) ──
   loadFlatToday();
+  // ── Research picks (esports, soccer, etc.) ──
+  loadResearchToday();
 }
 async function loadFlatToday(){
   const todayET=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset()-300);return d.toISOString().slice(0,10);};
@@ -1514,12 +1692,63 @@ async function loadFlatToday(){
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          <span class="dim">${p.model_version||""}</span></div>
+          <span class="dim">${p.model_version||""}</span>
+          ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div></div>`;
         box.appendChild(d);
       });
     }
   }catch(e){/* flat picks unavailable */ }
+}
+async function loadResearchToday(){
+  const todayET=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset()-300);return d.toISOString().slice(0,10);};
+  try{
+    const rp=await api("/api/research-picks");
+    const today=(Array.isArray(rp)?rp:[]).filter(p=>{
+      const start=p.event_start_utc||p.start_et||"";
+      return start.startsWith(todayET());
+    });
+    if(!today.length)return;
+    const box=$("#todayPicks");
+    const sep=document.createElement("h2");
+    sep.textContent=`Research — ${today.length} picks (esports, soccer, international baseball)`;
+    sep.style.cssText="margin-top:20px;padding-top:12px;border-top:2px dashed var(--violet);color:var(--violet)";
+    box.appendChild(sep);
+    const note=document.createElement("div");
+    note.className="small dim";note.style.marginBottom="8px";
+    note.textContent="Research-eligible picks logged to the separate research ledger. Paper only — zero real-money exposure.";
+    box.appendChild(note);
+    const bySport={};
+    today.forEach(p=>{(bySport[p.league||"?"]=bySport[p.league||"?"]||[]).push(p);});
+    const pickEdge=p=>edgePoints(p);
+    for(const [sport,rows] of Object.entries(bySport)){
+      rows.sort((a,b)=>(pickEdge(b)??-9)-(pickEdge(a)??-9));
+      const h=document.createElement("h3");h.textContent=sport+" — "+rows.length+" picks";h.style.color="var(--violet)";
+      box.appendChild(h);
+      rows.forEach(p=>{
+        const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
+        const market=pregamePrice(p);
+        const edge=pickEdge(p);
+        const evBadge=edge==null?"":
+          edge>0.02?'<span class="pill win">+EV</span>':
+          edge>0?'<span class="pill open">thin</span>':
+          '<span class="pill push">—EV</span>';
+        const res=(p.result?`<span class="pill ${p.result}">${p.result}${p.pnl_units?(" "+Number(p.pnl_units).toFixed(2)+"U"):""}</span>`
+          :'<span class="pill open">'+(p.status||"open")+'</span>')+" "+evBadge;
+        const d=document.createElement("div");d.className="pick";
+        d.innerHTML=`<div class="pick-row"><div class="pick-copy">
+          <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et||""} · ${p.market_type}</span>${res}</div>
+          <div class="pick-metrics"><span>pick <b>${esc(pickLabel(p))}</b></span>
+          <span>model <b>${conf?pct(conf):"—"}</b></span>
+          <span>market <b>${cents(market)}</b></span>
+          <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
+          <span class="dim">${p.model_version||""}</span>
+          ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
+          </div></div>`;
+        box.appendChild(d);
+      });
+    }
+  }catch(e){/* research picks unavailable */ }
 }
 function pickLabel(p){
   const sel=String(p.selection||"").toLowerCase();
@@ -1792,39 +2021,62 @@ async function loadMarket(){
 }
 
 /* ---------- research ---------- */
-async function renderResearch(){
-  // Research picks table (same style as main Ledger)
+let _researchCache=[];
+function filteredResearchRows(){
+  // Own filter bar (fSport_R etc.) — independent of Ledger/Flat's filters.
+  const fs=$("#fSport_R").value, fm=$("#fMarket_R").value, fst=$("#fStatus_R").value, fr=$("#fResult_R").value;
+  const fq=($("#fSearch_R").value||'').toLowerCase();
+  const ff=$("#fFrom_R").value, ft=$("#fTo_R").value;
+  return (_researchCache||[]).filter(p=>{
+    if(fs&&(p.league||'')!==fs)return false;
+    if(fm&&(p.market_type||'moneyline')!==fm)return false;
+    const st=String(p.status||'').toLowerCase();
+    if(fst==='open'&&st!=='open')return false;
+    if(fst==='settled'&&st!=='settled')return false;
+    const res=String(p.result||'').toLowerCase();
+    if(fr&&res!==fr)return false;
+    if(fq){
+      const hay=(p.away_team||'')+' '+(p.home_team||'')+' '+(p.event_id||'');
+      if(!hay.toLowerCase().includes(fq))return false;
+    }
+    if(ff||ft){
+      const d=(p.event_start_utc||'').slice(0,10);
+      if(ff&&d<ff)return false;
+      if(ft&&d>ft)return false;
+    }
+    return true;
+  });
+}
+let _researchLoaded=false;
+async function loadResearchCache(force){
+  if(_researchLoaded&&!force)return;
+  const rp=await api("/api/research-picks");
+  _researchCache=Array.isArray(rp)?rp:[];
+  _researchLoaded=true;
+}
+// Pure render from the already-fetched cache — no network call, so filtering
+// is instant instead of re-fetching/re-decorating on every keystroke.
+function renderResearchTable(){
   try{
-    const rp=await api("/api/research-picks");
-    if(rp&&rp.length){
-      const active=rp.filter(p=>p.status==="open").length;
-      const settled=rp.filter(p=>p.status==="settled").length;
+    if(_researchCache.length){
+      const active=_researchCache.filter(p=>p.status==="open").length;
+      const settled=_researchCache.filter(p=>p.status==="settled").length;
       $("#researchActive").textContent=active;
       $("#researchSettled").textContent=settled;
-      let html="";
-      rp.forEach(p=>{
-        const t=p.event_start_utc?new Date(p.event_start_utc).toLocaleString("en-US",{timeZone:"America/New_York",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:true}):"";
-        const edge=p.edge!=null?((p.edge>0?"+":"")+(p.edge*100).toFixed(1)+"pp"):"—";
-        const size=p.units>0?p.units.toFixed(2)+"U":"—";
-        const mktProb=p.market_implied_probability!=null?(p.market_implied_probability*100).toFixed(1)+"%":"—";
-        const pnl=p.pnl_units!=null?((p.pnl_units>0?"+":"")+p.pnl_units.toFixed(2)):"—";
-        const cls=p.result==="win"?"green":p.result==="loss"?"red":p.result==="push"?"yellow":"";
-        html+=`<tr>
-          <td class="dim">${t}</td>
-          <td>${p.league||""}</td>
-          <td>${(p.away_team||"")} ${p.selection==="away"?"ML":p.selection==="home"?"ML":""}</td>
-          <td class="dim">${(p.model_probability*100).toFixed(1)}%</td>
-          <td class="dim">${mktProb}</td>
-          <td>${edge}</td>
-          <td>${size}</td>
-          <td class="${cls}"><b>${p.result||"—"}</b></td>
-          <td class="${cls}">${pnl}</td>
-          <td class="dim">${(p.away_team||"")} @ ${(p.home_team||"")}</td>
-        </tr>`;
-      });
-      $("#researchTable tbody").innerHTML=html;
+      $("#openCount_R").textContent=active;
+      $("#settledCount_R").textContent=settled;
+      const rows=filteredResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+      $("#researchShown").textContent=rows.length;
+      let html=ledgerHeaderRow(false);
+      if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
+      rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
+      $("#researchTable").innerHTML=html;
     }
-  }catch(e){$("#researchTable tbody").innerHTML='<tr><td colspan=10 class="dim">No research picks loaded.</td></tr>';}
+  }catch(e){$("#researchTable").innerHTML='<tr><td colspan=12 class="dim">No research picks loaded.</td></tr>';}
+}
+async function renderResearch(force){
+  await loadResearchCache(force);
+  renderResearchTable();
 
   // Existing backtest/audit/pipeline content
   const bt=await api("/api/backtests");
@@ -1851,6 +2103,61 @@ async function renderResearch(){
 }
 window.openBacktest=async f=>{const d=await api("/api/backtest?file="+encodeURIComponent(f));
   showModal(`<h2>${f}</h2><pre>${esc(JSON.stringify(d,null,1)).slice(0,60000)}</pre>`);};
+
+/* ---------- gated research (esports/soccer picks that genuinely cleared eligibility) ---------- */
+let _gatedResearchCache=[];
+function filteredGatedResearchRows(){
+  // Own filter bar (fSport_G etc.) — independent of the other tabs' filters.
+  const fs=$("#fSport_G").value, fm=$("#fMarket_G").value, fst=$("#fStatus_G").value, fr=$("#fResult_G").value;
+  const fq=($("#fSearch_G").value||'').toLowerCase();
+  const ff=$("#fFrom_G").value, ft=$("#fTo_G").value;
+  return (_gatedResearchCache||[]).filter(p=>{
+    if(fs&&(p.league||'')!==fs)return false;
+    if(fm&&(p.market_type||'moneyline')!==fm)return false;
+    const st=String(p.status||'').toLowerCase();
+    if(fst==='open'&&st!=='open')return false;
+    if(fst==='settled'&&st!=='settled')return false;
+    const res=String(p.result||'').toLowerCase();
+    if(fr&&res!==fr)return false;
+    if(fq){
+      const hay=(p.away_team||'')+' '+(p.home_team||'')+' '+(p.event_id||'');
+      if(!hay.toLowerCase().includes(fq))return false;
+    }
+    if(ff||ft){
+      const d=(p.event_start_utc||'').slice(0,10);
+      if(ff&&d<ff)return false;
+      if(ft&&d>ft)return false;
+    }
+    return true;
+  });
+}
+let _gatedResearchLoaded=false;
+async function loadGatedResearchCache(force){
+  if(_gatedResearchLoaded&&!force)return;
+  const rp=await api("/api/gated-research-picks");
+  _gatedResearchCache=Array.isArray(rp)?rp:[];
+  _gatedResearchLoaded=true;
+}
+function renderGatedResearchTable(){
+  try{
+    const active=_gatedResearchCache.filter(p=>p.status==="open").length;
+    const settled=_gatedResearchCache.filter(p=>p.status==="settled").length;
+    $("#gatedResearchActive").textContent=active;
+    $("#gatedResearchSettled").textContent=settled;
+    $("#openCount_G").textContent=active;
+    $("#settledCount_G").textContent=settled;
+    const rows=filteredGatedResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+    $("#gatedResearchShown").textContent=rows.length;
+    let html=ledgerHeaderRow(false);
+    if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
+    rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
+    $("#gatedResearchTable").innerHTML=html;
+  }catch(e){$("#gatedResearchTable").innerHTML='<tr><td colspan=12 class="dim">No gated research picks loaded.</td></tr>';}
+}
+async function renderGatedResearch(force){
+  await loadGatedResearchCache(force);
+  renderGatedResearchTable();
+}
 
 /* ---------- actions (async jobs; long runs survive refreshes) ---------- */
 async function confirmAction(action,message,extra={}){
@@ -1890,7 +2197,7 @@ async function pollJob(action,jobId){
       }
       showModal(`<h2>${action}</h2><pre class="red">Lost contact with the dashboard server after 5 retries (${esc(String(e))}).
 The server process has stopped. Restart it:
-  cd ~/"Documents/Poly & Kalshi/model prediction" && python3 dashboard_server.py
+  cd ~/"model prediction" && python3 dashboard_server.py
 (or install the auto-start service: bash install_dashboard_service.sh)
 Crash details, if any, are in dashboard/server.log</pre>`);
       return;
@@ -1936,20 +2243,27 @@ function resetTimer(){
 async function refreshAll(){
   try{
     const [s,m,p,perf,evidence]=await Promise.all([api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence")]);
-    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); renderProductionEvidence(evidence); populateFilters(); renderPicks(); renderLive(); renderFolio(); renderResearch(); renderFlat();
+    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); renderProductionEvidence(evidence); renderPicks(); renderLive(); renderFolio();
+    // populateFilters() reads _flatCache/_researchCache/_gatedResearchCache,
+    // so it must run AFTER these caches are loaded — otherwise the first
+    // refresh after a page load builds every dropdown except Ledger's from
+    // empty arrays (only backfilled on the NEXT refresh cycle).
+    await Promise.all([renderResearch(true), renderFlat(true), renderGatedResearch(true)]);
+    populateFilters();
   }catch(e){
     $("#updatedTxt").innerHTML='<span class="red">Updated: SERVER UNREACHABLE — is dashboard_server.py running?</span>';
   }
 }
 if(location.protocol==="file:"){
-  document.body.innerHTML='<div style="max-width:640px;margin:80px auto;font-family:monospace;color:#e8e8f0;background:#16213e;border:1px solid #ff4444;border-radius:12px;padding:24px">'+
-  '<h2 style="color:#ff4444">Opened as a file — the dashboard needs its server</h2>'+
+  document.body.innerHTML='<div style="max-width:640px;margin:80px auto;font-family:monospace;color:#e7e9f0;background:#12151d;border:1px solid #ff5c5c;border-radius:12px;padding:24px">'+
+  '<h2 style="color:#ff5c5c">Opened as a file — the dashboard needs its server</h2>'+
   '<p style="line-height:1.7;margin-top:10px">This page reads live data through a local server. Run:</p>'+
-  '<pre style="background:#1a1a2e;padding:12px;border-radius:8px">cd "~/Documents/Poly &amp; Kalshi/model prediction"\npython3 dashboard_server.py</pre>'+
-  '<p style="line-height:1.7">then open <a href="http://127.0.0.1:8765/" style="color:#00ff88">http://127.0.0.1:8765/</a></p></div>';
+  '<pre style="background:#0a0c11;padding:12px;border-radius:8px">cd "~/model prediction"\npython3 dashboard_server.py</pre>'+
+  '<p style="line-height:1.7">then open <a href="http://127.0.0.1:8765/" style="color:#33d17e">http://127.0.0.1:8765/</a></p></div>';
   throw new Error("file:// mode");
 }
 applySettings();
+mountFilterBars();
 $("#mDate").value=todayET();
 refreshAll(); loadMarket(); resetTimer();
 </script>

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 PARK_FACTORS_VERSION = "2025-three-year"
 
 # Home team display name -> run factor (three-year rolling, both teams' runs).

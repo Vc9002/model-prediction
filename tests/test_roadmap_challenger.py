@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from model_prediction.models.learned_market import LearnedMarketArtifact, build_artifact
 from model_prediction.roadmap_challenger import (
     ADDITIONS,
     GATE_GRID,
@@ -11,7 +12,6 @@ from model_prediction.roadmap_challenger import (
     _independent_effect_label,
     _variant_name,
 )
-from model_prediction.models.learned_market import LearnedMarketArtifact, build_artifact
 from model_prediction.validation import ValidationRow
 
 

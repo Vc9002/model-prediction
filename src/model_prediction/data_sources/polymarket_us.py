@@ -11,7 +11,6 @@ import httpx
 
 from ..domain import iso_utc, parse_utc, utc_now
 
-
 # Verified against GET /v2/leagues on the live gateway (2026-07-16).
 LEAGUE_SLUGS = {
     "MLB": "mlb",
@@ -49,7 +48,8 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "nba": ("NBA",),
     "wnba": ("WNBA",),
     "nfl": ("NFL",),
-    "soccer": ("EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "UCL", "UEFA", "MLS", "WORLD_CUP"),
+    # WORLD_CUP dropped 2026-07: tournament is over, no games left to trade.
+    "soccer": ("EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "UCL", "UEFA", "MLS"),
     "tennis": ("WTA", "ITF_MEN", "ITF_WOMEN"),
     "esports": (
         "LOL",
@@ -66,15 +66,15 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
 }
 
 # Sports whose prospective BBO capture feeds the daily qualification/promotion
-# pipeline (config/model.yaml, models/registry.py). Soccer and tennis have
-# Polymarket gateway coverage in POLYMARKET_SPORT_LEAGUES above but are not
-# yet wired into daily BBO capture, so they stay out of this set on purpose —
-# do not derive this from "every league in POLYMARKET_SPORT_LEAGUES" or from
-# registry.MODEL_SPECS wholesale, both of which also include soccer/tennis.
-# Esports is research-only, but prospective BBO capture must begin before
-# profitability can ever be tested; capturing prices does not qualify a model
-# or authorize execution.
-BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "esports", "kbo", "npb"}
+# pipeline (config/model.yaml, models/registry.py). Tennis has Polymarket
+# gateway coverage in POLYMARKET_SPORT_LEAGUES above but is not yet wired into
+# daily BBO capture, so it stays out of this set on purpose — do not derive
+# this from "every league in POLYMARKET_SPORT_LEAGUES" or from
+# registry.MODEL_SPECS wholesale.
+# Esports and soccer are research-only, but prospective BBO capture must begin
+# before profitability can ever be tested; capturing prices does not qualify a
+# model or authorize execution.
+BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "soccer", "esports", "kbo", "npb"}
 
 MARKET_TYPES = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "moneyline",
@@ -284,7 +284,7 @@ class PolymarketSnapshotStore:
         self.path = Path(path)
 
     @classmethod
-    def for_sport_date(cls, data_root: str | Path, sport: str, game_date: str) -> "PolymarketSnapshotStore":
+    def for_sport_date(cls, data_root: str | Path, sport: str, game_date: str) -> PolymarketSnapshotStore:
         return cls(Path(data_root) / "odds" / sport.lower() / game_date / "polymarket_snapshots.jsonl")
 
     def append(self, snapshot: dict[str, Any]) -> None:
