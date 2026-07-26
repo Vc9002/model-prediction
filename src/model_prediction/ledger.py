@@ -796,6 +796,65 @@ class PickLedger:
             )
         return [row["pick_id"] for row in removed]
 
+    def import_rows(
+        self,
+        rows: list[dict[str, str]],
+        *,
+        source: str,
+        reason: str,
+    ) -> list[str]:
+        """Import immutable ledger rows during an audited storage migration.
+
+        Existing pick IDs remain the identity of the original prospective
+        decisions. The operation is additive and idempotent; it never updates
+        an existing row or fabricates a new decision timestamp.
+        """
+        if not source.strip() or not reason.strip():
+            raise ValueError("source and reason are required")
+        normalized_rows = [
+            {field: str(row.get(field, "")) for field in FIELDNAMES}
+            for row in rows
+        ]
+        requested_ids = [row["pick_id"] for row in normalized_rows]
+        if any(not pick_id for pick_id in requested_ids):
+            raise ValueError("every imported row must have a pick_id")
+        if len(requested_ids) != len(set(requested_ids)):
+            raise ValueError("import rows contain duplicate pick IDs")
+
+        imported: list[dict[str, str]] = []
+        with self._lock():
+            if self.path.exists() and self.path.stat().st_size:
+                self._migrate_if_needed()
+                existing = self._read_unlocked()
+            else:
+                existing = []
+            existing_by_id = {row["pick_id"]: row for row in existing}
+            for row in normalized_rows:
+                prior = existing_by_id.get(row["pick_id"])
+                if prior is not None:
+                    if prior != row:
+                        raise ValueError(
+                            f"import conflicts with existing pick {row['pick_id']}"
+                        )
+                    continue
+                existing.append(row)
+                existing_by_id[row["pick_id"]] = row
+                imported.append(row)
+            if imported:
+                self._write_rows(existing)
+        if imported:
+            self.audit.append(
+                "ledger_rows_imported",
+                str(self.path),
+                {
+                    "source": source,
+                    "reason": reason,
+                    "rows_imported": len(imported),
+                    "pick_ids": [row["pick_id"] for row in imported],
+                },
+            )
+        return [row["pick_id"] for row in imported]
+
     def void(self, pick_id: str, reason: str) -> dict[str, str]:
         self.initialize()
         if not reason.strip():

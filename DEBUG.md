@@ -36,8 +36,18 @@ forecast scope is now repaired in this working tree:
   output, and `$0.50` tie-contract P&L are wired.
 - Flat is isolated from soccer/esports/KBO/NPB. The unified runner no longer
   lets a flat phase clear or overwrite research/gated ledgers.
-- Focused verification passes 71 tests. The full suite passes 424 and retains
-  four pre-existing dashboard order-preview failures outside this edit scope.
+- Research and Gated Research are split into independent per-sport workbooks
+  for Soccer, LoL, CS2, Dota 2, Valorant, KBO, and NPB. The dashboard
+  aggregates those files without merging their storage.
+- A centralized Gated Research eligibility wrapper now requires exact model
+  inputs, a timestamp-valid executable quote, and the configured per-sport
+  edge/confidence floors. Valid low-edge rows remain zero-unit Research
+  `NO_CALL` observations; unresolved or untrained inputs enter neither ledger.
+- The legacy mixed ledgers were archived intact under
+  `data/archive/research-ledger-split-20260726T192729Z/`. The cleaned live
+  ledgers contain 32 Research rows and 22 Gated rows with zero invariant
+  violations.
+- The full suite passes 436 tests.
 
 ## Verified audit result — 2026-07-26
 

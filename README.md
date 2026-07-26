@@ -3,7 +3,7 @@
 Shadow-first multi-sport prediction, research, ledger, and local dashboard
 system with Polymarket US market-data integration.
 
-**Last updated**: 2026-07-26
+**Last updated**: 2026-07-27
 
 The current operational verdict and audit evidence live in
 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`DEBUG.md`](DEBUG.md).
@@ -17,8 +17,8 @@ defects are repaired.
 |--------|-------|
 | Active learned artifacts | MLB v6, NBA/WNBA/NFL v4 |
 | Research/override artifacts | Soccer Poisson/DC v1, Esports v4, KBO/NPB v2 identifiers |
-| Tests | **424 pass, 4 pre-existing dashboard failures** |
-| Audit chain | 16,635 events, 0 breaks, 0 hash mismatches |
+| Tests | **436 pass** |
+| Audit chain | 16,918 events, 0 breaks, 0 hash mismatches |
 | Artifact integrity | 31 valid, 2 mismatched, 33 total |
 | Ruff | 117 findings |
 | Release status | **Blocked** |
@@ -28,15 +28,18 @@ Do not infer executable profitability from artifact hit rates, synthetic
 
 ## Ledger Structure
 
-Three ledgers with distinct purposes:
+Four ledger tiers with distinct purposes:
 
 | Ledger | File | Purpose |
 |--------|------|---------|
 | **Main** | `data/picks.xlsx` | Main shadow-call ledger. A row label is not proof of artifact qualification or a placed order. |
-| **Flat** | `data/flat_picks.xlsx` | All games with production model decisions. Research/diagnostic only. |
-| **Research** | `data/research.xlsx` | Research and development models. Feature ablation, challengers, experiments. |
+| **Flat** | `data/flat_picks.xlsx` | All MLB/NBA/WNBA/NFL production-model decisions. Research/diagnostic only. |
+| **Research** | `data/research/{sport}.xlsx` | Separate Soccer, LoL, CS2, Dota 2, Valorant, KBO, and NPB workbooks. Contains only exact-input, executable-quote research-model decisions; a valid low-edge decision remains a zero-unit `NO_CALL`. |
+| **Gated Research** | `data/gated_research/{sport}.xlsx` | Separate workbooks for the same seven sports. Strict subset of Research containing only positive-unit calls that clear the sport's configured executable-edge and confidence floors. |
 
-Main and flat use production models. Research is for everything else — new features, model variants, alternative calibrations.
+Main and flat use production models. Research-only sports never enter Flat. The
+dashboard aggregates the separate sport workbooks for unified Research and
+Gated Research views.
 
 The project uses complete-date chronological 60/20/20 validation. Model
 accuracy, calibration, diagnostic units, and executable profitability are
@@ -153,6 +156,8 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 │   ├── availability/           # Timestamped official report and research caches
 │   ├── esports/                # Versioned LoL/CS2 series backfills and identities
 │   ├── international_baseball/ # Official KBO/NPB results, identities, and manifests
+│   ├── research/               # One research ledger workbook per research-only sport
+│   ├── gated_research/         # One gated-subset workbook per research-only sport
 │   └── events.jsonl            # Audit chain
 ├── dashboard.html              # Single-page dashboard
 ├── dashboard_server.py         # Dashboard HTTP server

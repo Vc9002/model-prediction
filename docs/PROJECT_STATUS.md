@@ -1,7 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-07-26 against the dirty `deepseek-phase5` checkout at
-`697d765`.
+**Last verified**: 2026-07-27 against the dirty `deepseek-phase5` checkout.
 
 This document is the operational status entry point. `DEBUG.md` contains the
 full audit evidence and reproduction commands. Historical metrics in old
@@ -16,8 +15,8 @@ should not be used.
 The blunt reason: the project currently has a plausible forecasting layer on
 top of an execution and evidence chain that is not yet trustworthy enough for
 capital. Model hit rates do not offset an order-ticket binding flaw,
-non-point-in-time MLB validation, non-atomic ledger/audit writes, failing tests,
-and stale release evidence.
+non-point-in-time MLB validation, non-atomic ledger/audit writes, artifact
+integrity defects, and stale release evidence.
 
 ## Source-of-truth order
 
@@ -38,28 +37,24 @@ execution semantics.
 
 | Check | Verified result | Consequence |
 |---|---|---|
-| Test suite | **410 passed, 4 failed** | Four dashboard order-preview tests drifted from the current `$5.00` unit cap. |
+| Test suite | **436 passed** | Full suite is green after pinning the intended unit value in four order-preview tests and adding per-sport ledger/dashboard regressions. |
 | Focused critical tests | **84 passed** | Audit, CLI, domain, forward, and XLSX modules now have direct tests. |
 | Ruff | **117 findings** | Not lint-clean; 79 are executable-bit/shebang findings. |
 | Critical imports | Pass | Core modules and feature/data-source packages import. |
 | Python/package | Python 3.14.5; editable install resolves here | Packaging and console entry point work. |
 | Artifact hashes | **31 valid, 2 mismatched, 33 total** | NBA and NFL spread baselines fail canonical hash verification. |
-| Audit chain | **16,387 events, 0 breaks, 0 hash mismatches** | Cryptographic chain is intact. |
+| Audit chain | **16,918 events, 0 breaks, 0 hash mismatches** | Cryptographic chain is intact. |
 | Ledger/audit reconciliation | **False** | 1,150 historical creation events lack audited removal events; current rows all have creation events. |
 | Config artifacts | One missing; one wrong semantic reference | Market-residual artifact is absent; MLB total research points to the spread artifact. |
 | Latest learned report | Stale | It names an old worktree and MLB v5, not active MLB v6/current checkout. |
 | Dashboard runtime | Healthy process, inconsistent governance state | `/api/status` reports `promotion_allowed=true` while warning MLB is below its qualification gate. |
 | Working tree | Heavily dirty | A release cannot be attributed to one stable, reviewable source state. |
 
-The four failing tests are:
-
-- `test_resting_order_preview_and_submit_persist_exchange_id`
-- `test_submit_parses_success_after_interactive_prompt`
-- `test_buy_at_current_ask_submits_marketable_ioc_limit`
-- `test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled`
-
-Their fixed share counts now exceed the current config-derived dollar cap. The
-tests must explicitly pin their intended unit value or use cap-compliant sizes.
+Research and Gated Research now use independent workbooks for Soccer, LoL, CS2,
+Dota 2, Valorant, KBO, and NPB. The dashboard aggregates those files. A cleanup
+archived the two legacy mixed workbooks intact, retained 32 valid Research rows
+and 22 valid Gated rows, and rejected 106 Research plus 6 Gated rows that failed
+current invariants.
 
 ## P0 blockers
 
@@ -140,12 +135,15 @@ artifact and points `models.market_residual.artifact` to a nonexistent file.
 
 The code no longer enforces the policy described in older documentation.
 
-The CLI can apply a sport-specific minimum edge against an executable ask before
-logging. After that, `eligibility.py` enforces bans, lifecycle state,
-staleness, and provenance, but it intentionally ignores market disagreement,
-exposure, and post-uncertainty edge when deciding `CALL` versus `NO_CALL`.
-Sizing uses `edge_scaled_units`, not the exposure-aware `recommend_units`
-decision.
+For research-only sports, `eligibility.py` centrally enforces exact model
+inputs, executable edge, confidence, lifecycle state, staleness, provenance,
+and bans before a call can enter Gated Research. Valid low-edge decisions stay
+in the sport's Research workbook as zero-unit `NO_CALL` observations.
+Unresolved or untrained model inputs enter neither ledger.
+
+Market disagreement and exposure remain deliberately relaxed for shadow
+research. Sizing uses `edge_scaled_units`, not the exposure-aware
+`recommend_units` decision.
 
 Therefore:
 

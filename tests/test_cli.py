@@ -139,7 +139,7 @@ def _esports_forecast() -> dict:
     }
 
 
-def test_esports_research_logs_all_priced_but_gated_keeps_only_valid_positive_edge(
+def test_esports_research_excludes_invalid_inputs_and_gated_requires_positive_edge(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
@@ -164,13 +164,36 @@ def test_esports_research_logs_all_priced_but_gated_keeps_only_valid_positive_ed
         _esports_forecast(), config, research, gated_ledger=gated
     )
 
-    assert logged == 3
-    assert len(research.appended) == 3
+    assert logged == 2
+    assert len(research.appended) == 2
     assert len(gated.appended) == 1
     assert gated.appended[0][0].event_id == "valid"
     by_event = {request.event_id: eligibility for request, eligibility in research.appended}
     assert by_event["negative-edge"].reason_code == "NO_CALL_LOW_EDGE"
-    assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert "untrained-team" not in by_event
+
+
+def test_esports_flat_mode_never_writes_research_or_gated(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    config = {
+        "models": {"LOL": {"status": "shadow_qualified"}},
+        "project": {},
+        "bankroll": {},
+    }
+
+    logged = cli._log_esports_forecast(
+        _esports_forecast(),
+        config,
+        research,
+        flat_mode=True,
+        gated_ledger=gated,
+    )
+
+    assert logged == 0
+    assert research.appended == []
+    assert gated.appended == []
 
 
 def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_leagues() -> None:

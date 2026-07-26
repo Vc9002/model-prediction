@@ -1,0 +1,431 @@
+{
+  "archive": "/Users/vincentc9002/model prediction/data/archive/research-ledger-split-20260726T192729Z",
+  "archived_legacy_ledgers": {
+    "gated_research.xlsx": "/Users/vincentc9002/model prediction/data/archive/research-ledger-split-20260726T192729Z/gated_research.xlsx",
+    "research.xlsx": "/Users/vincentc9002/model prediction/data/archive/research-ledger-split-20260726T192729Z/research.xlsx"
+  },
+  "archived_sha256": {
+    "gated_research.xlsx": "dcf4a035244c5f705bc8c0f4b133d5f817b12ee23c642bd3e89386f4aeba7a8b",
+    "research.xlsx": "93b4595c98976a51903495a28d480d5aba7dc29668beb1dc5bc02a64917016ad"
+  },
+  "duplicate_gated": {},
+  "duplicate_research": {},
+  "gated_duplicates_removed": 0,
+  "gated_kept": {
+    "cs2": 11,
+    "dota2": 0,
+    "kbo": 0,
+    "lol": 11,
+    "npb": 0,
+    "soccer": 0,
+    "valorant": 0
+  },
+  "gated_rejected": 6,
+  "gated_rejection_reasons": {
+    "below_configured_edge_gate": 2,
+    "missing_valid_research_pair": 6,
+    "team_identity_unresolved": 4
+  },
+  "rejected_gated": {
+    "5731c8f737ac4537": [
+      "team_identity_unresolved",
+      "missing_valid_research_pair"
+    ],
+    "59899b82acff46b4": [
+      "team_identity_unresolved",
+      "missing_valid_research_pair"
+    ],
+    "808e212cb7534e81": [
+      "below_configured_edge_gate",
+      "missing_valid_research_pair"
+    ],
+    "a2203ec652454349": [
+      "below_configured_edge_gate",
+      "missing_valid_research_pair"
+    ],
+    "e7c15658496b44c8": [
+      "team_identity_unresolved",
+      "missing_valid_research_pair"
+    ],
+    "f33dad858ec44b5e": [
+      "team_identity_unresolved",
+      "missing_valid_research_pair"
+    ]
+  },
+  "rejected_research": {
+    "01b059df08d3450e": [
+      "no_call_has_units"
+    ],
+    "0290b65f79474bcb": [
+      "no_call_has_units"
+    ],
+    "06b31dbf45314895": [
+      "no_call_has_units"
+    ],
+    "087e2fcbcae64a96": [
+      "no_call_has_units"
+    ],
+    "0cd9b93567af4452": [
+      "team_identity_unresolved"
+    ],
+    "156758151bad4e5d": [
+      "edge_probability_mismatch",
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "163f9b89282a4c61": [
+      "below_configured_edge_gate"
+    ],
+    "1a50600b5543482c": [
+      "no_call_has_units"
+    ],
+    "1a9cbe29a8aa4c16": [
+      "team_identity_unresolved"
+    ],
+    "1d0a8428b2da49c1": [
+      "no_call_has_units"
+    ],
+    "22487633e181401d": [
+      "no_call_has_units"
+    ],
+    "2376b6dcc4174f68": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "23b4ec1ef79f4798": [
+      "team_identity_unresolved"
+    ],
+    "275051808b7f4b14": [
+      "edge_probability_mismatch",
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "27b43691e60a4423": [
+      "below_configured_edge_gate"
+    ],
+    "2900b22a279a470d": [
+      "no_call_has_units"
+    ],
+    "29214b15e3664d08": [
+      "team_identity_unresolved"
+    ],
+    "2ad755bd459b425a": [
+      "team_identity_unresolved"
+    ],
+    "2bc8e8a35ef44728": [
+      "no_call_has_units"
+    ],
+    "2de8bb1e586a448d": [
+      "edge_probability_mismatch",
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "35f6498a4c1d46b5": [
+      "no_call_has_units"
+    ],
+    "39626d9d58e943ed": [
+      "no_call_has_units"
+    ],
+    "3b498ded64774a56": [
+      "no_call_has_units"
+    ],
+    "3bd88c73052c4652": [
+      "team_identity_unresolved"
+    ],
+    "3c44b7684ff64f3f": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "3cd92ac6e6844889": [
+      "no_call_has_units"
+    ],
+    "3e032d97e18147f7": [
+      "no_call_has_units"
+    ],
+    "421de4f055644ebd": [
+      "no_call_has_units"
+    ],
+    "42a4948493b444ea": [
+      "no_call_has_units"
+    ],
+    "45c18e4ae35c4950": [
+      "no_call_has_units"
+    ],
+    "46411ce0c3e5451a": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "46bf4494cb8647cd": [
+      "no_call_has_units"
+    ],
+    "4939bf7553054762": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "4df0b0c4ddf348eb": [
+      "no_call_has_units"
+    ],
+    "4ead3a31f1df41bb": [
+      "no_call_has_units"
+    ],
+    "4fdd43d0ca324413": [
+      "team_identity_unresolved"
+    ],
+    "525c1c2254fc4ad8": [
+      "team_identity_unresolved"
+    ],
+    "536cf218b26447d6": [
+      "team_identity_unresolved"
+    ],
+    "583e71a3fd5c44e5": [
+      "no_call_has_units"
+    ],
+    "5a0a26925c424ed2": [
+      "team_identity_unresolved"
+    ],
+    "5ca8c85f58574a8f": [
+      "no_call_has_units"
+    ],
+    "5dafc4f3fa5149d0": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "5fee95548f264016": [
+      "no_call_has_units"
+    ],
+    "61cf5d2603504bda": [
+      "team_untrained_in_exact_artifact",
+      "no_call_has_units"
+    ],
+    "627654dd115145f0": [
+      "no_call_has_units"
+    ],
+    "63741d63a6744f52": [
+      "no_call_has_units"
+    ],
+    "644b0705035d477b": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "64dd938469894069": [
+      "team_untrained_in_exact_artifact",
+      "no_call_has_units"
+    ],
+    "6c466ff51b5c460d": [
+      "no_call_has_units"
+    ],
+    "6d6afdeb246e4a8f": [
+      "no_call_has_units"
+    ],
+    "738bcb383e85492a": [
+      "no_call_has_units"
+    ],
+    "780c6e652d7e403d": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "78bfc4914bcf4e96": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "79e64509f67048c1": [
+      "no_call_has_units"
+    ],
+    "7e0858b912374088": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "81a328b8d84a4505": [
+      "no_call_has_units"
+    ],
+    "839b3455178e47fd": [
+      "no_call_has_units"
+    ],
+    "84bb1f7e7a8440c9": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "86195cd6ef414a9d": [
+      "below_configured_edge_gate"
+    ],
+    "88556ad9f9604bc9": [
+      "team_identity_unresolved",
+      "below_configured_edge_gate"
+    ],
+    "88bceed2cf544f06": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "8a2105f8fa1d40f6": [
+      "team_identity_unresolved"
+    ],
+    "8d55c6bb844b4c40": [
+      "no_call_has_units"
+    ],
+    "8fbb1b4b8ad24307": [
+      "no_call_has_units"
+    ],
+    "90457e5609cd4c46": [
+      "no_call_has_units"
+    ],
+    "9530e14151804df2": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "9684256eb2af4826": [
+      "no_call_has_units"
+    ],
+    "9800a4298e0e485c": [
+      "edge_probability_mismatch",
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "98eba3198a354759": [
+      "no_call_has_units"
+    ],
+    "9bee23623285455c": [
+      "edge_probability_mismatch",
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "9f4fbbffaf4f4ab1": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "a232e14d96984007": [
+      "no_call_has_units"
+    ],
+    "a86a54396d904849": [
+      "no_call_has_units"
+    ],
+    "ad66e5d4a4d84176": [
+      "no_call_has_units"
+    ],
+    "adcd4bd2a83e43ab": [
+      "no_call_has_units"
+    ],
+    "aeb9ca3c7d2c45ec": [
+      "no_call_has_units"
+    ],
+    "b0f18f4df91e4e67": [
+      "edge_probability_mismatch",
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "b0fc9f336a6d45a2": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "b196e991eecc4227": [
+      "team_identity_unresolved"
+    ],
+    "b4f1cdd6e52f4510": [
+      "no_call_has_units"
+    ],
+    "b5a127b1bcba47d9": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "b64037d71c394cbb": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "b64295ae005540a3": [
+      "team_identity_unresolved"
+    ],
+    "b6bcf0e09b1c4057": [
+      "no_call_has_units"
+    ],
+    "b948ea8c0be54c58": [
+      "no_call_has_units"
+    ],
+    "bbf66d2ea89d48ca": [
+      "no_call_has_units"
+    ],
+    "c59e2f711d374bbc": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "c6b7f5508fab4c36": [
+      "no_call_has_units"
+    ],
+    "c96b3111c9c64a5d": [
+      "team_untrained_in_exact_artifact",
+      "no_call_has_units"
+    ],
+    "cc3004e222d04955": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "d3ebe98f1e2b495b": [
+      "team_identity_unresolved"
+    ],
+    "d4b5fb122195468c": [
+      "no_call_has_units"
+    ],
+    "d65a9716e4df435f": [
+      "no_call_has_units"
+    ],
+    "d90d48e1a8cc4623": [
+      "no_call_has_units"
+    ],
+    "dcf31876749d448f": [
+      "edge_probability_mismatch",
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "dd87ccc1546b4e35": [
+      "no_call_has_units"
+    ],
+    "e15c744b4efb4626": [
+      "no_call_has_units"
+    ],
+    "e1960e2ad8944a67": [
+      "team_untrained_in_exact_artifact",
+      "no_call_has_units"
+    ],
+    "e424d1a6e17743f5": [
+      "team_identity_unresolved"
+    ],
+    "e52bb5f3c40648aa": [
+      "no_call_has_units"
+    ],
+    "e55a457d96a140ca": [
+      "no_call_has_units"
+    ],
+    "ec5f8d7b7b024e96": [
+      "no_call_has_units"
+    ],
+    "ed8294a6bbd4411f": [
+      "team_identity_unresolved",
+      "no_call_has_units"
+    ],
+    "ed9f7eff1e3e4d89": [
+      "team_identity_unresolved"
+    ],
+    "f495ec3fb35f4b05": [
+      "below_configured_edge_gate"
+    ],
+    "fbfa8685a306416e": [
+      "no_call_has_units"
+    ]
+  },
+  "research_duplicates_removed": 0,
+  "research_kept": {
+    "cs2": 14,
+    "dota2": 0,
+    "kbo": 0,
+    "lol": 18,
+    "npb": 0,
+    "soccer": 0,
+    "valorant": 0
+  },
+  "research_rejected": 106,
+  "research_rejection_reasons": {
+    "below_configured_edge_gate": 5,
+    "edge_probability_mismatch": 7,
+    "no_call_has_units": 85,
+    "team_identity_unresolved": 43,
+    "team_untrained_in_exact_artifact": 4
+  }
+}

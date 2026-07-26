@@ -80,9 +80,23 @@ def _log(message: str) -> None:
 # source of truth is src/model_prediction/domain.py (League enum, EASTERN zone).
 # Keep these in sync with domain.py.
 EASTERN = ZoneInfo("America/New_York")
-SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
+SPORTS = (
+    "mlb",
+    "nba",
+    "wnba",
+    "nfl",
+    "soccer",
+    "lol",
+    "cs2",
+    "dota2",
+    "valorant",
+    "kbo",
+    "npb",
+)
 GATEWAY = "https://gateway.polymarket.us"
-RESEARCH_ONLY_LEAGUES = frozenset({"LOL", "CS2", "DOTA2", "VALORANT", "KBO", "NPB"})
+RESEARCH_ONLY_LEAGUES = frozenset(
+    {"SOCCER", "LOL", "CS2", "DOTA2", "VALORANT", "KBO", "NPB"}
+)
 
 _CACHE: dict[str, tuple[float, object]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -400,6 +414,22 @@ def _parse_picks(path: Path) -> list[dict]:
         picks.append(row)
     wb.close()
     return picks
+
+
+def _research_ledger_paths(*, gated: bool = False) -> list[Path]:
+    directory = DATA / ("gated_research" if gated else "research")
+    paths = sorted(directory.glob("*.xlsx")) if directory.exists() else []
+    if paths:
+        return paths
+    legacy = DATA / ("gated_research.xlsx" if gated else "research.xlsx")
+    return [legacy] if legacy.exists() else []
+
+
+def _parse_research_picks(*, gated: bool = False) -> list[dict]:
+    rows: list[dict] = []
+    for path in _research_ledger_paths(gated=gated):
+        rows.extend(_parse_picks(path))
+    return rows
 
 
 def _number(value, default=0.0):
@@ -1209,7 +1239,11 @@ def production_evidence() -> dict:
     international_validation = (
         _read_json(OUTPUTS / "international-baseball-baseline-validation.json") or {}
     )
-    ledger_paths = (DATA / "picks.xlsx", DATA / "flat_picks.xlsx", DATA / "research.xlsx")
+    ledger_paths = (
+        DATA / "picks.xlsx",
+        DATA / "flat_picks.xlsx",
+        *_research_ledger_paths(),
+    )
     rows_by_source = {str(path.relative_to(ROOT)): _read_evidence_ledger(path) for path in ledger_paths}
     feature_registry = _feature_registry_evidence()
     registry_by_name = {str(item.get("name")): item for item in feature_registry["features"]}
@@ -1277,12 +1311,19 @@ def production_evidence() -> dict:
             feature_names,
         )
 
+        sport_research_source = f"data/research/{str(sport).casefold()}.xlsx"
+        legacy_research_source = "data/research.xlsx"
+        research_source = (
+            sport_research_source
+            if sport_research_source in rows_by_source
+            else legacy_research_source
+        )
         research_ledger = _ledger_evidence_for_source(
             str(sport),
             model_config,
             version,
-            "data/research.xlsx",
-            rows_by_source.get("data/research.xlsx", []),
+            research_source,
+            rows_by_source.get(research_source, []),
             artifact,
             feature_names,
         )
@@ -2480,7 +2521,12 @@ def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dic
         if slug:
             net = _net_position_quantity(slug, portfolio_history or _load_portfolio_history())
             position_closed = net is not None and abs(net) < 1e-6
-    display_units = _number(row.get("units")) or _number(row.get("research_score_units")) or _suggested_units(row) or 0
+    display_units = (
+        _number(row.get("units"))
+        or _number(row.get("research_score_units"))
+        or _suggested_units(row)
+        or 0
+    )
     display_pnl = _number(row.get("pnl_units")) or _number(row.get("research_pnl_units"))
     # Fallback: compute P&L from american_odds when research_pnl_units is absent
     if display_pnl == 0 and row.get("result") in ("win", "loss") and row.get("american_odds"):
@@ -2496,8 +2542,11 @@ def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dic
             pass
     return {
         **row,
-        "units": display_units,
-        "pnl_units": display_pnl,
+        # Preserve ledger facts in the API. A Research NO_CALL must remain
+        # units=0 instead of looking like a sized Gated call merely because
+        # the dashboard can calculate a hypothetical display size.
+        "display_units": display_units,
+        "display_pnl_units": display_pnl,
         "quote": quote,
         "order": order,
         "filled_entry": filled_entry,
@@ -2960,9 +3009,9 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
     if name == "main_forecast":
         # Same command as Step 3 of run_daily.sh: MLB/WNBA -> picks.xlsx,
-        # esports/soccer/nba/nfl -> research.xlsx + gated_research.xlsx. One
-        # shared forecast pass, not three independent ones — the Ledger,
-        # Research, and Gated Research tab buttons all trigger this.
+        # esports/soccer/KBO/NPB -> separate per-sport research and gated
+        # workbooks. One shared forecast pass, not three independent ones —
+        # the Ledger, Research, and Gated Research tab buttons all trigger it.
         return cli + [
             "forecast", "--all", "--date", str(payload.get("date") or _today()),
             "--log", "--replace-today", "--model", "learned",
@@ -3234,17 +3283,17 @@ class Handler(BaseHTTPRequestHandler):
                 flat = [r for r in flat if str(r.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES]
                 self._send(_cached("flat-performance", 30, lambda: performance(flat)))
             elif route == "/api/research-performance":
-                research = _parse_picks(DATA / "research.xlsx") if (DATA / "research.xlsx").exists() else []
+                research = _parse_research_picks()
                 self._send(_cached("research-performance", 30, lambda: performance(research)))
             elif route == "/api/research-picks":
-                research = _parse_picks(DATA / "research.xlsx") if (DATA / "research.xlsx").exists() else []
+                research = _parse_research_picks()
                 decorated = [_decorate_pick(r) for r in research]
                 self._send(_cached("research-picks", 30, lambda: decorated))
             elif route == "/api/gated-research-performance":
-                gated = _parse_picks(DATA / "gated_research.xlsx") if (DATA / "gated_research.xlsx").exists() else []
+                gated = _parse_research_picks(gated=True)
                 self._send(_cached("gated-research-performance", 30, lambda: performance(gated)))
             elif route == "/api/gated-research-picks":
-                gated = _parse_picks(DATA / "gated_research.xlsx") if (DATA / "gated_research.xlsx").exists() else []
+                gated = _parse_research_picks(gated=True)
                 decorated = [_decorate_pick(r) for r in gated]
                 self._send(_cached("gated-research-picks", 30, lambda: decorated))
             elif route == "/api/backtests":

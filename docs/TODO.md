@@ -38,18 +38,27 @@ config, reports, ledgers, and audit state disagree.
 ## P1 — routing, settlement, and concurrency
 
 - [x] Make KBO/NPB forecast preview work without a ledger or writes.
-- [x] Log all intended KBO/NPB research rows before gated-subset filtering.
+- [x] Log exact-input KBO/NPB research decisions before gated-subset filtering;
+  keep unresolved, untrained, or non-executable candidates in forecast
+  diagnostics rather than either ledger.
 - [x] Grade KBO/NPB `$0.50` tie settlement using entry price, not ordinary
   moneyline push economics.
 - [x] Include flat/research/gated settlement results and failures in `settle`
   and `daily` output.
 - [x] Keep flat isolated to MLB/NBA/WNBA/NFL; route soccer, esports, KBO, and
   NPB only to research plus the valid gated subset.
+- [x] Split Research and Gated Research storage into one workbook per sport and
+  aggregate those files in the dashboard.
+- [x] Enforce model-input, executable-edge, confidence, and Research-pair
+  invariants centrally before a row can enter Gated Research.
+- [x] Audit and archive the legacy mixed Research/Gated workbooks, then migrate
+  only valid rows into the per-sport ledgers.
 - [x] Run daily forecasts in one process, share learned-slate caches, overlap
   independent captures, and propagate stage failures.
 - [ ] Make exposure-check-plus-append atomic across processes and preserve
   research/gated paired-ledger consistency.
-- [ ] Keep the cross-process singleton guard for all daily/forecast writers.
+- [x] Keep a cross-process singleton guard around the complete scheduled daily
+  writer workflow.
 
 ## P2 — source and feature correctness
 

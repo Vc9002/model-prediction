@@ -448,6 +448,7 @@ def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_p
     monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
     monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
     monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quote)
+    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
     monkeypatch.setattr(
@@ -499,6 +500,7 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
     monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
     monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
     monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quote)
+    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
     accepted = {
@@ -690,6 +692,7 @@ def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: 
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
     monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
+    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
     submitted = {}
 
     def fake_run(command, **kwargs):
@@ -838,6 +841,7 @@ def test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled(monke
         },
     )
     monkeypatch.setattr(dashboard_server, "_suggested_units", lambda row: 1.25)
+    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
     monkeypatch.setattr(
         dashboard_server,
         "_config_payload",

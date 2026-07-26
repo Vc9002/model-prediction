@@ -355,7 +355,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-research" style="display:none">
     <div class="secgrid">
       <div class="card" style="grid-column:1/-1">
-        <h2>Research Picks (esports, international baseball)</h2>
+        <h2>Research Picks (per-sport ledgers)</h2>
+        <div class="small dim" style="margin-bottom:8px">Aggregate view of separate soccer, esports, KBO, and NPB workbooks. Exact-input decisions can remain here as zero-unit <code>NO_CALL</code> rows when they miss the sport's edge or confidence gate; those rows never enter Gated Research.</div>
         <div class="filters" id="filters_R" style="margin-bottom:12px"></div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
           <span>Active: <b id="researchActive">0</b></span>
@@ -378,8 +379,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <section id="tab-gated-research" style="display:none">
     <div class="card">
-      <h2>Gated Research Picks (esports, soccer)</h2>
-      <div class="small dim" style="margin-bottom:8px">Curated subset of Research: only picks evaluate_eligibility genuinely approved units for (never the diagnostic edge-scaled fallback). Same relationship flat_picks.xlsx has to picks.xlsx, but for research-only sports.</div>
+      <h2>Gated Research Picks (per-sport ledgers)</h2>
+      <div class="small dim" style="margin-bottom:8px">Aggregate view of separate soccer, esports, KBO, and NPB ledgers. Only exact-input model calls clearing the sport's executable-edge and confidence gates appear here; no negative-edge or unresolved-team rows.</div>
       <div class="filters" id="filters_G" style="margin-bottom:12px"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <span>Active: <b id="gatedResearchActive">0</b></span>
@@ -423,7 +424,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-research-perf" style="display:none">
     <div class="card">
       <h2>Research Performance — Esports, International Baseball</h2>
-      <div class="small dim" style="margin-bottom:8px">Settled picks from research.xlsx. Same metrics as main Performance tab.</div>
+      <div class="small dim" style="margin-bottom:8px">Settled picks aggregated from the separate per-sport Research workbooks. Same metrics as main Performance tab.</div>
       <div id="researchPerfKpis" class="kpis" style="margin-bottom:16px"></div>
       <div class="two-col">
         <div><canvas id="researchPerfChart" height="180"></canvas></div>
@@ -440,7 +441,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-gated-research-perf" style="display:none">
     <div class="card">
       <h2>Gated Research Performance — Esports, Soccer</h2>
-      <div class="small dim" style="margin-bottom:8px">Settled picks from gated_research.xlsx. Same metrics as main Performance tab.</div>
+      <div class="small dim" style="margin-bottom:8px">Settled picks aggregated from the separate per-sport Gated Research workbooks. Same metrics as main Performance tab.</div>
       <div id="gatedResearchPerfKpis" class="kpis" style="margin-bottom:16px"></div>
       <div class="two-col">
         <div><canvas id="gatedResearchPerfChart" height="180"></canvas></div>
@@ -1110,7 +1111,8 @@ function drill(sport,market){
 /* ---------- picks ---------- */
 // null means "not settled yet" -- distinct from a real 0.00 push/break-even
 // result. Callers must render null as "--" (fmt() already does), never as 0.
-const pickPnl=p=>{const u=Number(p.units)||0;
+const pickPnl=p=>{if(p.display_pnl_units!=null)return Number(p.display_pnl_units);
+  const u=Number(p.units)||0;
   if(u>0)return p.pnl_units==null?null:Number(p.pnl_units);
   return (p.research_score_units==null||p.research_pnl_units==null)?null:Number(p.research_pnl_units);};
 const pnlClass=v=>v==null?"":(v>=0?"green":"red");
@@ -1138,19 +1140,27 @@ const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))retu
 // leading checkbox (bulk-clear/archive, a Ledger-only feature) and clickable
 // sort-header state differ; everything else — data columns, styling, colors
 // — is identical by construction.
-function ledgerHeaderRow(showCheckbox){
+function ledgerHeaderRow(showCheckbox,mode="default"){
+  const research=mode==="research";
   const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
     ["model_probability","Model"],["market_implied_probability","Pregame close"],["filled_entry","Bought at"],["edge","Decision edge"],
-    ["units","Size"],["result","State"],["pnl_units","P&L"]];
+    ["units","Size"],["result",research?"Decision":"State"],["pnl_units","P&L"]];
   const checkboxTh=showCheckbox?'<th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>':"";
   const headCells=cols.map(([k,l])=>showCheckbox
     ?`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`
     :`<th>${l}</th>`).join("");
   return `<tr>${checkboxTh}${headCells}<th>Order</th><th>Matchup</th></tr>`;
 }
-function ledgerRowHtml(p,showCheckbox){
-  const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
-  const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p),size=Number(p.units)||Number(p.suggested_paper_units)||0;
+function ledgerRowHtml(p,showCheckbox,mode="default"){
+  const research=mode==="research",gated=mode==="gated";
+  const settledResult=p.result?` · ${p.result}`:"";
+  const res=research
+    ?`<span class="pill ${p.decision==="CALL"?"win":"push"}" title="${escAttr(p.reason_code||"")}">${esc(p.decision||"NO_CALL")}${settledResult}</span>`
+    :(p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':""));
+  const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p);
+  const size=research?(Number(p.units)||0):(Number(p.display_units??p.units)||Number(p.suggested_paper_units)||0);
+  const rowPnl=research?(Number(p.pnl_units)||0):pickPnl(p);
+  const order=(research||gated)?'<span class="dim">paper only</span>':orderControl(p);
   const checkboxTd=showCheckbox?`<td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td>`:"";
   return `<tr${p.archived?' style="opacity:.45"':''}>${checkboxTd}<td title="Scheduled ${esc(String(p.event_start_utc||""))}">${gameTimeET(p.event_start_utc)}</td><td>${p.league||""}</td>
     <td>${p.market_type||""}</td><td>${pickLabel(p)}${p.unavailable_features?` <span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠</span>`:""}</td>
@@ -1159,8 +1169,8 @@ function ledgerRowHtml(p,showCheckbox){
     <td title="${escAttr(p.filled_entry?.basis==="exchange_trade"?"Exchange-confirmed fill in the selected outcome coordinate":p.filled_entry?"Filled order limit; exact execution price unavailable":"No filled exchange buy")}">${cents(entry)}</td>
     <td class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</td>
     <td>${size?size.toFixed(2)+"U":"—"}</td><td>${res}</td>
-    <td class="${pnlClass(pickPnl(p))}">${fmt(pickPnl(p))}</td>
-    <td>${orderControl(p)}</td>
+    <td class="${pnlClass(rowPnl)}">${fmt(rowPnl)}</td>
+    <td>${order}</td>
     <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;
 }
 /* Each ledger view (Ledger=L, Flat=F, Research=R) gets its own independent
@@ -1208,7 +1218,7 @@ function populateFilters(){
   // Each tab's dropdowns list only what's actually in ITS OWN ledger — not a
   // combined union across all 4. Research picking "MLB" from a dropdown that
   // only exists because the Ledger tab has MLB rows would silently show zero
-  // results forever, since research.xlsx never contains MLB at all.
+  // results forever, since the per-sport research workbooks never contain MLB.
   const perTabRows={
     L: state.picks,
     F: _flatCache||[],
@@ -1716,7 +1726,7 @@ async function loadResearchToday(){
     box.appendChild(sep);
     const note=document.createElement("div");
     note.className="small dim";note.style.marginBottom="8px";
-    note.textContent="Research-eligible picks logged to the separate research ledger. Paper only — zero real-money exposure.";
+    note.textContent="Research-eligible picks aggregated from separate per-sport workbooks. Paper only — zero real-money exposure.";
     box.appendChild(note);
     const bySport={};
     today.forEach(p=>{(bySport[p.league||"?"]=bySport[p.league||"?"]||[]).push(p);});
@@ -2067,9 +2077,9 @@ function renderResearchTable(){
       $("#settledCount_R").textContent=settled;
       const rows=filteredResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
       $("#researchShown").textContent=rows.length;
-      let html=ledgerHeaderRow(false);
+      let html=ledgerHeaderRow(false,"research");
       if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
-      rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
+      rows.forEach(p=>{html+=ledgerRowHtml(p,false,"research");});
       $("#researchTable").innerHTML=html;
     }
   }catch(e){$("#researchTable").innerHTML='<tr><td colspan=12 class="dim">No research picks loaded.</td></tr>';}
@@ -2148,9 +2158,9 @@ function renderGatedResearchTable(){
     $("#settledCount_G").textContent=settled;
     const rows=filteredGatedResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
     $("#gatedResearchShown").textContent=rows.length;
-    let html=ledgerHeaderRow(false);
+    let html=ledgerHeaderRow(false,"gated");
     if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
-    rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
+    rows.forEach(p=>{html+=ledgerRowHtml(p,false,"gated");});
     $("#gatedResearchTable").innerHTML=html;
   }catch(e){$("#gatedResearchTable").innerHTML='<tr><td colspan=12 class="dim">No gated research picks loaded.</td></tr>';}
 }

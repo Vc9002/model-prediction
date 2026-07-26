@@ -12,6 +12,15 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 RUNNER_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$RUNNER_DIR/.." || exit 1
 
+# Hold one non-blocking OS lock for the entire settlement/ingest/forecast
+# workflow. Re-entry uses the inherited lock descriptor and skips this wrapper.
+if [ "${MODEL_PREDICTION_DAILY_LOCK_HELD:-}" != "1" ]; then
+    export MODEL_PREDICTION_DAILY_LOCK_HELD=1
+    export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
+    exec .venv/bin/python -m model_prediction.daily_lock \
+        --lock data/locks/daily.lock -- bash "$0"
+fi
+
 RUN_DATE=$(TZ=America/New_York date +%Y-%m-%d)
 LOG="data/logs/daily_${RUN_DATE}.log"
 mkdir -p data/logs

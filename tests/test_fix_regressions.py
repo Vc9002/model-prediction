@@ -23,7 +23,10 @@ from model_prediction.data_sources.polymarket_execute import (
     PolymarketExecutor,
 )
 from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest
-from model_prediction.eligibility import evaluate_esports_eligibility
+from model_prediction.eligibility import (
+    evaluate_esports_eligibility,
+    evaluate_gated_research_eligibility,
+)
 from model_prediction.esports import NeutralElo, _fuzzy_match_team, _team_alias_index
 from model_prediction.features.base import FeatureStore
 from model_prediction.ledger import PickLedger
@@ -186,6 +189,42 @@ def test_esports_eligibility_no_longer_gates_on_exposure_caps():
     assert result.decision == "CALL"
     assert result.reason_code == "QUALIFIED"
     assert result.units > 0
+
+
+def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
+    negative_edge = _future_request(model_probability=0.58, american_odds=-150)
+    result = evaluate_gated_research_eligibility(
+        negative_edge,
+        Exposure(),
+        UnitPolicy(),
+        model_inputs_valid=True,
+        minimum_edge=0.02,
+    )
+    assert result.decision == "NO_CALL"
+    assert result.reason_code == "NO_CALL_LOW_EDGE"
+    assert result.units == 0
+
+    invalid_inputs = _future_request(model_probability=0.62, american_odds=100)
+    result = evaluate_gated_research_eligibility(
+        invalid_inputs,
+        Exposure(),
+        UnitPolicy(),
+        model_inputs_valid=False,
+        minimum_edge=0.02,
+    )
+    assert result.decision == "NO_CALL"
+    assert result.reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert result.units == 0
+
+    valid = evaluate_gated_research_eligibility(
+        invalid_inputs,
+        Exposure(),
+        UnitPolicy(),
+        model_inputs_valid=True,
+        minimum_edge=0.02,
+    )
+    assert valid.decision == "CALL"
+    assert valid.units > 0
 
 
 # ------------------------------------------------------------- executor

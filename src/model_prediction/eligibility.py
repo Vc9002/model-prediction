@@ -134,6 +134,74 @@ def evaluate_esports_eligibility(
     return _call_result(request, away, home, policy)
 
 
+def evaluate_gated_research_eligibility(
+    request: PickRequest,
+    exposure: Exposure,
+    policy: UnitPolicy,
+    *,
+    model_inputs_valid: bool,
+    minimum_edge: float,
+    minimum_confidence: float = 0.0,
+    now: datetime | None = None,
+    maximum_age_hours: float = 12,
+    maximum_unreviewed_disagreement: float = 0.10,
+) -> EligibilityResult:
+    """Apply the complete invariant for a Gated Research row.
+
+    Research sports deliberately use relaxed exposure/disagreement rails, but
+    Gated Research is still a curated subset. A row cannot be a CALL unless
+    its exact model inputs are valid, its executable edge clears the sport's
+    configured floor, and the model has the configured minimum opinion.
+    Keeping this in the eligibility layer prevents call sites from appending a
+    row merely because the underlying trust/provenance checks returned CALL.
+    """
+    eligibility = evaluate_esports_eligibility(
+        request,
+        exposure,
+        policy,
+        now=now,
+        maximum_age_hours=maximum_age_hours,
+        maximum_unreviewed_disagreement=maximum_unreviewed_disagreement,
+    )
+    if eligibility.decision != "CALL":
+        return eligibility
+    if not model_inputs_valid:
+        return _downgrade_research_call(
+            eligibility,
+            NoCallReason.MODEL_UNVALIDATED.value,
+        )
+    executable_edge = request.model_probability - implied_probability(request.american_odds)
+    if executable_edge < minimum_edge:
+        return _downgrade_research_call(
+            eligibility,
+            NoCallReason.LOW_EDGE.value,
+        )
+    if abs(request.model_probability - 0.5) < minimum_confidence:
+        return _downgrade_research_call(
+            eligibility,
+            NoCallReason.LOW_EDGE.value,
+        )
+    return eligibility
+
+
+def _downgrade_research_call(
+    eligibility: EligibilityResult,
+    reason_code: str,
+) -> EligibilityResult:
+    return EligibilityResult(
+        RecordType.RESEARCH_OBSERVATION,
+        "NO_CALL",
+        reason_code,
+        0,
+        eligibility.confidence_score,
+        eligibility.edge,
+        eligibility.adjusted_edge,
+        eligibility.away_team,
+        eligibility.home_team,
+        eligibility.banned_team,
+    )
+
+
 def _call_result(
     request: PickRequest,
     away: CanonicalTeam,
