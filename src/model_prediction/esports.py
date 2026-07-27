@@ -13,7 +13,7 @@ import math
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -333,6 +333,118 @@ def backfill_esports(
     }
     _atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return {**manifest, "paths": {"matches": str(matches_path), "teams": str(teams_path), "manifest": str(manifest_path)}}
+
+
+def refresh_recent_matches(
+    data_root: str | Path,
+    title: str,
+    lookback_days: int = 14,
+    client: Bo3EsportsClient | None = None,
+) -> dict[str, Any]:
+    """Merge newly-finished matches from the last `lookback_days` into the
+    existing match history, instead of `backfill_esports`'s full-window
+    overwrite.
+
+    `backfill_esports` replaces matches.jsonl entirely with whatever
+    `from_date..to_date` returns -- calling it with a short recent window on
+    a schedule would silently delete years of older history, and calling it
+    with each title's multi-year `minimum_date` to avoid that would refetch
+    the entire catalog (tens of thousands of matches per title) every cycle.
+    This instead fetches only a short recent window (cheap: BO3 pagination
+    already stops once it reaches dates older than `from_date`) and merges
+    it into the existing file, keyed by BO3's stable `match_id`, so ratings
+    can be kept fresh on a regular schedule without either problem.
+    """
+    title = title.lower()
+    if title not in TITLE_SPECS:
+        raise ValueError(f"unsupported baseline title: {title}")
+    today = eastern_today()
+    from_date = today - timedelta(days=lookback_days)
+    minimum = date.fromisoformat(str(TITLE_SPECS[title]["minimum_date"]))
+    from_date = max(from_date, minimum)
+
+    directory = Path(data_root) / "esports" / title
+    matches_path = directory / "matches.jsonl"
+    teams_path = directory / "teams.json"
+    existing_matches: dict[str, dict[str, Any]] = {}
+    if matches_path.exists():
+        with matches_path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    row = json.loads(line)
+                    existing_matches[str(row["match_id"])] = row
+    existing_teams: dict[str, dict[str, Any]] = {}
+    if teams_path.exists():
+        existing_teams = json.loads(teams_path.read_text(encoding="utf-8"))
+
+    source = client or Bo3EsportsClient()
+    recent_matches, match_pages = source.finished_matches(title, from_date, today)
+    fetched_teams, team_pages = source.teams(title)
+
+    new_or_updated = sum(1 for row in recent_matches if str(row["match_id"]) not in existing_matches)
+    for row in recent_matches:
+        existing_matches[str(row["match_id"])] = row
+
+    used_team_ids = {row["team1_id"] for row in existing_matches.values()} | {
+        row["team2_id"] for row in existing_matches.values()
+    }
+    used_teams = {}
+    for team_id in sorted(used_team_ids):
+        if team_id in fetched_teams:
+            used_teams[team_id] = fetched_teams[team_id]
+        elif team_id in existing_teams:
+            # A team from older history that fell outside this fetch's team
+            # catalog page range -- keep what we already had rather than
+            # dropping it (backfill_esports has the same "used team" concept
+            # but only ever sees one fetch, never a merge).
+            used_teams[team_id] = existing_teams[team_id]
+    for row in existing_matches.values():
+        row["team1_name"] = used_teams.get(row["team1_id"], {}).get("name", row["team1_id"])
+        row["team2_name"] = used_teams.get(row["team2_id"], {}).get("name", row["team2_id"])
+
+    ordered = sorted(existing_matches.values(), key=lambda row: (str(row["start_utc"]), str(row["match_id"])))
+    _atomic_write(matches_path, "".join(_canonical_json(row) + "\n" for row in ordered))
+    _atomic_write(teams_path, json.dumps(used_teams, indent=2, sort_keys=True) + "\n")
+
+    manifest_path = directory / "manifest.json"
+    old_manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    manifest = {
+        **old_manifest,
+        "schema_version": "esports-series-v1",
+        "title": title,
+        "title_name": TITLE_SPECS[title]["name"],
+        "source": "bo3.gg public website data endpoint",
+        "source_base_url": BO3_BASE_URL,
+        "source_attribution_url": "https://bo3.gg/",
+        "source_terms_url": "https://bo3.gg/wiki/use-of-services",
+        "requires_api_key": False,
+        "requires_signup": False,
+        "extracted_at_utc": _utc_now(),
+        "requested_window": {"from": from_date.isoformat(), "to": today.isoformat()},
+        "effective_window": old_manifest.get("effective_window", {"from": from_date.isoformat(), "to": today.isoformat()}),
+        "match_count": len(ordered),
+        "team_count": len(used_teams),
+        "request_pages": {"matches": match_pages, "teams": team_pages},
+        "matches_sha256": _sha256(matches_path),
+        "teams_sha256": _sha256(teams_path),
+        "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
+        "limitations": [
+            "BO3 does not publish a stable public API contract; schema availability may change.",
+            "Historical corrections after extraction require a new versioned backfill.",
+            "Team IDs do not encode point-in-time rosters or substitutions.",
+        ],
+    }
+    _atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return {
+        "title": title,
+        "lookback_from": from_date.isoformat(),
+        "to": today.isoformat(),
+        "fetched_matches": len(recent_matches),
+        "new_or_updated_matches": new_or_updated,
+        "total_matches": len(ordered),
+        "total_teams": len(used_teams),
+        "request_pages": {"matches": match_pages, "teams": team_pages},
+    }
 
 
 @dataclass

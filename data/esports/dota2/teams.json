@@ -5074,6 +5074,13 @@
     "source_team_id": 24686,
     "team_id": "bo3:2:24686"
   },
+  "bo3:2:24687": {
+    "acronym": "HBS",
+    "name": "Habos Babos",
+    "slug": "habos-babos",
+    "source_team_id": 24687,
+    "team_id": "bo3:2:24687"
+  },
   "bo3:2:24788": {
     "acronym": "EFA",
     "name": "Eternal Focus Amethyst",
@@ -7988,7 +7995,7 @@
   },
   "bo3:2:7194": {
     "acronym": "AG.AL",
-    "name": "AG.AL",
+    "name": "All Gamers",
     "slug": "all-gamers",
     "source_team_id": 7194,
     "team_id": "bo3:2:7194"

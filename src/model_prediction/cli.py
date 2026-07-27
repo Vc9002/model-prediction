@@ -80,6 +80,7 @@ from .esports import (
     TITLE_SPECS,
     backfill_esports,
     forecast_esports_slate,
+    refresh_recent_matches,
     validate_all_esports_baselines,
 )
 from .features.base import FeatureStore
@@ -722,6 +723,32 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
         "candidates": [asdict(candidate) for candidate in candidates],
         "note": "All entries are zero-unit research; closing odds are attached only after start.",
     }
+
+
+def _refresh_esports_ratings(data_root) -> dict:
+    """Keep esports Elo ratings from going stale.
+
+    forecast_esports_slate only ever reads frozen ratings out of each
+    title's artifact -- nothing previously re-ran the backfill+validate
+    cycle automatically, so ratings only updated when someone manually ran
+    `esports-backfill --all` then `validate-esports --write-artifacts`.
+    Without this, team strength silently drifts further out of date every
+    day the daily pipeline runs (observed 7-9 days stale in practice).
+    Uses refresh_recent_matches (a bounded, incremental merge), not
+    backfill_esports (a full-history overwrite -- see its own docstring for
+    why that would be unsafe to run on a schedule).
+    """
+    titles = tuple(TITLE_SPECS)
+    backfill_results = {title: refresh_recent_matches(data_root, title) for title in titles}
+    validation = validate_all_esports_baselines(data_root, titles, PROJECT_ROOT / "config/models")
+    # Keep the dashboard's evidence-consistency report in sync with the
+    # artifacts it describes -- otherwise it goes stale again the moment new
+    # matches merge in, since it's read as a pinned snapshot elsewhere
+    # (dashboard_server.production_evidence).
+    report_path = PROJECT_ROOT / "outputs/latest/esports-baseline-validation.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(validation, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    return {"backfill": backfill_results, "validation": validation}
 
 
 def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans, flat_ledger, audit) -> dict:
@@ -2498,6 +2525,10 @@ def main(argv: list[str] | None = None) -> None:
                 research_ledger=research_ledger(data_directory, "soccer"),
                 gated_ledger=research_ledger(data_directory, "soccer", gated=True),
             )
+            try:
+                forecast_result["_esports_ratings_refresh"] = _refresh_esports_ratings(data_directory)
+            except Exception:
+                logger.warning("Esports ratings refresh failed", exc_info=True)
             for title in ESPORTS_TITLES:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=data_directory,

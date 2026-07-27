@@ -11,6 +11,7 @@ from model_prediction.esports import (
     NeutralElo,
     _metrics,
     forecast_esports_slate,
+    refresh_recent_matches,
     validate_esports_baseline,
 )
 
@@ -101,6 +102,103 @@ def test_cs2_backfill_excludes_legacy_csgo_game_version() -> None:
     )
     matches, _ = source.finished_matches("cs2", date(2024, 1, 1), date(2024, 1, 3))
     assert [row["match_id"] for row in matches] == ["bo3:2"]
+
+
+def test_refresh_recent_matches_merges_instead_of_overwriting(tmp_path) -> None:
+    """refresh_recent_matches must merge a short recent fetch into existing
+    history, not replace it (unlike backfill_esports, which does a full-file
+    overwrite and would silently delete older history if called with a
+    short window on a schedule)."""
+    directory = tmp_path / "esports" / "lol"
+    directory.mkdir(parents=True)
+    old_match = {
+        "match_id": "bo3:1",
+        "source_match_id": 1,
+        "start_utc": "2024-01-01T00:00:00Z",
+        "end_utc": "2024-01-01T01:00:00Z",
+        "team1_id": "bo3:3:10",
+        "team1_name": "Old Team A",
+        "team1_score": 2,
+        "team2_id": "bo3:3:20",
+        "team2_name": "Old Team B",
+        "team2_score": 0,
+        "winner_id": "bo3:3:10",
+        "best_of": 3,
+        "tier": "a",
+        "title": "lol",
+        "tournament_id": 1,
+        "game_version": None,
+        "source_url": "https://bo3.gg/matches/old",
+    }
+    (directory / "matches.jsonl").write_text(json.dumps(old_match) + "\n", encoding="utf-8")
+    old_teams = {
+        "bo3:3:10": {"team_id": "bo3:3:10", "source_team_id": 10, "name": "Old Team A", "slug": "a", "acronym": "A"},
+        "bo3:3:20": {"team_id": "bo3:3:20", "source_team_id": 20, "name": "Old Team B", "slug": "b", "acronym": "B"},
+    }
+    (directory / "teams.json").write_text(json.dumps(old_teams), encoding="utf-8")
+
+    new_match_row = {
+        "id": 2,
+        "team1_id": 10,
+        "team2_id": 30,
+        "winner_team_id": 30,
+        "team1_score": 0,
+        "team2_score": 2,
+        "status": "finished",
+        "start_date": "2026-07-20T12:00:00.000+00:00",
+        "end_date": "2026-07-20T14:00:00.000+00:00",
+        "bo_type": 3,
+        "discipline_id": 3,
+        "game_version": None,
+    }
+    new_team_row = {"id": 30, "discipline_id": 3, "name": "New Team C", "slug": "c", "acronym": "C"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/matches"):
+            return httpx.Response(
+                200,
+                json={"total": {"count": 1, "limit": 100, "offset": 0}, "results": [new_match_row]},
+            )
+        if request.url.path.endswith("/teams"):
+            return httpx.Response(
+                200,
+                json={"total": {"count": 1, "limit": 100, "offset": 0}, "results": [new_team_row]},
+            )
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    client = Bo3EsportsClient(
+        "https://example.test/api/v1",
+        httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    result = refresh_recent_matches(tmp_path, "lol", lookback_days=14, client=client)
+
+    assert result["new_or_updated_matches"] == 1
+    assert result["total_matches"] == 2
+
+    merged = [
+        json.loads(line)
+        for line in (directory / "matches.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    match_ids = {row["match_id"] for row in merged}
+    assert match_ids == {"bo3:1", "bo3:2"}
+    # The old match's team names must survive untouched (team 20 isn't in
+    # this fetch's team catalog at all).
+    old_row = next(row for row in merged if row["match_id"] == "bo3:1")
+    assert old_row["team1_name"] == "Old Team A"
+    assert old_row["team2_name"] == "Old Team B"
+
+    teams = json.loads((directory / "teams.json").read_text(encoding="utf-8"))
+    assert "bo3:3:20" in teams, "team not present in this fetch's page range must be preserved, not dropped"
+    assert teams["bo3:3:20"]["name"] == "Old Team B"
+    assert teams["bo3:3:30"]["name"] == "New Team C"
+
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["match_count"] == 2
+    import hashlib
+
+    assert manifest["matches_sha256"] == hashlib.sha256((directory / "matches.jsonl").read_bytes()).hexdigest()
 
 
 def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_path) -> None:

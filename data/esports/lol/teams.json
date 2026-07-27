@@ -358,7 +358,7 @@
   },
   "bo3:3:16923": {
     "acronym": "MILO",
-    "name": "MIBR.LOS",
+    "name": "LOS",
     "slug": "los",
     "source_team_id": 16923,
     "team_id": "bo3:3:16923"
@@ -883,7 +883,7 @@
   },
   "bo3:3:17162": {
     "acronym": "AG.AL",
-    "name": "AG.AL",
+    "name": "Anyone's Legend",
     "slug": "anyones-legend",
     "source_team_id": 17162,
     "team_id": "bo3:3:17162"
@@ -3520,6 +3520,13 @@
     "source_team_id": 20094,
     "team_id": "bo3:3:20094"
   },
+  "bo3:3:20111": {
+    "acronym": null,
+    "name": "Absolved",
+    "slug": "absolved",
+    "source_team_id": 20111,
+    "team_id": "bo3:3:20111"
+  },
   "bo3:3:20141": {
     "acronym": "RATZ",
     "name": "RATZ",
@@ -3610,6 +3617,13 @@
     "slug": "odd-esports",
     "source_team_id": 20504,
     "team_id": "bo3:3:20504"
+  },
+  "bo3:3:20508": {
+    "acronym": "CONT",
+    "name": "Contingent Esports",
+    "slug": "contingent-esports",
+    "source_team_id": 20508,
+    "team_id": "bo3:3:20508"
   },
   "bo3:3:20517": {
     "acronym": "NA",
@@ -4710,6 +4724,41 @@
     "source_team_id": 24690,
     "team_id": "bo3:3:24690"
   },
+  "bo3:3:24739": {
+    "acronym": "DS",
+    "name": "Disruptors",
+    "slug": "disruptors",
+    "source_team_id": 24739,
+    "team_id": "bo3:3:24739"
+  },
+  "bo3:3:24862": {
+    "acronym": null,
+    "name": "Brod n Friends",
+    "slug": "brod-n-friends",
+    "source_team_id": 24862,
+    "team_id": "bo3:3:24862"
+  },
+  "bo3:3:24863": {
+    "acronym": null,
+    "name": "B2U",
+    "slug": "b2u",
+    "source_team_id": 24863,
+    "team_id": "bo3:3:24863"
+  },
+  "bo3:3:24865": {
+    "acronym": null,
+    "name": "S\u00f8rby eSport",
+    "slug": "sorby-esport-",
+    "source_team_id": 24865,
+    "team_id": "bo3:3:24865"
+  },
+  "bo3:3:24866": {
+    "acronym": null,
+    "name": "2 Massive",
+    "slug": "2-massive",
+    "source_team_id": 24866,
+    "team_id": "bo3:3:24866"
+  },
   "bo3:3:24905": {
     "acronym": "AO",
     "name": "Ancient Ones",
@@ -4723,5 +4772,68 @@
     "slug": "crystal-rose",
     "source_team_id": 24906,
     "team_id": "bo3:3:24906"
+  },
+  "bo3:3:24925": {
+    "acronym": null,
+    "name": "Volda E-Sport",
+    "slug": "volda-e-sport",
+    "source_team_id": 24925,
+    "team_id": "bo3:3:24925"
+  },
+  "bo3:3:24927": {
+    "acronym": "PIV",
+    "name": "Pyramid IV Esports",
+    "slug": "pyramid-iv-esports",
+    "source_team_id": 24927,
+    "team_id": "bo3:3:24927"
+  },
+  "bo3:3:24931": {
+    "acronym": "ROLE",
+    "name": "Role Swappers",
+    "slug": "role-swappers",
+    "source_team_id": 24931,
+    "team_id": "bo3:3:24931"
+  },
+  "bo3:3:24932": {
+    "acronym": "HYPE",
+    "name": "Hyperion",
+    "slug": "hyperion-pt",
+    "source_team_id": 24932,
+    "team_id": "bo3:3:24932"
+  },
+  "bo3:3:24933": {
+    "acronym": "TUNG",
+    "name": "Tung Tung Bogi",
+    "slug": "tung-tung-bogi",
+    "source_team_id": 24933,
+    "team_id": "bo3:3:24933"
+  },
+  "bo3:3:24935": {
+    "acronym": "NORT",
+    "name": "NORTHERNGRADE ESPORTS",
+    "slug": "northerngrade-esports",
+    "source_team_id": 24935,
+    "team_id": "bo3:3:24935"
+  },
+  "bo3:3:24936": {
+    "acronym": "EXG",
+    "name": "EXSAD Gaming",
+    "slug": "exsad-gaming-lol",
+    "source_team_id": 24936,
+    "team_id": "bo3:3:24936"
+  },
+  "bo3:3:24937": {
+    "acronym": "DOMI",
+    "name": "Dominion Goblins",
+    "slug": "dominion-goblins",
+    "source_team_id": 24937,
+    "team_id": "bo3:3:24937"
+  },
+  "bo3:3:24938": {
+    "acronym": "CAPY",
+    "name": "Capybara Esports",
+    "slug": "capybara-esports",
+    "source_team_id": 24938,
+    "team_id": "bo3:3:24938"
   }
 }

@@ -5628,7 +5628,7 @@
     "team_id": "bo3:1:21044"
   },
   "bo3:1:21045": {
-    "acronym": "LFO",
+    "acronym": "LFO UK",
     "name": "LFO",
     "slug": "lfo-ua",
     "source_team_id": 21045,
@@ -7750,8 +7750,8 @@
   },
   "bo3:1:22734": {
     "acronym": "WBT",
-    "name": "WhiteBIT Team",
-    "slug": "wrotberry",
+    "name": "WBT",
+    "slug": "wbt",
     "source_team_id": 22734,
     "team_id": "bo3:1:22734"
   },
@@ -8793,7 +8793,7 @@
   },
   "bo3:1:23433": {
     "acronym": "PG",
-    "name": "Privateer Gaming",
+    "name": "Privateer",
     "slug": "privateer-gaming",
     "source_team_id": 23433,
     "team_id": "bo3:1:23433"
@@ -9190,6 +9190,13 @@
     "source_team_id": 24511,
     "team_id": "bo3:1:24511"
   },
+  "bo3:1:24535": {
+    "acronym": "FRT",
+    "name": "Fraternity",
+    "slug": "fraternity",
+    "source_team_id": 24535,
+    "team_id": "bo3:1:24535"
+  },
   "bo3:1:24538": {
     "acronym": null,
     "name": "EAC Rising",
@@ -9309,6 +9316,13 @@
     "source_team_id": 24634,
     "team_id": "bo3:1:24634"
   },
+  "bo3:1:24638": {
+    "acronym": null,
+    "name": "NEXORA",
+    "slug": "nexora",
+    "source_team_id": 24638,
+    "team_id": "bo3:1:24638"
+  },
   "bo3:1:24641": {
     "acronym": null,
     "name": "Mai Tai",
@@ -9386,12 +9400,26 @@
     "source_team_id": 24839,
     "team_id": "bo3:1:24839"
   },
+  "bo3:1:24855": {
+    "acronym": "BTF",
+    "name": "Butterfly",
+    "slug": "butterfly",
+    "source_team_id": 24855,
+    "team_id": "bo3:1:24855"
+  },
   "bo3:1:24856": {
     "acronym": null,
     "name": "Gr\u00eamio",
     "slug": "gremio",
     "source_team_id": 24856,
     "team_id": "bo3:1:24856"
+  },
+  "bo3:1:24857": {
+    "acronym": null,
+    "name": "ex-RUSTEC",
+    "slug": "ex-rustec",
+    "source_team_id": 24857,
+    "team_id": "bo3:1:24857"
   },
   "bo3:1:2486": {
     "acronym": null,
@@ -9421,12 +9449,61 @@
     "source_team_id": 24918,
     "team_id": "bo3:1:24918"
   },
+  "bo3:1:24924": {
+    "acronym": null,
+    "name": "Black Phoenix",
+    "slug": "black-phoenix",
+    "source_team_id": 24924,
+    "team_id": "bo3:1:24924"
+  },
+  "bo3:1:24941": {
+    "acronym": null,
+    "name": "sleepers",
+    "slug": "sleepers-cs2",
+    "source_team_id": 24941,
+    "team_id": "bo3:1:24941"
+  },
+  "bo3:1:24942": {
+    "acronym": null,
+    "name": "gribo4ki",
+    "slug": "gribo4ki",
+    "source_team_id": 24942,
+    "team_id": "bo3:1:24942"
+  },
+  "bo3:1:24946": {
+    "acronym": null,
+    "name": "ex-Young Ninjas",
+    "slug": "ex-young-ninjas",
+    "source_team_id": 24946,
+    "team_id": "bo3:1:24946"
+  },
+  "bo3:1:24948": {
+    "acronym": "MTX",
+    "name": "MTX",
+    "slug": "mtx-spain",
+    "source_team_id": 24948,
+    "team_id": "bo3:1:24948"
+  },
+  "bo3:1:24956": {
+    "acronym": null,
+    "name": "DENDELE CS",
+    "slug": "dendele-cs",
+    "source_team_id": 24956,
+    "team_id": "bo3:1:24956"
+  },
   "bo3:1:2496": {
     "acronym": "\u00c1rmann",
     "name": "Armann",
     "slug": "armann",
     "source_team_id": 2496,
     "team_id": "bo3:1:2496"
+  },
+  "bo3:1:24968": {
+    "acronym": "GBC",
+    "name": "Gothboiclique",
+    "slug": "gothboiclique-ru",
+    "source_team_id": 24968,
+    "team_id": "bo3:1:24968"
   },
   "bo3:1:2498": {
     "acronym": "SAGA",
@@ -10358,6 +10435,13 @@
     "slug": "brute",
     "source_team_id": 370,
     "team_id": "bo3:1:370"
+  },
+  "bo3:1:3706": {
+    "acronym": null,
+    "name": "163ON",
+    "slug": "163on",
+    "source_team_id": 3706,
+    "team_id": "bo3:1:3706"
   },
   "bo3:1:3708": {
     "acronym": "XI",
@@ -12994,7 +13078,7 @@
   "bo3:1:9032": {
     "acronym": null,
     "name": "United Kingdom",
-    "slug": "ubited-kingdom",
+    "slug": "united-kingdom-cs",
     "source_team_id": 9032,
     "team_id": "bo3:1:9032"
   },
@@ -13816,6 +13900,13 @@
     "slug": "fn-productions",
     "source_team_id": 9898,
     "team_id": "bo3:1:9898"
+  },
+  "bo3:1:9899": {
+    "acronym": null,
+    "name": "???",
+    "slug": "question-marks",
+    "source_team_id": 9899,
+    "team_id": "bo3:1:9899"
   },
   "bo3:1:990": {
     "acronym": "DUSTY",
