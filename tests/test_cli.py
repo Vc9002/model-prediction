@@ -139,7 +139,7 @@ def _esports_forecast() -> dict:
     }
 
 
-def test_esports_research_excludes_invalid_inputs_and_gated_requires_positive_edge(
+def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_edge(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
@@ -164,13 +164,16 @@ def test_esports_research_excludes_invalid_inputs_and_gated_requires_positive_ed
         _esports_forecast(), config, research, gated_ledger=gated
     )
 
-    assert logged == 2
-    assert len(research.appended) == 2
+    # Every safely priced candidate reaches the research ledger, including
+    # the unvalidated/new-team one (as a downgraded NO_CALL row) -- only the
+    # gated ledger is a curated subset.
+    assert logged == 3
+    assert len(research.appended) == 3
     assert len(gated.appended) == 1
     assert gated.appended[0][0].event_id == "valid"
     by_event = {request.event_id: eligibility for request, eligibility in research.appended}
     assert by_event["negative-edge"].reason_code == "NO_CALL_LOW_EDGE"
-    assert "untrained-team" not in by_event
+    assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
 
 
 def test_esports_flat_mode_never_writes_research_or_gated(monkeypatch) -> None:

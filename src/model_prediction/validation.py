@@ -24,6 +24,7 @@ from .config import PROJECT_ROOT
 from .data_sources.espn_probables import point_in_time_pitcher_era_gap
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
+from .features.bullpen import bullpen_profile
 from .features.elo_ratings import build_elo
 from .features.park_factors import park_factor
 from .features.schedule_load import matchup_schedule_load
@@ -69,6 +70,10 @@ class ValidationRow:
     starter_era_gap: float = 0.0
     probable_starter_era_gap: float = 0.0
     probable_starter_available: bool = False
+    bullpen_weakness_gap: float = 0.0
+    bullpen_available: bool = False
+    bullpen_fatigue_gap: float = 0.0
+    bullpen_fatigue_available: bool = False
     consistency_gap: float = 0.0
     hot_cold_gap: float = 0.0
     rest_disparity: float = 0.0
@@ -119,6 +124,22 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "park_factor",
         "weather_factor",
         "pitcher_era_gap",
+    ),
+    "elo_trend_park_weather_pitcher_bullpen": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "pitcher_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "elo_trend_park_weather_pitcher_bullpen_fatigue": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "pitcher_era_gap",
+        "bullpen_fatigue_gap",
     ),
     "elo_trend_park_probable_starter": (
         "elo_probability",
@@ -194,6 +215,17 @@ def build_walk_forward_rows(
                 # Real starter ERA gap from MLB Stats API snapshots (point-in-time)
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
 
+                # Real bullpen weakness gap from MLB Stats API snapshots (point-in-time)
+                bullpen_gap, bullpen_ok = (
+                    _bullpen_weakness_gap(game.event_id) if sport.lower() == "mlb" else (0.0, False)
+                )
+
+                # Real bullpen recent-workload (fatigue) gap -- who's actually
+                # available tonight, as opposed to season-long bullpen quality.
+                bullpen_fatigue_gap, bullpen_fatigue_ok = (
+                    _bullpen_fatigue_gap(game.event_id) if sport.lower() == "mlb" else (0.0, False)
+                )
+
                 # Probable starter ERA is usable in historical validation only
                 # when an append-only observation proves it existed before
                 # first pitch. The legacy retroactive ESPN date cache is
@@ -247,6 +279,10 @@ def build_walk_forward_rows(
                         starter_era_gap=starter_gap,
                         probable_starter_era_gap=probable_gap,
                         probable_starter_available=probable_available,
+                        bullpen_weakness_gap=bullpen_gap,
+                        bullpen_available=bullpen_ok,
+                        bullpen_fatigue_gap=bullpen_fatigue_gap,
+                        bullpen_fatigue_available=bullpen_fatigue_ok,
                         park_available=park["status"] == "available",
                         weather_available=weather.get("available", False),
                         elo_neutral_probability=elo.expected_neutral_win(
@@ -307,6 +343,8 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
         variants_to_run.extend([
             "elo_trend_adaptive_hfa", "elo_trend_park", "elo_trend_park_weather",
             "elo_trend_park_pitcher", "elo_trend_park_weather_pitcher",
+            "elo_trend_park_weather_pitcher_bullpen",
+            "elo_trend_park_weather_pitcher_bullpen_fatigue",
         ])
     if sport.lower() == "soccer":
         # Tested 2026-07-25 via paired holdout ablation against the production
@@ -1733,3 +1771,185 @@ def _load_starter_era_map() -> dict[str, float]:
 def _starter_era_gap(event_id: str) -> float:
     """Get the real starter ERA gap for a given event, or 0.0 if unavailable."""
     return _load_starter_era_map().get(event_id, 0.0)
+
+
+# ── Bullpen weakness gap from MLB Stats API snapshots ────────────────────
+
+_BULLPEN_MAP: dict[str, tuple[float, bool]] | None = None
+
+
+def _load_bullpen_map() -> dict[str, tuple[float, bool]]:
+    """Build point-in-time bullpen weakness gap map from mlb_statsapi snapshots.
+
+    Returns dict of event_id → (home_weakness_index - away_weakness_index, available).
+    Computed from each team's rolling relief performance (via
+    features.bullpen.bullpen_profile) over its last 5 games with a bullpen
+    appearance. History is built strictly chronologically — the current
+    game's relievers are NOT included in its own team's pregame bullpen
+    history, mirroring `_load_starter_era_map`."""
+    global _BULLPEN_MAP
+    if _BULLPEN_MAP is not None:
+        return _BULLPEN_MAP
+
+    import json as _json
+
+    snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
+    crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
+    if not snap_path.exists() or not crosswalk_path.exists():
+        _BULLPEN_MAP = {}
+        return _BULLPEN_MAP
+
+    def _ip_float(v):
+        w, _, f = v.partition(".")
+        return int(w) + {"0": 0.0, "1": 1 / 3, "2": 2 / 3}.get(f, 0.0)
+
+    # Load crosswalk: (time, home, away) → event_id
+    crosswalk = {}
+    with crosswalk_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            g = _json.loads(line)
+            crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
+
+    # Load snapshots, build point-in-time bullpen history
+    with snap_path.open(encoding="utf-8") as f:
+        snaps = [_json.loads(line) for line in f if line.strip()]
+    snaps.sort(key=lambda r: r["game_start_utc"])
+
+    history: dict[str, list[dict]] = {}
+    result: dict[str, tuple[float, bool]] = {}
+
+    for snap in snaps:
+        key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
+        eid = crosswalk.get(key)
+        if not eid:
+            continue
+
+        home_weakness = away_weakness = None
+        game_relief: dict[str, dict] = {}
+        for side_key, side_data in [("home", snap["home"]), ("away", snap["away"])]:
+            team = side_data["team_name"]
+            order = side_data.get("pitcher_order") or []
+            relievers = order[1:]  # index 0 is the starter
+            innings = earned = 0.0
+            for pid in relievers:
+                player = next((p for p in side_data["players"] if p["player_id"] == pid), None)
+                if not player or "inningsPitched" not in player.get("pitching", {}):
+                    continue
+                stats = player["pitching"]
+                innings += _ip_float(stats["inningsPitched"])
+                earned += float(stats.get("earnedRuns", 0))
+            game_relief[team] = {"innings": innings, "earned_runs": earned}
+
+            prior = history.get(team, [])
+            if len(prior) >= 2:
+                profile = bullpen_profile(prior[-5:])
+                if profile["status"] == "available":
+                    weakness = profile["bullpen_weakness_index"]
+                    if side_key == "home":
+                        home_weakness = weakness
+                    else:
+                        away_weakness = weakness
+
+        # Update history AFTER computing this game's feature (point-in-time)
+        for team, line in game_relief.items():
+            if line["innings"] > 0:
+                history.setdefault(team, []).append(line)
+
+        if home_weakness is not None and away_weakness is not None:
+            result[eid] = (round(home_weakness - away_weakness, 6), True)
+
+    _BULLPEN_MAP = result
+    return _BULLPEN_MAP
+
+
+def _bullpen_weakness_gap(event_id: str) -> tuple[float, bool]:
+    """Get the real bullpen weakness gap for a given event, or (0.0, False) if unavailable."""
+    return _load_bullpen_map().get(event_id, (0.0, False))
+
+
+# ── Bullpen recent-workload (fatigue) gap from MLB Stats API snapshots ───
+
+_FATIGUE_WINDOW_DAYS = 3
+_BULLPEN_FATIGUE_MAP: dict[str, tuple[float, bool]] | None = None
+
+
+def _load_bullpen_fatigue_map() -> dict[str, tuple[float, bool]]:
+    """Build point-in-time bullpen fatigue (recent relief workload) gap map.
+
+    Unlike `_load_bullpen_map` (relief quality/ERA), this tracks how many
+    relief innings each team has thrown in the trailing
+    `_FATIGUE_WINDOW_DAYS` calendar days -- a proxy for which relievers are
+    actually available tonight, not season-long bullpen quality. History is
+    built strictly chronologically, mirroring `_load_bullpen_map`."""
+    global _BULLPEN_FATIGUE_MAP
+    if _BULLPEN_FATIGUE_MAP is not None:
+        return _BULLPEN_FATIGUE_MAP
+
+    import json as _json
+    from datetime import date as _date
+
+    snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
+    crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
+    if not snap_path.exists() or not crosswalk_path.exists():
+        _BULLPEN_FATIGUE_MAP = {}
+        return _BULLPEN_FATIGUE_MAP
+
+    def _ip_float(v):
+        w, _, f = v.partition(".")
+        return int(w) + {"0": 0.0, "1": 1 / 3, "2": 2 / 3}.get(f, 0.0)
+
+    crosswalk = {}
+    with crosswalk_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            g = _json.loads(line)
+            crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
+
+    with snap_path.open(encoding="utf-8") as f:
+        snaps = [_json.loads(line) for line in f if line.strip()]
+    snaps.sort(key=lambda r: r["game_start_utc"])
+
+    history: dict[str, list[tuple[Any, float]]] = {}
+    result: dict[str, tuple[float, bool]] = {}
+
+    for snap in snaps:
+        key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
+        eid = crosswalk.get(key)
+        if not eid:
+            continue
+        game_date = _date.fromisoformat(snap["game_start_utc"][:10])
+
+        fatigue: dict[str, float] = {}
+        game_relief: dict[str, float] = {}
+        for side_key, side_data in [("home", snap["home"]), ("away", snap["away"])]:
+            team = side_data["team_name"]
+            order = side_data.get("pitcher_order") or []
+            innings = 0.0
+            for pid in order[1:]:  # index 0 is the starter
+                player = next((p for p in side_data["players"] if p["player_id"] == pid), None)
+                if not player or "inningsPitched" not in player.get("pitching", {}):
+                    continue
+                innings += _ip_float(player["pitching"]["inningsPitched"])
+            game_relief[team] = innings
+
+            prior = history.get(team, [])
+            fatigue[side_key] = sum(
+                ip for game_day, ip in prior if 0 <= (game_date - game_day).days <= _FATIGUE_WINDOW_DAYS
+            )
+
+        # Update history AFTER computing this game's feature (point-in-time)
+        for team, innings in game_relief.items():
+            history.setdefault(team, []).append((game_date, innings))
+
+        result[eid] = (round(fatigue["home"] - fatigue["away"], 6), True)
+
+    _BULLPEN_FATIGUE_MAP = result
+    return _BULLPEN_FATIGUE_MAP
+
+
+def _bullpen_fatigue_gap(event_id: str) -> tuple[float, bool]:
+    """Get the real bullpen fatigue gap for a given event, or (0.0, False) if unavailable."""
+    return _load_bullpen_fatigue_map().get(event_id, (0.0, False))

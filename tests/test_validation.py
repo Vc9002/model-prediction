@@ -166,6 +166,156 @@ def test_historical_pitcher_audit_rejects_unversioned_retroactive_stats(tmp_path
     assert audit["decision"] == "REJECT_HISTORICAL_PITCHER_FEATURES_LEAKAGE_RISK"
 
 
+def test_bullpen_weakness_gap_requires_two_prior_games_and_uses_pit_history(
+    tmp_path, monkeypatch
+) -> None:
+    import json
+
+    import model_prediction.validation as validation_module
+    from model_prediction.validation import _bullpen_weakness_gap
+
+    def snapshot(event_start_utc, home_relief, away_relief):
+        def side(team_name, relief):
+            players = [
+                {"player_id": 100 + i, "pitching": {"inningsPitched": ip, "earnedRuns": er}}
+                for i, (ip, er) in enumerate(relief)
+            ]
+            return {
+                "team_name": team_name,
+                "pitcher_order": [1] + [100 + i for i in range(len(relief))],
+                "players": players,
+            }
+
+        return {
+            "game_start_utc": event_start_utc,
+            "home": side("Home Team", home_relief),
+            "away": side("Away Team", away_relief),
+        }
+
+    # Games 1-2: home bullpen throws thirds-notation "2.1" + "0.2" innings
+    # (2 + 1/3 and 0 + 2/3 == 3.0 exactly) for 3 earned runs (era 9); away
+    # bullpen throws 3.0 shutout innings (era 0). Game 3 is the query target,
+    # with a deliberately extreme relief line of its own to prove it can't
+    # leak into its own feature.
+    games = [
+        ("2026-01-01T00:00:00Z", [("2.1", 2), ("0.2", 1)], [("3.0", 0)]),
+        ("2026-01-02T00:00:00Z", [("2.1", 2), ("0.2", 1)], [("3.0", 0)]),
+        ("2026-01-03T00:00:00Z", [("1.0", 100)], [("1.0", 100)]),
+    ]
+
+    snap_path = tmp_path / "data/mlb_statsapi/game_snapshots.jsonl"
+    snap_path.parent.mkdir(parents=True)
+    crosswalk_path = tmp_path / "data/processed/mlb/games.jsonl"
+    crosswalk_path.parent.mkdir(parents=True)
+
+    with snap_path.open("w", encoding="utf-8") as handle:
+        for start, home_relief, away_relief in games:
+            handle.write(json.dumps(snapshot(start, home_relief, away_relief)) + "\n")
+
+    event_ids = [f"evt-{i}" for i in range(len(games))]
+    with crosswalk_path.open("w", encoding="utf-8") as handle:
+        for (start, _, _), eid in zip(games, event_ids, strict=True):
+            handle.write(
+                json.dumps(
+                    {
+                        "event_start_utc": start,
+                        "home_team": "Home Team",
+                        "away_team": "Away Team",
+                        "event_id": eid,
+                    }
+                )
+                + "\n"
+            )
+
+    monkeypatch.setattr(validation_module, "PROJECT_ROOT", tmp_path)
+    validation_module._BULLPEN_MAP = None
+    try:
+        gap0, available0 = _bullpen_weakness_gap(event_ids[0])
+        gap1, available1 = _bullpen_weakness_gap(event_ids[1])
+        assert (gap0, available0) == (0.0, False)
+        assert (gap1, available1) == (0.0, False)
+
+        gap2, available2 = _bullpen_weakness_gap(event_ids[2])
+        assert available2 is True
+        # Hand-computed from games 1-2 only: home era 9.0 (6 innings / 6 earned),
+        # away era 0.0, league_relief_era 4.10 -- game 3's own 100-earned-run
+        # line must not shift this.
+        assert gap2 == round(9 / 4.10, 6)
+    finally:
+        validation_module._BULLPEN_MAP = None
+
+
+def test_bullpen_fatigue_gap_uses_trailing_calendar_window_not_self(
+    tmp_path, monkeypatch
+) -> None:
+    import json
+
+    import model_prediction.validation as validation_module
+    from model_prediction.validation import _bullpen_fatigue_gap
+
+    def snapshot(event_start_utc, home_relief_ip, away_relief_ip):
+        def side(team_name, ip):
+            return {
+                "team_name": team_name,
+                "pitcher_order": [1, 101],
+                "players": [{"player_id": 101, "pitching": {"inningsPitched": ip, "earnedRuns": 0}}],
+            }
+
+        return {
+            "game_start_utc": event_start_utc,
+            "home": side("Home Team", home_relief_ip),
+            "away": side("Away Team", away_relief_ip),
+        }
+
+    # Day 0 and day 5 are both within the 3-day window of day 2, but day 0 is
+    # more than 3 days before day 5, so only day 2's relief work should count
+    # toward the query game on day 5. The query game's own (extreme) relief
+    # line must not leak into its own fatigue figure.
+    games = [
+        ("2026-02-01T00:00:00Z", "3.0", "2.0"),
+        ("2026-02-03T00:00:00Z", "1.1", "0.2"),
+        ("2026-02-06T00:00:00Z", "9.0", "9.0"),
+    ]
+
+    snap_path = tmp_path / "data/mlb_statsapi/game_snapshots.jsonl"
+    snap_path.parent.mkdir(parents=True)
+    crosswalk_path = tmp_path / "data/processed/mlb/games.jsonl"
+    crosswalk_path.parent.mkdir(parents=True)
+
+    with snap_path.open("w", encoding="utf-8") as handle:
+        for start, home_ip, away_ip in games:
+            handle.write(json.dumps(snapshot(start, home_ip, away_ip)) + "\n")
+
+    event_ids = [f"evt-{i}" for i in range(len(games))]
+    with crosswalk_path.open("w", encoding="utf-8") as handle:
+        for (start, _, _), eid in zip(games, event_ids, strict=True):
+            handle.write(
+                json.dumps(
+                    {
+                        "event_start_utc": start,
+                        "home_team": "Home Team",
+                        "away_team": "Away Team",
+                        "event_id": eid,
+                    }
+                )
+                + "\n"
+            )
+
+    monkeypatch.setattr(validation_module, "PROJECT_ROOT", tmp_path)
+    validation_module._BULLPEN_FATIGUE_MAP = None
+    try:
+        gap0, available0 = _bullpen_fatigue_gap(event_ids[0])
+        assert (gap0, available0) == (0.0, True)
+
+        gap2, available2 = _bullpen_fatigue_gap(event_ids[2])
+        assert available2 is True
+        # Only game 1 (day 2) is within 3 days of day 5; game 0 (day 0) is not,
+        # and game 2's own 9.0/9.0 relief line must not leak into itself.
+        assert gap2 == round((1 + 1 / 3) - (0 + 2 / 3), 6)
+    finally:
+        validation_module._BULLPEN_FATIGUE_MAP = None
+
+
 def test_score_sports_multimarket_validation_requires_exact_lines(tmp_path) -> None:
     for sport in ("nba", "wnba", "nfl"):
         readiness = multi_market_readiness(seed_games(tmp_path), sport)

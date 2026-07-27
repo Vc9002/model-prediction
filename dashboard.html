@@ -219,7 +219,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="rail-label">Ledger</div>
       <button data-tab="picks">Ledger</button>
       <button data-tab="flat">Flat</button>
-      <button data-tab="research">Research</button>
+      <button data-tab="research">Flat Research</button>
       <button data-tab="gated-research">Gated Research</button>
     </div>
     <div class="rail-group">
@@ -355,8 +355,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-research" style="display:none">
     <div class="secgrid">
       <div class="card" style="grid-column:1/-1">
-        <h2>Research Picks (per-sport ledgers)</h2>
-        <div class="small dim" style="margin-bottom:8px">Aggregate view of separate soccer, esports, KBO, and NPB workbooks. Exact-input decisions can remain here as zero-unit <code>NO_CALL</code> rows when they miss the sport's edge or confidence gate; those rows never enter Gated Research.</div>
+        <h2>Flat Research Picks (per-sport ledgers)</h2>
+        <div class="small dim" style="margin-bottom:8px">Aggregate view of separate soccer, esports, KBO, and NPB workbooks — every model-favored candidate for every matched game and market, no edge gate. Only the subset that clears the sport's edge/confidence gate is additionally mirrored into Gated Research.</div>
         <div class="filters" id="filters_R" style="margin-bottom:12px"></div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
           <span>Active: <b id="researchActive">0</b></span>
@@ -1141,10 +1141,9 @@ const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))retu
 // sort-header state differ; everything else — data columns, styling, colors
 // — is identical by construction.
 function ledgerHeaderRow(showCheckbox,mode="default"){
-  const research=mode==="research";
   const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
     ["model_probability","Model"],["market_implied_probability","Pregame close"],["filled_entry","Bought at"],["edge","Decision edge"],
-    ["units","Size"],["result",research?"Decision":"State"],["pnl_units","P&L"]];
+    ["units","Size"],["result","State"],["pnl_units","P&L"]];
   const checkboxTh=showCheckbox?'<th><input type="checkbox" onchange="toggleAllRows(this)" title="select all shown"></th>':"";
   const headCells=cols.map(([k,l])=>showCheckbox
     ?`<th onclick="setSort('${k}')">${l}${sortKey===k?(sortAsc?" ▲":" ▼"):""}</th>`
@@ -1153,10 +1152,7 @@ function ledgerHeaderRow(showCheckbox,mode="default"){
 }
 function ledgerRowHtml(p,showCheckbox,mode="default"){
   const research=mode==="research",gated=mode==="gated";
-  const settledResult=p.result?` · ${p.result}`:"";
-  const res=research
-    ?`<span class="pill ${p.decision==="CALL"?"win":"push"}" title="${escAttr(p.reason_code||"")}">${esc(p.decision||"NO_CALL")}${settledResult}</span>`
-    :(p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':""));
+  const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
   const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p);
   const size=research?(Number(p.units)||0):(Number(p.display_units??p.units)||Number(p.suggested_paper_units)||0);
   const rowPnl=research?(Number(p.pnl_units)||0):pickPnl(p);
@@ -1721,12 +1717,12 @@ async function loadResearchToday(){
     if(!today.length)return;
     const box=$("#todayPicks");
     const sep=document.createElement("h2");
-    sep.textContent=`Research — ${today.length} picks (esports, soccer, international baseball)`;
+    sep.textContent=`Flat Research — ${today.length} picks (esports, soccer, international baseball)`;
     sep.style.cssText="margin-top:20px;padding-top:12px;border-top:2px dashed var(--violet);color:var(--violet)";
     box.appendChild(sep);
     const note=document.createElement("div");
     note.className="small dim";note.style.marginBottom="8px";
-    note.textContent="Research-eligible picks aggregated from separate per-sport workbooks. Paper only — zero real-money exposure.";
+    note.textContent="Every research-model pick aggregated from separate per-sport workbooks — no edge gate. Paper only — zero real-money exposure.";
     box.appendChild(note);
     const bySport={};
     today.forEach(p=>{(bySport[p.league||"?"]=bySport[p.league||"?"]||[]).push(p);});

@@ -1115,17 +1115,17 @@ def _log_esports_forecast(
             continue
         ask = float(best_side["executable_ask"])
 
-        # Research preserves every safely priced candidate. Gated research is
-        # the curated subset: positive executable edge, a real model opinion,
-        # and both teams resolved to ratings learned by this exact artifact.
-        # Exposure and model/market disagreement deliberately remain relaxed
-        # for shadow research; provenance and input validity do not.
+        # Research preserves every safely priced candidate, including a
+        # synthetic-1500-prior candidate for an unvalidated/new team --
+        # evaluate_gated_research_eligibility downgrades those to a
+        # RESEARCH_OBSERVATION/NO_CALL row below rather than dropping them.
+        # Gated research is the curated subset: positive executable edge, a
+        # real model opinion, and both teams resolved to ratings learned by
+        # this exact artifact. Exposure and model/market disagreement
+        # deliberately remain relaxed for shadow research; provenance and
+        # input validity do not.
         research_confidence_gate = float(model_config.get("research_confidence_gate", 0.05))
         model_inputs_valid = bool(contract.get("gated_research_eligible", False))
-        if not model_inputs_valid:
-            # A synthetic 1500 prior is useful in a preview payload, but it is
-            # not a valid research-model pick and belongs in neither ledger.
-            continue
 
         selected_team = str(best_side["team"])
         # Polymarket side ordering is arbitrary for venue-neutral esports;
