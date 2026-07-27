@@ -1,3 +1,4 @@
+import fcntl
 from datetime import UTC, datetime
 
 from openpyxl import Workbook, load_workbook
@@ -272,6 +273,58 @@ def test_research_scoring_is_separate_from_qualified_units(tmp_path) -> None:
     assert report["qualified_pnl_units"] == 0
     assert report["research_staked_units"] == 1.0
     assert report["research_pnl_units"] > 0
+
+
+def test_audit_append_happens_while_the_ledger_lock_is_still_held(
+    monkeypatch, registry, ban_list, tmp_path
+) -> None:
+    """A ledger write and its audit event must commit in one held-lock
+    critical section, not as two separately-lockable steps -- otherwise a
+    crash between them leaves a row with no matching audit event."""
+    from model_prediction.audit import AuditLog
+
+    lock_depth = 0
+    audit_calls_while_locked: list[bool] = []
+
+    real_flock = fcntl.flock
+
+    def tracking_flock(fd, cmd):
+        nonlocal lock_depth
+        real_flock(fd, cmd)
+        if cmd & fcntl.LOCK_EX:
+            lock_depth += 1
+        elif cmd == fcntl.LOCK_UN:
+            lock_depth -= 1
+
+    real_append = AuditLog.append
+
+    def tracking_append(self, *args, **kwargs):
+        audit_calls_while_locked.append(lock_depth > 0)
+        return real_append(self, *args, **kwargs)
+
+    monkeypatch.setattr(fcntl, "flock", tracking_flock)
+    monkeypatch.setattr(AuditLog, "append", tracking_append)
+
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    req = request("lock-order")
+    eligibility = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
+    row = ledger.append_evaluated(req, eligibility, NOW)
+    ledger.settle(row["pick_id"], 2, 3)
+
+    req2 = request("lock-order-void")
+    eligibility2 = evaluate_eligibility(req2, registry, ban_list, Exposure(), UnitPolicy(), NOW)
+    row2 = ledger.append_evaluated(req2, eligibility2, NOW)
+    ledger.void(row2["pick_id"], "test void")
+
+    req3 = request("lock-order-remove")
+    eligibility3 = evaluate_eligibility(req3, registry, ban_list, Exposure(), UnitPolicy(), NOW)
+    ledger.append_evaluated(req3, eligibility3, NOW)
+    ledger.remove_open_rows(["lock-order-remove"], "test removal")
+
+    assert audit_calls_while_locked, "expected at least one audit.append call to be observed"
+    assert all(audit_calls_while_locked), (
+        "every audit.append must fire while the ledger lock is still held"
+    )
 
 
 def test_excel_ledger_has_office_table_filter_and_frozen_header(tmp_path) -> None:

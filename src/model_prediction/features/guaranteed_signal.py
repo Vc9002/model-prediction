@@ -49,7 +49,7 @@ def evaluate_high_confidence(inputs: SignalInputs, now: datetime | None = None) 
         ),
         "spread_at_most_5pct": inputs.bid_ask_spread is not None and inputs.bid_ask_spread <= 0.05,
         "no_recent_injury_news": inputs.injury_news_clear_last_24h is True,
-        "data_fresh_under_6h": freshness_hours is not None and freshness_hours < 6,
+        "data_fresh_under_6h": freshness_hours is not None and 0 <= freshness_hours < 6,
         "team_not_banned": not inputs.team_banned,
         "at_least_30_observations": inputs.historical_observations_for_market >= 30,
         "passed_standard_gates": inputs.passed_standard_gates,

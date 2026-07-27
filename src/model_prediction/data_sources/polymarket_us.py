@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import suppress
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -112,6 +113,20 @@ def probability_to_american(probability: float) -> int:
     return round(100 * (1 - probability) / probability)
 
 
+@dataclass(frozen=True)
+class SportSlateResult:
+    """Return shape for ``PolymarketUSClient.sport_slate``.
+
+    ``events`` keeps the historical dict[league, list[event]] shape so every
+    existing consumer (event counting, BBO capture) keeps working unchanged.
+    ``errors`` is populated only for leagues whose fetch actually failed, so
+    a real outage stays distinguishable from a genuinely empty slate.
+    """
+
+    events: dict[str, list[dict[str, Any]]]
+    errors: dict[str, str]
+
+
 class PolymarketUSClient:
     """Read-only client for the unauthenticated Polymarket US public gateway."""
 
@@ -128,7 +143,7 @@ class PolymarketUSClient:
         response.raise_for_status()
         return response.json()
 
-    def events(self, league: str, limit: int = 50) -> list[dict[str, Any]]:
+    def events(self, league: str, limit: int = 200) -> list[dict[str, Any]]:
         slug = LEAGUE_SLUGS[league.upper()]
         payload = self._get(
             f"/v2/leagues/{slug}/events",
@@ -156,20 +171,28 @@ class PolymarketUSClient:
         sport: str,
         game_date: date,
         timezone_name: str = "America/New_York",
-    ) -> dict[str, list[dict[str, Any]]]:
-        """Slates for every gateway league in a sport, keyed by league."""
+    ) -> SportSlateResult:
+        """Slates for every gateway league in a sport, keyed by league.
+
+        A league whose fetch fails still gets an empty list in ``.events``
+        (so callers that only care about event lists keep working
+        unmodified), but the failure is also recorded in ``.errors`` so it
+        stays distinguishable from a genuinely empty day.
+        """
         leagues = POLYMARKET_SPORT_LEAGUES.get(sport.lower())
         if leagues is None:
             raise ValueError(
                 f"unknown sport: {sport}; expected one of {sorted(POLYMARKET_SPORT_LEAGUES)}"
             )
-        output: dict[str, list[dict[str, Any]]] = {}
+        events: dict[str, list[dict[str, Any]]] = {}
+        errors: dict[str, str] = {}
         for league in leagues:
             try:
-                output[league] = self.slate(league, game_date, timezone_name)
-            except httpx.HTTPError:
-                output[league] = []
-        return output
+                events[league] = self.slate(league, game_date, timezone_name)
+            except httpx.HTTPError as exc:
+                events[league] = []
+                errors[league] = str(exc)[:200]
+        return SportSlateResult(events=events, errors=errors)
 
     def market(self, slug: str) -> dict[str, Any]:
         return self._get(f"/v1/market/slug/{slug}")["market"]
@@ -379,7 +402,7 @@ def capture_slate_snapshots(
     }
     qualification_sports = BBO_CAPTURE_SPORTS
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
-    skipped_summer_league = 0
+    skipped_summer_league = timestamp_invalid = 0
     failure_details: list[dict[str, str]] = []
     for league, events in events_by_league.items():
         sport = league_to_sport.get(league.upper())
@@ -461,15 +484,20 @@ def capture_slate_snapshots(
             captured += 1
             if snapshot["long"].get("ask") is None or snapshot["short"].get("ask") is None:
                 missing_bbo += 1
+            if not snapshot.get("timestamp_valid", True):
+                timestamp_invalid += 1
     return {
-        "status": "ok" if failures == 0 else "partial",
+        "status": (
+            "ok" if failures == 0 and missing_bbo == 0 and timestamp_invalid == 0 else "partial"
+        ),
         "captured": captured,
         "missing_executable_ask": missing_bbo,
         "failures": failures,
         "skipped_nonqualification_contracts": skipped_nonqualification_contracts,
         "skipped_summer_league": skipped_summer_league,
         "failure_details": failure_details,
-        "timestamp_valid": True,
+        "timestamp_valid": timestamp_invalid == 0,
+        "timestamp_invalid_count": timestamp_invalid,
         "sports_scope": sorted(qualification_sports),
         "storage": f"data/odds/<sport>/{game_date}/polymarket_snapshots.jsonl",
     }

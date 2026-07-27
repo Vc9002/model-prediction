@@ -499,18 +499,21 @@ class PickLedger:
             )
             existing.append(row)
             self._write_rows(existing)
-        event_type = (
-            "pick_created"
-            if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
-            else "research_observation_created"
-        )
-        self.audit.append(event_type, pick_id, self._decision_audit_payload(row))
-        if eligibility.decision == "NO_CALL":
-            self.audit.append(
-                "pick_rejected",
-                pick_id,
-                {"reason_code": eligibility.reason_code, "record_type": eligibility.record_type.value},
+            # Audit append happens while the lock is still held, not after
+            # release, so a ledger write can never succeed without its
+            # matching audit event committed in the same critical section.
+            event_type = (
+                "pick_created"
+                if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
+                else "research_observation_created"
             )
+            self.audit.append(event_type, pick_id, self._decision_audit_payload(row))
+            if eligibility.decision == "NO_CALL":
+                self.audit.append(
+                    "pick_rejected",
+                    pick_id,
+                    {"reason_code": eligibility.reason_code, "record_type": eligibility.record_type.value},
+                )
         return row
 
     def settle(
@@ -659,19 +662,19 @@ class PickLedger:
                 )
             self._assert_decision_snapshot(row, decision_snapshot)
             self._write_rows(rows)
-        self.audit.append(
-            "pick_settled",
-            pick_id,
-            {
-                "away_score": away_score,
-                "home_score": home_score,
-                "result": result.value,
-                "pnl_units": pnl,
-                "research_score_units": research_units,
-                "research_pnl_units": research_pnl,
-                "binary_contract_settlement_value": binary_contract_settlement_value,
-            },
-        )
+            self.audit.append(
+                "pick_settled",
+                pick_id,
+                {
+                    "away_score": away_score,
+                    "home_score": home_score,
+                    "result": result.value,
+                    "pnl_units": pnl,
+                    "research_score_units": research_units,
+                    "research_pnl_units": research_pnl,
+                    "binary_contract_settlement_value": binary_contract_settlement_value,
+                },
+            )
         return row
 
     def recompute_research_sizing(self, policy=None) -> int:
@@ -779,21 +782,21 @@ class PickLedger:
                 keep.append(row)
             if removed:
                 self._write_rows(keep)
-        for row in removed:
-            self.audit.append(
-                "pick_removed",
-                row["pick_id"],
-                {
-                    "reason": reason,
-                    "event_id": row["event_id"],
-                    "league": row["league"],
-                    "market_type": row["market_type"],
-                    "selection": row["selection"],
-                    "model_version": row["model_version"],
-                    "record_type": row["record_type"],
-                    "created_at_utc": row["created_at_utc"],
-                },
-            )
+            for row in removed:
+                self.audit.append(
+                    "pick_removed",
+                    row["pick_id"],
+                    {
+                        "reason": reason,
+                        "event_id": row["event_id"],
+                        "league": row["league"],
+                        "market_type": row["market_type"],
+                        "selection": row["selection"],
+                        "model_version": row["model_version"],
+                        "record_type": row["record_type"],
+                        "created_at_utc": row["created_at_utc"],
+                    },
+                )
         return [row["pick_id"] for row in removed]
 
     def import_rows(
@@ -878,7 +881,7 @@ class PickLedger:
                 }
             )
             self._write_rows(rows)
-        self.audit.append("pick_voided", pick_id, {"reason": reason})
+            self.audit.append("pick_voided", pick_id, {"reason": reason})
         return row
 
     def update_closing(
@@ -932,15 +935,15 @@ class PickLedger:
             self._assert_decision_snapshot(row, decision_snapshot)
             self._write_rows(rows)
             updated = row.copy()
-        self.audit.append(
-            "closing_data_updated",
-            pick_id,
-            {
-                "closing_line": closing_line,
-                "closing_american_odds": closing_american_odds,
-                "probability_clv": updated["probability_clv"],
-            },
-        )
+            self.audit.append(
+                "closing_data_updated",
+                pick_id,
+                {
+                    "closing_line": closing_line,
+                    "closing_american_odds": closing_american_odds,
+                    "probability_clv": updated["probability_clv"],
+                },
+            )
         return updated
 
     def review_loss(
@@ -968,11 +971,11 @@ class PickLedger:
                 }
             )
             self._write_rows(rows)
-        self.audit.append(
-            "loss_review_completed",
-            pick_id,
-            {"classification": classification, "cause": cause, "corrective_action": corrective_action},
-        )
+            self.audit.append(
+                "loss_review_completed",
+                pick_id,
+                {"classification": classification, "cause": cause, "corrective_action": corrective_action},
+            )
         return row
 
     def score_research(

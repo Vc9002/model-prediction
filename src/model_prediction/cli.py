@@ -582,15 +582,19 @@ def _polymarket_slate(args, config) -> dict:
         return {"provider": "kalshi", "status": "deferred", "note": KALSHI_DEFERRED_MESSAGE}
     client = PolymarketUSClient()
     game_date = date.fromisoformat(args.date)
+    league_errors: dict[str, str] = {}
     if args.league:
         events = {args.league.upper(): client.slate(args.league, game_date, args.timezone)}
     elif args.all:
         events = {}
         for sport in SPORTS:
-            for league, slate in client.sport_slate(sport, game_date, args.timezone).items():
-                events[league] = slate
+            result = client.sport_slate(sport, game_date, args.timezone)
+            events.update(result.events)
+            league_errors.update(result.errors)
     elif args.sport:
-        events = client.sport_slate(args.sport, game_date, args.timezone)
+        result = client.sport_slate(args.sport, game_date, args.timezone)
+        events = result.events
+        league_errors = result.errors
     else:
         raise ValueError("provide --sport, --league, or --all")
     bbo_capture = (
@@ -609,6 +613,7 @@ def _polymarket_slate(args, config) -> dict:
         "timezone": args.timezone,
         "events_by_league": events,
         "event_count": sum(len(items) for items in events.values()),
+        "league_fetch_errors": league_errors,
         "prospective_bbo_capture": bbo_capture,
         "note": (
             "Public market discovery plus prospective executable-BBO storage. "
@@ -977,42 +982,44 @@ def _forecast_learned_sport(
                     eligibility_kwargs["maximum_age_hours"] = maximum_data_age_hours
                 if maximum_unreviewed_disagreement is not None:
                     eligibility_kwargs["maximum_unreviewed_disagreement"] = maximum_unreviewed_disagreement
-                eligibility = evaluate_eligibility(
-                    request, registry, bans,
-                    (exposure_ledger or ledger).exposure(
-                        request, now=decision_observed_at,
-                        canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
-                    ),
-                    unit_policy(config), **eligibility_kwargs,
-                )
-                if quote_warning and eligibility.decision == "CALL":
-                    eligibility = replace(
-                        eligibility,
-                        record_type=RecordType.RESEARCH_OBSERVATION,
-                        decision="NO_CALL",
-                        reason_code="NO_CALL_MARKET_UNAVAILABLE",
-                        units=0,
-                    )
-                # evaluate_eligibility now returns a real QUALIFIED_SHADOW_CALL
-                # for every candidate that clears the trust-boundary checks
-                # (banned team, stale/missing data, unvalidated model) --
-                # disagreement, exposure, and low edge no longer produce
-                # NO_CALL at all (operator directive, 2026-07-26; see
-                # eligibility._call_result). What's still NO_CALL here is
-                # always one of those hard trust-boundary reasons.
-                genuinely_eligible = eligibility.decision == "CALL"
-                # Main ledger (MLB/WNBA, non-flat, non-research-routed) holds
-                # ONLY genuine qualified calls -- any remaining NO_CALL is a
-                # structurally-untrustworthy reason, real diagnostic
-                # information that still belongs in flat_picks.xlsx (which
-                # already logs every game every day) rather than muddying main.
-                skip_main_no_call = (
-                    not flat_mode
-                    and not research_routed
-                    and eligibility.decision != "CALL"
-                    and quote_warning is None
-                )
+                # Exposure check and append happen inside one held lock -- see
+                # the matching comment in _log_esports_forecast.
                 with _LEDGER_LOCK:
+                    eligibility = evaluate_eligibility(
+                        request, registry, bans,
+                        (exposure_ledger or ledger).exposure(
+                            request, now=decision_observed_at,
+                            canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
+                        ),
+                        unit_policy(config), **eligibility_kwargs,
+                    )
+                    if quote_warning and eligibility.decision == "CALL":
+                        eligibility = replace(
+                            eligibility,
+                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            decision="NO_CALL",
+                            reason_code="NO_CALL_MARKET_UNAVAILABLE",
+                            units=0,
+                        )
+                    # evaluate_eligibility now returns a real QUALIFIED_SHADOW_CALL
+                    # for every candidate that clears the trust-boundary checks
+                    # (banned team, stale/missing data, unvalidated model) --
+                    # disagreement, exposure, and low edge no longer produce
+                    # NO_CALL at all (operator directive, 2026-07-26; see
+                    # eligibility._call_result). What's still NO_CALL here is
+                    # always one of those hard trust-boundary reasons.
+                    genuinely_eligible = eligibility.decision == "CALL"
+                    # Main ledger (MLB/WNBA, non-flat, non-research-routed) holds
+                    # ONLY genuine qualified calls -- any remaining NO_CALL is a
+                    # structurally-untrustworthy reason, real diagnostic
+                    # information that still belongs in flat_picks.xlsx (which
+                    # already logs every game every day) rather than muddying main.
+                    skip_main_no_call = (
+                        not flat_mode
+                        and not research_routed
+                        and eligibility.decision != "CALL"
+                        and quote_warning is None
+                    )
                     if not skip_main_no_call:
                         logged.append(
                             ledger.append_evaluated(
@@ -1172,22 +1179,27 @@ def _log_esports_forecast(
         )
         try:
             request.validate(now=observed_now)
-            exposure = ledger.exposure(request, now=observed_now)
-            eligibility = evaluate_gated_research_eligibility(
-                request,
-                exposure,
-                unit_policy(config),
-                model_inputs_valid=model_inputs_valid,
-                minimum_edge=min_edge,
-                minimum_confidence=research_confidence_gate,
-                now=observed_now,
-                maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
-                maximum_unreviewed_disagreement=float(
-                    config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
-                ),
-            )
-            genuinely_eligible = eligibility.decision == "CALL"
+            # Exposure is checked and the row appended inside one held lock,
+            # not as two separately-lockable steps -- otherwise two concurrent
+            # forecast threads could both read the same stale exposure before
+            # either writes (in-process TOCTOU). This does not make the check
+            # cross-process-atomic; that needs a lock spanning both ledgers.
             with _LEDGER_LOCK:
+                exposure = ledger.exposure(request, now=observed_now)
+                eligibility = evaluate_gated_research_eligibility(
+                    request,
+                    exposure,
+                    unit_policy(config),
+                    model_inputs_valid=model_inputs_valid,
+                    minimum_edge=min_edge,
+                    minimum_confidence=research_confidence_gate,
+                    now=observed_now,
+                    maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                    maximum_unreviewed_disagreement=float(
+                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                    ),
+                )
+                genuinely_eligible = eligibility.decision == "CALL"
                 ledger.append_evaluated(request, eligibility, now=observed_now)
                 # gated_ledger: curated subset of rows evaluate_esports_eligibility
                 # genuinely approved as a real call. Same relationship
@@ -1291,22 +1303,24 @@ def _forecast_international_sport(
         )
         try:
             request.validate(now=observed_now)
-            exposure = research_ledger.exposure(request, now=observed_now)
-            eligibility = evaluate_gated_research_eligibility(
-                request,
-                exposure,
-                unit_policy(config),
-                model_inputs_valid=True,
-                minimum_edge=min_edge,
-                minimum_confidence=research_confidence_gate,
-                now=observed_now,
-                maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
-                maximum_unreviewed_disagreement=float(
-                    config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
-                ),
-            )
-            genuinely_eligible = eligibility.decision == "CALL"
+            # Exposure check and append happen inside one held lock -- see
+            # the matching comment in _log_esports_forecast.
             with _LEDGER_LOCK:
+                exposure = research_ledger.exposure(request, now=observed_now)
+                eligibility = evaluate_gated_research_eligibility(
+                    request,
+                    exposure,
+                    unit_policy(config),
+                    model_inputs_valid=True,
+                    minimum_edge=min_edge,
+                    minimum_confidence=research_confidence_gate,
+                    now=observed_now,
+                    maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                    maximum_unreviewed_disagreement=float(
+                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                    ),
+                )
+                genuinely_eligible = eligibility.decision == "CALL"
                 research_ledger.append_evaluated(request, eligibility, now=observed_now)
                 if gated_ledger is not None and genuinely_eligible:
                     with suppress(DuplicatePickError):
@@ -1388,26 +1402,28 @@ def _forecast_soccer_sport(
         )
         try:
             request.validate(now=observed_now)
-            eligibility = evaluate_gated_research_eligibility(
-                request,
-                research_ledger.exposure(request, now=observed_now),
-                unit_policy(config),
-                model_inputs_valid=True,
-                minimum_edge=min_edge,
-                minimum_confidence=0.0,
-                now=observed_now,
-                maximum_age_hours=float(
-                    config["project"].get("maximum_data_age_hours", 12)
-                ),
-                maximum_unreviewed_disagreement=float(
-                    config["project"].get(
-                        "maximum_unreviewed_market_disagreement",
-                        0.10,
-                    )
-                ),
-            )
-            genuinely_eligible = eligibility.decision == "CALL"
+            # Exposure check and append happen inside one held lock -- see
+            # the matching comment in _log_esports_forecast.
             with _LEDGER_LOCK:
+                eligibility = evaluate_gated_research_eligibility(
+                    request,
+                    research_ledger.exposure(request, now=observed_now),
+                    unit_policy(config),
+                    model_inputs_valid=True,
+                    minimum_edge=min_edge,
+                    minimum_confidence=0.0,
+                    now=observed_now,
+                    maximum_age_hours=float(
+                        config["project"].get("maximum_data_age_hours", 12)
+                    ),
+                    maximum_unreviewed_disagreement=float(
+                        config["project"].get(
+                            "maximum_unreviewed_market_disagreement",
+                            0.10,
+                        )
+                    ),
+                )
+                genuinely_eligible = eligibility.decision == "CALL"
                 research_ledger.append_evaluated(
                     request,
                     eligibility,

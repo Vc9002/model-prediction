@@ -31,6 +31,18 @@ ODDS_SOCCER_KEYS: dict[str, str] = {
 }
 
 
+def _redact_api_key(text: str, api_key: str) -> str:
+    """Strip a leaked API key out of exception text before it is stored or logged.
+
+    httpx sends the key as a query param, so an HTTP-error exception's message
+    (which includes the full request URL) embeds it verbatim -- this must never
+    reach the daily JSON log or CLI output unredacted.
+    """
+    if not api_key:
+        return text
+    return text.replace(api_key, "***REDACTED***")
+
+
 def collect_soccer_scores(
     api_key: str | None = None,
     data_root: str | Path | None = None,
@@ -65,7 +77,10 @@ def collect_soccer_scores(
         try:
             matches = client.scores(league_name, days_from=days_from)
         except Exception as exc:
-            results[league_name] = {"status": "error", "error": str(exc)[:100]}
+            results[league_name] = {
+                "status": "error",
+                "error": _redact_api_key(str(exc), api_key)[:100],
+            }
             continue
 
         new_games = 0

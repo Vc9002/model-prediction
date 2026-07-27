@@ -176,6 +176,45 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
     assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
 
 
+def test_esports_exposure_check_happens_while_ledger_lock_is_held(monkeypatch) -> None:
+    """Exposure must be computed and the row appended inside one held
+    _LEDGER_LOCK critical section, not as two separately-lockable steps --
+    otherwise two concurrent forecast threads could both read the same stale
+    exposure before either writes (in-process TOCTOU)."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+
+    lock_held_when_exposure_checked: list[bool] = []
+
+    class _LockCheckingLedger(_CaptureLedger):
+        def exposure(self, request, now=None, **kwargs):
+            lock_held_when_exposure_checked.append(cli._LEDGER_LOCK.locked())
+            return super().exposure(request, now=now, **kwargs)
+
+    research = _LockCheckingLedger()
+    gated = _CaptureLedger()
+    config = {
+        "models": {
+            "LOL": {
+                "min_edge": 0.02,
+                "research_confidence_gate": 0.0,
+                "status": "shadow_qualified",
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+
+    cli._log_esports_forecast(_esports_forecast(), config, research, gated_ledger=gated)
+
+    assert lock_held_when_exposure_checked, "expected exposure() to be called at least once"
+    assert all(lock_held_when_exposure_checked), (
+        "exposure() must be checked while _LEDGER_LOCK is held"
+    )
+
+
 def test_esports_flat_mode_never_writes_research_or_gated(monkeypatch) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     research = _CaptureLedger()

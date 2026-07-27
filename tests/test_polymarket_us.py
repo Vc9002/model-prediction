@@ -192,6 +192,74 @@ def test_slate_capture_stores_prospective_bbo_by_sport_and_date(tmp_path) -> Non
     assert stored["usage"] == "prospective_executable_bbo"
 
 
+def test_sport_slate_surfaces_a_failed_league_distinctly_from_an_empty_one() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/leagues/lol/events" in request.url.path:
+            return httpx.Response(500, json={"error": "gateway down"})
+        return httpx.Response(200, json={"events": []})
+
+    client = PolymarketUSClient(
+        "https://example.test", httpx.Client(transport=httpx.MockTransport(handler))
+    )
+
+    result = client.sport_slate("esports", date(2026, 7, 27))
+
+    assert result.events["LOL"] == []
+    assert "LOL" in result.errors
+    # A league whose fetch genuinely returned zero events must not appear in
+    # errors -- that's what distinguishes a real outage from an empty day.
+    assert "CS2" not in result.errors
+    assert result.events["CS2"] == []
+
+
+def test_slate_capture_summary_reflects_missing_ask_and_invalid_timestamp(tmp_path) -> None:
+    # Two contracts: one clean, one with a missing ask AND an observed_at_utc
+    # after event_start_utc (stale/invalid). The aggregate summary must not
+    # hardcode timestamp_valid=True or report status="ok" when either
+    # per-snapshot problem is present -- both must be visible to the caller.
+    class FakeClient:
+        def snapshot(self, slug: str) -> dict:
+            if slug == "clean":
+                return {
+                    "market_slug": slug,
+                    "event_start_utc": "2026-07-18T23:00:00Z",
+                    "observed_at_utc": "2026-07-17T12:00:00Z",
+                    "long": {"ask": 0.55},
+                    "short": {"ask": 0.47},
+                }
+            return {
+                "market_slug": slug,
+                "event_start_utc": "2026-07-18T23:00:00Z",
+                "observed_at_utc": "2026-07-19T00:00:00Z",  # after event start
+                "long": {"ask": None},
+                "short": {"ask": 0.47},
+            }
+
+    result = capture_slate_snapshots(
+        FakeClient(),
+        {
+            "MLB": [
+                {
+                    "event_id": "event-1",
+                    "markets": [
+                        {"market_slug": "clean", "market_type": "moneyline", "line": None},
+                        {"market_slug": "stale", "market_type": "moneyline", "line": None},
+                    ],
+                }
+            ]
+        },
+        tmp_path,
+        "2026-07-18",
+    )
+
+    assert result["captured"] == 2
+    assert result["failures"] == 0
+    assert result["missing_executable_ask"] == 1
+    assert result["timestamp_invalid_count"] == 1
+    assert result["timestamp_valid"] is False
+    assert result["status"] == "partial"
+
+
 def test_slate_capture_skips_sports_outside_qualification_scope(tmp_path) -> None:
     # Soccer is now in BBO_CAPTURE_SPORTS (research pipeline); EPL contracts
     # should be captured, not skipped.
