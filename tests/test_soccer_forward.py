@@ -99,11 +99,12 @@ def test_soccer_forward_prices_draw_aware_full_game_total_from_exact_bbo(tmp_pat
 
 
 def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) -> None:
-    """Polymarket has never listed a soccer moneyline market on this gateway
-    (checked live and against captured history), but the pricing path exists
-    so it activates automatically if one appears. Verify side selection
-    matches by team name against the snapshot's long/short description
-    rather than assuming a fixed long==home convention."""
+    """Polymarket prices soccer full-time result as three SEPARATE Yes/No
+    team_win markets per event (home wins / draw / away wins), not one
+    combined moneyline market -- verified live 2026-07-27 against the raw
+    gateway payload. Verify matching finds the correct one of the (up to
+    two) per-team markets for the model-favored team, by the snapshot's
+    `team` field, not by market ordering."""
     history_path = tmp_path / "processed" / "soccer" / "games.jsonl"
     history_path.parent.mkdir(parents=True)
     history = []
@@ -131,24 +132,49 @@ def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) ->
         / "polymarket_snapshots.jsonl"
     )
     snapshot_path.parent.mkdir(parents=True)
+    rows = [
+        {
+            "event_id": "pm-1",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "team_win",
+            "team": "Alpha FC",
+            "line": None,
+            "market_slug": "atc-mls-alpha-beta-2026-07-27-alpha",
+            "long": {"description": "Yes", "ask": 0.4},
+            "short": {"description": "No", "ask": 0.62},
+        },
+        {
+            "event_id": "pm-1",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "team_win",
+            "team": "Beta FC",
+            "line": None,
+            "market_slug": "atc-mls-alpha-beta-2026-07-27-beta",
+            "long": {"description": "Yes", "ask": 0.58},
+            "short": {"description": "No", "ask": 0.44},
+        },
+        {
+            "event_id": "pm-1",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "team_win",
+            "team": None,
+            "line": None,
+            "market_slug": "atc-mls-alpha-beta-2026-07-27-draw",
+            "long": {"description": "Yes", "ask": 0.25},
+            "short": {"description": "No", "ask": 0.78},
+        },
+    ]
     snapshot_path.write_text(
-        json.dumps(
-            {
-                "event_id": "pm-1",
-                "event_title": "Alpha FC vs Beta FC",
-                "event_start_utc": "2026-07-27T20:00:00Z",
-                "observed_at_utc": "2026-07-27T12:00:00Z",
-                "timestamp_valid": True,
-                "market_type": "moneyline",
-                "line": None,
-                "market_slug": "tsc-mls-alpha-beta-2026-07-27-ml",
-                # Side ordering intentionally reversed from home/away order
-                # to prove matching is by team name, not a long==home guess.
-                "long": {"description": "Alpha FC", "ask": 0.4},
-                "short": {"description": "Beta FC", "ask": 0.58},
-            }
-        )
-        + "\n",
+        "".join(json.dumps(row) + "\n" for row in rows),
         encoding="utf-8",
     )
 

@@ -100,6 +100,18 @@ MARKET_TYPES = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "moneyline",
     "SPORTS_MARKET_TYPE_SPREAD": "spread",
     "SPORTS_MARKET_TYPE_TOTAL": "total",
+    # Soccer's win market is not one combined 2-team market like moneyline --
+    # it's three separate Yes/No markets per event (home wins / draw / away
+    # wins), each with its own market_slug. The classifier reads
+    # sportsMarketTypeV2 first, falling back to sportsMarketType only when
+    # V2 is absent (see _normalize_event) -- verified live 2026-07-27 that
+    # soccer win markets actually populate sportsMarketTypeV2 as
+    # SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME (sportsMarketType separately carries
+    # the more descriptive "soccer_team_full_time_winner", kept below as a
+    # defensive fallback in case some response omits V2). Neither key was
+    # previously recognized, so these markets were silently dropped entirely.
+    "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME": "team_win",
+    "soccer_team_full_time_winner": "team_win",
 }
 
 
@@ -457,6 +469,14 @@ def capture_slate_snapshots(
                         "event_title": str(event.get("title", "")),
                         "market_type": market.get("market_type"),
                         "line": market.get("line"),
+                        # Which team this specific market concerns, e.g. for
+                        # team_win markets (soccer's "Will X win?" Yes/No,
+                        # one market per team, unlike moneyline's single
+                        # combined market) -- None where not team-specific.
+                        "team": next(
+                            (side.get("team") for side in market.get("sides", []) if side.get("team")),
+                            None,
+                        ),
                         "timestamp_valid": observed <= event_start,
                         "usage": "prospective_executable_bbo",
                     }

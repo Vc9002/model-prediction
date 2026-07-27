@@ -96,7 +96,18 @@ def _latest_moneyline_snapshots(
     game_date: str,
 ) -> list[dict[str, Any]]:
     """Same freshness/dedup logic as `_latest_total_snapshots`, but for
-    moneyline markets -- which carry no `line`, unlike totals."""
+    soccer win markets.
+
+    Unlike moneyline for other sports (one combined market with two named
+    sides), Polymarket prices soccer full-time-result as three SEPARATE
+    Yes/No markets per event -- "will <team> win?" for each side, plus a
+    draw market -- each its own market_slug, classified as `team_win`
+    (verified live 2026-07-27 against the raw gateway payload; the
+    classifier previously didn't recognize this type at all, so these
+    markets never reached pricing). Each captured snapshot carries a
+    `team` field naming which team (or None, for the draw market) that
+    specific snapshot's Yes side concerns.
+    """
     path = (
         Path(data_root)
         / "odds"
@@ -117,7 +128,8 @@ def _latest_moneyline_snapshots(
                 continue
             slug = str(row.get("market_slug") or "")
             if (
-                row.get("market_type") != "moneyline"
+                row.get("market_type") != "team_win"
+                or not row.get("team")
                 or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
                 or not bool(row.get("timestamp_valid", False))
                 or not row.get("event_title")
@@ -253,12 +265,11 @@ def build_soccer_total_slate(
             }
         )
 
-    # Polymarket has never listed a moneyline market for soccer on this
-    # gateway (checked live and against every captured day of data) -- draws
-    # make a simple two-sided win market awkward. This still prices whichever
-    # side(s) exist, using the same PIT/matching discipline as totals, so it
-    # activates automatically the day one appears rather than requiring a
-    # future code change.
+    # Polymarket prices soccer full-time result as three separate per-team
+    # Yes/No "team_win" markets (home wins / draw / away wins), not one
+    # combined moneyline market -- verified live 2026-07-27. Up to two
+    # candidates (home-win market, away-win market) can legitimately match
+    # one event; the draw market is excluded at the loader level (no team).
     for prediction in moneylines:
         start = parse_utc(prediction.event_start_utc)
         candidates = []
@@ -281,43 +292,40 @@ def build_soccer_total_slate(
                 )
             ):
                 candidates.append(snapshot)
-        if len(candidates) != 1:
+        if not candidates:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": "no unique timestamp-valid moneyline matched",
+                    "reason": "no timestamp-valid team_win market matched",
                 }
             )
             continue
-        snapshot = candidates[0]
-        # Draws are not tradeable as a distinct outcome in a two-sided
-        # binary market, so this compares only the two win probabilities --
-        # not the full 3-way distribution -- and matches by team name rather
-        # than assuming long==home, since a real market's side ordering is
-        # unverified (none has ever been observed).
+        # Draws aren't tradeable as a distinct outcome across two separate
+        # per-team markets, so this compares only the two win probabilities,
+        # then finds whichever matched team_win market concerns the
+        # model-favored team -- matching by team name, not market ordering.
         selection = max(("home", "away"), key=lambda side: prediction.probabilities[side])
         selected_team = prediction.home_team if selection == "home" else prediction.away_team
-        side_key = None
-        for candidate_key in ("long", "short"):
-            side = snapshot.get(candidate_key) or {}
-            if _team_matches_title(selected_team, str(side.get("description", ""))):
-                side_key = candidate_key
-                break
-        if side_key is None:
+        matching = [
+            snapshot
+            for snapshot in candidates
+            if _team_matches_title(selected_team, str(snapshot.get("team") or ""))
+        ]
+        if len(matching) != 1:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": "moneyline side could not be matched to the model-favored team",
+                    "reason": "no unique team_win market for the model-favored team",
                 }
             )
             continue
-        side = snapshot.get(side_key) or {}
-        ask = side.get("ask")
+        snapshot = matching[0]
+        ask = (snapshot.get("long") or {}).get("ask")
         if ask is None or not 0 < float(ask) < 1:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": "selected moneyline side has no executable ask",
+                    "reason": "selected team_win side has no executable ask",
                 }
             )
             continue
