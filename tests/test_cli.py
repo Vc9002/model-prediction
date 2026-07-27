@@ -265,7 +265,7 @@ def _mlb_totals_candidate(market_type: MarketType, selection: str, line: float |
     )
 
 
-def test_mlb_totals_flat_keeps_only_total_candidates_and_never_touches_main_ledger(
+def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touches_main_ledger(
     monkeypatch, registry, ban_list
 ) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
@@ -288,12 +288,17 @@ def test_mlb_totals_flat_keeps_only_total_candidates_and_never_touches_main_ledg
         "2026-07-27", True, config, registry, ban_list, flat_ledger, None
     )
 
-    assert result["market_candidates"] == 1
-    assert len(flat_ledger.appended) == 1
-    request, _eligibility = flat_ledger.appended[0]
-    assert request.market_type is MarketType.TOTAL
-    assert request.line == 8.5
-    assert request.selection == "over"
+    assert result["market_candidates"] == 2
+    assert result["total_candidates"] == 1
+    assert result["spread_candidates"] == 1
+    assert len(flat_ledger.appended) == 2
+    logged_types = {request.market_type for request, _eligibility in flat_ledger.appended}
+    assert logged_types == {MarketType.TOTAL, MarketType.SPREAD}
+    spread_request = next(
+        request for request, _e in flat_ledger.appended if request.market_type is MarketType.SPREAD
+    )
+    assert spread_request.line == -1.5
+    assert spread_request.selection == "away"
 
 
 def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_leagues() -> None:

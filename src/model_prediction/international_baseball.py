@@ -751,16 +751,24 @@ def forecast_international_baseball_slate(
     for event in events:
         event_start = parse_utc(str(event["event_start_utc"]))
         for market in event.get("markets", []):
-            if market.get("market_type") != "moneyline" or len(market.get("sides", [])) != 2:
-                continue
-            descriptions = [str(side.get("description") or "") for side in market["sides"]]
-            matches = [aliases.get(_identity_key(description), set()) for description in descriptions]
+            if market.get("market_type") != "moneyline":
+                continue  # not a moneyline market for this event; not this function's concern
+            descriptions = [str(side.get("description") or "") for side in market.get("sides", [])]
             base = {
                 "event_id": event["event_id"],
                 "event_start_utc": event["event_start_utc"],
-                "market_slug": market["market_slug"],
+                "market_slug": market.get("market_slug"),
                 "teams": descriptions,
             }
+            if len(market.get("sides", [])) != 2:
+                # A moneyline market exists for this event, but the gateway
+                # dropped a side (e.g. a transient boundary quote -- see
+                # polymarket_us._normalize_event) -- this must be counted as
+                # a no-call, not silently vanish from both priced_contracts
+                # and no_calls.
+                no_calls.append({**base, "reason": "NO_CALL_MARKET_SIDES_INVALID"})
+                continue
+            matches = [aliases.get(_identity_key(description), set()) for description in descriptions]
             if event_start <= observed_now:
                 no_calls.append({**base, "reason": "NO_CALL_EVENT_STARTED"})
                 continue

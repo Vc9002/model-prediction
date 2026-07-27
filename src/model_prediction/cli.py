@@ -725,15 +725,16 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
 
 
 def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans, flat_ledger, audit) -> dict:
-    """MLB total-runs picks (Measured Edge Monte-Carlo totals model) into
-    flat_picks.xlsx only -- no edge gate, never the main ledger.
+    """MLB total-runs and run-line picks (Measured Edge Monte-Carlo margin +
+    totals models) into flat_picks.xlsx only -- no edge gate, never the main
+    ledger.
 
     Reuses build_mlb_slate's paired margin+totals output but keeps only the
-    TOTAL candidates; MLB moneyline is already served live by
-    learned_forward.py, so the margin/moneyline half of this pair is
-    discarded here rather than duplicated. The market line each candidate
-    prices against is already the main/most-balanced line, not an alternate
-    (see mlb_market_odds._select_full_game_market's `_market_balance`).
+    TOTAL and SPREAD candidates; MLB moneyline is already served live by
+    learned_forward.py, so the moneyline third of this triple is discarded
+    here rather than duplicated. The market line each candidate prices
+    against is already the main/most-balanced line, not an alternate (see
+    mlb_market_odds._select_full_game_market's `_market_balance`).
     """
     spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.2.yaml")
     observed_at = utc_now()
@@ -753,7 +754,11 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
         observed_at,
         odds_feed,
     )
-    totals_candidates = [candidate for candidate in candidates if candidate.market_type is MarketType.TOTAL]
+    totals_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.market_type in (MarketType.TOTAL, MarketType.SPREAD)
+    ]
     logged, duplicates = [], []
     if log:
         for candidate in totals_candidates:
@@ -812,11 +817,13 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
                 skipped.append({"event_id": candidate.event_id, "reason": str(error)[:200]})
     return {
         "sport": "mlb_totals",
-        "model_name": "Measured Edge Totals",
-        "model_version": "measured-edge-totals-v1",
+        "model_name": "Measured Edge Totals + Spread",
+        "model_versions": ["measured-edge-totals-v1", "measured-edge-margin-v1"],
         "game_date": args_date,
         "scheduled_games": scheduled,
         "market_candidates": len(totals_candidates),
+        "total_candidates": sum(1 for c in totals_candidates if c.market_type is MarketType.TOTAL),
+        "spread_candidates": sum(1 for c in totals_candidates if c.market_type is MarketType.SPREAD),
         "logged": len(logged),
         "logged_pick_ids": [row["pick_id"] for row in logged],
         "duplicate_pick_ids": duplicates,
@@ -2475,7 +2482,7 @@ def main(argv: list[str] | None = None) -> None:
                         forecast_result[f"_flat_{sport}"] = future.result()
                     except Exception:
                         logger.warning("Flat forecast failed for sport %s", sport, exc_info=True)
-            # MLB totals: Measured Edge totals model, flat only (moneyline
+            # MLB totals + spread: Measured Edge models, flat only (moneyline
             # already ran above via the learned production path).
             try:
                 forecast_result["mlb_totals"] = _forecast_mlb_totals_flat(

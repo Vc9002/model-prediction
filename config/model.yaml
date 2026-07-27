@@ -24,11 +24,6 @@ team_ban_list:
     CS2: []
     KBO: []
     NPB: []
-    WORLD_CUP:
-    - canonical_team_id: world-cup-kor
-      input: South Korea
-      reason: manual_governance
-      review_after: null
   allowed_reasons:
   - data_quality
   - injury_uncertainty
@@ -244,10 +239,6 @@ models:
   TENNIS:
     family: elo_trend_logistic_regression
     status: deferred
-    origin: statistical_model
-  WORLD_CUP:
-    family: poisson_dixon_coles
-    status: shadow_qualified
     origin: statistical_model
   LOL:
     family: neutral_series_elo
