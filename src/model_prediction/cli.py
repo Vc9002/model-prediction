@@ -131,7 +131,12 @@ _LEDGER_LEAGUE_TO_ESPN = {
     "NBA": ("NBA",),
     "WNBA": ("WNBA",),
     "NFL": ("NFL",),
-    "SOCCER": ("EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "MLS", "UCL"),
+    "SOCCER": (
+        "EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "MLS", "UCL",
+        "BRASILEIRAO", "BRAZIL_SERIE_B", "ARGENTINA", "ARGENTINA_2",
+        "COLOMBIA", "CHILE", "URUGUAY", "ECUADOR", "PERU", "SUDAMERICANA",
+        "FRIENDLIES", "CLUB_FRIENDLIES",
+    ),
 }
 
 

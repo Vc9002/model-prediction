@@ -11,7 +11,9 @@ import httpx
 
 from ..domain import iso_utc, parse_utc, utc_now
 
-# Verified against GET /v2/leagues on the live gateway (2026-07-16).
+# Verified against GET /v2/leagues on the live gateway (2026-07-16;
+# South American/friendlies additions re-verified 2026-07-27 via
+# GET /v2/sports, which lists all 61 currently operational soccer leagues).
 LEAGUE_SLUGS = {
     "MLB": "mlb",
     "NBA": "nba",
@@ -26,6 +28,18 @@ LEAGUE_SLUGS = {
     "UEFA": "uefa",
     "MLS": "mls",
     "WORLD_CUP": "fwc",
+    "BRASILEIRAO": "bra",
+    "BRAZIL_SERIE_B": "brb",
+    "ARGENTINA": "lpa",
+    "ARGENTINA_2": "arg2",
+    "COLOMBIA": "lco",
+    "CHILE": "pdc",
+    "URUGUAY": "uru1",
+    "ECUADOR": "ecu1",
+    "PERU": "pl1",
+    "SUDAMERICANA": "sud",
+    "FRIENDLIES": "intf",
+    "CLUB_FRIENDLIES": "clbf",
     "WTA": "wta",
     "ITF_MEN": "itfm",
     "ITF_WOMEN": "itfw",
@@ -49,7 +63,12 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "wnba": ("WNBA",),
     "nfl": ("NFL",),
     # WORLD_CUP dropped 2026-07: tournament is over, no games left to trade.
-    "soccer": ("EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "UCL", "UEFA", "MLS"),
+    "soccer": (
+        "EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "UCL", "UEFA", "MLS",
+        "BRASILEIRAO", "BRAZIL_SERIE_B", "ARGENTINA", "ARGENTINA_2",
+        "COLOMBIA", "CHILE", "URUGUAY", "ECUADOR", "PERU", "SUDAMERICANA",
+        "FRIENDLIES", "CLUB_FRIENDLIES",
+    ),
     "tennis": ("WTA", "ITF_MEN", "ITF_WOMEN"),
     "esports": (
         "LOL",

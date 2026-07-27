@@ -216,6 +216,18 @@ models:
     - SERIE_A
     - MLS
     - UCL
+    - BRASILEIRAO
+    - BRAZIL_SERIE_B
+    - ARGENTINA
+    - ARGENTINA_2
+    - COLOMBIA
+    - CHILE
+    - URUGUAY
+    - ECUADOR
+    - PERU
+    - SUDAMERICANA
+    - FRIENDLIES
+    - CLUB_FRIENDLIES
     markets:
     - full_game_total_2_5
   NFL:
