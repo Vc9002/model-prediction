@@ -23,6 +23,7 @@ from model_prediction.domain import (
 )
 from model_prediction.eligibility import EligibilityResult, RecordType
 from model_prediction.entities import CanonicalTeam
+from model_prediction.forward import MLBForwardCandidate
 from model_prediction.learned_forward import LearnedForwardCandidate
 from model_prediction.ledger import PickLedger
 from model_prediction.units import Exposure
@@ -236,6 +237,63 @@ def test_esports_flat_mode_never_writes_research_or_gated(monkeypatch) -> None:
     assert logged == 0
     assert research.appended == []
     assert gated.appended == []
+
+
+def _mlb_totals_candidate(market_type: MarketType, selection: str, line: float | None) -> MLBForwardCandidate:
+    return MLBForwardCandidate(
+        event_id="mlb-totals-1",
+        event_start_utc="2026-07-27T23:00:00Z",
+        away_team="Boston Red Sox",
+        home_team="New York Yankees",
+        market_type=market_type,
+        selection=selection,
+        line=line,
+        sportsbook="polymarket_us",
+        american_odds=-110,
+        raw_probability=0.55,
+        shrunk_probability=0.53,
+        no_vig_probability=0.52,
+        uncertainty=0.02,
+        rationale="fixture",
+        risks="fixture",
+        observed_at_utc="2026-07-27T19:00:00Z",
+        model_name="Measured Edge Totals",
+        model_version="measured-edge-totals-v1",
+        model_artifact_hash="hash",
+        calibration_version="measured-edge-totals-v1",
+        feature_schema_version="mlb-analyst-poisson-trend-v0.2",
+    )
+
+
+def test_mlb_totals_flat_keeps_only_total_candidates_and_never_touches_main_ledger(
+    monkeypatch, registry, ban_list
+) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
+    monkeypatch.setattr(cli, "load_formula_spec", lambda path: object())
+    monkeypatch.setattr(cli, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
+
+    candidates = [
+        _mlb_totals_candidate(MarketType.MONEYLINE, "home", None),
+        _mlb_totals_candidate(MarketType.SPREAD, "away", -1.5),
+        _mlb_totals_candidate(MarketType.TOTAL, "over", 8.5),
+    ]
+    monkeypatch.setattr(
+        cli, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1)
+    )
+
+    flat_ledger = _CaptureLedger()
+    config = {"project": {}, "bankroll": {}}
+
+    result = cli._forecast_mlb_totals_flat(
+        "2026-07-27", True, config, registry, ban_list, flat_ledger, None
+    )
+
+    assert result["market_candidates"] == 1
+    assert len(flat_ledger.appended) == 1
+    request, _eligibility = flat_ledger.appended[0]
+    assert request.market_type is MarketType.TOTAL
+    assert request.line == 8.5
+    assert request.selection == "over"
 
 
 def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_leagues() -> None:

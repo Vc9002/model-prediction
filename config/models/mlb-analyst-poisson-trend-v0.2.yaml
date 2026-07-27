@@ -1,17 +1,36 @@
 away_field_run_factor: 1.0
+# Renamed/completed to match the factors current estimate_runs()/_offense_index()/
+# _starter_weakness() in models/mlb.py actually clip (bullpen_weakness, park,
+# weather, offense, starter_weakness) -- the prior keys (bullpen_fatigue,
+# park_factor, temperature, wind_speed) don't match any current code path.
+# park is a direct carry-over of the old park_factor range (same concept,
+# same real park-factor scale, Coors ~1.12 to Seattle ~0.92 per data/features/
+# park_factors.py). weather bounds a single combined multiplicative run
+# factor (features/weather.py's run_factor_from_conditions), not separate
+# temperature/wind inputs, so it can't reuse the old temperature/wind_speed
+# ranges directly -- reasoned as a modest +/-15-20% swing, the largest real
+# weather effects (e.g. wind at Wrigley) being outliers, not the norm.
+# offense/starter_weakness/bullpen_weakness are all ratios centered on 1.0
+# (value / league-average value); reasoned bounds allow real best-to-worst
+# spread without permitting runaway multiplicative outliers. Same caveat as
+# the simulation block below: a documented starting calibration, not fit
+# against this project's own historical data.
 factor_bounds:
-  bullpen_fatigue:
-  - 0.0
-  - 1.0
-  park_factor:
+  bullpen_weakness:
+  - 0.5
+  - 2.0
+  park:
   - 0.8
   - 1.3
-  temperature:
-  - 30.0
-  - 110.0
-  wind_speed:
-  - 0.0
-  - 30.0
+  weather:
+  - 0.85
+  - 1.2
+  offense:
+  - 0.7
+  - 1.4
+  starter_weakness:
+  - 0.5
+  - 2.0
 feature_schema_version: v3
 formula_version: mlb-analyst-poisson-trend-v0.2
 home_field_run_factor: 1.04
@@ -21,13 +40,54 @@ league_strikeout_rate: 0.225
 league_walk_rate: 0.082
 recent_half_life_games: 10.0
 recent_prior_strength_games: 12.0
+seed_method: stable_hash
+# Gamma-Poisson mixture variance decomposition, restoring fields the
+# 2026-07-20 sync accidentally dropped (see git history: this file never
+# carried them, but simulate_game() in models/mlb.py has always required
+# them). Values are reasoned, not fit from this project's own historical
+# data: real MLB team runs-per-game has mean ~4.5 (matches
+# league_runs_per_team_game above) with a variance well above the pure-
+# Poisson value of 4.5 (empirically closer to 7-9), so total excess
+# variance / mean^2 implies a combined dispersion parameter around 0.15-0.2.
+# Split unevenly between a shared (park/weather/umpire, affects both teams
+# equally) and team-specific (that day's starter/bullpen/lineup) component,
+# weighting team-specific higher since day-to-day team form varies more
+# than shared park/weather conditions. Treat as a documented starting
+# calibration to refine against real historical run variance, not a
+# precision-fit value.
 simulation:
-  num_simulations: 10000
+  simulations: 10000
   seed: 42
+  shared_environment_variance: 0.06
+  team_specific_variance: 0.12
+  extra_inning_home_probability_bounds:
+  - 0.50
+  - 0.55
 starter_recent_weight: 0.7
 starter_season_weight: 0.3
 strikeout_weight: 0.15
+# Same situation as factor_bounds: the old market/model keys don't match
+# any current code path. _uncertainty_components() combines these in
+# quadrature (sqrt of sum of squares) per active condition, then clips to
+# [minimum, maximum] -- so components are fractional-probability
+# contributions, not independent additive percentages. base/model_form/
+# pitcher are always active; the rest add only when that specific input is
+# degraded (rookie starter, missing bullpen/weather/lineup/xFIP/wRC+ data).
+# Reasoned to keep the always-on floor near the file's old 0.005-0.01 scale
+# and degraded-input penalties larger, capped so total uncertainty can't
+# collapse to false precision (minimum) or explode past a sane bound
+# (maximum). Documented starting calibration, not historically fit.
 uncertainty:
-  market: 0.005
-  model: 0.01
+  base: 0.02
+  model_form: 0.01
+  pitcher: 0.015
+  rookie_starter: 0.03
+  bullpen_unavailable: 0.02
+  weather_unavailable: 0.01
+  lineup_projected: 0.015
+  lineup_unavailable: 0.025
+  missing_xfip: 0.01
+  missing_wrc_plus: 0.01
+  minimum: 0.02
+  maximum: 0.15
 walk_weight: 0.1

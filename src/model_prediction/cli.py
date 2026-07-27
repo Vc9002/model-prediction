@@ -724,6 +724,110 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
     }
 
 
+def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans, flat_ledger, audit) -> dict:
+    """MLB total-runs picks (Measured Edge Monte-Carlo totals model) into
+    flat_picks.xlsx only -- no edge gate, never the main ledger.
+
+    Reuses build_mlb_slate's paired margin+totals output but keeps only the
+    TOTAL candidates; MLB moneyline is already served live by
+    learned_forward.py, so the margin/moneyline half of this pair is
+    discarded here rather than duplicated. The market line each candidate
+    prices against is already the main/most-balanced line, not an alternate
+    (see mlb_market_odds._select_full_game_market's `_market_balance`).
+    """
+    spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.2.yaml")
+    observed_at = utc_now()
+    odds_api_key = os.getenv("THE_ODDS_API_KEY")
+    odds_feed = MLBMarketOddsFeed(
+        registry,
+        MarketOddsSnapshotStore(market_odds_snapshot_path(config)),
+        odds_api=TheOddsAPIClient(odds_api_key) if odds_api_key else None,
+        observed_at=observed_at,
+    )
+    candidates, skipped, scheduled = build_mlb_slate(
+        args_date,
+        ESPNMLBClient(),
+        spec,
+        PROJECT_ROOT / "config/models/measured-edge-margin-v1.json",
+        PROJECT_ROOT / "config/models/measured-edge-totals-v1.json",
+        observed_at,
+        odds_feed,
+    )
+    totals_candidates = [candidate for candidate in candidates if candidate.market_type is MarketType.TOTAL]
+    logged, duplicates = [], []
+    if log:
+        for candidate in totals_candidates:
+            request = PickRequest(
+                event_start_utc=candidate.event_start_utc,
+                event_id=candidate.event_id,
+                league=League.MLB,
+                away_team=candidate.away_team,
+                home_team=candidate.home_team,
+                market_type=candidate.market_type,
+                selection=candidate.selection,
+                line=candidate.line,
+                sportsbook=candidate.sportsbook,
+                american_odds=candidate.american_odds,
+                model_probability=candidate.shrunk_probability,
+                model_uncertainty=candidate.uncertainty,
+                model_version=candidate.model_version,
+                rationale=candidate.rationale,
+                risks=candidate.risks,
+                model_origin=ModelOrigin.STATISTICAL_MODEL,
+                model_state=ModelState.RESEARCH,
+                observed_at_utc=candidate.observed_at_utc,
+                model_artifact_hash=candidate.model_artifact_hash,
+                calibration_method="flat_probability_shrinkage_toward_half",
+                calibration_version=candidate.calibration_version,
+                calibration_artifact_hash=candidate.model_artifact_hash,
+                feature_schema_version=candidate.feature_schema_version,
+                entity_map_version=registry.version,
+                code_revision="measured-edge-paired-v1",
+                decision_no_vig_probability=candidate.no_vig_probability,
+            )
+            try:
+                request.validate(now=observed_at)
+                away = registry.resolve(request.league, request.away_team, request.event_start_utc)
+                home = registry.resolve(request.league, request.home_team, request.event_start_utc)
+                # Exposure check and append happen inside one held lock -- see
+                # the matching comment in _log_esports_forecast.
+                with _LEDGER_LOCK:
+                    eligibility = evaluate_eligibility(
+                        request,
+                        registry,
+                        bans,
+                        flat_ledger.exposure(
+                            request,
+                            now=observed_at,
+                            canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
+                        ),
+                        unit_policy(config),
+                        now=observed_at,
+                    )
+                    # Flat: every evaluated candidate is logged, no edge gate.
+                    logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
+            except DuplicatePickError as error:
+                duplicates.append(error.pick_id)
+            except (EntityResolutionError, ValueError) as error:
+                skipped.append({"event_id": candidate.event_id, "reason": str(error)[:200]})
+    return {
+        "sport": "mlb_totals",
+        "model_name": "Measured Edge Totals",
+        "model_version": "measured-edge-totals-v1",
+        "game_date": args_date,
+        "scheduled_games": scheduled,
+        "market_candidates": len(totals_candidates),
+        "logged": len(logged),
+        "logged_pick_ids": [row["pick_id"] for row in logged],
+        "duplicate_pick_ids": duplicates,
+        "skipped": skipped,
+        "note": (
+            "Flat only, no main-ledger promotion; MLB moneyline is served "
+            "separately by the learned production path."
+        ),
+    }
+
+
 def _forecast_learned_sport(
     sport: str,
     args_date: str,
@@ -1347,7 +1451,8 @@ def _forecast_soccer_sport(
     research_ledger,
     gated_ledger=None,
 ) -> dict:
-    """Price the draw-aware soccer score model into full-game 2.5 totals."""
+    """Price the draw-aware soccer score model: full-game 2.5 totals, plus
+    moneyline whenever Polymarket lists a matching two-sided win market."""
     from .data_sources.polymarket_us import probability_to_american
     model_config = config["models"].get("SOCCER", {})
     forecast = build_soccer_total_slate(
@@ -1374,9 +1479,9 @@ def _forecast_soccer_sport(
             league=League.SOCCER,
             away_team=str(contract["away_team"]),
             home_team=str(contract["home_team"]),
-            market_type=MarketType.TOTAL,
+            market_type=MarketType(str(contract["market_type"])),
             selection=str(contract["selection"]),
-            line=float(contract["line"]),
+            line=None if contract["line"] is None else float(contract["line"]),
             sportsbook="polymarket_us",
             american_odds=probability_to_american(ask),
             model_probability=float(contract["model_probability"]),
@@ -2158,6 +2263,10 @@ def main(argv: list[str] | None = None) -> None:
                         gated_ledger=None,
                         exposure_ledger=ledger,
                     )
+                    if is_flat and sport == "mlb":
+                        results["mlb_totals"] = _forecast_mlb_totals_flat(
+                            args.date, log, config, registry, bans, flat_ledger, audit
+                        )
                 else:
                     results[sport] = _forecast_research_sport(sport, args.date, config)
             output = results[sports[0]] if len(sports) == 1 else results
@@ -2366,6 +2475,14 @@ def main(argv: list[str] | None = None) -> None:
                         forecast_result[f"_flat_{sport}"] = future.result()
                     except Exception:
                         logger.warning("Flat forecast failed for sport %s", sport, exc_info=True)
+            # MLB totals: Measured Edge totals model, flat only (moneyline
+            # already ran above via the learned production path).
+            try:
+                forecast_result["mlb_totals"] = _forecast_mlb_totals_flat(
+                    args.date, True, config, registry, bans, flat_ledger, audit
+                )
+            except Exception:
+                logger.warning("MLB totals flat forecast failed", exc_info=True)
             # Esports run serially — logged to research ledger only (never main ledger)
             forecast_result["soccer"] = _forecast_soccer_sport(
                 data_root=data_directory,

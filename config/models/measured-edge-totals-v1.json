@@ -6,5 +6,7 @@
   "offset": 0.075,
   "trained_on_games": 2430,
   "trained_through_date": "2026-07-16",
-  "artifact_hash": "2da9cbc8fbfed3fd939ba7db7d4b7120d6eaf9be9b5aad5c9de945d019d21533"
+  "model_name": "Measured Edge Totals",
+  "calibration_version": "measured-edge-totals-v1",
+  "artifact_hash": "0aa06c0f065ec20d43901d386280174165e2b07065216b6c7ffe72c98e322706"
 }

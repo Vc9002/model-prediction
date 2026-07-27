@@ -91,6 +91,45 @@ def _latest_total_snapshots(
     return list(latest.values())
 
 
+def _latest_moneyline_snapshots(
+    data_root: str | Path,
+    game_date: str,
+) -> list[dict[str, Any]]:
+    """Same freshness/dedup logic as `_latest_total_snapshots`, but for
+    moneyline markets -- which carry no `line`, unlike totals."""
+    path = (
+        Path(data_root)
+        / "odds"
+        / "soccer"
+        / game_date
+        / "polymarket_snapshots.jsonl"
+    )
+    if not path.exists():
+        return []
+    latest: dict[str, dict[str, Any]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            slug = str(row.get("market_slug") or "")
+            if (
+                row.get("market_type") != "moneyline"
+                or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
+                or not bool(row.get("timestamp_valid", False))
+                or not row.get("event_title")
+            ):
+                continue
+            if slug not in latest or str(row.get("observed_at_utc") or "") > str(
+                latest[slug].get("observed_at_utc") or ""
+            ):
+                latest[slug] = row
+    return list(latest.values())
+
+
 def build_soccer_total_slate(
     *,
     data_root: str | Path,
@@ -126,12 +165,19 @@ def build_soccer_total_slate(
             skipped.append({"event_id": event_id, "reason": str(error)})
 
     model = soccer_model()
+    all_predictions = model.predict_games(history, upcoming)
     totals = [
         prediction
-        for prediction in model.predict_games(history, upcoming)
+        for prediction in all_predictions
         if str(prediction.market_type) == "total" and prediction.line == 2.5
     ]
+    moneylines = [
+        prediction
+        for prediction in all_predictions
+        if str(prediction.market_type) == "moneyline"
+    ]
     snapshots = _latest_total_snapshots(data_root, game_date)
+    moneyline_snapshots = _latest_moneyline_snapshots(data_root, game_date)
     priced: list[dict[str, Any]] = []
     unmatched: list[dict[str, str]] = []
     for prediction in totals:
@@ -206,6 +252,100 @@ def build_soccer_total_slate(
                 ),
             }
         )
+
+    # Polymarket has never listed a moneyline market for soccer on this
+    # gateway (checked live and against every captured day of data) -- draws
+    # make a simple two-sided win market awkward. This still prices whichever
+    # side(s) exist, using the same PIT/matching discipline as totals, so it
+    # activates automatically the day one appears rather than requiring a
+    # future code change.
+    for prediction in moneylines:
+        start = parse_utc(prediction.event_start_utc)
+        candidates = []
+        for snapshot in moneyline_snapshots:
+            try:
+                snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
+                snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if (
+                abs((snapshot_start - start).total_seconds()) <= 30 * 60
+                and snapshot_at < start
+                and _team_matches_title(
+                    prediction.away_team,
+                    str(snapshot.get("event_title", "")),
+                )
+                and _team_matches_title(
+                    prediction.home_team,
+                    str(snapshot.get("event_title", "")),
+                )
+            ):
+                candidates.append(snapshot)
+        if len(candidates) != 1:
+            unmatched.append(
+                {
+                    "event_id": prediction.event_id,
+                    "reason": "no unique timestamp-valid moneyline matched",
+                }
+            )
+            continue
+        snapshot = candidates[0]
+        # Draws are not tradeable as a distinct outcome in a two-sided
+        # binary market, so this compares only the two win probabilities --
+        # not the full 3-way distribution -- and matches by team name rather
+        # than assuming long==home, since a real market's side ordering is
+        # unverified (none has ever been observed).
+        selection = max(("home", "away"), key=lambda side: prediction.probabilities[side])
+        selected_team = prediction.home_team if selection == "home" else prediction.away_team
+        side_key = None
+        for candidate_key in ("long", "short"):
+            side = snapshot.get(candidate_key) or {}
+            if _team_matches_title(selected_team, str(side.get("description", ""))):
+                side_key = candidate_key
+                break
+        if side_key is None:
+            unmatched.append(
+                {
+                    "event_id": prediction.event_id,
+                    "reason": "moneyline side could not be matched to the model-favored team",
+                }
+            )
+            continue
+        side = snapshot.get(side_key) or {}
+        ask = side.get("ask")
+        if ask is None or not 0 < float(ask) < 1:
+            unmatched.append(
+                {
+                    "event_id": prediction.event_id,
+                    "reason": "selected moneyline side has no executable ask",
+                }
+            )
+            continue
+        priced.append(
+            {
+                "event_id": prediction.event_id,
+                "event_start_utc": prediction.event_start_utc,
+                "away_team": prediction.away_team,
+                "home_team": prediction.home_team,
+                "market_type": "moneyline",
+                "selection": selection,
+                "line": None,
+                "model_probability": prediction.probabilities[selection],
+                "model_uncertainty": prediction.uncertainty,
+                "model_version": prediction.model_version,
+                "feature_basis": prediction.feature_basis,
+                "rationale": prediction.rationale,
+                "market_slug": snapshot["market_slug"],
+                "executable_ask": float(ask),
+                "observed_at_utc": snapshot["observed_at_utc"],
+                "timestamp_valid": True,
+                "edge_vs_executable_ask": round(
+                    prediction.probabilities[selection] - float(ask),
+                    6,
+                ),
+            }
+        )
+
     model_source = Path(__file__).with_name("models") / "soccer.py"
     code_hash = hashlib.sha256(model_source.read_bytes()).hexdigest()
     return {

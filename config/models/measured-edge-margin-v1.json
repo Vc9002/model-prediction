@@ -6,5 +6,7 @@
   "offset": 0.075,
   "trained_on_games": 2430,
   "trained_through_date": "2026-07-16",
-  "artifact_hash": "16dfbbeccdaaf591d67a698cab6894a48c4c5d2023cabd07b8adb51abb2efa43"
+  "model_name": "Measured Edge Margin",
+  "calibration_version": "measured-edge-margin-v1",
+  "artifact_hash": "bd86494ed21c6a0389ab0efcf4b8a5bb7b9f8f8786b6d5fb9da69d8cf0a70bdc"
 }
