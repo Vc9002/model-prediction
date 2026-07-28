@@ -17,7 +17,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import suppress
 from dataclasses import asdict, replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -945,11 +945,16 @@ def _forecast_learned_sport(
     if log and to_log and registry is not None and bans is not None and ledger is not None:
         data_root = Path(ledger_path(config)).parent
         # --force is meant for backfilling a past date's picks using genuinely
-        # point-in-time data (frozen at midnight of args_date, matching the
-        # candidate-generation observed_at above) — request.validate()'s
-        # "cannot create a call after the event has started" check needs this
-        # same frozen timestamp, not real wall-clock time, or every game that
-        # has since started gets rejected regardless of --force.
+        # point-in-time data — request.validate()'s "cannot create a call
+        # after the event has started" check needs a frozen (non-wall-clock)
+        # timestamp, or every game that has since started gets rejected
+        # regardless of --force. A single global freeze for the whole date
+        # (e.g. midnight UTC) doesn't work: real Polymarket quote captures
+        # for a date don't start until hours after midnight, so no captured
+        # quote can ever be "as of midnight" and every one gets rejected by
+        # the same validate() call as "in the future" relative to that
+        # frozen instant. Each game gets its own effective decision time
+        # instead (just before ITS OWN first pitch) — see effective_now below.
         # Main ledger: ONLY production sports (MLB, WNBA) — everything else goes to flat/research.
         # Flat ledger: every game gets diagnostic edge-scaled units.
         research_routed = False
@@ -967,6 +972,13 @@ def _forecast_learned_sport(
                 }
         configured_state = str(model_config.get("status", "research"))
         for candidate in to_log:
+            if force:
+                try:
+                    effective_now = parse_utc(candidate.event_start_utc) - timedelta(seconds=1)
+                except ValueError:
+                    effective_now = decision_observed_at
+            else:
+                effective_now = decision_observed_at
             quote = match_executable_quote(data_root, sport, args_date, candidate)
             quote_warning: str | None = None
             if quote is None:
@@ -1049,7 +1061,7 @@ def _forecast_learned_sport(
                     if quote_warning
                     else "espn"
                 )
-                observed_at_utc = iso_utc(decision_observed_at) if quote_warning else None
+                observed_at_utc = iso_utc(effective_now) if quote_warning else None
                 decision_no_vig = None
                 rationale = (
                     f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
@@ -1114,10 +1126,10 @@ def _forecast_learned_sport(
                 ),
             )
             try:
-                request.validate(now=decision_observed_at)
+                request.validate(now=effective_now)
                 away = registry.resolve(request.league, request.away_team, request.event_start_utc)
                 home = registry.resolve(request.league, request.home_team, request.event_start_utc)
-                eligibility_kwargs: dict = {"now": decision_observed_at}
+                eligibility_kwargs: dict = {"now": effective_now}
                 if maximum_data_age_hours is not None:
                     eligibility_kwargs["maximum_age_hours"] = maximum_data_age_hours
                 if maximum_unreviewed_disagreement is not None:
@@ -1128,7 +1140,7 @@ def _forecast_learned_sport(
                     eligibility = evaluate_eligibility(
                         request, registry, bans,
                         (exposure_ledger or ledger).exposure(
-                            request, now=decision_observed_at,
+                            request, now=effective_now,
                             canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
                         ),
                         unit_policy(config), **eligibility_kwargs,
@@ -1165,7 +1177,7 @@ def _forecast_learned_sport(
                             ledger.append_evaluated(
                                 request,
                                 eligibility,
-                                now=decision_observed_at,
+                                now=effective_now,
                             )
                         )
                     # gated_ledger mirrors research_ledger but only for rows
@@ -1178,7 +1190,7 @@ def _forecast_learned_sport(
                             gated_ledger.append_evaluated(
                                 request,
                                 eligibility,
-                                now=decision_observed_at,
+                                now=effective_now,
                             )
             except DuplicatePickError as error:
                 duplicates.append(error.pick_id)
