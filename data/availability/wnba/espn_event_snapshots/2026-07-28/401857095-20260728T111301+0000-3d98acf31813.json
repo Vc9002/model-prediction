@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "2529458",
+      "current_status": "Out",
+      "player_name": "Cheyenne Parker-Tyus",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-27T23:54:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4433633",
+      "current_status": "Out",
+      "player_name": "Kierstan Bell",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-27T23:51:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4565501",
+      "current_status": "Out",
+      "player_name": "Janiah Barker",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-15T23:46:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4703794",
+      "current_status": "Out",
+      "player_name": "Sarah Ashlee Barker",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-24T15:18:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4433795",
+      "current_status": "Out",
+      "player_name": "Sania Feagin",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-09T23:15:00+00:00",
+      "team": "Portland Fire"
+    }
+  ],
+  "event_id": "401857095",
+  "observed_at_utc": "2026-07-28T11:13:01.593381+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "3d98acf318134ba13779aada4edd9a080b039cbaa4925428f89fabdfeb7c0738",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}
