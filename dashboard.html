@@ -1406,9 +1406,12 @@ async function renderGatedResearchPerf(){
 }
 
 /* ---------- Today tab ---------- */
+let todayRenderToken=0;
 async function renderToday(){
+  const myToken=++todayRenderToken;
   let t;
   try{t=await api("/api/today");}catch(e){$("#todayPicks").innerHTML='<div class="red small">server unreachable</div>';return;}
+  if(myToken!==todayRenderToken)return; // a newer renderToday() call superseded this one
   $("#todayDate").textContent="— "+t.date;
   $("#todayKpis").innerHTML=`
     <div class="k"><b>${t.count}</b><span>picks today</span></div>
@@ -1435,13 +1438,19 @@ async function renderToday(){
     box.appendChild(h);
     rows.forEach(p=>{
       const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
-      const market=pregamePrice(p);
-      const edge=pickEdge(p);
+      // No real executable quote was matched -- the row's "market price" is a
+      // neutral -110 placeholder (cli.py's quote_warning fallback), not a real
+      // Polymarket price. A computed edge/EV badge/suggested size against a
+      // fabricated price would misrepresent a model-opinion-only row as an
+      // actionable +EV pick.
+      const noQuote=p.sportsbook==="model_opinion_no_executable_quote";
+      const market=noQuote?null:pregamePrice(p);
+      const edge=noQuote?null:pickEdge(p);
       // Border reflects tailability: green only when the model DISAGREES with
       // the market in our favor. High confidence with negative edge is the
       // model being LESS sure than the market — research value, not a play.
-      const cls=(edge!=null&&edge<=0)?"":(conf>=0.65?"hi":conf>=0.60?"med":"");
-      const evBadge=edge==null?"":
+      const cls=noQuote?"":(edge!=null&&edge<=0)?"":(conf>=0.65?"hi":conf>=0.60?"med":"");
+      const evBadge=noQuote?'<span class="pill push">model opinion only</span>':edge==null?"":
         edge>0.02?'<span class="pill win">+EV vs market</span>':
         edge>0?'<span class="pill open">thin edge</span>':
         '<span class="pill push">no edge — research only</span>';
@@ -1450,32 +1459,33 @@ async function renderToday(){
       const actualU=Number(p.units)||0;
       const suggested=p.suggested_paper_units;
       const unitValue=Number(p.unit_value_usd||state.status?.unit_value_usd||7.5);
-      const sizing=actualU>0?`size <b class="green">${actualU.toFixed(2)}U / $${(actualU*unitValue).toFixed(2)}</b>`:
+      const sizing=noQuote?"":actualU>0?`size <b class="green">${actualU.toFixed(2)}U / $${(actualU*unitValue).toFixed(2)}</b>`:
         suggested>0?`size <b class="${edge>0?"green":"dim"}">${Number(suggested).toFixed(2)}U / $${(Number(suggested)*unitValue).toFixed(2)}</b> <span class="dim">(suggested paper)</span>`:"";
       const d=document.createElement("div");d.className="pick "+cls;
       d.innerHTML=`<div class="pick-row"><div class="pick-copy">
         <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et} · ${p.market_type}</span>${res}</div>
         <div class="pick-metrics"><span>pick <b>${esc(pickLabel(p))}</b></span>
         <span>model <b>${conf?pct(conf):"—"}</b></span>
-        <span>market <b>${cents(market)}</b> <span class="dim">(${market?pct(market):"—"})</span></span>
-        <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
+        <span>market <b>${noQuote?"no quote":cents(market)}</b> <span class="dim">${noQuote?"":"("+(market?pct(market):"—")+")"}</span></span>
+        <span>edge <b class="${edge>0?"green":"red"}">${noQuote?"—":edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
         ${sizing?`<span>${sizing}</span>`:""}<span class="dim">${p.model_version||""}</span>
         ${p.unavailable_features?`<span class="pill push" title="Fell back to a neutral default for this game — every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div><div class="pick-action">${orderControl(p,true)}</div></div>
-        <div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`;
+        ${noQuote?"":`<div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`}`;
       d.onclick=()=>showModal(`<h2>${p.away_team} @ ${p.home_team}</h2><pre>${esc(JSON.stringify(p,null,1))}</pre>`);
       box.appendChild(d);
     });
   }
   // ── Flat ledger picks (all model candidates, no edge gate) ──
-  loadFlatToday();
+  loadFlatToday(myToken);
   // ── Research picks (esports, soccer, etc.) ──
-  loadResearchToday();
+  loadResearchToday(myToken);
 }
-async function loadFlatToday(){
+async function loadFlatToday(token){
   const todayET=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset()-300);return d.toISOString().slice(0,10);};
   try{
     const flat=await api("/api/flat-picks");
+    if(token!==todayRenderToken)return; // a newer renderToday() call superseded this one
     const today=flat.filter(p=>{
       const start=p.event_start_utc||p.start_et||"";
       return start.startsWith(todayET());
@@ -1518,10 +1528,11 @@ async function loadFlatToday(){
     }
   }catch(e){/* flat picks unavailable */ }
 }
-async function loadResearchToday(){
+async function loadResearchToday(token){
   const todayET=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset()-300);return d.toISOString().slice(0,10);};
   try{
     const rp=await api("/api/research-picks");
+    if(token!==todayRenderToken)return; // a newer renderToday() call superseded this one
     const today=(Array.isArray(rp)?rp:[]).filter(p=>{
       const start=p.event_start_utc||p.start_et||"";
       return start.startsWith(todayET());
