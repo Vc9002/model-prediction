@@ -68,3 +68,29 @@ OSError: [Errno 48] Address already in use
 2026-07-26T12:27:32 job finished: daily-1785068338 :: ok in 513.4s
 2026-07-26T17:52:12 job started: daily-1785088332 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
 2026-07-26T17:57:32 job finished: daily-1785088332 :: ok in 320.1s
+2026-07-26T18:55:31 job started: daily-1785092131 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T18:57:31 job finished: daily-1785092131 :: ok in 119.9s
+2026-07-26T19:30:39 job started: daily-1785094239 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T19:32:38 job finished: daily-1785094239 :: ok in 118.1s
+2026-07-26T20:04:39 job started: daily-1785096279 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-26T20:06:33 job finished: daily-1785096279 :: ok in 114.1s
+2026-07-26T20:09:56 job started: main_forecast-1785096596 :: forecast --all --date 2026-07-26 --log --replace-today --model learned
+2026-07-26T20:11:23 job finished: main_forecast-1785096596 :: ok in 86.7s
+2026-07-27T01:51:39 job started: daily-1785117099 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-27T01:53:50 job finished: daily-1785117099 :: ok in 130.8s
+2026-07-27T02:58:21 job started: daily-1785121101 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-27T02:59:54 job finished: daily-1785121101 :: ok in 92.3s
+2026-07-27T05:22:52 job started: daily-1785129772 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-27T05:25:19 job finished: daily-1785129772 :: ok in 147.7s
+2026-07-27T15:49:46 job started: refresh_prices-1785167386 :: --contract mlb@2026-07-27=aec-mlb-nyy-cws-2026-07-27 --contract mlb@2026-07-27=aec-mlb-chc-stl-2026-07-27 --contract mlb@2026-07-27=aec-mlb-hou-laa-2026-07-27 --contract mlb@2026-07-27=aec-mlb-bos-ath-2026-07-27
+2026-07-27T15:49:51 job finished: refresh_prices-1785167386 :: ok in 5.0s
+2026-07-27T17:03:32 job started: daily-1785171812 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-27T17:08:44 job finished: daily-1785171812 :: ok in 312.1s
+2026-07-27T17:33:18 job started: daily-1785173598 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-27T17:38:33 job finished: daily-1785173598 :: ok in 314.8s
+2026-07-27T17:39:22 job started: refresh_prices-1785173962 :: --contract mlb@2026-07-27=aec-mlb-nyy-cws-2026-07-27 --contract mlb@2026-07-27=aec-mlb-chc-stl-2026-07-27 --contract mlb@2026-07-27=aec-mlb-hou-laa-2026-07-27 --contract mlb@2026-07-27=aec-mlb-bos-ath-2026-07-27
+2026-07-27T17:39:28 job finished: refresh_prices-1785173962 :: ok in 5.8s
+2026-07-27T17:44:37 job started: refresh_prices-1785174277 :: --contract mlb@2026-07-27=aec-mlb-nyy-cws-2026-07-27 --contract mlb@2026-07-27=aec-mlb-chc-stl-2026-07-27 --contract mlb@2026-07-27=aec-mlb-hou-laa-2026-07-27 --contract mlb@2026-07-27=aec-mlb-bos-ath-2026-07-27
+2026-07-27T17:44:43 job finished: refresh_prices-1785174277 :: ok in 6.0s
+2026-07-28T02:06:04 job started: daily-1785204364 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-07-28T02:08:58 job finished: daily-1785204364 :: ok in 174.2s

@@ -1,0 +1,229 @@
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime
+
+from model_prediction.tennis_forward import build_tennis_slate
+
+
+def _write_history(tmp_path, count=60):
+    history_path = tmp_path / "processed" / "tennis" / "games.jsonl"
+    history_path.parent.mkdir(parents=True)
+    rows = []
+    for index in range(count):
+        rows.append(
+            {
+                "event_id": f"history-{index}",
+                "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+                "league": "WTA",
+                "winner": "Alpha Player" if index % 2 else "Beta Player",
+                "loser": "Beta Player" if index % 2 else "Alpha Player",
+                "surface": "Hard",
+                "match_date": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+            }
+        )
+    history_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+
+def _write_snapshot(tmp_path, **overrides):
+    snapshot_path = tmp_path / "odds" / "tennis" / "2026-07-27" / "polymarket_snapshots.jsonl"
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    row = {
+        "event_start_utc": "2026-07-27T20:00:00Z",
+        "observed_at_utc": "2026-07-27T12:00:00Z",
+        "timestamp_valid": True,
+        "market_type": "moneyline",
+        "league": "WTA",
+        "market_slug": "wta-alpha-beta-2026-07-27",
+        "long": {"description": "Alpha Player", "ask": 0.42},
+        "short": {"description": "Beta Player", "ask": 0.6},
+    }
+    row.update(overrides)
+    with snapshot_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row) + "\n")
+
+
+class Client:
+    @staticmethod
+    def scoreboard(league, game_date):
+        assert league == "WTA"
+        return {
+            "events": [
+                {
+                    "id": "espn-1",
+                    "date": "2026-07-27T20:00:00Z",
+                    "name": "Test Open",
+                    "groupings": [
+                        {
+                            "grouping": {"displayName": "Women's Singles"},
+                            "competitions": [
+                                {
+                                    "id": "c1",
+                                    "date": "2026-07-27T20:00:00Z",
+                                    "type": {"slug": "womens-singles"},
+                                    "status": {"type": {"completed": False}},
+                                    "competitors": [
+                                        {
+                                            "homeAway": "away",
+                                            "athlete": {"displayName": "Alpha Player"},
+                                        },
+                                        {
+                                            "homeAway": "home",
+                                            "athlete": {"displayName": "Beta Player"},
+                                        },
+                                    ],
+                                }
+                            ],
+                        },
+                        {
+                            "grouping": {"displayName": "Women's Doubles"},
+                            "competitions": [
+                                {
+                                    "id": "c2",
+                                    "date": "2026-07-27T20:00:00Z",
+                                    "type": {"slug": "womens-doubles"},
+                                    "status": {"type": {"completed": False}},
+                                    "competitors": [
+                                        {
+                                            "homeAway": "away",
+                                            "roster": {
+                                                "athletes": [
+                                                    {"displayName": "Gamma Player"},
+                                                    {"displayName": "Delta Player"},
+                                                ]
+                                            },
+                                        },
+                                        {
+                                            "homeAway": "home",
+                                            "roster": {
+                                                "athletes": [
+                                                    {"displayName": "Epsilon Player"},
+                                                    {"displayName": "Zeta Player"},
+                                                ]
+                                            },
+                                        },
+                                    ],
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ]
+        }
+
+
+class _CombinedTournamentClient(Client):
+    """The WTA endpoint returns the SAME combined event -- including its
+    Men's Singles grouping -- for shared ATP+WTA tournaments (verified live
+    2026-07-27). Discovery must filter to Women's Singles specifically, not
+    just "singles" generically, or a men's match would be treated as a WTA
+    match with no possible real Polymarket counterpart."""
+
+    @staticmethod
+    def scoreboard(league, game_date):
+        payload = Client.scoreboard(league, game_date)
+        payload["events"][0]["groupings"].append(
+            {
+                "grouping": {"displayName": "Men's Singles"},
+                "competitions": [
+                    {
+                        "id": "c3",
+                        "date": "2026-07-27T20:00:00Z",
+                        "type": {"slug": "mens-singles"},
+                        "status": {"type": {"completed": False}},
+                        "competitors": [
+                            {"homeAway": "away", "athlete": {"displayName": "Men Player One"}},
+                            {"homeAway": "home", "athlete": {"displayName": "Men Player Two"}},
+                        ],
+                    }
+                ],
+            }
+        )
+        return payload
+
+
+def test_tennis_forward_excludes_mens_singles_returned_by_the_wta_endpoint(tmp_path) -> None:
+    _write_history(tmp_path)
+    _write_snapshot(tmp_path)
+
+    result = build_tennis_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=_CombinedTournamentClient(),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    assert result["scheduled_games"] == 1
+    assert all(
+        "Men Player" not in c["away_team"] and "Men Player" not in c["home_team"]
+        for c in result["priced_contracts"]
+    )
+
+
+def test_tennis_forward_prices_singles_moneyline_and_excludes_doubles(tmp_path) -> None:
+    _write_history(tmp_path)
+    _write_snapshot(tmp_path)
+
+    result = build_tennis_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    assert result["model_version"] == "tennis-surface-elo-v1"
+    assert result["scheduled_games"] == 1
+    assert result["priced_count"] == 1
+    contract = result["priced_contracts"][0]
+    assert contract["market_type"] == "moneyline"
+    assert contract["line"] is None
+    assert contract["away_team"] == "Alpha Player"
+    assert contract["home_team"] == "Beta Player"
+    assert contract["selection"] in {"away", "home"}
+    expected_ask = 0.42 if contract["selection"] == "away" else 0.6
+    assert contract["executable_ask"] == expected_ask
+
+
+def test_tennis_forward_reports_no_op_when_no_moneyline_snapshot_exists(tmp_path) -> None:
+    _write_history(tmp_path)
+
+    result = build_tennis_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    assert result["scheduled_games"] == 1
+    assert result["priced_count"] == 0
+    assert len(result["unmatched"]) == 1
+
+
+class _ClayTournamentClient(Client):
+    @staticmethod
+    def scoreboard(league, game_date):
+        payload = Client.scoreboard(league, game_date)
+        payload["events"][0]["name"] = "Roland Garros"
+        return payload
+
+
+def test_tennis_forward_infers_surface_from_tournament_name_for_live_matches(tmp_path) -> None:
+    """A live/upcoming match must not always default to Hard -- surface
+    should be inferred from the tournament name the same way the historical
+    Elo-build path already does (data_sources/espn.py::_infer_tennis_surface),
+    otherwise surface-blending is inert at forecast time."""
+    _write_history(tmp_path)
+    _write_snapshot(tmp_path)
+
+    result = build_tennis_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=_ClayTournamentClient(),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    assert result["priced_count"] == 1
+    assert result["priced_contracts"][0]["feature_basis"]["surface"] == "Clay"

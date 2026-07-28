@@ -1,0 +1,1969 @@
+{
+  "bo3:7:19211": {
+    "acronym": null,
+    "name": "Washington Wizards",
+    "slug": "washington-wizards",
+    "source_team_id": 19211,
+    "team_id": "bo3:7:19211"
+  },
+  "bo3:7:19212": {
+    "acronym": null,
+    "name": "Asparaguus",
+    "slug": "asparaguus",
+    "source_team_id": 19212,
+    "team_id": "bo3:7:19212"
+  },
+  "bo3:7:19213": {
+    "acronym": null,
+    "name": "Ex-ITB Academy",
+    "slug": "ex-itb-academy",
+    "source_team_id": 19213,
+    "team_id": "bo3:7:19213"
+  },
+  "bo3:7:19214": {
+    "acronym": null,
+    "name": "ex-Into The Breach",
+    "slug": "ex-into-the-breach-1",
+    "source_team_id": 19214,
+    "team_id": "bo3:7:19214"
+  },
+  "bo3:7:19215": {
+    "acronym": null,
+    "name": "RazaH Company Academy",
+    "slug": "razah-company-academy",
+    "source_team_id": 19215,
+    "team_id": "bo3:7:19215"
+  },
+  "bo3:7:19216": {
+    "acronym": null,
+    "name": "JJ and Co",
+    "slug": "jj-and-co",
+    "source_team_id": 19216,
+    "team_id": "bo3:7:19216"
+  },
+  "bo3:7:19217": {
+    "acronym": null,
+    "name": "Wildcard Aces",
+    "slug": "wildcard-aces-1",
+    "source_team_id": 19217,
+    "team_id": "bo3:7:19217"
+  },
+  "bo3:7:19218": {
+    "acronym": null,
+    "name": "FLUFFY AIMERS",
+    "slug": "fluffy-aimers-1",
+    "source_team_id": 19218,
+    "team_id": "bo3:7:19218"
+  },
+  "bo3:7:19219": {
+    "acronym": null,
+    "name": "The Bay Harbour Butchers",
+    "slug": "the-bay-harbour-butchers",
+    "source_team_id": 19219,
+    "team_id": "bo3:7:19219"
+  },
+  "bo3:7:19220": {
+    "acronym": null,
+    "name": "BANDSCOAST",
+    "slug": "bandscoast",
+    "source_team_id": 19220,
+    "team_id": "bo3:7:19220"
+  },
+  "bo3:7:19221": {
+    "acronym": null,
+    "name": "Evil Connections Esports",
+    "slug": "evil-connections-esports",
+    "source_team_id": 19221,
+    "team_id": "bo3:7:19221"
+  },
+  "bo3:7:19222": {
+    "acronym": null,
+    "name": "SpaceShoobs!",
+    "slug": "spaceshoobs",
+    "source_team_id": 19222,
+    "team_id": "bo3:7:19222"
+  },
+  "bo3:7:19223": {
+    "acronym": null,
+    "name": "Garage Talks",
+    "slug": "garage-talks",
+    "source_team_id": 19223,
+    "team_id": "bo3:7:19223"
+  },
+  "bo3:7:19224": {
+    "acronym": null,
+    "name": "Friendship Team",
+    "slug": "friendship-team",
+    "source_team_id": 19224,
+    "team_id": "bo3:7:19224"
+  },
+  "bo3:7:19225": {
+    "acronym": null,
+    "name": "Loyalty Is Scarce",
+    "slug": "loyalty-is-scarce",
+    "source_team_id": 19225,
+    "team_id": "bo3:7:19225"
+  },
+  "bo3:7:19226": {
+    "acronym": null,
+    "name": "Qor Gaming",
+    "slug": "qor-gaming",
+    "source_team_id": 19226,
+    "team_id": "bo3:7:19226"
+  },
+  "bo3:7:19227": {
+    "acronym": null,
+    "name": "Amo Minha Ex",
+    "slug": "amo-minha-ex",
+    "source_team_id": 19227,
+    "team_id": "bo3:7:19227"
+  },
+  "bo3:7:19228": {
+    "acronym": null,
+    "name": "Stellae Gaming",
+    "slug": "stellae-gaming-1",
+    "source_team_id": 19228,
+    "team_id": "bo3:7:19228"
+  },
+  "bo3:7:19229": {
+    "acronym": null,
+    "name": "123 Team",
+    "slug": "123-team",
+    "source_team_id": 19229,
+    "team_id": "bo3:7:19229"
+  },
+  "bo3:7:19230": {
+    "acronym": null,
+    "name": "LOS",
+    "slug": "los-1",
+    "source_team_id": 19230,
+    "team_id": "bo3:7:19230"
+  },
+  "bo3:7:19231": {
+    "acronym": null,
+    "name": "CL4L",
+    "slug": "cl4l",
+    "source_team_id": 19231,
+    "team_id": "bo3:7:19231"
+  },
+  "bo3:7:19232": {
+    "acronym": null,
+    "name": "Project X",
+    "slug": "project-x-1",
+    "source_team_id": 19232,
+    "team_id": "bo3:7:19232"
+  },
+  "bo3:7:19233": {
+    "acronym": null,
+    "name": "Into The Breach Academy",
+    "slug": "into-the-breach-academy-1",
+    "source_team_id": 19233,
+    "team_id": "bo3:7:19233"
+  },
+  "bo3:7:19235": {
+    "acronym": null,
+    "name": "Winter Bear",
+    "slug": "winter-bear-1",
+    "source_team_id": 19235,
+    "team_id": "bo3:7:19235"
+  },
+  "bo3:7:19236": {
+    "acronym": null,
+    "name": "7REX TEAM",
+    "slug": "7rex-team",
+    "source_team_id": 19236,
+    "team_id": "bo3:7:19236"
+  },
+  "bo3:7:19237": {
+    "acronym": null,
+    "name": "True Synergy Gaming",
+    "slug": "true-synergy-gaming",
+    "source_team_id": 19237,
+    "team_id": "bo3:7:19237"
+  },
+  "bo3:7:19238": {
+    "acronym": null,
+    "name": "Lycus Empire",
+    "slug": "lycus-empire-2",
+    "source_team_id": 19238,
+    "team_id": "bo3:7:19238"
+  },
+  "bo3:7:19239": {
+    "acronym": null,
+    "name": "Prodigy",
+    "slug": "prodigy-1",
+    "source_team_id": 19239,
+    "team_id": "bo3:7:19239"
+  },
+  "bo3:7:19240": {
+    "acronym": null,
+    "name": "Outlast",
+    "slug": "outlast",
+    "source_team_id": 19240,
+    "team_id": "bo3:7:19240"
+  },
+  "bo3:7:19241": {
+    "acronym": null,
+    "name": "Orgless-kr",
+    "slug": "orgless-kr",
+    "source_team_id": 19241,
+    "team_id": "bo3:7:19241"
+  },
+  "bo3:7:19242": {
+    "acronym": null,
+    "name": "w7m esports Academy",
+    "slug": "w7m-esports-academy",
+    "source_team_id": 19242,
+    "team_id": "bo3:7:19242"
+  },
+  "bo3:7:19243": {
+    "acronym": null,
+    "name": "Thrive",
+    "slug": "thrive",
+    "source_team_id": 19243,
+    "team_id": "bo3:7:19243"
+  },
+  "bo3:7:19244": {
+    "acronym": null,
+    "name": "EASTSIDE",
+    "slug": "eastside",
+    "source_team_id": 19244,
+    "team_id": "bo3:7:19244"
+  },
+  "bo3:7:19245": {
+    "acronym": null,
+    "name": "The Vicious Esports",
+    "slug": "the-vicious-esports",
+    "source_team_id": 19245,
+    "team_id": "bo3:7:19245"
+  },
+  "bo3:7:19246": {
+    "acronym": null,
+    "name": "PrevailANZ",
+    "slug": "prevail",
+    "source_team_id": 19246,
+    "team_id": "bo3:7:19246"
+  },
+  "bo3:7:19247": {
+    "acronym": null,
+    "name": "Rival Esports",
+    "slug": "rival-esports",
+    "source_team_id": 19247,
+    "team_id": "bo3:7:19247"
+  },
+  "bo3:7:19248": {
+    "acronym": null,
+    "name": "DOPENESS",
+    "slug": "dopeness-1",
+    "source_team_id": 19248,
+    "team_id": "bo3:7:19248"
+  },
+  "bo3:7:19250": {
+    "acronym": null,
+    "name": "yiyo",
+    "slug": "yiyo",
+    "source_team_id": 19250,
+    "team_id": "bo3:7:19250"
+  },
+  "bo3:7:19251": {
+    "acronym": null,
+    "name": "Ex-Beyond Stratos Gaming",
+    "slug": "ex-beyond-stratos-gaming",
+    "source_team_id": 19251,
+    "team_id": "bo3:7:19251"
+  },
+  "bo3:7:19252": {
+    "acronym": null,
+    "name": "CarrotMarket",
+    "slug": "carrotmarket",
+    "source_team_id": 19252,
+    "team_id": "bo3:7:19252"
+  },
+  "bo3:7:19254": {
+    "acronym": null,
+    "name": "Cloud9 Beastcoast",
+    "slug": "cloud9-beastcoast",
+    "source_team_id": 19254,
+    "team_id": "bo3:7:19254"
+  },
+  "bo3:7:19255": {
+    "acronym": null,
+    "name": "The Forgotten Days",
+    "slug": "the-forgotten-days",
+    "source_team_id": 19255,
+    "team_id": "bo3:7:19255"
+  },
+  "bo3:7:19256": {
+    "acronym": null,
+    "name": "Make Your Destiny",
+    "slug": "make-your-destiny-1",
+    "source_team_id": 19256,
+    "team_id": "bo3:7:19256"
+  },
+  "bo3:7:19257": {
+    "acronym": null,
+    "name": "E1 Academy",
+    "slug": "e1-academy",
+    "source_team_id": 19257,
+    "team_id": "bo3:7:19257"
+  },
+  "bo3:7:19258": {
+    "acronym": null,
+    "name": "Spacestation Gaming Academy",
+    "slug": "spacestation-gaming-academy",
+    "source_team_id": 19258,
+    "team_id": "bo3:7:19258"
+  },
+  "bo3:7:19259": {
+    "acronym": null,
+    "name": "Los Mangos",
+    "slug": "los-mangos",
+    "source_team_id": 19259,
+    "team_id": "bo3:7:19259"
+  },
+  "bo3:7:19260": {
+    "acronym": null,
+    "name": "Team Nemophila",
+    "slug": "team-nemophila",
+    "source_team_id": 19260,
+    "team_id": "bo3:7:19260"
+  },
+  "bo3:7:19261": {
+    "acronym": null,
+    "name": "REALIZE",
+    "slug": "realize",
+    "source_team_id": 19261,
+    "team_id": "bo3:7:19261"
+  },
+  "bo3:7:19262": {
+    "acronym": null,
+    "name": "PSG Talon",
+    "slug": "psg-talon-1",
+    "source_team_id": 19262,
+    "team_id": "bo3:7:19262"
+  },
+  "bo3:7:19263": {
+    "acronym": null,
+    "name": "Passion Esports",
+    "slug": "passion-esports",
+    "source_team_id": 19263,
+    "team_id": "bo3:7:19263"
+  },
+  "bo3:7:19264": {
+    "acronym": null,
+    "name": "ROC Esports",
+    "slug": "roc-esports",
+    "source_team_id": 19264,
+    "team_id": "bo3:7:19264"
+  },
+  "bo3:7:19265": {
+    "acronym": null,
+    "name": "Vision Esports",
+    "slug": "vision-esports-1",
+    "source_team_id": 19265,
+    "team_id": "bo3:7:19265"
+  },
+  "bo3:7:19266": {
+    "acronym": null,
+    "name": "Onyx Ravens",
+    "slug": "onyx-ravens-1",
+    "source_team_id": 19266,
+    "team_id": "bo3:7:19266"
+  },
+  "bo3:7:19267": {
+    "acronym": null,
+    "name": "Dabbe E-Sport",
+    "slug": "dabbe-e-sport",
+    "source_team_id": 19267,
+    "team_id": "bo3:7:19267"
+  },
+  "bo3:7:19268": {
+    "acronym": null,
+    "name": "Daystar",
+    "slug": "daystar-1",
+    "source_team_id": 19268,
+    "team_id": "bo3:7:19268"
+  },
+  "bo3:7:19269": {
+    "acronym": null,
+    "name": "Knock Knock",
+    "slug": "knock-knock",
+    "source_team_id": 19269,
+    "team_id": "bo3:7:19269"
+  },
+  "bo3:7:19270": {
+    "acronym": null,
+    "name": "Orgless LATAM North",
+    "slug": "orgless-latam-north",
+    "source_team_id": 19270,
+    "team_id": "bo3:7:19270"
+  },
+  "bo3:7:19271": {
+    "acronym": null,
+    "name": "Panic Esports",
+    "slug": "panic-esports",
+    "source_team_id": 19271,
+    "team_id": "bo3:7:19271"
+  },
+  "bo3:7:19272": {
+    "acronym": null,
+    "name": "6Targets Esports",
+    "slug": "6targets-esports",
+    "source_team_id": 19272,
+    "team_id": "bo3:7:19272"
+  },
+  "bo3:7:19273": {
+    "acronym": null,
+    "name": "Man eSports LFO",
+    "slug": "man-esports-lfo",
+    "source_team_id": 19273,
+    "team_id": "bo3:7:19273"
+  },
+  "bo3:7:19274": {
+    "acronym": null,
+    "name": "Antic Esports",
+    "slug": "antic-esports-1",
+    "source_team_id": 19274,
+    "team_id": "bo3:7:19274"
+  },
+  "bo3:7:19275": {
+    "acronym": null,
+    "name": "Vasco eSports",
+    "slug": "vasco-esports",
+    "source_team_id": 19275,
+    "team_id": "bo3:7:19275"
+  },
+  "bo3:7:19276": {
+    "acronym": null,
+    "name": "NXT Player",
+    "slug": "nxt-player",
+    "source_team_id": 19276,
+    "team_id": "bo3:7:19276"
+  },
+  "bo3:7:19278": {
+    "acronym": null,
+    "name": "ENTER FORCE.36",
+    "slug": "enter-force36",
+    "source_team_id": 19278,
+    "team_id": "bo3:7:19278"
+  },
+  "bo3:7:19279": {
+    "acronym": null,
+    "name": "KINOTROPE gaming",
+    "slug": "kinotrope-gaming",
+    "source_team_id": 19279,
+    "team_id": "bo3:7:19279"
+  },
+  "bo3:7:19280": {
+    "acronym": null,
+    "name": "Fluxo",
+    "slug": "fluxo-1",
+    "source_team_id": 19280,
+    "team_id": "bo3:7:19280"
+  },
+  "bo3:7:19281": {
+    "acronym": null,
+    "name": "Mir Gaming",
+    "slug": "mir-gaming",
+    "source_team_id": 19281,
+    "team_id": "bo3:7:19281"
+  },
+  "bo3:7:19282": {
+    "acronym": null,
+    "name": "ENCE",
+    "slug": "ence-1",
+    "source_team_id": 19282,
+    "team_id": "bo3:7:19282"
+  },
+  "bo3:7:19283": {
+    "acronym": null,
+    "name": "G Who",
+    "slug": "g-who",
+    "source_team_id": 19283,
+    "team_id": "bo3:7:19283"
+  },
+  "bo3:7:19284": {
+    "acronym": null,
+    "name": "SONS OF PETAH",
+    "slug": "sons-of-petah",
+    "source_team_id": 19284,
+    "team_id": "bo3:7:19284"
+  },
+  "bo3:7:19285": {
+    "acronym": null,
+    "name": "Yutoru",
+    "slug": "yutoru-1",
+    "source_team_id": 19285,
+    "team_id": "bo3:7:19285"
+  },
+  "bo3:7:19289": {
+    "acronym": null,
+    "name": "VITE",
+    "slug": "vite-1",
+    "source_team_id": 19289,
+    "team_id": "bo3:7:19289"
+  },
+  "bo3:7:19295": {
+    "acronym": null,
+    "name": "Odium",
+    "slug": "odium-1",
+    "source_team_id": 19295,
+    "team_id": "bo3:7:19295"
+  },
+  "bo3:7:19298": {
+    "acronym": null,
+    "name": "Barbie Boys",
+    "slug": "barbie-boys",
+    "source_team_id": 19298,
+    "team_id": "bo3:7:19298"
+  },
+  "bo3:7:19303": {
+    "acronym": null,
+    "name": "Hasib Warriors",
+    "slug": "hasib-warriors",
+    "source_team_id": 19303,
+    "team_id": "bo3:7:19303"
+  },
+  "bo3:7:19307": {
+    "acronym": null,
+    "name": "Into The Breach",
+    "slug": "into-the-breach-1",
+    "source_team_id": 19307,
+    "team_id": "bo3:7:19307"
+  },
+  "bo3:7:19308": {
+    "acronym": null,
+    "name": "GELIDA Esports",
+    "slug": "gelida-esports-1",
+    "source_team_id": 19308,
+    "team_id": "bo3:7:19308"
+  },
+  "bo3:7:19309": {
+    "acronym": null,
+    "name": "NoCapR6",
+    "slug": "nocapr6",
+    "source_team_id": 19309,
+    "team_id": "bo3:7:19309"
+  },
+  "bo3:7:19310": {
+    "acronym": null,
+    "name": "Keyd Stars",
+    "slug": "keyd-stars-1",
+    "source_team_id": 19310,
+    "team_id": "bo3:7:19310"
+  },
+  "bo3:7:19311": {
+    "acronym": null,
+    "name": "E1 Sports",
+    "slug": "e1-sports",
+    "source_team_id": 19311,
+    "team_id": "bo3:7:19311"
+  },
+  "bo3:7:19312": {
+    "acronym": null,
+    "name": "Before & After",
+    "slug": "before-after",
+    "source_team_id": 19312,
+    "team_id": "bo3:7:19312"
+  },
+  "bo3:7:19313": {
+    "acronym": null,
+    "name": "WEBL",
+    "slug": "webl",
+    "source_team_id": 19313,
+    "team_id": "bo3:7:19313"
+  },
+  "bo3:7:19320": {
+    "acronym": null,
+    "name": "CintaNegra Esports",
+    "slug": "cintanegra-esports",
+    "source_team_id": 19320,
+    "team_id": "bo3:7:19320"
+  },
+  "bo3:7:19325": {
+    "acronym": null,
+    "name": "Karn & Co",
+    "slug": "karn-co",
+    "source_team_id": 19325,
+    "team_id": "bo3:7:19325"
+  },
+  "bo3:7:19329": {
+    "acronym": null,
+    "name": "REVEN ECLUB",
+    "slug": "reven-esports-1",
+    "source_team_id": 19329,
+    "team_id": "bo3:7:19329"
+  },
+  "bo3:7:19335": {
+    "acronym": null,
+    "name": "BlossoM",
+    "slug": "blossom-1",
+    "source_team_id": 19335,
+    "team_id": "bo3:7:19335"
+  },
+  "bo3:7:19336": {
+    "acronym": null,
+    "name": "Dplus",
+    "slug": "dplus-1",
+    "source_team_id": 19336,
+    "team_id": "bo3:7:19336"
+  },
+  "bo3:7:19337": {
+    "acronym": null,
+    "name": "Twisted Minds",
+    "slug": "twisted-minds-2",
+    "source_team_id": 19337,
+    "team_id": "bo3:7:19337"
+  },
+  "bo3:7:19340": {
+    "acronym": null,
+    "name": "Geekay Esports",
+    "slug": "geekay-esports-1",
+    "source_team_id": 19340,
+    "team_id": "bo3:7:19340"
+  },
+  "bo3:7:19342": {
+    "acronym": null,
+    "name": "AKATSUKI-TEAM",
+    "slug": "akatsuki-team",
+    "source_team_id": 19342,
+    "team_id": "bo3:7:19342"
+  },
+  "bo3:7:19345": {
+    "acronym": null,
+    "name": "Circular Spheres",
+    "slug": "circular-spheres",
+    "source_team_id": 19345,
+    "team_id": "bo3:7:19345"
+  },
+  "bo3:7:19348": {
+    "acronym": null,
+    "name": "Keltons Knights",
+    "slug": "keltons-knights",
+    "source_team_id": 19348,
+    "team_id": "bo3:7:19348"
+  },
+  "bo3:7:19354": {
+    "acronym": null,
+    "name": "Shaheens",
+    "slug": "shaheens",
+    "source_team_id": 19354,
+    "team_id": "bo3:7:19354"
+  },
+  "bo3:7:19356": {
+    "acronym": null,
+    "name": "Bleed Esports",
+    "slug": "bleed-esports-1",
+    "source_team_id": 19356,
+    "team_id": "bo3:7:19356"
+  },
+  "bo3:7:19362": {
+    "acronym": null,
+    "name": "Elevate Academy",
+    "slug": "elevate-academy",
+    "source_team_id": 19362,
+    "team_id": "bo3:7:19362"
+  },
+  "bo3:7:19363": {
+    "acronym": null,
+    "name": "M80",
+    "slug": "m80-1",
+    "source_team_id": 19363,
+    "team_id": "bo3:7:19363"
+  },
+  "bo3:7:19372": {
+    "acronym": null,
+    "name": "Team 86",
+    "slug": "team-86",
+    "source_team_id": 19372,
+    "team_id": "bo3:7:19372"
+  },
+  "bo3:7:19415": {
+    "acronym": null,
+    "name": "SuperNova Team",
+    "slug": "supernova-team",
+    "source_team_id": 19415,
+    "team_id": "bo3:7:19415"
+  },
+  "bo3:7:19430": {
+    "acronym": null,
+    "name": "Beyond Stratos Gaming",
+    "slug": "beyond-stratos-gaming",
+    "source_team_id": 19430,
+    "team_id": "bo3:7:19430"
+  },
+  "bo3:7:19435": {
+    "acronym": null,
+    "name": "Rebels Gaming",
+    "slug": "rebels-gaming-1",
+    "source_team_id": 19435,
+    "team_id": "bo3:7:19435"
+  },
+  "bo3:7:19439": {
+    "acronym": null,
+    "name": "Team Falcons",
+    "slug": "falcons-esport-1",
+    "source_team_id": 19439,
+    "team_id": "bo3:7:19439"
+  },
+  "bo3:7:19442": {
+    "acronym": null,
+    "name": "Father's Back",
+    "slug": "fathers-back-1",
+    "source_team_id": 19442,
+    "team_id": "bo3:7:19442"
+  },
+  "bo3:7:19444": {
+    "acronym": null,
+    "name": "Gaimin Gladiators",
+    "slug": "gaimin-gladiators-1",
+    "source_team_id": 19444,
+    "team_id": "bo3:7:19444"
+  },
+  "bo3:7:19447": {
+    "acronym": null,
+    "name": "Wolves Esports",
+    "slug": "wolves-esports-1",
+    "source_team_id": 19447,
+    "team_id": "bo3:7:19447"
+  },
+  "bo3:7:19464": {
+    "acronym": null,
+    "name": "ALPHA TEAM",
+    "slug": "alpha-team",
+    "source_team_id": 19464,
+    "team_id": "bo3:7:19464"
+  },
+  "bo3:7:19465": {
+    "acronym": null,
+    "name": "Arial Arise",
+    "slug": "arial-arise-1",
+    "source_team_id": 19465,
+    "team_id": "bo3:7:19465"
+  },
+  "bo3:7:19466": {
+    "acronym": null,
+    "name": "IGZIST",
+    "slug": "igzist-1",
+    "source_team_id": 19466,
+    "team_id": "bo3:7:19466"
+  },
+  "bo3:7:19476": {
+    "acronym": null,
+    "name": "Team Cruelty",
+    "slug": "team-cruelty-2",
+    "source_team_id": 19476,
+    "team_id": "bo3:7:19476"
+  },
+  "bo3:7:19479": {
+    "acronym": null,
+    "name": "Akave Esports",
+    "slug": "akave-esports-2",
+    "source_team_id": 19479,
+    "team_id": "bo3:7:19479"
+  },
+  "bo3:7:19493": {
+    "acronym": null,
+    "name": "Team Valor",
+    "slug": "team-valor-1",
+    "source_team_id": 19493,
+    "team_id": "bo3:7:19493"
+  },
+  "bo3:7:19502": {
+    "acronym": null,
+    "name": "FEARX",
+    "slug": "fearx-1",
+    "source_team_id": 19502,
+    "team_id": "bo3:7:19502"
+  },
+  "bo3:7:19503": {
+    "acronym": null,
+    "name": "BLUE BEES",
+    "slug": "blue-bees-1",
+    "source_team_id": 19503,
+    "team_id": "bo3:7:19503"
+  },
+  "bo3:7:19507": {
+    "acronym": null,
+    "name": "Maycam Evolve",
+    "slug": "maycam-evolve-1",
+    "source_team_id": 19507,
+    "team_id": "bo3:7:19507"
+  },
+  "bo3:7:19509": {
+    "acronym": null,
+    "name": "Hawks",
+    "slug": "hawks-1",
+    "source_team_id": 19509,
+    "team_id": "bo3:7:19509"
+  },
+  "bo3:7:19526": {
+    "acronym": null,
+    "name": "Team Bliss",
+    "slug": "team-bliss-1",
+    "source_team_id": 19526,
+    "team_id": "bo3:7:19526"
+  },
+  "bo3:7:19528": {
+    "acronym": null,
+    "name": "Dire Wolves",
+    "slug": "dire-wolves-1",
+    "source_team_id": 19528,
+    "team_id": "bo3:7:19528"
+  },
+  "bo3:7:19530": {
+    "acronym": null,
+    "name": "Six Karma",
+    "slug": "six-karma-1",
+    "source_team_id": 19530,
+    "team_id": "bo3:7:19530"
+  },
+  "bo3:7:19545": {
+    "acronym": null,
+    "name": "Leviat\u00e1n Esports",
+    "slug": "leviatan-esports-2",
+    "source_team_id": 19545,
+    "team_id": "bo3:7:19545"
+  },
+  "bo3:7:19551": {
+    "acronym": null,
+    "name": "Helios Gaming",
+    "slug": "helios-gaming",
+    "source_team_id": 19551,
+    "team_id": "bo3:7:19551"
+  },
+  "bo3:7:19580": {
+    "acronym": null,
+    "name": "Chiefs Esports Club",
+    "slug": "chiefs-esports-club-1",
+    "source_team_id": 19580,
+    "team_id": "bo3:7:19580"
+  },
+  "bo3:7:19597": {
+    "acronym": null,
+    "name": "WYLDE",
+    "slug": "wylde-1",
+    "source_team_id": 19597,
+    "team_id": "bo3:7:19597"
+  },
+  "bo3:7:19605": {
+    "acronym": null,
+    "name": "beastcoast",
+    "slug": "beastcoast-1",
+    "source_team_id": 19605,
+    "team_id": "bo3:7:19605"
+  },
+  "bo3:7:19610": {
+    "acronym": null,
+    "name": "Mkers",
+    "slug": "mkers-1",
+    "source_team_id": 19610,
+    "team_id": "bo3:7:19610"
+  },
+  "bo3:7:19620": {
+    "acronym": null,
+    "name": "Crest Gaming Lst",
+    "slug": "crest-gaming-lst",
+    "source_team_id": 19620,
+    "team_id": "bo3:7:19620"
+  },
+  "bo3:7:19628": {
+    "acronym": null,
+    "name": "9z Team",
+    "slug": "9z-team-r6",
+    "source_team_id": 19628,
+    "team_id": "bo3:7:19628"
+  },
+  "bo3:7:19629": {
+    "acronym": null,
+    "name": "Malvinas Gaming",
+    "slug": "malvinas-gaming-2",
+    "source_team_id": 19629,
+    "team_id": "bo3:7:19629"
+  },
+  "bo3:7:19636": {
+    "acronym": null,
+    "name": "Orgless",
+    "slug": "orgless-2",
+    "source_team_id": 19636,
+    "team_id": "bo3:7:19636"
+  },
+  "bo3:7:19639": {
+    "acronym": null,
+    "name": "Heretics",
+    "slug": "heretics-1",
+    "source_team_id": 19639,
+    "team_id": "bo3:7:19639"
+  },
+  "bo3:7:19641": {
+    "acronym": null,
+    "name": "MACKO Esports",
+    "slug": "macko-esports-1",
+    "source_team_id": 19641,
+    "team_id": "bo3:7:19641"
+  },
+  "bo3:7:19662": {
+    "acronym": null,
+    "name": "FURIA",
+    "slug": "furia-esports-1",
+    "source_team_id": 19662,
+    "team_id": "bo3:7:19662"
+  },
+  "bo3:7:19665": {
+    "acronym": null,
+    "name": "Soniqs",
+    "slug": "susquehanna-soniqs-1",
+    "source_team_id": 19665,
+    "team_id": "bo3:7:19665"
+  },
+  "bo3:7:19668": {
+    "acronym": null,
+    "name": "Virtus.pro",
+    "slug": "virtuspro-1",
+    "source_team_id": 19668,
+    "team_id": "bo3:7:19668"
+  },
+  "bo3:7:19671": {
+    "acronym": null,
+    "name": "Oxygen Esports",
+    "slug": "oxygen-esports-1",
+    "source_team_id": 19671,
+    "team_id": "bo3:7:19671"
+  },
+  "bo3:7:19677": {
+    "acronym": null,
+    "name": "TRIPPY",
+    "slug": "trippy",
+    "source_team_id": 19677,
+    "team_id": "bo3:7:19677"
+  },
+  "bo3:7:19679": {
+    "acronym": null,
+    "name": "Knights",
+    "slug": "knights-1",
+    "source_team_id": 19679,
+    "team_id": "bo3:7:19679"
+  },
+  "bo3:7:19682": {
+    "acronym": null,
+    "name": "Fury",
+    "slug": "fury-1",
+    "source_team_id": 19682,
+    "team_id": "bo3:7:19682"
+  },
+  "bo3:7:19684": {
+    "acronym": null,
+    "name": "SCARZ",
+    "slug": "scarz-1",
+    "source_team_id": 19684,
+    "team_id": "bo3:7:19684"
+  },
+  "bo3:7:19685": {
+    "acronym": null,
+    "name": "Cloud9",
+    "slug": "cloud9-2",
+    "source_team_id": 19685,
+    "team_id": "bo3:7:19685"
+  },
+  "bo3:7:19699": {
+    "acronym": null,
+    "name": "CAG Osaka",
+    "slug": "cag-osaka",
+    "source_team_id": 19699,
+    "team_id": "bo3:7:19699"
+  },
+  "bo3:7:19704": {
+    "acronym": null,
+    "name": "Elevate",
+    "slug": "elevate",
+    "source_team_id": 19704,
+    "team_id": "bo3:7:19704"
+  },
+  "bo3:7:19706": {
+    "acronym": null,
+    "name": "INTZ",
+    "slug": "intz",
+    "source_team_id": 19706,
+    "team_id": "bo3:7:19706"
+  },
+  "bo3:7:19707": {
+    "acronym": null,
+    "name": "Black Dragons",
+    "slug": "black-dragons-e-sports",
+    "source_team_id": 19707,
+    "team_id": "bo3:7:19707"
+  },
+  "bo3:7:19710": {
+    "acronym": null,
+    "name": "Luminosity Gaming",
+    "slug": "luminosity-gaming-1",
+    "source_team_id": 19710,
+    "team_id": "bo3:7:19710"
+  },
+  "bo3:7:19715": {
+    "acronym": null,
+    "name": "G2 Esports",
+    "slug": "g2-esports-1",
+    "source_team_id": 19715,
+    "team_id": "bo3:7:19715"
+  },
+  "bo3:7:19716": {
+    "acronym": null,
+    "name": "Shifters",
+    "slug": "shifters",
+    "source_team_id": 19716,
+    "team_id": "bo3:7:19716"
+  },
+  "bo3:7:19717": {
+    "acronym": null,
+    "name": "Wildcard",
+    "slug": "wildcard",
+    "source_team_id": 19717,
+    "team_id": "bo3:7:19717"
+  },
+  "bo3:7:19719": {
+    "acronym": null,
+    "name": "MIBR.LOS",
+    "slug": "mibr-2",
+    "source_team_id": 19719,
+    "team_id": "bo3:7:19719"
+  },
+  "bo3:7:19720": {
+    "acronym": null,
+    "name": "Team Liquid",
+    "slug": "team-liquid-1",
+    "source_team_id": 19720,
+    "team_id": "bo3:7:19720"
+  },
+  "bo3:7:19721": {
+    "acronym": null,
+    "name": "Ninjas in Pyjamas",
+    "slug": "ninjas-in-pyjamas-1",
+    "source_team_id": 19721,
+    "team_id": "bo3:7:19721"
+  },
+  "bo3:7:19723": {
+    "acronym": null,
+    "name": "Spacestation Gaming",
+    "slug": "spacestation-gaming-1",
+    "source_team_id": 19723,
+    "team_id": "bo3:7:19723"
+  },
+  "bo3:7:19727": {
+    "acronym": null,
+    "name": "Fnatic",
+    "slug": "fnatic-2",
+    "source_team_id": 19727,
+    "team_id": "bo3:7:19727"
+  },
+  "bo3:7:19728": {
+    "acronym": null,
+    "name": "FaZe Clan",
+    "slug": "faze-clan-1",
+    "source_team_id": 19728,
+    "team_id": "bo3:7:19728"
+  },
+  "bo3:7:19729": {
+    "acronym": null,
+    "name": "DarkZero",
+    "slug": "darkzero-esports-1",
+    "source_team_id": 19729,
+    "team_id": "bo3:7:19729"
+  },
+  "bo3:7:19758": {
+    "acronym": "NM",
+    "name": "No Meanies",
+    "slug": "no-meanies",
+    "source_team_id": 19758,
+    "team_id": "bo3:7:19758"
+  },
+  "bo3:7:19759": {
+    "acronym": "EA",
+    "name": "Eminem Academy",
+    "slug": "eminem-academy",
+    "source_team_id": 19759,
+    "team_id": "bo3:7:19759"
+  },
+  "bo3:7:19761": {
+    "acronym": "TJ",
+    "name": "TEAM JOEL",
+    "slug": "team-joel",
+    "source_team_id": 19761,
+    "team_id": "bo3:7:19761"
+  },
+  "bo3:7:19762": {
+    "acronym": "SR",
+    "name": "Shopify Rebellion",
+    "slug": "shopify-rebellion-r6",
+    "source_team_id": 19762,
+    "team_id": "bo3:7:19762"
+  },
+  "bo3:7:19763": {
+    "acronym": "UN",
+    "name": "Unwanted",
+    "slug": "unwanted",
+    "source_team_id": 19763,
+    "team_id": "bo3:7:19763"
+  },
+  "bo3:7:19764": {
+    "acronym": "Secret",
+    "name": "Team Secret",
+    "slug": "team-secret-rbs",
+    "source_team_id": 19764,
+    "team_id": "bo3:7:19764"
+  },
+  "bo3:7:20015": {
+    "acronym": "MYTH",
+    "name": "Myth Esports",
+    "slug": "myth-esports-r6",
+    "source_team_id": 20015,
+    "team_id": "bo3:7:20015"
+  },
+  "bo3:7:20016": {
+    "acronym": "TS.A",
+    "name": "Team Secret Academy",
+    "slug": "team-secret-academy-r6",
+    "source_team_id": 20016,
+    "team_id": "bo3:7:20016"
+  },
+  "bo3:7:20021": {
+    "acronym": null,
+    "name": "LOUD",
+    "slug": "loud-r6",
+    "source_team_id": 20021,
+    "team_id": "bo3:7:20021"
+  },
+  "bo3:7:20366": {
+    "acronym": null,
+    "name": "Team Nemesis",
+    "slug": "nemesis-r6",
+    "source_team_id": 20366,
+    "team_id": "bo3:7:20366"
+  },
+  "bo3:7:20794": {
+    "acronym": "ENX",
+    "name": "ENX",
+    "slug": "enx",
+    "source_team_id": 20794,
+    "team_id": "bo3:7:20794"
+  },
+  "bo3:7:20796": {
+    "acronym": "Gen.G",
+    "name": "Gen.G Esports",
+    "slug": "gen-g-esports",
+    "source_team_id": 20796,
+    "team_id": "bo3:7:20796"
+  },
+  "bo3:7:20910": {
+    "acronym": null,
+    "name": "Saga Esports",
+    "slug": "saga-esports-r6",
+    "source_team_id": 20910,
+    "team_id": "bo3:7:20910"
+  },
+  "bo3:7:20911": {
+    "acronym": null,
+    "name": "Ludavica",
+    "slug": "ludavica",
+    "source_team_id": 20911,
+    "team_id": "bo3:7:20911"
+  },
+  "bo3:7:20913": {
+    "acronym": "AS",
+    "name": "ArrivalSeven",
+    "slug": "arrivalseven",
+    "source_team_id": 20913,
+    "team_id": "bo3:7:20913"
+  },
+  "bo3:7:20914": {
+    "acronym": "LDE",
+    "name": "Latent Dragon Esports",
+    "slug": "latent-dragon-esports",
+    "source_team_id": 20914,
+    "team_id": "bo3:7:20914"
+  },
+  "bo3:7:20915": {
+    "acronym": "TO",
+    "name": "Team Orchid",
+    "slug": "team-orchid",
+    "source_team_id": 20915,
+    "team_id": "bo3:7:20915"
+  },
+  "bo3:7:20916": {
+    "acronym": "SHE",
+    "name": "Soul's Heart Esport",
+    "slug": "souls-heart-esport",
+    "source_team_id": 20916,
+    "team_id": "bo3:7:20916"
+  },
+  "bo3:7:20917": {
+    "acronym": "WBG",
+    "name": "Weibo Gaming",
+    "slug": "weibo-gaming-r6",
+    "source_team_id": 20917,
+    "team_id": "bo3:7:20917"
+  },
+  "bo3:7:20921": {
+    "acronym": "ENVY",
+    "name": "ENVY",
+    "slug": "envy",
+    "source_team_id": 20921,
+    "team_id": "bo3:7:20921"
+  },
+  "bo3:7:20922": {
+    "acronym": "STANDBY",
+    "name": "STANDBY LFO",
+    "slug": "standby-lfo",
+    "source_team_id": 20922,
+    "team_id": "bo3:7:20922"
+  },
+  "bo3:7:20928": {
+    "acronym": "EP",
+    "name": "ENTERPRISE Esports",
+    "slug": "enterprise",
+    "source_team_id": 20928,
+    "team_id": "bo3:7:20928"
+  },
+  "bo3:7:21413": {
+    "acronym": "DW",
+    "name": "Dream Warriors",
+    "slug": "dream-warriors",
+    "source_team_id": 21413,
+    "team_id": "bo3:7:21413"
+  },
+  "bo3:7:21414": {
+    "acronym": null,
+    "name": "Shark LFO",
+    "slug": "shark-lfo",
+    "source_team_id": 21414,
+    "team_id": "bo3:7:21414"
+  },
+  "bo3:7:22018": {
+    "acronym": null,
+    "name": "AG.AL International",
+    "slug": "all-gamers-r6",
+    "source_team_id": 22018,
+    "team_id": "bo3:7:22018"
+  },
+  "bo3:7:22019": {
+    "acronym": null,
+    "name": "KingZone",
+    "slug": "kingzone",
+    "source_team_id": 22019,
+    "team_id": "bo3:7:22019"
+  },
+  "bo3:7:22020": {
+    "acronym": null,
+    "name": "Titan Esports Club",
+    "slug": "titan-esports-club-r6",
+    "source_team_id": 22020,
+    "team_id": "bo3:7:22020"
+  },
+  "bo3:7:22021": {
+    "acronym": null,
+    "name": "WolvesY",
+    "slug": "wolvesy",
+    "source_team_id": 22021,
+    "team_id": "bo3:7:22021"
+  },
+  "bo3:7:22022": {
+    "acronym": null,
+    "name": "Four Angry Men",
+    "slug": "four-angry-men-r6",
+    "source_team_id": 22022,
+    "team_id": "bo3:7:22022"
+  },
+  "bo3:7:22150": {
+    "acronym": null,
+    "name": "Attacking Soul",
+    "slug": "attacking-soul",
+    "source_team_id": 22150,
+    "team_id": "bo3:7:22150"
+  },
+  "bo3:7:22151": {
+    "acronym": null,
+    "name": "My Queen",
+    "slug": "my-queen-cn",
+    "source_team_id": 22151,
+    "team_id": "bo3:7:22151"
+  },
+  "bo3:7:22153": {
+    "acronym": null,
+    "name": "TYLOO",
+    "slug": "tyloo-r6",
+    "source_team_id": 22153,
+    "team_id": "bo3:7:22153"
+  },
+  "bo3:7:22192": {
+    "acronym": null,
+    "name": "Fluxo W7M",
+    "slug": "fluxo-w7m-r6",
+    "source_team_id": 22192,
+    "team_id": "bo3:7:22192"
+  },
+  "bo3:7:22232": {
+    "acronym": null,
+    "name": "Team Anios",
+    "slug": "team-anios",
+    "source_team_id": 22232,
+    "team_id": "bo3:7:22232"
+  },
+  "bo3:7:22295": {
+    "acronym": "PZ",
+    "name": "Project Zero",
+    "slug": "project-zero",
+    "source_team_id": 22295,
+    "team_id": "bo3:7:22295"
+  },
+  "bo3:7:22296": {
+    "acronym": "PAN",
+    "name": "Pannuhuone",
+    "slug": "pannuhuone",
+    "source_team_id": 22296,
+    "team_id": "bo3:7:22296"
+  },
+  "bo3:7:22304": {
+    "acronym": null,
+    "name": "LFO (Ex-ENX)",
+    "slug": "ex-enx",
+    "source_team_id": 22304,
+    "team_id": "bo3:7:22304"
+  },
+  "bo3:7:22305": {
+    "acronym": "ZZS",
+    "name": "Zero Zero Sete",
+    "slug": "zero-zero-sete",
+    "source_team_id": 22305,
+    "team_id": "bo3:7:22305"
+  },
+  "bo3:7:22306": {
+    "acronym": "2GAME",
+    "name": "2GAME Esports",
+    "slug": "2game-esports-r6",
+    "source_team_id": 22306,
+    "team_id": "bo3:7:22306"
+  },
+  "bo3:7:22307": {
+    "acronym": null,
+    "name": "Orgless",
+    "slug": "orgless-usa",
+    "source_team_id": 22307,
+    "team_id": "bo3:7:22307"
+  },
+  "bo3:7:22308": {
+    "acronym": "AWO",
+    "name": "Awooooooo",
+    "slug": "awooooooo",
+    "source_team_id": 22308,
+    "team_id": "bo3:7:22308"
+  },
+  "bo3:7:22369": {
+    "acronym": null,
+    "name": "ex-Chiefs Esports Cluv",
+    "slug": "ex-chiefs-esports-cluv",
+    "source_team_id": 22369,
+    "team_id": "bo3:7:22369"
+  },
+  "bo3:7:22958": {
+    "acronym": "FC",
+    "name": "Fisher College",
+    "slug": "fisher-college-r6",
+    "source_team_id": 22958,
+    "team_id": "bo3:7:22958"
+  },
+  "bo3:7:22959": {
+    "acronym": "RdG",
+    "name": "roth da goat",
+    "slug": "roth-da-goat",
+    "source_team_id": 22959,
+    "team_id": "bo3:7:22959"
+  },
+  "bo3:7:22960": {
+    "acronym": "COLT",
+    "name": "Team Colt",
+    "slug": "team-colt-r6",
+    "source_team_id": 22960,
+    "team_id": "bo3:7:22960"
+  },
+  "bo3:7:22961": {
+    "acronym": "ALLN",
+    "name": "Allen Esports",
+    "slug": "allen-esports",
+    "source_team_id": 22961,
+    "team_id": "bo3:7:22961"
+  },
+  "bo3:7:22962": {
+    "acronym": "F5",
+    "name": "F5 Esports",
+    "slug": "f5-esports-r6",
+    "source_team_id": 22962,
+    "team_id": "bo3:7:22962"
+  },
+  "bo3:7:22963": {
+    "acronym": "OT.S",
+    "name": "Overtake Sector",
+    "slug": "overtake-sector",
+    "source_team_id": 22963,
+    "team_id": "bo3:7:22963"
+  },
+  "bo3:7:22964": {
+    "acronym": "IoM",
+    "name": "Imperium of Man",
+    "slug": "imperium-of-man",
+    "source_team_id": 22964,
+    "team_id": "bo3:7:22964"
+  },
+  "bo3:7:22965": {
+    "acronym": "OL",
+    "name": "Outlast NA",
+    "slug": "outlast-na",
+    "source_team_id": 22965,
+    "team_id": "bo3:7:22965"
+  },
+  "bo3:7:22966": {
+    "acronym": "1/30",
+    "name": "1 of 30",
+    "slug": "footlockers-finest",
+    "source_team_id": 22966,
+    "team_id": "bo3:7:22966"
+  },
+  "bo3:7:22968": {
+    "acronym": "SYIV",
+    "name": "See You in Valhalla",
+    "slug": "see-you-in-valhalla",
+    "source_team_id": 22968,
+    "team_id": "bo3:7:22968"
+  },
+  "bo3:7:22969": {
+    "acronym": "KEEG",
+    "name": "Keeg n Co",
+    "slug": "keeg-n-co",
+    "source_team_id": 22969,
+    "team_id": "bo3:7:22969"
+  },
+  "bo3:7:22970": {
+    "acronym": "LAT",
+    "name": "LATAM LAST HOPE",
+    "slug": "latam-last-hope",
+    "source_team_id": 22970,
+    "team_id": "bo3:7:22970"
+  },
+  "bo3:7:22971": {
+    "acronym": "HAT",
+    "name": "Hat and Co",
+    "slug": "hat-and-co",
+    "source_team_id": 22971,
+    "team_id": "bo3:7:22971"
+  },
+  "bo3:7:22972": {
+    "acronym": "FF",
+    "name": "FURIA FROGS",
+    "slug": "furia-frogs",
+    "source_team_id": 22972,
+    "team_id": "bo3:7:22972"
+  },
+  "bo3:7:22973": {
+    "acronym": "InC",
+    "name": "InControl",
+    "slug": "incontrol-r6",
+    "source_team_id": 22973,
+    "team_id": "bo3:7:22973"
+  },
+  "bo3:7:22974": {
+    "acronym": "OOTS",
+    "name": "Order of the Shield",
+    "slug": "order-of-the-shield",
+    "source_team_id": 22974,
+    "team_id": "bo3:7:22974"
+  },
+  "bo3:7:22975": {
+    "acronym": "LB",
+    "name": "La bourse",
+    "slug": "la-bourse",
+    "source_team_id": 22975,
+    "team_id": "bo3:7:22975"
+  },
+  "bo3:7:22976": {
+    "acronym": "AIU",
+    "name": "Al Ula",
+    "slug": "al-ula",
+    "source_team_id": 22976,
+    "team_id": "bo3:7:22976"
+  },
+  "bo3:7:22977": {
+    "acronym": "ME",
+    "name": "Maestro Esca",
+    "slug": "maestro-esca",
+    "source_team_id": 22977,
+    "team_id": "bo3:7:22977"
+  },
+  "bo3:7:22978": {
+    "acronym": "DYV",
+    "name": "Dyavoli",
+    "slug": "dyavoli",
+    "source_team_id": 22978,
+    "team_id": "bo3:7:22978"
+  },
+  "bo3:7:22979": {
+    "acronym": "LFO",
+    "name": "Turks LFO",
+    "slug": "turks-lfo",
+    "source_team_id": 22979,
+    "team_id": "bo3:7:22979"
+  },
+  "bo3:7:22980": {
+    "acronym": "TP",
+    "name": "Tens Pantera",
+    "slug": "tens-pantera",
+    "source_team_id": 22980,
+    "team_id": "bo3:7:22980"
+  },
+  "bo3:7:22981": {
+    "acronym": "Gli",
+    "name": "Giggioletti",
+    "slug": "giggioletti",
+    "source_team_id": 22981,
+    "team_id": "bo3:7:22981"
+  },
+  "bo3:7:22982": {
+    "acronym": "GAP",
+    "name": "BLATANT GAP",
+    "slug": "blatant-gap",
+    "source_team_id": 22982,
+    "team_id": "bo3:7:22982"
+  },
+  "bo3:7:22983": {
+    "acronym": "SKIDS",
+    "name": "Certified Skids",
+    "slug": "certified-skids",
+    "source_team_id": 22983,
+    "team_id": "bo3:7:22983"
+  },
+  "bo3:7:22984": {
+    "acronym": "SBT",
+    "name": "Sabor time",
+    "slug": "sabor-time",
+    "source_team_id": 22984,
+    "team_id": "bo3:7:22984"
+  },
+  "bo3:7:22985": {
+    "acronym": "OTDO",
+    "name": "Os trem do odio",
+    "slug": "os-trem-do-odio",
+    "source_team_id": 22985,
+    "team_id": "bo3:7:22985"
+  },
+  "bo3:7:22986": {
+    "acronym": "TQC",
+    "name": "Time qualquer coisa",
+    "slug": "time-qualquer-coisa",
+    "source_team_id": 22986,
+    "team_id": "bo3:7:22986"
+  },
+  "bo3:7:22987": {
+    "acronym": "RC",
+    "name": "RazaH Company",
+    "slug": "razah-company",
+    "source_team_id": 22987,
+    "team_id": "bo3:7:22987"
+  },
+  "bo3:7:22988": {
+    "acronym": "EMB",
+    "name": "Embargados Team",
+    "slug": "embargados-team",
+    "source_team_id": 22988,
+    "team_id": "bo3:7:22988"
+  },
+  "bo3:7:22989": {
+    "acronym": "AG",
+    "name": "AdvoGatos",
+    "slug": "advogatos",
+    "source_team_id": 22989,
+    "team_id": "bo3:7:22989"
+  },
+  "bo3:7:22990": {
+    "acronym": "NM",
+    "name": "NewMode",
+    "slug": "newmode",
+    "source_team_id": 22990,
+    "team_id": "bo3:7:22990"
+  },
+  "bo3:7:22991": {
+    "acronym": "V7",
+    "name": "Vince Seven Esports",
+    "slug": "vince-seven-esports",
+    "source_team_id": 22991,
+    "team_id": "bo3:7:22991"
+  },
+  "bo3:7:22992": {
+    "acronym": "IMP",
+    "name": "Imperial Esports",
+    "slug": "imperial-esports-r6",
+    "source_team_id": 22992,
+    "team_id": "bo3:7:22992"
+  },
+  "bo3:7:22993": {
+    "acronym": "RC",
+    "name": "Rectangular Cubes",
+    "slug": "rectangular-cubes",
+    "source_team_id": 22993,
+    "team_id": "bo3:7:22993"
+  },
+  "bo3:7:22994": {
+    "acronym": "TBSD",
+    "name": "The business i read on a sheet the other day",
+    "slug": "the-business-i-ead-on-a-sheet-the-other-day",
+    "source_team_id": 22994,
+    "team_id": "bo3:7:22994"
+  },
+  "bo3:7:22995": {
+    "acronym": "BCP",
+    "name": "BCP Esports",
+    "slug": "bcp-esports",
+    "source_team_id": 22995,
+    "team_id": "bo3:7:22995"
+  },
+  "bo3:7:22996": {
+    "acronym": "FxE",
+    "name": "FluxEsports",
+    "slug": "fluxesports",
+    "source_team_id": 22996,
+    "team_id": "bo3:7:22996"
+  },
+  "bo3:7:22997": {
+    "acronym": "OMFG",
+    "name": "Only Mighty Fine Girls",
+    "slug": "only-mighty-fine-girls",
+    "source_team_id": 22997,
+    "team_id": "bo3:7:22997"
+  },
+  "bo3:7:22998": {
+    "acronym": "VAU",
+    "name": "Vizion AU",
+    "slug": "vizion-au",
+    "source_team_id": 22998,
+    "team_id": "bo3:7:22998"
+  },
+  "bo3:7:22999": {
+    "acronym": "KQRM",
+    "name": "Kqrma esports",
+    "slug": "kqrma-esports",
+    "source_team_id": 22999,
+    "team_id": "bo3:7:22999"
+  },
+  "bo3:7:23000": {
+    "acronym": "GV",
+    "name": "Garden's Veil",
+    "slug": "garden-s-veil",
+    "source_team_id": 23000,
+    "team_id": "bo3:7:23000"
+  },
+  "bo3:7:23001": {
+    "acronym": "BGNS",
+    "name": "BGNS",
+    "slug": "bgns",
+    "source_team_id": 23001,
+    "team_id": "bo3:7:23001"
+  },
+  "bo3:7:23002": {
+    "acronym": "AA",
+    "name": "Avengerz Assemble",
+    "slug": "avengerz-assemble",
+    "source_team_id": 23002,
+    "team_id": "bo3:7:23002"
+  },
+  "bo3:7:23003": {
+    "acronym": "CB",
+    "name": "Circular Beers",
+    "slug": "circular-beers",
+    "source_team_id": 23003,
+    "team_id": "bo3:7:23003"
+  },
+  "bo3:7:23005": {
+    "acronym": null,
+    "name": "Shaiikademy",
+    "slug": "shaiikademy",
+    "source_team_id": 23005,
+    "team_id": "bo3:7:23005"
+  },
+  "bo3:7:23006": {
+    "acronym": "UAIM",
+    "name": "UAIM",
+    "slug": "uaim",
+    "source_team_id": 23006,
+    "team_id": "bo3:7:23006"
+  },
+  "bo3:7:23008": {
+    "acronym": "Anticz",
+    "name": "Anticz Esports",
+    "slug": "anticz-esports",
+    "source_team_id": 23008,
+    "team_id": "bo3:7:23008"
+  },
+  "bo3:7:23026": {
+    "acronym": null,
+    "name": "ex-E.36",
+    "slug": "ex-e-36",
+    "source_team_id": 23026,
+    "team_id": "bo3:7:23026"
+  },
+  "bo3:7:23027": {
+    "acronym": "TFK",
+    "name": "Team Function Kyoto",
+    "slug": "team-function-kyoto",
+    "source_team_id": 23027,
+    "team_id": "bo3:7:23027"
+  },
+  "bo3:7:23028": {
+    "acronym": "LVE",
+    "name": "Land Valk esports",
+    "slug": "land-valk-esports",
+    "source_team_id": 23028,
+    "team_id": "bo3:7:23028"
+  },
+  "bo3:7:23029": {
+    "acronym": "EgiS",
+    "name": "EgiS",
+    "slug": "egis",
+    "source_team_id": 23029,
+    "team_id": "bo3:7:23029"
+  },
+  "bo3:7:23030": {
+    "acronym": "OCSH",
+    "name": "OCS HIROSHIMA",
+    "slug": "ocs-hiroshima",
+    "source_team_id": 23030,
+    "team_id": "bo3:7:23030"
+  },
+  "bo3:7:23031": {
+    "acronym": "CYBME",
+    "name": "Can You Be My Enemy",
+    "slug": "can-you-be-my-enemy",
+    "source_team_id": 23031,
+    "team_id": "bo3:7:23031"
+  },
+  "bo3:7:23032": {
+    "acronym": "67",
+    "name": "SIX7EVEN",
+    "slug": "six7even",
+    "source_team_id": 23032,
+    "team_id": "bo3:7:23032"
+  },
+  "bo3:7:23033": {
+    "acronym": "7H",
+    "name": "Seventh Heaven",
+    "slug": "seventh-heaven",
+    "source_team_id": 23033,
+    "team_id": "bo3:7:23033"
+  },
+  "bo3:7:23034": {
+    "acronym": "DE",
+    "name": "Dolphin Esport",
+    "slug": "dolphin-esport",
+    "source_team_id": 23034,
+    "team_id": "bo3:7:23034"
+  },
+  "bo3:7:23035": {
+    "acronym": "K5",
+    "name": "K5 Esport",
+    "slug": "k5-esport",
+    "source_team_id": 23035,
+    "team_id": "bo3:7:23035"
+  },
+  "bo3:7:23036": {
+    "acronym": "YG",
+    "name": "Young Generation",
+    "slug": "young-generation-r6",
+    "source_team_id": 23036,
+    "team_id": "bo3:7:23036"
+  },
+  "bo3:7:23037": {
+    "acronym": "LW",
+    "name": "Lightning Warriors",
+    "slug": "lightning-warriors",
+    "source_team_id": 23037,
+    "team_id": "bo3:7:23037"
+  },
+  "bo3:7:23079": {
+    "acronym": "5F",
+    "name": "Five Fears",
+    "slug": "five-fears",
+    "source_team_id": 23079,
+    "team_id": "bo3:7:23079"
+  },
+  "bo3:7:23080": {
+    "acronym": "OWN",
+    "name": "Owned eSport",
+    "slug": "owned-esport",
+    "source_team_id": 23080,
+    "team_id": "bo3:7:23080"
+  },
+  "bo3:7:23093": {
+    "acronym": null,
+    "name": "LFO No Name",
+    "slug": "lfo-no-name",
+    "source_team_id": 23093,
+    "team_id": "bo3:7:23093"
+  },
+  "bo3:7:23094": {
+    "acronym": "UN",
+    "name": "Unreal Nightmare",
+    "slug": "unreal-nightmare",
+    "source_team_id": 23094,
+    "team_id": "bo3:7:23094"
+  },
+  "bo3:7:23095": {
+    "acronym": null,
+    "name": "Rock LFO",
+    "slug": "rock-lfo",
+    "source_team_id": 23095,
+    "team_id": "bo3:7:23095"
+  },
+  "bo3:7:23108": {
+    "acronym": null,
+    "name": "HL tauri Esports",
+    "slug": "hl-tauri-esports-r6",
+    "source_team_id": 23108,
+    "team_id": "bo3:7:23108"
+  },
+  "bo3:7:23109": {
+    "acronym": "100T",
+    "name": "100 Thieves",
+    "slug": "100-thieves-r6",
+    "source_team_id": 23109,
+    "team_id": "bo3:7:23109"
+  },
+  "bo3:7:23211": {
+    "acronym": "LEVS",
+    "name": "Leviat\u00e1n Soul",
+    "slug": "leviatan-soul",
+    "source_team_id": 23211,
+    "team_id": "bo3:7:23211"
+  },
+  "bo3:7:23212": {
+    "acronym": "EDG",
+    "name": "EDward Gaming",
+    "slug": "edward-gaming-r6",
+    "source_team_id": 23212,
+    "team_id": "bo3:7:23212"
+  },
+  "bo3:7:23213": {
+    "acronym": "OC",
+    "name": "One Coin",
+    "slug": "one-coin",
+    "source_team_id": 23213,
+    "team_id": "bo3:7:23213"
+  },
+  "bo3:7:23245": {
+    "acronym": "AGM",
+    "name": "AGM Ac",
+    "slug": "agm-ac",
+    "source_team_id": 23245,
+    "team_id": "bo3:7:23245"
+  },
+  "bo3:7:23246": {
+    "acronym": null,
+    "name": "by\u0142a\u015b iluzja",
+    "slug": "bylas-iluzja",
+    "source_team_id": 23246,
+    "team_id": "bo3:7:23246"
+  },
+  "bo3:7:23247": {
+    "acronym": null,
+    "name": "Fight Club 1",
+    "slug": "fight-club-1",
+    "source_team_id": 23247,
+    "team_id": "bo3:7:23247"
+  },
+  "bo3:7:23248": {
+    "acronym": null,
+    "name": "For The Love Of The Game",
+    "slug": "for-the-love-of-the-game",
+    "source_team_id": 23248,
+    "team_id": "bo3:7:23248"
+  },
+  "bo3:7:23249": {
+    "acronym": null,
+    "name": "Wisteria",
+    "slug": "wisteria",
+    "source_team_id": 23249,
+    "team_id": "bo3:7:23249"
+  },
+  "bo3:7:23250": {
+    "acronym": "SII",
+    "name": "Siikopatas",
+    "slug": "siikopatas",
+    "source_team_id": 23250,
+    "team_id": "bo3:7:23250"
+  },
+  "bo3:7:23251": {
+    "acronym": "GI",
+    "name": "Good Intentions",
+    "slug": "good-intentions",
+    "source_team_id": 23251,
+    "team_id": "bo3:7:23251"
+  },
+  "bo3:7:23252": {
+    "acronym": "FOA",
+    "name": "Fans of Attics",
+    "slug": "fans-of-attics",
+    "source_team_id": 23252,
+    "team_id": "bo3:7:23252"
+  },
+  "bo3:7:23253": {
+    "acronym": "PCW",
+    "name": "PistonCupWinners",
+    "slug": "pistoncupwinners",
+    "source_team_id": 23253,
+    "team_id": "bo3:7:23253"
+  },
+  "bo3:7:24364": {
+    "acronym": null,
+    "name": "POZY",
+    "slug": "pozy",
+    "source_team_id": 24364,
+    "team_id": "bo3:7:24364"
+  },
+  "bo3:7:24366": {
+    "acronym": null,
+    "name": "RRX",
+    "slug": "rrx",
+    "source_team_id": 24366,
+    "team_id": "bo3:7:24366"
+  },
+  "bo3:7:24387": {
+    "acronym": "PSYKN",
+    "name": "PSYKN Company",
+    "slug": "psykn-company",
+    "source_team_id": 24387,
+    "team_id": "bo3:7:24387"
+  },
+  "bo3:7:24388": {
+    "acronym": "ARC",
+    "name": "Arcade Esports",
+    "slug": "arcade-esports-r6",
+    "source_team_id": 24388,
+    "team_id": "bo3:7:24388"
+  },
+  "bo3:7:24480": {
+    "acronym": "FF",
+    "name": "For Fun Esports",
+    "slug": "for-fun-esports",
+    "source_team_id": 24480,
+    "team_id": "bo3:7:24480"
+  },
+  "bo3:7:24644": {
+    "acronym": null,
+    "name": "7VEN",
+    "slug": "7ven",
+    "source_team_id": 24644,
+    "team_id": "bo3:7:24644"
+  },
+  "bo3:7:24672": {
+    "acronym": "CAG",
+    "name": "CAG by VARREL",
+    "slug": "cag-by-varrel",
+    "source_team_id": 24672,
+    "team_id": "bo3:7:24672"
+  }
+}

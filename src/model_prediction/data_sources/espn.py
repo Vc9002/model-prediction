@@ -178,6 +178,102 @@ class ESPNClient:
             )
         return games
 
+    @staticmethod
+    def completed_tennis_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]]:
+        """Normalize completed singles matches from ESPN's tennis scoreboard.
+
+        Tennis events nest matches under ``groupings`` (one per draw, e.g.
+        "Men's Singles", "Women's Doubles") rather than a flat
+        ``competitions`` list, and competitors carry an ``athlete`` (singles)
+        or ``roster`` (doubles) payload instead of ``team`` — the shape
+        ``completed_games`` assumes. Doubles draws are dropped entirely via
+        the competition's ``type.slug`` since this project only prices
+        1-on-1 markets.
+
+        Combined tournaments (most ATP 500/1000s and all four majors) return
+        the SAME event, with BOTH Men's and Women's Singles groupings, from
+        BOTH the ``tennis/atp`` and ``tennis/wta`` site-API paths -- verified
+        live 2026-07-27 (e.g. ``scores_atp.json`` for Brisbane International
+        contains a "Women's Singles" grouping, and ``scores_wta.json`` for
+        the same date contains its "Men's Singles" grouping too). The tour
+        ("ATP"/"WTA") is therefore derived per match from the competition's
+        own ``type.slug`` here, never from which endpoint happened to serve
+        it -- tagging by endpoint silently misattributed every WTA player's
+        combined-tournament matches to "ATP" (whichever fetch ran first in
+        ``SPORT_LEAGUES["tennis"]`` claimed the event_id, and the later
+        fetch's identical event_id was deduped away), which then dropped
+        real WTA rating history when downstream code filtered to WTA only.
+        """
+        matches: list[dict[str, Any]] = []
+        for event in scoreboard.get("events", []):
+            tournament = str(event.get("name", "unknown"))
+            surface = _infer_tennis_surface(tournament)
+            for grouping in event.get("groupings", []):
+                for competition in grouping.get("competitions", []):
+                    slug = str(competition.get("type", {}).get("slug", ""))
+                    if "singles" not in slug:
+                        continue
+                    tour = "WTA" if "womens" in slug else "ATP" if "mens" in slug else None
+                    if tour is None:
+                        continue
+                    status = competition.get("status", {}).get("type", {})
+                    if not status.get("completed"):
+                        continue
+                    competitors = competition.get("competitors", [])
+                    if len(competitors) != 2:
+                        continue
+                    winners = [item for item in competitors if item.get("winner")]
+                    losers = [item for item in competitors if not item.get("winner")]
+                    if len(winners) != 1 or len(losers) != 1:
+                        continue
+                    winner, loser = winners[0], losers[0]
+                    winner_athlete = winner.get("athlete") or {}
+                    loser_athlete = loser.get("athlete") or {}
+                    if not winner_athlete.get("displayName") or not loser_athlete.get("displayName"):
+                        continue
+                    match_date = competition.get("date") or event.get("date")
+                    matches.append(
+                        {
+                            "event_id": f"{event.get('id')}:{competition.get('id')}",
+                            "event_start_utc": match_date,
+                            "match_date": match_date,
+                            "tournament": tournament,
+                            "round": str(competition.get("round", {}).get("displayName", "unknown")),
+                            "surface": surface,
+                            "league": tour,
+                            "winner": winner_athlete.get("displayName"),
+                            "loser": loser_athlete.get("displayName"),
+                            "winner_id": str(winner.get("id", "")),
+                            "loser_id": str(loser.get("id", "")),
+                            "status": "completed",
+                        }
+                    )
+        return matches
+
+
+# ESPN's tennis scoreboard has no surface field at all, so surface is
+# inferred from well-known tournament names; anything unmatched defaults to
+# Hard (the ATP/WTA tour's most common surface and TennisModel's own default).
+_CLAY_TOURNAMENT_HINTS = (
+    "roland garros", "french open", "monte-carlo", "monte carlo", "madrid", "internazionali",
+    "rome", "barcelona", "munich", "estoril", "geneva", "hamburg", "bastad", "kitzbuhel",
+    "umag", "gstaad", "buenos aires", "rio de janeiro", "santiago", "cordoba", "cordoba open",
+    "houston", "marrakech", "bucharest", "parma", "båstad", "swedish open", "croatia open",
+)
+_GRASS_TOURNAMENT_HINTS = (
+    "wimbledon", "queen's", "queens club", "halle", "terra wortmann", "eastbourne", "mallorca",
+    "newport", "s-hertogenbosch", "libema", "nottingham", "birmingham", "berlin",
+)
+
+
+def _infer_tennis_surface(tournament: str) -> str:
+    name = tournament.casefold()
+    if any(hint in name for hint in _CLAY_TOURNAMENT_HINTS):
+        return "Clay"
+    if any(hint in name for hint in _GRASS_TOURNAMENT_HINTS):
+        return "Grass"
+    return "Hard"
+
 
 class ESPNMLBClient:
     """Read-only ESPN MLB client. ESPN does not provide a point-in-time archive guarantee."""

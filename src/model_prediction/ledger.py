@@ -1,3 +1,31 @@
+"""Pick ledger: xlsx-backed, audit-chained.
+
+Atomicity note: every mutation appends to the audit chain (``self.audit.
+append``) BEFORE writing the ledger row (``self._write_rows``), not after.
+The two are separate files with separate locks -- true cross-file atomicity
+would need a real transaction log, which doesn't exist here -- so a crash
+between the two calls is possible either way. Audit-first makes that crash's
+failure mode recoverable rather than silent: the worst case becomes an audit
+event describing a mutation that never actually landed in the ledger,
+detectable by comparing the two (an audit event with no matching row/state).
+For mutations keyed on an EXISTING pick_id (``settle``, ``void``,
+``remove_open_rows``, ``update_closing``, ``review_loss``,
+``score_research``), retrying the identical call after such a crash is
+genuinely idempotent -- e.g. ``settle`` short-circuits if the row is already
+settled with the same scores. ``append_evaluated`` is the one exception:
+its pick_id is a fresh ``uuid4()`` per call (not derived from the request),
+so a retry after a crash creates a NEW row under a NEW id rather than
+completing the crashed one -- the crashed attempt's audit event stays a
+real, honestly-visible orphan (an audit trail says an append was tried and
+didn't land), which is still strictly better than the old failure mode: a
+real ledger mutation with no audit event at all, permanently invisible to
+``verify-chain`` and impossible to reconstruct after the fact.
+``write_xlsx_rows_atomic`` is "atomic" only with respect to the ledger
+*file itself* (temp file + rename, so a crash mid-write never corrupts it)
+-- it says nothing about the audit log, which is exactly the gap this
+ordering addresses.
+"""
+
 from __future__ import annotations
 
 import fcntl
@@ -266,6 +294,13 @@ class PickLedger:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     def initialize(self) -> None:
+        # Known residual gap in the audit-first ordering this module
+        # otherwise follows (see module docstring): _migrate_if_needed is
+        # called opportunistically from many mutating methods, not just
+        # here, so restructuring it to audit-append before its own write
+        # would touch every call site. Schema migration is a rare, one-time
+        # event per ledger file (not part of the hot pick-lifecycle path),
+        # so this stays lower priority than the fixes above.
         migrated_from: str | None = None
         with self._lock():
             if not self.path.exists() or self.path.stat().st_size == 0:
@@ -498,10 +533,15 @@ class PickLedger:
                 }
             )
             existing.append(row)
-            self._write_rows(existing)
-            # Audit append happens while the lock is still held, not after
-            # release, so a ledger write can never succeed without its
-            # matching audit event committed in the same critical section.
+            # Audit append happens BEFORE the ledger write, not after -- see
+            # the module docstring's atomicity note. If the process dies
+            # between the two, the worst case is an audit event describing a
+            # pick that never actually landed (detectable: no matching row).
+            # pick_id is a fresh uuid4 each call, so a retry doesn't complete
+            # this exact orphaned event -- it creates a new row under a new
+            # id -- but that's still strictly better than a real ledger
+            # mutation with no audit trail at all (previously possible, and
+            # permanent -- no retry can recreate a dropped audit event).
             event_type = (
                 "pick_created"
                 if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
@@ -514,6 +554,7 @@ class PickLedger:
                     pick_id,
                     {"reason_code": eligibility.reason_code, "record_type": eligibility.record_type.value},
                 )
+            self._write_rows(existing)
         return row
 
     def settle(
@@ -661,7 +702,6 @@ class PickLedger:
                     }
                 )
             self._assert_decision_snapshot(row, decision_snapshot)
-            self._write_rows(rows)
             self.audit.append(
                 "pick_settled",
                 pick_id,
@@ -675,6 +715,7 @@ class PickLedger:
                     "binary_contract_settlement_value": binary_contract_settlement_value,
                 },
             )
+            self._write_rows(rows)
         return row
 
     def recompute_research_sizing(self, policy=None) -> int:
@@ -730,13 +771,12 @@ class PickLedger:
                     row["pnl_units"] = f"{pnl:.4f}"
                 changed += 1
             if changed:
+                self.audit.append(
+                    "ledger_units_recomputed",
+                    str(self.path),
+                    {"rows_changed": changed, "reason": "backfill fixed research-observation sizing rule"},
+                )
                 self._write_rows(rows)
-        if changed:
-            self.audit.append(
-                "ledger_units_recomputed",
-                str(self.path),
-                {"rows_changed": changed, "reason": "backfill fixed research-observation sizing rule"},
-            )
         return changed
 
     def remove_open_rows(
@@ -781,22 +821,22 @@ class PickLedger:
                     continue
                 keep.append(row)
             if removed:
+                for row in removed:
+                    self.audit.append(
+                        "pick_removed",
+                        row["pick_id"],
+                        {
+                            "reason": reason,
+                            "event_id": row["event_id"],
+                            "league": row["league"],
+                            "market_type": row["market_type"],
+                            "selection": row["selection"],
+                            "model_version": row["model_version"],
+                            "record_type": row["record_type"],
+                            "created_at_utc": row["created_at_utc"],
+                        },
+                    )
                 self._write_rows(keep)
-            for row in removed:
-                self.audit.append(
-                    "pick_removed",
-                    row["pick_id"],
-                    {
-                        "reason": reason,
-                        "event_id": row["event_id"],
-                        "league": row["league"],
-                        "market_type": row["market_type"],
-                        "selection": row["selection"],
-                        "model_version": row["model_version"],
-                        "record_type": row["record_type"],
-                        "created_at_utc": row["created_at_utc"],
-                    },
-                )
         return [row["pick_id"] for row in removed]
 
     def import_rows(
@@ -844,18 +884,17 @@ class PickLedger:
                 existing_by_id[row["pick_id"]] = row
                 imported.append(row)
             if imported:
+                self.audit.append(
+                    "ledger_rows_imported",
+                    str(self.path),
+                    {
+                        "source": source,
+                        "reason": reason,
+                        "rows_imported": len(imported),
+                        "pick_ids": [row["pick_id"] for row in imported],
+                    },
+                )
                 self._write_rows(existing)
-        if imported:
-            self.audit.append(
-                "ledger_rows_imported",
-                str(self.path),
-                {
-                    "source": source,
-                    "reason": reason,
-                    "rows_imported": len(imported),
-                    "pick_ids": [row["pick_id"] for row in imported],
-                },
-            )
         return [row["pick_id"] for row in imported]
 
     def void(self, pick_id: str, reason: str) -> dict[str, str]:
@@ -880,8 +919,8 @@ class PickLedger:
                     "review_status": "not_applicable",
                 }
             )
-            self._write_rows(rows)
             self.audit.append("pick_voided", pick_id, {"reason": reason})
+            self._write_rows(rows)
         return row
 
     def update_closing(
@@ -933,7 +972,6 @@ class PickLedger:
                 }
             )
             self._assert_decision_snapshot(row, decision_snapshot)
-            self._write_rows(rows)
             updated = row.copy()
             self.audit.append(
                 "closing_data_updated",
@@ -944,6 +982,7 @@ class PickLedger:
                     "probability_clv": updated["probability_clv"],
                 },
             )
+            self._write_rows(rows)
         return updated
 
     def review_loss(
@@ -970,12 +1009,12 @@ class PickLedger:
                     "corrective_action": corrective_action.strip(),
                 }
             )
-            self._write_rows(rows)
             self.audit.append(
                 "loss_review_completed",
                 pick_id,
                 {"classification": classification, "cause": cause, "corrective_action": corrective_action},
             )
+            self._write_rows(rows)
         return row
 
     def score_research(
@@ -1012,17 +1051,17 @@ class PickLedger:
                     }
                 )
                 updated.append(row.copy())
+            for row in updated:
+                self.audit.append(
+                    "research_score_updated",
+                    row["pick_id"],
+                    {
+                        "research_score_units": row["research_score_units"],
+                        "research_pnl_units": row["research_pnl_units"],
+                        "note": note,
+                    },
+                )
             self._write_rows(rows)
-        for row in updated:
-            self.audit.append(
-                "research_score_updated",
-                row["pick_id"],
-                {
-                    "research_score_units": row["research_score_units"],
-                    "research_pnl_units": row["research_pnl_units"],
-                    "note": note,
-                },
-            )
         return updated
 
     def report(

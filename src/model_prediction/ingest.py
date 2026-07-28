@@ -87,9 +87,18 @@ class Ingestor:
                 )
                 fetched += 1
                 time_module.sleep(self.rate_limit_seconds)
-            for game in ESPNClient.completed_games(payload):
-                game["league"] = league
-                new_games.append(game)
+            if sport_key == "tennis":
+                # Combined ATP+WTA tournaments return the same event (with
+                # both gender groupings) from both the ATP and WTA site-API
+                # paths -- completed_tennis_singles_matches derives the real
+                # per-match tour itself; tagging by which endpoint served it
+                # would misattribute WTA matches to ATP (see that function's
+                # docstring), so `league` is deliberately not overwritten here.
+                new_games.extend(ESPNClient.completed_tennis_singles_matches(payload))
+            else:
+                for game in ESPNClient.completed_games(payload):
+                    game["league"] = league
+                    new_games.append(game)
         appended = self._append_games(sport_key, new_games)
         result = {
             "sport": sport_key,

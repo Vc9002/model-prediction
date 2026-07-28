@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from pathlib import Path
 from unittest.mock import Mock
@@ -133,196 +132,39 @@ def test_latest_persisted_action_returns_newest_finished_job(
     assert result["started_at"] == "2026-07-20T11:00:00"
 
 
-def test_matrix_labels_total_score_artifact_as_research_only(monkeypatch, tmp_path: Path) -> None:
-    output = tmp_path / "outputs"
-    output.mkdir()
-    (output / "total-score-validation.json").write_text(
-        json.dumps(
-            {
-                "sports": {
-                    "nfl": {
-                        "status": "research_score_model_candidate",
-                        "training": {"holdout_rows": 101},
-                        "model": "linear_regression_on_elo_trend",
-                        "train_observations": 380,
-                        "validation_observations": 131,
-                        "holdout_observations": 101,
-                        "holdout": {"calls": 56, "hit_rate": 0.553571, "brier": 0.248164},
-                        "reference_line": 46.0,
-                        "threshold": 0.52,
-                        "locked_holdout": {
-                            "mae": 11.2,
-                            "baseline_mae": 11.7,
-                            "mae_gain_vs_rolling_league_mean": 0.5,
-                            "mae_gain_95pct_interval": [-0.2, 1.2],
-                        },
-                        "market_qualification": {"reason": "BLOCKED_MISSING_LINES"},
-                    }
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    (output / "learned-model-validation-v2.json").write_text(
-        json.dumps(
-            {
-                "sports": {
-                    "nfl": {
-                        "multi_market_readiness": {
-                            "spread": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-                            "total": "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES",
-                        }
-                    }
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(dashboard_server, "OUTPUTS", output)
-
-    cell = dashboard_server.matrix()["grid"]["nfl"]["total"]
-
-    assert cell["state"] == "research_total_candidate"
-    assert cell["holdout_rows"] == 101
-    assert cell["train_rows"] == 380
-    assert cell["validation_rows"] == 131
-    assert cell["calls"] == 56
-    assert cell["hit_rate"] == 0.553571
-    assert cell["brier"] == 0.248164
-    assert cell["reference_line"] == 46.0
-    assert cell["threshold"] == 0.52
-    assert cell["qualification"] == "BLOCKED_MISSING_LINES"
-
-
-def test_matrix_uses_newest_artifact_backed_soccer_variant(monkeypatch, tmp_path: Path) -> None:
-    output = tmp_path / "outputs"
-    output.mkdir()
-    artifact = tmp_path / "soccer-model.json"
-    artifact.write_text(
-        json.dumps(
-            {
-                "model_version": "soccer-elo-trend-lr-v1",
-                "market_models": {
-                    "moneyline": {
-                        "feature_names": ["elo_probability"],
-                        "confidence_threshold": 0.54397949,
-                    }
-                },
-                "qualification": {
-                    "qualified": True,
-                    "calls": 268,
-                    "hit_rate": 0.600746,
-                    "units_at_minus_110": 39.363636,
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    stale = {
-        "production_artifacts": {"soccer": str(artifact)},
-        "sports": {
-            "soccer": {
-                "variants": {
-                    "elo_trend": {
-                        "features": ["elo_probability", "trend_gap"],
-                        "primary_65": {
-                            "learned_threshold": 0.50,
-                            "locked_holdout": {
-                                "qualified": True,
-                                "calls": 432,
-                                "hit_rate": 0.6875,
-                            },
-                        },
-                    }
-                }
-            }
-        },
-    }
-    current = {
-        "production_artifacts": {"soccer": str(artifact)},
-        "sports": {
-            "soccer": {
-                "variants": {
-                    "elo_only": {
-                        "features": ["elo_probability"],
-                        "primary_65": {
-                            "learned_threshold": 0.54397949,
-                            "locked_holdout": {
-                                "qualified": True,
-                                "calls": 268,
-                                "hit_rate": 0.600746,
-                                "units_at_minus_110": 39.363636,
-                            },
-                        },
-                    },
-                    "elo_trend": {
-                        "features": ["elo_probability", "trend_gap"],
-                        "primary_65": {
-                            "learned_threshold": 0.54135498,
-                            "locked_holdout": {
-                                "qualified": False,
-                                "calls": 272,
-                                "hit_rate": 0.599265,
-                            },
-                        },
-                    },
-                    "soccer_3way": {
-                        "features": ["elo_probability", "trend_gap"],
-                        "primary_65": {
-                            "learned_threshold": 0.60980005,
-                            "locked_holdout": {
-                                "qualified": True,
-                                "calls": 53,
-                                "hit_rate": 0.660377,
-                                "units_at_minus_110": 13.818182,
-                            },
-                        },
-                    },
-                }
-            }
-        },
-    }
-    (output / "learned-model-validation-final.json").write_text(
-        json.dumps({"sports": {}}), encoding="utf-8"
-    )
-    stale_path = output / "soccer-validation.json"
-    stale_path.write_text(json.dumps(stale), encoding="utf-8")
-    current_path = output / "soccer-all-data.json"
-    current_path.write_text(json.dumps(current), encoding="utf-8")
-    os.utime(stale_path, (1, 1))
-    os.utime(current_path, (2, 2))
-    monkeypatch.setattr(dashboard_server, "OUTPUTS", output)
-
+def test_matrix_reports_wiring_and_features_not_validation_stats() -> None:
+    """The Matrix tab answers "is this model wired into daily, and what does
+    it run on" -- not hit rates, MAE, or promotion-gate status. Locks in the
+    2026-07-28 redesign so a future change doesn't silently reintroduce
+    validation-metric cells."""
     result = dashboard_server.matrix()
-    cell = result["grid"]["soccer"]["moneyline"]
 
-    assert result["source"].endswith("soccer-all-data.json")
-    assert cell["variant_name"] == "elo_only"
-    assert cell["hit_rate"] == 0.600746
-    assert cell["calls"] == 268
-    assert cell["three_way"]["hit_rate"] == 0.660377
-    assert cell["three_way"]["calls"] == 53
+    assert "grid" not in result
+    assert "baseball" not in result
+    assert "basketball" not in result
+    assert "esports" not in result
+    rows = result["rows"]
+    by_sport = {row["sport"]: row for row in rows}
 
+    mlb_totals = next(r for r in rows if r["sport"] == "MLB" and r["market"] == "Totals & Spread")
+    assert mlb_totals["wired"] is True
+    assert mlb_totals["ledger"] == "Flat only"
 
-def test_matrix_marks_mlb_special_markets_blocked_from_readiness(monkeypatch) -> None:
-    meta = {
-        "multi_market_readiness": {
-            "f5_spread": "BLOCKED_F5_SPREAD",
-            "f5_total": "BLOCKED_F5_TOTAL",
-            "yrfi_nrfi": "BLOCKED_YRFI_NRFI",
-        }
-    }
-    validation = {"sports": {"mlb": meta}, "production_artifacts": {}}
+    legacy = next(r for r in rows if r["market"] == "Moneyline (legacy)")
+    assert legacy["wired"] is False
 
-    monkeypatch.setattr(dashboard_server, "_newest_validation", lambda: (validation, "test"))
-    result = dashboard_server.matrix()["baseball"]["mlb"]
+    btts = next(r for r in rows if r["market"] == "BTTS")
+    assert btts["wired"] is False
 
-    assert result["f5_spread"] == {
-        "state": "blocked",
-        "readiness": "BLOCKED_F5_SPREAD",
-    }
-    assert result["f5_total"]["state"] == "blocked"
-    assert result["yrfi_nrfi"]["state"] == "blocked"
+    dead_esports = next(r for r in rows if "CoD" in r["sport"])
+    assert dead_esports["wired"] is False
+
+    for row in rows:
+        for forbidden_key in ("hit_rate", "brier", "calls", "mae", "qualification"):
+            assert forbidden_key not in row
+
+    assert "Tennis" in by_sport
+    assert by_sport["Tennis"]["wired"] is True
 
 
 def test_metricless_qualified_artifact_is_not_rendered_as_qualified() -> None:

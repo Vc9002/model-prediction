@@ -1,5 +1,11 @@
 # World Cup research contract
 
+**Retired 2026-07-27**: `League.WORLD_CUP` was removed from the codebase
+entirely (enum member, model registry entry, live-trading league list, and
+settlement mapping) — the tournament is over and there are no games left to
+forecast or settle. This document is kept as historical research context
+only; nothing below describes a currently wired model.
+
 ## Model identity
 
 World Cup coverage is `WORLD_CUP`, a research-only international soccer league. The first safe version should be an international goal-intensity model, not an odds-only hunch:

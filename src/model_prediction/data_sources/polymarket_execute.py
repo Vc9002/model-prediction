@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -41,6 +42,9 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from ..audit import AuditLog
 from ..domain import RecordType, iso_utc, utc_now
+
+_MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9\-]+)")
+_MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9\-]+)\)\.?\s*$")
 
 KEY_ID_ENV = "POLYMARKET_KEY_ID"
 SECRET_KEY_ENV = "POLYMARKET_SECRET_KEY"
@@ -73,6 +77,18 @@ class OrderTicket:
         )
 
 
+def _extract_market_slug(rationale: str) -> str | None:
+    """Recover the market slug a ledger row's rationale text was priced
+    against — the same extraction pattern settlement already uses
+    (cli.py::_settle_esports_pick) to tie a settlement back to its market.
+    Used here to bind an execution ticket to the exact row it claims to
+    come from, not just whatever market_slug the caller happened to pass."""
+    match = _MARKET_SLUG_RE.search(rationale)
+    if match is None:
+        match = _MARKET_SLUG_LEGACY_RE.search(rationale)
+    return match.group(1) if match else None
+
+
 class PolymarketExecutor:
     """All gate checks live here so no caller can skip them piecemeal."""
 
@@ -95,8 +111,23 @@ class PolymarketExecutor:
         execute_flag: bool,
         user_command: bool,
         manual_research_order: bool = False,
+        artifact_qualified: bool = True,
     ) -> dict[str, Any]:
-        """Run the full gate; submit only if every condition passes."""
+        """Run the full gate; submit only if every condition passes.
+
+        ``artifact_qualified`` is the ledger row's backing model ARTIFACT's
+        own ``qualified`` field (from its JSON file), not the config-declared
+        ``status``. A config ``qualification_override`` can make a row's
+        ``record_type`` read ``QUALIFIED_SHADOW_CALL`` for legitimate
+        observation purposes even when the artifact itself never cleared
+        holdout validation (e.g. MLB v6, 2026-07: "qualified=false in the
+        artifact itself; running live for observation"). That distinction is
+        fine for shadow logging, but real-money execution must not treat an
+        override-only qualification as equivalent to a genuinely validated
+        one — the caller must pass the real artifact value here, defaulting
+        True only preserves existing callers that don't yet distinguish the
+        two (see cli.py's ``execute``/``sell-position`` handlers).
+        """
         # Gate 1: explicit user command. The CLI sets this True only for the
         # `execute` subcommand; nothing else may.
         if not user_command:
@@ -118,6 +149,31 @@ class PolymarketExecutor:
                 f"REFUSED: {', '.join(missing)} is not set. Real-money execution is "
                 "impossible without Polymarket US API credentials; nothing was submitted."
             )
+        # Ticket-to-row binding: a ticket's identity must match the exact row
+        # it claims to execute, not merely whichever row the caller happened
+        # to look up. Without this, a caller could pass a legitimately
+        # qualified pick_row (to clear the gate below) alongside a ticket
+        # naming an unrelated market/price/size.
+        if pick_row.get("pick_id") and ticket.pick_id != pick_row["pick_id"]:
+            raise ExecutionGateError(
+                f"REFUSED: ticket pick_id {ticket.pick_id!r} does not match the "
+                f"looked-up row {pick_row['pick_id']!r}."
+            )
+        row_slug = _extract_market_slug(str(pick_row.get("rationale", "")))
+        if row_slug is not None and ticket.market_slug != row_slug:
+            raise ExecutionGateError(
+                f"REFUSED: ticket market_slug {ticket.market_slug!r} does not match "
+                f"the market this pick was actually priced against ({row_slug!r})."
+            )
+        # Cost is recomputed server-side rather than trusted from the
+        # caller-supplied ticket field, so a stale/incorrect estimated_cost_usd
+        # can't understate what the unit cap actually checks against.
+        recomputed_cost = round(ticket.price * ticket.size_shares, 2)
+        if abs(recomputed_cost - ticket.estimated_cost_usd) > 0.01:
+            raise ExecutionGateError(
+                f"REFUSED: ticket estimated_cost_usd ${ticket.estimated_cost_usd:.2f} does not "
+                f"match price * size_shares = ${recomputed_cost:.2f}."
+            )
         # Gate 6: qualified model call, or an explicit manual authorization
         # whose active-model/edge/ban checks were completed by the CLI.
         qualified = pick_row.get("record_type") == RecordType.QUALIFIED_SHADOW_CALL.value
@@ -125,6 +181,13 @@ class PolymarketExecutor:
             raise ExecutionGateError(
                 "REFUSED: research picks require the explicit manual-research-order override. "
                 f"This pick is {pick_row.get('record_type') or 'unknown'}."
+            )
+        if qualified and not artifact_qualified and not manual_research_order:
+            raise ExecutionGateError(
+                "REFUSED: this pick's record_type is QUALIFIED_SHADOW_CALL, but the "
+                "backing model artifact itself is not qualified (config "
+                "qualification_override, not a real holdout pass) -- resubmit with "
+                "--manual-research-order to execute anyway under research-order scrutiny."
             )
         if pick_row.get("status") != "open":
             raise ExecutionGateError("REFUSED: pick is not open.")
@@ -140,10 +203,10 @@ class PolymarketExecutor:
             )
         if (
             ticket.maximum_cost_usd is not None
-            and ticket.estimated_cost_usd > ticket.maximum_cost_usd + 0.005
+            and recomputed_cost > ticket.maximum_cost_usd + 0.005
         ):
             raise ExecutionGateError(
-                f"REFUSED: ${ticket.estimated_cost_usd:.2f} exceeds the authorized "
+                f"REFUSED: ${recomputed_cost:.2f} exceeds the authorized "
                 f"unit cap of ${ticket.maximum_cost_usd:.2f}."
             )
         if ticket.order_type not in {"limit_gtc", "limit_ioc"}:
@@ -175,11 +238,12 @@ class PolymarketExecutor:
                 "exchange_price": submission.get("exchange_price"),
                 "exchange_price_basis": "long_side_probability",
                 "size_shares": ticket.size_shares,
-                "estimated_cost_usd": ticket.estimated_cost_usd,
+                "estimated_cost_usd": recomputed_cost,
                 "maximum_cost_usd": ticket.maximum_cost_usd,
                 "authorization_type": ticket.authorization_type,
                 "source_record_type": pick_row.get("record_type"),
                 "source_reason_code": pick_row.get("reason_code"),
+                "source_artifact_qualified": artifact_qualified,
                 "transaction_hash": submission.get("transaction_hash"),
                 "submitted_at_utc": iso_utc(utc_now()),
             },

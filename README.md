@@ -3,7 +3,7 @@
 Shadow-first multi-sport prediction, research, ledger, and local dashboard
 system with Polymarket US market-data integration.
 
-**Last updated**: 2026-07-27
+**Last updated**: 2026-07-28
 
 The current operational verdict and audit evidence live in
 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`DEBUG.md`](DEBUG.md).
@@ -15,16 +15,37 @@ defects are repaired.
 
 | Metric | Value |
 |--------|-------|
-| Active learned artifacts | MLB v6, NBA/WNBA/NFL v4 |
-| Research/override artifacts | Soccer Poisson/DC v1, Esports v4, KBO/NPB v2 identifiers |
-| Tests | **436 pass** |
-| Audit chain | 16,918 events, 0 breaks, 0 hash mismatches |
-| Artifact integrity | 31 valid, 2 mismatched, 33 total |
-| Ruff | 117 findings |
-| Release status | **Blocked** |
+| Tests | **461 pass** |
+| Ruff | 113 findings |
+| Git | single `main` branch (no other active branches, local or `origin`) |
+| Release status | **Blocked** — see `docs/PROJECT_STATUS.md` for why |
 
 Do not infer executable profitability from artifact hit rates, synthetic
 `-110` units, shadow-ledger P&L, or a dashboard qualification badge.
+
+## What's Wired (live in `daily`) and What Feeds It
+
+The operating question for this project day-to-day is **not** "is this model
+validated" — it's "is this model actually running, and on what data." That
+table:
+
+| Sport | Wired in `daily`? | Model / features it actually runs on | Ledger it writes to |
+|---|---|---|---|
+| MLB moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v6 artifact) | Main + Flat |
+| MLB totals & spread | Yes | `models/mlb.py` `MeasuredEdgeTotalsModel`/margin — Gamma-Poisson mixture Monte-Carlo (`config/models/mlb-analyst-poisson-trend-v0.2.yaml`), priced against real Polymarket lines closest to 50/50 | Flat only |
+| MLB moneyline (legacy) | **No, by design** | `MeasuredEdgeMarginModel` via `--model legacy-measured-edge` — intentionally retained as an explicit manual rollback path, not part of `daily`; see `_forecast_mlb` docstring | Main, only if manually invoked |
+| NBA / WNBA / NFL | Yes | `learned_forward.py` — Elo + trend logistic regression (v4 artifacts) | Main + Flat |
+| Soccer totals (2.5 line) | Yes | `models/soccer.py` — Poisson/Dixon-Coles score matrix | Flat Research + Gated Research |
+| Soccer moneyline | Yes | Same score matrix; matched against Polymarket's per-team `team_win` Yes/No markets (not a single combined moneyline market) | Flat Research + Gated Research |
+| Soccer BTTS | **No** | The model already computes a BTTS probability (`models/soccer.py`), but nothing classifies a BTTS market type on the Polymarket US ingestion side yet, so it's never matched against a price | — |
+| Tennis moneyline | Yes | `models/tennis.py` — surface-blended Elo, singles only, **WTA only** (Polymarket US has no ATP market at all; ESPN has no ITF scoreboard, so WTA is the only tour where both a prediction and an executable price can exist). Two data bugs fixed 2026-07-28 (see `DEBUG.md`) — real player probabilities now compute correctly instead of always defaulting to 50%. | Flat Research + Gated Research |
+| Esports (LoL/CS2/Dota2/Valorant/Rainbow Six) | Yes | `esports.py` — result-based neutral Elo, Platt-scaled, refreshed from bo3.gg before every forecast (`refresh_recent_matches`). Dota2/Valorant had swapped discipline IDs (fixed 2026-07-28); Rainbow Six added 2026-07-28. | Flat Research + Gated Research |
+| Esports (CoD/Rocket League/Overwatch) | **Not buildable** | Polymarket lists these 3 additional esports leagues and real BBO is captured for them daily, but bo3.gg (this project's only esports data source) has no discipline for any of them at all — there is no data to train a real model on | — |
+| KBO / NPB | Yes | `international_baseball.py` — tie-aware home-field Elo (result/margin only, no starters/park/weather) | Flat Research + Gated Research |
+
+"Flat Research" ledgers log every model-evaluated candidate with no edge gate;
+"Gated Research" is the strict subset that clears that sport's configured
+edge/confidence floor. See Ledger Structure below.
 
 ## Ledger Structure
 
@@ -33,43 +54,27 @@ Four ledger tiers with distinct purposes:
 | Ledger | File | Purpose |
 |--------|------|---------|
 | **Main** | `data/picks.xlsx` | Main shadow-call ledger. A row label is not proof of artifact qualification or a placed order. |
-| **Flat** | `data/flat_picks.xlsx` | All MLB/NBA/WNBA/NFL production-model decisions. Research/diagnostic only. |
-| **Research** | `data/research/{sport}.xlsx` | Separate Soccer, LoL, CS2, Dota 2, Valorant, KBO, and NPB workbooks. Contains only exact-input, executable-quote research-model decisions; a valid low-edge decision remains a zero-unit `NO_CALL`. |
-| **Gated Research** | `data/gated_research/{sport}.xlsx` | Separate workbooks for the same seven sports. Strict subset of Research containing only positive-unit calls that clear the sport's configured executable-edge and confidence floors. |
+| **Flat** | `data/flat_picks.xlsx` | Every MLB/NBA/WNBA/NFL production-model decision, plus MLB totals/spread. Research/diagnostic only. |
+| **Flat Research** | `data/research/{sport}.xlsx` | Separate Soccer, Tennis, LoL, CS2, Dota 2, Valorant, KBO, and NPB workbooks. Every model-favored candidate for every matched game/market, no edge gate — a valid low-edge decision remains a zero-unit `NO_CALL`. |
+| **Gated Research** | `data/gated_research/{sport}.xlsx` | Separate workbooks for the same eight sports. Strict subset of Flat Research containing only positive-unit calls that clear the sport's configured executable-edge and confidence floors. |
 
-Main and flat use production models. Research-only sports never enter Flat. The
-dashboard aggregates the separate sport workbooks for unified Research and
-Gated Research views.
+Main and flat use production models. Research-only sports never enter the main
+Flat ledger — they get their own Flat Research workbook instead. The dashboard
+aggregates the separate sport workbooks for unified Flat Research and Gated
+Research views.
 
-The project uses complete-date chronological 60/20/20 validation. Model
-accuracy, calibration, diagnostic units, and executable profitability are
-separate claims. A model is operationally eligible only when its config,
-artifact, current report, tests, and point-in-time evidence agree.
-
-## Research Models
-
-| League | Model | Status |
-|--------|-------|--------|
-| MLB | v6 probable-starter experiment + spread/total research | Unqualified; prospective starter archive began 2026-07-26, but old validation remains non-PIT |
-| NBA | spread-baseline-v1 | Research |
-| WNBA | spread-baseline-v1 | Research |
-| NFL | spread-baseline-v1 | Research |
-| LoL/CS2/DOTA2/Valorant | neutral-series Elo v4 | Config override; dashboard evidence remains research-only |
-| Soccer | Poisson/Dixon-Coles full-game 2.5 totals | Research-only; draw-aware and executable-BBO matched |
-| KBO/NPB | tie-aware Elo v2 identifiers | Research-only; preview, paired-ledger routing, daily wiring, and `$0.50` tie settlement are active |
-
-Spread, total, F5, and other derivative models remain research-only unless exact
-historical contract lines and decision-horizon inputs exist. Never infer
-readiness from a hardcoded snapshot-count target.
+The project uses complete-date chronological 60/20/20 validation for models
+that have been promoted to production. Model accuracy, calibration, diagnostic
+units, and executable profitability are separate claims from "is it wired."
 
 ## Data Sources
 
 | Source | Coverage | Cost |
 |--------|----------|------|
-| ESPN Public API | MLB, NBA, WNBA, NFL scores | Free |
+| ESPN Public API | MLB, NBA, WNBA, NFL scores; ATP/WTA tennis scores (singles only, doubles filtered out) | Free |
 | Polymarket US Gateway | Live odds, BBO snapshots, event discovery | Free |
 | The Odds API | Soccer scores (3-day lookback) | Free tier |
-| BO3 public website data | LoL and CS2 best-of match history | Free, no signup/key |
+| BO3 public website data | LoL, CS2, Dota 2, Valorant, Rainbow Six Siege best-of match history | Free, no signup/key |
 | Official KBO schedule/results | KBO regular-season scores and stable game/team IDs | Free, no signup/key |
 | Official NPB English calendar | NPB regular-season scores and stable game links/team codes | Free, no signup/key |
 
@@ -106,6 +111,14 @@ env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli validate-esports -
 # Discover all current Polymarket US esports titles and capture research BBOs
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli polymarket-slate --sport esports --date YYYY-MM-DD
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli esports-forecast --title lol --date YYYY-MM-DD
+
+# Bootstrap tennis (parses ESPN's ATP/WTA scoreboards into singles-only match
+# records; doubles draws are dropped at ingestion) and preview the WTA-only
+# moneyline slate -- Polymarket US has no ATP market, so ATP history is built
+# but never priced
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli bootstrap --sport tennis --from 2024-01-01 --to YYYY-MM-DD
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli polymarket-slate --sport tennis --date YYYY-MM-DD
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli forecast --sport tennis --date YYYY-MM-DD
 
 # Backfill, validate, discover, and price separate KBO/NPB research baselines
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli international-baseball-backfill --all --from 2022-01-01
@@ -144,6 +157,8 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 │   └── models/                 # Immutable, hash-verified artifacts
 ├── src/model_prediction/
 │   ├── learned_forward.py      # Forward model; current WNBA hook can degrade/fail open
+│   ├── soccer_forward.py       # Soccer totals + moneyline live pricing (BTTS not yet wired)
+│   ├── tennis_forward.py       # Tennis moneyline live pricing (WTA only)
 │   ├── validation.py           # Walk-forward validation pipeline
 │   ├── features/               # Elo, trends, park factors, player availability
 │   ├── data_sources/           # ESPN, markets, official WNBA injury reports
@@ -151,12 +166,13 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 │   └── cli.py                  # CLI entry point
 ├── data/
 │   ├── historical/             # Processed game records
+│   ├── processed/              # Per-sport normalized game records (gitignored)
 │   ├── raw/                    # Cached ESPN scoreboards
 │   ├── odds/                   # Polymarket BBO snapshots
 │   ├── availability/           # Timestamped official report and research caches
-│   ├── esports/                # Versioned LoL/CS2 series backfills and identities
+│   ├── esports/                # Versioned LoL/CS2/Dota2/Valorant series backfills and identities
 │   ├── international_baseball/ # Official KBO/NPB results, identities, and manifests
-│   ├── research/               # One research ledger workbook per research-only sport
+│   ├── research/               # One Flat Research ledger workbook per research-only sport
 │   ├── gated_research/         # One gated-subset workbook per research-only sport
 │   └── events.jsonl            # Audit chain
 ├── dashboard.html              # Single-page dashboard
@@ -166,15 +182,32 @@ Model config in `config/model.yaml`. Artifacts in `config/models/`. Dashboard st
 
 ## Audit & Integrity
 
-- **Artifact hashes:** all 33 JSON artifacts carry SHA-256 fields, but the NBA
+- **Artifact hashes:** all JSON artifacts carry SHA-256 fields, but the NBA
   and NFL spread baselines currently mismatch their canonical contents.
-- **Audit chain:** `data/events.jsonl` is intact at 16,387 events, but
-  ledger/audit reconciliation remains false because 1,150 historical removals
-  predate audited removal events.
+- **Audit chain:** `data/events.jsonl` is intact (0 breaks), but ledger/audit
+  reconciliation remains false because historical removals predate audited
+  removal events (1,230 as of 2026-07-27; this number only grows over time by
+  design — see `DEBUG.md`).
 - **Validation:** `outputs/latest/learned-model-validation.json` is stale for
   this checkout and active MLB v6. It is not a release manifest.
 - **Execution:** the current order ticket is not structurally bound to the
   qualified ledger row. Do not use real-money execution.
+
+**Known wiring gaps** (tracked, not release blockers):
+- Soccer BTTS: model computes it, but no BTTS market currently exists on
+  Polymarket US at all (live-verified 2026-07-27 — only moneyline/spread/
+  total/team_win market types were found across every soccer league). Nothing
+  to classify until one appears.
+- Three esports leagues (CoD, Rocket League, Overwatch) get real BBO captured
+  daily with no possible model — bo3.gg has no discipline for any of them.
+
+**Resolved 2026-07-28** (kept here briefly since they were serious): dota2
+and valorant esports discipline IDs were swapped (each model was trained on
+the other game's history); tennis's `FeatureStore`/`GameRecord` incompatibility
+meant every live tennis forecast silently used zero match history and always
+computed exactly 50%; combined ATP+WTA tournaments were mistagging WTA
+players' matches as ATP. `League.WORLD_CUP` is now fully retired (enum member
+removed, not just dropped from live trading). Full detail in `DEBUG.md`.
 
 Run the checks in `DEBUG.md`. Record failures as failures; never rewrite the
 documentation to say the scan passed until tests, Ruff, hashes, the chain, config,

@@ -22,7 +22,7 @@ def ban_list(tmp_path, registry) -> TeamBanList:
         "unrelated": {"preserve": True},
         "team_ban_list": {
             "enabled": True,
-            "teams": {"MLB": [], "NBA": [], "WNBA": [], "NFL": [], "WORLD_CUP": []},
+            "teams": {"MLB": [], "NBA": [], "WNBA": [], "NFL": []},
             "allowed_reasons": ["manual_governance", "data_quality"],
         },
     }

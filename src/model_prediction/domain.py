@@ -22,18 +22,26 @@ class League(StrEnum):
     NFL = "NFL"
     TENNIS = "TENNIS"
     SOCCER = "SOCCER"
-    WORLD_CUP = "WORLD_CUP"
     LOL = "LOL"
     CS2 = "CS2"
     DOTA2 = "DOTA2"
     VALORANT = "VALORANT"
+    RAINBOW_SIX = "RAINBOW_SIX"
     KBO = "KBO"
     NPB = "NPB"
 
 # Canonical sport tuples — single source of truth for iteration and CLI choices.
 # When adding a sport, update League, these tuples, and config/model.yaml together.
+# WORLD_CUP retired 2026-07-27: the tournament is over, no games left to
+# forecast or settle, and it was a half-removed inconsistency (dropped from
+# live trading/settlement but still a valid enum value) that could have let a
+# stray pick settle-stall forever. ESPN's historical scoreboard path for it
+# (data_sources/espn.py) is untouched -- that's a raw ingestion string key,
+# not this enum, and still works for backfilling already-played tournaments.
 PRODUCTION_SPORTS: tuple[str, ...] = ("mlb", "wnba")
-LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant")
+LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = (
+    "mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant", "rainbow_six",
+)
 ALL_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis")
 
 

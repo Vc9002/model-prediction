@@ -244,24 +244,12 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <div class="wrap">
   <section id="tab-matrix">
     <div class="card">
-      <h2>Sports × Market Matrix</h2>
+      <h2>Model Wiring Matrix</h2>
       <div class="small dim" id="matrixGate" style="margin-bottom:8px"></div>
       <div class="matrix-scroll"><table class="matrix" id="matrixTable"></table></div>
       <div class="small dim" style="margin-top:8px">
-        <span class="green">qualified</span> · <span class="red">tested, below gate</span> · <span style="color:var(--violet)">research score model (shadow only)</span> · blocked, no valid contract lines · <span class="yellow">untested</span> · no data · — n/a — click a cell to drill down, hover for detail
+        <span class="green">wired in daily</span> · <span class="red">not wired</span> — shows what's actually running and what feeds it, not hit rates or promotion-gate status
       </div>
-    </div>
-    <div class="card" id="esportsCard" style="display:none">
-      <h2>Esports</h2>
-      <div class="matrix-scroll"><table class="matrix" id="esportsTable"></table></div>
-    </div>
-    <div class="card" id="baseballCard" style="display:none">
-      <h2>Baseball</h2>
-      <div class="matrix-scroll"><table class="matrix" id="baseballTable"></table></div>
-    </div>
-    <div class="card" id="basketballCard" style="display:none">
-      <h2>Basketball</h2>
-      <div class="matrix-scroll"><table class="matrix" id="basketballTable"></table></div>
     </div>
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
   </section>
@@ -918,197 +906,20 @@ function renderProductionEvidence(payload){
 }
 
 /* ---------- matrix ---------- */
-const MARKET_LABELS={moneyline:"ML",spread:"Spread",total:"Total",f5_spread:"F5 Spread",f5_total:"F5 Total",yrfi_nrfi:"YRFI/NRFI"};
-const MATRIX_ICONS={
-  q:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.2 3.2L13 4.5"/></svg>',
-  t:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
-  r:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h4M6.5 2v3.2L3.4 11a1.5 1.5 0 0 0 1.3 2.2h6.6a1.5 1.5 0 0 0 1.3-2.2L9.5 5.2V2"/></svg>',
-  b:'<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M4 4l8 8"/></svg>',
-  u:'<svg class="icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="3.4"/></svg>',
-};
-// Heatmap range is scoped per-table: qualified cells are colored by hit_rate
-// relative to the weakest/strongest qualified cell in that same table, not
-// against a single global bound (grid/esports/baseball are different scales).
-function matrixHeat(rate,lo,hi){
-  if(rate==null||hi<=lo)return .30;
-  const t=Math.max(0,Math.min(1,(rate-lo)/(hi-lo)));
-  return .14+t*.34;
-}
-function matrixQualifiedRange(cells){
-  const rates=cells.filter(c=>c&&c.state==="qualified"&&c.hit_rate!=null).map(c=>Number(c.hit_rate));
-  return [rates.length?Math.min(...rates):0, rates.length?Math.max(...rates):1];
-}
-function matrixCell(c,sport,mk,heatRange){
-  c=c||{state:"no_data"};
-  // Every cell renders the SAME two-line template: .c1 = status + primary
-  // metric, .c2 = one dim detail line. No third lines, no mixed styles.
-  let cls="n",l1="no data",l2="—";
-  if(c.state==="qualified"){
-    cls="q";l1=pct(c.hit_rate);
-    l2=mk==="moneyline"&&c.three_way?`${c.calls} binary · 3W ${pct(c.three_way.hit_rate)}/${c.three_way.calls}c`:
-      mk==="total"?`${c.calls??"—"} calls · ${c.holdout_rows??"—"} holdout games`:
-      (c.units!=null?`${c.calls} calls · ${(c.units>=0?"+":"")}${fmt(c.units,1)}U`:`${c.calls} calls`);
-  }else if(c.state==="tested_not_qualified"){
-    cls="t";l1=pct(c.hit_rate);l2=`${c.calls} calls · below gate`;
-  }else if(c.state==="research_total_candidate"||c.state==="research_active"||c.state==="research_only"){
-    cls="r";l1=pct(c.hit_rate);
-    l2=c.state==="research_only"
-      ?`${c.calls??'—'} calls · research only · 0U`
-      :(c.calls?`${c.calls} calls · ${(c.units>=0?'+':'')}${fmt(c.units,1)}U`:`${c.calls??'—'} calls · research`);
-  }else if(c.state==="blocked"){
-    cls="b";l1="blocked";
-    l2=c.readiness&&typeof c.readiness==="string"
-      ?c.readiness.toLowerCase().replaceAll("_"," ")
-      :"missing valid contract lines";
-  }else if(c.state==="model_untested"){
-    cls="u";l1="untested";l2="model exists · no holdout";
-  }else if(c.state==="not_applicable"){
-    cls="na";l1="—";l2="n/a";
-  }
-  const style=cls==="q"
-    ?`style="background:rgba(0,255,136,${matrixHeat(c.hit_rate!=null?Number(c.hit_rate):null,heatRange[0],heatRange[1]).toFixed(3)})"`
-    :"";
-  const tip=[l2,c.qualification?String(c.qualification).replaceAll("_"," "):""]
-    .filter(Boolean).join(" · ").replaceAll('"',"&quot;");
-  return `<td class="cell ${cls}" ${style} data-tip="${tip}" onclick='drill("${sport}","${mk}")'>`+
-    `<div class="c1">${MATRIX_ICONS[cls]||""}${l1}</div><div class="c2">${l2}</div></td>`;
-}
 function renderMatrix(m){
   state.matrix=m;
-  $("#matrixGate").textContent=m.gate?("Qualification gate: "+m.gate+"  ·  source: "+m.source):"";
+  $("#matrixGate").textContent=m.note||"";
   const tbl=$("#matrixTable");
-  const gridCells=Object.keys(m.grid).flatMap(sport=>m.markets.map(mk=>m.grid[sport][mk]));
-  const gridHeat=matrixQualifiedRange(gridCells);
-  let html="<tr><th>Sport</th>"+m.markets.map(k=>`<th>${MARKET_LABELS[k]||k}</th>`).join("")+"</tr>";
-  for(const sport of Object.keys(m.grid)){
-    if(!visibleSports().includes(sport))continue;
-    html+=`<tr><th>${sport.toUpperCase()}</th>`;
-    for(const mk of m.markets)html+=matrixCell(m.grid[sport][mk],sport,mk,gridHeat);
-    html+="</tr>";
+  let html="<tr><th>Sport</th><th>Market</th><th>Wired in Daily?</th><th>Model / Features</th><th>Ledger</th></tr>";
+  for(const row of m.rows||[]){
+    const cls=row.wired?"q":"b";
+    html+=`<tr><th>${esc(row.sport)}</th><td style="text-align:left">${esc(row.market)}</td>`+
+      `<td class="cell ${cls}"><div class="c1">${row.wired?"yes":"no"}</div></td>`+
+      `<td style="text-align:left;max-width:420px">${esc(row.model)}</td>`+
+      `<td style="text-align:left">${esc(row.ledger)}</td></tr>`;
   }
   tbl.innerHTML=html;
-  // Render esports table (ML only)
-  if(m.esports&&Object.keys(m.esports).length){
-    const et=$("#esportsTable"), ec=$("#esportsCard");
-    ec.style.display="";
-    const heat=matrixQualifiedRange(Object.values(m.esports).map(v=>v.moneyline));
-    let ehtml="<tr><th>Sport</th><th>ML</th></tr>";
-    for(const sport of Object.keys(m.esports)){
-      ehtml+=`<tr><th>${sport.toUpperCase()}</th>${matrixCell(m.esports[sport].moneyline,sport,"moneyline",heat)}</tr>`;
-    }
-    et.innerHTML=ehtml;
-  }
-  // Render baseball table (MLB/KBO/NPB) — MLB gets spread/total/F5 columns
-  if(m.baseball&&Object.keys(m.baseball).length){
-    const bt=$("#baseballTable"), bc=$("#baseballCard");
-    bc.style.display="";
-    const allCells=Object.values(m.baseball).flatMap(v=>Object.values(v));
-    const heat=matrixQualifiedRange(allCells);
-    const baseballMarkets=["moneyline","spread","total","f5_spread","f5_total"];
-    let bhtml="<tr><th>Sport</th>"+baseballMarkets.map(k=>`<th>${MARKET_LABELS[k]||k}</th>`).join("")+"</tr>";
-    for(const sport of Object.keys(m.baseball)){
-      bhtml+=`<tr><th>${sport.toUpperCase()}</th>`;
-      for(const mk of baseballMarkets){
-        bhtml+=matrixCell((m.baseball[sport]||{})[mk],sport,mk,heat);
-      }
-      bhtml+="</tr>";
-    }
-    bt.innerHTML=bhtml;
-  }
-  // Render basketball table (NBA/WNBA) with ML + Spread + Total
-  if(m.basketball&&Object.keys(m.basketball).length){
-    const bbt=$("#basketballTable"), bbc=$("#basketballCard");
-    bbc.style.display="";
-    const allCells=Object.values(m.basketball).flatMap(v=>Object.values(v));
-    const heat=matrixQualifiedRange(allCells);
-    const bballMarkets=["moneyline","spread","total"];
-    let bhtml="<tr><th>Sport</th>"+bballMarkets.map(k=>`<th>${MARKET_LABELS[k]||k}</th>`).join("")+"</tr>";
-    for(const sport of Object.keys(m.basketball)){
-      bhtml+=`<tr><th>${sport.toUpperCase()}</th>`;
-      for(const mk of bballMarkets){
-        bhtml+=matrixCell((m.basketball[sport]||{})[mk],sport,mk,heat);
-      }
-      bhtml+="</tr>";
-    }
-    bbt.innerHTML=bhtml;
-  }
 }
-function drill(sport,market){
-  const esportsCell=(state.matrix.esports||{})[sport]||{};
-  const baseballCell=(state.matrix.baseball||{})[sport]||{};
-  const basketballCell=(state.matrix.basketball||{})[sport]||{};
-  const cell=esportsCell[market]||baseballCell[market]||basketballCell[market]||
-    (state.matrix.grid[sport]||{})[market]||{};
-  if(market==="total"&&(cell.state==="qualified"||cell.state==="research_total_candidate")){
-    const calls=Number(cell.calls)||0,hits=calls&&cell.hit_rate!=null?Math.round(calls*Number(cell.hit_rate)):null;
-    const reason=String(cell.qualification||"not reported").replaceAll("_"," ");
-    const qualified=cell.state==="qualified";
-    const note=qualified?
-      `<div class="alert info">✅ Passed the research validation gate. This does not prove edge against timestamp-valid market contract lines.</div>`:
-      `<div class="alert warn">Research validation only · ${esc(reason)}. No executable total is implied.</div>`;
-    const metric=(value,label)=>`<div class="k"><b>${value}</b><span>${label}</span></div>`;
-    let html=`<h2>${sport.toUpperCase()} — TOTAL VALIDATION</h2>${note}<div class="kpis">
-      ${metric(pct(cell.hit_rate),"holdout hit rate")}
-      ${metric(cell.calls??"—","holdout calls")}
-      ${metric(hits??"—","holdout wins")}
-      ${metric(cell.holdout_rows??"—","locked-holdout games")}
-      ${metric(fmt(cell.brier,3),"holdout brier")}
-    </div><h2>Validation cohorts</h2><table class="data">
-      <tr><th>Train games</th><th>Threshold-validation games</th><th>Locked-holdout games</th></tr>
-      <tr><td>${cell.train_rows??"—"}</td><td>${cell.validation_rows??"—"}</td><td>${cell.holdout_rows??"—"}</td></tr>
-    </table><h2 style="margin-top:16px">Model validation details</h2><table class="data">
-      <tr><th>Reference total</th><th>Call threshold</th><th>Holdout MAE</th><th>Baseline MAE</th><th>Qualification</th></tr>
-      <tr><td>${fmt(cell.reference_line,1)}</td><td>${pct(cell.threshold)}</td><td>${fmt(cell.mae,3)}</td><td>${fmt(cell.baseline_mae,3)}</td><td>${esc(reason)}</td></tr>
-    </table>`;
-    showModal(html);return;
-  }
-  if(market==="total"){
-    const reason=String(cell.readiness||"NO_VALIDATION_ARTIFACT").replaceAll("_"," ");
-    const validCalls=cell.state==="blocked"?0:"—";
-    showModal(`<h2>${sport.toUpperCase()} — TOTAL VALIDATION</h2>
-      <div class="alert warn">No valid hit-rate percentage exists yet. Totals vary by game, so validation requires timestamp-valid pregame contract lines; a fixed league-average line would be misleading.</div>
-      <div class="kpis">
-        <div class="k"><b>—</b><span>valid hit rate</span></div>
-        <div class="k"><b>${validCalls}</b><span>valid holdout calls</span></div>
-        <div class="k"><b>50</b><span>minimum calls</span></div>
-        <div class="k"><b>${cell.state==="blocked"?"BLOCKED":"NO DATA"}</b><span>validation status</span></div>
-      </div><h2>Validation requirement</h2><table class="data">
-        <tr><th>Current result</th><th>Required evidence</th><th>Qualification gate</th></tr>
-        <tr><td>${esc(reason)}</td><td>Game-specific line + point-in-time inputs</td><td>≥60% hit rate · ≥50 locked-holdout calls</td></tr>
-      </table>`);return;
-  }
-  const picks=state.picks.filter(p=>String(p.league).toLowerCase()===sport&&String(p.market_type)===market.replace("moneyline","moneyline"));
-  const monthly={};
-  picks.filter(p=>p.status==="settled"&&(p.result==="win"||p.result==="loss")).forEach(p=>{
-    const mo=String(p.settled_at_utc||"").slice(0,7);
-    monthly[mo]=monthly[mo]||{pnl:0,w:0,c:0};
-    monthly[mo].pnl+=pickPnl(p); monthly[mo].c++; monthly[mo].w+=p.result==="win";
-  });
-  const variantDetails=market==="moneyline"&&cell.three_way?`<h2>Validated model variants</h2><table class="data">
-    <tr><th>Market basis</th><th>Variant</th><th>Holdout hit rate</th><th>Calls</th><th>Status</th></tr>
-    <tr><td>Binary team to win</td><td>${esc(cell.variant_name||"production")}</td><td>${pct(cell.hit_rate)}</td><td>${cell.calls??"—"}</td><td>qualified</td></tr>
-    <tr><td>Three-way 1X2</td><td>soccer_3way</td><td>${pct(cell.three_way.hit_rate)}</td><td>${cell.three_way.calls??"—"}</td><td>qualified separately</td></tr>
-  </table><div class="dim small" style="margin-top:6px">Results remain separate because binary and 1X2 calls are different prediction targets.</div>`:"";
-  let html=`<h2>${sport.toUpperCase()} — ${MARKET_LABELS[market]||market}</h2>
-  <div class="kpis">
-    <div class="k"><b>${pct(cell.hit_rate)}</b><span>holdout hit rate</span></div>
-    <div class="k"><b>${cell.calls??"—"}</b><span>holdout calls</span></div>
-    <div class="k"><b>${fmt(cell.units,1)}</b><span>units @ -110</span></div>
-    <div class="k"><b>${fmt(cell.brier,3)}</b><span>brier</span></div>
-    <div class="k"><b>${fmt(cell.threshold,3)}</b><span>learned threshold</span></div>
-  </div>${variantDetails}<h2>Ledger months</h2><table class="data"><tr><th>Month</th><th>Calls</th><th>Wins</th><th>P&L</th><th></th></tr>`;
-  const months=Object.keys(monthly).sort();
-  if(!months.length)html+=`<tr><td colspan=5 class="dim">no settled ledger rows for this cell yet</td></tr>`;
-  const maxAbs=Math.max(0.1,...months.map(mo=>Math.abs(monthly[mo].pnl)));
-  months.forEach(mo=>{const e=monthly[mo];
-    const w=Math.round(60*Math.abs(e.pnl)/maxAbs);
-    html+=`<tr><td>${mo}</td><td>${e.c}</td><td>${e.w}</td>
-      <td class="${e.pnl>=0?"green":"red"}">${fmt(e.pnl)}</td>
-      <td><span style="display:inline-block;height:9px;width:${w}px;background:${e.pnl>=0?"var(--green)":"var(--red)"};border-radius:3px"></span></td></tr>`;});
-  html+="</table>";
-  showModal(html);
-}
-
 /* ---------- picks ---------- */
 // null means "not settled yet" -- distinct from a real 0.00 push/break-even
 // result. Callers must render null as "--" (fmt() already does), never as 0.
@@ -1264,7 +1075,7 @@ function onFilterChange(tab){
   if(tab==="L"){renderPicks();return;}
   renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();
 }
-let sortKey="event_start_utc",sortAsc=false;
+let sortKey="event_start_utc",sortAsc=true;
 function updateCounts(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
   $("#openCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
@@ -1458,7 +1269,7 @@ function renderFlatTable(){
     $("#settledCount_F").textContent=_flatCache.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
 
     let rows=filteredFlatRows();
-    rows.sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+    rows.sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
 
     // KPI
     const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
@@ -2072,7 +1883,7 @@ function renderResearchTable(){
       $("#researchSettled").textContent=settled;
       $("#openCount_R").textContent=active;
       $("#settledCount_R").textContent=settled;
-      const rows=filteredResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+      const rows=filteredResearchRows().sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
       $("#researchShown").textContent=rows.length;
       let html=ledgerHeaderRow(false,"research");
       if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
@@ -2153,7 +1964,7 @@ function renderGatedResearchTable(){
     $("#gatedResearchSettled").textContent=settled;
     $("#openCount_G").textContent=active;
     $("#settledCount_G").textContent=settled;
-    const rows=filteredGatedResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+    const rows=filteredGatedResearchRows().sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
     $("#gatedResearchShown").textContent=rows.length;
     let html=ledgerHeaderRow(false,"gated");
     if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';

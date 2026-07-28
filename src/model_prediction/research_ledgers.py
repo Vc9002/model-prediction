@@ -6,10 +6,12 @@ from .ledger import PickLedger
 
 RESEARCH_LEDGER_SPORTS: tuple[str, ...] = (
     "soccer",
+    "tennis",
     "lol",
     "cs2",
     "dota2",
     "valorant",
+    "rainbow_six",
     "kbo",
     "npb",
 )

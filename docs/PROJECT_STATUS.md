@@ -1,11 +1,33 @@
 # Project status and source of truth
 
-**Last verified**: 2026-07-27 against the dirty `deepseek-phase5` checkout.
+**Last verified**: 2026-07-28, single `main` branch (the `deepseek-phase5`
+branch this doc previously referenced was merged and deleted this session;
+`main` is now the only branch, locally and on `origin`).
 
 This document is the operational status entry point. `DEBUG.md` contains the
 full audit evidence and reproduction commands. Historical metrics in old
 reports, changelog entries, model cards, and rollback artifacts are not current
 operational truth.
+
+**Operating note**: day-to-day work on this project prioritizes *wiring and
+features* over validation metrics — is a model actually running in `daily`,
+and on what data, not its hit rate or promotion-gate status. The release
+verdict below is a separate, narrower claim about real-money execution safety
+specifically, and remains unchanged by wiring work. See `DEBUG.md`'s
+"2026-07-27 (evening) — wiring session" and "2026-07-28 (early hours) —
+critical esports and tennis correctness fixes" entries for the current
+per-sport wiring audit, including two serious, live-verified data bugs found
+and fixed after the initial audit: dota2 and valorant esports models had
+swapped discipline IDs (each trained on the other game's history), and tennis
+silently used zero match history on every live forecast (a `FeatureStore`/
+`GameRecord` shape incompatibility), so every tennis pick showed exactly 50%
+regardless of the players involved. Both are fixed and live-verified with
+real, differentiated probabilities. `League.WORLD_CUP` is now fully retired
+(not just dropped from live trading). A fifth esports title (Rainbow Six
+Siege) was added with real bo3.gg data; CoD/Rocket League/Overwatch are
+confirmed to have no data source at all and are not buildable. Soccer BTTS
+remains unwired because no BTTS market currently exists on Polymarket US
+(live-verified), not because of a missing classifier.
 
 ## Release verdict
 
@@ -16,7 +38,11 @@ The blunt reason: the project currently has a plausible forecasting layer on
 top of an execution and evidence chain that is not yet trustworthy enough for
 capital. Model hit rates do not offset an order-ticket binding flaw,
 non-point-in-time MLB validation, non-atomic ledger/audit writes, artifact
-integrity defects, and stale release evidence.
+integrity defects, and stale release evidence. **None of the P0 items below
+were touched or re-verified in the 2026-07-27 wiring session** — that session's
+scope was research-sport pipeline wiring (soccer, tennis, esports, KBO/NPB),
+not the execution/ledger-atomicity surface. Treat everything in this section
+as last-verified 2026-07-26 until independently re-run.
 
 ## Source-of-truth order
 
@@ -37,14 +63,14 @@ execution semantics.
 
 | Check | Verified result | Consequence |
 |---|---|---|
-| Test suite | **436 passed** | Full suite is green after pinning the intended unit value in four order-preview tests and adding per-sport ledger/dashboard regressions. |
-| Focused critical tests | **84 passed** | Audit, CLI, domain, forward, and XLSX modules now have direct tests. |
-| Ruff | **117 findings** | Not lint-clean; 79 are executable-bit/shebang findings. |
+| Test suite | **458 passed** (re-verified 2026-07-27; includes new soccer moneyline, esports refresh, and tennis test coverage added this session) | Full suite is green. |
+| Focused critical tests | **84 passed** (last verified 2026-07-26, not re-run 2026-07-27) | Audit, CLI, domain, forward, and XLSX modules now have direct tests. |
+| Ruff | **113 findings** (re-verified 2026-07-27; down from 117 — no new findings introduced by this session's changes) | Not lint-clean; the majority are executable-bit/shebang findings. |
 | Critical imports | Pass | Core modules and feature/data-source packages import. |
 | Python/package | Python 3.14.5; editable install resolves here | Packaging and console entry point work. |
 | Artifact hashes | **31 valid, 2 mismatched, 33 total** | NBA and NFL spread baselines fail canonical hash verification. |
-| Audit chain | **16,918 events, 0 breaks, 0 hash mismatches** | Cryptographic chain is intact. |
-| Ledger/audit reconciliation | **False** | 1,150 historical creation events lack audited removal events; current rows all have creation events. |
+| Audit chain | **0 breaks, 0 hash mismatches** (re-verified 2026-07-27) | Cryptographic chain is intact. |
+| Ledger/audit reconciliation | **False** (re-verified 2026-07-27: 1,230 historical creation events now lack audited removal events, up from 1,150 — this count only grows over time by design, see `DEBUG.md`) | Current rows all have creation events. |
 | Config artifacts | One missing; one wrong semantic reference | Market-residual artifact is absent; MLB total research points to the spread artifact. |
 | Latest learned report | Stale | It names an old worktree and MLB v5, not active MLB v6/current checkout. |
 | Dashboard runtime | Healthy process, inconsistent governance state | `/api/status` reports `promotion_allowed=true` while warning MLB is below its qualification gate. |
@@ -104,7 +130,17 @@ executable profitability.
 | NBA | `nba-elo-trend-lr-v4` | Yes | 577 | 73.66% | Predictor gate pass; executable economics remain separate. |
 | WNBA | `wnba-elo-trend-lr-v4` | Yes | 163 | 67.48% | Predictor gate pass; availability fail-open path remains a blocker. |
 | NFL | `nfl-elo-trend-lr-v4` | Yes | 87 | 71.26% | Predictor gate pass; spread research artifact hash is corrupt. |
-| Soccer | `soccer-poisson-dc-v1` | No production artifact | — | — | Draw-aware full-game 2.5 total research; executable-BBO matched and research-only. |
+| Soccer | `soccer-poisson-dc-v1` | No production artifact | — | — | Draw-aware full-game 2.5 total plus per-team moneyline research; executable-BBO matched and research-only. BTTS is computed by the model, but no BTTS market currently exists on Polymarket US at all (live-verified 2026-07-27 across every soccer league) — nothing to classify yet, not a missing feature. |
+| Tennis | `tennis-surface-elo-v1` (new 2026-07-27) | No production artifact | — | — | Surface-blended Elo, singles only, WTA moneyline only (Polymarket US has no ATP market, ESPN has no ITF scoreboard). Two data bugs fixed 2026-07-28: combined ATP+WTA tournaments were mistagging WTA players' matches as ATP, and `tennis_forward.py` was reading history through `FeatureStore`/`GameRecord` (built for team sports; every tennis row raised `KeyError` and was silently skipped), so every forecast used zero history and always computed exactly 50% regardless of the real players involved. Both fixed and live-verified: a known top player now computes a real, differentiated Elo/probability instead of 50%. |
+
+Esports now covers five titles: LOL, CS2, DOTA2, VALORANT, and RAINBOW_SIX
+(added 2026-07-28, real bo3.gg data, 2,969 matches). DOTA2 and VALORANT had
+swapped `discipline_id` values in `esports.py` (verified live against bo3.gg's
+own `/disciplines` endpoint) — each model had been trained on and predicting
+from the *other* game's match history since inception. Fixed 2026-07-28; both
+titles' data rebuilt from scratch and re-validated. CoD, Rocket League, and
+Overwatch are confirmed to have no discipline on bo3.gg at all (this
+project's only esports data source) and cannot get a real model.
 
 The active esports, KBO, and NPB config entries use qualification overrides,
 while the dashboard evidence surface still labels those markets

@@ -105,18 +105,20 @@ from .research_ledgers import (
     research_ledger,
 )
 from .soccer_forward import build_soccer_total_slate
+from .tennis_forward import build_tennis_slate
 from .total_score import validate_all_total_score_models
 from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
-ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant")
+ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant", "rainbow_six")
 DAILY_LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl")
 DAILY_INTERNATIONAL_BASEBALL_SPORTS = ("kbo", "npb")
 FLAT_LEDGER_SPORTS = DAILY_LEARNED_SPORTS
 RESEARCH_ONLY_DAILY_SPORTS = (
     "soccer",
+    "tennis",
     *ESPORTS_TITLES,
     *DAILY_INTERNATIONAL_BASEBALL_SPORTS,
 )
@@ -1086,7 +1088,7 @@ def _forecast_learned_sport(
                 model_uncertainty=None,
                 model_version=candidate.model_version,
                 rationale=rationale,
-                risks="Learned model; promotion gate not yet open; zero-unit research until review.",
+                risks="Learned model; shadow-qualified via operator override.",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=ModelState(configured_state),
                 observed_at_utc=observed_at_utc,
@@ -1584,6 +1586,112 @@ def _forecast_soccer_sport(
     return forecast
 
 
+def _forecast_tennis_sport(
+    *,
+    data_root,
+    args_date: str,
+    config: dict,
+    research_ledger,
+    gated_ledger=None,
+) -> dict:
+    """Price the surface-blended Elo model against WTA moneyline markets only
+    -- see tennis_forward.py for why ATP and ITF can never be matched here."""
+    from .data_sources.polymarket_us import probability_to_american
+    model_config = config["models"].get("TENNIS", {})
+    forecast = build_tennis_slate(
+        data_root=data_root,
+        game_date=args_date,
+        client=ESPNClient(),
+        observed_at=utc_now(),
+    )
+    if research_ledger is None:
+        forecast["logged"] = 0
+        return forecast
+
+    min_edge = float(model_config.get("min_edge", 0.05))
+    configured_state = str(model_config.get("status", "research"))
+    observed_now = utc_now()
+    logged = 0
+    gated = 0
+    for contract in forecast.get("priced_contracts", []):
+        ask = float(contract["executable_ask"])
+        request = PickRequest(
+            event_start_utc=str(contract["event_start_utc"]),
+            event_id=str(contract["event_id"]),
+            league=League.TENNIS,
+            away_team=str(contract["away_team"]),
+            home_team=str(contract["home_team"]),
+            market_type=MarketType(str(contract["market_type"])),
+            selection=str(contract["selection"]),
+            line=None if contract["line"] is None else float(contract["line"]),
+            sportsbook="polymarket_us",
+            american_odds=probability_to_american(ask),
+            model_probability=float(contract["model_probability"]),
+            model_uncertainty=float(contract["model_uncertainty"]),
+            model_version=str(contract["model_version"]),
+            rationale=(
+                f"{contract['rationale']} Executable ask {ask:.4f} "
+                f"({contract['market_slug']})."
+            ),
+            risks=(
+                "Research-only surface-blended Elo model; singles only, "
+                "WTA-only market coverage, not yet locked-holdout qualified."
+            ),
+            model_origin=ModelOrigin.STATISTICAL_MODEL,
+            model_state=ModelState(configured_state),
+            observed_at_utc=str(contract["observed_at_utc"]),
+            model_artifact_hash=str(forecast["model_code_hash"]),
+            calibration_method="surface_blended_elo",
+            calibration_version=str(contract["model_version"]),
+            calibration_artifact_hash=str(forecast["model_code_hash"]),
+            feature_schema_version="tennis-surface-elo-v1",
+            code_revision=str(forecast["model_code_hash"]),
+        )
+        try:
+            request.validate(now=observed_now)
+            # Exposure check and append happen inside one held lock -- see
+            # the matching comment in _log_esports_forecast.
+            with _LEDGER_LOCK:
+                eligibility = evaluate_gated_research_eligibility(
+                    request,
+                    research_ledger.exposure(request, now=observed_now),
+                    unit_policy(config),
+                    model_inputs_valid=True,
+                    minimum_edge=min_edge,
+                    minimum_confidence=0.0,
+                    now=observed_now,
+                    maximum_age_hours=float(
+                        config["project"].get("maximum_data_age_hours", 12)
+                    ),
+                    maximum_unreviewed_disagreement=float(
+                        config["project"].get(
+                            "maximum_unreviewed_market_disagreement",
+                            0.10,
+                        )
+                    ),
+                )
+                genuinely_eligible = eligibility.decision == "CALL"
+                research_ledger.append_evaluated(
+                    request,
+                    eligibility,
+                    now=observed_now,
+                )
+                if gated_ledger is not None and genuinely_eligible:
+                    with suppress(DuplicatePickError):
+                        gated_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
+                        gated += 1
+            logged += 1
+        except (DuplicatePickError, KeyError, ValueError):
+            continue
+    forecast["logged"] = logged
+    forecast["gated_logged"] = gated
+    return forecast
+
+
 def _forecast_research_sport(sport: str, args_date: str, config) -> dict:
     """Research-only preview for non-MLB sports from cached data. Never logs."""
     store = FeatureStore(Path(ledger_path(config)).parent)
@@ -1632,7 +1740,7 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             pending.append(row["pick_id"])
             continue
         # Esports: settle via Polymarket contract resolution
-        if row["league"] in ("LOL", "CS2", "DOTA2", "VALORANT"):
+        if row["league"] in ("LOL", "CS2", "DOTA2", "VALORANT", "RAINBOW_SIX"):
             result = _settle_esports_pick(row, ledger)
             if result is None:
                 pending.append(row["pick_id"])
@@ -1647,6 +1755,18 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
         # settle from the official league schedule instead.
         if row["league"] in ("KBO", "NPB"):
             result = _settle_international_baseball_pick(row, ledger, config)
+            if result is None:
+                pending.append(row["pick_id"])
+            elif result.get("settled"):
+                settled.append(result)
+            else:
+                failures.append(result)
+            continue
+        # Tennis: player-vs-player, not team-vs-team -- ESPN's tennis
+        # scoreboard shape doesn't fit `_find_espn_result` at all (see
+        # `_find_tennis_result`).
+        if row["league"] == "TENNIS":
+            result = _settle_tennis_pick(row, ledger, espn)
             if result is None:
                 pending.append(row["pick_id"])
             elif result.get("settled"):
@@ -1870,6 +1990,69 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
         return {"pick_id": row["pick_id"], "reason": str(error)}
 
 
+def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | None:
+    """Match a ledger row to a completed WTA singles match by player name.
+
+    ESPN's tennis scoreboard nests matches under `groupings` with
+    `athlete`-shaped competitors (see
+    `data_sources.espn.completed_tennis_singles_matches`) rather than the
+    flat `competitions`/`team` shape `_find_espn_result` assumes, so tennis
+    needs its own matcher. Only WTA is checked -- tennis is only ever
+    forecast (and therefore only ever needs settling) against WTA (see
+    tennis_forward.py).
+    """
+    away_names = {row["away_team"].casefold(), row["original_away_team"].casefold()}
+    home_names = {row["home_team"].casefold(), row["original_home_team"].casefold()}
+    try:
+        scoreboard = espn.scoreboard("WTA", game_day)
+    except Exception:
+        logger.warning(
+            "ESPN WTA scoreboard fetch failed for %s; tennis settlement skipping", game_day, exc_info=True
+        )
+        return None
+    for event in scoreboard.get("events", []):
+        for grouping in event.get("groupings", []):
+            for competition in grouping.get("competitions", []):
+                slug = str(competition.get("type", {}).get("slug", ""))
+                if "singles" not in slug:
+                    continue
+                competitors = competition.get("competitors", [])
+                if len(competitors) != 2:
+                    continue
+                by_side = {item.get("homeAway"): item for item in competitors}
+                away, home = by_side.get("away"), by_side.get("home")
+                if not away or not home:
+                    continue
+                away_name = str((away.get("athlete") or {}).get("displayName", ""))
+                home_name = str((home.get("athlete") or {}).get("displayName", ""))
+                if away_name.casefold() not in away_names or home_name.casefold() not in home_names:
+                    continue
+                status = competition.get("status", {}).get("type", {})
+                completed = bool(status.get("completed"))
+                record = {"completed": completed, "status_name": str(status.get("name", ""))}
+                if completed:
+                    record["away_score"] = 1 if away.get("winner") else 0
+                    record["home_score"] = 1 if home.get("winner") else 0
+                return record
+    return None
+
+
+def _settle_tennis_pick(row: dict, ledger, espn: ESPNClient) -> dict | None:
+    try:
+        start = parse_utc(row["event_start_utc"])
+    except ValueError:
+        return {"pick_id": row["pick_id"], "reason": "bad event_start_utc"}
+    game_day = start.astimezone(EASTERN).date().isoformat()
+    match = _find_tennis_result(espn, game_day, row)
+    if match is None or not match.get("completed"):
+        return None
+    try:
+        settled = ledger.settle(row["pick_id"], match["away_score"], match["home_score"])
+        return {"pick_id": row["pick_id"], "result": settled["result"], "settled": True}
+    except (KeyError, ValueError) as error:
+        return {"pick_id": row["pick_id"], "reason": str(error)}
+
+
 def _identity_key(value: str) -> str:
     return "".join(c.lower() for c in value if c.isalnum())
 
@@ -2077,6 +2260,58 @@ def _summary(config, ledger) -> dict:
     }
 
 
+def _row_artifact_qualified(row: dict[str, str], config: dict) -> bool:
+    """Whether a ledger row's backing model ARTIFACT is genuinely qualified,
+    not just config-declared.
+
+    ``config/model.yaml`` can set ``status: shadow_qualified`` with an
+    explicit ``qualification_override`` for a league whose artifact itself
+    never cleared holdout validation (e.g. MLB v6, 2026-07:
+    ``qualification.meets_primary_holdout_metrics`` is false --
+    "running live for observation" ahead of any real promotion decision).
+    That's a legitimate, documented choice for shadow logging, but
+    real-money execution (PolymarketExecutor.execute's ``artifact_qualified``
+    gate) must not treat an override-only qualification as equivalent to a
+    genuinely validated one.
+
+    Two artifact schemas exist in this project (verified against real
+    artifact files, not assumed): learned MLB/NBA/WNBA/NFL artifacts record
+    ``qualification.meets_primary_holdout_metrics``; Elo-baseline artifacts
+    (esports, KBO, NPB -- identifiable by ``k``+``ratings`` fields, the same
+    shape check dashboard_server.py's ``_ml_cell`` uses) record a top-level
+    ``qualified_for_betting`` instead. Neither schema has a top-level
+    ``qualified`` field -- checking one that doesn't exist would silently
+    return False for every artifact, including genuinely qualified ones.
+
+    Fails closed (returns False) whenever the artifact can't be loaded or
+    matched to the exact version this row was computed from -- an
+    unverifiable claim of qualification is not qualification.
+    """
+    model_config = config.get("models", {}).get(str(row.get("league", "")).upper(), {})
+    artifact_value = model_config.get("production_artifact")
+    if not artifact_value:
+        return False
+    artifact_path = Path(artifact_value)
+    if not artifact_path.is_absolute():
+        artifact_path = PROJECT_ROOT / artifact_path
+    if not artifact_path.exists():
+        return False
+    try:
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    row_hash = str(row.get("model_artifact_hash") or "")
+    if row_hash and row_hash != str(artifact.get("artifact_hash", "")):
+        # The config's current production artifact isn't the exact version
+        # this row was priced from (e.g. a newer artifact has since been
+        # promoted) -- can't verify qualification against a version that no
+        # longer matches, so refuse to claim it.
+        return False
+    if "k" in artifact and "ratings" in artifact:
+        return bool(artifact.get("qualified_for_betting", False))
+    return bool(artifact.get("qualification", {}).get("meets_primary_holdout_metrics", False))
+
+
 def main(argv: list[str] | None = None) -> None:
     args = parser().parse_args(argv)
     config = load_config()
@@ -2269,6 +2504,22 @@ def main(argv: list[str] | None = None) -> None:
                     )
                 elif sport == "soccer":
                     results[sport] = _forecast_soccer_sport(
+                        data_root=data_directory,
+                        args_date=args.date,
+                        config=config,
+                        research_ledger=(
+                            research_ledger(data_directory, sport)
+                            if log and not is_flat
+                            else None
+                        ),
+                        gated_ledger=(
+                            research_ledger(data_directory, sport, gated=True)
+                            if log and not is_flat
+                            else None
+                        ),
+                    )
+                elif sport == "tennis":
+                    results[sport] = _forecast_tennis_sport(
                         data_root=data_directory,
                         args_date=args.date,
                         config=config,
@@ -2525,6 +2776,16 @@ def main(argv: list[str] | None = None) -> None:
                 research_ledger=research_ledger(data_directory, "soccer"),
                 gated_ledger=research_ledger(data_directory, "soccer", gated=True),
             )
+            try:
+                forecast_result["tennis"] = _forecast_tennis_sport(
+                    data_root=data_directory,
+                    args_date=args.date,
+                    config=config,
+                    research_ledger=research_ledger(data_directory, "tennis"),
+                    gated_ledger=research_ledger(data_directory, "tennis", gated=True),
+                )
+            except Exception:
+                logger.warning("Tennis forecast failed", exc_info=True)
             try:
                 forecast_result["_esports_ratings_refresh"] = _refresh_esports_ratings(data_directory)
             except Exception:
@@ -2941,6 +3202,7 @@ def main(argv: list[str] | None = None) -> None:
                 execute_flag=args.execute_flag,
                 user_command=True,
                 manual_research_order=manual,
+                artifact_qualified=_row_artifact_qualified(row, config),
             )
         elif args.command == "sell-position":
             # Close a live exchange position you already hold. There is no

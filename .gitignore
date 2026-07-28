@@ -10,6 +10,8 @@ artifacts/models/
 dashboard/orders.json
 dashboard/portfolio_history.json
 data/*.lock
+data/**/*.lock
+data/locks/
 data/processed/
 data/raw/
 .claude/worktrees/

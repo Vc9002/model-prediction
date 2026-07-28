@@ -61,17 +61,11 @@ MODEL_SPECS = {
     ),
     League.TENNIS: ModelSpec(
         League.TENNIS,
-        "Elo + opponent-adjusted trend logistic regression",
-        "moneyline home-win probability",
-        "binary logistic regression",
-        ("Elo home-win probability", "offensive momentum gap"),
-    ),
-    League.WORLD_CUP: ModelSpec(
-        League.WORLD_CUP,
-        "Poisson goal model with Dixon-Coles low-score correction",
-        "three-way result, O/U 2.5, BTTS",
-        "correlated Poisson score matrix",
-        ("EWMA attack/defense strength", "form points", "tournament incentives"),
+        "surface-blended Elo (60% surface-specific, 40% overall)",
+        "moneyline win probability, WTA only",
+        "chronological Elo updated match-by-match, blended per surface",
+        ("overall Elo", "per-surface Elo", "singles-only ESPN match history"),
+        status=ModelState.RESEARCH,
     ),
     League.NFL: ModelSpec(
         League.NFL,
@@ -129,6 +123,14 @@ MODEL_SPECS = {
         ("point-in-time team Elo",),
         status=ModelState.RESEARCH,
     ),
+    League.RAINBOW_SIX: ModelSpec(
+        League.RAINBOW_SIX,
+        "venue-neutral series Elo baseline",
+        "best-of match/series winner probability",
+        "binary Elo expectation",
+        ("point-in-time team Elo",),
+        status=ModelState.RESEARCH,
+    ),
 }
 
 _CONFIG_STATUS_CACHE: dict[str, dict[str, ModelState]] = {}
@@ -152,13 +154,11 @@ def _status_from_config(league: League) -> ModelState | None:
             for lk, v in models.items():
                 if lk not in League.__members__:
                     continue
-                # One league using a non-ModelState status string (e.g.
-                # config's own "deferred" annotation for TENNIS, meaning
-                # "not actively pursued" rather than a real lifecycle state)
-                # must not silently blank out every OTHER league's status --
-                # a single bad/placeholder value here previously poisoned the
-                # whole cache via one blanket try/except around the entire
-                # dict comprehension.
+                # One league using a non-ModelState status string in the YAML
+                # (a stale placeholder, a typo, whatever) must not silently
+                # blank out every OTHER league's status -- a single bad value
+                # here previously poisoned the whole cache via one blanket
+                # try/except around the entire dict comprehension.
                 with suppress(ValueError, AttributeError):
                     statuses[lk] = ModelState(v.get("status", "research"))
         _CONFIG_STATUS_CACHE[cache_key] = statuses

@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "10a412e78306d1f4d1a66590dd7cd2087ed53520bfa3bb925889a6371153732f",
+  "artifact_hash": "0633355b1144e4205ca6d08e3f328d99cab0970358846bd77228f3bcbfcd70ee",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -27,7 +27,7 @@
     "every_called_month_positive_at_minus_110": false,
     "every_qualifying_month_positive_at_minus_110": false,
     "failures": [
-      "no complete month reached the 10-call qualification minimum"
+      "CONTAMINATED_FEATURE: probable_starter_era_gap coefficient (-0.2868) was fit on live/current ESPN probables ERA applied retroactively to historical training dates (confirmed by this artifact's own experimental_note: ESPN returns the SAME current ERA for a pitcher regardless of query date, verified 3 months apart). The coefficient sign is backwards -- a worse home starter ERA should lower home win probability, not raise it -- and the feature itself predicted outcomes at 25% accuracy (3/12) in the window checked, worse than chance. The 71.1% holdout hit rate (96/135) that otherwise clears the primary bar is not evidence this model is skillful: it went 9-3 during a 3-day span by picking 11 of 12 home teams, matching the market favorite (also 9-3) with no independent edge from the contaminated feature. meets_primary_holdout_metrics is force-set False here despite the raw numbers clearing the bar, because the bar itself is not a valid signal for a model whose defining feature cannot be honestly backtested. Do not flip this back to True by re-running holdout evaluation alone -- the fix is retraining without probable_starter_era_gap (or refitting it only once the point-in-time archive at data/point_in_time/mlb_probable_starters.jsonl has enough real history to support a real coefficient), not accumulating more calls on the same coefficient."
     ],
     "framework": "recency_restricted_90d_partial",
     "hit_rate": 0.711111,

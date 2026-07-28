@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from model_prediction import cli
-from model_prediction.cli import _clear_today_open, _verify_chain
+from model_prediction.cli import _clear_today_open, _find_tennis_result, _verify_chain
 from model_prediction.domain import (
     League,
     MarketType,
@@ -308,14 +308,98 @@ def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_l
     assert set(cli.FLAT_LEDGER_SPORTS) == {"mlb", "nba", "wnba", "nfl"}
     assert set(cli.RESEARCH_ONLY_DAILY_SPORTS) == {
         "soccer",
+        "tennis",
         "lol",
         "cs2",
         "dota2",
         "valorant",
+        "rainbow_six",
         "kbo",
         "npb",
     }
     assert not set(cli.FLAT_LEDGER_SPORTS) & set(cli.RESEARCH_ONLY_DAILY_SPORTS)
+
+
+class _FakeTennisESPN:
+    def __init__(self, scoreboard):
+        self._scoreboard = scoreboard
+
+    def scoreboard(self, league, game_date):
+        assert league == "WTA"
+        return self._scoreboard
+
+
+def _tennis_row(**overrides):
+    row = {
+        "away_team": "Alpha Player",
+        "original_away_team": "Alpha Player",
+        "home_team": "Beta Player",
+        "original_home_team": "Beta Player",
+    }
+    row.update(overrides)
+    return row
+
+
+def _tennis_scoreboard(*, completed=True, away_wins=True, slug="womens-singles"):
+    return {
+        "events": [
+            {
+                "id": "e1",
+                "date": "2026-07-27T20:00:00Z",
+                "groupings": [
+                    {
+                        "competitions": [
+                            {
+                                "id": "c1",
+                                "type": {"slug": slug},
+                                "status": {"type": {"completed": completed, "name": "STATUS_FINAL"}},
+                                "competitors": [
+                                    {
+                                        "homeAway": "away",
+                                        "winner": away_wins,
+                                        "athlete": {"displayName": "Alpha Player"},
+                                    },
+                                    {
+                                        "homeAway": "home",
+                                        "winner": not away_wins,
+                                        "athlete": {"displayName": "Beta Player"},
+                                    },
+                                ],
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def test_find_tennis_result_matches_singles_by_player_name_and_encodes_winner() -> None:
+    espn = _FakeTennisESPN(_tennis_scoreboard(away_wins=True))
+    result = _find_tennis_result(espn, "2026-07-27", _tennis_row())
+    assert result == {
+        "completed": True,
+        "status_name": "STATUS_FINAL",
+        "away_score": 1,
+        "home_score": 0,
+    }
+
+
+def test_find_tennis_result_excludes_doubles_draws() -> None:
+    espn = _FakeTennisESPN(_tennis_scoreboard(slug="womens-doubles"))
+    assert _find_tennis_result(espn, "2026-07-27", _tennis_row()) is None
+
+
+def test_find_tennis_result_returns_none_for_unmatched_players() -> None:
+    espn = _FakeTennisESPN(_tennis_scoreboard())
+    row = _tennis_row(away_team="Nobody", original_away_team="Nobody")
+    assert _find_tennis_result(espn, "2026-07-27", row) is None
+
+
+def test_find_tennis_result_pending_while_match_not_yet_completed() -> None:
+    espn = _FakeTennisESPN(_tennis_scoreboard(completed=False))
+    result = _find_tennis_result(espn, "2026-07-27", _tennis_row())
+    assert result["completed"] is False
 
 
 def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executable(

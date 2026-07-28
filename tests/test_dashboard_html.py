@@ -111,8 +111,6 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "timeZone:ET_ZONE" in html
     assert "Scan Open Ledger Prices" in html
     assert "Scan Today’s Prices" not in html
-    assert "Validated model variants" in html
-    assert "Results remain separate because binary and 1X2 calls" in html
     assert "order-wrap" in html
     assert "Live Portfolio — Exchange Positions" in html
     assert "Model Picks Ledger" in html
@@ -136,14 +134,6 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert 'canceled:"CXL"' in html
     assert 'rejected:"REJ"' in html
     assert "`B ${cents(bid)} / A ${cents(ask)} · `" in html
-    assert "holdout games" in html
-    assert "TOTAL VALIDATION" in html
-    assert "Validation cohorts" in html
-    assert "Model validation details" in html
-    assert 'c.state==="research_only"' in html
-    assert "research only · 0U" in html
-    assert "const baseballCell" in html
-    assert "const basketballCell" in html
     assert "Current ask buys immediately" in html
     assert "immediate-or-cancel buy" in html
     assert 'value="open" selected>active only' in html

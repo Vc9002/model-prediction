@@ -86,15 +86,17 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
 }
 
 # Sports whose prospective BBO capture feeds the daily qualification/promotion
-# pipeline (config/model.yaml, models/registry.py). Tennis has Polymarket
-# gateway coverage in POLYMARKET_SPORT_LEAGUES above but is not yet wired into
-# daily BBO capture, so it stays out of this set on purpose — do not derive
-# this from "every league in POLYMARKET_SPORT_LEAGUES" or from
-# registry.MODEL_SPECS wholesale.
-# Esports and soccer are research-only, but prospective BBO capture must begin
-# before profitability can ever be tested; capturing prices does not qualify a
-# model or authorize execution.
-BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "soccer", "esports", "kbo", "npb"}
+# pipeline (config/model.yaml, models/registry.py). Do not derive this from
+# "every league in POLYMARKET_SPORT_LEAGUES" or from registry.MODEL_SPECS
+# wholesale.
+# Esports, soccer, and tennis are research-only, but prospective BBO capture
+# must begin before profitability can ever be tested; capturing prices does
+# not qualify a model or authorize execution. Tennis capture only ever
+# produces usable rows for the WTA league within it -- Polymarket US has no
+# ATP market, and ITF has no matching ESPN scoreboard to build a prediction
+# from (see tennis_forward.py) -- but ITF/WTA snapshots are still captured
+# here in case that coverage gap closes later.
+BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "soccer", "esports", "kbo", "npb", "tennis"}
 
 MARKET_TYPES = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "moneyline",

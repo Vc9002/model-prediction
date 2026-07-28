@@ -86,16 +86,18 @@ SPORTS = (
     "wnba",
     "nfl",
     "soccer",
+    "tennis",
     "lol",
     "cs2",
     "dota2",
     "valorant",
+    "rainbow_six",
     "kbo",
     "npb",
 )
 GATEWAY = "https://gateway.polymarket.us"
 RESEARCH_ONLY_LEAGUES = frozenset(
-    {"SOCCER", "LOL", "CS2", "DOTA2", "VALORANT", "KBO", "NPB"}
+    {"SOCCER", "TENNIS", "LOL", "CS2", "DOTA2", "VALORANT", "RAINBOW_SIX", "KBO", "NPB"}
 )
 
 _CACHE: dict[str, tuple[float, object]] = {}
@@ -1635,10 +1637,6 @@ def status() -> dict:
     }
 
 
-MATRIX_SPORTS = ("nfl", "soccer")  # main grid: moneyline only
-MATRIX_MARKETS = ["moneyline"]
-BASKETBALL_SPORTS = ("nba", "wnba")
-BASKETBALL_MARKETS = ["moneyline", "spread", "total"]
 # ── SECTION: Validation & Matrix ────────────────────────────────────
 
 
@@ -1754,47 +1752,6 @@ def _config_production_artifact_path(sport: str) -> str:
     return ""
 
 
-def _readiness_cell(readiness: str | None) -> dict:
-    """Map a multi_market_readiness status string to a dashboard cell."""
-    if not readiness:
-        return {"state": "no_data", "readiness": None}
-    if readiness.startswith("DATA_READY"):
-        # Data exists but no locked-holdout evaluation has been run yet.
-        return {"state": "model_untested", "readiness": readiness}
-    if readiness.startswith("INSUFFICIENT_DATA"):
-        # Some data collected but below the minimum threshold.
-        return {"state": "blocked", "readiness": readiness}
-    # BLOCKED_*, DIAGNOSTIC_ONLY_*, etc.
-    return {"state": "blocked", "readiness": readiness}
-
-
-def _configured_research_cell(sport: str, market: str) -> dict | None:
-    """Return an untested cell when config declares a research artifact."""
-    try:
-        config = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError):
-        config = {}
-    model = (config.get("models") or {}).get(sport.upper()) or {}
-    key = f"{market}_research_artifact"
-    raw_path = str(model.get(key) or "")
-    if not raw_path:
-        return None
-    path = Path(raw_path)
-    if not path.is_absolute():
-        path = ROOT / path
-    if not path.exists():
-        return {
-            "state": "blocked",
-            "readiness": "CONFIGURED_RESEARCH_ARTIFACT_MISSING",
-        }
-    artifact = _read_json(path) or {}
-    return {
-        "state": "model_untested",
-        "readiness": "MODEL_EXISTS_NO_LOCKED_HOLDOUT",
-        "model_version": artifact.get("model_version"),
-    }
-
-
 def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
     """Moneyline cell pinned to the active artifact's exact validated variant."""
     variants = sport_meta.get("variants") or {}
@@ -1900,117 +1857,98 @@ def _ml_cell(sport_meta: dict, artifact: dict | None = None) -> dict:
 
 
 def matrix() -> dict:
-    validation, source = _newest_validation()
-    total_validation = _read_json(OUTPUTS / "total-score-validation.json") or {}
-    total_results = total_validation.get("sports") or {}
-    sports_meta = validation.get("sports") or {}
-    markets = list(MATRIX_MARKETS)
-    grid = {}
-    for sport in MATRIX_SPORTS:
-        row = {}
-        meta = sports_meta.get(sport) or {}
-        row["moneyline"] = _ml_cell(meta, _production_artifact(validation, sport))
-        readiness = meta.get("multi_market_readiness") or {}
-        spread_key = "full_game_spread" if sport == "mlb" else "spread"
-        total_key = "full_game_total" if sport == "mlb" else "total"
-        spread_readiness = readiness.get(spread_key) or readiness.get("spread")
-        if isinstance(spread_readiness, dict) and spread_readiness.get("state"):
-            row["spread"] = spread_readiness
-        else:
-            row["spread"] = {
-                "state": "blocked" if spread_readiness else "no_data",
-                "readiness": spread_readiness,
-            }
-        total_readiness = readiness.get(total_key) or readiness.get("total")
-        if isinstance(total_readiness, dict) and total_readiness.get("state") == "research_active":
-            row["total"] = total_readiness
-        else:
-            score_model = total_results.get(sport) or {}
-            holdout = score_model.get("locked_holdout") or {}
-            if score_model.get("status") == "research_score_model_candidate":
-                qual = (score_model.get("market_qualification") or {}).get("reason", "")
-                state = "qualified" if qual == "qualified" else "research_total_candidate"
-                called_holdout = score_model.get("holdout") or {}
-                row["total"] = {
-                    "state": state,
-                    "mae": holdout.get("mae"),
-                    "baseline_mae": holdout.get("baseline_mae"),
-                    "mae_gain": holdout.get("mae_gain_vs_rolling_league_mean"),
-                    "mae_gain_interval": holdout.get("mae_gain_95pct_interval"),
-                    "holdout_rows": score_model.get("holdout_observations")
-                    or (score_model.get("training") or {}).get("holdout_rows"),
-                    "train_rows": score_model.get("train_observations"),
-                    "validation_rows": score_model.get("validation_observations"),
-                    "readiness": total_readiness,
-                    "qualification": qual,
-                    "calls": called_holdout.get("calls"),
-                    "hit_rate": called_holdout.get("hit_rate"),
-                    "brier": called_holdout.get("brier"),
-                    "reference_line": score_model.get("reference_line"),
-                    "threshold": score_model.get("threshold"),
-                    "model": score_model.get("model"),
-                }
-            else:
-                row["total"] = {
-                    "state": "blocked" if total_readiness else "no_data",
-                    "readiness": total_readiness,
-                }
-        mlb_special_readiness = {
-            "f5_spread": readiness.get("first_five_spread"),
-            "f5_total": readiness.get("first_five_total"),
-            "yrfi_nrfi": readiness.get("yrfi_nrfi"),
-        }
-        for market, market_readiness in mlb_special_readiness.items():
-            row[market] = (
-                {
-                    "state": "blocked" if market_readiness else "no_data",
-                    "readiness": market_readiness,
-                }
-                if sport == "mlb"
-                else {"state": "not_applicable"}
-            )
-        grid[sport] = row
-    gate = validation and (
-        "locked holdout hit rate >= 65% target (learned threshold), >= 60% floor, >= 50 calls"
-    )
-    esports = validation.get("esports_grid") or {}
-    baseball = validation.get("baseball_grid") or {}
-    # Add MLB to baseball grid with all markets
-    mlb_row = {}
-    mlb_meta = sports_meta.get("mlb") or {}
-    mlb_row["moneyline"] = _ml_cell(mlb_meta, _production_artifact(validation, "mlb"))
-    mlb_readiness = mlb_meta.get("multi_market_readiness") or {}
-    for mk in ["spread", "total", "f5_spread", "f5_total", "yrfi_nrfi"]:
-        key = f"full_game_{mk}" if mk in ("spread", "total") else mk
-        rd = mlb_readiness.get(key) or mlb_readiness.get(mk)
-        if isinstance(rd, dict) and rd.get("state"):
-            mlb_row[mk] = rd
-        else:
-            configured = _configured_research_cell("mlb", mk)
-            mlb_row[mk] = configured or _readiness_cell(rd)
-    baseball["mlb"] = mlb_row
-    # Build basketball grid (NBA/WNBA) with moneyline + spread + total
-    basketball = {}
-    for sport in BASKETBALL_SPORTS:
-        bball_row = {}
-        meta = sports_meta.get(sport) or {}
-        bball_row["moneyline"] = _ml_cell(meta, _production_artifact(validation, sport))
-        readiness = meta.get("multi_market_readiness") or {}
-        for mk in ["spread", "total"]:
-            rd = readiness.get(mk)
-            if isinstance(rd, dict) and rd.get("state"):
-                bball_row[mk] = rd
-            else:
-                bball_row[mk] = _readiness_cell(rd)
-        basketball[sport] = bball_row
+    """Wiring status per sport/market: is it live in `daily`, what does it
+    actually run on, and which ledger does it write to.
+
+    Deliberately NOT hit rates, Brier scores, MAE, or promotion-gate status
+    -- those questions live on the System/Evidence tabs. This mirrors the
+    operator's standing instruction to discuss models in terms of wiring and
+    features, not validation metrics (see docs/PROJECT_STATUS.md's operating
+    note). Rows are maintained by hand alongside cli.py's actual dispatch
+    logic -- when a sport's wiring changes, update this list in the same
+    change.
+    """
+    rows = [
+        {
+            "sport": "MLB", "market": "Moneyline", "wired": True,
+            "model": "learned_forward.py -- Elo + trend logistic regression (v6 artifact)",
+            "ledger": "Main + Flat",
+        },
+        {
+            "sport": "MLB", "market": "Totals & Spread", "wired": True,
+            "model": "models/mlb.py MeasuredEdgeTotalsModel/margin -- Gamma-Poisson mixture "
+            "Monte-Carlo, priced against real Polymarket lines closest to 50/50",
+            "ledger": "Flat only",
+        },
+        {
+            "sport": "MLB", "market": "Moneyline (legacy)", "wired": False,
+            "model": "MeasuredEdgeMarginModel via --model legacy-measured-edge -- intentionally "
+            "retained as an explicit manual rollback, not part of daily",
+            "ledger": "Main, only if manually invoked",
+        },
+        {
+            "sport": "NBA", "market": "Moneyline", "wired": True,
+            "model": "learned_forward.py -- Elo + trend logistic regression (v4 artifact)",
+            "ledger": "Main + Flat",
+        },
+        {
+            "sport": "WNBA", "market": "Moneyline", "wired": True,
+            "model": "learned_forward.py -- Elo + trend logistic regression (v4 artifact)",
+            "ledger": "Main + Flat",
+        },
+        {
+            "sport": "NFL", "market": "Moneyline", "wired": True,
+            "model": "learned_forward.py -- Elo + trend logistic regression (v4 artifact)",
+            "ledger": "Main + Flat",
+        },
+        {
+            "sport": "Soccer", "market": "Totals (2.5)", "wired": True,
+            "model": "models/soccer.py -- Poisson/Dixon-Coles score matrix",
+            "ledger": "Flat Research + Gated Research",
+        },
+        {
+            "sport": "Soccer", "market": "Moneyline", "wired": True,
+            "model": "Same score matrix, matched against Polymarket's per-team team_win "
+            "Yes/No markets (not a single combined moneyline market)",
+            "ledger": "Flat Research + Gated Research",
+        },
+        {
+            "sport": "Soccer", "market": "BTTS", "wired": False,
+            "model": "Model already computes it, but no BTTS market currently exists on "
+            "Polymarket US at all (live-verified) -- nothing to classify yet",
+            "ledger": "--",
+        },
+        {
+            "sport": "Tennis", "market": "Moneyline", "wired": True,
+            "model": "models/tennis.py -- surface-blended Elo, singles only, WTA only "
+            "(Polymarket US has no ATP market; ESPN has no ITF scoreboard)",
+            "ledger": "Flat Research + Gated Research",
+        },
+        {
+            "sport": "LOL / CS2 / DOTA2 / VALORANT / Rainbow Six", "market": "Moneyline", "wired": True,
+            "model": "esports.py -- result-based neutral Elo, Platt-scaled, refreshed from "
+            "bo3.gg before every forecast",
+            "ledger": "Flat Research + Gated Research",
+        },
+        {
+            "sport": "CoD / Rocket League / Overwatch", "market": "Moneyline", "wired": False,
+            "model": "Polymarket lists these leagues and real BBO is captured daily, but "
+            "bo3.gg (the only esports data source) has no discipline for any of them -- not buildable",
+            "ledger": "--",
+        },
+        {
+            "sport": "KBO / NPB", "market": "Moneyline", "wired": True,
+            "model": "international_baseball.py -- tie-aware home-field Elo "
+            "(result/margin only, no starters/park/weather)",
+            "ledger": "Flat Research + Gated Research",
+        },
+    ]
     return {
-        "markets": markets,
-        "grid": grid,
-        "esports": esports,
-        "baseball": baseball,
-        "basketball": basketball,
-        "source": source,
-        "gate": gate,
+        "rows": rows,
+        "note": (
+            "Wiring and features, not validation stats -- see docs/PROJECT_STATUS.md's "
+            "operating note."
+        ),
     }
 
 

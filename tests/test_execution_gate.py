@@ -22,7 +22,13 @@ def ticket() -> OrderTicket:
 
 
 def qualified_row() -> dict[str, str]:
-    return {"record_type": "QUALIFIED_SHADOW_CALL", "status": "open"}
+    return {
+        "pick_id": "pick-1",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "status": "open",
+        "rationale": "Learned LR call at threshold 0.55; executable ask 0.6200 "
+        "(market_slug=aec-mlb-nyy-bos-2026-07-17).",
+    }
 
 
 def executor(tmp_path, answer="y", env=None) -> PolymarketExecutor:
@@ -99,11 +105,71 @@ def test_explicit_manual_research_override_can_submit(tmp_path, monkeypatch) -> 
     assert result["order_id"] == "manual-order-123"
 
 
+def test_ticket_pick_id_must_match_the_looked_up_row(tmp_path) -> None:
+    """A ticket for a different pick_id than the row it's paired with must be
+    refused -- otherwise a caller could pass a legitimately qualified row to
+    clear the gate while submitting an unrelated ticket."""
+    mismatched = OrderTicket(**{**ticket().__dict__, "pick_id": "pick-999"})
+    with pytest.raises(ExecutionGateError, match="does not match the looked-up row"):
+        executor(tmp_path, env=US_CREDS).execute(
+            mismatched, qualified_row(), execute_flag=True, user_command=True
+        )
+
+
+def test_ticket_market_slug_must_match_what_the_row_was_priced_against(tmp_path) -> None:
+    wrong_market = OrderTicket(**{**ticket().__dict__, "market_slug": "aec-mlb-lad-sf-2026-07-17"})
+    with pytest.raises(ExecutionGateError, match="does not match the market this pick"):
+        executor(tmp_path, env=US_CREDS).execute(
+            wrong_market, qualified_row(), execute_flag=True, user_command=True
+        )
+
+
+def test_ticket_estimated_cost_is_recomputed_not_trusted(tmp_path) -> None:
+    understated = OrderTicket(**{**ticket().__dict__, "estimated_cost_usd": 0.01})
+    with pytest.raises(ExecutionGateError, match=r"does not match price \* size_shares"):
+        executor(tmp_path, env=US_CREDS).execute(
+            understated, qualified_row(), execute_flag=True, user_command=True
+        )
+
+
+def test_config_override_qualified_call_refused_without_manual_order(tmp_path) -> None:
+    """A row can read QUALIFIED_SHADOW_CALL purely because config declares
+    qualification_override: true (e.g. MLB v6, whose own artifact says
+    qualified=false) -- real execution must not treat that the same as a
+    genuinely validated artifact."""
+    with pytest.raises(ExecutionGateError, match="backing model artifact itself is not qualified"):
+        executor(tmp_path, env=US_CREDS).execute(
+            ticket(), qualified_row(), execute_flag=True, user_command=True, artifact_qualified=False
+        )
+
+
+def test_config_override_qualified_call_can_submit_via_manual_order(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, answer="y", env=US_CREDS)
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "override-order-1", "state": "ORDER_STATE_NEW"}
+    )
+
+    result = client.execute(
+        ticket(),
+        qualified_row(),
+        execute_flag=True,
+        user_command=True,
+        manual_research_order=True,
+        artifact_qualified=False,
+    )
+
+    assert result["status"] == "submitted"
+
+
 def test_executor_enforces_authorized_dollar_cap(tmp_path) -> None:
+    # size_shares raised (not just estimated_cost_usd) so price * size_shares
+    # itself exceeds the cap -- the executor now recomputes cost server-side
+    # rather than trusting a caller-supplied estimated_cost_usd.
     oversized = OrderTicket(
         **{
             **ticket().__dict__,
-            "estimated_cost_usd": 8.0,
+            "size_shares": 13,
+            "estimated_cost_usd": 8.06,
             "maximum_cost_usd": 7.5,
         }
     )

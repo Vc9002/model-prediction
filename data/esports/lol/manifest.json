@@ -3,14 +3,14 @@
     "from": "2024-01-01",
     "to": "2026-07-19"
   },
-  "extracted_at_utc": "2026-07-27T11:16:55.109117Z",
+  "extracted_at_utc": "2026-07-28T02:07:08.248908Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
     "Team IDs do not encode point-in-time rosters or substitutions."
   ],
-  "match_count": 12089,
-  "matches_sha256": "215f724b279ca1bf99307faf22d07fd479f3f41ffc248fce43019b850d6dab4a",
+  "match_count": 12104,
+  "matches_sha256": "59a28ddf06b0ee997d5630699a27bf1aa614cf9efd1f5461a475d698b6b6790a",
   "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
   "request_pages": {
     "matches": 4,
@@ -27,8 +27,8 @@
   "source_attribution_url": "https://bo3.gg/",
   "source_base_url": "https://api.bo3.gg/api/v1",
   "source_terms_url": "https://bo3.gg/wiki/use-of-services",
-  "team_count": 691,
-  "teams_sha256": "4f7e4740004279ff2cf89fc02796da32ab5dc17a660b63f6b0ac3a82d940d49b",
+  "team_count": 692,
+  "teams_sha256": "53817e7e42e5710cadd45aab7003c4e667d029b7d064052ec5d4dcfbcef618b6",
   "title": "lol",
   "title_name": "League of Legends"
 }

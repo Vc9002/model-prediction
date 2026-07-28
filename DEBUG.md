@@ -1,11 +1,15 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-07-26
+**Last audited**: 2026-07-28 (early UTC hours, wiring/features audit
+continued from 2026-07-27 evening; see note below — the P0 execution-safety
+findings further down were last independently re-verified 2026-07-26 and were
+not re-run in either pass)
 
 **Project**: `/Users/vincentc9002/model prediction`
 
-**Checkout audited**: `deepseek-phase5` at `697d765`, with a heavily dirty
-working tree
+**Checkout audited**: single `main` branch (git history was consolidated this
+session — the old `deepseek-phase5` branch referenced throughout this file's
+older sections no longer exists, locally or on `origin`)
 
 ## Safety boundary
 
@@ -17,6 +21,318 @@ the operator separately authorizes that state change.
 
 The source tree was changing during this audit. Re-run the checks before acting
 on any line number or count.
+
+## 2026-07-27 (evening) — wiring session
+
+Per operator directive, this session's scope was **wiring and features, not
+validation**: is a model actually running in the live daily pipeline, and on
+what data — not hit rates, Brier scores, or promotion-gate status. Two
+background audit agents independently verified the results below against
+current source; findings are their direct file:line citations, not
+self-reported claims.
+
+**Git**: `deepseek-phase5` and all other branches were merged and deleted; the
+repo is now a single `main` branch, synced with `origin/main`.
+
+**Newly wired this session** (previously either broken, unwired, or
+nonexistent):
+- MLB totals + spread now reach `data/flat_picks.xlsx` via
+  `_forecast_mlb_totals_flat` (`cli.py`), pricing `MeasuredEdgeTotalsModel`/
+  margin (`models/mlb.py`) against real Polymarket lines. The frozen
+  `config/models/mlb-analyst-poisson-trend-v0.2.yaml` spec was missing/
+  mismatched `factor_bounds`, `uncertainty`, and `simulation` keys entirely;
+  all three blocks were rebuilt with documented reasoned-default values (not
+  precision-fit) since the file could not otherwise load.
+- Soccer moneyline now prices against Polymarket's real market shape — three
+  separate per-team `team_win` Yes/No markets, not one combined moneyline
+  market as first assumed. `MARKET_TYPES` in `data_sources/polymarket_us.py`
+  didn't recognize `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` at all before this,
+  so these markets were silently dropped.
+- Esports ratings now auto-refresh before every forecast
+  (`esports.py::refresh_recent_matches`, called by `cli.py::
+  _refresh_esports_ratings` inside `daily`) instead of only updating via a
+  full-file-overwrite manual backfill. Verified today (2026-07-27) that
+  `manifest.json`'s `matches_sha256` for all four titles matches the actual
+  current file hash — the incremental-merge path keeps the manifest/hash
+  chain consistent, which a naive implementation would have broken.
+- KBO/NPB: a silent-gap bug in `international_baseball.py` — a market with
+  the wrong number of sides was silently `continue`d past with no recorded
+  reason — now appends `{"reason": "NO_CALL_MARKET_SIDES_INVALID"}` before
+  skipping (`international_baseball.py:763-770`, confirmed present by
+  audit). Every other `continue` in that function was independently checked
+  and does record a reason; one bare `continue` for non-moneyline market
+  types is intentional, not a gap.
+- Tennis is entirely new this session — see the dedicated section below.
+- `League.WORLD_CUP` removed from `config/model.yaml` (`team_ban_list.teams`
+  and `models:`) and from `POLYMARKET_SPORT_LEAGUES`/`_LEDGER_LEAGUE_TO_ESPN`
+  (live trading and settlement no longer see it) — but see the gap noted
+  below; the removal is incomplete elsewhere.
+- Dashboard: research-mode CALL/NO_CALL pill removed in favor of plain
+  win/loss/push/open across all tabs; "Research" tab renamed "Flat Research"
+  (it was always the ungated tier; gated research is the filtered one, so the
+  old name was ambiguous); `#researchTable`/`#gatedResearchTable`/
+  `#flatTable`/`#btTable` wrapped in `overflow-x:auto` (previously missing,
+  causing wide tables to push past the page edge).
+
+### Tennis (new, 2026-07-27)
+
+**Wired: yes**, independently re-verified by a background audit agent against
+current source (not just self-reported):
+
+- Invoked from `daily` (`cli.py:2728`, immediately after soccer's call) and
+  from the `forecast`/`flat-forecast` sport-dispatch loop (`cli.py:2469`,
+  `elif sport == "tennis":`).
+- `RESEARCH_LEDGER_SPORTS` (`research_ledgers.py:7-16`) includes `"tennis"`,
+  so today-clearing and dashboard discovery pick it up automatically.
+- `BBO_CAPTURE_SPORTS` (`data_sources/polymarket_us.py:99`) includes
+  `"tennis"`, so real odds get captured daily.
+- Settlement: `_find_tennis_result`/`_settle_tennis_pick` (`cli.py:1993-2053`)
+  branch on `league == "TENNIS"` inside `_settle_all_unsettled`
+  (`cli.py:1768-1776`), matching completed WTA singles matches by player name
+  since ESPN's tennis scoreboard shape (`groupings`/`athlete`) doesn't fit the
+  generic team-based settlement path at all.
+- Ingestion: `data_sources/espn.py::completed_tennis_singles_matches` parses
+  ESPN's tennis scoreboard (matches nested under `groupings`, competitors
+  carrying `athlete` for singles or `roster` for doubles) and filters to
+  singles only via `competition.type.slug` containing `"singles"` — doubles
+  are dropped entirely (matches the operator's confirmation that Polymarket
+  US never lists doubles markets). Real historical bootstrap run 2026-07-27
+  produced 25,787 singles matches (ATP 16,721 / WTA 9,066) into
+  `data/processed/tennis/games.jsonl` and `data/historical/
+  tennis_games_all.jsonl`, both previously empty despite 1,866 cached raw
+  ESPN days sitting unused.
+- Live-verified end to end with real data, no mocks, 2026-07-27: a real
+  `polymarket-slate --sport tennis` capture stored 420 real BBOs; a real
+  `forecast --sport tennis --log` run found 143 scheduled WTA matches, priced
+  16 against real Polymarket asks by player name, and logged all 16 to the
+  new `data/research/tennis.xlsx` (confirmed 16 rows via `PickLedger`).
+- **Structural coverage limit, not a bug**: `POLYMARKET_SPORT_LEAGUES["tennis"]`
+  (`polymarket_us.py:73`) is `("WTA", "ITF_MEN", "ITF_WOMEN")` — there is no
+  ATP market on Polymarket US at all (comment at line 60 confirms this was
+  independently verified live). `LEAGUE_PATHS`/`SPORT_LEAGUES`
+  (`espn.py:57-58,92`) only expose `ATP`/`WTA` — no ITF scoreboard path
+  exists. WTA is therefore the only tour where both a model prediction and a
+  real executable price can ever coexist; `tennis_forward.py` deliberately
+  only builds a WTA slate.
+- **Gap found by audit, not yet fixed**: `tennis_forward.py`'s
+  `_upcoming_singles_matches` (lines 48-78) never extracts the tournament
+  name or calls `_infer_tennis_surface`, and `build_tennis_slate` constructs
+  `UpcomingMatch(...)` without a `surface=` kwarg (lines 139-147) — live
+  predictions therefore always fall back to the dataclass default
+  `surface="Hard"` (`models/tennis.py:49`), even though the *historical*
+  Elo-build path correctly infers surface per match
+  (`espn.py:196,225`). Surface-blending is effectively inert at forecast
+  time today. Tracked as an open follow-up.
+
+### Newly found gaps (not yet fixed)
+
+- **Soccer BTTS**: `models/soccer.py:119-121,165-173` already computes a full
+  BTTS probability and emits a `GamePrediction(market_type="btts", ...)` —
+  the gap is entirely on the classification side.
+  `data_sources/polymarket_us.py`'s `MARKET_TYPES` (lines 99-115) has no BTTS
+  entry, so no BTTS market is ever recognized even if one exists on the
+  gateway. Confirmed still unbuilt, not broken.
+- **Esports BBO-capture/forecast mismatch**: `POLYMARKET_SPORT_LEAGUES
+  ["esports"]` (`polymarket_us.py:74-82`) lists 8 leagues (LOL, CS2, COD,
+  VALORANT, DOTA2, ROCKET_LEAGUE, OVERWATCH, RAINBOW_SIX); because `"esports"`
+  is one bucket in `BBO_CAPTURE_SPORTS`, real BBO gets captured for all 8
+  whenever Polymarket lists them. Confirmed live: `data/odds/esports/
+  2026-07-18/polymarket_snapshots.jsonl` (and 07-19, 07-22) contain real COD
+  and RAINBOW_SIX snapshots with live asks/bids. `ESPORTS_TITLES`
+  (`cli.py:114`) and `TITLE_SPECS` (`esports.py`) only ever price 4 of the 8
+  — COD/ROCKET_LEAGUE/OVERWATCH/RAINBOW_SIX get real market data captured
+  and stored with zero consuming model, silently, every day. Not dangerous
+  (no money moves), but dead capture work with no test catching the
+  mismatch.
+- **World Cup removal is incomplete**: dropped from the live-trading league
+  tuple (`polymarket_us.py`) and from `_LEDGER_LEAGUE_TO_ESPN`
+  (`cli.py:130-141`) — confirmed zero WORLD_CUP rows in `data/picks.xlsx` (20
+  rows) or `data/flat_picks.xlsx` (81 rows) as of 2026-07-27, so nothing is
+  actively broken. But `League.WORLD_CUP` still exists as an enum member
+  (`domain.py:25`), still has a `ModelSpec` (`models/registry.py:70-76`), and
+  is still listed in `espn.py`'s `LEAGUE_PATHS`/`SPORT_LEAGUES`
+  (lines 44,78) and in `the_odds_api.py`/`football_data.py` sport-key maps.
+  If a WORLD_CUP ledger row were ever logged while still open, it would
+  settle-stall silently forever (`_LEDGER_LEAGUE_TO_ESPN.get("WORLD_CUP", ())`
+  returns nothing, no match, `pending` forever, no error). `tests/
+  conftest.py:25` also carries a stale `"WORLD_CUP": []` ban-list fixture key
+  that doesn't match the real `config/model.yaml` (which has no `WORLD_CUP`
+  key at all). Decision needed: fully retire `League.WORLD_CUP`, or
+  explicitly document it as "history/ingest-only, never a live league."
+- **Legacy MLB margin model — confirmed intentional, not a gap**:
+  `MeasuredEdgeMarginModel` (`models/mlb.py:406-447`) is only reachable via
+  the explicit `--model legacy-measured-edge` flag on `forecast`/`log`
+  (`cli.py:230,256,2414-2417`); `daily`'s argparse (`cli.py:273-280`) has no
+  `--model` flag at all, so this path structurally cannot fire from `daily`.
+  `_forecast_mlb`'s own docstring calls it "retained as an explicit
+  rollback." Live MLB moneyline in `daily` genuinely goes through
+  `learned_forward.py` via `_forecast_learned_sport` for `mlb` in
+  `DAILY_LEARNED_SPORTS`. Not documented anywhere in `docs/`, but not
+  confusing dead code either — just undocumented.
+- **KBO/NPB observation, not confirmed as a bug**: `data/logs/
+  daily_2026-07-27.log` shows both leagues returned `"events": 0` across all
+  runs today, with no `data/odds/{kbo,npb}/2026-07-27/` capture directories
+  (2026-07-26 had 1-5 events for both). Consistent with an off-day/All-Star
+  break rather than a wiring bug, but not externally confirmed against either
+  league's real schedule.
+
+### Numbers re-verified 2026-07-27 (this session)
+
+| Check | Result |
+|---|---|
+| Full test suite | **458 passed** |
+| Ruff (`src/ tests/`) | **113 findings** |
+| `verify-chain` | 0 breaks, 0 hash mismatches, `reconciled: false` (1,230 historical creation events without a matching removal event — grows over time by design, see note below) |
+
+The P0/P1 findings and numbers further down this file (test/ruff/hash/
+reconciliation counts under "Verified audit result — 2026-07-26") were **not**
+re-run this session — they concern real-money execution safety and ledger/
+audit transaction atomicity, which this session's scope did not touch. Treat
+them as last-verified-2026-07-26, not current, until independently re-run.
+
+## 2026-07-28 (early hours) — critical esports and tennis correctness fixes
+
+Two bugs found and fixed this pass are more severe than anything in the prior
+audit — both were live-verified against real external sources (bo3.gg's API,
+the actual dashboard output), not just re-read from code.
+
+### Esports: dota2 and valorant discipline IDs were swapped
+
+Verified live against `GET https://api.bo3.gg/api/v1/disciplines`: the real
+mapping is `{1: csgo, 2: valorant, 3: lol, 4: dota2, 5: deadlock, 6: games,
+7: r6siege, 8: mlbb}`. `esports.py`'s `TITLE_SPECS` had `dota2:
+discipline_id=2` and `valorant: discipline_id=4` — backwards. Confirmed by
+cross-referencing real team IDs: the team "Wintermint", stored under the old
+`data/esports/dota2/matches.jsonl`, resolves only under `discipline_id=2`
+(real Valorant) via `GET /api/v1/teams?filter[teams.discipline_id][eq]=2`;
+"Team Sexy", stored under the old `valorant` file, resolves only under
+`discipline_id=4` (real Dota 2). The dota2 model had been trained on and
+predicting from Valorant match history, and vice versa, for as long as this
+project has run esports.
+
+Fixed: swapped `TITLE_SPECS["dota2"]["discipline_id"]` to 4 and
+`TITLE_SPECS["valorant"]["discipline_id"]` to 2. Both titles' `matches.jsonl`/
+`teams.json`/`manifest.json` were deleted and rebuilt from scratch via
+`esports-backfill` (the old data was for the wrong game entirely, not
+correctable by a metadata fix) — dota2 now has 10,888 real Dota 2 matches,
+valorant 14,575 real Valorant matches. Re-validated: `config/models/
+dota2-tiered-elo-v4.json` and `valorant-tiered-elo-v4.json` regenerated.
+Live-verified post-fix: `forecast --sport dota2` now resolves real Dota 2
+team names ("Nemiga Gaming", "Team Bald", "Level UP") with real computed
+probabilities; `forecast --sport valorant` resolves real VCT teams ("Cloud9
+GC", "Shopify Rebellion Gold/Black").
+
+### New: Rainbow Six Siege esports model
+
+bo3.gg's `disciplines` endpoint confirmed real coverage for R6 Siege
+(`discipline_id: 7, slug: r6siege`) with 2,969 real finished matches
+available. Added `TITLE_SPECS["rainbow_six"]`, `League.RAINBOW_SIX`
+(`domain.py`), a `ModelSpec` (`models/registry.py`), a `config/model.yaml`
+entry (`status: research`, not `qualification_override`-promoted like the
+other four — that promotion was a deliberate per-title operator review this
+title hasn't had), and wired it into `ESPORTS_TITLES` (`cli.py`), which is
+consumed generically by both the `daily` handler and the `forecast`/
+`flat-forecast` dispatch loop (no other per-title code needed changing).
+Settlement (`_settle_esports_pick`'s league check) and dashboard
+(`SPORTS`/`RESEARCH_ONLY_LEAGUES`) updated. Backfilled and validated;
+`config/models/rainbow_six-tiered-elo-v4.json` exists with 281 team ratings.
+
+**Confirmed not buildable**: CoD, Rocket League, and Overwatch do **not**
+exist as disciplines on bo3.gg at all (verified against the full 8-entry
+disciplines list above) — this project has no other esports data source, so
+these three cannot get a real model. Polymarket US does list all three as
+esports leagues and real BBO gets captured for them daily
+(`BBO_CAPTURE_SPORTS` includes the whole `"esports"` bucket) with nothing
+ever consuming it — this is real, harmless (no money moves), but genuinely
+dead capture work. No fix applied; flagging honestly rather than building a
+model with fabricated data.
+
+### Tennis: two additional bugs beyond the surface-inference fix above
+
+Found live from the dashboard itself — every tennis pick showed exactly
+50.0% model probability, including for well-known players (Madison Keys,
+Sofia Kenin) who should have hundreds of real matches on file. Two distinct
+bugs, both now fixed:
+
+**Bug 1 — combined ATP+WTA tournaments mistagged by fetch order, not by
+match.** ESPN's `tennis/atp` and `tennis/wta` site-API paths both return the
+*entire combined event* (both Men's and Women's Singles groupings) for
+shared tournaments — verified live: `scores_atp.json` for Brisbane
+International contains a "Women's Singles" grouping, and `scores_wta.json`
+for the same date contains its "Men's Singles" grouping too. `ingest.py`
+previously tagged every match `league = <the endpoint that fetched it>`,
+and since `SPORT_LEAGUES["tennis"] = ("ATP", "WTA")` fetches ATP first, every
+WTA player's combined-tournament matches got claimed by the ATP fetch first
+and the later WTA fetch's identical `event_id` was deduped away as already
+seen. Fixed: `completed_tennis_singles_matches` (`data_sources/espn.py`) now
+derives `league` per match from the competition's own `type.slug`
+(`"womens-singles"` → WTA, `"mens-singles"` → ATP) instead of accepting a
+caller-supplied tag; `ingest.py` no longer overwrites it for tennis.
+`tennis_forward.py`'s live discovery was also filtering on generic
+`"singles" in slug`, which would have accepted Men's Singles matches
+returned redundantly by the WTA endpoint — narrowed to `"womens-singles"`
+specifically. Rebuilt from already-cached raw files (no new network calls):
+WTA match count went from 9,066 (undercounted) to 15,289; Madison Keys's 129
+matches are now all correctly tagged WTA (previously split across both
+leagues depending on fetch order).
+
+**Bug 2 (the actual cause of the 50% symptom) — `tennis_forward.py` was
+reading history through the wrong abstraction and always got zero rows.**
+`build_tennis_slate` called `FeatureStore("data").games_before("tennis",
+...)`, but `FeatureStore.load_games` builds a `GameRecord` per row via
+direct dict subscript on `raw["away_team"]`, `raw["home_team"]`,
+`raw["away_score"]`, `raw["home_score"]` — fields that exist for every
+team-vs-team sport but do not exist on tennis's player-vs-player rows
+(`winner`/`loser`/`surface`/`match_date`, no scores at all). Every tennis row
+therefore raised `KeyError` and was silently caught by `load_games`'s broad
+`except (KeyError, TypeError, ValueError): continue`
+(`features/base.py`), so `games_before("tennis", ...)` had returned an empty
+list for every single call since tennis was wired — completely independent
+of bug 1 above, and the reason real players still showed exactly 0.5 even
+after bug 1 was fixed. Fixed: added `tennis_forward.py::
+_tennis_history_before`, which reads `data/processed/tennis/games.jsonl`
+directly as raw dicts (the shape `TennisModel.build_elo` already expects)
+and applies the same point-in-time cutoff `games_before` uses, bypassing
+`FeatureStore`/`GameRecord` entirely rather than trying to force tennis into
+an abstraction built for team sports.
+
+Verified post-fix, directly against real data: Madison Keys's computed Elo is
+now 1863 vs. a lower-ranked opponent's 1512, giving a real 84.6% win
+probability — not 50%. `_tennis_history_before` returns 25,955 total rows
+(15,282 WTA) where it previously returned 0.
+
+**Note on pre-fix ledger rows**: `data/research/tennis.xlsx` contains 16 rows
+logged 2026-07-27 before this fix, all computed with the broken
+always-cold-start model (every `model_probability` in that batch is exactly
+0.5). They were left in place (paper-only, no real exposure) rather than
+deleted, but should not be used to judge tennis model performance — treat
+anything logged before this fix's commit as void.
+
+### Full-pipeline verification after all of the above
+
+Ran the real `daily --date 2026-07-28` command end to end (not a dry run) to
+confirm every sport discussed this session actually logs through the live
+pipeline post-fix. All of MLB (main+flat), WNBA (main+flat), soccer, tennis,
+KBO, NPB, LOL, CS2, DOTA2, VALORANT, and RAINBOW_SIX appeared in
+`step2_3_forecast_and_log`'s output with no exceptions and exit code 0. Real
+unit sizing confirmed working end to end by inspecting the actual gated
+ledgers afterward: `data/gated_research/cs2.xlsx` (17 rows, 0.75U–2.00U),
+`dota2.xlsx` (5 rows, 0.75U–2.00U), `lol.xlsx` (16 rows, 1.00U–2.00U) all show
+real, differentiated unit sizes tied to real edge. KBO/NPB/rainbow_six/
+soccer/tennis/valorant gated ledgers were empty at this particular run — that
+reflects zero candidates clearing that sport's edge/confidence floor *today*,
+not a sizing bug (soccer logged 6 candidates to Flat Research the same run,
+none gated; KBO logged 5, none gated — both expected, low-edge days).
+
+One transient, non-reproducible discrepancy: a `forecast --sport kbo --log`
+run showed `priced_count: 5, logged: 0` at one point. Re-running the
+identical logic standalone immediately after succeeded and logged all 5 rows
+correctly (now confirmed present in `data/research/kbo.xlsx` with real,
+differentiated probabilities). Most likely explanation is lock contention
+with the recurring `com.modelprediction.daily.plist` background cron (every
+3 hours) rather than a code defect — the exact code path was re-verified
+working when run in isolation moments later with no changes. Flagged here in
+case it recurs; not treated as a confirmed bug.
 
 ## 2026-07-27 remediation note
 

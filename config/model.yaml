@@ -237,9 +237,12 @@ models:
     spread_research_artifact: config/models/nfl-spread-baseline-v1.json
     total_research_artifact: config/models/nfl-spread-baseline-v1.json
   TENNIS:
-    family: elo_trend_logistic_regression
-    status: deferred
+    family: surface_blended_elo
+    status: research
     origin: statistical_model
+    active_research_version: tennis-surface-elo-v1
+    min_edge: 0.05
+    note: WTA moneyline only -- Polymarket US has no ATP market and ESPN has no ITF scoreboard.
   LOL:
     family: neutral_series_elo
     status: shadow_qualified
@@ -288,6 +291,16 @@ models:
     market_target: esports_match_winner
     min_edge: 0.02
     research_confidence_gate: 0.0
+  RAINBOW_SIX:
+    family: neutral_series_elo
+    status: research
+    origin: statistical_model
+    active_research_version: rainbow_six-tiered-elo-v4
+    market_target: esports_match_winner
+    min_edge: 0.02
+    note: New 2026-07-27. Unlike LOL/CS2/DOTA2/VALORANT, not yet promoted to
+      shadow_qualified via qualification_override -- that was a deliberate
+      per-title operator review this title hasn't had yet.
   KBO:
     family: tie_aware_home_elo
     status: shadow_qualified

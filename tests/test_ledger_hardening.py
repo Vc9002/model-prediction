@@ -327,6 +327,64 @@ def test_audit_append_happens_while_the_ledger_lock_is_still_held(
     )
 
 
+def test_ledger_write_crash_leaves_a_recoverable_audit_event_not_a_silent_gap(
+    monkeypatch, registry, ban_list, tmp_path
+) -> None:
+    """The 2026-07-28 atomicity fix: audit.append happens BEFORE
+    self._write_rows, not after (see ledger.py's module docstring). This
+    proves the actual failure mode changed. Simulate the ledger file write
+    crashing (a corrupt disk, a killed process mid-write) immediately after
+    the audit event committed: the audit chain must show the attempted
+    mutation even though the row never landed.
+
+    pick_id is a random uuid4 (ledger.py:458), not derived from the request,
+    so a retry after a crash does NOT reuse the crashed attempt's pick_id --
+    it's a new row under a new id, not a literal replay. The old, real
+    improvement this proves: the crashed attempt is now honestly visible in
+    the audit chain (a real, if orphaned, record that something was tried
+    and didn't land) and the ledger itself is left in a consistent state a
+    fresh append can build on -- not the old failure mode, where a crash in
+    the same spot occurred AFTER a successful write, leaving a real ledger
+    row with no audit event at all and no way to ever discover the gap.
+    """
+    from model_prediction.xlsx_ledger import write_xlsx_rows_atomic
+
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    ledger.initialize()  # creates the empty file for real, before the crash is armed
+    req = request("crash-recovery")
+    eligibility = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
+
+    def crashing_write(*args, **kwargs):
+        raise OSError("simulated crash mid-write")
+
+    monkeypatch.setattr("model_prediction.ledger.write_xlsx_rows_atomic", crashing_write)
+    try:
+        ledger.append_evaluated(req, eligibility, NOW)
+        raise AssertionError("expected the simulated write crash to propagate")
+    except OSError:
+        pass
+
+    # Audit event committed despite the ledger write never landing.
+    events = ledger.audit.events()
+    crash_events = [
+        event
+        for event in events
+        if event["event_type"] in ("pick_created", "research_observation_created")
+    ]
+    assert len(crash_events) == 1, "the crashed attempt's audit event must still exist"
+    # The row genuinely isn't in the ledger -- confirms this is a detectable
+    # gap (audit says something happened, ledger disagrees), not silently
+    # invisible the way an unaudited ledger mutation would have been.
+    assert read_xlsx_rows(ledger.path)[1] == []
+
+    monkeypatch.setattr("model_prediction.ledger.write_xlsx_rows_atomic", write_xlsx_rows_atomic)
+    row = ledger.append_evaluated(req, eligibility, NOW)
+    assert any(r["pick_id"] == row["pick_id"] for r in read_xlsx_rows(ledger.path)[1])
+    # The retry's pick_id differs from the crashed attempt's -- both audit
+    # events are real and legitimately distinct, not a duplicate.
+    assert row["pick_id"] != crash_events[0]["subject_id"]
+
+
 def test_excel_ledger_has_office_table_filter_and_frozen_header(tmp_path) -> None:
     path = tmp_path / "picks.xlsx"
     ledger = PickLedger(path, tmp_path / "events.jsonl")

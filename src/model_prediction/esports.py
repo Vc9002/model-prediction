@@ -27,6 +27,17 @@ from .research_io import sha256_file as _sha256
 from .research_io import utc_now as _utc_now
 
 BO3_BASE_URL = "https://api.bo3.gg/api/v1"
+# discipline_id values verified live against GET /api/v1/disciplines
+# (2026-07-27): {1: csgo, 2: valorant, 3: lol, 4: dota2, 5: deadlock,
+# 6: games, 7: r6siege, 8: mlbb}. dota2 and valorant were previously swapped
+# here (dota2 pointed at discipline_id 2, which is actually Valorant, and
+# vice versa) -- confirmed by cross-checking real team IDs pulled from each
+# title's stored match history against GET /api/v1/teams with an explicit
+# discipline_id filter (e.g. team "Wintermint", stored under the old "dota2"
+# file, resolves only under discipline_id=2/Valorant). Fixed 2026-07-27; both
+# titles' match/team/manifest files were rebuilt from scratch afterward since
+# the previously-collected data was for the wrong game entirely, not just
+# mislabeled.
 TITLE_SPECS: dict[str, dict[str, Any]] = {
     "lol": {
         "name": "League of Legends",
@@ -42,14 +53,20 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
     },
     "dota2": {
         "name": "Dota 2",
-        "discipline_id": 2,
+        "discipline_id": 4,
         "polymarket_league": "DOTA2",
         "minimum_date": "2020-01-01",
     },
     "valorant": {
         "name": "VALORANT",
-        "discipline_id": 4,
+        "discipline_id": 2,
         "polymarket_league": "VALORANT",
+        "minimum_date": "2020-01-01",
+    },
+    "rainbow_six": {
+        "name": "Rainbow Six Siege",
+        "discipline_id": 7,
+        "polymarket_league": "RAINBOW_SIX",
         "minimum_date": "2020-01-01",
     },
 }
