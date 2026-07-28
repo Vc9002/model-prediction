@@ -2874,9 +2874,15 @@ def main(argv: list[str] | None = None) -> None:
                 _research_settlement = settlement
                 _gated_settlement = settlement
             else:
+                # A postponed/canceled game never becomes "completed" under its
+                # original event_id -- ESPN issues a new event_id for any
+                # reschedule -- so leaving void_postponed off here means an
+                # affected pick sits "open" forever with no automatic path to
+                # resolution; only a manually-run `settle --void-postponed`
+                # would ever clear it. Auto-void in the unattended daily run.
                 settle_args = argparse.Namespace(
                     all_unsettled=True,
-                    void_postponed=False,
+                    void_postponed=True,
                 )
                 settlement = _settle_all_unsettled(settle_args, config, ledger)
                 flat_settlement = _settle_all_unsettled(
