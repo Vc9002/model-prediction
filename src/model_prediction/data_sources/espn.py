@@ -18,9 +18,9 @@ from typing import Any
 import httpx
 
 from ..domain import League, parse_utc
-from ..features.bullpen import bullpen_profile
+from ..features.bullpen import bullpen_profile, team_recent_relief_lines
 from ..features.park_factors import park_factor
-from ..features.weather import weather_profile
+from ..features.weather import resolve_weather
 from ..models.mlb import MLBGameFeatures, PitcherForm, TeamForm, feature_hash
 
 SITE_API = "https://site.api.espn.com/apis/site/v2/sports"
@@ -346,24 +346,37 @@ class ESPNMLBClient:
         # Wire the full feature pipeline — every field degrades to neutral when
         # the underlying source is unavailable so the model works with partial data.
         home_name = home["team"]["displayName"]
-        weather_info = competition.get("situation", {}).get("weather", {}) or {}
         park = park_factor(home_name)
-        weather = weather_profile(home_name, weather_info if weather_info else None)
-        bullpen = bullpen_profile(None)  # StatsAPI data not cached yet — returns neutral
+        # ESPN's own weather fields (competition.situation.weather,
+        # summary gameInfo.weather) are empirically always empty for MLB, live
+        # or completed -- confirmed by direct inspection, not just in docs.
+        # Open-Meteo (live forecast for upcoming games, historical archive for
+        # past ones) is the only source that actually returns real conditions,
+        # and resolve_weather() picks the right endpoint from event["date"].
+        weather = resolve_weather(home_name, event["date"])
+        away_name = away["team"]["displayName"]
+        # Real relief-appearance history (mlb_statsapi.py's boxscore
+        # snapshots) for each team's last 10 completed games strictly before
+        # this one -- replaces the old always-neutral bullpen_profile(None),
+        # confirmed by direct inspection: that call never had real data wired
+        # in at all, every MLB game got a flat 1.0 bullpen factor regardless
+        # of real bullpen strength.
+        away_bullpen = bullpen_profile(team_recent_relief_lines(away_name, start))
+        home_bullpen = bullpen_profile(team_recent_relief_lines(home_name, start))
         features = MLBGameFeatures(
             event_id=str(event["id"]),
             event_start_utc=event["date"],
             decision_timestamp_utc=(start - timedelta(hours=2)).isoformat().replace("+00:00", "Z"),
-            away_team=away["team"]["displayName"],
+            away_team=away_name,
             home_team=home_name,
             away_form=parse_team_form(away_schedule, str(away["team"]["id"]), start),
             home_form=parse_team_form(home_schedule, str(home["team"]["id"]), start),
             away_starter=parse_pitcher_form(away_gamelog, away_profile, start),
             home_starter=parse_pitcher_form(home_gamelog, home_profile, start),
-            away_bullpen_weakness=bullpen["bullpen_weakness_index"],
-            home_bullpen_weakness=bullpen["bullpen_weakness_index"],
-            away_bullpen_status=bullpen["status"],
-            home_bullpen_status=bullpen["status"],
+            away_bullpen_weakness=away_bullpen["bullpen_weakness_index"],
+            home_bullpen_weakness=home_bullpen["bullpen_weakness_index"],
+            away_bullpen_status=away_bullpen["status"],
+            home_bullpen_status=home_bullpen["status"],
             park_factor=park["park_factor"],
             park_factor_status=park["status"],
             weather_factor=weather["weather_run_factor"],

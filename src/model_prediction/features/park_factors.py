@@ -1,48 +1,57 @@
 """MLB park-adjusted run environment.
 
-Static three-year park run factors (1.00 = neutral). These are published
-figures, not live data; the table is versioned here so changes are reviewable
-in git. Unknown parks return neutral with an explicit status.
+Empirical park run factors computed directly from this project's own real
+historical game data (``data/historical/mlb_games_all.jsonl``, 2024-02-22 to
+2026-07-25, 7,803 completed games) rather than an externally published
+static table -- confirmed during a real backtest investigation (2026-07-29)
+that the prior static table was meaningfully stale for several parks, most
+strikingly the Athletics: 0.98 (their old Oakland Coliseum figure) versus a
+real 1.153 at their current park across 162 real games there. Regenerate by
+re-running the same per-team average-total-runs-vs-league-average
+computation, credibility-shrunk toward 1.0 by games-played (50-game prior)
+so a thin sample doesn't swing as hard as a well-established one. Unknown
+parks return neutral with an explicit status.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-PARK_FACTORS_VERSION = "2025-three-year"
+PARK_FACTORS_VERSION = "2026-07-29-empirical"
 
-# Home team display name -> run factor (three-year rolling, both teams' runs).
+# Home team display name -> run factor, from real games (see module docstring
+# for the exact computation and source window).
 PARK_RUN_FACTORS: dict[str, float] = {
-    "Colorado Rockies": 1.12,
-    "Cincinnati Reds": 1.05,
-    "Boston Red Sox": 1.04,
-    "Kansas City Royals": 1.03,
-    "Arizona Diamondbacks": 1.02,
-    "Texas Rangers": 1.02,
-    "Atlanta Braves": 1.01,
-    "Baltimore Orioles": 1.01,
-    "Los Angeles Angels": 1.01,
-    "Philadelphia Phillies": 1.01,
-    "Chicago Cubs": 1.00,
-    "Houston Astros": 1.00,
-    "Minnesota Twins": 1.00,
-    "Pittsburgh Pirates": 1.00,
-    "Toronto Blue Jays": 1.00,
-    "Washington Nationals": 1.00,
-    "Chicago White Sox": 0.99,
-    "Los Angeles Dodgers": 0.99,
-    "Miami Marlins": 0.99,
-    "New York Yankees": 0.99,
-    "St. Louis Cardinals": 0.99,
-    "Athletics": 0.98,
-    "Detroit Tigers": 0.98,
-    "Milwaukee Brewers": 0.98,
-    "New York Mets": 0.97,
-    "Cleveland Guardians": 0.97,
-    "San Francisco Giants": 0.96,
-    "Tampa Bay Rays": 0.96,
-    "San Diego Padres": 0.95,
-    "Seattle Mariners": 0.92,
+    "Colorado Rockies": 1.193,
+    "Athletics": 1.153,
+    "Arizona Diamondbacks": 1.097,
+    "Washington Nationals": 1.042,
+    "Minnesota Twins": 1.037,
+    "Cincinnati Reds": 1.036,
+    "Baltimore Orioles": 1.030,
+    "Los Angeles Dodgers": 1.026,
+    "Toronto Blue Jays": 1.019,
+    "Philadelphia Phillies": 1.018,
+    "Boston Red Sox": 1.017,
+    "New York Yankees": 1.012,
+    "Los Angeles Angels": 1.010,
+    "Miami Marlins": 1.001,
+    "Milwaukee Brewers": 0.997,
+    "Pittsburgh Pirates": 0.988,
+    "Chicago Cubs": 0.986,
+    "San Francisco Giants": 0.980,
+    "New York Mets": 0.978,
+    "Kansas City Royals": 0.972,
+    "Cleveland Guardians": 0.966,
+    "Tampa Bay Rays": 0.965,
+    "Detroit Tigers": 0.963,
+    "Houston Astros": 0.956,
+    "St. Louis Cardinals": 0.946,
+    "San Diego Padres": 0.945,
+    "Chicago White Sox": 0.937,
+    "Seattle Mariners": 0.936,
+    "Atlanta Braves": 0.929,
+    "Texas Rangers": 0.912,
 }
 
 

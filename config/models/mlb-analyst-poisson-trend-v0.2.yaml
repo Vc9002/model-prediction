@@ -40,6 +40,33 @@ league_strikeout_rate: 0.225
 league_walk_rate: 0.082
 recent_half_life_games: 10.0
 recent_prior_strength_games: 12.0
+# Shrinkage strength for the starter's recent (last-5-start) ERA before it
+# enters the season/recent blend below -- mirrors recent_prior_strength_games
+# for team offense, but in innings-pitched rather than games (ERA's natural
+# sample-size unit). 20 IP means a starter needs roughly a full turn through
+# the rotation before their recent-form number gets close to full trust
+# relative to their season ERA; below that, season_era dominates. Added
+# 2026-07-29 after a real 162-game backtest showed starter_weakness pinned
+# against its factor_bounds clip on a meaningful share of real games without
+# this -- reasoned from standard ERA-stabilization heuristics (meaningful
+# reliability needs well over 20 IP on its own), not itself precision-fit.
+starter_recent_prior_innings: 20.0
+# Same shrinkage treatment for season_era itself, toward league_starter_era
+# rather than toward season_era (there's nothing more stable to shrink
+# toward for the season number). A higher prior than the recent-form one
+# above since season ERA is trusted more readily once there's a real sample
+# -- but a starter with only a handful of innings this season (early callup,
+# return from injury) still needs heavy regression toward league average, not
+# their own single-outing ERA at full confidence. 40 IP means real signal
+# roughly balances the league prior at that point. Reasoned from standard
+# ERA-stabilization heuristics, not itself precision-fit.
+starter_season_prior_innings: 40.0
+# Shrinkage strength for the K%/BB% "discipline" adjustment, in batters
+# faced (that rate's own natural sample-size unit) -- same treatment as the
+# two ERA priors above, applied 2026-07-29 in the same pass. 60 batters
+# faced is roughly two real starts' worth of the last-5-start window this
+# rate is computed over.
+starter_rate_prior_batters_faced: 60.0
 seed_method: stable_hash
 # Gamma-Poisson mixture variance decomposition, restoring fields the
 # 2026-07-20 sync accidentally dropped (see git history: this file never

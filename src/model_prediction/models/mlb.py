@@ -48,6 +48,9 @@ class FormulaSpec:
     league_walk_rate: float
     recent_half_life_games: float
     recent_prior_strength_games: float
+    starter_season_prior_innings: float
+    starter_recent_prior_innings: float
+    starter_rate_prior_batters_faced: float
     starter_recent_weight: float
     starter_season_weight: float
     strikeout_weight: float
@@ -173,6 +176,9 @@ def load_formula_spec(path: str | Path) -> FormulaSpec:
         league_walk_rate=float(raw["league_walk_rate"]),
         recent_half_life_games=float(raw["recent_half_life_games"]),
         recent_prior_strength_games=float(raw["recent_prior_strength_games"]),
+        starter_season_prior_innings=float(raw["starter_season_prior_innings"]),
+        starter_recent_prior_innings=float(raw["starter_recent_prior_innings"]),
+        starter_rate_prior_batters_faced=float(raw["starter_rate_prior_batters_faced"]),
         starter_recent_weight=float(raw["starter_recent_weight"]),
         starter_season_weight=float(raw["starter_season_weight"]),
         strikeout_weight=float(raw["strikeout_weight"]),
@@ -333,15 +339,38 @@ def _offense_index(form: TeamForm, spec: FormulaSpec) -> float:
 
 
 def _starter_weakness(pitcher: PitcherForm, spec: FormulaSpec) -> float:
-    season_era = _era(pitcher.season_earned_runs, pitcher.season_innings, spec.league_starter_era)
-    recent_era = _era(pitcher.last_five_earned_runs, pitcher.last_five_innings, spec.league_starter_era)
+    # Both season and recent ERA get credibility-weighted shrinkage toward a
+    # stable baseline by innings pitched -- _offense_index already does this
+    # for team offense; ERA needs it even more, since a starter who's only
+    # thrown a handful of innings this season (early callup, return from
+    # injury) can otherwise post something like a 21.60 ERA off one bad start
+    # and have it trusted at full weight. Confirmed necessary by a real
+    # 162-game backtest: without shrinking season_era specifically (shrinking
+    # only the recent-vs-season blend does nothing when recent IS the entire
+    # season sample), starter_weakness pinned against its clip bounds on a
+    # meaningful share of real games.
+    raw_season_era = _era(pitcher.season_earned_runs, pitcher.season_innings, spec.league_starter_era)
+    season_credibility = pitcher.season_innings / (pitcher.season_innings + spec.starter_season_prior_innings)
+    season_era = season_credibility * raw_season_era + (1 - season_credibility) * spec.league_starter_era
+    raw_recent_era = _era(pitcher.last_five_earned_runs, pitcher.last_five_innings, season_era)
+    recent_credibility = pitcher.last_five_innings / (pitcher.last_five_innings + spec.starter_recent_prior_innings)
+    recent_era = recent_credibility * raw_recent_era + (1 - recent_credibility) * season_era
     blended_era = spec.starter_season_weight * season_era + spec.starter_recent_weight * recent_era
-    k_rate = _rate(
+    # Same small-sample problem as ERA above: last_five_batters_faced is
+    # typically only ~100-130 batters, so a raw K%/BB% over that window
+    # deserves the same credibility-weighted shrinkage toward the league
+    # rate rather than being trusted at face value.
+    rate_credibility = pitcher.last_five_batters_faced / (
+        pitcher.last_five_batters_faced + spec.starter_rate_prior_batters_faced
+    )
+    raw_k_rate = _rate(
         pitcher.last_five_strikeouts,
         pitcher.last_five_batters_faced,
         spec.league_strikeout_rate,
     )
-    bb_rate = _rate(pitcher.last_five_walks, pitcher.last_five_batters_faced, spec.league_walk_rate)
+    raw_bb_rate = _rate(pitcher.last_five_walks, pitcher.last_five_batters_faced, spec.league_walk_rate)
+    k_rate = rate_credibility * raw_k_rate + (1 - rate_credibility) * spec.league_strikeout_rate
+    bb_rate = rate_credibility * raw_bb_rate + (1 - rate_credibility) * spec.league_walk_rate
     discipline = (
         1
         - spec.strikeout_weight * (k_rate - spec.league_strikeout_rate)
@@ -411,8 +440,22 @@ class MeasuredEdgeMarginModel:
         if formula_spec.formula_version != ENGINE_VERSION:
             raise ValueError("margin model must use the configured Trend Engine score model")
         scale, offset = _artifact_float(self.raw, "scale"), _artifact_float(self.raw, "offset")
-        if not 0 < scale <= 1.5 or not -0.25 <= offset <= 0.25:
-            raise ValueError("margin calibration scale/offset outside governance bounds")
+        # The real invariant this guards is "the calibration doesn't inject a
+        # large systematic bias", checked directly at a 50/50 raw input,
+        # rather than bounding offset in isolation -- a fixed |offset|<=0.25
+        # bound implicitly assumed scale stays close to 1 (mild shrinkage).
+        # A real backtest (2026-07-29) showed the honest, correctly-centered
+        # fit needs much heavier shrinkage (scale ~0.1), which mathematically
+        # requires a larger offset (~0.45) to keep calibrated(0.5) near 0.5 --
+        # rejecting that as "outside bounds" would have forced a dishonestly
+        # off-center fit just to satisfy an arbitrary number.
+        if not 0 < scale <= 1.5:
+            raise ValueError("margin calibration scale outside governance bounds")
+        calibrated_at_half = scale * 0.5 + offset
+        if not 0.35 <= calibrated_at_half <= 0.65:
+            raise ValueError(
+                "margin calibration offset implies too much bias at raw probability 0.5"
+            )
         self.formula_spec = formula_spec
 
     def predict(

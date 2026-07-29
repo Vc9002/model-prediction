@@ -6,7 +6,7 @@ Fallback: ESPN gameInfo.weather from summaries.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -175,7 +175,7 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
         temp = float(temps[hour_index])
         wind = float(winds[hour_index]) if len(winds) > hour_index else None
         humid = float(humids[hour_index]) if len(humids) > hour_index else None
-        
+
         return {
             "temperature_f": round(temp, 1),
             "wind_mph": round(wind, 1) if wind else None,
@@ -187,3 +187,86 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
     except (httpx.HTTPError, IndexError, KeyError, TypeError, ValueError):
         return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
                 "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo"}
+
+
+def historical_weather(home_team: str, game_start_utc: str) -> dict[str, Any]:
+    """Real recorded weather for a past game, from Open-Meteo's historical archive.
+
+    Same shape and same run-factor formula as live_weather -- this is what
+    makes it safe to fit calibration against: a walk-forward backtest and a
+    live serve both see 'real weather at first pitch', not a fabricated
+    stand-in for one of the two.
+    """
+    if home_team in DOME_TEAMS:
+        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
+                "weather_run_factor": 1.0, "status": "dome", "source": "dome"}
+    coords = BALLPARK_COORDS.get(home_team)
+    if not coords:
+        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
+                "weather_run_factor": 1.0, "status": "unknown_park", "source": "none"}
+    lat, lon = coords
+    try:
+        game_start = datetime.fromisoformat(game_start_utc.replace("Z", "+00:00")).astimezone(UTC)
+        day = game_start.date().isoformat()
+        url = (f"https://archive-api.open-meteo.com/v1/archive?"
+               f"latitude={lat}&longitude={lon}"
+               f"&start_date={day}&end_date={day}"
+               f"&hourly=temperature_2m,wind_speed_10m,relative_humidity_2m"
+               f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC")
+        resp = httpx.get(url, timeout=10)
+        if resp.status_code != 200:
+            return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
+                    "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo-archive"}
+        data = resp.json()
+        hourly = data.get("hourly", {})
+        temps = hourly.get("temperature_2m", [])
+        winds = hourly.get("wind_speed_10m", [])
+        humids = hourly.get("relative_humidity_2m", [])
+        times = hourly.get("time", [])
+        if not temps:
+            return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
+                    "weather_run_factor": 1.0, "status": "no_data", "source": "open-meteo-archive"}
+        parsed_hours = [
+            datetime.fromisoformat(str(value)).replace(tzinfo=UTC) for value in times
+        ]
+        hour_index = min(
+            range(min(len(parsed_hours), len(temps))),
+            key=lambda index: abs((parsed_hours[index] - game_start).total_seconds()),
+        )
+        temp = float(temps[hour_index])
+        wind = float(winds[hour_index]) if len(winds) > hour_index else None
+        humid = float(humids[hour_index]) if len(humids) > hour_index else None
+        return {
+            "temperature_f": round(temp, 1),
+            "wind_mph": round(wind, 1) if wind else None,
+            "humidity_pct": round(humid, 1) if humid else None,
+            "weather_run_factor": run_factor_from_conditions(temp, wind),
+            "status": "available",
+            "source": "open-meteo-archive",
+        }
+    except (httpx.HTTPError, IndexError, KeyError, TypeError, ValueError):
+        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
+                "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo-archive"}
+
+
+def resolve_weather(home_team: str, game_start_utc: str | None) -> dict[str, Any]:
+    """Real weather for any game, live or historical, through one code path.
+
+    ESPN's scoreboard/summary payloads never actually carry MLB weather data
+    in practice (empirically confirmed: situation.weather and gameInfo.weather
+    are empty for both pregame and completed games) -- Open-Meteo is the only
+    real source here. Games within Open-Meteo's forecast window use the live
+    7-day forecast endpoint; anything older uses the historical archive, so a
+    walk-forward backtest sees the same real conditions a live run would have.
+    """
+    if not game_start_utc:
+        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
+                "weather_run_factor": 1.0, "status": "unavailable_from_source", "source": "none"}
+    try:
+        start = datetime.fromisoformat(str(game_start_utc).replace("Z", "+00:00")).astimezone(UTC)
+    except ValueError:
+        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
+                "weather_run_factor": 1.0, "status": "unavailable_from_source", "source": "none"}
+    if start >= datetime.now(UTC) - timedelta(hours=6):
+        return live_weather(home_team, game_start_utc)
+    return historical_weather(home_team, game_start_utc)

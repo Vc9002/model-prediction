@@ -238,9 +238,17 @@ def test_bullpen_weakness_gap_requires_two_prior_games_and_uses_pit_history(
         gap2, available2 = _bullpen_weakness_gap(event_ids[2])
         assert available2 is True
         # Hand-computed from games 1-2 only: home era 9.0 (6 innings / 6 earned),
-        # away era 0.0, league_relief_era 4.10 -- game 3's own 100-earned-run
+        # away era 0.0, league_relief_era 4.10, then credibility-weighted
+        # shrinkage toward league_relief_era by BULLPEN_PRIOR_INNINGS=30
+        # (features/bullpen.py -- 6 real innings is nowhere near enough to
+        # trust an ERA at full confidence) -- game 3's own 100-earned-run
         # line must not shift this.
-        assert gap2 == round(9 / 4.10, 6)
+        from model_prediction.features.bullpen import BULLPEN_PRIOR_INNINGS, LEAGUE_RELIEF_ERA
+
+        credibility = 6 / (6 + BULLPEN_PRIOR_INNINGS)
+        home_weakness = (credibility * 9.0 + (1 - credibility) * LEAGUE_RELIEF_ERA) / LEAGUE_RELIEF_ERA
+        away_weakness = (credibility * 0.0 + (1 - credibility) * LEAGUE_RELIEF_ERA) / LEAGUE_RELIEF_ERA
+        assert gap2 == round(home_weakness - away_weakness, 6)
     finally:
         validation_module._BULLPEN_MAP = None
 
