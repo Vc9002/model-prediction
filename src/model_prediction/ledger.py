@@ -570,7 +570,14 @@ class PickLedger:
         closing_consensus_line: float | None = None,
         closing_raw_probability: float | None = None,
         binary_contract_settlement_value: float | None = None,
+        correction_reason: str | None = None,
     ) -> dict[str, str]:
+        """correction_reason: explicit operator override of an already-settled
+        or voided row (e.g. a postponed game whose real make-up result became
+        known after the original was pushed) -- required to bypass the normal
+        "already settled" guard, and recorded on the audit event so a
+        corrected row is distinguishable from a first-time settlement.
+        """
         self.initialize()
         if away_score < 0 or home_score < 0:
             raise ValueError("scores cannot be negative")
@@ -581,7 +588,8 @@ class PickLedger:
             if row["status"] == PickStatus.SETTLED.value:
                 if row["away_score"] == str(away_score) and row["home_score"] == str(home_score):
                     return row
-                raise ValueError("pick is already settled with different scores")
+                if not correction_reason or not correction_reason.strip():
+                    raise ValueError("pick is already settled with different scores")
             decision_snapshot = {field: row[field] for field in DECISION_FIELDS}
             line = (
                 float(row["decision_line"] or row["line"]) if (row["decision_line"] or row["line"]) else None
@@ -692,6 +700,11 @@ class PickLedger:
                     "review_status": "review_required" if result is PickResult.LOSS else "not_applicable",
                 }
             )
+            if correction_reason:
+                # Clear the prior void_reason -- this row is no longer voided,
+                # it's a real graded result. void_reason described why it was
+                # a push before; leaving it would misrepresent the row now.
+                row["void_reason"] = ""
             if research_units is not None:
                 row.update(
                     {
@@ -703,7 +716,7 @@ class PickLedger:
                 )
             self._assert_decision_snapshot(row, decision_snapshot)
             self.audit.append(
-                "pick_settled",
+                "pick_settled" if not correction_reason else "pick_resettled_corrected",
                 pick_id,
                 {
                     "away_score": away_score,
@@ -713,6 +726,7 @@ class PickLedger:
                     "research_score_units": research_units,
                     "research_pnl_units": research_pnl,
                     "binary_contract_settlement_value": binary_contract_settlement_value,
+                    **({"correction_reason": correction_reason} if correction_reason else {}),
                 },
             )
             self._write_rows(rows)
