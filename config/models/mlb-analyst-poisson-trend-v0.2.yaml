@@ -34,10 +34,10 @@ factor_bounds:
 feature_schema_version: v3
 formula_version: mlb-analyst-poisson-trend-v0.2
 home_field_run_factor: 1.04
-league_runs_per_team_game: 4.5
-league_starter_era: 4.2
-league_strikeout_rate: 0.225
-league_walk_rate: 0.082
+league_runs_per_team_game: 4.5493
+league_starter_era: 4.1958
+league_strikeout_rate: 0.2193
+league_walk_rate: 0.0785
 recent_half_life_games: 10.0
 recent_prior_strength_games: 12.0
 # Shrinkage strength for the starter's recent (last-5-start) ERA before it

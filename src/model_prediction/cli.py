@@ -97,6 +97,7 @@ from .international_baseball import (
 from .learned_forward import build_learned_moneyline_slate, match_executable_quote
 from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError, PickLedger
 from .models import MODEL_SPECS
+from .mlb_baseline_refresh import refresh_if_due
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
 from .models.mlb import load_formula_spec
 from .research_ledgers import (
@@ -452,6 +453,17 @@ def parser() -> argparse.ArgumentParser:
         "train-residual", help="train the market-residual layer on the rolling settled window"
     )
     residual.add_argument("--output", default="config/models/market-residual-v1.json")
+
+    mlb_baselines = commands.add_parser(
+        "refresh-mlb-baselines",
+        help="regenerate real MLB park factors and league rates from historical data",
+    )
+    mlb_baselines.add_argument(
+        "--force", action="store_true", help="refresh even if the last one was recent"
+    )
+    mlb_baselines.add_argument(
+        "--min-days", type=float, default=7.0, help="minimum days between refreshes unless --force"
+    )
 
     execute = commands.add_parser(
         "execute",
@@ -2627,6 +2639,15 @@ def main(argv: list[str] | None = None) -> None:
                     closing_raw_probability=closing_probability,
                 )
         elif args.command == "daily":
+            # Self-throttled to weekly (see mlb_baseline_refresh's module
+            # docstring) -- safe to call every daily cron cycle since it's a
+            # cheap no-op most of the time, but keeps park factors and league
+            # rates from silently drifting stale for months between manual runs.
+            try:
+                mlb_baseline_refresh_result = refresh_if_due(data_root, PROJECT_ROOT)
+            except (OSError, ValueError):
+                logger.warning("MLB baseline refresh failed", exc_info=True)
+                mlb_baseline_refresh_result = {"status": "error"}
             slate_args = argparse.Namespace(
                 provider="polymarket",
                 league=None,
@@ -2912,6 +2933,7 @@ def main(argv: list[str] | None = None) -> None:
 
             output = {
                 "date": args.date,
+                "step0_mlb_baseline_refresh": mlb_baseline_refresh_result,
                 "step1_polymarket_search": {
                     "event_count": slate["event_count"],
                     "leagues_with_events": [
@@ -3115,6 +3137,10 @@ def main(argv: list[str] | None = None) -> None:
                 args.start,
                 args.end,
                 PROJECT_ROOT / args.output,
+            )
+        elif args.command == "refresh-mlb-baselines":
+            output = refresh_if_due(
+                data_root, PROJECT_ROOT, min_days=args.min_days, force=args.force
             )
         elif args.command == "train-residual":
             rows = [

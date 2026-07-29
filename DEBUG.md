@@ -1,9 +1,8 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-07-28 (early UTC hours, wiring/features audit
-continued from 2026-07-27 evening; see note below — the P0 execution-safety
-findings further down were last independently re-verified 2026-07-26 and were
-not re-run in either pass)
+**Last audited**: 2026-07-29 (see new section directly below; the
+2026-07-28 and 2026-07-27 sections after it remain useful history but are
+now superseded wherever they overlap)
 
 **Project**: `/Users/vincentc9002/model prediction`
 
@@ -21,6 +20,163 @@ the operator separately authorizes that state change.
 
 The source tree was changing during this audit. Re-run the checks before acting
 on any line number or count.
+
+## 2026-07-29 — MLB backfill/settlement fixes, dashboard fixes, Measured Edge
+## model investigation, baseline auto-refresh
+
+All items below were operator-directed, verified with real data (real ESPN/
+Polymarket/Open-Meteo/MLB Stats API calls, real historical games, real
+backtests), and committed with tests passing. Full test suite: **478
+passed**. `verify-chain`: 0 breaks, `chain_intact: true`, `reconciled: false`
+(the reconciliation gap is expected/documented, grows monotonically — see
+2026-07-26 section below, not new).
+
+### Ledger/settlement fixes
+
+- **`forecast --force` backfill bug (found and fixed)**: `--force` froze the
+  point-in-time decision timestamp at literal midnight UTC of the target
+  date, but real Polymarket quote captures for a date don't start until
+  hours later (~04:02 UTC observed) — every captured quote was "in the
+  future" relative to that frozen instant, so `request.validate()` correctly
+  rejected all of them and a real backfill attempt silently returned
+  `logged: 0` with zero duplicates flagged. Fixed: each candidate now gets
+  its own effective decision time (its own game's start minus one second)
+  instead of one shared midnight freeze — `cli.py::_forecast_learned_sport`,
+  `effective_now`. Recovered 6 main-ledger + 11 flat-ledger real 7/27 MLB
+  moneyline picks this way, using real archived point-in-time odds.
+- **`daily`'s automatic settlement never auto-voided postponed/canceled
+  games** (`void_postponed=False` hardcoded in the `daily` command handler)
+  — a postponed game never becomes "completed" under its original event_id
+  (ESPN issues a new event_id for any reschedule), so an affected pick sat
+  `open` forever with no automatic resolution path; only a manually-run
+  `settle --void-postponed` would clear it. Fixed: `daily`'s automatic
+  settlement now passes `void_postponed=True`.
+- **`PickLedger.settle()` gained a `correction_reason` parameter** to allow
+  re-grading an already-settled/voided row when explicitly reasoned (audit
+  event type `pick_resettled_corrected`, distinct from a first-time
+  `pick_settled`). Real case: the 7/27 7:00 PM Reds/Guardians game was
+  postponed and never played under its own event_id (correctly voided as a
+  push), but was actually replayed same-day as game 2 of a doubleheader
+  (real final Reds 2, Guardians 0) — re-graded all 4 affected rows (main
+  moneyline, flat moneyline/spread/total) to `win` per explicit operator
+  directive.
+
+### Dashboard fixes (real bugs found from an actual screenshot, not
+### hypothetical)
+
+- **Today tab duplicated the entire Flat Ledger / Flat Research sections.**
+  `renderToday()` calls `loadFlatToday()`/`loadResearchToday()` without
+  awaiting them, and neither cleared its own previously-appended DOM before
+  re-appending; an overlapping call (auto-refresh racing a slow fetch, or a
+  second manual refresh) let a stale in-flight call's results land after a
+  newer render had already rebuilt the page. Fixed with a render-token guard
+  (`todayRenderToken`) — a stale async loader now bails out instead of
+  touching the DOM.
+- **A pick with no matched executable quote still showed a computed
+  market/edge/+EV badge/suggested size** — all derived from the `-110`
+  neutral placeholder `cli.py` uses when no real quote is found
+  (`sportsbook: "model_opinion_no_executable_quote"`), making a
+  model-opinion-only row look like a real actionable edge. The backend
+  already blocked the Buy button correctly; only the display was wrong.
+  Fixed: rows with that sportsbook value now show `market: no quote`,
+  `edge: —`, and a "model opinion only" badge instead.
+
+### MLB Measured Edge (spread/total) model investigation
+
+Four independent, individually-confirmed real bugs in the Trend Engine
+feature formula (`models/mlb.py`), found via a real 162-game walk-forward
+backtest (real historical Polymarket-reconstructed spread/total lines from
+`data/historical/mlb_market_lines_reconstructed.jsonl`, real final scores,
+point-in-time-correct reconstructed features):
+
+1. **Weather was silently always neutral.** ESPN's own weather fields
+   (`competition.situation.weather`, summary `gameInfo.weather`) are
+   empirically always empty for MLB, live or completed — confirmed by
+   direct inspection across multiple real games, not just reading docs.
+   Fixed: `features/weather.py::resolve_weather` (live Open-Meteo forecast
+   for upcoming games, historical archive for backtest/past dates) wired
+   into `ESPNMLBClient.reconstructed_features`.
+2. **Starter ERA had zero shrinkage for small-innings samples.** A pitcher
+   with e.g. 3.3 total innings this season (early callup, return from
+   injury) could post a 21.6 ERA off one bad outing and have it trusted at
+   full confidence — drove implausible pregame run-total projections
+   (observed range 4.32–18.55 runs before the fix). Fixed: credibility-
+   weighted shrinkage toward `league_starter_era` for both `season_era` and
+   `recent_era` (mirrors the shrinkage `_offense_index` already applies to
+   team offense), plus the same treatment for the K%/BB% "discipline"
+   multiplier. New spec fields: `starter_season_prior_innings` (40 IP),
+   `starter_recent_prior_innings` (20 IP), `starter_rate_prior_batters_faced`
+   (60 BF).
+3. **Bullpen strength was hardcoded neutral for literally every game** —
+   `bullpen_profile(None)`, no data source wired at all. Fixed: built a real
+   relief-appearance index from `mlb_statsapi.py`'s boxscore snapshots
+   (`features/bullpen.py::team_recent_relief_lines` — last 10 completed
+   games' relief lines per team, excluding that game's own starter), with
+   the same credibility-weighted shrinkage applied in `bullpen_profile()`
+   itself.
+4. **Park factors were a static, undated table.** Recomputed empirically
+   from this project's own 7,803+ real completed games — confirmed several
+   parks were meaningfully stale, most strikingly the Athletics (0.98 static
+   vs. 1.153 real, since the team relocated to a different park).
+
+**Honest finding, not swept under the rug**: none of the four fixes
+recovered meaningful real-world predictive signal. Margin correlation with
+real outcomes stayed weakly positive across every formula revision tested
+(0.045–0.12); totals stayed at or below zero throughout (-0.019 to -0.123).
+That's a structural finding about the hand-tuned multiplicative-index
+formula (every factor's own noise compounds rather than averaging out), not
+something further feature-level tuning fixes. Flagged rather than chased
+further after four independent rounds all showed the same pattern.
+
+**Calibration refit from the real 162-game backtest**, replacing the prior
+identical-for-both-markets `0.85`/`0.075` placeholder:
+- `measured-edge-margin-v1.json`: `scale=0.1007`, `offset=0.4667` — real,
+  honest, heavy shrinkage; margin showed a real if small positive signal.
+- `measured-edge-totals-v1.json`: reuses margin's shrinkage as the most
+  conservative available estimate (totals' own fit was noise-level/
+  negative), with an explicit `qualification.insufficient_real_signal` flag
+  and the full backtest evidence documented in the artifact itself.
+- `MeasuredEdgeMarginModel`'s governance bounds check was rewritten: the old
+  fixed `-0.25 <= offset <= 0.25` bound implicitly assumed scale stays close
+  to 1 (mild shrinkage) and would have rejected this real, correctly-
+  centered, heavy-shrinkage fit. Now checks the actual invariant that
+  matters — `calibrated(0.5)` stays near 0.5 — regardless of how much
+  shrinkage that requires.
+
+Existing picks under the old calibration (52 rows, all already settled)
+were left as real historical record rather than destroyed — distinguishable
+from new picks by `model_artifact_hash` going forward. Still Flat-only, no
+main-ledger promotion.
+
+### MLB season-dependent baseline auto-refresh (new)
+
+Park factors, league-average starter ERA/K%/BB%, and league relief ERA all
+drift as a real season progresses (and can jump discontinuously — a team
+relocating ballparks, like the Athletics did). These were one-time
+snapshots computed manually during the investigation above; a real
+regeneration workflow now exists so they don't go stale again silently.
+
+- New module: `mlb_baseline_refresh.py` — `compute_park_factors` (from
+  `data/historical/mlb_games_all.jsonl`), `compute_league_rates` (from
+  `data/mlb_statsapi/game_snapshots.jsonl`), and writer functions that patch
+  `features/park_factors.py` (full regeneration, it's a generated file now)
+  and the four `league_*` fields in `mlb-analyst-poisson-trend-v0.2.yaml` /
+  `LEAGUE_RELIEF_ERA` in `features/bullpen.py` (targeted regex substitution,
+  preserving every hand-written comment in both files).
+- Self-throttled via `data/mlb_baseline_refresh_state.json` — default
+  minimum 7 days between refreshes (park factors and league rates are
+  full-season aggregates; day-to-day noise dominates anything a faster
+  cadence would catch, and there's no cost to checking more often since it
+  no-ops when recent). `--force` bypasses the throttle.
+- Wired into `daily` (`step0_mlb_baseline_refresh` in its output) so it runs
+  automatically on the existing cron cadence without needing separate
+  infrastructure, and exposed as its own CLI command:
+  `model-prediction refresh-mlb-baselines [--force] [--min-days N]`.
+- First real run (2026-07-29): 30 real park factors from 7,803 games
+  (2024-02-22 to 2026-07-25); league rates from 6,349 real boxscore
+  snapshots (2024-03-20 to 2026-09-22) — starter ERA 4.1958, strikeout rate
+  0.2193, walk rate 0.0785, relief ERA 4.0593, runs/team/game 4.5493. All
+  close to but distinct from the prior hand-typed reasoned defaults.
 
 ## 2026-07-27 (evening) — wiring session
 
