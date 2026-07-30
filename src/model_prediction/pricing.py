@@ -44,6 +44,11 @@ def grade_pick(
             raise ValueError("spread requires a line")
         raw_margin = home_score - away_score if selection == "home" else away_score - home_score
         margin = raw_margin + line
+    elif market_type is MarketType.BTTS:
+        # Binary yes/no on both teams scoring -- no push case, like
+        # moneyline's "draw" sub-case above.
+        both_scored = away_score > 0 and home_score > 0
+        return PickResult.WIN if (both_scored == (selection == "yes")) else PickResult.LOSS
     else:
         if line is None:
             raise ValueError("total requires a line")

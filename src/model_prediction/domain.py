@@ -49,6 +49,7 @@ class MarketType(StrEnum):
     MONEYLINE = "moneyline"
     SPREAD = "spread"
     TOTAL = "total"
+    BTTS = "btts"  # soccer "both teams to score" -- a binary yes/no, no line
 
 
 class PickStatus(StrEnum):
@@ -207,6 +208,12 @@ class PickRequest:
             allowed = {"away", "home"}
             if self.line is None:
                 raise ValueError("spread calls require a selection-relative line")
+        elif self.market_type is MarketType.BTTS:
+            # A binary yes/no on both teams scoring, no line -- same shape
+            # as moneyline's "draw" case, not a totals-style line bet.
+            allowed = {"yes", "no"}
+            if self.line is not None:
+                raise ValueError("btts calls must not have a line")
         else:
             allowed = {"over", "under"}
             if self.line is None or self.line <= 0:

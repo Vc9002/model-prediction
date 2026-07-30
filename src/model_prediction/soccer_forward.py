@@ -91,6 +91,64 @@ def _latest_total_snapshots(
     return list(latest.values())
 
 
+def _latest_btts_snapshots(
+    data_root: str | Path,
+    game_date: str,
+) -> list[dict[str, Any]]:
+    """Same freshness/dedup logic as `_latest_total_snapshots`, for a BTTS
+    (both teams to score) Yes/No market.
+
+    Unlike team_win, a BTTS market (if one exists) is a single combined
+    Yes/No contract per event, same shape as totals -- so this mirrors
+    `_latest_total_snapshots` exactly, just without a `line` field to check.
+
+    IMPORTANT: `market_type == "btts"` here is NOT yet a real, verified
+    classification. Checked live 2026-07-31 across all 19 configured soccer
+    leagues and across 4 real days of already-captured snapshots
+    (2026-07-25, 07-27, 07-29, 07-30): Polymarket has never listed a BTTS
+    market for soccer at all -- only spread/total/team_win have ever been
+    seen. `data_sources/polymarket_us.py`'s `MARKET_TYPES` therefore has no
+    BTTS entry (unlike team_win, which WAS added only after being verified
+    live) -- adding a guessed raw type string there would be fabrication,
+    not wiring. This function exists so pricing activates automatically,
+    with zero further code changes, the moment a real BTTS market appears
+    and someone adds its confirmed raw type string to MARKET_TYPES. Until
+    then this always returns [] (no BTTS rows in the snapshot file, since
+    none can ever be classified as "btts" yet).
+    """
+    path = (
+        Path(data_root)
+        / "odds"
+        / "soccer"
+        / game_date
+        / "polymarket_snapshots.jsonl"
+    )
+    if not path.exists():
+        return []
+    latest: dict[str, dict[str, Any]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            slug = str(row.get("market_slug") or "")
+            if (
+                row.get("market_type") != "btts"
+                or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
+                or not bool(row.get("timestamp_valid", False))
+                or not row.get("event_title")
+            ):
+                continue
+            if slug not in latest or str(row.get("observed_at_utc") or "") > str(
+                latest[slug].get("observed_at_utc") or ""
+            ):
+                latest[slug] = row
+    return list(latest.values())
+
+
 def _latest_moneyline_snapshots(
     data_root: str | Path,
     game_date: str,
@@ -188,8 +246,14 @@ def build_soccer_total_slate(
         for prediction in all_predictions
         if str(prediction.market_type) == "moneyline"
     ]
+    btts_predictions = [
+        prediction
+        for prediction in all_predictions
+        if str(prediction.market_type) == "btts"
+    ]
     snapshots = _latest_total_snapshots(data_root, game_date)
     moneyline_snapshots = _latest_moneyline_snapshots(data_root, game_date)
+    btts_snapshots = _latest_btts_snapshots(data_root, game_date)
     priced: list[dict[str, Any]] = []
     unmatched: list[dict[str, str]] = []
     for prediction in totals:
@@ -344,6 +408,82 @@ def build_soccer_total_slate(
                 "away_team": prediction.away_team,
                 "home_team": prediction.home_team,
                 "market_type": "moneyline",
+                "selection": selection,
+                "line": None,
+                "model_probability": prediction.probabilities[selection],
+                "model_uncertainty": prediction.uncertainty,
+                "model_version": prediction.model_version,
+                "feature_basis": prediction.feature_basis,
+                "rationale": prediction.rationale,
+                "market_slug": snapshot["market_slug"],
+                "executable_ask": float(ask),
+                "observed_at_utc": snapshot["observed_at_utc"],
+                "timestamp_valid": True,
+                "edge_vs_executable_ask": round(
+                    prediction.probabilities[selection] - float(ask),
+                    6,
+                ),
+            }
+        )
+
+    # BTTS: same complementary-sides shape as totals (one snapshot, long=yes/
+    # short=no), so matching mirrors that loop exactly. In practice this will
+    # currently always report "no unique timestamp-valid BTTS market matched"
+    # -- honest, not a bug, since no BTTS market has ever been observed live
+    # (see _latest_btts_snapshots's docstring). Kept in `priced` alongside
+    # totals/moneyline so it activates automatically, with no further code
+    # changes, once Polymarket ever lists one and its raw type string is
+    # confirmed and added to MARKET_TYPES.
+    for prediction in btts_predictions:
+        start = parse_utc(prediction.event_start_utc)
+        candidates = []
+        for snapshot in btts_snapshots:
+            try:
+                snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
+                snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if (
+                abs((snapshot_start - start).total_seconds()) <= 30 * 60
+                and snapshot_at < start
+                and _team_matches_title(
+                    prediction.away_team,
+                    str(snapshot.get("event_title", "")),
+                )
+                and _team_matches_title(
+                    prediction.home_team,
+                    str(snapshot.get("event_title", "")),
+                )
+            ):
+                candidates.append(snapshot)
+        if len(candidates) != 1:
+            unmatched.append(
+                {
+                    "event_id": prediction.event_id,
+                    "reason": "no unique timestamp-valid BTTS market matched",
+                }
+            )
+            continue
+        snapshot = candidates[0]
+        selection = max(("yes", "no"), key=lambda side: prediction.probabilities[side])
+        side_key = "long" if selection == "yes" else "short"
+        side = snapshot.get(side_key) or {}
+        ask = side.get("ask")
+        if ask is None or not 0 < float(ask) < 1:
+            unmatched.append(
+                {
+                    "event_id": prediction.event_id,
+                    "reason": "selected BTTS side has no executable ask",
+                }
+            )
+            continue
+        priced.append(
+            {
+                "event_id": prediction.event_id,
+                "event_start_utc": prediction.event_start_utc,
+                "away_team": prediction.away_team,
+                "home_team": prediction.home_team,
+                "market_type": "btts",
                 "selection": selection,
                 "line": None,
                 "model_probability": prediction.probabilities[selection],

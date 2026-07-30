@@ -262,3 +262,98 @@ def test_soccer_forward_rejects_partial_or_timestamp_invalid_totals(tmp_path) ->
     from model_prediction.soccer_forward import _latest_total_snapshots
 
     assert _latest_total_snapshots(tmp_path, "2026-07-27") == []
+
+
+def test_soccer_forward_prices_btts_from_a_matched_bbo(tmp_path) -> None:
+    """BTTS activates automatically once a real market_type=="btts" snapshot
+    exists -- confirmed no such market has ever been observed live (see
+    _latest_btts_snapshots's docstring), but the matching/pricing plumbing
+    itself must work correctly for whenever one appears."""
+    history_path = tmp_path / "processed" / "soccer" / "games.jsonl"
+    history_path.parent.mkdir(parents=True)
+    history = []
+    for index in range(60):
+        history.append(
+            {
+                "event_id": f"history-{index}",
+                "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+                "league": "SOCCER",
+                "away_team": "Alpha FC" if index % 2 else "Beta FC",
+                "home_team": "Beta FC" if index % 2 else "Alpha FC",
+                "away_score": index % 3,
+                "home_score": (index + 1) % 4,
+            }
+        )
+    history_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in history),
+        encoding="utf-8",
+    )
+    snapshot_path = (
+        tmp_path
+        / "odds"
+        / "soccer"
+        / "2026-07-27"
+        / "polymarket_snapshots.jsonl"
+    )
+    snapshot_path.parent.mkdir(parents=True)
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "event_id": "pm-1",
+                "event_title": "Alpha FC vs Beta FC",
+                "event_start_utc": "2026-07-27T20:00:00Z",
+                "observed_at_utc": "2026-07-27T12:00:00Z",
+                "timestamp_valid": True,
+                "market_type": "btts",
+                "market_slug": "btts-mls-alpha-beta-2026-07-27",
+                "long": {"description": "Yes", "ask": 0.55},
+                "short": {"description": "No", "ask": 0.46},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class Client:
+        @staticmethod
+        def scoreboard(league, game_date):
+            assert league == "MLS"
+            return {
+                "events": [
+                    {
+                        "id": "espn-1",
+                        "date": "2026-07-27T20:00:00Z",
+                        "competitions": [
+                            {
+                                "competitors": [
+                                    {
+                                        "homeAway": "away",
+                                        "team": {"displayName": "Alpha FC"},
+                                    },
+                                    {
+                                        "homeAway": "home",
+                                        "team": {"displayName": "Beta FC"},
+                                    },
+                                ]
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    result = build_soccer_total_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        leagues=("MLS",),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    btts_contracts = [c for c in result["priced_contracts"] if c["market_type"] == "btts"]
+    assert len(btts_contracts) == 1
+    contract = btts_contracts[0]
+    assert contract["line"] is None
+    assert contract["selection"] in {"yes", "no"}
+    expected_ask = 0.55 if contract["selection"] == "yes" else 0.46
+    assert contract["executable_ask"] == expected_ask
+    assert contract["timestamp_valid"] is True

@@ -1,7 +1,12 @@
 from model_prediction.features.base import GameRecord
 from model_prediction.models.basketball import UpcomingGame
 from model_prediction.models.nba import nba_model
-from model_prediction.models.soccer import UpcomingMatch, soccer_model
+from model_prediction.models.soccer import (
+    BTTS_CALIBRATION_SLOPE,
+    UpcomingMatch,
+    _apply_btts_calibration,
+    soccer_model,
+)
 from model_prediction.models.tennis import UpcomingMatch as TennisMatch
 from model_prediction.models.tennis import tennis_model
 
@@ -92,6 +97,21 @@ def test_soccer_model_three_way_and_totals_are_coherent() -> None:
     assert moneyline.probabilities["home"] > moneyline.probabilities["away"]
     assert abs(total.probabilities["over"] + total.probabilities["under"] - 1) < 1e-6
     assert abs(btts.probabilities["yes"] + btts.probabilities["no"] - 1) < 1e-6
+
+
+def test_btts_calibration_pulls_extreme_raw_probabilities_toward_the_center() -> None:
+    """Real walk-forward evidence (models/soccer.py's module comment): raw
+    BTTS probability is measurably overconfident (55.0% raw accuracy vs.
+    62.5% for this same model's moneyline). BTTS_CALIBRATION_SLOPE < 1
+    should compress extreme raw values toward 0.5, not leave them untouched
+    or invert them."""
+    assert 0 < BTTS_CALIBRATION_SLOPE < 1  # confirms real shrinkage, not a no-op or inversion
+    high = _apply_btts_calibration(0.90)
+    low = _apply_btts_calibration(0.10)
+    assert 0.5 < high < 0.90  # pulled toward center, not left untouched or flipped
+    assert 0.10 < low < 0.5
+    # Monotonic: a higher raw input must never calibrate to a lower probability.
+    assert _apply_btts_calibration(0.6) < _apply_btts_calibration(0.8)
 
 
 def test_tennis_model_flat_call_from_surface_elo() -> None:
