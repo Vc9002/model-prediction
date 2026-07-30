@@ -21,42 +21,37 @@ the operator separately authorizes that state change.
 The source tree was changing during this audit. Re-run the checks before acting
 on any line number or count.
 
-## 2026-07-30 — esports and soccer: real live "wrong side" pricing bug found and fixed
+## 2026-07-30 — esports/soccer side-selection: investigated, "fixed," then reverted per operator design decision
 
-Both `_log_esports_forecast` (`cli.py`) and `build_soccer_total_slate`
-(`soccer_forward.py`) selected which side of a two-sided contract to price by
-**raw model probability** ("whichever side the model thinks is more likely to
-win/happen"), not by **real edge vs. the market's own price**. Those are not
-the same side whenever the market's own vig structure disagrees with the
-model about which side is cheap. Confirmed live against real captured data,
-not a hypothetical:
+Found that `_log_esports_forecast` (`cli.py`) and `build_soccer_total_slate`
+(`soccer_forward.py`) both select which side of a two-sided contract to log
+by **raw model probability** ("whichever side the model thinks is more
+likely to win/happen"). Confirmed live (not hypothetical): 23 of 64 real
+esports contracts today (36%) had the model's raw favorite priced at
+negative edge while the other side was positive (e.g. LOL "Joblife" 56.5%
+model prob but ask 0.64, edge -7.5pp, vs. "Skillcamp Esport" 43.5% prob but
+ask 0.37, edge +6.5pp); soccer's live slate showed the same pattern
+(Newell's Old Boys @ Independiente: model favors Independiente 45.6% to
+Newell's 27.8% outright, but Independiente's own team_win market was
+-13.4pp edge while Newell's was +11.8pp).
 
-- Esports (2026-07-30, 64 real priced contracts across lol/cs2/dota2/valorant):
-  in 23 of 64 (36%) the model's raw favorite was priced at **negative**
-  edge while the other side was positive — the old code logged the losing
-  side and never even evaluated the profitable one. Example: LOL "Joblife"
-  56.5% model prob but ask 0.64 (edge -7.5pp); "Skillcamp Esport" 43.5% model
-  prob but ask 0.37 (edge +6.5pp) — old code always picked Joblife.
-- Soccer (2026-07-30, real live slate): "Newell's Old Boys @ Independiente" —
-  model favors Independiente 45.6% to Newell's 27.8% outright, but
-  Independiente's own team_win market asked 0.59 (edge -13.4pp) while
-  Newell's asked 0.16 (edge +11.8pp). Old code always priced Independiente.
-  Soccer totals (over/under) has the identical structural bug (same
-  complementary-sides-of-one-snapshot shape as esports) — fixed the same way
-  even though today's live slate had no totals to reproduce it against
-  directly.
-
-Fixed in both places: select `max(sides, key=model_probability - ask)`
-instead of `max(sides, key=model_probability)`. Downstream eligibility gates
-(`eligibility.py`) were already probability-direction-agnostic (`abs(prob -
-0.5)` for confidence, `prob - implied_probability(odds)` for edge), so no
-other change was needed — confirmed by reading those gates before assuming
-the fix was safe. Live re-run after the fix: all 5 real soccer moneyline
-contracts and all 64 real esports contracts now price the genuinely
-higher-edge side. Added regression tests reproducing the exact live pattern
-(`tests/test_cli.py::test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_edge`,
-`tests/test_soccer_forward.py::test_soccer_forward_totals_picks_the_positive_edge_side_not_the_model_favorite`,
-`tests/test_soccer_forward.py::test_soccer_forward_moneyline_picks_the_positive_edge_team_not_the_model_favorite`).
+Initially "fixed" this to select by edge instead of raw probability
+(`max(sides, key=model_probability - ask)`), reasoning the ledger exists to
+find +EV mispricings. **Operator corrected this**: every sport's model is
+supposed to call the winner and log that pick -- `learned_forward.py`'s MLB
+moneyline already works this way (`selection = "home" if home_probability >=
+0.5 else "away"`, confirmed by reading the code), unconditionally, with no
+edge comparison between sides. Esports/soccer picking by edge instead was
+inconsistent with that established, system-wide policy, not an independent
+improvement. Reverted both call sites and their tests back to raw-probability
+selection to match MLB's pattern; the min_edge/eligibility gate downstream
+(already probability-direction-agnostic: `abs(prob - 0.5)` for confidence,
+`prob - implied_probability(odds)` for edge) is what decides whether a
+correctly-called winner is *also* good value enough to become a real pick
+vs. a zero-unit research observation -- that part was never broken and did
+not need to change. Net code diff after the revert: comments only,
+documenting the now-confirmed system-wide policy explicitly at both call
+sites so this doesn't get "fixed" the same way again.
 
 Also investigated and consciously left alone: `esports.py`'s
 `SPORT_K_OVERRIDE` hardcodes K=96 (the top of the grid) for lol/cs2/dota2/

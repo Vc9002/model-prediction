@@ -1277,20 +1277,22 @@ def _log_esports_forecast(
     observed_now = utc_now()
 
     for contract in forecast.get("priced_contracts", []):
-        # Log whichever side has the better real edge vs the market, not
-        # whichever side the model merely considers more likely to win --
-        # the market's own price is independent of that, so the "underdog"
-        # side is sometimes the genuinely profitable one. Confirmed live
-        # (2026-07-30): ~36% of real priced contracts had the model's
-        # favorite priced at negative edge while the other side was
-        # positive; picking by raw probability logged the losing-value side
-        # and never even considered the positive-edge one.
+        # Only log the model's pick: the side with higher model probability.
+        # Consistent with every other sport (e.g. learned_forward.py's MLB
+        # moneyline: `selection = "home" if home_probability >= 0.5 else
+        # "away"`) -- the model's job is to call the winner; the min_edge
+        # gate downstream decides whether that call is also good enough
+        # value to become a real pick vs. a zero-unit research observation.
         sides = contract.get("sides", [])
         if len(sides) != 2:
             continue
-        best_side = max(sides, key=lambda s: float(s["model_probability"]) - float(s["executable_ask"]))
+        best_side = max(sides, key=lambda s: float(s["model_probability"]))
         model_prob = float(best_side["model_probability"])
-        if not 0.0 <= model_prob <= 1.0:
+        # esports.py builds the two sides as complementary (p, 1-p), so the
+        # max of the two must be >= 0.5. If it isn't, something upstream
+        # produced a NaN or otherwise corrupted probability — fail closed
+        # rather than log a "pick" the model doesn't actually favor.
+        if model_prob < 0.5:
             continue
         ask = float(best_side["executable_ask"])
 
