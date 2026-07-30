@@ -3227,6 +3227,27 @@ def live_gateway_slate(sport: str, day: str) -> dict:
     }
 
 
+def _all_ledger_rows_for_price_scan() -> list[dict]:
+    """Every row from all four ledgers (Main, Flat, Research, Gated
+    Research), for the "Scan Open Ledger Prices" action.
+
+    read_picks() only ever parsed picks.xlsx (Main) -- confirmed a real gap
+    (2026-07-31): every open Flat/Research/Gated Research pick's price was
+    permanently stale, since nothing else ever refreshed them. Pulled into
+    its own function (rather than inlined in _action_command) so tests can
+    monkeypatch this one seam instead of four separate parse calls. The
+    caller's (sport, game_day, slug) dedup already collapses the same real
+    contract appearing in more than one ledger (e.g. an MLB game open in
+    both Main and Flat) into a single --contract entry.
+    """
+    return (
+        read_picks()
+        + _parse_picks(DATA / "flat_picks.xlsx")
+        + _parse_research_picks(gated=False)
+        + _parse_research_picks(gated=True)
+    )
+
+
 def _action_command(name: str, payload: dict) -> list[str]:
     runner = _resolve_runner()
     if name == "run_tests":
@@ -3254,7 +3275,7 @@ def _action_command(name: str, payload: dict) -> list[str]:
         command = cli + ["polymarket-ledger-prices", "--date", day]
         seen: set[tuple[str, str, str]] = set()
         archived = set(_load_archive()["pick_ids"])
-        for row in _dedupe_picks(read_picks()):
+        for row in _dedupe_picks(_all_ledger_rows_for_price_scan()):
             if row.get("status") != "open" or str(row.get("pick_id")) in archived:
                 continue
             quote = _pick_quote(row) or {}
