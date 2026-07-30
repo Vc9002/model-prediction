@@ -1,8 +1,8 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-07-29 (see new section directly below; the
-2026-07-28 and 2026-07-27 sections after it remain useful history but are
-now superseded wherever they overlap)
+**Last audited**: 2026-07-30 (see new section directly below; the 2026-07-29
+section and everything after it remains useful history but is now
+superseded wherever they overlap)
 
 **Project**: `/Users/vincentc9002/model prediction`
 
@@ -20,6 +20,60 @@ the operator separately authorizes that state change.
 
 The source tree was changing during this audit. Re-run the checks before acting
 on any line number or count.
+
+## 2026-07-30 — esports and soccer: real live "wrong side" pricing bug found and fixed
+
+Both `_log_esports_forecast` (`cli.py`) and `build_soccer_total_slate`
+(`soccer_forward.py`) selected which side of a two-sided contract to price by
+**raw model probability** ("whichever side the model thinks is more likely to
+win/happen"), not by **real edge vs. the market's own price**. Those are not
+the same side whenever the market's own vig structure disagrees with the
+model about which side is cheap. Confirmed live against real captured data,
+not a hypothetical:
+
+- Esports (2026-07-30, 64 real priced contracts across lol/cs2/dota2/valorant):
+  in 23 of 64 (36%) the model's raw favorite was priced at **negative**
+  edge while the other side was positive — the old code logged the losing
+  side and never even evaluated the profitable one. Example: LOL "Joblife"
+  56.5% model prob but ask 0.64 (edge -7.5pp); "Skillcamp Esport" 43.5% model
+  prob but ask 0.37 (edge +6.5pp) — old code always picked Joblife.
+- Soccer (2026-07-30, real live slate): "Newell's Old Boys @ Independiente" —
+  model favors Independiente 45.6% to Newell's 27.8% outright, but
+  Independiente's own team_win market asked 0.59 (edge -13.4pp) while
+  Newell's asked 0.16 (edge +11.8pp). Old code always priced Independiente.
+  Soccer totals (over/under) has the identical structural bug (same
+  complementary-sides-of-one-snapshot shape as esports) — fixed the same way
+  even though today's live slate had no totals to reproduce it against
+  directly.
+
+Fixed in both places: select `max(sides, key=model_probability - ask)`
+instead of `max(sides, key=model_probability)`. Downstream eligibility gates
+(`eligibility.py`) were already probability-direction-agnostic (`abs(prob -
+0.5)` for confidence, `prob - implied_probability(odds)` for edge), so no
+other change was needed — confirmed by reading those gates before assuming
+the fix was safe. Live re-run after the fix: all 5 real soccer moneyline
+contracts and all 64 real esports contracts now price the genuinely
+higher-edge side. Added regression tests reproducing the exact live pattern
+(`tests/test_cli.py::test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_edge`,
+`tests/test_soccer_forward.py::test_soccer_forward_totals_picks_the_positive_edge_side_not_the_model_favorite`,
+`tests/test_soccer_forward.py::test_soccer_forward_moneyline_picks_the_positive_edge_team_not_the_model_favorite`).
+
+Also investigated and consciously left alone: `esports.py`'s
+`SPORT_K_OVERRIDE` hardcodes K=96 (the top of the grid) for lol/cs2/dota2/
+valorant. Re-running the grid search on current (larger) data shows the true
+validation-set optimum is now lower for three of those four (lol: 40, cs2:
+32, dota2: 48) — but checking held-out locked-test performance with the
+auto-selected K vs. the override K gave mixed results (override K=96 did
+*better* on LOL's locked test despite scoring worse on validation). With only
+one validation/test split this is genuinely ambiguous small-sample noise in
+which K wins, not a clear-cut bug like the pricing-side issue above — did not
+touch it. Also bumped `mlb-analyst-poisson-trend-v0.2.yaml`'s Monte Carlo
+`simulations` from 10000 to 20000 (numpy-vectorized, negligible cost either
+way; reduces sampling noise only, does not address the model's real
+correlation ceiling documented in the 2026-07-29 section below).
+
+Full test suite: **480 passed**. Ruff: **117 findings**, same as prior
+baseline (no new findings). `verify-chain`: 0 breaks, `chain_intact: true`.
 
 ## 2026-07-29 — MLB backfill/settlement fixes, dashboard fixes, Measured Edge
 ## model investigation, baseline auto-refresh

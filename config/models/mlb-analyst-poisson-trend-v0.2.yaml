@@ -83,7 +83,7 @@ seed_method: stable_hash
 # calibration to refine against real historical run variance, not a
 # precision-fit value.
 simulation:
-  simulations: 10000
+  simulations: 20000
   seed: 42
   shared_environment_variance: 0.06
   team_specific_variance: 0.12

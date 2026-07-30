@@ -118,12 +118,29 @@ def _esports_forecast() -> dict:
             },
             {
                 **base,
-                "event_id": "negative-edge",
-                "market_slug": "negative-edge",
+                "event_id": "low-edge-both-sides",
+                "market_slug": "low-edge-both-sides",
                 "gated_research_eligible": True,
                 "sides": [
-                    {"team": "Team A", "model_probability": 0.60, "executable_ask": 0.62},
-                    {"team": "Team B", "model_probability": 0.40, "executable_ask": 0.38},
+                    {"team": "Team A", "model_probability": 0.55, "executable_ask": 0.55},
+                    {"team": "Team B", "model_probability": 0.45, "executable_ask": 0.46},
+                ],
+            },
+            {
+                # The model's favorite (Team A, higher probability) is priced
+                # at negative edge here -- the market is charging more for it
+                # than the model thinks it's worth. Team B, the underdog, is
+                # genuinely underpriced. Picking "whichever side the model
+                # thinks is more likely to win" (the pre-fix behavior) would
+                # log Team A's losing-value bet and never even look at Team
+                # B's real edge; the fix must pick Team B here instead.
+                **base,
+                "event_id": "underdog-has-the-real-edge",
+                "market_slug": "underdog-has-the-real-edge",
+                "gated_research_eligible": True,
+                "sides": [
+                    {"team": "Team A", "model_probability": 0.60, "executable_ask": 0.68},
+                    {"team": "Team B", "model_probability": 0.40, "executable_ask": 0.30},
                 ],
             },
             {
@@ -168,13 +185,26 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
     # Every safely priced candidate reaches the research ledger, including
     # the unvalidated/new-team one (as a downgraded NO_CALL row) -- only the
     # gated ledger is a curated subset.
-    assert logged == 3
-    assert len(research.appended) == 3
-    assert len(gated.appended) == 1
-    assert gated.appended[0][0].event_id == "valid"
+    assert logged == 4
+    assert len(research.appended) == 4
+    assert len(gated.appended) == 2
+    gated_events = {request.event_id for request, _ in gated.appended}
+    assert gated_events == {"valid", "underdog-has-the-real-edge"}
     by_event = {request.event_id: eligibility for request, eligibility in research.appended}
-    assert by_event["negative-edge"].reason_code == "NO_CALL_LOW_EDGE"
+    assert by_event["low-edge-both-sides"].reason_code == "NO_CALL_LOW_EDGE"
     assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    # The regression case: the model's raw favorite (Team A) has negative
+    # edge here, so the logged pick must be the underdog (Team B) instead --
+    # picking by probability alone would have logged Team A's losing-value
+    # bet and missed Team B's real edge entirely.
+    underdog_request, underdog_eligibility = next(
+        (request, eligibility)
+        for request, eligibility in research.appended
+        if request.event_id == "underdog-has-the-real-edge"
+    )
+    assert underdog_request.selection == "away"  # Team B is teams[1] in the fixture
+    assert abs(underdog_request.model_probability - 0.40) < 1e-6
+    assert underdog_eligibility.decision == "CALL"
 
 
 def test_esports_exposure_check_happens_while_ledger_lock_is_held(monkeypatch) -> None:

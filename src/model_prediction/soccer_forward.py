@@ -225,14 +225,20 @@ def build_soccer_total_slate(
             )
             continue
         snapshot = candidates[0]
-        selection = max(
-            ("over", "under"),
-            key=lambda side: prediction.probabilities[side],
-        )
-        side_key = "long" if selection == "over" else "short"
-        side = snapshot.get(side_key) or {}
-        ask = side.get("ask")
-        if ask is None or not 0 < float(ask) < 1:
+        # Log whichever side has the better real edge vs the market, not
+        # whichever side the model merely considers more likely -- the
+        # market's own price is independent of that, so "under" can be the
+        # genuinely profitable side even when the model favors "over" (same
+        # bug confirmed live in the moneyline block below; over/under here
+        # are two complementary sides of this one snapshot exactly like
+        # esports's two-sided contracts).
+        side_asks = {"over": (snapshot.get("long") or {}).get("ask"), "under": (snapshot.get("short") or {}).get("ask")}
+        edges = {
+            side: prediction.probabilities[side] - float(ask)
+            for side, ask in side_asks.items()
+            if ask is not None and 0 < float(ask) < 1
+        }
+        if not edges:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
@@ -240,6 +246,8 @@ def build_soccer_total_slate(
                 }
             )
             continue
+        selection = max(edges, key=edges.get)
+        ask = side_asks[selection]
         priced.append(
             {
                 "event_id": prediction.event_id,
@@ -301,34 +309,41 @@ def build_soccer_total_slate(
             )
             continue
         # Draws aren't tradeable as a distinct outcome across two separate
-        # per-team markets, so this compares only the two win probabilities,
-        # then finds whichever matched team_win market concerns the
-        # model-favored team -- matching by team name, not market ordering.
-        selection = max(("home", "away"), key=lambda side: prediction.probabilities[side])
-        selected_team = prediction.home_team if selection == "home" else prediction.away_team
-        matching = [
-            snapshot
-            for snapshot in candidates
-            if _team_matches_title(selected_team, str(snapshot.get("team") or ""))
-        ]
-        if len(matching) != 1:
+        # per-team markets. Each team_win market is an independent Yes/No
+        # question with its own price, so the market can underprice the
+        # underdog's win market even while overpricing the favorite's --
+        # confirmed live 2026-07-30 (Newell's Old Boys @ Independiente: model
+        # favors Independiente 45.6% to Newell's 27.8%, but Independiente's
+        # own win-market asked 0.59, edge -13.4pp, while Newell's asked 0.16,
+        # edge +11.8pp). Score every unambiguously-matched team's own market
+        # against that team's own model probability and log the best real
+        # edge, not simply whichever team the model considers more likely to
+        # win outright.
+        edge_options = []
+        for side in ("home", "away"):
+            team_name = prediction.home_team if side == "home" else prediction.away_team
+            matching = [
+                snapshot
+                for snapshot in candidates
+                if _team_matches_title(team_name, str(snapshot.get("team") or ""))
+            ]
+            if len(matching) != 1:
+                continue
+            ask = (matching[0].get("long") or {}).get("ask")
+            if ask is None or not 0 < float(ask) < 1:
+                continue
+            edge_options.append(
+                (prediction.probabilities[side] - float(ask), side, matching[0], float(ask))
+            )
+        if not edge_options:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": "no unique team_win market for the model-favored team",
+                    "reason": "no unique team_win market with an executable ask for either team",
                 }
             )
             continue
-        snapshot = matching[0]
-        ask = (snapshot.get("long") or {}).get("ask")
-        if ask is None or not 0 < float(ask) < 1:
-            unmatched.append(
-                {
-                    "event_id": prediction.event_id,
-                    "reason": "selected team_win side has no executable ask",
-                }
-            )
-            continue
+        _, selection, snapshot, ask = max(edge_options, key=lambda item: item[0])
         priced.append(
             {
                 "event_id": prediction.event_id,
