@@ -79,11 +79,26 @@ class Ingestor:
             # error. Only a past date's cache with zero completed events (an
             # in-progress/pre-game snapshot) is treated as stale; a genuinely
             # final historical payload is still never re-fetched.
+            #
+            # Must use the SAME completion parser as the real ingest below
+            # (completed_tennis_singles_matches for tennis, completed_games
+            # otherwise) -- tennis events nest matches under `groupings`, a
+            # completely different shape from `completed_games`'s flat
+            # `competitions` list, so that parser always returns zero
+            # matches for tennis regardless of true completion state. Using
+            # it here first flagged ~1748 tennis dates as "stale" that were
+            # actually fine -- a false positive from the wrong parser, not
+            # real staleness like the MLB/WNBA/soccer case above.
+            completed_events = (
+                ESPNClient.completed_tennis_singles_matches(cached_payload)
+                if sport_key == "tennis" and cached_payload is not None
+                else ESPNClient.completed_games(cached_payload) if cached_payload is not None else []
+            )
             cache_is_stale = (
                 cached_payload is not None
                 and is_past_date
                 and cached_payload.get("events")
-                and not ESPNClient.completed_games(cached_payload)
+                and not completed_events
             )
             if cached_payload is not None and not cache_is_stale:
                 skipped += 1

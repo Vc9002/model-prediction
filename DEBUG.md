@@ -51,10 +51,20 @@ Two real bugs found and fixed while building this:
   games for 4 days. Fixed: a past-dated cache with zero completed events is
   now treated as stale and re-fetched; a genuinely final payload is still
   never touched. Same audit found 12 more stale WNBA dates and 44 stale
-  soccer games — recovered. Tennis showed ~1748 flagged dates, but that's
-  likely a different, structural cause (known ATP/ITF coverage gaps, not
-  necessarily this same mid-day-cache bug) — not investigated further, left
-  for a dedicated pass.
+  soccer games — recovered.
+
+  Tennis initially showed ~1748 flagged dates using this same check, but
+  that turned out to be a false positive in the fix itself, not a real gap:
+  tennis events nest matches under `groupings` (one per draw), a completely
+  different shape from the flat `competitions` list `ESPNClient.completed_games`
+  assumes, so that parser always sees zero completed matches for tennis
+  regardless of true state -- confirmed live (statuses were real
+  `STATUS_FINAL`/`STATUS_WALKOVER`, `completed_games` still returned 0).
+  Fixed by using the same sport-aware parser real ingest already branches on
+  (`completed_tennis_singles_matches` for tennis). Re-checked against all
+  1878 real cached tennis files with the corrected parser: 0 genuinely
+  stale. Added a regression test pinning that a final tennis cache is never
+  refetched.
 
 Retrospective check against real, already-settled picks: on the 20 main-ledger
 and 72 flat-ledger v6/v5 games that could be matched to real history, v7 would

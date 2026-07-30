@@ -83,6 +83,66 @@ def test_stale_pregame_cache_for_a_past_date_is_refetched_not_trusted_forever(tm
     assert json.loads(raw_path.read_text())["events"][0]["competitions"][0]["status"]["type"]["completed"] is True
 
 
+def _tennis_scoreboard(game_date: str) -> dict:
+    return {
+        "events": [
+            {
+                "id": "t1",
+                "date": f"{game_date}T12:00:00Z",
+                "name": "Test Open",
+                "groupings": [
+                    {
+                        "competitions": [
+                            {
+                                "id": "c1",
+                                "date": f"{game_date}T12:00:00Z",
+                                "type": {"slug": "mens-singles"},
+                                "status": {"type": {"completed": True}},
+                                "round": {"displayName": "Final"},
+                                "competitors": [
+                                    {"winner": True, "athlete": {"displayName": "Player A"}},
+                                    {"winner": False, "athlete": {"displayName": "Player B"}},
+                                ],
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+
+
+class FakeTennisESPN:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def scoreboard(self, league: str, game_date: str):
+        self.calls += 1
+        return _tennis_scoreboard(game_date)
+
+
+def test_final_tennis_cache_is_not_a_false_positive_stale_refetch(tmp_path) -> None:
+    """Tennis events nest matches under `groupings`, not the flat
+    `competitions` list `completed_games` assumes -- using that generic
+    parser for the staleness check (rather than
+    completed_tennis_singles_matches) made every single real, final tennis
+    cache look "stale" (confirmed live: ~1748 dates falsely flagged), since
+    it always sees zero completed matches for tennis regardless of true
+    state. This pins the fix: a genuinely final tennis payload must not be
+    refetched, checked with the SAME sport-aware parser real ingest uses."""
+    fake = FakeTennisESPN()
+    ingestor = Ingestor(tmp_path, client=fake, rate_limit_seconds=0)
+    past_date = "2020-01-01"
+
+    first = ingestor.ingest_scores("tennis", past_date)
+    assert fake.calls == 2  # ATP + WTA
+    assert first["fetched"] == 2
+
+    second = ingestor.ingest_scores("tennis", past_date)
+    assert fake.calls == 2  # not refetched -- the false-positive this guards against
+    assert second["fetched"] == 0 and second["cached"] == 2
+
+
 def test_genuinely_final_cache_is_never_refetched_even_for_a_past_date(tmp_path) -> None:
     """The staleness check must not defeat immutability for real historical
     data -- a cache with completed events stays untouched regardless of
