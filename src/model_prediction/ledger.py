@@ -9,8 +9,8 @@ failure mode recoverable rather than silent: the worst case becomes an audit
 event describing a mutation that never actually landed in the ledger,
 detectable by comparing the two (an audit event with no matching row/state).
 For mutations keyed on an EXISTING pick_id (``settle``, ``void``,
-``remove_open_rows``, ``update_closing``, ``review_loss``,
-``score_research``), retrying the identical call after such a crash is
+``remove_open_rows``, ``archive_settled_rows``, ``update_closing``,
+``review_loss``, ``score_research``), retrying the identical call after such a crash is
 genuinely idempotent -- e.g. ``settle`` short-circuits if the row is already
 settled with the same scores. ``append_evaluated`` is the one exception:
 its pick_id is a fresh ``uuid4()`` per call (not derived from the request),
@@ -852,6 +852,69 @@ class PickLedger:
                     )
                 self._write_rows(keep)
         return [row["pick_id"] for row in removed]
+
+    def archive_settled_rows(
+        self,
+        pick_ids: list[str],
+        reason: str,
+        archive_reference: str,
+    ) -> list[dict[str, str]]:
+        """Physically remove SETTLED rows for retired model versions, under
+        the ledger lock, with a real audit event per row.
+
+        ``remove_open_rows`` deliberately refuses settled rows -- that's a
+        real integrity safeguard (permanent historical record), not an
+        oversight, and this method does not weaken it: it is a distinct,
+        explicitly-invoked path for a distinct real need (2026-07-31,
+        operator-directed): archiving picks logged under model versions that
+        have since been fully retired and superseded (e.g. mlb-elo-trend-
+        lr-v5/v6, replaced by v7), so the live ledger reflects only current
+        models going forward.
+
+        Nothing is actually lost: the audit event below records the row's
+        COMPLETE content (every field), not just its id, so the full
+        historical record survives in the audit chain even after removal
+        from the live xlsx -- and the caller is expected to have already
+        written the same rows to a separate archive file
+        (``archive_reference`` records where, for traceability) before
+        calling this. ``reason`` and ``archive_reference`` are both
+        required and must be non-empty; there is no default/blank-reason
+        path, unlike some other mutations, because this one can't be
+        undone by re-settling or re-forecasting.
+
+        Returns the full removed rows (not just their ids), so the caller
+        can double check/log/re-verify precisely what left the ledger.
+        """
+        if not reason.strip():
+            raise ValueError("a removal reason is required")
+        if not archive_reference.strip():
+            raise ValueError("an archive_reference (where the rows were saved) is required")
+        requested = {str(pick_id) for pick_id in pick_ids if str(pick_id)}
+        if not requested:
+            return []
+        removed: list[dict[str, str]] = []
+        with self._lock():
+            self._migrate_if_needed()
+            rows = self._read_unlocked()
+            keep: list[dict[str, str]] = []
+            for row in rows:
+                if row["pick_id"] in requested and row["status"] == PickStatus.SETTLED.value:
+                    removed.append(row)
+                    continue
+                keep.append(row)
+            if removed:
+                for row in removed:
+                    self.audit.append(
+                        "settled_pick_archived",
+                        row["pick_id"],
+                        {
+                            "reason": reason,
+                            "archive_reference": archive_reference,
+                            "archived_row": dict(row),
+                        },
+                    )
+                self._write_rows(keep)
+        return removed
 
     def import_rows(
         self,

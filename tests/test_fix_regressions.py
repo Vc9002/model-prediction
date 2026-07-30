@@ -99,6 +99,52 @@ def test_remove_open_rows_requires_reason(tmp_path):
         ledger.remove_open_rows(["anything"], reason="  ")
 
 
+def test_archive_settled_rows_removes_settled_but_not_open(tmp_path):
+    """archive_settled_rows is the deliberate counterpart to
+    remove_open_rows -- it ONLY removes settled rows (the opposite
+    filter), for a distinct real need (retired model versions), not a
+    weakening of remove_open_rows's own settled-row refusal."""
+    ledger, open_research, staked, settled = _seed_ledger(tmp_path)
+    removed = ledger.archive_settled_rows(
+        [open_research["pick_id"], staked["pick_id"], settled["pick_id"]],
+        reason="retired model version test cleanup",
+        archive_reference="data/archive/test-archive.xlsx",
+    )
+    assert [row["pick_id"] for row in removed] == [settled["pick_id"]]
+    remaining = {row["pick_id"] for row in ledger.rows()}
+    assert open_research["pick_id"] in remaining and staked["pick_id"] in remaining
+    assert settled["pick_id"] not in remaining
+    events = AuditLog(tmp_path / "events.jsonl").events()
+    archive_events = [e for e in events if e["event_type"] == "settled_pick_archived"]
+    assert len(archive_events) == 1
+    assert archive_events[0]["subject_id"] == settled["pick_id"]
+    assert archive_events[0]["payload"]["reason"] == "retired model version test cleanup"
+    assert archive_events[0]["payload"]["archive_reference"] == "data/archive/test-archive.xlsx"
+    # Full row content survives in the audit trail even after live removal.
+    assert archive_events[0]["payload"]["archived_row"]["pick_id"] == settled["pick_id"]
+    assert archive_events[0]["payload"]["archived_row"]["status"] == "settled"
+
+
+def test_archive_settled_rows_requires_reason_and_archive_reference(tmp_path):
+    ledger, *_ = _seed_ledger(tmp_path)
+    with pytest.raises(ValueError, match="reason"):
+        ledger.archive_settled_rows(["anything"], reason="  ", archive_reference="somewhere.xlsx")
+    with pytest.raises(ValueError, match="archive_reference"):
+        ledger.archive_settled_rows(["anything"], reason="valid reason", archive_reference="  ")
+
+
+def test_archive_settled_rows_is_idempotent_on_retry(tmp_path):
+    ledger, _open_research, _staked, settled = _seed_ledger(tmp_path)
+    first = ledger.archive_settled_rows(
+        [settled["pick_id"]], reason="cleanup", archive_reference="archive.xlsx"
+    )
+    assert len(first) == 1
+    second = ledger.archive_settled_rows(
+        [settled["pick_id"]], reason="cleanup", archive_reference="archive.xlsx"
+    )
+    assert second == []  # already gone -- retry is a safe no-op, not an error
+
+
 # ------------------------------------------------------- esports settlement
 
 
