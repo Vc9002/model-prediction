@@ -212,7 +212,7 @@ def test_matrix_reports_wiring_and_features_not_validation_stats() -> None:
     assert legacy["wired"] is False
 
     btts = next(r for r in rows if r["market"] == "BTTS")
-    assert btts["wired"] is False
+    assert btts["wired"] is True  # wired 2026-07-31; still prices 0 real contracts (no live market)
 
     dead_esports = next(r for r in rows if "CoD" in r["sport"])
     assert dead_esports["wired"] is False

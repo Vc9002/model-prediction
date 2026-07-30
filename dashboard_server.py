@@ -2119,14 +2119,24 @@ def matrix() -> dict:
             "sport": "MLB", "market": "Moneyline", "wired": True,
             "model": (
                 "learned_forward.py -- Elo + trend logistic regression "
-                f"({active_version('mlb')})"
+                f"({active_version('mlb')}); features: elo_probability, trend_gap, "
+                "park_factor, weather_factor, pitcher_era_gap, bullpen_weakness_gap "
+                "-- no probable_starter_era_gap (v6's contaminated ESPN-live-probables "
+                "feature, retired 2026-07-30). No confidence-threshold or "
+                "min-edge-vs-ask gate as of 2026-07-30 -- every real forecasted game "
+                "becomes a real, sized Main-ledger call; both numbers are still "
+                "recorded for manual review, not used to hide the row."
             ),
             "ledger": "Main + Flat",
         },
         {
             "sport": "MLB", "market": "Totals & Spread", "wired": True,
             "model": "models/mlb.py MeasuredEdgeTotalsModel/margin -- Gamma-Poisson mixture "
-            "Monte-Carlo, priced against real Polymarket lines closest to 50/50",
+            "Monte-Carlo (20000 sims), priced against real Polymarket lines closest to "
+            "50/50. Rebuilt 2026-07-30: real elasticities fit per factor (offense 0.035, "
+            "starter weakness 0.211, park 0.222, weather 0.021) replace the prior "
+            "assumed-1.0 multiplicative weight on each; bullpen elasticity fit "
+            "consistently negative/implausible and is zeroed rather than trusted.",
             "ledger": "Flat only",
         },
         {
@@ -2139,15 +2149,18 @@ def matrix() -> dict:
             "sport": "NBA", "market": "Moneyline", "wired": True,
             "model": (
                 "learned_forward.py -- Elo + trend logistic regression "
-                f"({active_version('nba')})"
+                f"({active_version('nba')}); features: elo_probability, trend_gap, "
+                "defensive_trend_gap. Not in PRODUCTION_SPORTS (domain.py) -- never "
+                "reaches Main regardless of real-world strength."
             ),
-            "ledger": "Main + Flat",
+            "ledger": "Flat only",
         },
         {
             "sport": "WNBA", "market": "Moneyline", "wired": True,
             "model": (
                 "learned_forward.py -- Elo + trend logistic regression "
-                f"({active_version('wnba')})"
+                f"({active_version('wnba')}); features: elo_probability, trend_gap, "
+                "defensive_trend_gap"
             ),
             "ledger": "Main + Flat",
         },
@@ -2155,9 +2168,11 @@ def matrix() -> dict:
             "sport": "NFL", "market": "Moneyline", "wired": True,
             "model": (
                 "learned_forward.py -- Elo + trend logistic regression "
-                f"({active_version('nfl')})"
+                f"({active_version('nfl')}); features: elo_probability, trend_gap. "
+                "Not in PRODUCTION_SPORTS (domain.py) -- never reaches Main regardless "
+                "of real-world strength."
             ),
-            "ledger": "Main + Flat",
+            "ledger": "Flat only",
         },
         {
             "sport": "Soccer", "market": "Totals (2.5)", "wired": True,
@@ -2171,10 +2186,14 @@ def matrix() -> dict:
             "ledger": "Flat Research + Gated Research",
         },
         {
-            "sport": "Soccer", "market": "BTTS", "wired": False,
-            "model": "Model already computes it, but no BTTS market currently exists on "
-            "Polymarket US at all (live-verified) -- nothing to classify yet",
-            "ledger": "--",
+            "sport": "Soccer", "market": "BTTS", "wired": True,
+            "model": "Same score matrix, Platt-recalibrated (2026-07-31: raw joint-matrix "
+            "probability was overconfident, 55.0% real accuracy; calibrated to 56.7%). "
+            "Matching/pricing fully wired (soccer_forward.py), but no BTTS market has "
+            "ever been observed live on Polymarket US (checked across all 19 configured "
+            "leagues and 4 real captured days) -- activates automatically, no further "
+            "code changes, once one appears and its raw market type is confirmed.",
+            "ledger": "Flat Research + Gated Research (currently prices 0 -- no real market exists yet)",
         },
         {
             "sport": "Tennis", "market": "Moneyline", "wired": True,
@@ -2186,7 +2205,11 @@ def matrix() -> dict:
         {
             "sport": "LOL / CS2 / DOTA2 / VALORANT / Rainbow Six", "market": "Moneyline", "wired": True,
             "model": "esports.py -- result-based neutral Elo, Platt-scaled, refreshed from "
-            f"bo3.gg before every forecast; active config: {esports_versions}",
+            f"bo3.gg before every forecast; active config: {esports_versions}. Gated "
+            "Research's research_confidence_gate raised 2026-07-31 (was 0.0 for every "
+            "title, barely filtering anything -- real settled Gated picks were "
+            "performing worse than unfiltered Research) to each title's own already-"
+            "validated confidence_threshold: LOL/DOTA2/VALORANT 0.05, CS2/Rainbow Six 0.03.",
             "ledger": "Flat Research + Gated Research",
         },
         {
