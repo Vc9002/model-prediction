@@ -1,17 +1,29 @@
 {
   "created_utc": "2026-07-31",
-  "reason": "retired model version (mlb-elo-trend-lr-v5/v6, fully superseded by v7 on 2026-07-30) -- archived per operator direction",
+  "reason": "retired model version/calibration (mlb-elo-trend-lr-v5/v6 fully superseded by v7; Measured Edge margin/totals calibration superseded by the 2026-07-30/31 elasticity rebuild + ingest-staleness fix) -- archived per operator direction",
   "results": {
     "main": {
       "archived": 29,
       "removed": 29,
-      "archive_path": "data/archive/2026-07-31-retired-mlb-model-picks/main_retired_mlb_picks_archive.xlsx"
+      "archive_path": "data/archive/2026-07-31-retired-mlb-model-picks/main_retired_mlb_picks_archive.xlsx",
+      "scope": "mlb-elo-trend-lr-v5/v6 (distinct model_version string, superseded by v7)"
     },
-    "flat": {
+    "flat_moneyline": {
       "archived": 89,
       "removed": 89,
-      "archive_path": "data/archive/2026-07-31-retired-mlb-model-picks/flat_retired_mlb_picks_archive.xlsx"
+      "archive_path": "data/archive/2026-07-31-retired-mlb-model-picks/flat_retired_mlb_picks_archive.xlsx",
+      "scope": "mlb-elo-trend-lr-v5/v6 (distinct model_version string, superseded by v7)"
+    },
+    "flat_measured_edge": {
+      "archived": 74,
+      "removed": 74,
+      "archive_path": "data/archive/2026-07-31-retired-mlb-model-picks/flat_retired_measured_edge_calibrations_archive.xlsx",
+      "scope": "measured-edge-margin-v1/totals-v1 (SAME model_version string, but calibration_artifact_hash from two now-superseded generations: the 2026-07-29 pre-elasticity fit, and the first 2026-07-30 elasticity rebuild that used stale ingest data before the ingest.py cache-staleness bug was found and fixed). Only rows matching the current, final calibration hash were kept live."
     }
   },
-  "note": "Research/Gated Research ledgers had no old-model-version rows to archive at the time of this operation -- every esports/soccer/tennis title has only ever used a single model_version string (e.g. lol-tiered-elo-v4), even though calibration/K-values were refreshed internally without a version bump. No archive files were created for those two ledger types since there was nothing to archive; this manifest documents that as a real, checked finding, not an oversight."
+  "explicitly_left_alone": {
+    "esports": "LOL/CS2/Dota2/Valorant show 16-23 distinct calibration_artifact_hash values each in Research/Gated Research, because ratings auto-refresh continuously (daily) as new match results accumulate -- this is expected, ongoing model behavior, not a retired model. Archiving every non-current hash would remove ~90%+ of existing history now and require repeating the same mass-removal every future day. Operator-confirmed 2026-07-31: leave esports alone.",
+    "soccer": "research/soccer.xlsx showed 2 distinct hashes, but checked directly: the change is a coincidental side effect of adding BTTS calibration code to models/soccer.py (which shifted the whole file's hash, used as calibration_artifact_hash for every soccer prediction including moneyline/totals), not a real change to the moneyline/totals math itself. The 17 settled 'old-hash' rows are still genuinely representative of the current model and were not archived.",
+    "tennis_kbo_npb": "single model_version and single calibration hash each -- nothing to archive."
+  }
 }
