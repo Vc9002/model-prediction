@@ -1038,19 +1038,27 @@ def _forecast_learned_sport(
                         }
                     )
                     continue
-            # Gate: require minimum edge over executable Polymarket ask.
-            # Per-sport minimum edge from model.yaml; defaults to 2% absolute.
-            # Flat mode bypasses the edge gate — log every call regardless.
-            if not flat_mode and quote is not None:
+            # Operator directive (2026-07-30): the minimum-edge-vs-executable-
+            # ask check no longer hides a candidate from the ledger. Sizing
+            # (edge_scaled_units, applied downstream in evaluate_eligibility)
+            # is driven by the model's own confidence distance from 50/50,
+            # not by this vs-market number, so removing this gate does not
+            # risk generously sizing a trade the model itself considers bad
+            # -- it only stops hiding the row before a human ever sees it.
+            # model_edge is still computed and recorded below (rationale)
+            # purely as a reference: how much the model currently disagrees
+            # with the executable market price. Flat mode already bypassed
+            # this; now every mode does.
+            model_edge = None
+            if quote is not None:
                 min_edge = float(model_config.get("min_edge", 0.02))
                 model_edge = candidate.model_probability - quote["executable_ask"]
                 if model_edge < min_edge:
                     edge_pct = f"{min_edge*100:.0f}%"
                     edge_blocked.append(
                         {"event_id": candidate.event_id,
-                         "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f}"}
+                         "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f} — logged anyway, operator review"}
                     )
-                    continue
             # Convert UTC event time to Eastern for consistent ledger display
             try:
                 event_et = datetime.fromisoformat(candidate.event_start_utc.replace('Z','+00:00')).astimezone(EASTERN).strftime('%Y-%m-%dT%H:%M:%S%z')
@@ -1064,7 +1072,7 @@ def _forecast_learned_sport(
                 rationale = (
                     f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
                     f"executable ask {quote['executable_ask']:.4f} "
-                    f"({quote['market_slug']})."
+                    f"({quote['market_slug']}); model edge vs ask {model_edge:+.4f}."
                 )
             else:
                 american_odds = -110
@@ -1215,7 +1223,7 @@ def _forecast_learned_sport(
             f"Flat mode: logged {len(logged)} of {len(candidates)} games "
             f"({len(calls)} above threshold); "
             f"{len(duplicates)} duplicates, {len(unmatched)} without a matched quote, "
-            f"{len(edge_blocked)} blocked by edge gate."
+            f"{len(edge_blocked)} below min-edge (logged anyway, operator review)."
         )
     elif not calls:
         logging_note = "No calls above the learned confidence threshold."
@@ -1223,7 +1231,7 @@ def _forecast_learned_sport(
         logging_note = (
             f"Logged {len(logged)} of {len(calls)} calls against stored executable asks; "
             f"{len(duplicates)} duplicates, {len(unmatched)} without a matched quote, "
-            f"{len(edge_blocked)} blocked by edge gate."
+            f"{len(edge_blocked)} below min-edge (logged anyway, operator review)."
         )
     return {
         "sport": sport,
