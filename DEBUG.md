@@ -4,6 +4,29 @@
 section and everything after it remains useful history but is now
 superseded wherever they overlap)
 
+## 2026-07-31 (later) — archived retired-model settled picks; new ledger capability
+
+Operator directive: archive picks logged under fully-retired model versions
+so the live ledgers reflect only current models. `remove_open_rows`
+deliberately refuses settled rows (permanent record safeguard), so this
+required a genuinely new capability, not a workaround: `ledger.py`'s
+`archive_settled_rows(pick_ids, reason, archive_reference)` -- same audited
+rigor as `remove_open_rows` (lock-held, audit-first, required non-empty
+reason), but the opposite filter (settled only), and the audit event
+records the row's COMPLETE content so nothing is actually lost even after
+live removal. Added tests (mirrors `remove_open_rows`'s own test, plus
+idempotency and required-fields checks).
+
+Applied for real: 29 rows (Main, `mlb-elo-trend-lr-v5`/`v6`) and 89 rows
+(Flat, same versions) archived to
+`data/archive/2026-07-31-retired-mlb-model-picks/{main,flat}_retired_mlb_picks_archive.xlsx`
+and removed from the live ledgers. Verified: 118 real `settled_pick_archived`
+audit events written, `verify-chain` still clean (0 breaks), full test suite
+green. Research/Gated Research had nothing to archive -- checked first:
+every esports/soccer/tennis title has only ever used one `model_version`
+string, even though calibration was refreshed internally without a version
+bump, so there was no "old version" to separate out.
+
 ## 2026-07-31 — soccer/esports validation, MLB gate removal, Gated Research tightened
 
 Soccer's Poisson-DC model (`soccer-poisson-dc-v1`) genuinely qualifies against

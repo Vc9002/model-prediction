@@ -1,0 +1,17 @@
+{
+  "created_utc": "2026-07-31",
+  "reason": "retired model version (mlb-elo-trend-lr-v5/v6, fully superseded by v7 on 2026-07-30) -- archived per operator direction",
+  "results": {
+    "main": {
+      "archived": 29,
+      "removed": 29,
+      "archive_path": "data/archive/2026-07-31-retired-mlb-model-picks/main_retired_mlb_picks_archive.xlsx"
+    },
+    "flat": {
+      "archived": 89,
+      "removed": 89,
+      "archive_path": "data/archive/2026-07-31-retired-mlb-model-picks/flat_retired_mlb_picks_archive.xlsx"
+    }
+  },
+  "note": "Research/Gated Research ledgers had no old-model-version rows to archive at the time of this operation -- every esports/soccer/tennis title has only ever used a single model_version string (e.g. lol-tiered-elo-v4), even though calibration/K-values were refreshed internally without a version bump. No archive files were created for those two ledger types since there was nothing to archive; this manifest documents that as a real, checked finding, not an oversight."
+}
