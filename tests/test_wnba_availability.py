@@ -402,14 +402,23 @@ def test_gate_logs_on_skip(caplog) -> None:
 
 
 def test_gate_reason_action_consistency() -> None:
-    """reason and action must agree: both CALL or both NO_CALL."""
-    # Verify the code pattern — these two strings are the only possible values
-    # The gate sets both action and reason from the same `call` boolean
-    call_action_pairs = {
-        True: "QUALIFIED_SHADOW_CALL",
-        False: "NO_CALL_BELOW_LEARNED_CONFIDENCE",
-    }
-    for call, expected_action in call_action_pairs.items():
-        reason = "CALL_LEARNED_CONFIDENCE" if call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
-        assert (reason == "CALL_LEARNED_CONFIDENCE") == call
-        assert (expected_action == "QUALIFIED_SHADOW_CALL") == call
+    """Operator directive (2026-07-30): `call` is always True and `action` is
+    always QUALIFIED_SHADOW_CALL regardless of the model's own confidence --
+    the learned confidence threshold no longer gates whether a candidate is
+    a real, sized call. `reason` alone still distinguishes whether this
+    candidate cleared its own confidence threshold, purely as an
+    informational signal for a human reviewing the pick."""
+    for cleared_confidence_threshold, expected_reason in (
+        (True, "CALL_LEARNED_CONFIDENCE"),
+        (False, "CALL_BELOW_LEARNED_CONFIDENCE_OPERATOR_REVIEW"),
+    ):
+        call = True
+        action = "QUALIFIED_SHADOW_CALL"
+        reason = (
+            "CALL_LEARNED_CONFIDENCE"
+            if cleared_confidence_threshold
+            else "CALL_BELOW_LEARNED_CONFIDENCE_OPERATOR_REVIEW"
+        )
+        assert call is True
+        assert action == "QUALIFIED_SHADOW_CALL"
+        assert reason == expected_reason

@@ -332,12 +332,26 @@ def build_learned_moneyline_slate(
                 dict.fromkeys((*unavailable_features, *availability_notes))
             )
 
-            # Recompute selection/call/action/reason from (possibly adjusted) probability
+            # Recompute selection/call/action/reason from (possibly adjusted) probability.
+            # Operator directive (2026-07-30): every candidate is a real,
+            # sized call regardless of the model's own learned confidence
+            # threshold -- that threshold is kept on the candidate purely as
+            # a reference number (confidence_threshold below) so a human can
+            # see how confident the model was and decide for themselves
+            # whether to act on it. This was previously a hard gate (below
+            # threshold = zero-unit NO_CALL, never reaching the main
+            # ledger); removed because it hid real, sized picks from the
+            # person meant to make the final bet/no-bet decision.
             selection = "home" if home_probability >= 0.5 else "away"
             model_probability = home_probability if selection == "home" else (1 - home_probability)
-            call = model_probability >= confidence_threshold
-            action = "QUALIFIED_SHADOW_CALL" if call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
-            reason = "CALL_LEARNED_CONFIDENCE" if call else "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+            call = True
+            cleared_confidence_threshold = model_probability >= confidence_threshold
+            action = "QUALIFIED_SHADOW_CALL"
+            reason = (
+                "CALL_LEARNED_CONFIDENCE"
+                if cleared_confidence_threshold
+                else "CALL_BELOW_LEARNED_CONFIDENCE_OPERATOR_REVIEW"
+            )
             basis = _build_basis(features, home_trend, away_trend, len(history))
             snap_hash = _feature_hash(key, game_date, event_id, basis)
             

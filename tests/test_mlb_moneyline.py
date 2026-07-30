@@ -241,12 +241,18 @@ def test_insufficient_team_history_skips_event(tmp_path):
     assert "insufficient_team_history" in skipped[0]["reason"]
 
 
-def test_below_threshold_produces_no_call(tmp_path):
-    """A low-confidence prediction should still produce a candidate with call=False."""
+def test_below_threshold_still_produces_a_real_call(tmp_path):
+    """Operator directive (2026-07-30): the learned confidence threshold no
+    longer gates whether a candidate is a real, sized call -- every
+    candidate is call=True regardless of confidence, so a human can review
+    and decide rather than having sub-threshold picks silently zeroed out
+    before they're ever seen. confidence_threshold is still recorded (and
+    whether this candidate cleared it, via `reason`) purely as a reference
+    number."""
     _write_history(tmp_path)
     artifact_path = tmp_path / "artifact.json"
-    # Intercept=0 + all-zero coefs → 50/50 probability. Threshold 0.95 ensures
-    # neither side clears, producing a no-call.
+    # Intercept=0 + all-zero coefs → 50/50 probability. Threshold 0.95 means
+    # this would have failed the old gate -- it must not fail the new one.
     _write_artifact(artifact_path, threshold=0.95, intercept=0.0,
                     coefficients=[0.0], feature_names=["elo_probability"])
 
@@ -260,9 +266,10 @@ def test_below_threshold_produces_no_call(tmp_path):
     )
 
     c = candidates[0]
-    assert c.call is False
-    assert c.action == "NO_CALL_BELOW_LEARNED_CONFIDENCE"
-    assert c.reason == "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+    assert c.call is True
+    assert c.action == "QUALIFIED_SHADOW_CALL"
+    assert c.reason == "CALL_BELOW_LEARNED_CONFIDENCE_OPERATOR_REVIEW"
+    assert c.confidence_threshold == 0.95  # still reported, just not a gate
 
 
 def test_unqualified_artifact_still_produces_candidates(tmp_path):
