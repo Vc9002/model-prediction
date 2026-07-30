@@ -1,13 +1,13 @@
 {
-  "artifact_hash": "c05bda6086190b5b398519d3b57b0edba8160090cd5e3c9cb0614cecfbf03f01",
+  "artifact_hash": "2bc2ce55b0d39a20103f724bbddbde5394909acd49297f52665b596a0ae3ae8b",
   "base_score_model_version": "mlb-analyst-poisson-trend-v0.2",
   "calibration_method": "flat_probability_shrinkage_toward_half",
-  "calibration_note": "Refit 2026-07-29 from a real walk-forward backtest: 162 real MLB games (2026-07-01 to 2026-07-12) with real historical Polymarket-reconstructed spread lines, real final scores, and point-in-time-correct reconstructed features (team form, starter ERA, real bullpen data, real empirical park factors, real historical weather). OLS fit of raw simulated cover probability against actual cover outcome. Correlation with real outcomes was weak but consistently positive across four independent formula revisions during this investigation (0.045-0.12) -- real, small signal, not fabricated confidence. Superseded the prior 0.85/0.075 placeholder, which was an unfit reasoned default identical to (and therefore not independently derived from) the totals artifact.",
+  "calibration_note": "Rebuilt 2026-07-30: the Trend Engine's estimate_runs() formula was changed from an implicit exponent-1.0 assumption on every factor (offense, opposing starter weakness, opposing bullpen weakness, park, weather) to real elasticities fit via a Poisson GLM against 629 real games spanning 2024-02 to 2026-07 (see mlb-analyst-poisson-trend-v0.2.yaml's offense_elasticity etc. and its comments for the full fit methodology and chronological cross-validation). This artifact's own scale/offset were then refit the same way as the 2026-07-29 version: OLS of the REBUILT formula's raw simulated cover probability against real cover outcomes, same 162-game/2026-07-01..07-12 window (real historical Polymarket-reconstructed spread lines, real final scores, point-in-time-correct features). Correlation with real outcomes: 0.062 (previous four formula revisions on 2026-07-29 ranged 0.045-0.12, so this sits within that range -- margin did not improve much from the elasticity rebuild, unlike totals; see measured-edge-totals-v1.json for that result). Flat -110 diagnostic: 80 selected picks, 53.7% hit rate, +2.09 units. Still real but small evidence on a 162-game sample -- treat as diagnostic, not proof, same as before.",
   "calibration_version": "measured-edge-margin-v1",
   "model_name": "Measured Edge Margin",
   "model_version": "measured-edge-margin-v1",
-  "offset": 0.4667,
-  "scale": 0.1007,
+  "offset": 0.4236,
+  "scale": 0.1965,
   "trained_on_games": 162,
   "trained_through_date": "2026-07-12"
 }

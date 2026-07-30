@@ -1,17 +1,13 @@
 {
-  "artifact_hash": "57de3d47944562994a5b1afaec1ed80c7d895d39fce98e14c1dee1a330df60d1",
+  "artifact_hash": "cbc2c9bf5a9569a49e1902c816d96556d704cf10819ca3a9e927721685757d0b",
   "base_score_model_version": "mlb-analyst-poisson-trend-v0.2",
   "calibration_method": "flat_probability_shrinkage_toward_half",
-  "calibration_note": "Refit 2026-07-29 alongside measured-edge-margin-v1 in the same real backtest. Superseded the prior 0.85/0.075 placeholder, which was an unfit reasoned default identical to (and therefore not independently derived from) the margin artifact. See qualification.evidence for why this model is flagged unproven rather than given its own literal fit.",
+  "calibration_note": "Rebuilt 2026-07-30 alongside measured-edge-margin-v1 -- same elasticity change to estimate_runs() (see that artifact's note and mlb-analyst-poisson-trend-v0.2.yaml). Unlike margin, totals shows a real, meaningful improvement from the rebuild: raw simulated over-probability correlation with actual over/under outcomes on the same real 162-game/2026-07-01..07-12 backtest went from -0.019..-0.123 (2026-07-29, four formula revisions, all at/below zero -- statistically indistinguishable from no skill) to +0.166 with the rebuilt formula. This is the first time this project has seen positive real signal on MLB totals. Scale/offset here ARE now fit directly from this model's own OLS regression (previously they borrowed margin's fit because the totals-specific fit was degenerate/negative -- no longer the case). Flat -110 diagnostic: 91 selected picks, 56.0% hit rate, +6.36 units. Still only 162 real games and one 12-day window -- promising, not proven; keep model_state/units at research/zero until this holds up on new, independent real settled history.",
   "calibration_version": "measured-edge-totals-v1",
   "model_name": "Measured Edge Totals",
   "model_version": "measured-edge-totals-v1",
-  "offset": 0.4496,
-  "qualification": {
-    "evidence": "A real walk-forward backtest (160 real MLB games, 2026-07-01 to 2026-07-12, real historical over/under lines, real final scores, point-in-time-correct features) showed raw simulated over-probability correlation with actual over/under outcomes at or below zero across four independent formula revisions during this investigation (-0.019 to -0.123) -- statistically indistinguishable from no real skill, not merely miscalibrated. The scale/offset here are NOT fit from that noisy near-zero result (which would have produced a negative/degenerate scale); they instead reuse margin's real, positive, if weak, fitted shrinkage as the most conservative available estimate, centered at 0.5. Treat this model's picks as diagnostic only until real accumulating settled history (or a structural model change) provides real evidence otherwise -- do not present them as a tail-worthy edge.",
-    "insufficient_real_signal": true
-  },
-  "scale": 0.1007,
-  "trained_on_games": 160,
+  "offset": -0.0005,
+  "scale": 0.9701,
+  "trained_on_games": 162,
   "trained_through_date": "2026-07-12"
 }

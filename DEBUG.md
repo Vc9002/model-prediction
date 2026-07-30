@@ -21,6 +21,77 @@ the operator separately authorizes that state change.
 The source tree was changing during this audit. Re-run the checks before acting
 on any line number or count.
 
+## 2026-07-30 — MLB Measured Edge rebuild: real elasticities replace the assumed-1.0 multiplicative formula
+
+The 2026-07-29 investigation fixed four real data bugs (weather, starter ERA
+shrinkage, bullpen shrinkage, park factors) but the resulting model still
+showed weak-to-nonexistent real correlation on a 162-game/12-day backtest
+(margin 0.045-0.12, totals ~0 or negative) -- concluded at the time as a
+likely structural limit of the formula itself: `estimate_runs()` combines
+offense/starter-weakness/bullpen/park/weather multiplicatively with an
+*implicit, never-fit* exponent of 1.0 on every one of them (`league_avg *
+factor1 * factor2 * ...`), assuming each factor should move the run
+estimate exactly proportionally. Operator asked to rebuild rather than
+accept that ceiling.
+
+**Real refit**: collected point-in-time features (`reconstructed_features`)
+and real final scores for 629 real games spanning 2024-02 to 2026-07 (vs.
+the previous 162-game/12-day window -- far too narrow to safely fit five
+new parameters), sampling every 8th real game-date for season/park/weather
+coverage. Fit a Poisson GLM (log link) on `log(runs) ~ elasticity *
+log(factor)` per factor, pooling both team-game sides of every game.
+Validated via 4 chronological expanding-window folds before trusting any
+single number (real risk here: point estimates are noisy at this sample
+size and can flip sign fold-to-fold at these correlation magnitudes).
+
+Real fitted elasticities (alpha=0.05 L2, chosen from the middle of the
+tested range 0/0.02/0.05/0.1 since fold performance was similar across all
+of them): `offense_elasticity=0.035`, `starter_weakness_elasticity=0.211`,
+`park_elasticity=0.222`, `weather_elasticity=0.021`. Every one of these is
+real but far below the previously-assumed 1.0 -- the formula had been
+letting every factor swing the run estimate much harder than the real data
+supports. `bullpen_elasticity` fit consistently **negative** across every
+alpha and fold (worse opposing bullpen correlating with *fewer* runs
+allowed) -- baseball-implausible given the feature's own definition, most
+likely selection bias in which relief inning gets recorded (a leading
+team's closer vs. a trailing team's mop-up arm), not real signal. Confirmed
+dropping the feature entirely gives statistically indistinguishable holdout
+performance from including it at its negative fit, so clipped to `0.0`
+rather than trusted. Full reasoning lives in
+`mlb-analyst-poisson-trend-v0.2.yaml`'s comments.
+
+**Wired in**: `FormulaSpec` gained the five elasticity fields (required in
+`load_formula_spec`, no silent defaulting); `estimate_runs()` now applies
+`factor ** elasticity` instead of `factor` directly -- elasticity=1.0 is a
+strict no-op vs. the pre-rebuild formula, so this is a generalization, not
+a rewrite. New tests (`tests/test_mlb_elasticities.py`) verify the
+exponentiation mechanism itself (zero elasticity nullifies a factor,
+elasticity=1.0 reproduces exact pre-rebuild multiplication, fractional
+elasticity dampens the swing) independent of which real values were fit.
+
+**Recalibrated against the same real 162-game/2026-07-01..07-12 backtest**
+used on 2026-07-29 (OLS of raw simulated probability vs. real outcome, same
+methodology, both margin and totals artifacts rewritten with real new
+hashes):
+
+| Market | 2026-07-29 correlation | 2026-07-30 rebuilt correlation | Flat -110 diagnostic |
+|---|---|---|---|
+| Margin (spread cover) | 0.045-0.12 | **0.062** (within the old range -- rebuild didn't move margin much) | 80 picks, 53.7% hit, +2.09u |
+| Totals (over/under) | ~0 or negative | **+0.166** (real, meaningful improvement -- first time this project has seen positive real signal on MLB totals) | 91 picks, 56.0% hit, +6.36u |
+
+Honest caveat, stated the same way as every prior number in this
+investigation: still only 162 real games, one 12-day window. Totals'
+improvement is the most encouraging result of this whole MLB investigation
+so far, but one backtest window is promising, not proven -- `model_state`/
+units stay at research/zero (`qualification.insufficient_real_signal` was
+removed from the totals artifact since it's no longer accurate, but no
+qualification/promotion claim was added either). Live-verified: `build_mlb_slate`
+against the real 2026-07-30 slate produces 27 real priced candidates across
+9 real games with no new errors.
+
+Full test suite: **481 passed** (3 new). Ruff: **117 findings**, same
+baseline. `verify-chain`: 0 breaks, `chain_intact: true`.
+
 ## 2026-07-30 — esports/soccer side-selection: investigated, "fixed," then reverted per operator design decision
 
 Found that `_log_esports_forecast` (`cli.py`) and `build_soccer_total_slate`

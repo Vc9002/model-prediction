@@ -57,6 +57,11 @@ class FormulaSpec:
     walk_weight: float
     home_field_run_factor: float
     away_field_run_factor: float
+    offense_elasticity: float
+    starter_weakness_elasticity: float
+    bullpen_elasticity: float
+    park_elasticity: float
+    weather_elasticity: float
     factor_bounds: dict[str, tuple[float, float]]
     uncertainty: dict[str, float]
     simulation: dict[str, Any]
@@ -156,6 +161,8 @@ def load_formula_spec(path: str | Path) -> FormulaSpec:
     required = {
         "seed_method", "factor_bounds", "uncertainty", "simulation",
         "league_runs_per_team_game", "league_starter_era",
+        "offense_elasticity", "starter_weakness_elasticity", "bullpen_elasticity",
+        "park_elasticity", "weather_elasticity",
     }
     missing = sorted(required - set(raw))
     engine_sim_fields = {"simulations", "shared_environment_variance", "team_specific_variance"}
@@ -185,6 +192,11 @@ def load_formula_spec(path: str | Path) -> FormulaSpec:
         walk_weight=float(raw["walk_weight"]),
         home_field_run_factor=float(raw["home_field_run_factor"]),
         away_field_run_factor=float(raw["away_field_run_factor"]),
+        offense_elasticity=float(raw["offense_elasticity"]),
+        starter_weakness_elasticity=float(raw["starter_weakness_elasticity"]),
+        bullpen_elasticity=float(raw["bullpen_elasticity"]),
+        park_elasticity=float(raw["park_elasticity"]),
+        weather_elasticity=float(raw["weather_elasticity"]),
         factor_bounds=bounds,
         uncertainty={key: float(value) for key, value in raw["uncertainty"].items()},
         simulation=raw["simulation"],
@@ -202,22 +214,29 @@ def estimate_runs(features: MLBGameFeatures, spec: FormulaSpec) -> RunEstimate:
     home_bullpen = _clip(features.home_bullpen_weakness, spec.factor_bounds["bullpen_weakness"])
     park = _clip(features.park_factor, spec.factor_bounds["park"])
     weather = _clip(features.weather_factor, spec.factor_bounds["weather"])
+    # Elasticities (added 2026-07-30) replace the previous implicit
+    # assumption that every factor moves the run estimate exactly
+    # proportionally (exponent 1.0). Fit via a real Poisson regression
+    # against 629 real games spanning 2024-02..2026-07 (the 2026-07-29
+    # backtest's 162-game/12-day window was too narrow to fit this safely).
+    # See mlb-analyst-poisson-trend-v0.2.yaml for the fitted values and the
+    # full rebuild rationale, including why bullpen_elasticity is 0.0.
     away_expected = (
         spec.league_runs_per_team_game
-        * away_offense
-        * home_starter_weakness
-        * home_bullpen
-        * park
-        * weather
+        * away_offense ** spec.offense_elasticity
+        * home_starter_weakness ** spec.starter_weakness_elasticity
+        * home_bullpen ** spec.bullpen_elasticity
+        * park ** spec.park_elasticity
+        * weather ** spec.weather_elasticity
         * spec.away_field_run_factor
     )
     home_expected = (
         spec.league_runs_per_team_game
-        * home_offense
-        * away_starter_weakness
-        * away_bullpen
-        * park
-        * weather
+        * home_offense ** spec.offense_elasticity
+        * away_starter_weakness ** spec.starter_weakness_elasticity
+        * away_bullpen ** spec.bullpen_elasticity
+        * park ** spec.park_elasticity
+        * weather ** spec.weather_elasticity
         * spec.home_field_run_factor
     )
     components = _uncertainty_components(features, spec)

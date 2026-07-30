@@ -33,6 +33,34 @@ factor_bounds:
   - 2.0
 feature_schema_version: v3
 formula_version: mlb-analyst-poisson-trend-v0.2
+# Elasticities on each run-scaling factor below (offense, opposing starter
+# weakness, opposing bullpen weakness, park, weather) -- added 2026-07-30.
+# Previously every factor implicitly had exponent 1.0 (assumed to move the
+# run estimate exactly proportionally); a real Poisson GLM fit against 629
+# real games (2024-02..2026-07, reconstructed_features against real box
+# scores -- far more than the 2026-07-29 backtest's 162-game/12-day window)
+# showed every one of them is real but much weaker than 1.0 in practice.
+# Fit via chronological expanding-window cross-validation (4 folds); alpha
+# 0.05 L2 regularization chosen as a middle ground across the tested range
+# (0, 0.02, 0.05, 0.1), since fold-to-fold performance was similar across
+# that range and this sits in the middle rather than at either boundary.
+# bullpen_elasticity's raw fit was consistently NEGATIVE across every alpha
+# and every fold's point estimate (worse opposing bullpen -> fewer runs
+# allowed) -- baseball-implausible given how the feature is defined higher
+# is supposed to mean weaker/more runs-prone), most likely selection bias in
+# which relief innings get recorded (a leading team's best reliever closes
+# it out; a trailing team's mop-up arm eats innings), not a real causal
+# effect. Clipped to 0.0 rather than trusted -- confirmed dropping the
+# feature entirely gives statistically indistinguishable holdout
+# correlation from including it at its negative fit, so 0.0 costs nothing
+# real. Re-fit periodically alongside the other season-dependent baselines
+# (see mlb_baseline_refresh.py) once more real relief-appearance data
+# accumulates enough to test whether the selection-bias explanation holds.
+offense_elasticity: 0.035
+starter_weakness_elasticity: 0.211
+bullpen_elasticity: 0.0
+park_elasticity: 0.222
+weather_elasticity: 0.021
 home_field_run_factor: 1.04
 league_runs_per_team_game: 4.5493
 league_starter_era: 4.1958
