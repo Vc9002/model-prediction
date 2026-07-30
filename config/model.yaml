@@ -255,7 +255,16 @@ models:
     production_artifact: config/models/lol-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.0
-    research_confidence_gate: 0.0
+    # Raised from 0.0 (2026-07-31): real settled Gated Research picks were
+    # performing WORSE than unfiltered Research (46.4% vs 54.2% win rate) --
+    # confirmed the gate was doing almost no curation. Set to this artifact's
+    # own validated confidence_threshold (lol-tiered-elo-v4.json), the same
+    # distance-from-0.5 value the real accuracy-by-confidence table shows
+    # actually separates a meaningfully better-calibrated range (63.9% at
+    # 0.00 -> 74.9% at 0.15). Research (unfiltered, every priced game) is
+    # deliberately untouched -- only Gated (the "model says this is valid"
+    # tier) is tightened.
+    research_confidence_gate: 0.05
   CS2:
     family: neutral_series_elo
     status: shadow_qualified
@@ -267,7 +276,10 @@ models:
     production_artifact: config/models/cs2-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.01
-    research_confidence_gate: 0.0
+    # Raised from 0.0 (2026-07-31) -- see LOL's comment above for the full
+    # rationale. Value matches cs2-tiered-elo-v4.json's own validated
+    # confidence_threshold.
+    research_confidence_gate: 0.03
   DOTA2:
     family: neutral_series_elo
     status: shadow_qualified
@@ -279,7 +291,10 @@ models:
     production_artifact: config/models/dota2-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.02
-    research_confidence_gate: 0.0
+    # Raised from 0.0 (2026-07-31) -- see LOL's comment above for the full
+    # rationale. Value matches dota2-tiered-elo-v4.json's own validated
+    # confidence_threshold.
+    research_confidence_gate: 0.05
   VALORANT:
     family: neutral_series_elo
     status: shadow_qualified
@@ -291,7 +306,10 @@ models:
     production_artifact: config/models/valorant-tiered-elo-v4.json
     market_target: esports_match_winner
     min_edge: 0.02
-    research_confidence_gate: 0.0
+    # Raised from 0.0 (2026-07-31) -- see LOL's comment above for the full
+    # rationale. Value matches valorant-tiered-elo-v4.json's own validated
+    # confidence_threshold.
+    research_confidence_gate: 0.05
   RAINBOW_SIX:
     family: neutral_series_elo
     status: research
@@ -299,6 +317,11 @@ models:
     active_research_version: rainbow_six-tiered-elo-v4
     market_target: esports_match_winner
     min_edge: 0.02
+    # Added 2026-07-31, matching the other 4 titles' Gated tightening --
+    # value from rainbow_six-tiered-elo-v4.json's own validated
+    # confidence_threshold. Without this key, the code's own default (0.05)
+    # would silently apply instead of this title's real validated value.
+    research_confidence_gate: 0.03
     note: New 2026-07-27. Unlike LOL/CS2/DOTA2/VALORANT, not yet promoted to
       shadow_qualified via qualification_override -- that was a deliberate
       per-title operator review this title hasn't had yet.

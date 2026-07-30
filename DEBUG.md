@@ -1,8 +1,44 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-07-30 (see new section directly below; the 2026-07-29
+**Last audited**: 2026-07-31 (see new section directly below; the 2026-07-30
 section and everything after it remains useful history but is now
 superseded wherever they overlap)
+
+## 2026-07-31 — soccer/esports validation, MLB gate removal, Gated Research tightened
+
+Soccer's Poisson-DC model (`soccer-poisson-dc-v1`) genuinely qualifies against
+this project's own bar: 62.5% real locked-holdout hit rate, +90.4u, every
+month positive (`validation.py`'s `qualify_soccer_poisson_model`, previously
+never run against current data). Real settled Research picks confirm it:
+61.5% win rate (8-5, n=13) on real settled games, closely matching the
+backtest. No code changes needed -- it was already good, just never checked.
+
+Esports (5 titles) are also individually strong (65-71% locked-test accuracy,
+low calibration error) -- but real settled picks were running far below that
+(33-55%), and Gated Research was performing *worse* than unfiltered Research
+in every single title (e.g. LOL: 46.4% gated vs 54.2% research). Root cause,
+confirmed via `confidence_selection_on_validation`: accuracy climbs steadily
+with the model's own confidence (LOL 63.9% at zero threshold -> 74.9% at
+0.15), and Gated's `research_confidence_gate` was `0.0` for every title --
+barely filtering anything, so it wasn't curating for the better-calibrated
+range at all. Fixed: raised `research_confidence_gate` per title to match
+each artifact's own already-validated `confidence_threshold` (LOL/DOTA2/
+VALORANT 0.05, CS2/RAINBOW_SIX 0.03) -- not arbitrary numbers, the same
+values each artifact's own grid search already chose. Research (unfiltered)
+deliberately untouched.
+
+Operator directive, applied to MLB's learned moneyline path
+(`learned_forward.py`, shared by MLB/NBA/WNBA/NFL): the hard confidence
+threshold and the min-edge-vs-market gate in `cli.py` both used to silently
+skip a candidate from ever reaching the ledger. Both removed -- every
+candidate is now a real, sized call (sizing was already driven by the
+model's own confidence distance from 50/50, not by either gate, so removing
+them doesn't risk over-sizing a bad trade, only stops hiding the row). Both
+numbers are still recorded (`reason` field, rationale text) for a human to
+review before deciding whether to act. This is a deliberately different
+choice from esports' Gated tightening above -- explicit operator direction
+was "MLB: show me everything, I decide" vs. "esports: Research shows
+everything, Gated should mean something."
 
 **Project**: `/Users/vincentc9002/model prediction`
 
