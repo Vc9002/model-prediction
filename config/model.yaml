@@ -123,18 +123,19 @@ models:
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: 'v6 (2026-07-25): live pitcher-feature experiment,
-      operator-directed. Replaces the team-level pitcher_era_gap proxy with
-      probable_starter_era_gap (ESPN probables, real announced starter ERA).
-      Fitted on a 90-day recency-restricted window only (242 holdout calls,
-      single partial month) since ESPN''s probables endpoint returns
-      current/live ERA regardless of query date -- verified same pitcher/same
-      ERA 3 months apart -- so it cannot be honestly backtested on older
-      dates. qualified=false in the artifact itself; running live for
-      observation over the coming days before any real promotion decision.
-      v5 remains available as legacy_research_rollback.'
-    active_production_version: mlb-elo-trend-lr-v6
-    production_artifact: config/models/mlb-elo-trend-lr-v6.json
+    qualification_override_reason: 'v7 (2026-07-30): rebuilt via the project''s
+      own standard walk-forward pipeline (validation.py), replacing v6''s ad-hoc
+      90-day/242-call operator experiment on the contaminated probable_starter_era_gap
+      feature (retired). Full real dataset: 3784 train / 1076 validation / 1370
+      locked-holdout games. Best of 9 tested feature variants by locked-holdout
+      hit rate and units (58.0%, +27.5u/-110); qualified=false in the artifact
+      itself -- does not clear this project''s own 60% bar or monthly-consistency
+      check, but is real, honest, and not resting on a known-broken coefficient.
+      See the artifact''s training.note for the full rebuild rationale, including
+      why Platt recalibration was tested and rejected. v5 remains available as
+      legacy_research_rollback.'
+    active_production_version: mlb-elo-trend-lr-v7
+    production_artifact: config/models/mlb-elo-trend-lr-v7.json
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
     min_edge: 0.05

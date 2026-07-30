@@ -63,11 +63,31 @@ class Ingestor:
         raw_dir = self.raw_dir(sport_key, game_date)
         new_games: list[dict[str, Any]] = []
         fetched = skipped = errors = 0
+        is_past_date = date.fromisoformat(game_date) < eastern_today()
         for league in leagues:
             raw_path = raw_dir / f"scores_{league.lower()}.json"
-            if raw_path.exists():
+            cached_payload = json.loads(raw_path.read_text(encoding="utf-8")) if raw_path.exists() else None
+            # "Immutable" (module docstring) means a genuinely FINAL raw
+            # payload is never overwritten -- it does not mean a snapshot
+            # captured mid-day, while games were still STATUS_SCHEDULED/
+            # IN_PROGRESS, gets treated as the permanent record forever.
+            # Confirmed live: 2026-07-26's cache was written at 14:29 (before
+            # that evening's games), froze every event at STATUS_SCHEDULED,
+            # and every ingest since silently skipped re-fetching it --
+            # data/processed/mlb/games.jsonl (and the live Elo/trend features
+            # every forecast reads from it) went stale for days with no
+            # error. Only a past date's cache with zero completed events (an
+            # in-progress/pre-game snapshot) is treated as stale; a genuinely
+            # final historical payload is still never re-fetched.
+            cache_is_stale = (
+                cached_payload is not None
+                and is_past_date
+                and cached_payload.get("events")
+                and not ESPNClient.completed_games(cached_payload)
+            )
+            if cached_payload is not None and not cache_is_stale:
                 skipped += 1
-                payload = json.loads(raw_path.read_text(encoding="utf-8"))
+                payload = cached_payload
             else:
                 try:
                     payload = self.client.scoreboard(league, game_date)

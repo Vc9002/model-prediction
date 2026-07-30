@@ -192,3 +192,46 @@ def test_pitcher_gap_served_from_history_and_starter_gap_fails_closed(
     assert skipped == [
         {"event_id": "future-1", "reason": "moneyline missing learned features: ['starter_era_gap']"}
     ]
+
+
+def test_bullpen_weakness_gap_served_live_from_real_relief_functions(tmp_path, monkeypatch) -> None:
+    """v7 (2026-07-30) added bullpen_weakness_gap to the production moneyline
+    model -- confirmed live that no feature provider existed for it at all
+    (every real game skipped with "missing learned features"). This locks in
+    the fix: the feature must be computed live via features/bullpen.py's
+    real team_recent_relief_lines/bullpen_profile (the same functions
+    Measured Edge already serves live with), not left unwired."""
+    _write_history(tmp_path)
+    artifact_path = tmp_path / "artifact.json"
+    artifact = build_artifact(
+        sport="mlb",
+        model_version="mlb-bullpen-gap-test",
+        market_models={
+            "moneyline": {
+                "feature_names": ["bullpen_weakness_gap"],
+                "coefficients": [-1.0],
+                "intercept": 3.0,
+                "confidence_threshold": 0.8,
+                "positive_class": "home",
+            }
+        },
+        training={"market_inputs_used": False},
+        qualification={"qualified": False},
+    )
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    learned_forward._FEATURE_PROVIDERS.clear()
+    learned_forward._slate_cache.clear()
+
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="mlb",
+        game_date="2026-07-17",
+        store=FeatureStore(tmp_path),
+        client=FakeESPN(),
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
+    )
+    assert scheduled == 1
+    assert skipped == []  # not "missing learned features" -- the regression this guards against
+    assert len(candidates) == 1
+    assert "bullpen_weakness_gap" in candidates[0].feature_basis
+    assert isinstance(candidates[0].feature_basis["bullpen_weakness_gap"], float)

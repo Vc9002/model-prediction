@@ -13,6 +13,7 @@ from typing import Any
 
 from .domain import parse_utc
 from .features.base import FeatureStore
+from .features.bullpen import bullpen_profile, team_recent_relief_lines
 from .features.elo_ratings import build_elo
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
@@ -76,6 +77,20 @@ def _compute_features(
         features["pitcher_era_gap"] = pitcher_era_gap_from_history(
             history, home_team, away_team
         )
+    if "bullpen_weakness_gap" in wanted:
+        # Real per-team relief-appearance history (mlb_statsapi.py's boxscore
+        # snapshots), same functions Measured Edge already serves live with
+        # (features/bullpen.py) -- NOT validation.py's _load_bullpen_map,
+        # which is a historical event_id crosswalk with no path to a future
+        # game. home-minus-away, same sign convention as every other gap
+        # feature in this module.
+        home_weakness = bullpen_profile(
+            team_recent_relief_lines(home_team, event_start)
+        )["bullpen_weakness_index"]
+        away_weakness = bullpen_profile(
+            team_recent_relief_lines(away_team, event_start)
+        )["bullpen_weakness_index"]
+        features["bullpen_weakness_gap"] = round(home_weakness - away_weakness, 6)
     if wanted & AVAILABILITY_FEATURE_NAMES:
         if sport != "wnba":
             raise ValueError(

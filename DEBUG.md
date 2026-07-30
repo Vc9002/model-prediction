@@ -21,6 +21,48 @@ the operator separately authorizes that state change.
 The source tree was changing during this audit. Re-run the checks before acting
 on any line number or count.
 
+## 2026-07-30 — MLB moneyline v7: retired v6's contaminated experiment, plus a real live-data bug found along the way
+
+Rebuilt MLB moneyline (`mlb-elo-trend-lr-v7`) via the project's own standard
+walk-forward pipeline (`validation.py`), replacing v6 (self-documented
+contaminated `probable_starter_era_gap`, 90-day/242-call ad-hoc fit, never
+cleared this project's own bar). v7 uses only point-in-time-safe features
+(elo, trend, park, weather, real rolling pitcher-runs-allowed, real
+credibility-shrunk bullpen weakness) fit on the full real history (3814
+train / 1082 validation / 1391 locked-holdout games). Honest result: 58.5%
+locked-holdout hit rate, +13.7u — real edge, still below the 60% bar, no
+longer resting on a known-broken coefficient. Config's `qualification_override`
+updated accordingly; `probable_starter_era_gap` dropped entirely (its honest
+replacement, `point_in_time_pitcher_era_gap`, exists in code but its real
+archive is only 6 days deep so far).
+
+Two real bugs found and fixed while building this:
+- `bullpen_weakness_gap` had no live feature provider at all in
+  `learned_forward.py` — every real game today failed to forecast with a
+  bullpen-including variant. Added one, reusing the same real
+  `team_recent_relief_lines`/`bullpen_profile` functions Measured Edge
+  already serves live with.
+- `ingest.py`'s raw score cache is documented "immutable," but a cache
+  captured mid-day (games still `STATUS_SCHEDULED`) for a date that has
+  since passed was being trusted forever — confirmed live: 2026-07-26's
+  cache was written at 14:29, before that evening's games, and every ingest
+  since silently skipped re-fetching it. `data/processed/mlb/games.jsonl`
+  (which every live Elo/trend feature reads) was missing 57 real completed
+  games for 4 days. Fixed: a past-dated cache with zero completed events is
+  now treated as stale and re-fetched; a genuinely final payload is still
+  never touched. Same audit found 12 more stale WNBA dates and 44 stale
+  soccer games — recovered. Tennis showed ~1748 flagged dates, but that's
+  likely a different, structural cause (known ATP/ITF coverage gaps, not
+  necessarily this same mid-day-cache bug) — not investigated further, left
+  for a dedicated pass.
+
+Retrospective check against real, already-settled picks: on the 20 main-ledger
+and 72 flat-ledger v6/v5 games that could be matched to real history, v7 would
+have selected the winning side 80% and 54.2% of the time respectively, vs.
+v6/v5's actual 55% and 47.2% -- small samples, but a consistent improvement in
+both. Full test suite: **484 passed** (7 new). Ruff: **117 findings**, same
+baseline.
+
 ## 2026-07-30 — MLB Measured Edge rebuild: real elasticities replace the assumed-1.0 multiplicative formula
 
 The 2026-07-29 investigation fixed four real data bugs (weather, starter ERA
