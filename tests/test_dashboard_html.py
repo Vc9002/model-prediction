@@ -103,7 +103,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "const pregamePrice" in html
     assert "const entryPrice" in html
     assert "side-adjusted realized P&amp;L" in html
-    assert "Your-side price" in html
+    assert "<th>Entry</th><th>Decision</th><th>Spread</th><th>Slippage</th><th>Fees</th>" in html
     assert '"Odds"' not in html
     assert "shortDate" in html
     assert '"Game (ET)"' in html
@@ -157,7 +157,7 @@ def test_dashboard_wires_live_production_evidence_tab_into_refresh() -> None:
     assert 'id="productionEvidence"' in html
     assert 'id="featureRegistry"' in html
     assert 'api("/api/production-evidence")' in html
-    assert "renderProductionEvidence(evidence)" in html
+    assert "renderProductionEvidence(evidenceResult.value)" in html
     assert "featureRegistryHtml" in html
     assert "ACTIVE MODEL · scope: exact model version only" in html
     assert "P&amp;L is shadow/hypothetical" in html
@@ -165,6 +165,102 @@ def test_dashboard_wires_live_production_evidence_tab_into_refresh() -> None:
     assert "PROFITABILITY NOT ESTABLISHED" in html
     assert "keeps any positive out-of-sample contribution" in html
     assert "@media(max-width:600px)" in html
+
+
+def test_dashboard_exposes_live_health_and_applies_display_settings() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+
+    assert 'data-tab="health"' in html
+    assert 'id="tab-health"' in html
+    assert 'id="healthDataTable"' in html
+    assert "function renderHealth" in html
+    assert "data_sources" in html
+    assert "new ResizeObserver(syncStatusbarHeight)" in html
+    assert "Set 1U to this percentage of the live balance; adjusts up or down" in html
+    assert 'data-tab="perf">Performance<' in html
+
+    # Settings were previously persisted but never applied. All four ledger
+    # filters and the Today source loaders now honor the shared predicate.
+    assert "const passesDisplaySettings" in html
+    assert html.count("if(!passesDisplaySettings(p))return false;") == 4
+    assert html.count("passesDisplaySettings(p)&&todayPassesControls(p)&&etDate(start)===todayET()") == 2
+
+    # Today must use the real America/New_York conversion (including DST),
+    # respect "show settled" for supplemental ledgers, and avoid inflating a
+    # called-side probability with max(p, 1-p).
+    assert "start.startsWith(todayET())" not in html
+    assert "Math.max(p.model_probability,1-p.model_probability)" not in html
+    assert 'className="today-source"' in html
+
+
+def test_dashboard_operational_views_are_null_safe_filterable_and_accessible() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+
+    # One shared Performance surface replaces four drifting top-level tabs.
+    assert html.count('data-tab="perf"') == 1
+    assert 'data-tab="flat-perf"' not in html
+    assert 'data-tab="research-perf"' not in html
+    assert 'data-tab="gated-research-perf"' not in html
+    assert 'id="perfLedgerSelect"' in html
+    assert 'id="perfSportFilter"' in html
+    assert 'id="perfMode"' in html
+    assert "renderPerformanceCompare" in html
+    assert 'id="perfCompare"' in html
+
+    # Empty active-ledger states stay undefined instead of becoming green zeroes.
+    assert "const hasSettled=wins+losses>0" in html
+    assert "const winRate=hasSettled?wins/(wins+losses):null" in html
+    assert "const totalPnl=hasSettled?" in html
+    assert 'const rowPnl=isSettled?' in html
+    assert 'rowPnl==null?"—":fmt(rowPnl)' in html
+
+    # Purchase controls fail closed in the row instead of inviting a rejected click.
+    assert "if(p.buy_ready!==true)" in html
+    assert 'class="blocked-order"' in html
+    assert 'class="pill loss">Blocked' in html
+    assert 'aria-label="Purchase blocked:' in html
+
+    # Market/Today/Portfolio controls and their URL-backed state are first class.
+    for element_id in (
+        "marketMode",
+        "marketStaleMinutes",
+        "todaySport",
+        "todayMarket",
+        "todayActionable",
+        "folioFrom",
+        "folioTo",
+        "folioSport",
+        "folioMarket",
+        "folioType",
+        "folioAttribution",
+        "folioPageSize",
+    ):
+        assert f'id="{element_id}"' in html
+    assert 'api/live' in html
+    assert "quoteStateBadge" in html
+    assert "timeToStart" in html
+    assert "setUrlState" in html
+    assert "history.replaceState" in html
+
+    # Large/raw row payloads use a keyboard-accessible detail drawer.
+    assert 'id="drawer"' in html
+    assert 'role="dialog"' in html
+    assert "showPickDrawer" in html
+    assert "showMarketDrawer" in html
+    assert "showFolioDrawer" in html
+    assert 'event.key==="Escape"' in html
+    assert 'role="button"' in html
+
+    # Panels expose independent freshness/error/retry state and integrity checks.
+    for meta_id in ("healthMeta", "perfMeta", "todayMeta", "marketMeta", "folioMeta"):
+        assert f'id="{meta_id}"' in html
+    assert "Promise.allSettled" in html
+    assert "dashboardIntegrity" in html
+    assert "Duplicate ledger rows" in html
+    assert "Missing event timestamps" in html
+    assert "Open rows missing quotes" in html
+    assert "Past events still unsettled" in html
+    assert "status-health-link" in html
 
 
 def test_feature_registry_renders_retention_strict_decision_and_safety() -> None:

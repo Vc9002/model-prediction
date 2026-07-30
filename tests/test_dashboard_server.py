@@ -97,6 +97,64 @@ def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
     server.server_close.assert_called_once_with()
 
 
+def test_live_model_link_carries_dashboard_execution_context(monkeypatch) -> None:
+    row = {
+        "pick_id": "pick-1",
+        "league": "MLB",
+        "away_team": "Away",
+        "home_team": "Home",
+        "selection": "away",
+        "market_type": "moneyline",
+        "model_probability": 0.61,
+        "model_version": "model-v1",
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [row])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_pick_quote",
+        lambda _row: {
+            "market_slug": "aec-mlb-away-home-2026-07-31",
+            "side": "long",
+            "bid": 0.54,
+            "ask": 0.57,
+            "observed_at_utc": "2026-07-31T12:00:00Z",
+        },
+    )
+    monkeypatch.setattr(dashboard_server, "_load_orders", lambda: {"orders": []})
+
+    links = dashboard_server._live_model_links()
+
+    linked = links[("aec-mlb-away-home-2026-07-31", "long")]
+    assert linked["decision_price"] == 0.57
+    assert linked["decision_bid"] == 0.54
+    assert linked["decision_spread"] == 0.03
+    assert linked["quote_observed_at_utc"] == "2026-07-31T12:00:00Z"
+
+
+def test_unsupported_live_market_view_has_timestamp_and_clear_error() -> None:
+    result = dashboard_server.live_gateway_slate("soccer", "2026-07-31")
+
+    assert result["events"] == []
+    assert result["observed_at_utc"]
+    assert "unavailable for this sport" in result["error"]
+
+
+def test_market_table_name_does_not_require_public_metadata(monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "_team_name_index", lambda: {})
+    monkeypatch.setattr(
+        dashboard_server,
+        "_public_market_question",
+        lambda _slug: pytest.fail("Market table naming must stay local"),
+    )
+
+    name = dashboard_server._human_market_name(
+        "tsc-mlb-bos-ath-2026-07-30-10pt5",
+        allow_lookup=False,
+    )
+
+    assert name == "MLB · BOS @ ATH · Total 10.5"
+
+
 def test_latest_persisted_action_returns_newest_finished_job(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -165,6 +223,77 @@ def test_matrix_reports_wiring_and_features_not_validation_stats() -> None:
 
     assert "Tennis" in by_sport
     assert by_sport["Tennis"]["wired"] is True
+
+
+def test_matrix_reads_active_version_from_live_config(monkeypatch, tmp_path: Path) -> None:
+    config = tmp_path / "model.yaml"
+    config.write_text(
+        "models:\n"
+        "  MLB:\n"
+        "    active_production_version: mlb-live-v99\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config)
+
+    result = dashboard_server.matrix()
+
+    mlb = next(
+        row
+        for row in result["rows"]
+        if row["sport"] == "MLB" and row["market"] == "Moneyline"
+    )
+    assert "mlb-live-v99" in mlb["model"]
+    assert "v6 artifact" not in mlb["model"]
+
+
+def test_data_inventory_uses_each_sports_real_storage_layout(
+    monkeypatch, tmp_path: Path
+) -> None:
+    data = tmp_path / "data"
+    (data / "historical").mkdir(parents=True)
+    (data / "historical" / "mlb_games_all.jsonl").write_text(
+        '{"game": 1}\n{"game": 2}\n',
+        encoding="utf-8",
+    )
+    (data / "raw" / "mlb" / "2026-07-30").mkdir(parents=True)
+
+    (data / "esports" / "cs2").mkdir(parents=True)
+    (data / "esports" / "cs2" / "matches.jsonl").write_text(
+        '{"match": 1}\n{"match": 2}\n{"match": 3}\n',
+        encoding="utf-8",
+    )
+    (data / "esports" / "cs2" / "manifest.json").write_text(
+        json.dumps({"extracted_at_utc": "2026-07-29T13:00:00Z"}),
+        encoding="utf-8",
+    )
+
+    (data / "international_baseball" / "kbo").mkdir(parents=True)
+    (data / "international_baseball" / "kbo" / "games.jsonl").write_text(
+        '{"game": 1}\n',
+        encoding="utf-8",
+    )
+    (data / "international_baseball" / "kbo" / "manifest.json").write_text(
+        json.dumps({"extracted_at_utc": "2026-07-28T09:00:00Z"}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
+    monkeypatch.setattr(dashboard_server, "DATA", data)
+    monkeypatch.setattr(dashboard_server, "SPORTS", ("mlb", "cs2", "kbo"))
+
+    counts, last_ingest, sources = dashboard_server._data_inventory()
+
+    assert counts == {"mlb": 2, "cs2": 3, "kbo": 1}
+    assert last_ingest == {
+        "mlb": "2026-07-30",
+        "cs2": "2026-07-29",
+        "kbo": "2026-07-28",
+    }
+    assert sources == {
+        "mlb": "data/historical/mlb_games_all.jsonl",
+        "cs2": "data/esports/cs2/matches.jsonl",
+        "kbo": "data/international_baseball/kbo/games.jsonl",
+    }
 
 
 def test_metricless_qualified_artifact_is_not_rendered_as_qualified() -> None:

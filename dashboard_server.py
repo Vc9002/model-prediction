@@ -24,7 +24,7 @@ import sys
 import threading
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
@@ -447,21 +447,74 @@ def _pick_probability(row) -> float | None:
 
 
 def _pick_pnl(row) -> float:
-    """Unit P&L: real units if staked, else retrospective research scoring.
-
-    Every logged pick carries a real unit size regardless of record_type
-    (main, flat, research, and gated ledgers all settle pnl_units the same
-    way — see ledger.py:settle()), so units > 0 is enough here. Whether a
-    given ledger's P&L represents actually-staked money is a property of
-    which ledger you're looking at (main only), not something this helper
-    decides row by row.
-    """
+    """Return recorded unit P&L for a row that actually has a scoring basis."""
     units = _number(row.get("units"))
     if units > 0:
         return _number(row.get("pnl_units"))
-    if row.get("research_score_units"):
+    if _number(row.get("research_score_units")) > 0:
         return _number(row.get("research_pnl_units"))
     return 0.0
+
+
+def _pick_is_scored(row: dict) -> bool:
+    return _number(row.get("units")) > 0 or _number(row.get("research_score_units")) > 0
+
+
+def _performance_game_key(row: dict) -> str:
+    """Stable-enough event identity for dashboard-only game coverage metrics."""
+    event_id = str(row.get("event_id") or "").strip()
+    if event_id:
+        return f"{str(row.get('league') or '').casefold()}:{event_id}"
+    parts = (
+        row.get("league"),
+        row.get("event_start_utc"),
+        row.get("away_team"),
+        row.get("home_team"),
+    )
+    return "|".join(str(part or "").strip().casefold() for part in parts)
+
+
+def _performance_breakdown(
+    rows: list[dict],
+    key_fn,
+) -> dict[str, dict]:
+    """Build the same result/risk/game metrics for any ledger-derived dimension."""
+    groups: dict[str, dict] = {}
+    game_keys: dict[str, set[str]] = {}
+    for row in rows:
+        key = str(key_fn(row) or "unknown").strip() or "unknown"
+        won = row.get("result") == "win"
+        entry = groups.setdefault(
+            key,
+            {"wins": 0, "calls": 0, "scored_calls": 0, "pnl": 0.0, "risked": 0.0},
+        )
+        entry["calls"] += 1
+        entry["wins"] += won
+        if _pick_is_scored(row):
+            entry["scored_calls"] += 1
+            entry["pnl"] += _pick_pnl(row)
+            entry["risked"] += max(
+                _number(row.get("units")),
+                _number(row.get("research_score_units")),
+            )
+        game_keys.setdefault(key, set()).add(_performance_game_key(row))
+    for key, entry in groups.items():
+        entry["losses"] = entry["calls"] - entry["wins"]
+        entry["win_rate"] = round(entry["wins"] / entry["calls"], 4) if entry["calls"] else None
+        entry["pnl"] = round(entry["pnl"], 4) if entry["scored_calls"] else None
+        entry["risked"] = round(entry["risked"], 4) if entry["scored_calls"] else None
+        entry["roi"] = (
+            round(entry["pnl"] / entry["risked"], 4)
+            if entry["pnl"] is not None and entry["risked"]
+            else None
+        )
+        entry["games"] = len(game_keys.get(key, set()))
+    return dict(
+        sorted(
+            groups.items(),
+            key=lambda item: (-item[1]["calls"], item[0].casefold()),
+        )
+    )
 
 
 def performance(picks: list[dict]) -> dict:
@@ -472,6 +525,8 @@ def performance(picks: list[dict]) -> dict:
     wins = sum(1 for row in settled if row["result"] == "win")
     cumulative, curve = 0.0, []
     for row in settled:
+        if not _pick_is_scored(row):
+            continue
         cumulative += _pick_pnl(row)
         curve.append(
             {
@@ -479,35 +534,121 @@ def performance(picks: list[dict]) -> dict:
                 "pnl": round(cumulative, 4),
             }
         )
-    by_sport, by_market, by_bucket, by_month = {}, {}, {}, {}
-    buckets = (
-        ("0.50-0.55", 0.50, 0.55),
-        ("0.55-0.60", 0.55, 0.60),
-        ("0.60-0.65", 0.60, 0.65),
-        ("0.65+", 0.65, 1.01),
+    by_sport = _performance_breakdown(settled, lambda row: row.get("league"))
+    by_market = _performance_breakdown(settled, lambda row: row.get("market_type"))
+    probability_rows = [row for row in settled if _pick_probability(row) is not None]
+
+    def probability_bucket(row: dict) -> str:
+        probability = _pick_probability(row)
+        if probability is None:
+            return "unknown"
+        index = min(19, int(probability * 20))
+        lower = index / 20
+        upper = (index + 1) / 20
+        return f"{lower:.2f}-{upper:.2f}"
+
+    by_bucket = dict(
+        sorted(_performance_breakdown(probability_rows, probability_bucket).items())
     )
+    by_month = {}
     for row in settled:
         won = row["result"] == "win"
-        for table, key in ((by_sport, str(row.get("league"))), (by_market, str(row.get("market_type")))):
-            entry = table.setdefault(key, {"wins": 0, "calls": 0, "pnl": 0.0})
-            entry["calls"] += 1
-            entry["wins"] += won
-            entry["pnl"] = round(entry["pnl"] + _pick_pnl(row), 4)
-        p = _pick_probability(row)
-        if p is not None:
-            p_side = max(p, 1 - p)
-            for name, lo, hi in buckets:
-                if lo <= p_side < hi:
-                    entry = by_bucket.setdefault(name, {"wins": 0, "calls": 0, "pnl": 0.0})
-                    entry["calls"] += 1
-                    entry["wins"] += won
-                    entry["pnl"] = round(entry["pnl"] + _pick_pnl(row), 4)
         month = str(row.get("settled_at_utc") or "")[:7]
         if month:
-            entry = by_month.setdefault(month, {"pnl": 0.0, "calls": 0, "wins": 0})
-            entry["pnl"] = round(entry["pnl"] + _pick_pnl(row), 4)
+            entry = by_month.setdefault(
+                month,
+                {"pnl": 0.0, "calls": 0, "scored_calls": 0, "wins": 0},
+            )
             entry["calls"] += 1
             entry["wins"] += won
+            if _pick_is_scored(row):
+                entry["scored_calls"] += 1
+                entry["pnl"] = round(entry["pnl"] + _pick_pnl(row), 4)
+    for entry in by_month.values():
+        entry["losses"] = entry["calls"] - entry["wins"]
+        entry["win_rate"] = round(entry["wins"] / entry["calls"], 4) if entry["calls"] else None
+        if not entry["scored_calls"]:
+            entry["pnl"] = None
+
+    sport_market_groups: dict[tuple[str, str], list[dict]] = {}
+    for row in settled:
+        key = (
+            str(row.get("league") or "unknown"),
+            str(row.get("market_type") or "unknown"),
+        )
+        sport_market_groups.setdefault(key, []).append(row)
+    by_sport_market = []
+    for (sport, market_type), rows in sorted(
+        sport_market_groups.items(),
+        key=lambda item: (-len(item[1]), item[0][0].casefold(), item[0][1].casefold()),
+    ):
+        summary = next(iter(_performance_breakdown(rows, lambda _row: "all").values()))
+        by_sport_market.append(
+            {"sport": sport, "market_type": market_type, **summary}
+        )
+
+    market_contexts = []
+    for market_type, market_rows in sorted(
+        (
+            (market_type, [row for row in settled if str(row.get("market_type") or "unknown") == market_type])
+            for market_type in by_market
+        ),
+        key=lambda item: (-len(item[1]), item[0].casefold()),
+    ):
+        game_ids = {_performance_game_key(row) for row in market_rows}
+        lines = [
+            _number(row.get("line"), None)
+            for row in market_rows
+            if row.get("line") not in (None, "")
+        ]
+        lines = [line for line in lines if line is not None]
+        market_contexts.append(
+            {
+                "market_type": market_type,
+                "calls": len(market_rows),
+                "games": len(game_ids),
+                "sports": sorted(
+                    {str(row.get("league") or "unknown") for row in market_rows},
+                    key=str.casefold,
+                ),
+                "selections": _performance_breakdown(
+                    market_rows,
+                    lambda row: row.get("selection"),
+                ),
+                "line": {
+                    "count": len(lines),
+                    "mean": round(sum(lines) / len(lines), 3) if lines else None,
+                    "mean_abs": round(sum(abs(line) for line in lines) / len(lines), 3)
+                    if lines
+                    else None,
+                    "min": round(min(lines), 3) if lines else None,
+                    "max": round(max(lines), 3) if lines else None,
+                },
+            }
+        )
+
+    sport_contexts = []
+    for sport, metrics in by_sport.items():
+        sport_rows = [row for row in settled if str(row.get("league") or "unknown") == sport]
+        sport_contexts.append(
+            {
+                "sport": sport,
+                **metrics,
+                "markets": sorted(
+                    {str(row.get("market_type") or "unknown") for row in sport_rows},
+                    key=str.casefold,
+                ),
+            }
+        )
+
+    game_market_types: dict[str, set[str]] = {}
+    for row in settled:
+        game_market_types.setdefault(_performance_game_key(row), set()).add(
+            str(row.get("market_type") or "unknown")
+        )
+    unique_games = len(game_market_types)
+    multi_market_games = sum(1 for markets in game_market_types.values() if len(markets) > 1)
+
     # calibration: 10 buckets predicted vs actual
     calibration = []
     for index in range(10):
@@ -542,26 +683,88 @@ def performance(picks: list[dict]) -> dict:
         if row.get("probability_clv") not in (None, "")
     ]
     clv = [value for value in clv if value is not None]
-    staked = sum(max(_number(row.get("units")), _number(row.get("research_score_units"))) for row in settled)
-    total_pnl = round(sum(_pick_pnl(row) for row in settled), 4)
+    brier_values = [
+        (probability - (1.0 if row["result"] == "win" else 0.0)) ** 2
+        for row in settled
+        if (probability := _pick_probability(row)) is not None
+    ]
+    scored = [row for row in settled if _pick_is_scored(row)]
+    staked = sum(
+        max(_number(row.get("units")), _number(row.get("research_score_units")))
+        for row in scored
+    )
+    total_pnl = round(sum(_pick_pnl(row) for row in scored), 4) if scored else None
+    event_dates = sorted(
+        str(row.get("event_start_utc") or "")[:10]
+        for row in settled
+        if row.get("event_start_utc")
+    )
     return {
         "total_picks": len(picks),
         "settled": len(settled),
         "open": sum(1 for row in picks if row.get("status") == "open"),
         "wins": wins,
         "losses": len(settled) - wins,
+        "scored_calls": len(scored),
         "win_rate": round(wins / len(settled), 4) if settled else None,
         "total_pnl": total_pnl,
-        "roi": round(total_pnl / staked, 4) if staked else None,
+        "roi": round(total_pnl / staked, 4) if total_pnl is not None and staked else None,
         "pnl_curve": curve,
         "by_sport": by_sport,
         "by_market": by_market,
+        "by_sport_market": by_sport_market,
         "by_confidence": {name: table for name, table in by_bucket.items()},
         "by_month": dict(sorted(by_month.items())),
         "calibration": calibration,
         "streaks": {"longest_win": longest_w, "longest_loss": longest_l, "current": current},
         "mean_clv": round(sum(clv) / len(clv), 6) if clv else None,
+        "brier": round(sum(brier_values) / len(brier_values), 6) if brier_values else None,
+        "context": {
+            "sports": sport_contexts,
+            "markets": market_contexts,
+            "unique_games": unique_games,
+            "multi_market_games": multi_market_games,
+            "max_markets_per_game": max(
+                (len(markets) for markets in game_market_types.values()),
+                default=0,
+            ),
+            "probability_rows": len(brier_values),
+            "clv_rows": len(clv),
+            "period_start": event_dates[0] if event_dates else None,
+            "period_end": event_dates[-1] if event_dates else None,
+        },
     }
+
+
+def performance_for_sport(picks: list[dict], sport: str | None = None) -> dict:
+    """Return one ledger's performance, optionally scoped to an actual ledger sport."""
+    available = sorted(
+        {
+            str(row.get("league") or "").strip()
+            for row in picks
+            if row.get("status") == "settled"
+            and row.get("result") in ("win", "loss")
+            and str(row.get("league") or "").strip()
+        },
+        key=str.casefold,
+    )
+    requested = str(sport or "").strip()
+    selected = next(
+        (candidate for candidate in available if candidate.casefold() == requested.casefold()),
+        None,
+    )
+    if selected:
+        scoped = [
+            row
+            for row in picks
+            if str(row.get("league") or "").strip().casefold() == selected.casefold()
+        ]
+    else:
+        scoped = [] if requested else picks
+    payload = performance(scoped)
+    payload["available_sports"] = available
+    payload["selected_sport"] = selected or (requested if requested else None)
+    return payload
 
 
 # ── SECTION: Production Evidence ───────────────────────────────────
@@ -1525,6 +1728,34 @@ def _daily_pipeline_status() -> dict:
     }
 
 
+def _data_inventory() -> tuple[dict[str, int], dict[str, str | None], dict[str, str]]:
+    """Count each sport from its real storage layout and report refresh provenance."""
+    data_counts: dict[str, int] = {}
+    last_ingest: dict[str, str | None] = {}
+    data_sources: dict[str, str] = {}
+    for sport in SPORTS:
+        if sport in {"lol", "cs2", "dota2", "valorant", "rainbow_six"}:
+            data_path = DATA / "esports" / sport / "matches.jsonl"
+            manifest = _read_json(DATA / "esports" / sport / "manifest.json") or {}
+            data_counts[sport] = _count_lines(data_path)
+            last_ingest[sport] = str(manifest.get("extracted_at_utc") or "")[:10] or None
+        elif sport in {"kbo", "npb"}:
+            data_path = DATA / "international_baseball" / sport / "games.jsonl"
+            manifest = _read_json(
+                DATA / "international_baseball" / sport / "manifest.json"
+            ) or {}
+            data_counts[sport] = _count_lines(data_path)
+            last_ingest[sport] = str(manifest.get("extracted_at_utc") or "")[:10] or None
+        else:
+            data_path = DATA / "historical" / f"{sport}_games_all.jsonl"
+            data_counts[sport] = _count_lines(data_path)
+            raw_dir = DATA / "raw" / sport
+            dates = sorted(d.name for d in raw_dir.iterdir() if d.is_dir()) if raw_dir.exists() else []
+            last_ingest[sport] = dates[-1] if dates else None
+        data_sources[sport] = str(data_path.relative_to(ROOT))
+    return data_counts, last_ingest, data_sources
+
+
 def status() -> dict:
     validation, _source = _newest_validation()
     termination = _read_json(OUTPUTS / "termination-audit-2026-07-17.json") or {}
@@ -1532,12 +1763,7 @@ def status() -> dict:
     if audits:
         termination = _read_json(audits[-1]) or termination
     models = sorted(path.name for path in (ROOT / "config" / "models").glob("*.json"))
-    data_counts, last_ingest = {}, {}
-    for sport in SPORTS:
-        data_counts[sport] = _count_lines(DATA / "historical" / f"{sport}_games_all.jsonl")
-        raw_dir = DATA / "raw" / sport
-        dates = sorted(d.name for d in raw_dir.iterdir() if d.is_dir()) if raw_dir.exists() else []
-        last_ingest[sport] = dates[-1] if dates else None
+    data_counts, last_ingest, data_sources = _data_inventory()
     audit_events = _count_lines(DATA / "events.jsonl")
     last_event = None
     events_path = DATA / "events.jsonl"
@@ -1623,6 +1849,7 @@ def status() -> dict:
         "model_artifacts": models,
         "data_counts": data_counts,
         "last_ingest": last_ingest,
+        "data_sources": data_sources,
         "audit_events": audit_events,
         "last_audit_event": (last_event or {}).get("event_type") if last_event else None,
         "daily_pipeline": daily_pipeline,
@@ -1866,12 +2093,34 @@ def matrix() -> dict:
     features, not validation metrics (see docs/PROJECT_STATUS.md's operating
     note). Rows are maintained by hand alongside cli.py's actual dispatch
     logic -- when a sport's wiring changes, update this list in the same
-    change.
+    change. Active version labels are read from config/model.yaml so this
+    operational surface cannot silently lag a model promotion.
     """
+    try:
+        config = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        config = {}
+    configured_models = config.get("models") or {}
+
+    def active_version(sport: str) -> str:
+        sport_config = configured_models.get(sport.upper()) or {}
+        return str(
+            sport_config.get("active_production_version")
+            or sport_config.get("active_research_version")
+            or "version unavailable"
+        )
+
+    esports_versions = ", ".join(
+        f"{sport.upper()} {active_version(sport)}"
+        for sport in ("lol", "cs2", "dota2", "valorant", "rainbow_six")
+    )
     rows = [
         {
             "sport": "MLB", "market": "Moneyline", "wired": True,
-            "model": "learned_forward.py -- Elo + trend logistic regression (v6 artifact)",
+            "model": (
+                "learned_forward.py -- Elo + trend logistic regression "
+                f"({active_version('mlb')})"
+            ),
             "ledger": "Main + Flat",
         },
         {
@@ -1888,17 +2137,26 @@ def matrix() -> dict:
         },
         {
             "sport": "NBA", "market": "Moneyline", "wired": True,
-            "model": "learned_forward.py -- Elo + trend logistic regression (v4 artifact)",
+            "model": (
+                "learned_forward.py -- Elo + trend logistic regression "
+                f"({active_version('nba')})"
+            ),
             "ledger": "Main + Flat",
         },
         {
             "sport": "WNBA", "market": "Moneyline", "wired": True,
-            "model": "learned_forward.py -- Elo + trend logistic regression (v4 artifact)",
+            "model": (
+                "learned_forward.py -- Elo + trend logistic regression "
+                f"({active_version('wnba')})"
+            ),
             "ledger": "Main + Flat",
         },
         {
             "sport": "NFL", "market": "Moneyline", "wired": True,
-            "model": "learned_forward.py -- Elo + trend logistic regression (v4 artifact)",
+            "model": (
+                "learned_forward.py -- Elo + trend logistic regression "
+                f"({active_version('nfl')})"
+            ),
             "ledger": "Main + Flat",
         },
         {
@@ -1921,13 +2179,14 @@ def matrix() -> dict:
         {
             "sport": "Tennis", "market": "Moneyline", "wired": True,
             "model": "models/tennis.py -- surface-blended Elo, singles only, WTA only "
-            "(Polymarket US has no ATP market; ESPN has no ITF scoreboard)",
+            f"({active_version('tennis')}; Polymarket US has no ATP market; "
+            "ESPN has no ITF scoreboard)",
             "ledger": "Flat Research + Gated Research",
         },
         {
             "sport": "LOL / CS2 / DOTA2 / VALORANT / Rainbow Six", "market": "Moneyline", "wired": True,
             "model": "esports.py -- result-based neutral Elo, Platt-scaled, refreshed from "
-            "bo3.gg before every forecast",
+            f"bo3.gg before every forecast; active config: {esports_versions}",
             "ledger": "Flat Research + Gated Research",
         },
         {
@@ -1939,7 +2198,8 @@ def matrix() -> dict:
         {
             "sport": "KBO / NPB", "market": "Moneyline", "wired": True,
             "model": "international_baseball.py -- tie-aware home-field Elo "
-            "(result/margin only, no starters/park/weather)",
+            f"(KBO {active_version('kbo')}; NPB {active_version('npb')}; "
+            "result/margin only, no starters/park/weather)",
             "ledger": "Flat Research + Gated Research",
         },
     ]
@@ -2056,7 +2316,10 @@ def market_snapshots(sport: str, day: str) -> dict:
         rows.append(
             {
                 "market_slug": slug,
-                "market_name": _human_market_name(str(slug)),
+                # Market tables can contain hundreds of contracts. Keep this
+                # endpoint local and deterministic instead of doing one public
+                # metadata lookup per total/team-total slug.
+                "market_name": _human_market_name(str(slug), allow_lookup=False),
                 "market_type": snap.get("market_type"),
                 "line": snap.get("line"),
                 "league": snap.get("league"),
@@ -2885,13 +3148,21 @@ def live_gateway_slate(sport: str, day: str) -> dict:
     """Read-only live discovery quotes from the public gateway (indicative)."""
     league = {"mlb": "mlb", "nba": "nba", "wnba": "wnba", "nfl": "nfl"}.get(sport)
     if league is None:
-        return {"events": []}
+        return {
+            "events": [],
+            "observed_at_utc": datetime.now(UTC).isoformat(),
+            "error": "live indicative gateway is unavailable for this sport",
+        }
     url = f"{GATEWAY}/v2/leagues/{league}/events?limit=50&section=general&type=sport"
     try:
         with urllib.request.urlopen(url, timeout=15) as response:
             payload = json.loads(response.read().decode())
     except Exception as error:  # noqa: BLE001
-        return {"events": [], "error": type(error).__name__}
+        return {
+            "events": [],
+            "observed_at_utc": datetime.now(UTC).isoformat(),
+            "error": type(error).__name__,
+        }
     events = []
     for event in payload.get("events", []):
         start = str(event.get("startTime") or "")
@@ -2928,6 +3199,7 @@ def live_gateway_slate(sport: str, day: str) -> dict:
         )
     return {
         "events": events,
+        "observed_at_utc": datetime.now(UTC).isoformat(),
         "note": "indicative discovery quotes; decision prices come from stored BBO asks",
     }
 
@@ -3215,21 +3487,49 @@ class Handler(BaseHTTPRequestHandler):
 
                 self._send(_cached("flat-picks", 30, _flat_picks_decorated))
             elif route == "/api/performance":
-                self._send(_cached("performance", 30, lambda: performance(read_picks())))
+                sport = str(query.get("sport") or "").strip()
+                self._send(
+                    _cached(
+                        f"performance:{sport.casefold() or 'all'}",
+                        30,
+                        lambda: performance_for_sport(read_picks(), sport),
+                    )
+                )
             elif route == "/api/flat-performance":
+                sport = str(query.get("sport") or "").strip()
                 flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
                 flat = [r for r in flat if str(r.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES]
-                self._send(_cached("flat-performance", 30, lambda: performance(flat)))
+                self._send(
+                    _cached(
+                        f"flat-performance:{sport.casefold() or 'all'}",
+                        30,
+                        lambda: performance_for_sport(flat, sport),
+                    )
+                )
             elif route == "/api/research-performance":
+                sport = str(query.get("sport") or "").strip()
                 research = _parse_research_picks()
-                self._send(_cached("research-performance", 30, lambda: performance(research)))
+                self._send(
+                    _cached(
+                        f"research-performance:{sport.casefold() or 'all'}",
+                        30,
+                        lambda: performance_for_sport(research, sport),
+                    )
+                )
             elif route == "/api/research-picks":
                 research = _parse_research_picks()
                 decorated = [_decorate_pick(r) for r in research]
                 self._send(_cached("research-picks", 30, lambda: decorated))
             elif route == "/api/gated-research-performance":
+                sport = str(query.get("sport") or "").strip()
                 gated = _parse_research_picks(gated=True)
-                self._send(_cached("gated-research-performance", 30, lambda: performance(gated)))
+                self._send(
+                    _cached(
+                        f"gated-research-performance:{sport.casefold() or 'all'}",
+                        30,
+                        lambda: performance_for_sport(gated, sport),
+                    )
+                )
             elif route == "/api/gated-research-picks":
                 gated = _parse_research_picks(gated=True)
                 decorated = [_decorate_pick(r) for r in gated]
@@ -3535,6 +3835,9 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
     rows_by_id = {str(row.get("pick_id") or ""): row for row in all_rows}
 
     def _link(row: dict, side: str) -> dict:
+        quote = _pick_quote(row) or {}
+        bid = _number(quote.get("bid"), None)
+        ask = _number(quote.get("ask"), None)
         return {
             "pick_id": str(row.get("pick_id") or ""),
             "league": str(row.get("league") or ""),
@@ -3545,6 +3848,12 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
             "model_probability": _number(row.get("model_probability"), None),
             "model_version": str(row.get("model_version") or ""),
             "side": side,
+            "decision_price": ask,
+            "decision_bid": bid,
+            "decision_spread": (
+                round(ask - bid, 6) if ask is not None and bid is not None else None
+            ),
+            "quote_observed_at_utc": quote.get("observed_at_utc"),
         }
 
     for row in _dedupe_picks(all_rows):
@@ -3633,6 +3942,12 @@ def _normalize_live_activity(item: dict, links: dict[tuple[str, str], dict]) -> 
             "price_basis": ("selected_short_probability" if outcome_side == "short" else "long_probability"),
             "quantity": _number(trade.get("qtyDecimal") or trade.get("qty"), None),
             "cost_basis_usd": _amount_value(trade.get("costBasis")),
+            "fee_usd": _amount_value(
+                trade.get("fee")
+                or trade.get("fees")
+                or trade.get("feeAmount")
+                or trade.get("feePaid")
+            ),
             "realized_pnl_usd": selected_pnl,
             "exchange_realized_pnl_usd": exchange_pnl,
             "pnl_basis": (
@@ -3778,7 +4093,7 @@ def _public_market_question(slug: str) -> str | None:
     return question
 
 
-def _human_market_name(slug: str, title: str = "") -> str:
+def _human_market_name(slug: str, title: str = "", *, allow_lookup: bool = True) -> str:
     """Turn an exchange identifier into a compact, readable market name."""
     match = re.match(
         r"^(?P<prefix>[a-z]+)-(?P<league>[a-z0-9]+)-(?P<away>[a-z0-9]+)-"
@@ -3800,7 +4115,7 @@ def _human_market_name(slug: str, title: str = "") -> str:
     # These prefixes hide materially different contracts behind similar
     # slugs (team total vs match total, first half vs full game, 1X2, props).
     # The exchange question is the canonical, specific market name.
-    if prefix in {"tsc", "atc"}:
+    if allow_lookup and prefix in {"tsc", "atc"}:
         question = _public_market_question(slug)
         if question:
             return question.removesuffix("?")
@@ -3808,11 +4123,11 @@ def _human_market_name(slug: str, title: str = "") -> str:
     if prefix == "aec":
         market = "First 5 moneyline" if detail.startswith("f5") else "Moneyline"
         return f"{league_label} · {matchup} · {market}"
-    if prefix in {"tsc", "asc"}:
+    if prefix in {"tsc", "asc", "atc"}:
         line_match = re.search(r"(\d+)pt(\d+)", detail)
         line = f"{line_match.group(1)}.{line_match.group(2)}" if line_match else ""
         period = "First 5 " if "f5" in detail else ""
-        market = "Total" if prefix == "tsc" else "Spread"
+        market = {"tsc": "Total", "atc": "Team total", "asc": "Spread"}[prefix]
         suffix = f" {line}" if line else ""
         return f"{league_label} · {matchup} · {period}{market}{suffix}"
     if prefix == "astatc":

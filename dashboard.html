@@ -40,6 +40,15 @@ h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   padding:9px 18px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12px;min-height:var(--statusbar-h)}
 #statusbar .chip{display:flex;gap:6px;align-items:center;white-space:nowrap;color:var(--dim)}
 #statusbar #unitValueInput{width:70px;padding:4px 6px}
+.status-health-link{display:none}
+@media(max-width:1250px){
+  #statusbar .status-detail{display:none}
+  .status-health-link{display:inline-flex}
+}
+@media(max-width:760px){
+  #statusbar{gap:8px;padding:7px 10px}
+  #statusbar .unit-control,#statusbar .desktop-action{display:none}
+}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
 .dot.g{background:var(--green);box-shadow:0 0 0 3px rgba(51,209,126,.18)}
 .dot.r{background:var(--red);box-shadow:0 0 0 3px rgba(255,92,92,.18)}
@@ -124,7 +133,23 @@ table.data tr:hover td{background:var(--surface-2)}
 .pill.push{background:rgba(255,255,255,.08);color:var(--dim)}
 input,select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px}
 input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.click-row{cursor:pointer}.click-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.filter-field{display:flex;align-items:center;gap:5px;color:var(--dim);font-family:var(--mono);font-size:11px}
+.segmented{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.segmented button{border:0;border-radius:0;border-right:1px solid var(--border)}
+.segmented button:last-child{border-right:0}.segmented button.on{background:var(--accent);color:#fff}
+.panel-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:7px 0 12px;color:var(--dim);font:11px var(--mono)}
+.panel-meta .ok{color:var(--green)}.panel-meta .error{color:var(--red)}
+.state-badge{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font:700 10px var(--mono);text-transform:uppercase}
+.state-badge.ok{color:var(--green);border-color:rgba(51,209,126,.5)}
+.state-badge.warn{color:var(--yellow);border-color:rgba(242,169,60,.5)}
+.state-badge.bad{color:var(--red);border-color:rgba(255,92,92,.5)}
+.blocked-order{display:flex;max-width:240px;gap:6px;align-items:flex-start;white-space:normal}
+.blocked-order .reason{color:var(--dim);font-size:10.5px;line-height:1.35}
+.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;font:11px var(--mono);color:var(--dim)}
+.integrity-list{display:grid;gap:8px}
+.integrity-row{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid var(--border);padding-bottom:7px}
 .view-tools{position:relative}
 .view-tools summary{list-style:none;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
   padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:12px}
@@ -139,6 +164,38 @@ canvas{width:100%;height:180px;display:block}
 .kpis .k{display:flex;flex-direction:column;gap:2px}
 .kpis .k b{font-size:22px;font-weight:700}
 .kpis .k span{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.perf-context{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px}
+.perf-context .chip{border:1px solid var(--border);background:var(--surface-2);border-radius:999px;
+  padding:3px 8px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+.perf-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.perf-heading h2{margin-bottom:0}
+.perf-filter{display:flex;align-items:center;gap:7px;color:var(--dim);font-family:var(--mono);font-size:11px}
+.perf-filter select{min-width:150px}
+.perf-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:14px 18px}
+.perf-kpis .k{min-width:0}
+.perf-kpis .k b{font-size:clamp(18px,1.8vw,22px);overflow-wrap:anywhere}
+.perf-kpis .k span{line-height:1.25}
+.perf-hero{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:8px}
+.perf-panel{border:1px solid var(--border);border-radius:8px;padding:12px;min-width:0;overflow-x:auto}
+.perf-panel h3{font-size:10.5px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+.perf-sections{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:14px}
+.perf-section{border:1px solid var(--border);border-radius:8px;padding:12px;min-width:0;overflow-x:auto}
+.perf-section.wide{grid-column:1/-1}
+.perf-section h3{font-size:10.5px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+.perf-panel table.data,.perf-section table.data{font-size:clamp(10px,.78vw,12px)}
+.perf-market-note{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.5;margin-bottom:8px}
+.perf-market-stack{display:grid;gap:14px}
+.perf-market-block+.perf-market-block{border-top:1px solid var(--border);padding-top:14px}
+.perf-market-block h4{font-size:10.5px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:7px}
+.perf-months{display:flex;gap:8px;flex-wrap:wrap}
+.perf-month{border:1px solid var(--border);background:var(--surface-2);border-radius:6px;padding:7px 9px;
+  font-family:var(--mono);font-size:11px}
+@media(min-width:1550px){.perf-sections{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1700px){.perf-hero{grid-template-columns:minmax(0,1.15fr) minmax(520px,.85fr)}}
+@media(max-width:700px){
+  .perf-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .perf-panel,.perf-section{padding:9px}
+}
 
 /* live picks */
 .pick{border:1px solid var(--border);border-left:3px solid transparent;border-radius:8px;padding:10px 13px;margin-bottom:8px;font-family:var(--mono);font-size:12.5px;background:var(--surface)}
@@ -157,12 +214,36 @@ canvas{width:100%;height:180px;display:block}
 
 /* alerts */
 .alert{display:flex;gap:8px;align-items:center;padding:8px 11px;border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
+.alert.error{background:rgba(255,92,92,.09);border:1px solid rgba(255,92,92,.45)}
 .alert.warn{background:rgba(242,169,60,.09);border:1px solid rgba(242,169,60,.4);animation:pulse 2.5s infinite}
 .alert.info{background:var(--surface-2);border:1px solid var(--border)}
+
+/* system health */
+.health-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}
+.health-kpi{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:11px}
+.health-kpi b{display:block;font-family:var(--mono);font-size:19px;margin-bottom:3px}
+.health-kpi span{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.health-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:14px}
+.health-state{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;text-transform:uppercase}
+.health-state.ok{color:var(--green);border-color:rgba(51,209,126,.45)}
+.health-state.warn{color:var(--yellow);border-color:rgba(242,169,60,.45)}
+.health-state.bad{color:var(--red);border-color:rgba(255,92,92,.45)}
+.today-source{border-top:1px solid var(--border);margin-top:14px;padding-top:10px}
+.today-source summary{cursor:pointer;color:var(--dim);font-family:var(--mono);font-weight:700;padding:4px 0 8px}
+.today-source[open] summary{color:var(--text)}
+@media(max-width:1000px){.health-grid{grid-template-columns:1fr}}
 
 /* modal */
 #modal{position:fixed;inset:0;background:rgba(4,5,9,.72);display:none;align-items:center;justify-content:center;z-index:100}
 #modal .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:900px;width:92%;max-height:82vh;overflow:auto;padding:18px}
+#drawerBackdrop{position:fixed;inset:0;background:rgba(4,5,9,.58);display:none;z-index:109}
+#drawer{position:fixed;right:0;top:0;bottom:0;width:min(520px,94vw);background:var(--surface);border-left:1px solid var(--border);
+  z-index:110;transform:translateX(102%);transition:transform .2s ease;overflow:auto;padding:20px;box-shadow:-16px 0 40px rgba(0,0,0,.35)}
+#drawer.open{transform:translateX(0)}#drawerBackdrop.open{display:block}
+.drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
+.drawer-head h2{font-size:14px;color:var(--text);margin:0;text-transform:none;letter-spacing:0}
+.detail-grid{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(0,1.3fr);gap:8px 14px;font:12px var(--mono)}
+.detail-grid dt{color:var(--dim)}.detail-grid dd{overflow-wrap:anywhere}
 pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px;border-radius:8px}
 .secgrid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
 @media(max-width:1100px){.secgrid{grid-template-columns:1fr}}
@@ -193,17 +274,18 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 <div id="statusbar">
   <span class="chip"><span class="dot gray" id="testDot"></span><span id="testTxt">Tests: not run</span></span>
   <span class="chip"><span class="dot g"></span><span id="modelsTxt">Models: …</span></span>
-  <span class="chip mono dim" id="dataTxt">Data: …</span>
+  <span class="chip mono dim status-detail" id="dataTxt">Data: …</span>
   <span class="chip"><span class="dot gray" id="dailyDot"></span><span id="dailyTxt" title="Split pipeline: settle → flat forecast → main forecast">Pipeline: …</span></span>
-  <span class="chip dim mono" id="pipelineSteps" style="font-size:10px"></span>
+  <span class="chip dim mono status-detail" id="pipelineSteps" style="font-size:10px"></span>
   <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
   <span class="chip dim" id="updatedTxt">Updated: —</span>
   <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
   <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
-   <label class="chip" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><input id="autoPctInput" type="number" min="1" max="50" step="0.5" value="10" style="width:42px;padding:1px 2px" title="Percentage of bankroll">%<button onclick="autoUnitValue()" title="Set 1U to % of bankroll (ratchets up only)">Apply</button></label>
+  <button class="status-health-link" onclick="gotoTab('health')" aria-label="Open full system health details">Health details</button>
+  <label class="chip unit-control" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" aria-label="Dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><input id="autoPctInput" aria-label="Bankroll percentage for one unit" type="number" min="1" max="50" step="0.5" value="10" style="width:42px;padding:1px 2px" title="Percentage of bankroll">%<button onclick="autoUnitValue()" title="Set 1U to this percentage of the live balance; adjusts up or down">Apply</button></label>
   <span style="flex:1"></span>
-  <button onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
-  <button onclick="bootstrapDialog()">Bootstrap</button>
+  <button class="desktop-action" onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
+  <button class="desktop-action" onclick="bootstrapDialog()">Bootstrap</button>
   <button onclick="confirmAction('refresh_prices','Refresh executable bid/ask prices for every unique open pick in the ledger?')">Scan Open Ledger Prices</button>
   <button class="primary" onclick="confirmAction('daily','Run the split daily pipeline (settle → flat forecast → main forecast) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
 </div>
@@ -213,6 +295,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="rail-group">
       <div class="rail-label">Monitor</div>
       <button data-tab="matrix" class="on">Matrix</button>
+      <button data-tab="health">Health</button>
       <button data-tab="today">Today</button>
       <button data-tab="market">Market</button>
     </div>
@@ -226,17 +309,14 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="rail-group">
       <div class="rail-label">Performance</div>
       <button data-tab="perf">Performance</button>
-      <button data-tab="flat-perf">Flat Perf</button>
-      <button data-tab="research-perf">Research Perf</button>
-      <button data-tab="gated-research-perf">Gated Research Perf</button>
     </div>
     <div class="rail-group">
       <div class="rail-label">Portfolio</div>
       <button data-tab="folio">Portfolio</button>
-      <button data-tab="evidence">Evidence</button>
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
+      <button data-tab="evidence">Evidence</button>
       <button data-tab="settings">Settings</button>
     </div>
   </nav>
@@ -252,6 +332,26 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       </div>
     </div>
     <div class="card" id="alertsCard"><h2>Alerts</h2><div id="alerts"></div></div>
+  </section>
+
+  <section id="tab-health" style="display:none">
+    <div class="card">
+      <h2>System Health</h2>
+      <div class="small dim">Operational freshness and coverage from the sources the dashboard actually reads. Zero means zero records in that source—not an inferred model failure.</div>
+      <div class="panel-meta" id="healthMeta" role="status" aria-live="polite">Loading health…</div>
+      <div class="health-kpis" id="healthKpis" style="margin-top:12px"></div>
+    </div>
+    <div class="health-grid">
+      <div class="card">
+        <h2>Data Freshness by Sport</h2>
+        <div style="overflow-x:auto"><table class="data" id="healthDataTable"></table></div>
+      </div>
+      <div>
+        <div class="card"><h2>Pipeline Steps</h2><div id="healthPipeline"></div></div>
+        <div class="card"><h2>Active Alerts</h2><div id="healthAlerts"></div></div>
+        <div class="card"><h2>Dashboard Integrity</h2><div id="integrityChecks" class="integrity-list"></div></div>
+      </div>
+    </div>
   </section>
 
   <section id="tab-evidence" style="display:none">
@@ -286,33 +386,60 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
    <section id="tab-perf" style="display:none">
      <div class="card">
-       <h2>Performance — Qualified Calls Only</h2>
-       <div class="small dim" style="margin-bottom:8px">Settled qualified calls from picks.xlsx. Only picks that passed the edge gate.</div>
-       <div id="perfKpis" class="kpis" style="margin-bottom:16px"></div>
-       <div class="two-col">
-         <div><canvas id="cPnl" height="180"></canvas></div>
-         <div><table class="data" id="perfSport"></table></div>
+       <div class="perf-heading">
+         <h2 id="perfTitle">Performance</h2>
+         <div class="filters" style="margin:0">
+           <label class="filter-field" for="perfLedgerSelect">Ledger
+             <select id="perfLedgerSelect" onchange="performanceControlChanged()">
+               <option value="main">Qualified</option><option value="flat">Flat</option>
+               <option value="research">Research</option><option value="gated">Gated</option>
+             </select>
+           </label>
+           <label class="filter-field" for="perfSportFilter">Sport
+             <select id="perfSportFilter" onchange="performanceControlChanged()"><option value="">All sports</option></select>
+           </label>
+           <label class="filter-field" for="perfMode">View
+             <select id="perfMode" onchange="performanceControlChanged()"><option value="ledger">Ledger detail</option><option value="compare">Compare ledgers</option></select>
+           </label>
+         </div>
        </div>
-       <div style="margin-top:16px"><table class="data" id="perfBucket"></table></div>
-       <div style="margin-top:16px" class="two-col">
-         <div><table class="data" id="perfMarket"></table></div>
-         <div><table class="data" id="perfCal"></table></div>
+       <div class="panel-meta" id="perfMeta" role="status" aria-live="polite">Loading performance…</div>
+       <div class="small dim" id="perfSummary">Loading ledger context…</div>
+       <div class="perf-context" id="perfContext"></div>
+       <div id="perfKpis" class="kpis perf-kpis" style="margin-bottom:16px"></div>
+       <div id="perfDetail">
+         <div class="perf-hero">
+           <div class="perf-panel"><h3>Cumulative scored P&amp;L</h3><canvas id="cPnl" height="180"></canvas></div>
+           <div class="perf-panel" id="perfOverview"></div>
+         </div>
+         <div class="perf-sections" id="perfSections"></div>
        </div>
-       <div class="small dim" style="margin-top:8px" id="perfMonthly"></div>
+       <div id="perfCompare" style="display:none"></div>
      </div>
    </section>
 
   <section id="tab-folio" style="display:none">
     <div class="card">
       <h2>Live Portfolio — Exchange Positions</h2>
+      <div class="panel-meta" id="folioMeta" role="status" aria-live="polite">Loading portfolio…</div>
       <div class="small dim" id="folioStatus" style="margin-bottom:8px"></div>
       <div class="kpis" id="folioOpenKpis"></div>
       <div id="folioOpen"></div>
     </div>
     <div class="card">
       <h2>Trade &amp; Settlement History</h2>
+      <div class="filters" id="folioFilters">
+        <label class="filter-field" for="folioFrom">From <input id="folioFrom" type="date" onchange="folioFiltersChanged()"></label>
+        <label class="filter-field" for="folioTo">To <input id="folioTo" type="date" onchange="folioFiltersChanged()"></label>
+        <label class="filter-field" for="folioSport">Sport <select id="folioSport" onchange="folioFiltersChanged()"><option value="">All sports</option></select></label>
+        <label class="filter-field" for="folioMarket">Market <select id="folioMarket" onchange="folioFiltersChanged()"><option value="">All markets</option></select></label>
+        <label class="filter-field" for="folioType">Activity <select id="folioType" onchange="folioFiltersChanged()"><option value="">All activity</option><option value="trade">Trades</option><option value="settlement">Settlements</option></select></label>
+        <label class="filter-field" for="folioAttribution">Attribution <select id="folioAttribution" onchange="folioFiltersChanged()"><option value="">All attribution</option><option value="linked">Model-linked</option><option value="unlinked">Manual / unlinked</option></select></label>
+        <label class="filter-field" for="folioPageSize">Rows <select id="folioPageSize" onchange="folioFiltersChanged()"><option>25</option><option selected>50</option><option>100</option></select></label>
+      </div>
       <div class="kpis" id="folioHistKpis"></div>
       <div id="folioHistory"></div>
+      <div class="pager" id="folioPager"></div>
     </div>
   </section>
 
@@ -320,23 +447,32 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
         <h2>Today's Picks <span id="todayDate" class="dim"></span></h2>
-        <label class="small dim"><input type="checkbox" id="todayShowSettled" onchange="renderToday()"> show settled</label>
+        <div class="filters" style="margin:0">
+          <label class="filter-field" for="todaySport">Sport <select id="todaySport" onchange="todayFiltersChanged()"><option value="">All sports</option></select></label>
+          <label class="filter-field" for="todayMarket">Market <select id="todayMarket" onchange="todayFiltersChanged()"><option value="">All markets</option></select></label>
+          <label class="small dim"><input type="checkbox" id="todayActionable" onchange="todayFiltersChanged()"> actionable only</label>
+          <label class="small dim"><input type="checkbox" id="todayShowSettled" onchange="todayFiltersChanged()"> show settled</label>
+        </div>
       </div>
+      <div class="panel-meta" id="todayMeta" role="status" aria-live="polite">Loading today…</div>
       <div class="kpis" id="todayKpis"></div>
-      <div class="small dim" style="margin-bottom:8px">Every ledger pick for today's games (ET). <b>1U = $<span id="unitValueLabel">7.50</span>.</b> All picks remain paper research until you submit a separate order. <b>Only "+EV vs market" rows are tail candidates</b> — "no edge" means the market prices the same side higher than the model does. Sorted best edge first.</div>
+      <div class="small dim" style="margin-bottom:8px">Qualified calls are shown first. Flat and Research slates are collapsed below so the operational view is not buried under every candidate. Dates use America/New_York, including daylight saving. <b>1U = $<span id="unitValueLabel">7.50</span>.</b> All picks remain paper research until you submit a separate order.</div>
       <div id="todayPicks"></div>
     </div>
   </section>
 
   <section id="tab-market" style="display:none">
     <div class="card">
-      <h2>Polymarket — stored BBO snapshots</h2>
+      <h2>Polymarket Market Data</h2>
       <div class="filters">
-        <select id="mSport"><option>mlb</option><option>nba</option><option>wnba</option><option>nfl</option></select>
-        <input id="mDate" type="date">
-        <button onclick="loadMarket()">Load</button>
-        <span class="dim small">decision prices = stored executable asks; midpoint is reference only</span>
+        <label class="filter-field" for="marketMode">Source <select id="marketMode" onchange="marketFiltersChanged()"><option value="stored">Stored BBO</option><option value="live">Live indicative</option></select></label>
+        <label class="filter-field" for="mSport">Sport <select id="mSport" onchange="marketFiltersChanged()"><option value="mlb">MLB</option></select></label>
+        <label class="filter-field" for="mDate">Date <input id="mDate" type="date" onchange="marketFiltersChanged()"></label>
+        <label class="filter-field" for="marketStaleMinutes">Stale after <select id="marketStaleMinutes" onchange="marketFiltersChanged()"><option value="2">2 min</option><option value="5" selected>5 min</option><option value="15">15 min</option><option value="60">60 min</option></select></label>
+        <button onclick="loadMarket()">Retry / reload</button>
       </div>
+      <div class="panel-meta" id="marketMeta" role="status" aria-live="polite">Loading market data…</div>
+      <div class="dim small" id="marketBasis">Stored asks are executable decision-price evidence; midpoint is reference only.</div>
       <div style="overflow:auto;max-height:560px"><table class="data" id="marketTable"></table></div>
     </div>
   </section>
@@ -393,57 +529,6 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div style="overflow-x:auto"><table class="data" id="flatTable"><tr><td>Loading…</td></tr></table></div>
     </div>
   </section>
-  <section id="tab-flat-perf" style="display:none">
-    <div class="card">
-      <h2>Flat Performance — All Games (No Edge Gate)</h2>
-      <div class="small dim" style="margin-bottom:8px">Settled picks from flat_picks.xlsx. Same metrics as main Performance tab.</div>
-      <div id="flatPerfKpis" class="kpis" style="margin-bottom:16px"></div>
-      <div class="two-col">
-        <div><canvas id="flatPerfChart" height="180"></canvas></div>
-        <div><table class="data" id="flatPerfSport"></table></div>
-      </div>
-      <div style="margin-top:16px"><table class="data" id="flatPerfBucket"></table></div>
-      <div style="margin-top:16px" class="two-col">
-        <div><table class="data" id="flatPerfMarket"></table></div>
-        <div><table class="data" id="flatPerfCal"></table></div>
-      </div>
-      <div class="small dim" style="margin-top:8px" id="flatPerfMonthly"></div>
-    </div>
-  </section>
-  <section id="tab-research-perf" style="display:none">
-    <div class="card">
-      <h2>Research Performance — Esports, International Baseball</h2>
-      <div class="small dim" style="margin-bottom:8px">Settled picks aggregated from the separate per-sport Research workbooks. Same metrics as main Performance tab.</div>
-      <div id="researchPerfKpis" class="kpis" style="margin-bottom:16px"></div>
-      <div class="two-col">
-        <div><canvas id="researchPerfChart" height="180"></canvas></div>
-        <div><table class="data" id="researchPerfSport"></table></div>
-      </div>
-      <div style="margin-top:16px"><table class="data" id="researchPerfBucket"></table></div>
-      <div style="margin-top:16px" class="two-col">
-        <div><table class="data" id="researchPerfMarket"></table></div>
-        <div><table class="data" id="researchPerfCal"></table></div>
-      </div>
-      <div class="small dim" style="margin-top:8px" id="researchPerfMonthly"></div>
-    </div>
-  </section>
-  <section id="tab-gated-research-perf" style="display:none">
-    <div class="card">
-      <h2>Gated Research Performance — Esports, Soccer</h2>
-      <div class="small dim" style="margin-bottom:8px">Settled picks aggregated from the separate per-sport Gated Research workbooks. Same metrics as main Performance tab.</div>
-      <div id="gatedResearchPerfKpis" class="kpis" style="margin-bottom:16px"></div>
-      <div class="two-col">
-        <div><canvas id="gatedResearchPerfChart" height="180"></canvas></div>
-        <div><table class="data" id="gatedResearchPerfSport"></table></div>
-      </div>
-      <div style="margin-top:16px"><table class="data" id="gatedResearchPerfBucket"></table></div>
-      <div style="margin-top:16px" class="two-col">
-        <div><table class="data" id="gatedResearchPerfMarket"></table></div>
-        <div><table class="data" id="gatedResearchPerfCal"></table></div>
-      </div>
-      <div class="small dim" style="margin-top:8px" id="gatedResearchPerfMonthly"></div>
-    </div>
-  </section>
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -454,16 +539,24 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <label>Theme
           <select id="sTheme"><option value="dark" selected>dark</option><option value="light">light</option></select>
         </label>
-        <label>Min confidence shown
+        <label>Min called probability in ledger views
           <input id="sMinConf" type="number" step="0.01" min="0.5" max="0.9" value="0.50">
         </label>
-        <label>Visible sports
-          <span>
+        <label>Ledger sports shown
+          <span style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:4px">
             <label><input type="checkbox" class="sSport" value="mlb" checked>MLB</label>
             <label><input type="checkbox" class="sSport" value="nba" checked>NBA</label>
             <label><input type="checkbox" class="sSport" value="wnba" checked>WNBA</label>
             <label><input type="checkbox" class="sSport" value="nfl" checked>NFL</label>
             <label><input type="checkbox" class="sSport" value="soccer" checked>Soccer</label>
+            <label><input type="checkbox" class="sSport" value="tennis" checked>Tennis</label>
+            <label><input type="checkbox" class="sSport" value="lol" checked>LOL</label>
+            <label><input type="checkbox" class="sSport" value="cs2" checked>CS2</label>
+            <label><input type="checkbox" class="sSport" value="dota2" checked>DOTA2</label>
+            <label><input type="checkbox" class="sSport" value="valorant" checked>Valorant</label>
+            <label><input type="checkbox" class="sSport" value="rainbow_six" checked>Rainbow Six</label>
+            <label><input type="checkbox" class="sSport" value="kbo" checked>KBO</label>
+            <label><input type="checkbox" class="sSport" value="npb" checked>NPB</label>
           </span>
         </label>
       </div>
@@ -477,28 +570,63 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 <div id="modal" onclick="if(event.target===this)this.style.display='none'">
   <div class="box"><div id="modalBody"></div></div>
 </div>
+<div id="drawerBackdrop" onclick="closeDrawer()"></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true" inert tabindex="-1">
+  <div class="drawer-head"><h2 id="drawerTitle">Details</h2><button id="drawerClose" onclick="closeDrawer()" aria-label="Close details">Close</button></div>
+  <div id="drawerBody"></div>
+</aside>
 
 <script>
 "use strict";
 const $=q=>document.querySelector(q), $$=q=>[...document.querySelectorAll(q)];
-const state={picks:[],perf:null,matrix:null,status:null,productionEvidence:null,settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
+const state={picks:[],perf:null,matrix:null,status:null,productionEvidence:null,livePortfolio:null,marketRows:[],
+  settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
 const fmt=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
 const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
+const ALL_SPORTS=["mlb","nba","wnba","nfl","soccer","tennis","lol","cs2","dota2","valorant","rainbow_six","kbo","npb"];
+const urlParams=()=>new URLSearchParams(location.search);
+const initialUrlState=urlParams();
+function setUrlState(patch){
+  const params=urlParams();
+  Object.entries(patch).forEach(([key,value])=>{
+    if(value===null||value===undefined||value===""||value===false)params.delete(key);
+    else params.set(key,String(value));
+  });
+  history.replaceState(null,"",location.pathname+(params.size?"?"+params.toString():"")+location.hash);
+}
+function setControlFromUrl(id,key,checkbox=false){
+  const el=$("#"+id),value=urlParams().get(key);
+  if(!el||value===null)return;
+  if(checkbox)el.checked=value==="1"||value==="true";else el.value=value;
+}
+function setPanelState(id,status,message,retry){
+  const el=$("#"+id);if(!el)return;
+  const icon=status==="ok"?"✓":status==="error"?"!":"…";
+  el.innerHTML=`<span class="${status}">${icon} ${esc(message)}</span>`+
+    (retry?`<button onclick="${retry}">Retry</button>`:"");
+}
+const observedNow=()=>new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
 
 /* ---------- tabs ---------- */
 $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
-  $("#tab-"+b.dataset.tab).style.display=""; updateCounts();
-  if(b.dataset.tab==="flat-perf")renderFlatPerf();
-  if(b.dataset.tab==="research-perf")renderResearchPerf();
-  if(b.dataset.tab==="gated-research-perf")renderGatedResearchPerf(); });
+  $("#tab-"+b.dataset.tab).style.display=""; setUrlState({tab:b.dataset.tab});updateCounts();
+  if(b.dataset.tab==="perf")performanceControlChanged(false);
+  if(b.dataset.tab==="market")loadMarket();
+  if(b.dataset.tab==="today")renderToday();
+  if(b.dataset.tab==="folio"&&state.livePortfolio)renderFolioHistory();
+});
 
 /* ---------- settings ---------- */
 function applySettings(){
   const s=state.settings;
-  // Migration: settings saved before the soccer model existed lack "soccer";
-  // show it by default rather than silently hiding the new row.
-  if(Array.isArray(s.sports)&&!s.sportsV2){s.sports.push("soccer");s.sportsV2=true;}
+  // Older settings could only name five sports and the controls were not
+  // actually applied. Preserve any explicit choices while making newly
+  // introduced sports visible by default during this one-time migration.
+  if(Array.isArray(s.sports)&&!s.sportsV3){
+    ALL_SPORTS.forEach(sport=>{if(!s.sports.includes(sport))s.sports.push(sport);});
+    s.sportsV3=true;
+  }
   if(s.refresh!==undefined)$("#sRefresh").value=s.refresh;
   if(s.theme){$("#sTheme").value=s.theme;document.documentElement.dataset.theme=s.theme;}
   if(s.minConf)$("#sMinConf").value=s.minConf;
@@ -506,13 +634,20 @@ function applySettings(){
 }
 function saveSettings(){
   state.settings={refresh:$("#sRefresh").value,theme:$("#sTheme").value,
-    minConf:parseFloat($("#sMinConf").value)||0.5,sportsV2:true,
+    minConf:parseFloat($("#sMinConf").value)||0.5,sportsV2:true,sportsV3:true,
     sports:$$(".sSport").filter(c=>c.checked).map(c=>c.value)};
   localStorage.setItem("dash-settings",JSON.stringify(state.settings));
   document.documentElement.dataset.theme=state.settings.theme;
   resetTimer(); refreshAll();
 }
-const visibleSports=()=>state.settings.sports||["mlb","nba","wnba","nfl","soccer","lol","cs2"];
+const visibleSports=()=>state.settings.sports||ALL_SPORTS;
+const passesDisplaySettings=p=>{
+  const league=String(p.league||p.Sport||"").toLowerCase();
+  if(league&&!visibleSports().includes(league))return false;
+  const probability=Number(p.model_probability);
+  const minimum=Number(state.settings.minConf??0.5);
+  return !Number.isFinite(probability)||probability>=minimum;
+};
 
 /* ---------- fetch helpers ---------- */
 async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);return r.json();}
@@ -553,6 +688,9 @@ window.autoUnitValue=autoUnitValue;
 /* ---------- status bar ---------- */
 function renderStatus(s){
   state.status=s;
+  renderHealth(s);
+  setPanelState("healthMeta","ok",`Health updated ${observedNow()}`);
+  populateMarketSports(s);
   const unitValue=Number(s.unit_value_usd||7.5);
   if(document.activeElement!==$("#unitValueInput"))$("#unitValueInput").value=unitValue.toFixed(2);
   $("#unitValueLabel").textContent=unitValue.toFixed(2);
@@ -576,22 +714,83 @@ function renderStatus(s){
     const flat=steps.flat_ok===true?"✓":"flat_ok"in steps?"✗":"?";
     const main=steps.main_ok===true?"✓":"main_ok"in steps?"✗":"?";
     stepsEl.textContent=`settle ${settle} · flat ${flat} · main ${main}`;
-    stepsEl.style.color=((steps.settle_ok&&steps.flat_ok&&steps.main_ok)||Object.keys(steps).length===0)?"var(--green)":"var(--red)";
+    const expected=["settle_ok","flat_ok","main_ok"];
+    const failed=expected.some(key=>steps[key]===false);
+    const complete=expected.every(key=>steps[key]===true);
+    stepsEl.style.color=failed?"var(--red)":complete?"var(--green)":"var(--yellow)";
   }
   const n=(s.alerts||[]).length + (t.status==="failed"?1:0);
   $("#alertTxt").textContent=`Alerts: ${n}`;
-  $("#alertDot").className="dot "+(n? (s.alerts.some(a=>a.level==="warn")?"y":"g"):"g");
+  const hasError=t.status==="failed"||(s.alerts||[]).some(a=>a.level==="error");
+  const hasWarning=(s.alerts||[]).some(a=>a.level==="warn");
+  $("#alertDot").className="dot "+(hasError?"r":hasWarning?"y":"g");
   $("#updatedTxt").textContent="Updated: "+new Date().toLocaleTimeString();
   const box=$("#alerts"); box.innerHTML="";
   const alerts=[...(s.alerts||[])];
-  if(t.status==="failed")alerts.unshift({level:"warn",kind:"tests_failed",text:"pytest has failing tests"});
+  if(t.status==="failed")alerts.unshift({level:"error",kind:"tests_failed",text:"pytest has failing tests"});
   if(!alerts.length)box.innerHTML='<div class="dim small">No active alerts.</div>';
   alerts.forEach(a=>{const d=document.createElement("div");
-    d.className="alert "+(a.level==="warn"?"warn":"info");
-    d.innerHTML=`<span class="dot ${a.level==="warn"?"y":"gray"}"></span> ${a.text}`;
+    d.className="alert "+(a.level==="error"?"error":a.level==="warn"?"warn":"info");
+    d.innerHTML=`<span class="dot ${a.level==="error"?"r":a.level==="warn"?"y":"gray"}"></span> ${esc(a.text)}`;
     d.onclick=()=>{ if(a.kind==="tests_failed")showModal("<h2>pytest</h2><pre>"+esc((t.output_tail||""))+"</pre>");
-      else gotoTab("market"); };
+      else gotoTab("health"); };
     box.appendChild(d);});
+  syncStatusbarHeight();
+}
+
+let marketSportsInitialized=false;
+function populateMarketSports(s){
+  const select=$("#mSport");
+  if(!select)return;
+  const current=(!marketSportsInitialized&&initialUrlState.get("market_sport"))||select.value||"mlb";
+  const sports=Object.keys(s.polymarket_odds||s.data_counts||{});
+  select.innerHTML=sports.map(sport=>`<option value="${escAttr(sport)}">${esc(sport.toUpperCase().replaceAll("_"," "))}</option>`).join("");
+  select.value=sports.includes(current)?current:(sports[0]||"mlb");
+  marketSportsInitialized=true;
+}
+
+function renderHealth(s){
+  if(!$("#healthKpis"))return;
+  const pipeline=s.daily_pipeline||{}, tests=s.tests||{}, alerts=s.alerts||[];
+  const pipelineLabel=pipeline.age_hours==null?"No run":pipeline.stale?"Stale":`${pipeline.age_hours}h ago`;
+  const testsLabel=tests.status==="ok"?"Passing":tests.status==="failed"?"Failing":"Not run";
+  $("#healthKpis").innerHTML=`
+    <div class="health-kpi"><b class="${pipeline.stale?"red":"green"}">${pipelineLabel}</b><span>Daily pipeline</span></div>
+    <div class="health-kpi"><b class="${tests.status==="failed"?"red":tests.status==="ok"?"green":"yellow"}">${testsLabel}</b><span>Dashboard test state</span></div>
+    <div class="health-kpi"><b>${Number(s.models_loaded||0).toLocaleString()}</b><span>Model artifacts</span></div>
+    <div class="health-kpi"><b>${Number(s.audit_events||0).toLocaleString()}</b><span>Audit events</span></div>
+    <div class="health-kpi"><b class="${alerts.some(a=>a.level==="error")?"red":alerts.length?"yellow":"green"}">${alerts.length}</b><span>Active alerts</span></div>`;
+
+  const today=Date.parse(todayET()+"T12:00:00Z");
+  let table="<tr><th>Sport</th><th>Records</th><th>Last refresh</th><th>Age</th><th>State</th><th>Source</th></tr>";
+  Object.entries(s.data_counts||{}).forEach(([sport,count])=>{
+    const day=(s.last_ingest||{})[sport]||null;
+    const age=day?Math.max(0,Math.floor((today-Date.parse(day+"T12:00:00Z"))/86400000)):null;
+    const level=!count?"bad":age==null||age>7?"warn":"ok";
+    const label=!count?"no records":age==null?"unknown":age>7?"stale":"current";
+    table+=`<tr><td><b>${esc(sport.toUpperCase().replaceAll("_"," "))}</b></td>
+      <td>${Number(count||0).toLocaleString()}</td><td>${day||"never"}</td>
+      <td>${age==null?"—":age+"d"}</td><td><span class="health-state ${level}">${label}</span></td>
+      <td class="dim">${esc((s.data_sources||{})[sport]||"—")}</td></tr>`;
+  });
+  $("#healthDataTable").innerHTML=table;
+
+  const steps=pipeline.steps||{};
+  const stepLabels=[["settle_ok","Settlement"],["ingest_ok","Ingest"],["flat_ok","Flat forecast"],["main_ok","Main forecast"]];
+  $("#healthPipeline").innerHTML=stepLabels.map(([key,label])=>{
+    const value=steps[key],cls=value===true?"ok":value===false?"bad":"warn";
+    const text=value===true?"complete":value===false?"failed":"not reported";
+    return `<div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:8px"><span>${label}</span><span class="health-state ${cls}">${text}</span></div>`;
+  }).join("")+`<div class="small dim" style="margin-top:8px">Last run: ${esc(pipeline.last_run_at_utc||"never")}</div>`;
+
+  $("#healthAlerts").innerHTML=alerts.length?alerts.map(a=>
+    `<div class="alert ${a.level==="error"?"error":a.level==="warn"?"warn":"info"}"><span class="dot ${a.level==="error"?"r":a.level==="warn"?"y":"gray"}"></span>${esc(a.text)}</div>`
+  ).join(""):'<div class="small dim">No active alerts.</div>';
+}
+
+function syncStatusbarHeight(){
+  const height=$("#statusbar")?.offsetHeight;
+  if(height)document.documentElement.style.setProperty("--statusbar-h",height+"px");
 }
 
 /* ---------- production model evidence ---------- */
@@ -941,6 +1140,28 @@ const etDate=value=>{const p=etParts(value);return p?`${p.year}-${p.month}-${p.d
 const gameTimeET=value=>{const p=etParts(value);return p?`${p.month}/${p.day} ${p.hour}:${p.minute} ${p.dayPeriod}`:"—";};
 const todayET=()=>etDate(new Date());
 const shortDate=value=>{const s=String(value||"");return s.length>=16?`${s.slice(5,10).replace("-","/")} ${s.slice(11,16)}`:s;};
+function ageInfo(value,staleMinutes=5){
+  const timestamp=Date.parse(value||"");
+  if(!Number.isFinite(timestamp))return {label:"age unavailable",minutes:null,stale:true};
+  const minutes=Math.max(0,(Date.now()-timestamp)/60000);
+  const label=minutes<1?"just now":minutes<60?`${Math.floor(minutes)}m ago`:minutes<1440?`${Math.floor(minutes/60)}h ago`:`${Math.floor(minutes/1440)}d ago`;
+  return {label,minutes,stale:minutes>staleMinutes};
+}
+function timeToStart(value){
+  const timestamp=Date.parse(value||"");
+  if(!Number.isFinite(timestamp))return "start unavailable";
+  const minutes=Math.round((timestamp-Date.now())/60000);
+  if(minutes<-1)return `started ${Math.abs(minutes)<60?Math.abs(minutes)+"m":Math.floor(Math.abs(minutes)/60)+"h"} ago`;
+  if(minutes<=1)return "starting now";
+  if(minutes<60)return `starts in ${minutes}m`;
+  if(minutes<1440)return `starts in ${Math.floor(minutes/60)}h ${minutes%60}m`;
+  return `starts in ${Math.floor(minutes/1440)}d`;
+}
+function quoteStateBadge(value,staleMinutes=5){
+  const age=ageInfo(value,staleMinutes);
+  if(age.minutes==null)return '<span class="state-badge bad" aria-label="Quote timestamp unavailable">! no timestamp</span>';
+  return `<span class="state-badge ${age.stale?"warn":"ok"}" aria-label="Quote ${age.stale?"stale":"current"}; ${age.label}">${age.stale?"! stale":"✓ current"} · ${age.label}</span>`;
+}
 const pregamePrice=p=>Number(p.quote?.ask??p.market_implied_probability)||null;
 const entryPrice=p=>Number(p.filled_entry?.price)||null;
 const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
@@ -967,17 +1188,19 @@ function ledgerRowHtml(p,showCheckbox,mode="default"){
   const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
   const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p);
   const size=research?(Number(p.units)||0):(Number(p.display_units??p.units)||Number(p.suggested_paper_units)||0);
-  const rowPnl=research?(Number(p.pnl_units)||0):pickPnl(p);
+  const isSettled=String(p.status||"").toLowerCase()==="settled";
+  const rowPnl=isSettled?(research?(Number(p.pnl_units)||0):pickPnl(p)):null;
   const order=(research||gated)?'<span class="dim">paper only</span>':orderControl(p);
-  const checkboxTd=showCheckbox?`<td><input type="checkbox" class="rowSel" value="${p.pick_id}" onchange="updateSelCount()"></td>`:"";
-  return `<tr${p.archived?' style="opacity:.45"':''}>${checkboxTd}<td title="Scheduled ${esc(String(p.event_start_utc||""))}">${gameTimeET(p.event_start_utc)}</td><td>${p.league||""}</td>
+  const checkboxTd=showCheckbox?`<td><input type="checkbox" class="rowSel" value="${p.pick_id}" onclick="event.stopPropagation()" onchange="updateSelCount()"></td>`:"";
+  const archivedStyle=p.archived?' style="opacity:.45"':"";
+  return `<tr class="click-row" tabindex="0" role="button" aria-label="Open details for ${escAttr(p.away_team||"")} at ${escAttr(p.home_team||"")}" onclick="showPickDrawerById('${escAttr(p.pick_id||"")}', '${mode}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showPickDrawerById('${escAttr(p.pick_id||"")}', '${mode}')}"${archivedStyle}>${checkboxTd}<td title="Scheduled ${esc(String(p.event_start_utc||""))}">${gameTimeET(p.event_start_utc)}</td><td>${p.league||""}</td>
     <td>${p.market_type||""}</td><td>${pickLabel(p)}${p.unavailable_features?` <span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠</span>`:""}</td>
     <td>${p.model_probability?pct(p.model_probability):"—"}</td>
     <td title="${escAttr(p.quote?.observed_at_utc?`Last valid quote before tipoff · ${p.quote.observed_at_utc}`:"Stored decision-time pregame quote")}">${cents(mp)} <span class="dim">${mp?pct(mp):"—"}</span></td>
     <td title="${escAttr(p.filled_entry?.basis==="exchange_trade"?"Exchange-confirmed fill in the selected outcome coordinate":p.filled_entry?"Filled order limit; exact execution price unavailable":"No filled exchange buy")}">${cents(entry)}</td>
     <td class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</td>
     <td>${size?size.toFixed(2)+"U":"—"}</td><td>${res}</td>
-    <td class="${pnlClass(rowPnl)}">${fmt(rowPnl)}</td>
+    <td class="${rowPnl==null?"":pnlClass(rowPnl)}">${rowPnl==null?"—":fmt(rowPnl)}</td>
     <td>${order}</td>
     <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;
 }
@@ -987,6 +1210,7 @@ function ledgerRowHtml(p,showCheckbox,mode="default"){
    Ledger bar gets the archive/hide-rows tools, since those act on pick_id
    rows in the main ledger only. */
 const FILTER_TABS=["L","F","R","G"];
+let ledgerUrlRestored=false;
 function filterBarHTML(tab){
   const archiveTools=tab==="L"?`
     <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
@@ -1007,12 +1231,12 @@ function filterBarHTML(tab){
     <button onclick="preset('all','${tab}')">All picks</button>
     ${archiveTools}
     <span style="width:10px"></span>
-    <select id="fSport_${tab}" onchange="onFilterChange('${tab}')"><option value="">all sports</option></select>
-    <select id="fMarket_${tab}" onchange="onFilterChange('${tab}')"><option value="">all markets</option></select>
-    <select id="fStatus_${tab}" onchange="onFilterChange('${tab}')"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
-    <select id="fResult_${tab}" onchange="onFilterChange('${tab}')"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
-    <input id="fSearch_${tab}" placeholder="search team / event id" size="22" oninput="onFilterChange('${tab}')">
-    <input id="fFrom_${tab}" type="date"><input id="fTo_${tab}" type="date">
+    <select aria-label="Filter ${tab} ledger by sport" id="fSport_${tab}" onchange="onFilterChange('${tab}')"><option value="">all sports</option></select>
+    <select aria-label="Filter ${tab} ledger by market" id="fMarket_${tab}" onchange="onFilterChange('${tab}')"><option value="">all markets</option></select>
+    <select aria-label="Filter ${tab} ledger by status" id="fStatus_${tab}" onchange="onFilterChange('${tab}')"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
+    <select aria-label="Filter ${tab} ledger by result" id="fResult_${tab}" onchange="onFilterChange('${tab}')"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
+    <input aria-label="Search ${tab} ledger by team or event ID" id="fSearch_${tab}" placeholder="search team / event id" size="22" oninput="onFilterChange('${tab}')">
+    <input aria-label="${tab} ledger start date" id="fFrom_${tab}" type="date"><input aria-label="${tab} ledger end date" id="fTo_${tab}" type="date">
     <button onclick="onFilterChange('${tab}')">Apply</button>
     <button onclick="exportCsv('${tab}')">Export CSV</button>`;
 }
@@ -1044,12 +1268,24 @@ function populateFilters(){
     marketSel.innerHTML='<option value="">all markets</option>'+markets.map(s=>`<option>${s}</option>`).join("");
     sportSel.value=curS; marketSel.value=curM;
   });
+  if(!ledgerUrlRestored){
+    FILTER_TABS.forEach(tab=>{
+      const key=tab.toLowerCase();
+      setControlFromUrl("fSport_"+tab,key+"_sport");setControlFromUrl("fMarket_"+tab,key+"_market");
+      setControlFromUrl("fStatus_"+tab,key+"_status");setControlFromUrl("fResult_"+tab,key+"_result");
+      setControlFromUrl("fSearch_"+tab,key+"_search");setControlFromUrl("fFrom_"+tab,key+"_from");
+      setControlFromUrl("fTo_"+tab,key+"_to");
+    });
+    ledgerUrlRestored=true;
+    renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();
+  }
 }
 function filteredPicks(){
   const s=$("#fSport_L").value,m=$("#fMarket_L").value,st=$("#fStatus_L").value,r=$("#fResult_L").value,
         q=$("#fSearch_L").value.trim().toLowerCase(),from=$("#fFrom_L").value,to=$("#fTo_L").value;
   const showArchived=$("#fArchived_L").checked;
   return state.picks.filter(p=>{
+    if(!passesDisplaySettings(p))return false;
     if(p.archived&&!showArchived)return false;
     if(s&&p.league!==s)return false;
     if(m&&p.market_type!==m)return false;
@@ -1069,6 +1305,10 @@ function onFilterChange(tab){
   // Filtering used to call renderFlat()/renderResearch(), which always
   // re-fetched and re-decorated every row (orders + portfolio history) from
   // the server on every keystroke/dropdown change: that was the 5-10s lag.
+  const key=tab.toLowerCase();
+  setUrlState({[key+"_sport"]:$("#fSport_"+tab)?.value,[key+"_market"]:$("#fMarket_"+tab)?.value,
+    [key+"_status"]:$("#fStatus_"+tab)?.value,[key+"_result"]:$("#fResult_"+tab)?.value,
+    [key+"_search"]:$("#fSearch_"+tab)?.value,[key+"_from"]:$("#fFrom_"+tab)?.value,[key+"_to"]:$("#fTo_"+tab)?.value});
   if(tab==="F"){renderFlatTable();return;}
   if(tab==="R"){renderResearchTable();return;}
   if(tab==="G"){renderGatedResearchTable();return;}
@@ -1092,10 +1332,11 @@ function renderPicks(){
    const settled=rows.filter(p=>p.status==="settled"&&(p.result==="win"||p.result==="loss"));
    const wins=settled.filter(p=>p.result==="win").length;
    const losses=settled.filter(p=>p.result==="loss").length;
-   const winRate=wins+losses>0?wins/(wins+losses):0;
-   const totalPnl=settled.reduce((s,p)=>s+pickPnl(p),0);
+   const hasSettled=wins+losses>0;
+   const winRate=hasSettled?wins/(wins+losses):null;
+   const totalPnl=hasSettled?settled.reduce((s,p)=>s+pickPnl(p),0):null;
    const totalRisked=settled.reduce((s,p)=>s+(Number(p.units)||0),0);
-   const roi=totalRisked>0?totalPnl/totalRisked:0;
+   const roi=hasSettled&&totalRisked>0?totalPnl/totalRisked:null;
    // Streak from settled sorted by settled_at_utc
    const bySettled=[...settled].sort((a,b)=>(a.settled_at_utc||"").localeCompare(b.settled_at_utc||""));
    let streak=0;
@@ -1107,7 +1348,7 @@ function renderPicks(){
    $("#pickKpis").innerHTML=`
      <div class="k"><b>${rows.length}</b><span>shown picks</span></div>
      <div class="k"><b>${pct(winRate)}</b><span>win rate</span></div>
-     <div class="k"><b class="${totalPnl>=0?"green":"red"}">${fmt(totalPnl)}</b><span>total P&amp;L (U)</span></div>
+     <div class="k"><b class="${totalPnl==null?"":totalPnl>=0?"green":"red"}">${fmt(totalPnl)}</b><span>total P&amp;L (U)</span></div>
      <div class="k"><b>${pct(roi)}</b><span>ROI</span></div>
      <div class="k"><b>${streakLabel}</b><span>streak</span></div>`;
   let html=ledgerHeaderRow(true);
@@ -1233,6 +1474,7 @@ function filteredFlatRows(){
   const fq=($("#fSearch_F").value||'').toLowerCase();
   const ff=$("#fFrom_F").value, ft=$("#fTo_F").value;
   return (_flatCache||[]).filter(p=>{
+    if(!passesDisplaySettings(p))return false;
     if(fs&&(p.league||p.Sport||'')!==fs)return false;
     if(fm&&(p.market_type||p.Type||'moneyline')!==fm)return false;
     const st=String(p.status||p.State||'').toLowerCase();
@@ -1245,7 +1487,7 @@ function filteredFlatRows(){
       if(!hay.toLowerCase().includes(fq))return false;
     }
     if(ff||ft){
-      const d=(p.event_start_utc||'').slice(0,10);
+      const d=etDate(p.event_start_utc);
       if(ff&&d<ff)return false;
       if(ft&&d>ft)return false;
     }
@@ -1275,13 +1517,14 @@ function renderFlatTable(){
     const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
     const wins=settled.filter(p=>String(p.result||p.Result||'')==='win').length;
     const losses=settled.filter(p=>String(p.result||p.Result||'')==='loss').length;
-    const pnl=settled.reduce((s,p)=>s+pickPnl(p),0);
+    const hasSettled=wins+losses>0;
+    const pnl=hasSettled?settled.reduce((s,p)=>s+pickPnl(p),0):null;
     const risked=settled.reduce((s,p)=>s+(Number(p.units||p.Units)||0),0);
     $("#flatKpis").innerHTML=`
       <div class=\"k\"><b>${rows.length}</b><span>games</span></div>
       <div class=\"k\"><b>${wins+losses>0?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
-      <div class=\"k\"><b class=\"${pnl>=0?'green':'red'}\">${fmt(pnl)}</b><span>P&L (U)</span></div>
-      <div class=\"k\"><b>${risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
+      <div class=\"k\"><b class=\"${pnl==null?'':pnl>=0?'green':'red'}\">${fmt(pnl)}</b><span>P&L (U)</span></div>
+      <div class=\"k\"><b>${hasSettled&&risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
     
     let html=ledgerHeaderRow(false);
     if(!rows.length){html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';}
@@ -1293,140 +1536,230 @@ async function renderFlat(force){
   await loadFlatCache(force);
   renderFlatTable();
 }
+const PERFORMANCE_VIEWS={
+  main:{label:"Qualified Ledger",source:"picks.xlsx",policy:"Only ledger-qualified calls.",api:"/api/performance"},
+  flat:{label:"Flat Ledger",source:"flat_picks.xlsx",policy:"All recorded game calls; no edge gate.",api:"/api/flat-performance"},
+  research:{label:"Research Ledger",source:"per-sport research workbooks",policy:"Model calls recorded without the qualification gate.",api:"/api/research-performance"},
+  gated:{label:"Gated Research Ledger",source:"per-sport gated research workbooks",policy:"Only research calls that cleared their configured gate.",api:"/api/gated-research-performance"}
+};
+let perfFiltersInitialized=false;
+const marketLabel=value=>{
+  const key=String(value||"unknown").toLowerCase();
+  return ({moneyline:"Moneyline",spread:"Spread / handicap",total:"Game total",team_total:"Team total"}[key]||
+    key.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase()));
+};
+const selectionLabel=(market,selection)=>{
+  const key=String(selection||"unknown").toLowerCase(),type=String(market||"").toLowerCase();
+  if(type==="total"||type==="team_total")return ({over:"Over",under:"Under"}[key]||key);
+  if(type==="spread")return ({home:"Home spread",away:"Away spread"}[key]||key);
+  if(type==="moneyline")return ({home:"Listed home side",away:"Listed away side",draw:"Draw"}[key]||key);
+  return key.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
+};
+const perfRate=value=>value==null?"—":`${(Number(value)*100).toFixed(1)}%`;
+const perfUnits=value=>{
+  if(value==null)return '<span class="dim">—</span>';
+  const n=Number(value);return `<span class="${n>=0?'green':'red'}">${n>=0?'+':''}${n.toFixed(2)}U</span>`;
+};
+function performanceResultTable(items,labelHeader,labelFn){
+  const rows=items.map(item=>{
+    const v=item.metrics||item;
+    return `<tr><td>${esc(labelFn(item))}</td><td>${v.games??"—"}</td><td>${v.calls??0}</td>`+
+      `<td>${v.scored_calls??0}/${v.calls??0}</td><td>${v.wins??0}-${v.losses??Math.max(0,(v.calls||0)-(v.wins||0))}</td><td>${perfRate(v.win_rate)}</td>`+
+      `<td>${perfUnits(v.pnl)}</td><td>${perfRate(v.roi)}</td></tr>`;
+  }).join("");
+  return `<table class="data"><tr><th>${esc(labelHeader)}</th><th>Games</th><th>Calls</th><th title="Rows carrying units or an explicit research score">Scored</th><th>W-L</th><th>Hit rate</th><th>Scored P&amp;L</th><th>ROI</th></tr>`+
+    (rows||'<tr><td colspan="8" class="dim">No settled rows in this context.</td></tr>')+"</table>";
+}
+function performanceScope(context){
+  const sports=(context.sports||[]).map(row=>String(row.sport||"unknown").toUpperCase());
+  const markets=(context.markets||[]).map(row=>marketLabel(row.market_type));
+  const sportScope=sports.length<=3?sports.join(" + "):`${sports.length} sports`;
+  const marketScope=markets.length<=3?markets.join(" + "):`${markets.length} market types`;
+  return [sportScope,marketScope].filter(Boolean).join(" · ")||"No settled calls";
+}
+function performanceLineNote(market){
+  const line=market.line||{};
+  if(!line.count)return "";
+  const type=String(market.market_type||"").toLowerCase();
+  if(type==="total"||type==="team_total")
+    return ` Posted total averaged ${Number(line.mean).toFixed(2)} (range ${line.min} to ${line.max}).`;
+  if(type==="spread")
+    return ` Recorded handicap averaged ${Number(line.mean_abs).toFixed(2)} points in absolute value (signed range ${line.min} to ${line.max}).`;
+  return ` Recorded line averaged ${Number(line.mean).toFixed(2)} (range ${line.min} to ${line.max}).`;
+}
+function renderPerformanceView(p,viewKey){
+  p=p||{};
+  const view=PERFORMANCE_VIEWS[viewKey],context=p.context||{};
+  const title=$("#perfTitle"),summary=$("#perfSummary"),chips=$("#perfContext");
+  const kpis=$("#perfKpis"),overview=$("#perfOverview"),sections=$("#perfSections");
+  const filter=$("#perfSportFilter");
+  const available=(p.available_sports||[]).map(String);
+  const selected=String(p.selected_sport||"");
+  filter.innerHTML='<option value="">All sports</option>'+available.map(sport=>`<option value="${escAttr(sport)}">${esc(String(sport).toUpperCase())}</option>`).join("");
+  filter.value=selected;
+  const scope=selected&&!(context.sports||[]).length?`${selected.toUpperCase()} · No settled calls`:performanceScope(context);
+  title.textContent=`${view.label} — ${scope}`;
+  const period=context.period_start?(context.period_start===context.period_end?context.period_start:`${context.period_start} to ${context.period_end}`):"no settled period";
+  summary.textContent=`Live structure from ${view.source}: ${view.policy} Results cover ${context.unique_games||0} unique games during ${period}. Unit P&L is ledger scoring, not exchange portfolio P&L.`;
+  const sportChips=(context.sports||[]).map(row=>`<span class="chip">${esc(String(row.sport||"unknown").toUpperCase())}: ${row.calls} calls / ${row.games} games</span>`);
+  const marketChips=(context.markets||[]).map(row=>`<span class="chip">${esc(marketLabel(row.market_type))}: ${row.calls}</span>`);
+  chips.innerHTML=[...sportChips,...marketChips,`<span class="chip">Multi-market games: ${context.multi_market_games||0}</span>`,`<span class="chip">${esc(period)}</span>`].join("");
+  const hasScore=(p.scored_calls||0)>0;
+  const pnl=hasScore?Number(p.total_pnl):null;
+  const metricCards=[
+    [p.settled||0,"settled calls",""],
+    [context.unique_games||0,"unique games",""],
+    [`${p.wins||0}-${p.losses||0}`,"record",""],
+    [perfRate(p.win_rate),"hit rate",""],
+    [hasScore?`${pnl>=0?"+":""}${pnl.toFixed(2)}U`:"—","scored P&L",!hasScore?"":pnl>=0?"green":"red"],
+    [perfRate(p.roi),"scored ROI",""],
+    [`${p.scored_calls||0}/${p.settled||0}`,"P&L coverage",(p.scored_calls||0)<(p.settled||0)?"yellow":""],
+    [p.brier==null?"—":Number(p.brier).toFixed(3),"Brier score",""],
+    [(context.clv_rows||0)>0?`${(Number(p.mean_clv)*100).toFixed(2)}%`:"—",`mean CLV · ${context.clv_rows||0} rows`,""]
+  ];
+  kpis.innerHTML=metricCards.map(([value,label,klass])=>`<div class="k"><b class="${klass}">${value}</b><span>${label}</span></div>`).join("");
+  lineChart("#cPnl",p.pnl_curve||[]);
+
+  const sports=context.sports||[];
+  overview.innerHTML="<h3>Game coverage by sport</h3>"+performanceResultTable(
+    sports,"Sport",item=>`${String(item.sport||"unknown").toUpperCase()} · ${(item.markets||[]).map(marketLabel).join(" + ")}`
+  );
+
+  const blocks=[];
+  const markets=context.markets||[];
+  const marketItems=markets.map(item=>({label:marketLabel(item.market_type),metrics:(p.by_market||{})[item.market_type]||item}));
+  const represented=marketItems.map(item=>item.label).join(", ");
+  const marketNote=marketItems.length>1?`${represented} use different settlement semantics, so the pooled headline is not enough.`:
+    marketItems.length===1?`${represented} is the only represented market type in this view.`:"No market type has settled calls in this view.";
+  blocks.push(`<div class="perf-section wide"><h3>Market-type comparison</h3><div class="perf-market-note">${esc(marketNote)}</div>${performanceResultTable(marketItems,"Market",item=>item.label)}</div>`);
+  const intersections=p.by_sport_market||[];
+  blocks.push(`<div class="perf-section wide"><h3>Sport × market results</h3>${performanceResultTable(intersections,"Context",item=>`${String(item.sport||"unknown").toUpperCase()} · ${marketLabel(item.market_type)}`)}</div>`);
+  const calledSideBlocks=markets.map(market=>{
+    const selections=Object.entries(market.selections||{}).map(([selection,metrics])=>({selection,metrics}));
+    const sportText=(market.sports||[]).map(s=>String(s).toUpperCase()).join(", ");
+    const note=`${market.calls} settled calls across ${market.games} games${sportText?` in ${sportText}`:""}.${performanceLineNote(market)}`;
+    return `<div class="perf-market-block"><h4>${esc(marketLabel(market.market_type))}</h4><div class="perf-market-note">${esc(note)}</div>${performanceResultTable(selections,"Called side",item=>selectionLabel(market.market_type,item.selection))}</div>`;
+  }).join("");
+  blocks.push(`<div class="perf-section wide"><h3>Called-side results by market</h3><div class="perf-market-stack">${calledSideBlocks||'<div class="dim small">No settled called-side results in this view.</div>'}</div></div>`);
+  const confidence=Object.entries(p.by_confidence||{}).map(([bucket,metrics])=>({bucket,metrics}));
+  blocks.push(`<div class="perf-section wide"><h3>Model confidence</h3>${performanceResultTable(confidence,"Selected-side probability",item=>item.bucket)}</div>`);
+  const calibration=p.calibration||[];
+  const calibrationRows=calibration.map(c=>`<tr><td>${esc(c.bucket)}</td><td>${c.count}</td><td>${perfRate(c.mean_p)}</td><td>${perfRate(c.hit_rate)}</td><td class="${c.hit_rate>=c.mean_p?'green':'red'}">${((c.hit_rate-c.mean_p)*100).toFixed(1)}pp</td></tr>`).join("");
+  blocks.push(`<div class="perf-section wide"><h3>Calibration across represented markets</h3><div class="perf-market-note">Directional calibration of the called side. Read it beside the sport × market rows instead of treating a pooled gap as model-wide.</div><table class="data"><tr><th>Predicted bucket</th><th>N</th><th>Mean P</th><th>Hit rate</th><th>Gap</th></tr>${calibrationRows||'<tr><td colspan="5" class="dim">No probability rows in this view.</td></tr>'}</table></div>`);
+  const months=Object.entries(p.by_month||{});
+  const monthHtml=months.map(([month,v])=>`<div class="perf-month"><b>${esc(month)}</b><br>${v.wins}W-${v.losses}L · ${perfRate(v.win_rate)} · ${perfUnits(v.pnl)} · scored ${v.scored_calls||0}/${v.calls}</div>`).join("");
+  blocks.push(`<div class="perf-section wide"><h3>Settlement month</h3><div class="perf-months">${monthHtml||'<span class="dim small">No settled month in this view.</span>'}</div></div>`);
+  sections.innerHTML=blocks.join("");
+}
 function renderPerf(p){
   state.perf=p;
-  if(!p||!p.settled){$("#perfKpis").innerHTML='<div class="dim">No settled qualified calls yet.</div>';return;}
-  const wr=p.settled>0?p.wins/p.settled*100:0;
-  const s=p.streaks||{};
-  const clv=p.mean_clv?Number(p.mean_clv).toFixed(2)+"%":"—";
-  $("#perfKpis").innerHTML=`
-    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
-    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
-    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
-    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>
-    <div class="k"><b>${s.longest_win??"—"}</b><span>longest W streak</span></div>
-    <div class="k"><b class="red">${s.longest_loss??"—"}</b><span>longest L streak</span></div>
-    <div class="k"><b>${s.current>0?"W"+s.current:s.current<0?"L"+(-s.current):"—"}</b><span>current streak</span></div>
-    <div class="k"><b>${clv}</b><span>mean CLV</span></div>`;
-  lineChart("#cPnl",p.pnl_curve||[]);
-  const bs=Object.entries(p.by_sport||{});
-  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#perfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
-  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
-  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
-  $("#perfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
-  const bm=Object.entries(p.by_market||{});
-  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#perfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
-  const cal=p.calibration||[];
-  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
-  $("#perfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
-  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
-  $("#perfMonthly").textContent=mm.join(" · ");
+  const viewKey=$("#perfLedgerSelect").value||"main";
+  if($("#perfMode").value==="compare")renderPerformanceCompare();
+  else if(viewKey==="main"&&!$("#perfSportFilter").value&&!initialUrlState.get("perf_sport")){
+    renderPerformanceView(p,"main");setPanelState("perfMeta","ok",`Qualified ledger updated ${observedNow()}`);
+  }else loadPerformanceView(viewKey);
 }
-
-async function renderFlatPerf(){
-  let p;
-  try{p=await api("/api/flat-performance");}catch(e){$("#flatPerfKpis").innerHTML='<div class="red small">server unreachable</div>';return;}
-  if(!p||!p.settled){$("#flatPerfKpis").innerHTML='<div class="dim">No settled flat picks yet.</div>';return;}
-  const wr=p.settled>0?p.wins/p.settled*100:0;
-  $("#flatPerfKpis").innerHTML=`
-    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
-    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
-    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
-    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>`;
-  lineChart("#flatPerfChart",p.pnl_curve||[]);
-  const bs=Object.entries(p.by_sport||{});
-  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#flatPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
-  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
-  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
-  $("#flatPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
-  const bm=Object.entries(p.by_market||{});
-  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#flatPerfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
-  const cal=p.calibration||[];
-  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
-  $("#flatPerfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
-  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
-  $("#flatPerfMonthly").textContent=mm.join(" · ");
+async function loadPerformanceView(viewKey){
+  const view=PERFORMANCE_VIEWS[viewKey];
+  const sport=$("#perfSportFilter")?.value||(!perfFiltersInitialized?initialUrlState.get("perf_sport"):"")||"";
+  const url=view.api+(sport?`?sport=${encodeURIComponent(sport)}`:"");
+  try{
+    const payload=await api(url);
+    renderPerformanceView(payload,viewKey);
+    perfFiltersInitialized=true;
+    setPanelState("perfMeta","ok",`${view.label} updated ${observedNow()}`);
+  }catch(error){
+    $("#perfKpis").innerHTML='<div class="red small">Performance data unavailable.</div>';
+    setPanelState("perfMeta","error",`Performance request failed: ${error.message}`,"performanceControlChanged()");
+  }
 }
-
-async function renderResearchPerf(){
-  let p;
-  try{p=await api("/api/research-performance");}catch(e){$("#researchPerfKpis").innerHTML='<div class="red small">server unreachable</div>';return;}
-  if(!p||!p.settled){$("#researchPerfKpis").innerHTML='<div class="dim">No settled research picks yet.</div>';return;}
-  const wr=p.settled>0?p.wins/p.settled*100:0;
-  $("#researchPerfKpis").innerHTML=`
-    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
-    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
-    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
-    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>`;
-  lineChart("#researchPerfChart",p.pnl_curve||[]);
-  const bs=Object.entries(p.by_sport||{});
-  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#researchPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
-  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
-  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
-  $("#researchPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
-  const bm=Object.entries(p.by_market||{});
-  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#researchPerfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
-  const cal=p.calibration||[];
-  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
-  $("#researchPerfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
-  const mm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
-  $("#researchPerfMonthly").textContent=mm.join(" · ");
+async function renderPerformanceCompare(){
+  const sport=$("#perfSportFilter").value||(!perfFiltersInitialized?initialUrlState.get("perf_sport"):"")||"";
+  setPanelState("perfMeta","loading","Comparing all ledgers…");
+  const entries=Object.entries(PERFORMANCE_VIEWS);
+  try{
+    const payloads=await Promise.all(entries.map(([,view])=>api(view.api+(sport?`?sport=${encodeURIComponent(sport)}`:""))));
+    const available=[...new Set(payloads.flatMap(p=>p.available_sports||[]).map(String))].sort();
+    const selected=sport;
+    $("#perfSportFilter").innerHTML='<option value="">All sports</option>'+available.map(item=>`<option value="${escAttr(item)}">${esc(item.toUpperCase())}</option>`).join("");
+    $("#perfSportFilter").value=selected;
+    perfFiltersInitialized=true;
+    $("#perfTitle").textContent=`Performance comparison${sport?" — "+sport.toUpperCase():""}`;
+    $("#perfSummary").textContent="A single normalized comparison across the same sport scope. Undefined scoring remains —; it is never converted to zero.";
+    $("#perfContext").innerHTML=`<span class="chip">${sport?esc(sport.toUpperCase()):"All sports"}</span><span class="chip">4 ledgers</span>`;
+    $("#perfKpis").innerHTML=payloads.map((p,index)=>{
+      const scored=(p.scored_calls||0)>0,pnl=scored?Number(p.total_pnl):null;
+      return `<div class="k"><b class="${pnl==null?"":pnl>=0?"green":"red"}">${pnl==null?"—":(pnl>=0?"+":"")+pnl.toFixed(2)+"U"}</b><span>${entries[index][1].label} P&amp;L</span></div>`;
+    }).join("");
+    const rows=payloads.map((p,index)=>{
+      const view=entries[index][1],context=p.context||{},scored=(p.scored_calls||0)>0;
+      return `<tr><td><b>${esc(view.label)}</b></td><td>${p.settled||0}</td><td>${context.unique_games||0}</td><td>${p.wins||0}-${p.losses||0}</td><td>${perfRate(p.win_rate)}</td><td>${scored?perfUnits(p.total_pnl):"—"}</td><td>${scored?perfRate(p.roi):"—"}</td><td>${p.scored_calls||0}/${p.settled||0}</td></tr>`;
+    }).join("");
+    $("#perfCompare").innerHTML=`<div class="perf-section wide"><h3>Normalized ledger comparison</h3><table class="data"><tr><th>Ledger</th><th>Settled</th><th>Games</th><th>W-L</th><th>Hit rate</th><th>Scored P&amp;L</th><th>ROI</th><th>Coverage</th></tr>${rows}</table></div>`;
+    $("#perfDetail").style.display="none";$("#perfCompare").style.display="";
+    setPanelState("perfMeta","ok",`All ledgers compared ${observedNow()}`);
+  }catch(error){
+    $("#perfCompare").innerHTML='<div class="red small">Comparison unavailable.</div>';
+    setPanelState("perfMeta","error",`Comparison request failed: ${error.message}`,"performanceControlChanged()");
+  }
 }
-async function renderGatedResearchPerf(){
-  let p;
-  try{p=await api("/api/gated-research-performance");}catch(e){$("#gatedResearchPerfKpis").innerHTML='<div class="red small">server unreachable</div>';return;}
-  if(!p||!p.settled){$("#gatedResearchPerfKpis").innerHTML='<div class="dim">No settled gated research picks yet.</div>';return;}
-  const wr=p.settled>0?p.wins/p.settled*100:0;
-  $("#gatedResearchPerfKpis").innerHTML=`
-    <div class="k"><b>${p.settled||0}</b><span>settled</span></div>
-    <div class="k"><b>${wr.toFixed(1)}%</b><span>win rate</span></div>
-    <div class="k"><b class="${p.total_pnl>=0?'green':'red'}">${p.total_pnl>=0?'+':''}${(p.total_pnl||0).toFixed(2)}U</b><span>pnl</span></div>
-    <div class="k"><b>${((p.roi||0)*100).toFixed(1)}%</b><span>ROI</span></div>`;
-  lineChart("#gatedResearchPerfChart",p.pnl_curve||[]);
-  const bs=Object.entries(p.by_sport||{});
-  const rows=bs.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#gatedResearchPerfSport").innerHTML=`<tr><th>Sport</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${rows}`;
-  const order=["0.50-0.55","0.55-0.60","0.60-0.65","0.65+"];
-  const bb=order.filter(k=>(p.by_confidence||{})[k]).map(k=>{const v=p.by_confidence[k];return`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`;}).join("");
-  $("#gatedResearchPerfBucket").innerHTML=`<tr><th>Confidence</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${bb||'<tr><td colspan="5" class="dim">No confidence bucket data</td></tr>'}`;
-  const bm=Object.entries(p.by_market||{});
-  const mrows=bm.map(([k,v])=>`<tr><td>${k}</td><td>${v.calls}</td><td>${v.wins}</td><td>${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%</td><td class="${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U</td></tr>`).join("");
-  $("#gatedResearchPerfMarket").innerHTML=`<tr><th>Market</th><th>Calls</th><th>Wins</th><th>Win%</th><th>PnL</th></tr>${mrows||'<tr><td colspan="5" class="dim">No market data</td></tr>'}`;
-  const cal=p.calibration||[];
-  const crows=cal.map(c=>`<tr><td>${c.bucket}</td><td>${c.count}</td><td>${(c.mean_p*100).toFixed(1)}%</td><td>${(c.hit_rate*100).toFixed(1)}%</td></tr>`).join("");
-  $("#gatedResearchPerfCal").innerHTML=`<tr><th>Predicted</th><th>N</th><th>Mean P</th><th>Hit%</th></tr>${crows||'<tr><td colspan="4" class="dim">Insufficient sample</td></tr>'}`;
-  const gm=Object.entries(p.by_month||{}).map(([k,v])=>`${k}: ${v.pnl>=0?'+':''}${v.pnl.toFixed(2)}U (${v.calls} calls, ${v.wins}W-${v.calls-v.wins}L, ${v.calls?(v.wins/v.calls*100).toFixed(1):"—"}%)`);
-  $("#gatedResearchPerfMonthly").textContent=gm.join(" · ");
+async function performanceControlChanged(updateUrl=true){
+  const viewKey=$("#perfLedgerSelect").value||"main",mode=$("#perfMode").value||"ledger";
+  if(updateUrl)setUrlState({perf_ledger:viewKey,perf_sport:$("#perfSportFilter").value,perf_mode:mode});
+  $("#perfDetail").style.display=mode==="ledger"?"":"none";
+  $("#perfCompare").style.display=mode==="compare"?"":"none";
+  if(mode==="compare")await renderPerformanceCompare();else await loadPerformanceView(viewKey);
 }
+async function filterPerformance(viewKey){$("#perfLedgerSelect").value=viewKey;await performanceControlChanged();}
 
 /* ---------- Today tab ---------- */
 let todayRenderToken=0;
+let todayFiltersInitialized=false;
+function populateTodayFilters(rows){
+  const sport=$("#todaySport"),market=$("#todayMarket"),currentSport=sport.value,currentMarket=market.value;
+  const sports=[...new Set(rows.map(p=>p.league||p.Sport).filter(Boolean))].sort();
+  const markets=[...new Set(rows.map(p=>p.market_type||p.Type).filter(Boolean))].sort();
+  sport.innerHTML='<option value="">All sports</option>'+sports.map(value=>`<option value="${escAttr(value)}">${esc(String(value).toUpperCase())}</option>`).join("");
+  market.innerHTML='<option value="">All markets</option>'+markets.map(value=>`<option value="${escAttr(value)}">${esc(marketLabel(value))}</option>`).join("");
+  sport.value=(!todayFiltersInitialized&&initialUrlState.get("today_sport"))||currentSport;
+  market.value=(!todayFiltersInitialized&&initialUrlState.get("today_market"))||currentMarket;
+  todayFiltersInitialized=true;
+}
+function todayPassesControls(p){
+  const sport=$("#todaySport").value,market=$("#todayMarket").value;
+  if(sport&&String(p.league||p.Sport)!==sport)return false;
+  if(market&&String(p.market_type||p.Type)!==market)return false;
+  if($("#todayActionable").checked&&p.buy_ready!==true)return false;
+  return true;
+}
+function todayFiltersChanged(){
+  setUrlState({today_sport:$("#todaySport").value,today_market:$("#todayMarket").value,
+    today_actionable:$("#todayActionable").checked?"1":"",today_settled:$("#todayShowSettled").checked?"1":""});
+  renderToday();
+}
 async function renderToday(){
   const myToken=++todayRenderToken;
   let t;
-  try{t=await api("/api/today");}catch(e){$("#todayPicks").innerHTML='<div class="red small">server unreachable</div>';return;}
+  try{t=await api("/api/today");}catch(e){
+    $("#todayPicks").innerHTML='<div class="red small">Today data unavailable.</div>';
+    setPanelState("todayMeta","error",`Today request failed: ${e.message}`,"renderToday()");return;
+  }
   if(myToken!==todayRenderToken)return; // a newer renderToday() call superseded this one
   $("#todayDate").textContent="— "+t.date;
+  const allQualified=(t.picks||[]).filter(passesDisplaySettings);
+  populateTodayFilters(allQualified);
+  const qualified=allQualified.filter(todayPassesControls);
+  const qualifiedOpen=qualified.filter(p=>p.status==="open").length;
+  const qualifiedSettled=qualified.filter(p=>p.status==="settled").length;
   $("#todayKpis").innerHTML=`
-    <div class="k"><b>${t.count}</b><span>picks today</span></div>
-    <div class="k"><b class="yellow">${t.open}</b><span>open</span></div>
-    <div class="k"><b>${t.settled}</b><span>settled</span></div>`;
+    <div class="k"><b>${qualified.length}</b><span>qualified shown</span></div>
+    <div class="k"><b class="yellow">${qualifiedOpen}</b><span>qualified open</span></div>
+    <div class="k"><b>${qualifiedSettled}</b><span>qualified settled</span></div>`;
   const box=$("#todayPicks");box.innerHTML="";
-  if(!t.count){
-    box.innerHTML='<div class="dim">No picks logged for today yet. Hit <b>Daily Forecast</b> above — when it finishes, the slate lands here.</div>';
-    return;
-  }
   const showSettled=$("#todayShowSettled").checked;
-  const visiblePicks=t.picks.filter(p=>p.status==="open"||showSettled);
+  const visiblePicks=qualified.filter(p=>p.status==="open"||showSettled);
   if(!visiblePicks.length){
-    box.innerHTML='<div class="dim">No active picks remain today. Turn on <b>show settled</b> to review completed results.</div>';
-    return;
+    box.innerHTML='<div class="dim">No active picks remain today in the qualified ledger under the current display settings. Turn on <b>show settled</b> to review completed qualified results; Flat and Research candidates remain available below.</div>';
   }
   const pickEdge=p=>edgePoints(p);
   const bySport={};
@@ -1437,7 +1770,7 @@ async function renderToday(){
     const h=document.createElement("h2");h.textContent=sport+" — "+rows.length+" picks";h.style.marginTop="12px";
     box.appendChild(h);
     rows.forEach(p=>{
-      const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
+      const conf=Number.isFinite(Number(p.model_probability))?Number(p.model_probability):null;
       // No real executable quote was matched -- the row's "market price" is a
       // neutral -110 placeholder (cli.py's quote_warning fallback), not a real
       // Polymarket price. A computed edge/EV badge/suggested size against a
@@ -1463,16 +1796,17 @@ async function renderToday(){
         suggested>0?`size <b class="${edge>0?"green":"dim"}">${Number(suggested).toFixed(2)}U / $${(Number(suggested)*unitValue).toFixed(2)}</b> <span class="dim">(suggested paper)</span>`:"";
       const d=document.createElement("div");d.className="pick "+cls;
       d.innerHTML=`<div class="pick-row"><div class="pick-copy">
-        <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et} · ${p.market_type}</span>${res}</div>
+        <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et} · ${p.market_type}</span><span class="state-badge ${Date.parse(p.event_start_utc)>Date.now()?"ok":"warn"}">${esc(timeToStart(p.event_start_utc))}</span>${res}</div>
         <div class="pick-metrics"><span>pick <b>${esc(pickLabel(p))}</b></span>
         <span>model <b>${conf?pct(conf):"—"}</b></span>
         <span>market <b>${noQuote?"no quote":cents(market)}</b> <span class="dim">${noQuote?"":"("+(market?pct(market):"—")+")"}</span></span>
         <span>edge <b class="${edge>0?"green":"red"}">${noQuote?"—":edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-        ${sizing?`<span>${sizing}</span>`:""}<span class="dim">${p.model_version||""}</span>
+        ${sizing?`<span>${sizing}</span>`:""}${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
         ${p.unavailable_features?`<span class="pill push" title="Fell back to a neutral default for this game — every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div><div class="pick-action">${orderControl(p,true)}</div></div>
         ${noQuote?"":`<div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`}`;
-      d.onclick=()=>showModal(`<h2>${p.away_team} @ ${p.home_team}</h2><pre>${esc(JSON.stringify(p,null,1))}</pre>`);
+      d.tabIndex=0;d.setAttribute("role","button");d.setAttribute("aria-label",`Open details for ${p.away_team} at ${p.home_team}`);
+      d.onclick=()=>showPickDrawer(p);d.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();showPickDrawer(p);}};
       box.appendChild(d);
     });
   }
@@ -1480,33 +1814,35 @@ async function renderToday(){
   loadFlatToday(myToken);
   // ── Research picks (esports, soccer, etc.) ──
   loadResearchToday(myToken);
+  setPanelState("todayMeta","ok",`Today updated ${observedNow()} · ${qualified.length} qualified rows shown`);
 }
 async function loadFlatToday(token){
-  const todayET=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset()-300);return d.toISOString().slice(0,10);};
   try{
     const flat=await api("/api/flat-picks");
     if(token!==todayRenderToken)return; // a newer renderToday() call superseded this one
+    const showSettled=$("#todayShowSettled").checked;
     const today=flat.filter(p=>{
       const start=p.event_start_utc||p.start_et||"";
-      return start.startsWith(todayET());
+      return passesDisplaySettings(p)&&todayPassesControls(p)&&etDate(start)===todayET()&&(p.status==="open"||showSettled);
     });
     if(!today.length)return;
     const box=$("#todayPicks");
-    const sep=document.createElement("h2");
-    sep.textContent=`Flat Ledger — All ${today.length} model candidates (no edge gate)`;
-    sep.style.cssText="margin-top:20px;padding-top:12px;border-top:2px dashed var(--accent);color:var(--dim)";
-    box.appendChild(sep);
+    const details=document.createElement("details");details.className="today-source";
+    const summary=document.createElement("summary");
+    summary.textContent=`Flat Ledger — ${today.length} visible candidates (no edge gate)`;
+    details.appendChild(summary);
+    const content=document.createElement("div");details.appendChild(content);box.appendChild(details);
     const note=document.createElement("div");
     note.className="small dim";note.style.marginBottom="8px";
-    note.textContent="Every game the model evaluated today — no confidence filter. Use to cross-check missed opportunities.";
-    box.appendChild(note);
+    note.textContent="Candidates matching the current Settings sport and called-probability filters. Use to cross-check missed opportunities.";
+    content.appendChild(note);
     const bySport={};
     today.forEach(p=>{(bySport[p.league||"?"]=bySport[p.league||"?"]||[]).push(p);});
     for(const [sport,rows] of Object.entries(bySport)){
       const h=document.createElement("h3");h.textContent=sport+" — "+rows.length+" games";h.style.color="var(--dim)";
-      box.appendChild(h);
+      content.appendChild(h);
       rows.forEach(p=>{
-        const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
+        const conf=Number.isFinite(Number(p.model_probability))?Number(p.model_probability):null;
         const market=pregamePrice(p);
         const edge=edgePoints(p);
         const evBadge=edge==null?"":
@@ -1515,47 +1851,53 @@ async function loadFlatToday(token){
           '<span class="pill push">—EV</span>';
         const d=document.createElement("div");d.className="pick";
         d.innerHTML=`<div class="pick-row"><div class="pick-copy">
-          <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et||""} · ${p.market_type}</span>${evBadge}</div>
+          <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et||""} · ${p.market_type}</span><span class="state-badge ${Date.parse(p.event_start_utc)>Date.now()?"ok":"warn"}">${esc(timeToStart(p.event_start_utc))}</span>${evBadge}</div>
           <div class="pick-metrics"><span>pick <b>${esc(pickLabel(p))}</b></span>
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          <span class="dim">${p.model_version||""}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div></div>`;
-        box.appendChild(d);
+        d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);
+        d.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();showPickDrawer(p);}};
+        content.appendChild(d);
       });
     }
-  }catch(e){/* flat picks unavailable */ }
+  }catch(e){
+    if(token===todayRenderToken)$("#todayPicks").insertAdjacentHTML("beforeend",
+      `<div class="alert error"><span>! Flat Ledger unavailable: ${esc(e.message)}</span><button onclick="renderToday()">Retry</button></div>`);
+  }
 }
 async function loadResearchToday(token){
-  const todayET=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset()-300);return d.toISOString().slice(0,10);};
   try{
     const rp=await api("/api/research-picks");
     if(token!==todayRenderToken)return; // a newer renderToday() call superseded this one
+    const showSettled=$("#todayShowSettled").checked;
     const today=(Array.isArray(rp)?rp:[]).filter(p=>{
       const start=p.event_start_utc||p.start_et||"";
-      return start.startsWith(todayET());
+      return passesDisplaySettings(p)&&todayPassesControls(p)&&etDate(start)===todayET()&&(p.status==="open"||showSettled);
     });
     if(!today.length)return;
     const box=$("#todayPicks");
-    const sep=document.createElement("h2");
-    sep.textContent=`Flat Research — ${today.length} picks (esports, soccer, international baseball)`;
-    sep.style.cssText="margin-top:20px;padding-top:12px;border-top:2px dashed var(--violet);color:var(--violet)";
-    box.appendChild(sep);
+    const details=document.createElement("details");details.className="today-source";
+    const summary=document.createElement("summary");
+    summary.textContent=`Flat Research — ${today.length} visible picks (paper only)`;
+    details.appendChild(summary);
+    const content=document.createElement("div");details.appendChild(content);box.appendChild(details);
     const note=document.createElement("div");
     note.className="small dim";note.style.marginBottom="8px";
-    note.textContent="Every research-model pick aggregated from separate per-sport workbooks — no edge gate. Paper only — zero real-money exposure.";
-    box.appendChild(note);
+    note.textContent="Research calls matching the current Settings filters. No edge gate and zero real-money exposure.";
+    content.appendChild(note);
     const bySport={};
     today.forEach(p=>{(bySport[p.league||"?"]=bySport[p.league||"?"]||[]).push(p);});
     const pickEdge=p=>edgePoints(p);
     for(const [sport,rows] of Object.entries(bySport)){
       rows.sort((a,b)=>(pickEdge(b)??-9)-(pickEdge(a)??-9));
       const h=document.createElement("h3");h.textContent=sport+" — "+rows.length+" picks";h.style.color="var(--violet)";
-      box.appendChild(h);
+      content.appendChild(h);
       rows.forEach(p=>{
-        const conf=p.model_probability?Math.max(p.model_probability,1-p.model_probability):null;
+        const conf=Number.isFinite(Number(p.model_probability))?Number(p.model_probability):null;
         const market=pregamePrice(p);
         const edge=pickEdge(p);
         const evBadge=edge==null?"":
@@ -1566,18 +1908,23 @@ async function loadResearchToday(token){
           :'<span class="pill open">'+(p.status||"open")+'</span>')+" "+evBadge;
         const d=document.createElement("div");d.className="pick";
         d.innerHTML=`<div class="pick-row"><div class="pick-copy">
-          <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et||""} · ${p.market_type}</span>${res}</div>
+          <div class="pick-event"><b>${esc(p.away_team)} @ ${esc(p.home_team)}</b><span class="dim">${p.start_et||""} · ${p.market_type}</span><span class="state-badge ${Date.parse(p.event_start_utc)>Date.now()?"ok":"warn"}">${esc(timeToStart(p.event_start_utc))}</span>${res}</div>
           <div class="pick-metrics"><span>pick <b>${esc(pickLabel(p))}</b></span>
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          <span class="dim">${p.model_version||""}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
           </div></div>`;
-        box.appendChild(d);
+        d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);
+        d.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();showPickDrawer(p);}};
+        content.appendChild(d);
       });
     }
-  }catch(e){/* research picks unavailable */ }
+  }catch(e){
+    if(token===todayRenderToken)$("#todayPicks").insertAdjacentHTML("beforeend",
+      `<div class="alert error"><span>! Research Ledger unavailable: ${esc(e.message)}</span><button onclick="renderToday()">Retry</button></div>`);
+  }
 }
 function pickLabel(p){
   const sel=String(p.selection||"").toLowerCase();
@@ -1608,12 +1955,27 @@ function orderControl(p,compact=false){
     return `<span class="pill ${exchangeState==="pending_cancel"?"open":"win"}" title="${escAttr((order.order_id||"")+(exchangeState?" · "+exchangeState:""))}">${label}</span>`;
   }
   if(order.status==="filled"&&!p.position_closed)return `<span class="pill win" title="${escAttr(order.order_id||"")}">filled</span>`;
+  if(p.buy_ready!==true){
+    const reasons=[],edge=edgePoints(p);
+    if(p.quote?.ask==null)reasons.push("No executable ask is available");
+    if(p.quote?.observed_at_utc&&ageInfo(p.quote.observed_at_utc).stale)reasons.push(`Quote is stale (${ageInfo(p.quote.observed_at_utc).label})`);
+    if(edge==null)reasons.push("Decision edge is unavailable");
+    else if(edge<=0)reasons.push(`Decision edge ${(edge*100).toFixed(1)}pp is not positive`);
+    if(Date.parse(p.event_start_utc||"")<=Date.now())reasons.push("Event has already started");
+    const backendReason=String(p.buy_block_reason||""),backendKey=backendReason.toLowerCase();
+    const represented=(backendKey.includes("older")&&reasons.some(reason=>reason.includes("stale")))||
+      (backendKey.includes("positive")&&edge!=null&&edge<=0)||
+      (backendKey.includes("started")&&Date.parse(p.event_start_utc||"")<=Date.now())||
+      (backendKey.includes("quote")&&p.quote?.ask==null);
+    if(backendReason&&!represented)reasons.push(backendReason);
+    const exact=[...new Set(reasons)].join(" · ")||"Purchase authorization is unavailable";
+    return `<span class="blocked-order" role="status" aria-label="Purchase blocked: ${escAttr(exact)}"><span class="pill loss">Blocked</span><span class="reason">${esc(exact)}</span></span>`;
+  }
   const bid=p.quote?.bid,ask=p.quote?.ask;
   const defaultPrice=ask!=null?Number(ask).toFixed(2):"";
   const inputId=`orderPrice-${p.pick_id}`;
-  const reason=p.buy_ready?"Current ask buys immediately; a lower price rests on the book":(p.buy_block_reason||"order unavailable");
+  const reason="Current ask buys immediately; a lower price rests on the book";
   const auth=p.order_authorization==="manual_research_override"?"MAN":"MOD";
-  const blocked=reason.includes("older")?"scan prices":reason.includes("POLYMARKET_")?"API key needed":"blocked";
   // A previously filled buy whose position has since been fully sold/closed
   // (net shares back to ~0, per cached trade history) resets to a fresh buy
   // control instead of permanently showing "filled".
@@ -1624,8 +1986,8 @@ function orderControl(p,compact=false){
     p.position_closed?"Previous fill was fully sold/closed — showing a fresh buy":(order.status?`Previous order ${order.status}`:"")]
     .filter(Boolean).join(" · ");
   return `<span class="order-wrap${compact?" compact":""}" title="${escAttr(title)}">$<input class="order-price" id="${inputId}" aria-label="limit price" type="number" min="0.01" max="0.99" step="0.01" placeholder=".50" value="${defaultPrice}" onclick="event.stopPropagation()">`+
-    `<button class="${p.buy_ready?"primary":""}" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
-    `<span class="order-note">${prior}${book}${p.buy_ready?auth:blocked}</span></span>`;
+    `<button class="primary" onclick="event.stopPropagation();openBuy('${p.pick_id}',document.getElementById('${inputId}').value)">Buy</button>`+
+    `<span class="order-note">${prior}${book}${auth}</span></span>`;
 }
 function openSell(pickId){
   const p=state.picks.find(row=>String(row.pick_id)===String(pickId));
@@ -1741,6 +2103,7 @@ const renderLive=renderToday; // legacy name used by refreshAll
 
 /* ---------- Portfolio tab ---------- */
 async function renderFolio(){
+  try{
   const b=await api("/api/bets");
   state.livePortfolio=b;
   const live=b.status==="live";
@@ -1748,6 +2111,9 @@ async function renderFolio(){
   $("#folioStatus").innerHTML=live
     ?`<span class="green">● Connected to authenticated Polymarket US portfolio</span> · ${esc(shortDate(b.observed_at_utc))}`
     :`<span class="red">● Live account unavailable</span> · ${esc(b.error||"authentication required")} · model picks are not shown here`;
+  setPanelState("folioMeta",live?"ok":"error",
+    `${live?"Exchange portfolio":"Cached portfolio"} observed ${esc(shortDate(b.observed_at_utc||b.last_synced_at_utc||"unknown"))}`,
+    "renderFolio()");
   const o=b.open||{};
   const openCount=live?(Number(o.count)||0):0;
   $("#folioOpenKpis").innerHTML=`
@@ -1779,34 +2145,99 @@ async function renderFolio(){
     html+=`</table>`;
     $("#folioOpen").innerHTML=html;
   }
-  const h=b.recent_history||{};
-  const activityCount=Number(h.count)||0,tradeCount=Number(h.trade_count)||0,
-        settlementCount=Number(h.settlement_count)||0,realized=Number(h.realized_pnl_usd)||0;
-  const settlements=(h.activities||[]).filter(a=>a.type==="settlement");
-  const settledCount=settlements.length,
-        winCount=settlements.filter(a=>Number(a.realized_pnl_usd)>0).length,
-        lossCount=settlements.filter(a=>Number(a.realized_pnl_usd)<0).length,
-        winRate=settledCount>0?fmt(100*winCount/settledCount,1)+"%":"—";
-  $("#folioHistKpis").innerHTML=`
-    <div class="k"><b>${activityCount}</b><span>activities since ${esc(historyStart)}</span></div>
-    <div class="k"><b>${tradeCount}</b><span>filled trades</span></div>
-    <div class="k"><b>${settlementCount}</b><span>settlements</span></div>
-    <div class="k"><b>${winRate}</b><span>win rate (${winCount}W-${lossCount}L)</span></div>
-    <div class="k"><b class="${realized>=0?"green":"red"}">${realized>=0?"+$":"-$"}${fmt(Math.abs(realized),2)}</b><span>side-adjusted realized P&amp;L</span></div>`;
-  if(!activityCount){$("#folioHistory").innerHTML=`<p class="dim">No exchange trade or settlement history has been synced since ${esc(historyStart)}.</p>`;}
-  else {
-    let html=`<table class="data"><tr>
-      <th>Date</th><th>Type</th><th>Market</th><th>Your-side price</th><th>Quantity</th><th>Realized P&amp;L</th><th>Model link</th></tr>`;
-      (h.activities||[]).forEach(p=>{
-      html+=`<tr>
-        <td>${shortDate(p.occurred_at_utc)}</td><td><span class="pill ${p.type==="settlement"?"win":"open"}">${p.type}</span></td>
-        <td title="${escAttr(p.market_slug||"")}">${esc(p.market_name||p.title||slugToTitle(p.market_slug))}</td><td>${p.price==null?"—":cents(p.price)}</td><td>${p.quantity==null?"—":fmt(p.quantity,2)}</td>
-        <td class="${Number(p.realized_pnl_usd)>=0?"green":"red"}">${p.realized_pnl_usd==null?"—":(p.realized_pnl_usd>=0?"+$":"-$")+fmt(Math.abs(p.realized_pnl_usd),2)}</td>
-        <td>${p.model_pick&&p.outcome_side&&p.model_pick.side===p.outcome_side?esc(p.model_pick.model_version):"—"}</td>
-      </tr>`;});
-    html+=`</table>`;
-    $("#folioHistory").innerHTML=html;
+  populateFolioFilters();
+  renderFolioHistory();
+  renderIntegrity();
+  }catch(error){
+    $("#folioOpen").innerHTML='<p class="red">Portfolio data unavailable.</p>';
+    $("#folioHistory").innerHTML="";
+    setPanelState("folioMeta","error",`Portfolio request failed: ${error.message}`,"renderFolio()");
   }
+}
+let folioPage=1;
+let folioFiltersInitialized=false;
+function activitySport(row){
+  if(row.model_pick?.league)return String(row.model_pick.league).toLowerCase();
+  const parts=String(row.market_slug||"").split("-");
+  return parts.length>2?String(parts[1]).toLowerCase():"unknown";
+}
+function activityMarket(row){
+  if(row.model_pick?.market_type)return String(row.model_pick.market_type).toLowerCase();
+  const prefix=String(row.market_slug||"").split("-")[0];
+  return ({aec:"moneyline",asc:"spread",tsc:"total",atc:"team total",astatc:"player prop"}[prefix]||"other");
+}
+function activityIsLinked(row){return Boolean(row.model_pick&&(!row.outcome_side||row.model_pick.side===row.outcome_side));}
+function populateFolioFilters(){
+  const rows=state.livePortfolio?.recent_history?.activities||[];
+  const sport=$("#folioSport"),market=$("#folioMarket"),selectedSport=sport.value,selectedMarket=market.value;
+  const sports=[...new Set(rows.map(activitySport))].sort(),markets=[...new Set(rows.map(activityMarket))].sort();
+  sport.innerHTML='<option value="">All sports</option>'+sports.map(value=>`<option value="${escAttr(value)}">${esc(value.toUpperCase())}</option>`).join("");
+  market.innerHTML='<option value="">All markets</option>'+markets.map(value=>`<option value="${escAttr(value)}">${esc(marketLabel(value))}</option>`).join("");
+  sport.value=(!folioFiltersInitialized&&initialUrlState.get("folio_sport"))||selectedSport;
+  market.value=(!folioFiltersInitialized&&initialUrlState.get("folio_market"))||selectedMarket;
+  folioFiltersInitialized=true;
+}
+function filteredFolioActivities(){
+  const rows=state.livePortfolio?.recent_history?.activities||[],from=$("#folioFrom").value,to=$("#folioTo").value;
+  const sport=$("#folioSport").value,market=$("#folioMarket").value,type=$("#folioType").value,attribution=$("#folioAttribution").value;
+  return rows.filter(row=>{
+    const day=etDate(row.occurred_at_utc),linked=activityIsLinked(row);
+    if(from&&day<from||to&&day>to)return false;
+    if(sport&&activitySport(row)!==sport||market&&activityMarket(row)!==market||type&&row.type!==type)return false;
+    if(attribution==="linked"&&!linked||attribution==="unlinked"&&linked)return false;
+    return true;
+  });
+}
+function folioFiltersChanged(){
+  folioPage=1;
+  setUrlState({folio_from:$("#folioFrom").value,folio_to:$("#folioTo").value,folio_sport:$("#folioSport").value,
+    folio_market:$("#folioMarket").value,folio_type:$("#folioType").value,folio_attribution:$("#folioAttribution").value,
+    folio_rows:$("#folioPageSize").value});
+  renderFolioHistory();
+}
+function changeFolioPage(delta){folioPage+=delta;renderFolioHistory();}
+function renderFolioHistory(){
+  if(!state.livePortfolio)return;
+  const history=state.livePortfolio.recent_history||{},rows=filteredFolioActivities(),pageSize=Number($("#folioPageSize").value)||50;
+  const pages=Math.max(1,Math.ceil(rows.length/pageSize));folioPage=Math.min(Math.max(1,folioPage),pages);
+  const shown=rows.slice((folioPage-1)*pageSize,folioPage*pageSize);
+  const trades=rows.filter(row=>row.type==="trade"),settlements=rows.filter(row=>row.type==="settlement");
+  const winCount=settlements.filter(row=>Number(row.realized_pnl_usd)>0).length;
+  const lossCount=settlements.filter(row=>Number(row.realized_pnl_usd)<0).length;
+  const decidedSettlements=winCount+lossCount;
+  const realizedRows=rows.filter(row=>row.realized_pnl_usd!=null),realized=realizedRows.reduce((sum,row)=>sum+Number(row.realized_pnl_usd),0);
+  const linked=rows.filter(activityIsLinked).length,unlinked=rows.length-linked;
+  $("#folioHistKpis").innerHTML=`
+    <div class="k"><b>${rows.length}</b><span>filtered activities</span></div>
+    <div class="k"><b>${trades.length}</b><span>filled trades</span></div>
+    <div class="k"><b>${settlements.length}</b><span>settlements</span></div>
+    <div class="k"><b>${decidedSettlements?fmt(100*winCount/decidedSettlements,1)+"%":"—"}</b><span>win rate (${winCount}W-${lossCount}L)</span></div>
+    <div class="k"><b>${linked}</b><span>model-linked</span></div>
+    <div class="k"><b>${unlinked}</b><span>manual / unlinked</span></div>
+    <div class="k"><b class="${!realizedRows.length?"":realized>=0?"green":"red"}">${!realizedRows.length?"—":(realized>=0?"+$":"-$")+fmt(Math.abs(realized),2)}</b><span>filtered side-adjusted realized P&amp;L</span></div>`;
+  if(!rows.length){
+    $("#folioHistory").innerHTML='<p class="dim">No activities match these filters.</p>';
+  }else{
+    let html=`<div style="overflow:auto"><table class="data"><tr>
+      <th>Date</th><th>Sport</th><th>Market</th><th>Type</th><th>Entry</th><th>Decision</th><th>Spread</th><th>Slippage</th><th>Fees</th><th>Quantity</th><th>Realized P&amp;L</th><th>Attribution</th></tr>`;
+    shown.forEach((row,index)=>{
+      const model=row.model_pick||{},entry=row.price,decision=model.decision_price,spread=model.decision_spread;
+      const slippage=entry!=null&&decision!=null?Number(entry)-Number(decision):null;
+      const pnl=row.realized_pnl_usd,absoluteIndex=(folioPage-1)*pageSize+index;
+      html+=`<tr class="click-row" tabindex="0" role="button" onclick="showFolioDrawer(${absoluteIndex})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showFolioDrawer(${absoluteIndex})}">
+        <td>${shortDate(row.occurred_at_utc)}</td><td>${esc(activitySport(row).toUpperCase())}</td>
+        <td title="${escAttr(row.market_slug||"")}">${esc(row.market_name||row.title||slugToTitle(row.market_slug))}<div class="dim">${esc(marketLabel(activityMarket(row)))}</div></td>
+        <td><span class="pill ${row.type==="settlement"?"win":"open"}">${esc(row.type)}</span></td>
+        <td>${cents(entry)}</td><td>${cents(decision)}</td><td>${spread==null?"—":cents(spread)}</td>
+        <td class="${slippage==null?"":slippage<=0?"green":"red"}">${slippage==null?"—":(slippage>=0?"+":"")+cents(slippage)}</td>
+        <td>${row.fee_usd==null?"—":"$"+fmt(row.fee_usd,2)}</td><td>${row.quantity==null?"—":fmt(row.quantity,2)}</td>
+        <td class="${pnl==null?"":Number(pnl)>=0?"green":"red"}">${pnl==null?"—":(pnl>=0?"+$":"-$")+fmt(Math.abs(pnl),2)}</td>
+        <td>${activityIsLinked(row)?`<span class="state-badge ok">✓ ${esc(model.model_version||"linked")}</span>`:'<span class="state-badge warn">! manual / unlinked</span>'}</td></tr>`;
+    });
+    $("#folioHistory").innerHTML=html+"</table></div>";
+  }
+  window._filteredFolioActivities=rows;
+  $("#folioPager").innerHTML=`<button onclick="changeFolioPage(-1)" ${folioPage<=1?"disabled":""}>Previous</button><span>Page ${folioPage} of ${pages} · ${rows.length} rows</span><button onclick="changeFolioPage(1)" ${folioPage>=pages?"disabled":""}>Next</button>`;
 }
 function slugToTitle(slug){
   // aec-wnba-conn-phx-2026-07-17 → WNBA: Connecticut @ Phoenix
@@ -1834,19 +2265,52 @@ function marker(p){
 function gotoTab(name){const b=$$("#tabs button").find(x=>x.dataset.tab===name);if(b)b.click();}
 
 /* ---------- market ---------- */
+function marketFiltersChanged(){
+  setUrlState({market_source:$("#marketMode").value,market_sport:$("#mSport").value,
+    market_date:$("#mDate").value,market_stale:$("#marketStaleMinutes").value});
+  loadMarket();
+}
+function liveMarketRows(payload){
+  const observed=payload.observed_at_utc||null,rows=[];
+  (payload.events||[]).forEach(event=>(event.markets||[]).forEach(market=>(market.sides||[]).forEach(side=>{
+    rows.push({market_slug:market.slug||event.slug,market_name:event.title,market_type:market.type,line:market.line,
+      description:side.description,bid:null,ask:side.quote,spread:null,bid_size:null,ask_size:null,move:null,
+      observed_at_utc:observed,event_start_utc:event.start_utc,live_indicative:true});
+  })));
+  return rows;
+}
 async function loadMarket(){
-  const sport=$("#mSport").value,day=$("#mDate").value||todayET();
-  const m=await api(`/api/market?sport=${sport}&date=${day}`);
-  let html=`<tr><th>Market</th><th>Type</th><th>Line</th><th>Side</th><th>Bid</th><th>Ask</th><th>Spread</th><th>Move</th><th>Depth</th><th>Seen</th></tr>`;
-  (m.markets||[]).forEach(r=>{
-    const arrow=r.move==null?"—":r.move>0?`<span class="green">▲ ${fmt(r.move,3)}</span>`:r.move<0?`<span class="red">▼ ${fmt(r.move,3)}</span>`:"→";
-    html+=`<tr><td title="${escAttr(r.market_slug||"")}">${esc(r.market_name||slugToTitle(r.market_slug))}</td><td>${r.market_type||""}</td><td>${r.line??""}</td>
-      <td>${r.description||""}</td><td>${fmt(r.bid,3)}</td><td><b>${fmt(r.ask,3)}</b></td>
-      <td class="${r.spread>0.05?"yellow":""}">${fmt(r.spread,3)}</td><td>${arrow}</td>
-      <td class="dim">${fmt(r.bid_size,0)}/${fmt(r.ask_size,0)}</td>
-      <td class="dim">${String(r.observed_at_utc||"").slice(11,19)}</td></tr>`;});
-  if(!(m.markets||[]).length)html+=`<tr><td colspan=10 class="dim">No stored snapshots for ${sport} on ${day}.</td></tr>`;
-  $("#marketTable").innerHTML=html;
+  const sport=$("#mSport").value,day=$("#mDate").value||todayET(),mode=$("#marketMode").value||"stored";
+  const staleMinutes=Number($("#marketStaleMinutes").value)||5;
+  setPanelState("marketMeta","loading",`Loading ${mode} market data…`);
+  try{
+    const payload=await api(`/${mode==="live"?"api/live":"api/market"}?sport=${encodeURIComponent(sport)}&date=${encodeURIComponent(day)}`);
+    if(payload.error)throw new Error(payload.error);
+    const rows=mode==="live"?liveMarketRows(payload):(payload.markets||[]);
+    state.marketRows=rows;
+    $("#marketBasis").textContent=mode==="live"
+      ?"Live gateway quotes are indicative discovery prices, not executable BBOs. Bid, spread, and depth remain — when the gateway does not provide them."
+      :"Stored asks are executable decision-price evidence; midpoint is reference only.";
+    let html=`<tr><th>Market</th><th>Type</th><th>Line</th><th>Side</th><th>Bid</th><th>Ask / quote</th><th>Spread</th><th>Move</th><th>Depth B/A</th><th>Quote age</th><th>State</th></tr>`;
+    rows.forEach((r,index)=>{
+      const arrow=r.move==null?"—":r.move>0?`<span class="green">▲ ${fmt(r.move,3)}</span>`:r.move<0?`<span class="red">▼ ${fmt(r.move,3)}</span>`:"→";
+      const age=ageInfo(r.observed_at_utc,staleMinutes);
+      html+=`<tr class="click-row" tabindex="0" role="button" onclick="showMarketDrawer(${index})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMarketDrawer(${index})}">
+        <td title="${escAttr(r.market_slug||"")}">${esc(r.market_name||slugToTitle(r.market_slug))}</td><td>${esc(r.market_type||"—")}</td><td>${r.line??"—"}</td>
+        <td>${esc(r.description||"—")}</td><td>${fmt(r.bid,3)}</td><td><b>${fmt(r.ask,3)}</b></td>
+        <td class="${r.spread>0.05?"yellow":""}">${fmt(r.spread,3)}</td><td>${arrow}</td>
+        <td class="dim">${r.bid_size==null&&r.ask_size==null?"—":fmt(r.bid_size,0)+"/"+fmt(r.ask_size,0)}</td>
+        <td class="dim">${esc(age.label)}</td><td>${quoteStateBadge(r.observed_at_utc,staleMinutes)}</td></tr>`;
+    });
+    if(!rows.length)html+=`<tr><td colspan="11" class="dim">No ${mode} market rows for ${esc(sport.toUpperCase())} on ${esc(day)}.</td></tr>`;
+    $("#marketTable").innerHTML=html;
+    const stale=rows.filter(r=>ageInfo(r.observed_at_utc,staleMinutes).stale).length;
+    setPanelState("marketMeta","ok",`${rows.length} ${mode} rows updated ${observedNow()} · ${stale} stale`);
+    renderIntegrity();
+  }catch(error){
+    $("#marketTable").innerHTML='<tr><td class="red">Market data unavailable.</td></tr>';
+    setPanelState("marketMeta","error",`Market request failed: ${error.message}`,"loadMarket()");
+  }
 }
 
 /* ---------- research ---------- */
@@ -1857,6 +2321,7 @@ function filteredResearchRows(){
   const fq=($("#fSearch_R").value||'').toLowerCase();
   const ff=$("#fFrom_R").value, ft=$("#fTo_R").value;
   return (_researchCache||[]).filter(p=>{
+    if(!passesDisplaySettings(p))return false;
     if(fs&&(p.league||'')!==fs)return false;
     if(fm&&(p.market_type||'moneyline')!==fm)return false;
     const st=String(p.status||'').toLowerCase();
@@ -1869,7 +2334,7 @@ function filteredResearchRows(){
       if(!hay.toLowerCase().includes(fq))return false;
     }
     if(ff||ft){
-      const d=(p.event_start_utc||'').slice(0,10);
+      const d=etDate(p.event_start_utc);
       if(ff&&d<ff)return false;
       if(ft&&d>ft)return false;
     }
@@ -1931,7 +2396,10 @@ async function renderResearch(force){
     `${k.toUpperCase()}: <b>${v.toLocaleString()}</b> games <span class="dim">· last ingest ${s.last_ingest[k]||"never"}</span>`).join("<br>");
 }
 window.openBacktest=async f=>{const d=await api("/api/backtest?file="+encodeURIComponent(f));
-  showModal(`<h2>${f}</h2><pre>${esc(JSON.stringify(d,null,1)).slice(0,60000)}</pre>`);};
+  showDrawer(f,detailGrid([
+    ["Status",d.status||"—"],["Sport",d.sport||String(d.sports_scope||"—")],
+    ["Generated",d.generated_at||d.created_at||"—"],["Top-level sections",Object.keys(d).join(", ")||"—"]
+  ])+'<p class="small dim" style="margin-top:14px">This drawer summarizes the report. Open the source artifact directly for its complete payload.</p>');};
 
 /* ---------- gated research (esports/soccer picks that genuinely cleared eligibility) ---------- */
 let _gatedResearchCache=[];
@@ -1941,6 +2409,7 @@ function filteredGatedResearchRows(){
   const fq=($("#fSearch_G").value||'').toLowerCase();
   const ff=$("#fFrom_G").value, ft=$("#fTo_G").value;
   return (_gatedResearchCache||[]).filter(p=>{
+    if(!passesDisplaySettings(p))return false;
     if(fs&&(p.league||'')!==fs)return false;
     if(fm&&(p.market_type||'moneyline')!==fm)return false;
     const st=String(p.status||'').toLowerCase();
@@ -1953,7 +2422,7 @@ function filteredGatedResearchRows(){
       if(!hay.toLowerCase().includes(fq))return false;
     }
     if(ff||ft){
-      const d=(p.event_start_utc||'').slice(0,10);
+      const d=etDate(p.event_start_utc);
       if(ff&&d<ff)return false;
       if(ft&&d>ft)return false;
     }
@@ -2058,6 +2527,97 @@ window.confirmAction=confirmAction; window.bootstrapDialog=bootstrapDialog;
 /* ---------- modal ---------- */
 function showModal(html){$("#modalBody").innerHTML=html;$("#modal").style.display="flex";}
 const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+let drawerReturnFocus=null;
+function detailGrid(items){
+  return `<dl class="detail-grid">${items.map(([label,value])=>`<dt>${esc(label)}</dt><dd>${value==null||value===""?"—":esc(value)}</dd>`).join("")}</dl>`;
+}
+function showDrawer(title,html){
+  drawerReturnFocus=document.activeElement;
+  $("#drawerTitle").textContent=title;$("#drawerBody").innerHTML=html;
+  $("#drawerBackdrop").classList.add("open");$("#drawer").classList.add("open");
+  $("#drawer").removeAttribute("inert");$("#drawer").setAttribute("aria-hidden","false");
+  document.body.style.overflow="hidden";$("#drawer").focus();
+}
+function closeDrawer(){
+  $("#drawerBackdrop").classList.remove("open");$("#drawer").classList.remove("open");
+  $("#drawer").setAttribute("inert","");$("#drawer").setAttribute("aria-hidden","true");
+  document.body.style.overflow="";drawerReturnFocus?.focus?.();
+}
+function showPickDrawer(p){
+  if(!p)return;
+  const edge=edgePoints(p),quoteAge=ageInfo(p.quote?.observed_at_utc);
+  showDrawer(`${p.away_team||"Away"} @ ${p.home_team||"Home"}`,detailGrid([
+    ["Sport",String(p.league||"").toUpperCase()],["Market",marketLabel(p.market_type)],["Selection",pickLabel(p)],
+    ["Game time",`${gameTimeET(p.event_start_utc)} · ${timeToStart(p.event_start_utc)}`],
+    ["State",p.status||"unknown"],["Result",p.result||"—"],["Model probability",p.model_probability==null?"—":pct(p.model_probability)],
+    ["Decision ask",cents(pregamePrice(p))],["Decision edge",edge==null?"—":`${edge>=0?"+":""}${(edge*100).toFixed(1)}pp`],
+    ["Quote age",quoteAge.label],["Quote state",quoteAge.stale?"STALE":"CURRENT"],
+    ["Size",p.status==="settled"||Number(p.units)>0?`${fmt(p.display_units??p.units)}U`:"—"],
+    ["P&L",p.status==="settled"?`${fmt(pickPnl(p))}U`:"—"],
+    ["Purchase state",p.buy_ready===true?"Ready":`Blocked — ${p.buy_block_reason||"not authorized"}`],
+    ["Model version",p.model_version||"—"],["Pick ID",p.pick_id||"—"]
+  ]));
+}
+function showPickDrawerById(pickId,mode){
+  const rows=mode==="research"?_researchCache:mode==="gated"?_gatedResearchCache:
+    [...state.picks,..._flatCache,..._researchCache,..._gatedResearchCache];
+  showPickDrawer((rows||[]).find(row=>String(row.pick_id)===String(pickId)));
+}
+function showMarketDrawer(index){
+  const row=state.marketRows[index];if(!row)return;
+  const age=ageInfo(row.observed_at_utc,Number($("#marketStaleMinutes").value)||5);
+  showDrawer(row.market_name||slugToTitle(row.market_slug),detailGrid([
+    ["Source",row.live_indicative?"Live indicative gateway":"Stored executable BBO"],["Sport",String($("#mSport").value).toUpperCase()],
+    ["Market",marketLabel(row.market_type)],["Side",row.description||"—"],["Line",row.line??"—"],
+    ["Bid",cents(row.bid)],["Ask / quote",cents(row.ask)],["Spread",row.spread==null?"—":cents(row.spread)],
+    ["Bid depth",row.bid_size==null?"—":fmt(row.bid_size,0)],["Ask depth",row.ask_size==null?"—":fmt(row.ask_size,0)],
+    ["Quote age",age.label],["Stale state",age.stale?"STALE":"CURRENT"],["Observed UTC",row.observed_at_utc||"—"],
+    ["Event start",row.event_start_utc||"—"],["Market slug",row.market_slug||"—"]
+  ]));
+}
+function showFolioDrawer(index){
+  const row=(window._filteredFolioActivities||[])[index];if(!row)return;
+  const model=row.model_pick||{},decision=model.decision_price,slippage=row.price!=null&&decision!=null?Number(row.price)-Number(decision):null;
+  showDrawer(row.market_name||row.title||slugToTitle(row.market_slug),detailGrid([
+    ["Occurred",row.occurred_at_utc||"—"],["Sport",activitySport(row).toUpperCase()],["Market type",marketLabel(activityMarket(row))],
+    ["Activity",row.type||"—"],["Outcome side",row.outcome_side||"—"],["Entry price",cents(row.price)],
+    ["Decision price",cents(decision)],["Decision spread",cents(model.decision_spread)],
+    ["Slippage",slippage==null?"—":`${slippage>=0?"+":""}${cents(slippage)}`],["Fees",row.fee_usd==null?"—":"$"+fmt(row.fee_usd,2)],
+    ["Quantity",row.quantity==null?"—":fmt(row.quantity,2)],["Realized P&L",row.realized_pnl_usd==null?"—":"$"+fmt(row.realized_pnl_usd,2)],
+    ["Attribution",activityIsLinked(row)?`Model-linked · ${model.model_version||"version unavailable"}`:"Manual / unlinked"],
+    ["Market slug",row.market_slug||"—"],["Activity ID",row.activity_id||"—"]
+  ]));
+}
+function dashboardIntegrity(){
+  const sources=[["Qualified",state.picks],["Flat",_flatCache],["Research",_researchCache],["Gated",_gatedResearchCache]];
+  let duplicates=0,missingTimestamps=0,missingQuotes=0,pastUnsettled=0,total=0;
+  sources.forEach(([,rows])=>{
+    const seen=new Set();
+    (rows||[]).forEach(row=>{
+      total++;
+      const identity=String(row.pick_id||[row.league,row.event_id,row.market_type,row.selection,row.line].join("|"));
+      if(seen.has(identity))duplicates++;else seen.add(identity);
+      if(!row.event_start_utc)missingTimestamps++;
+      if(String(row.status).toLowerCase()==="open"&&pregamePrice(row)==null)missingQuotes++;
+      const start=Date.parse(row.event_start_utc||"");
+      if(String(row.status).toLowerCase()==="open"&&Number.isFinite(start)&&start<Date.now()-6*3600000)pastUnsettled++;
+    });
+  });
+  return {total,duplicates,missingTimestamps,missingQuotes,pastUnsettled};
+}
+function renderIntegrity(){
+  const box=$("#integrityChecks");if(!box)return;
+  const checks=dashboardIntegrity();
+  const rows=[
+    ["Duplicate ledger rows",checks.duplicates],
+    ["Missing event timestamps",checks.missingTimestamps],
+    ["Open rows missing quotes",checks.missingQuotes],
+    ["Past events still unsettled",checks.pastUnsettled]
+  ];
+  box.innerHTML=rows.map(([label,count])=>`<div class="integrity-row"><span>${esc(label)}</span><span class="state-badge ${count?"warn":"ok"}">${count?"! "+count:"✓ 0"}</span></div>`).join("")+
+    `<div class="small dim">${checks.total} rows checked across Qualified, Flat, Research, and Gated dashboard sources. These checks report display integrity; they do not mutate any ledger.</div>`;
+}
+document.addEventListener("keydown",event=>{if(event.key==="Escape"){closeDrawer();$("#modal").style.display="none";}});
 
 /* ---------- refresh loop ---------- */
 let timer=null,remaining=0;
@@ -2070,18 +2630,26 @@ function resetTimer(){
     if(remaining<=0){remaining=every;refreshAll();}},1000);
 }
 async function refreshAll(){
-  try{
-    const [s,m,p,perf,evidence]=await Promise.all([api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence")]);
-    state.picks=p; renderStatus(s); renderMatrix(m); renderPerf(perf); renderProductionEvidence(evidence); renderPicks(); renderLive(); renderFolio();
-    // populateFilters() reads _flatCache/_researchCache/_gatedResearchCache,
-    // so it must run AFTER these caches are loaded — otherwise the first
-    // refresh after a page load builds every dropdown except Ledger's from
-    // empty arrays (only backfilled on the NEXT refresh cycle).
-    await Promise.all([renderResearch(true), renderFlat(true), renderGatedResearch(true)]);
-    populateFilters();
-  }catch(e){
-    $("#updatedTxt").innerHTML='<span class="red">Updated: SERVER UNREACHABLE — is dashboard_server.py running?</span>';
-  }
+  const core=await Promise.allSettled([
+    api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence")
+  ]);
+  const [statusResult,matrixResult,picksResult,perfResult,evidenceResult]=core;
+  if(statusResult.status==="fulfilled")renderStatus(statusResult.value);
+  else setPanelState("healthMeta","error",`Health request failed: ${statusResult.reason?.message||"unknown error"}`,"refreshAll()");
+  if(matrixResult.status==="fulfilled")renderMatrix(matrixResult.value);
+  if(picksResult.status==="fulfilled"){state.picks=picksResult.value;renderPicks();}
+  if(perfResult.status==="fulfilled")renderPerf(perfResult.value);
+  else setPanelState("perfMeta","error",`Performance request failed: ${perfResult.reason?.message||"unknown error"}`,"performanceControlChanged()");
+  if(evidenceResult.status==="fulfilled")renderProductionEvidence(evidenceResult.value);
+  const panels=await Promise.allSettled([renderToday(),renderFolio(),loadMarket()]);
+  // populateFilters() reads every cache, so it must run after the ledger
+  // requests settle. One failed source no longer blanks every other panel.
+  await Promise.allSettled([renderResearch(true),renderFlat(true),renderGatedResearch(true)]);
+  populateFilters();renderIntegrity();
+  const failures=[...core,...panels].filter(result=>result.status==="rejected").length;
+  $("#updatedTxt").innerHTML=failures
+    ?`<span class="yellow">Updated with ${failures} panel error${failures===1?"":"s"}</span>`
+    :`Updated: ${new Date().toLocaleTimeString()}`;
 }
 if(location.protocol==="file:"){
   document.body.innerHTML='<div style="max-width:640px;margin:80px auto;font-family:monospace;color:#e7e9f0;background:#12151d;border:1px solid #ff5c5c;border-radius:12px;padding:24px">'+
@@ -2091,10 +2659,21 @@ if(location.protocol==="file:"){
   '<p style="line-height:1.7">then open <a href="http://127.0.0.1:8765/" style="color:#33d17e">http://127.0.0.1:8765/</a></p></div>';
   throw new Error("file:// mode");
 }
+if("ResizeObserver" in window)new ResizeObserver(syncStatusbarHeight).observe($("#statusbar"));
+window.addEventListener("resize",syncStatusbarHeight);
+syncStatusbarHeight();
 applySettings();
 mountFilterBars();
-$("#mDate").value=todayET();
-refreshAll(); loadMarket(); resetTimer();
+setControlFromUrl("perfLedgerSelect","perf_ledger");setControlFromUrl("perfMode","perf_mode");
+setControlFromUrl("marketMode","market_source");setControlFromUrl("marketStaleMinutes","market_stale");
+setControlFromUrl("mDate","market_date");if(!$("#mDate").value)$("#mDate").value=todayET();
+setControlFromUrl("todayActionable","today_actionable",true);setControlFromUrl("todayShowSettled","today_settled",true);
+setControlFromUrl("folioFrom","folio_from");setControlFromUrl("folioTo","folio_to");
+setControlFromUrl("folioType","folio_type");setControlFromUrl("folioAttribution","folio_attribution");
+setControlFromUrl("folioPageSize","folio_rows");
+const requestedTab=initialUrlState.get("tab");
+if(requestedTab&&$("#tab-"+requestedTab))gotoTab(requestedTab);
+refreshAll();resetTimer();
 </script>
 </body>
 </html>
