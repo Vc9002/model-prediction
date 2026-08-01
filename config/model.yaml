@@ -36,7 +36,12 @@ bankroll:
   reference_units: 5
   kelly_fraction: 0.5
   min_edge: 0.02
-  min_pick_units: 0.5
+  # Range widened 2026-07-31 (operator directive) from 0.5-2.0 to 1.0-2.0:
+  # 1U is now the floor for the LEAST confident logged pick, 2U the ceiling
+  # for the most confident -- paired with the same-day fix making
+  # model_uncertainty actually shrink sizing within that range (previously
+  # a dead parameter in edge_scaled_units).
+  min_pick_units: 1.0
   max_pick_units: 2.0
   max_daily_units: 5.0
   max_league_daily_units: 3.0
@@ -249,78 +254,82 @@ models:
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
+    qualification_override_reason: Esports v5 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: lol-tiered-elo-v4
-    production_artifact: config/models/lol-tiered-elo-v4.json
+    active_production_version: lol-tiered-elo-v5
+    production_artifact: config/models/lol-tiered-elo-v5.json
     market_target: esports_match_winner
     min_edge: 0.0
-    # Raised from 0.0 (2026-07-31): real settled Gated Research picks were
-    # performing WORSE than unfiltered Research (46.4% vs 54.2% win rate) --
-    # confirmed the gate was doing almost no curation. Set to this artifact's
-    # own validated confidence_threshold (lol-tiered-elo-v4.json), the same
-    # distance-from-0.5 value the real accuracy-by-confidence table shows
-    # actually separates a meaningfully better-calibrated range (63.9% at
-    # 0.00 -> 74.9% at 0.15). Research (unfiltered, every priced game) is
-    # deliberately untouched -- only Gated (the "model says this is valid"
-    # tier) is tightened.
+    # v5 (2026-07-31): re-validated with K/threshold selected by proper
+    # scoring rules instead of a raw flat-stake P&L proxy (v4's K=96 override
+    # sat at the exact top of its search grid for 4 of 5 titles -- a classic
+    # truncated-search/overfitting signal). K is now chosen by min Brier
+    # (a pure calibration parameter, no volume/quality tradeoff, so a proper
+    # scoring rule is the principled choice); confidence_threshold is still
+    # chosen by units_at_minus_110 deliberately -- Brier was tried there too
+    # and found structurally wrong for this decision (it improves almost
+    # monotonically toward the single most restrictive threshold with no
+    # interior optimum, unlike units_at_minus_110 which found a genuine
+    # interior optimum ~0.03-0.05 for every title). This value matches this
+    # artifact's own validated confidence_threshold.
     research_confidence_gate: 0.05
   CS2:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
+    qualification_override_reason: Esports v5 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: cs2-tiered-elo-v4
-    production_artifact: config/models/cs2-tiered-elo-v4.json
+    active_production_version: cs2-tiered-elo-v5
+    production_artifact: config/models/cs2-tiered-elo-v5.json
     market_target: esports_match_winner
     min_edge: 0.01
-    # Raised from 0.0 (2026-07-31) -- see LOL's comment above for the full
-    # rationale. Value matches cs2-tiered-elo-v4.json's own validated
-    # confidence_threshold.
+    # v5 (2026-07-31) -- see LOL's comment above for the full rationale.
+    # Value matches this artifact's own validated confidence_threshold.
     research_confidence_gate: 0.03
   DOTA2:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
+    qualification_override_reason: Esports v5 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: dota2-tiered-elo-v4
-    production_artifact: config/models/dota2-tiered-elo-v4.json
+    active_production_version: dota2-tiered-elo-v5
+    production_artifact: config/models/dota2-tiered-elo-v5.json
     market_target: esports_match_winner
     min_edge: 0.02
-    # Raised from 0.0 (2026-07-31) -- see LOL's comment above for the full
-    # rationale. Value matches dota2-tiered-elo-v4.json's own validated
-    # confidence_threshold.
-    research_confidence_gate: 0.05
+    # v5 (2026-07-31) -- see LOL's comment above for the full rationale.
+    # Value matches this artifact's own validated confidence_threshold
+    # (lower than v4's 0.05 -- the re-run search found the real interior
+    # optimum at 0.03 for this title).
+    research_confidence_gate: 0.03
   VALORANT:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: Esports v4 artifacts use Platt-scaled Elo; qualification
+    qualification_override_reason: Esports v5 artifacts use Platt-scaled Elo; qualification
       gate is not applicable to esports match-winner markets.
-    active_production_version: valorant-tiered-elo-v4
-    production_artifact: config/models/valorant-tiered-elo-v4.json
+    active_production_version: valorant-tiered-elo-v5
+    production_artifact: config/models/valorant-tiered-elo-v5.json
     market_target: esports_match_winner
     min_edge: 0.02
-    # Raised from 0.0 (2026-07-31) -- see LOL's comment above for the full
-    # rationale. Value matches valorant-tiered-elo-v4.json's own validated
-    # confidence_threshold.
-    research_confidence_gate: 0.05
+    # v5 (2026-07-31) -- see LOL's comment above for the full rationale.
+    # Value matches this artifact's own validated confidence_threshold
+    # (lower than v4's 0.05 -- the re-run search found the real interior
+    # optimum at 0.03 for this title).
+    research_confidence_gate: 0.03
   RAINBOW_SIX:
     family: neutral_series_elo
     status: research
     origin: statistical_model
-    active_research_version: rainbow_six-tiered-elo-v4
+    active_research_version: rainbow_six-tiered-elo-v5
     market_target: esports_match_winner
     min_edge: 0.02
-    # Added 2026-07-31, matching the other 4 titles' Gated tightening --
-    # value from rainbow_six-tiered-elo-v4.json's own validated
-    # confidence_threshold. Without this key, the code's own default (0.05)
-    # would silently apply instead of this title's real validated value.
+    # v5 (2026-07-31) -- see LOL's comment above for the full rationale.
+    # Value matches this artifact's own validated confidence_threshold.
+    # Without this key, the code's own default (0.05) would silently apply
+    # instead of this title's real validated value.
     research_confidence_gate: 0.03
     note: New 2026-07-27. Unlike LOL/CS2/DOTA2/VALORANT, not yet promoted to
       shadow_qualified via qualification_override -- that was a deliberate

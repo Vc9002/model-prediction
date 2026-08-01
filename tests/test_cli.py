@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from model_prediction import cli
 from model_prediction.cli import _clear_today_open, _find_tennis_result, _verify_chain
 from model_prediction.domain import (
@@ -400,6 +402,71 @@ def test_find_tennis_result_pending_while_match_not_yet_completed() -> None:
     espn = _FakeTennisESPN(_tennis_scoreboard(completed=False))
     result = _find_tennis_result(espn, "2026-07-27", _tennis_row())
     assert result["completed"] is False
+
+
+def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path) -> None:
+    """Operator directive, 2026-07-31: CLV wired for every model, not just
+    MLB -- tennis should read the same per-sport-date snapshot history the
+    daily slate capture already writes (data/odds/tennis/{date}/...)."""
+    from model_prediction.cli import _settle_tennis_pick
+    from model_prediction.data_sources.polymarket_us import PolymarketSnapshotStore
+
+    ledger = _ledger(tmp_path)
+    event_start_utc = "2026-07-27T20:00:00Z"
+    request = PickRequest(
+        event_start_utc=event_start_utc,
+        event_id="event-tennis-1",
+        league=League.TENNIS,
+        away_team="Alpha Player",
+        home_team="Beta Player",
+        market_type=MarketType.MONEYLINE,
+        selection="away",
+        line=None,
+        sportsbook="polymarket_us",
+        american_odds=110,
+        model_probability=0.55,
+        model_uncertainty=0.05,
+        model_version="tennis-surface-elo-v1",
+        rationale="Surface-blended Elo; executable ask 0.4500 (market_slug=wta-alpha-beta-2026).",
+        risks="",
+        model_origin=ModelOrigin.STATISTICAL_MODEL,
+        model_state=ModelState.SHADOW_QUALIFIED,
+    )
+    away_player = CanonicalTeam(
+        "Alpha Player", League.TENNIS, "Alpha Player", "Alpha Player", True, None, None, ()
+    )
+    home_player = CanonicalTeam(
+        "Beta Player", League.TENNIS, "Beta Player", "Beta Player", True, None, None, ()
+    )
+    eligibility = EligibilityResult(
+        RecordType.QUALIFIED_SHADOW_CALL,
+        "CALL",
+        "QUALIFIED",
+        0.5,
+        60,
+        0.05,
+        0.05,
+        away_player,
+        home_player,
+    )
+    row = ledger.append_evaluated(request, eligibility, now=datetime(2026, 7, 27, 10, tzinfo=UTC))
+
+    store = PolymarketSnapshotStore.for_sport_date(tmp_path, "tennis", "2026-07-27")
+    store.append(
+        {
+            "provider": "polymarket_us",
+            "market_slug": "wta-alpha-beta-2026",
+            "observed_at_utc": "2026-07-27T15:00:00Z",
+            "long": {"description": "Alpha Player", "ask": 0.58},
+            "short": {"description": "Beta Player", "ask": 0.44},
+        }
+    )
+    espn = _FakeTennisESPN(_tennis_scoreboard(away_wins=True))
+    result = _settle_tennis_pick(row, ledger, espn, data_root=tmp_path)
+    assert result is not None and result.get("settled") is True
+    settled_row = next(r for r in ledger.rows() if r["pick_id"] == row["pick_id"])
+    assert settled_row["probability_clv"] != ""
+    assert float(settled_row["closing_raw_implied_probability"]) == pytest.approx(0.58)
 
 
 def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executable(

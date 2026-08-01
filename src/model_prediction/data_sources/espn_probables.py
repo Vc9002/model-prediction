@@ -240,6 +240,50 @@ def point_in_time_pitcher_era_gap(
     return round(float(latest["home_era"]) - float(latest["away_era"]), 4)
 
 
+def point_in_time_probable_starters(
+    event_id: str,
+    decision_at: datetime,
+) -> dict[str, str]:
+    """Latest archived probable-starter NAMES available before first pitch.
+
+    Sibling to point_in_time_pitcher_era_gap, which discards the starter
+    identity and returns only the ERA gap number. The MLB availability
+    feature needs the actual name to cross-reference against MLB Stats API
+    roster/transaction status, so this exposes it separately rather than
+    changing the ERA gap function's return shape.
+    """
+    if not _PIT_ARCHIVE_PATH.exists():
+        raise ValueError(f"NO_CALL_STARTERS_NO_PIT_ARCHIVE: {event_id}")
+    decision = parse_utc(decision_at.isoformat())
+    eligible: list[dict] = []
+    with _PIT_ARCHIVE_PATH.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+                observed = parse_utc(str(row["observed_at_utc"]))
+                event_start = parse_utc(str(row["event_start_utc"]))
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                continue
+            if (
+                str(row.get("event_id")) == str(event_id)
+                and row.get("pit_eligible") is True
+                and observed <= decision
+                and observed < event_start
+                and row.get("home_starter")
+                and row.get("away_starter")
+            ):
+                eligible.append(row)
+    if not eligible:
+        raise ValueError(f"NO_CALL_STARTERS_NO_PIT_ARCHIVE: {event_id}")
+    latest = max(eligible, key=lambda row: str(row["observed_at_utc"]))
+    return {
+        "home_starter": str(latest["home_starter"]),
+        "away_starter": str(latest["away_starter"]),
+    }
+
+
 def espn_pitcher_era_gap(event_id: str, home_team: str, away_team: str,
                          date_str: str = "") -> float:
     """Live probable pitcher ERA gap from ESPN.

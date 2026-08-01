@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-08-01T06:01:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-30T21:57:00+00:00",
+      "team": "New York Liberty"
+    }
+  ],
+  "event_id": "401857106",
+  "observed_at_utc": "2026-08-01T06:34:41.843144+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "c63d1a04710e46fb7f8158f52e6ebdb1ba3a6243bbc70e466a291c472bed6740",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

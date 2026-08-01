@@ -26,6 +26,7 @@ from typing import Any
 import httpx
 
 from .domain import eastern_today
+from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
 from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
@@ -325,6 +326,118 @@ def backfill_international_baseball(
     }
 
 
+def refresh_recent_international_baseball_matches(
+    data_root: str | Path,
+    league: str,
+    client: OfficialInternationalBaseballClient | None = None,
+) -> dict[str, Any]:
+    """Merge the current season's newly-finished games into the existing
+    history, instead of `backfill_international_baseball`'s full-window
+    overwrite.
+
+    Found 2026-07-31: unlike esports (`refresh_recent_matches`, wired into
+    `daily`), nothing kept KBO/NPB Elo ratings current -- ratings only
+    updated when someone manually ran `backfill_international_baseball`
+    then re-validated. Confirmed live: kbo-tie-aware-elo-v1.json was 6 days
+    stale, npb-tie-aware-elo-v1.json 14 days stale, and nothing in the
+    dashboard's status/alert logic surfaces artifact staleness at all (only
+    a much looser 30-day raw-manifest-age check). `backfill_...` replaces
+    games.jsonl entirely with whatever `from_date..to_date` returns --
+    calling it with a short recent window on a schedule would silently
+    delete every prior season's history, and calling it with the league's
+    full multi-year minimum_year to avoid that would re-fetch the entire
+    catalog every cycle. This instead re-fetches only the current calendar
+    year (a single, cheap `kbo_year`/`npb_year` call -- a season is a few
+    hundred games, not the multi-year full history) and merges it into the
+    existing file, keyed by the source's stable `game_id`, so ratings can be
+    refreshed daily without either problem.
+
+    Self-healing fallback: if `games.jsonl` doesn't exist yet -- no backfill
+    has ever succeeded for this league (first run, or every prior daily
+    attempt failed before ever writing the file) -- a current-year-only
+    refresh would permanently strand every earlier season, since there's no
+    existing history to merge into. Falls back to a full
+    `backfill_international_baseball` (the league's real `minimum_year`
+    through today) in that case instead; every day this doesn't happen it's
+    a no-op fast path (an existing file means some earlier run already
+    completed the real backfill).
+    """
+    league = league.lower()
+    if league not in LEAGUE_SPECS:
+        raise ValueError(f"unsupported international baseball league: {league}")
+    directory = Path(data_root) / "international_baseball" / league
+    games_path = directory / "games.jsonl"
+    teams_path = directory / "teams.json"
+    manifest_path = directory / "manifest.json"
+
+    if not games_path.exists():
+        return backfill_international_baseball(
+            data_root,
+            league,
+            from_date=date(int(LEAGUE_SPECS[league]["minimum_year"]), 1, 1).isoformat(),
+            client=client,
+        )
+
+    existing_games: dict[str, dict[str, Any]] = {}
+    if games_path.exists():
+        with games_path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    row = json.loads(line)
+                    existing_games[str(row["game_id"])] = row
+
+    source = client or OfficialInternationalBaseballClient()
+    today = eastern_today()
+    fresh, request_count = source.kbo_year(today.year) if league == "kbo" else source.npb_year(today.year)
+    minimum = date(int(LEAGUE_SPECS[league]["minimum_year"]), 1, 1)
+    for row in fresh:
+        if minimum <= date.fromisoformat(row["game_date"]) <= today:
+            existing_games[str(row["game_id"])] = row
+
+    games = sorted(existing_games.values(), key=lambda row: (row["game_date"], row["game_id"]))
+    teams = {
+        team_id: {
+            "team_id": team_id,
+            "name": team["name"],
+            "aliases": sorted(
+                set(team.get("aliases", ())) | set(team.get("source_names", ())) | {team_id}
+            ),
+        }
+        for team_id, team in LEAGUE_SPECS[league]["teams"].items()
+    }
+    _atomic_write(games_path, "".join(_canonical_json(row) + "\n" for row in games))
+    _atomic_write(teams_path, json.dumps(teams, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+
+    earliest = min((row["game_date"] for row in games), default=today.isoformat())
+    manifest = {
+        "schema_version": "international-baseball-games-v1",
+        "league": league,
+        "league_name": LEAGUE_SPECS[league]["name"],
+        "source": "official league regular-season schedule/results",
+        "source_urls": [KBO_SCHEDULE_PAGE] if league == "kbo" else ["https://npb.jp/bis/eng/"],
+        "requires_api_key": False,
+        "requires_signup": False,
+        "extracted_at_utc": _utc_now(),
+        "requested_window": {"from": earliest, "to": today.isoformat()},
+        "effective_window": {"from": earliest, "to": today.isoformat()},
+        "game_count": len(games),
+        "tie_count": sum(bool(row["tie"]) for row in games),
+        "request_count": request_count,
+        "games_sha256": _sha256(games_path),
+        "teams_sha256": _sha256(teams_path),
+        "limitations": [
+            "Official pages do not provide a versioned bulk-data contract; cache and hashes preserve each extraction.",
+            "The baseline excludes postseason and exhibition games.",
+            "Incremental refresh: only the current calendar year was re-fetched this run; prior years are carried forward unchanged from the last full backfill.",
+        ],
+    }
+    _atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return {
+        **manifest,
+        "paths": {"games": str(games_path), "teams": str(teams_path), "manifest": str(manifest_path)},
+    }
+
+
 def find_international_baseball_result(
     data_root: str | Path,
     league: str,
@@ -388,8 +501,8 @@ class HomeElo:
 
     def decisive_home_probability(self, away_id: str, home_id: str) -> float:
         away = self.ratings.get(away_id, 1500.0)
-        home = self.ratings.get(home_id, 1500.0) + self.home_advantage
-        return 1.0 / (1.0 + 10.0 ** ((away - home) / 400.0))
+        home = self.ratings.get(home_id, 1500.0)
+        return expected_win_probability(home, away, self.home_advantage)
 
     def _apply_decay(self, game_date: str) -> None:
         if self.decay_rate <= 0 or self._last_active is None:
@@ -790,6 +903,15 @@ def forecast_international_baseball_slate(
             if not away_id or not home_id:
                 no_calls.append({**base, "reason": "NO_CALL_HOME_AWAY_UNRESOLVED"})
                 continue
+            # Resolved by team_id (tag-safe, via order_to_id above), not by
+            # position in `descriptions` -- market["sides"] has no ordering
+            # guarantee (see data_sources.polymarket_us._normalize_event), so
+            # a caller assuming descriptions[0]=away/descriptions[1]=home
+            # would silently swap home/away whenever the raw side order
+            # differs from that assumption.
+            id_to_description = dict(zip(team_ids, descriptions, strict=True))
+            base["away_team"] = id_to_description[away_id]
+            base["home_team"] = id_to_description[home_id]
             if any(team_id not in ratings for team_id in team_ids):
                 no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
                 continue

@@ -26,8 +26,8 @@ from ..domain import MarketType
 from .base import ScoreSimulation
 
 ENGINE_VERSION = "mlb-analyst-poisson-trend-v0.2"
-MARGIN_MODEL_VERSION = "measured-edge-margin-v1"
-TOTALS_MODEL_VERSION = "measured-edge-totals-v1"
+MARGIN_MODEL_VERSION = "measured-edge-margin-v2"
+TOTALS_MODEL_VERSION = "measured-edge-totals-v2"
 
 # Backwards-compatible alias kept for artifact validation strings.
 MODEL_VERSION = ENGINE_VERSION
@@ -506,7 +506,20 @@ class MeasuredEdgeMarginModel:
     def calibrate_selected_side(self, raw_probability: float) -> float:
         if not 0 < raw_probability < 1:
             raise ValueError("raw probability must be between 0 and 1")
-        return _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
+        calibrated = _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
+        if not 0 < calibrated < 1:
+            # __init__'s governance check only validates scale/offset at
+            # raw_probability=0.5 (the real invariant it guards: "no large
+            # systematic bias at a coinflip"); it says nothing about the
+            # extremes. A confident selected-side raw_probability near 1
+            # could still push a scale/offset pair that passed that check
+            # into an invalid "probability" here -- fail closed rather than
+            # silently return a value outside [0,1] into the ledger/edge math.
+            raise ValueError(
+                f"margin calibration produced an out-of-range probability ({calibrated}) "
+                f"for raw_probability={raw_probability}"
+            )
+        return calibrated
 
 
 _TOTALS_OVERRIDE_FIELDS = {
@@ -535,6 +548,20 @@ class MeasuredEdgeTotalsModel:
         self.raw = _load_artifact(model_path, TOTALS_MODEL_VERSION)
         if formula_spec.formula_version != ENGINE_VERSION:
             raise ValueError("totals model must use the configured Trend Engine score model")
+        # Same governance gate as MeasuredEdgeMarginModel -- previously
+        # missing entirely here, so a future totals recalibration could ship
+        # with zero bounds on scale/offset. Real invariant: calibration
+        # doesn't inject a large systematic bias, checked at a 50/50 raw
+        # input (see the matching comment on the margin model for why this
+        # is checked at 0.5 specifically, not by bounding offset alone).
+        scale, offset = _artifact_float(self.raw, "scale"), _artifact_float(self.raw, "offset")
+        if not 0 < scale <= 1.5:
+            raise ValueError("totals calibration scale outside governance bounds")
+        calibrated_at_half = scale * 0.5 + offset
+        if not 0.35 <= calibrated_at_half <= 0.65:
+            raise ValueError(
+                "totals calibration offset implies too much bias at raw probability 0.5"
+            )
         self.formula_spec = formula_spec
 
     def predict(
@@ -564,7 +591,13 @@ class MeasuredEdgeTotalsModel:
     def calibrate_selected_side(self, raw_probability: float) -> float:
         if not 0 < raw_probability < 1:
             raise ValueError("raw probability must be between 0 and 1")
-        return _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
+        calibrated = _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
+        if not 0 < calibrated < 1:
+            raise ValueError(
+                f"totals calibration produced an out-of-range probability ({calibrated}) "
+                f"for raw_probability={raw_probability}"
+            )
+        return calibrated
 
     @staticmethod
     def _apply_feature_overrides(

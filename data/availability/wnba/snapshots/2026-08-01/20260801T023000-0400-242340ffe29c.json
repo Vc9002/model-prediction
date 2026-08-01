@@ -1,0 +1,108 @@
+{
+  "entries": [
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Bell, Kierstan",
+      "reason": "Injury/Illness - Right Leg; right leg",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Parker- Tyus, Cheyenne",
+      "reason": "Not With Team",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Diggins, Skylar",
+      "reason": "Injury/Illness - Right Knee; Right Knee",
+      "team": "Chicago Sky"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Stevens, Azura",
+      "reason": "Personal Reasons",
+      "team": "Chicago Sky"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "NYL@PHX",
+      "player_name": "Fiebich, Leonie",
+      "reason": "Injury/Illness - Left Foot; L. Foot",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "NYL@PHX",
+      "player_name": "Sabally, Satou",
+      "reason": "Concussion Protocol",
+      "team": "New York Liberty"
+    }
+  ],
+  "observed_at_utc": "2026-08-01T06:34:38.603063+00:00",
+  "report_at_utc": "2026-08-01T06:30:00+00:00",
+  "schema_version": "1",
+  "source": "official_wnba_injury_report",
+  "source_index_url": "https://www.wnba.com/api/injury-reports",
+  "source_pdf_sha256": "242340ffe29c3ab62b6b0c532ee9e40eddc775fdf1db2f54c86b52fb54a029da",
+  "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-08-01_02_30AM.pdf",
+  "sport": "wnba",
+  "team_matchups": {
+    "Chicago Sky": "LVA@CHI",
+    "Connecticut Sun": "CON@DAL",
+    "Dallas Wings": "CON@DAL",
+    "Golden State Valkyries": "TOR@GSV",
+    "Indiana Fever": "IND@MIN",
+    "Las Vegas Aces": "LVA@CHI",
+    "Los Angeles Sparks": "LAS@PDX",
+    "Minnesota Lynx": "IND@MIN",
+    "New York Liberty": "NYL@PHX",
+    "Phoenix Mercury": "NYL@PHX",
+    "Portland Fire": "LAS@PDX",
+    "Toronto Tempo": "TOR@GSV"
+  },
+  "team_report_status": {
+    "Chicago Sky": "submitted",
+    "Connecticut Sun": "not_yet_submitted",
+    "Dallas Wings": "not_yet_submitted",
+    "Golden State Valkyries": "not_yet_submitted",
+    "Indiana Fever": "not_yet_submitted",
+    "Las Vegas Aces": "submitted",
+    "Los Angeles Sparks": "not_yet_submitted",
+    "Minnesota Lynx": "not_yet_submitted",
+    "New York Liberty": "submitted",
+    "Phoenix Mercury": "submitted_no_entries",
+    "Portland Fire": "not_yet_submitted",
+    "Toronto Tempo": "not_yet_submitted"
+  },
+  "teams_listed": [
+    "Chicago Sky",
+    "Connecticut Sun",
+    "Dallas Wings",
+    "Golden State Valkyries",
+    "Indiana Fever",
+    "Las Vegas Aces",
+    "Los Angeles Sparks",
+    "Minnesota Lynx",
+    "New York Liberty",
+    "Phoenix Mercury",
+    "Portland Fire",
+    "Toronto Tempo"
+  ]
+}

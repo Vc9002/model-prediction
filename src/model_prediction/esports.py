@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from .domain import eastern_today
+from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
 from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
@@ -73,11 +74,20 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
 # v4 lineage (2026-07-24): Platt-scaled Elo, manual alias overrides, improved
 # fuzzy matching, confidence gate in cli. Recency/tier scaffolding present but
 # disabled (set HALF_LIFE_DAYS=0 / weights=1.0 to enable).
-ESPORTS_MODEL_LINEAGE = "v4"
-K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0, 80.0, 96.0)
-CONFIDENCE_CANDIDATES = (0.0, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15)
-# Per-sport optimal K from grid search (overrides auto-selection).
-SPORT_K_OVERRIDE: dict[str, float] = {"cs2": 96.0, "lol": 96.0, "dota2": 96.0, "valorant": 96.0}
+ESPORTS_MODEL_LINEAGE = "v5"
+# Widened 2026-07-31 (was capped at 96.0): SPORT_K_OVERRIDE previously pinned
+# 4 of 5 titles to exactly the grid's own maximum, a classic sign the search
+# was truncated rather than the true optimum landing there.
+K_CANDIDATES = (8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0, 80.0, 96.0, 112.0, 128.0)
+CONFIDENCE_CANDIDATES = (0.0, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.22, 0.26, 0.30)
+# Removed 2026-07-31 (operator directive): both were hand-picked overrides of
+# the auto-selection below, justified only by "units_at_minus_110" -- a raw,
+# volume-sensitive flat-stake P&L proxy, not a proper scoring rule. K is a
+# pure calibration hyperparameter with no volume/quality tradeoff, so
+# selecting it by P&L instead of Brier score has no principled justification
+# and risks overfitting to noise (exactly what the grid-edge symptom above
+# suggested). Selection is now purely data-driven every time this runs.
+SPORT_K_OVERRIDE: dict[str, float] = {}
 SPORT_THRESHOLD_OVERRIDE: dict[str, float] = {}
 # Recency decay: newer matches get higher effective K (half-life 90 days, max 1.3x).
 RECENCY_HALF_LIFE_DAYS: float = 90.0
@@ -475,7 +485,7 @@ class NeutralElo:
         """Unshrunk Elo expectation — the correct basis for rating updates."""
         rating1 = self.ratings.get(team1_id, 1500.0)
         rating2 = self.ratings.get(team2_id, 1500.0)
-        return 1.0 / (1.0 + 10.0 ** ((rating2 - rating1) / 400.0))
+        return expected_win_probability(rating1, rating2)
 
     def probability(self, team1_id: str, team2_id: str) -> float:
         """Platt-calibrated prediction. Falls back to raw Elo if no calibrator."""
@@ -635,11 +645,14 @@ def validate_esports_baseline(
         validation_predictions_raw[k] = predictions
         candidate_scores.append({"k": k, **_metrics(predictions)})
 
-    # Select K by max diagnostic units (v4: was min Brier)
-    chosen_k = SPORT_K_OVERRIDE.get(
-        title,
-        float(max(candidate_scores, key=lambda row: float(row["units_at_minus_110"]))["k"]),
-    )
+    # Select K by min Brier score (a proper scoring rule) rather than the raw,
+    # volume-sensitive flat-stake "units_at_minus_110" diagnostic. K is a pure
+    # calibration hyperparameter with no volume/quality tradeoff, so a proper
+    # scoring rule is the principled choice -- v4 selected by units instead,
+    # which let 4 of 5 titles land exactly on the grid's own maximum (96.0),
+    # a classic overfitting/truncated-search signal (operator directive,
+    # 2026-07-31).
+    chosen_k = float(min(candidate_scores, key=lambda row: float(row["brier"]))["k"])
 
     # Fit Platt scaling on raw validation predictions for chosen K
     raw_preds = validation_predictions_raw[chosen_k]
@@ -661,9 +674,21 @@ def validate_esports_baseline(
         row for row in threshold_scores
         if int(row["observations"]) >= 50 and float(row["accuracy"] or 0) >= 0.60
     ]
-    chosen_threshold = SPORT_THRESHOLD_OVERRIDE.get(
-        title,
-        float(max(viable, key=lambda row: row["units_at_minus_110"])["threshold"]) if viable else 0.0,
+    # Unlike K above, Brier is NOT a valid criterion here: restricting to an
+    # ever-smaller, ever-more-confident subset mechanically improves Brier
+    # with no natural interior optimum (verified empirically 2026-07-31 --
+    # it decreases almost monotonically toward the single most restrictive
+    # threshold in the grid for every title, stopping only when the sample
+    # gets too small to be reliable, e.g. 34 observations at the top
+    # threshold for rainbow_six). units_at_minus_110 is the right choice
+    # here specifically because threshold selection is a genuine volume-vs-
+    # quality tradeoff (unlike K, a pure calibration parameter with no such
+    # tradeoff) -- confirmed it produces a real interior optimum (~0.03-0.05)
+    # for every title, not a grid-edge artifact.
+    chosen_threshold = (
+        float(max(viable, key=lambda row: float(row["units_at_minus_110"]))["threshold"])
+        if viable
+        else 0.0
     )
 
     # Locked test with Platt: train Elo on train+validation, predict test

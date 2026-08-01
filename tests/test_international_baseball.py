@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import pytest
 
 from model_prediction.data_sources.polymarket_us import LEAGUE_SLUGS, POLYMARKET_SPORT_LEAGUES
+from model_prediction.domain import eastern_today
 from model_prediction.international_baseball import (
     HomeElo,
     _chronological_split,
@@ -222,6 +223,77 @@ def test_forecast_uses_home_away_and_current_asks_but_stays_zero_unit(tmp_path) 
     assert all(side["executable_ask"] is not None for side in contract["sides"])
 
 
+class _HomeFirstMarketClient(_MarketClient):
+    """Same event as _MarketClient, but the gateway lists home before away --
+    market["sides"] has no ordering guarantee (see
+    data_sources.polymarket_us._normalize_event), so this must not be assumed."""
+
+    def slate(self, league, game_date, timezone_name):
+        return [
+            {
+                "event_id": "event-1",
+                "event_start_utc": "2099-07-20T09:00:00Z",
+                "markets": [
+                    {
+                        "market_type": "moneyline",
+                        "market_slug": "kbo-test",
+                        "sides": [
+                            {"description": "LG Twins", "selection": "home"},
+                            {"description": "Kia Tigers", "selection": "away"},
+                        ],
+                    }
+                ],
+            }
+        ]
+
+
+def test_forecast_resolves_home_away_by_tag_not_by_raw_side_position(tmp_path) -> None:
+    """Operator directive, 2026-07-31: home/away must be resolved by each
+    side's own tag, never by array position -- a swap would silently
+    mislabel the ledger row (feeds home_advantage lookups and the official-
+    schedule settlement match), even though it can never change WHICH team
+    the model picks (that's always by probability, independent of home/away)."""
+    directory = tmp_path / "international_baseball/kbo"
+    directory.mkdir(parents=True)
+    (directory / "teams.json").write_text(
+        json.dumps(
+            {
+                "KIA": {"name": "Kia Tigers", "aliases": ["KIA"]},
+                "LG": {"name": "LG Twins", "aliases": ["LG"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "kbo-tie-aware-elo-v1.json").write_text(
+        json.dumps(
+            {
+                "model_version": "kbo-tie-aware-elo-v1",
+                "artifact_hash": "abc",
+                "k": 20,
+                "home_advantage": 50,
+                "tie_probability": 0.04,
+                "trained_through_date": "2099-07-18",
+                "ratings": {"KIA": 1500, "LG": 1520},
+            }
+        ),
+        encoding="utf-8",
+    )
+    home_first = forecast_international_baseball_slate(
+        tmp_path, models, "kbo", "2099-07-20", client=_HomeFirstMarketClient()
+    )
+    away_first = forecast_international_baseball_slate(
+        tmp_path, models, "kbo", "2099-07-20", client=_MarketClient()
+    )
+    contract_home_first = home_first["priced_contracts"][0]
+    contract_away_first = away_first["priced_contracts"][0]
+    # Regardless of which order the gateway listed the sides in, the
+    # resolved home/away team names must agree.
+    assert contract_home_first["home_team"] == contract_away_first["home_team"] == "LG Twins"
+    assert contract_home_first["away_team"] == contract_away_first["away_team"] == "Kia Tigers"
+
+
 class _CollisionMarketClient:
     """Both side descriptions alias to the same team_id (e.g. an alias collision)."""
 
@@ -387,3 +459,80 @@ def test_find_international_baseball_result_none_when_teams_json_missing(tmp_pat
         tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha", client=object()
     )
     assert result is None
+
+
+class _FakeYearClient:
+    """Records every (league, year) requested and returns caller-supplied
+    rows for that exact year, [] otherwise -- lets a test assert exactly
+    which years were (or weren't) re-fetched."""
+
+    def __init__(self, rows_by_year: dict[int, list[dict]]):
+        self.rows_by_year = rows_by_year
+        self.requested_years: list[int] = []
+
+    def kbo_year(self, year: int):
+        self.requested_years.append(year)
+        return list(self.rows_by_year.get(year, [])), 1
+
+    def npb_year(self, year: int):
+        self.requested_years.append(year)
+        return list(self.rows_by_year.get(year, [])), 1
+
+
+def _game_row(game_id: str, game_date: str, home="LG", away="KIA", home_score=3, away_score=2):
+    return {
+        "game_id": game_id,
+        "game_date": game_date,
+        "home_team": home,
+        "away_team": away,
+        "home_score": home_score,
+        "away_score": away_score,
+        "tie": home_score == away_score,
+    }
+
+
+def test_refresh_merges_current_year_without_touching_older_seasons(tmp_path) -> None:
+    """Operator directive, 2026-07-31: KBO/NPB ratings were silently going
+    stale (confirmed live: 6-14 days) with nothing analogous to esports'
+    refresh_recent_matches. This is the KBO/NPB equivalent -- must only
+    re-fetch the current year, merging in without deleting prior seasons."""
+    from model_prediction.international_baseball import refresh_recent_international_baseball_matches
+
+    today = eastern_today()
+    directory = tmp_path / "international_baseball/kbo"
+    directory.mkdir(parents=True)
+    old_year_game = _game_row("old-1", f"{today.year - 2}-05-01")
+    (directory / "games.jsonl").write_text(json.dumps(old_year_game) + "\n", encoding="utf-8")
+    (directory / "teams.json").write_text("{}", encoding="utf-8")
+    (directory / "manifest.json").write_text("{}", encoding="utf-8")
+
+    new_game = _game_row("new-1", today.isoformat())
+    client = _FakeYearClient({today.year: [new_game]})
+
+    result = refresh_recent_international_baseball_matches(tmp_path, "kbo", client=client)
+
+    assert client.requested_years == [today.year]  # only the current year, nothing else
+    games_path = directory / "games.jsonl"
+    game_ids = {json.loads(line)["game_id"] for line in games_path.read_text().splitlines() if line.strip()}
+    assert game_ids == {"old-1", "new-1"}  # old season preserved, new season merged in
+    assert result["game_count"] == 2
+
+
+def test_refresh_falls_back_to_full_backfill_when_no_history_exists(tmp_path) -> None:
+    """If games.jsonl doesn't exist -- first run ever, or every prior daily
+    attempt failed before writing anything -- a current-year-only refresh
+    would permanently strand every earlier season. Must fall back to a real
+    multi-year backfill instead."""
+    from model_prediction.international_baseball import refresh_recent_international_baseball_matches
+
+    today = eastern_today()
+    client = _FakeYearClient({today.year: [_game_row("only-game", today.isoformat())]})
+
+    result = refresh_recent_international_baseball_matches(tmp_path, "kbo", client=client)
+
+    # minimum_year for kbo is 2015 -- a real fallback backfill requests
+    # every year from there through today, not just the current year.
+    assert len(client.requested_years) > 1
+    assert client.requested_years[0] == 2015
+    assert (tmp_path / "international_baseball/kbo/games.jsonl").exists()
+    assert result["game_count"] == 1

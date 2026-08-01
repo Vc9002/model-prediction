@@ -425,6 +425,77 @@ that same distribution.
 The first three groups should be collected prospectively even before the model
 is ready. Coefficients cannot recover information that was never timestamped.
 
+### MLB player-availability implementation status — 2026-08-01
+
+Implemented, shadow only, probable-starter unavailability only (rank-1
+group above, narrowed to a single binary check per side):
+
+- `data_sources/mlb_injuries.py` captures MLB Stats API's dated IL-transaction
+  history (`/v1/transactions`) and a same-day 40-man roster status snapshot
+  (`/v1/teams/{id}/roster?rosterType=40Man`), both free and keyless;
+- unlike the WNBA PDF report, MLB Stats API transactions are retroactively
+  queryable: a single capture fetched at any time, covering a date range that
+  includes the target game date, can reconstruct availability as of that date.
+  The point-in-time discipline lives entirely in each transaction's own
+  `date` field (stored as `reported_date`) — `effectiveDate` (stored as
+  `effective_date`, sometimes retroactively backdated, e.g. "placed on IL
+  retroactive to a week earlier") is captured for reference only and is never
+  used to decide what was knowable as of a decision time. This is the single
+  highest-value correctness detail in the feature and has a dedicated
+  regression test (`test_retroactively_backdated_effective_date_never_leaks_future_knowledge`
+  in `tests/test_mlb_availability.py`);
+- `features/mlb_player_availability.py` cross-references the ESPN-reported
+  probable starter (via a new sibling helper,
+  `data_sources/espn_probables.py::point_in_time_probable_starters`, exposing
+  the point-in-time-archived starter *names* that the existing ERA-gap helper
+  discarded) against the captured transaction history, and emits
+  `probable_starter_unavailable_{home,away}` plus
+  `availability_report_age_hours`;
+- fail-closed handling for missing transaction data, stale live captures
+  (default 24h), unrecognized transaction types, and post-decision
+  observations; absence of any IL history for a player defaults to Active
+  rather than failing closed, since a clean record is the overwhelming
+  common case and the whole point is flagging genuine evidence of
+  unavailability, not requiring an explicit "Active" transaction to exist;
+- `learned_forward.py`'s generic feature-computation path gained its own
+  MLB-scoped dispatch branch (a separate feature-name constant from WNBA's,
+  not a union), but no production artifact's `feature_names` config lists
+  these names yet — the branch is inert in live production today. This
+  matches the WNBA precedent: computed and logged only when explicitly
+  requested, never silently adjusting a live forecast;
+- `cli.py`'s `daily` command captures roster and transaction snapshots for
+  every scheduled MLB team each run (`step5c_mlb_availability`), independent
+  of whether any artifact yet consumes the resulting features;
+- **2026-08-02 fix**: `UNAVAILABLE_TRANSACTION_MARKERS` didn't recognize
+  "sent RHP X on a rehab assignment to Y" (291 distinct real instances) as
+  evidence of continued unavailability — a rehab-assignment transaction is
+  common and unambiguous (still recovering, not yet activated), and without
+  it a player whose original IL-placement transaction fell outside the
+  transactions capture's lookback window would silently default to Active.
+  Added `"rehab assignment"` to the marker list;
+- **2026-08-02 addition**: `features/mlb_player_availability.py` now checks
+  a fresh (within `maximum_report_age_hours`, strictly before the decision
+  time) live 40-man roster snapshot *first*, falling back to the
+  transactions-based reconstruction only when no sufficiently fresh roster
+  read exists. The roster snapshot is a direct current-status signal, immune
+  to the transactions path's inherent blind spot (an IL placement older than
+  the transactions capture's own rolling lookback window, with no
+  intervening rehab-assignment transaction to catch it) — this closes that
+  gap for any live/near-live decision, while the transactions-based path
+  remains the only option for a genuinely historical/backtest decision time
+  (a live-only roster read can never cover the past). Result now exposes
+  `{home,away}_probable_starter_source` (`"roster"` or `"transactions"`) so
+  which path resolved each side is always visible, not just the flag itself.
+
+Explicitly out of scope for this pass, same caveats as WNBA's own
+still-unpromoted feature: lineup-regular/position-player tracking, any
+probability-adjustment wiring, and any promotion claim. Unlike WNBA, this
+feature does not need a prospective-only archive to backtest, because the
+underlying transaction data is genuinely retroactively queryable — but it
+still has zero track record of catching a real case where an announced
+starter actually didn't pitch, since it was only wired up on 2026-08-01.
+Do not claim any lift until that track record exists.
+
 ---
 
 ## 9. NFL feature roadmap

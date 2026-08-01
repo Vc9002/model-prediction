@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5106145",
+      "current_status": "Out",
+      "player_name": "Darianna Littlepage-Buggs",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-07-31T22:35:00+00:00",
+      "team": "Washington Mystics"
+    },
+    {
+      "athlete_id": "5345473",
+      "current_status": "Out",
+      "player_name": "Costanza Verona",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-31T22:39:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4595910",
+      "current_status": "Out",
+      "player_name": "Haley Jones",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-31T22:34:00+00:00",
+      "team": "Dallas Wings"
+    }
+  ],
+  "event_id": "401857103",
+  "observed_at_utc": "2026-07-31T23:29:00.368751+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "f68461db06f719b1cf5084f56935fed7935f130d4a1b09bed7ba7ddf30f34d3b",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

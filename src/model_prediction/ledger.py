@@ -736,26 +736,24 @@ class PickLedger:
         """Recompute ``units`` (and ``pnl_units`` for already-settled rows)
         for every RESEARCH_OBSERVATION row, from that row's own stored
         decision-time fields, using the current sizing rule in
-        ``eligibility._research``: edge_scaled_units for reasons that still
-        reflect a genuine model opinion (LOW_EDGE, EXPOSURE_LIMIT,
-        LARGE_DISAGREEMENT_REVIEW), hard-zero for every other reason.
+        ``eligibility._research``/``_downgrade_research_call``: every reason
+        gets a real edge_scaled_units paper size except NO_CALL_TEAM_BANNED,
+        which always stays zero (a banned team is never sized, regardless of
+        model opinion).
 
         One-time backfill for rows logged under an earlier, buggier version
         of that rule (a flat min_pick_units cap regardless of edge, or a
-        hardcoded zero) -- brings already-logged history in line with the
-        current rule without re-forecasting or touching decision/reason_code.
-        QUALIFIED_SHADOW_CALL rows are never touched: their sizing always
-        came from the real, validated, exposure-capped path, not this one.
+        hardcoded zero for reasons like MODEL_UNVALIDATED/LOW_EDGE) --
+        brings already-logged history in line with the current rule without
+        re-forecasting or touching decision/reason_code. QUALIFIED_SHADOW_CALL
+        rows are never touched: their sizing always came from the real,
+        validated, exposure-capped path, not this one.
         """
         from .config import load_config
         from .config import unit_policy as _unit_policy
 
         policy = policy or _unit_policy(load_config())
-        sizable_reasons = {
-            "NO_CALL_LOW_EDGE",
-            "NO_CALL_EXPOSURE_LIMIT",
-            "NO_CALL_LARGE_DISAGREEMENT_REVIEW",
-        }
+        unsizable_reasons = {"NO_CALL_TEAM_BANNED"}
         changed = 0
         with self._lock():
             self._migrate_if_needed()
@@ -771,9 +769,9 @@ class PickLedger:
                 uncertainty_raw = row.get("model_uncertainty")
                 uncertainty = float(uncertainty_raw) if uncertainty_raw not in (None, "") else 0.05
                 new_units = (
-                    edge_scaled_units(model_probability, uncertainty or 0.05, american_odds, policy)
-                    if row.get("reason_code") in sizable_reasons
-                    else 0.0
+                    0.0
+                    if row.get("reason_code") in unsizable_reasons
+                    else edge_scaled_units(model_probability, uncertainty or 0.05, american_odds, policy)
                 )
                 old_units = float(row["units"] or 0)
                 if abs(new_units - old_units) < 1e-9:

@@ -1,23 +1,22 @@
 {
   "effective_window": {
-    "from": "2022-01-01",
-    "to": "2026-07-18"
+    "from": "2022-03-25",
+    "to": "2026-08-01"
   },
-  "extracted_at_utc": "2026-07-18T17:01:17.640127Z",
-  "game_count": 3877,
-  "games_sha256": "24b1fd913921d16ac97e8f35d066f2fbfdf928c3ab85fa6efca6cf67d35942ef",
+  "extracted_at_utc": "2026-08-01T21:24:51.640150Z",
+  "game_count": 3936,
+  "games_sha256": "2ee6d74edd08534c3600990557cfe91d6c7afcc4ff9158a54ff4ff4400af72d9",
   "league": "npb",
   "league_name": "Nippon Professional Baseball",
   "limitations": [
     "Official pages do not provide a versioned bulk-data contract; cache and hashes preserve each extraction.",
     "The baseline excludes postseason and exhibition games.",
-    "NPB v1 ends on September 30 because the official October calendar mixes competitions.",
-    "NPB calendar rows omit scheduled first-pitch time; same-day games are frozen as one rating batch."
+    "Incremental refresh: only the current calendar year was re-fetched this run; prior years are carried forward unchanged from the last full backfill."
   ],
-  "request_count": 30,
+  "request_count": 6,
   "requested_window": {
-    "from": "2022-01-01",
-    "to": "2026-07-18"
+    "from": "2022-03-25",
+    "to": "2026-08-01"
   },
   "requires_api_key": false,
   "requires_signup": false,

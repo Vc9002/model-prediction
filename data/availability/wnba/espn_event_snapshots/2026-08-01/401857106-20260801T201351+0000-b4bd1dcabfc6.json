@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4688629",
+      "current_status": "Out",
+      "player_name": "Shay Ciezki",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-08-01T18:04:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "4698730",
+      "current_status": "Out",
+      "player_name": "Kara Dunn",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-08-01T18:02:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-08-01T19:01:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4281930",
+      "current_status": "Out",
+      "player_name": "Anneli Maley",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-08-01T18:25:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-30T21:57:00+00:00",
+      "team": "New York Liberty"
+    }
+  ],
+  "event_id": "401857106",
+  "observed_at_utc": "2026-08-01T20:13:51.007279+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "b4bd1dcabfc6e13dd36c5e647df015c9dd0a669cff79bab7ef96f653b94d0654",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

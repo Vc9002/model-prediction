@@ -4501,7 +4501,7 @@
     "team_id": "bo3:3:22808"
   },
   "bo3:3:22809": {
-    "acronym": null,
+    "acronym": "RLX",
     "name": "Croatian Flair",
     "slug": "croatian-flair",
     "source_team_id": 22809,
@@ -4815,6 +4815,13 @@
     "source_team_id": 24933,
     "team_id": "bo3:3:24933"
   },
+  "bo3:3:24934": {
+    "acronym": "PANE",
+    "name": "Panel\u00e3o LHC",
+    "slug": "panelao-lhc",
+    "source_team_id": 24934,
+    "team_id": "bo3:3:24934"
+  },
   "bo3:3:24935": {
     "acronym": "NORT",
     "name": "NORTHERNGRADE ESPORTS",
@@ -4842,5 +4849,40 @@
     "slug": "capybara-esports",
     "source_team_id": 24938,
     "team_id": "bo3:3:24938"
+  },
+  "bo3:3:24975": {
+    "acronym": "HOOL",
+    "name": "Hooligans",
+    "slug": "hooligans",
+    "source_team_id": 24975,
+    "team_id": "bo3:3:24975"
+  },
+  "bo3:3:24979": {
+    "acronym": "RLX",
+    "name": "Croatian Flair x RLX",
+    "slug": "rlx-esports",
+    "source_team_id": 24979,
+    "team_id": "bo3:3:24979"
+  },
+  "bo3:3:25003": {
+    "acronym": "AZRE",
+    "name": "AZ Rising Eterna",
+    "slug": "az-rising-eterna",
+    "source_team_id": 25003,
+    "team_id": "bo3:3:25003"
+  },
+  "bo3:3:25005": {
+    "acronym": "SHA",
+    "name": "Shark Attack",
+    "slug": "shark-attack",
+    "source_team_id": 25005,
+    "team_id": "bo3:3:25005"
+  },
+  "bo3:3:25006": {
+    "acronym": "DIA",
+    "name": "DIA Ozarox Esports",
+    "slug": "dia-ozarox-esports",
+    "source_team_id": 25006,
+    "team_id": "bo3:3:25006"
   }
 }

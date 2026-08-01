@@ -1,0 +1,123 @@
+{
+  "entries": [
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-31",
+      "game_time_et": "07:30 (ET)",
+      "matchup": "SEA@ATL",
+      "player_name": "Mair, Taina",
+      "reason": "Coach's Decision - Coach's Decision",
+      "team": "Seattle Storm"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-07-31",
+      "game_time_et": "07:30 (ET)",
+      "matchup": "SEA@ATL",
+      "player_name": "Malonga, Dominique",
+      "reason": "Injury/Illness - Back; Injury/Illness",
+      "team": "Seattle Storm"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-31",
+      "game_time_et": "07:30 (ET)",
+      "matchup": "SEA@ATL",
+      "player_name": "Paopao, Te- Hina",
+      "reason": "Injury/Illness - Right Leg; N/A",
+      "team": "Atlanta Dream"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-07-31",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "IND@PDX",
+      "player_name": "Billings, Monique",
+      "reason": "Injury/Illness - Left Hip; Hip",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-07-31",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "IND@PDX",
+      "player_name": "Boston, Aliyah",
+      "reason": "Injury/Illness - Right Leg; Lower",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-07-31",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "IND@PDX",
+      "player_name": "Clark, Caitlin",
+      "reason": "Injury/Illness - Back; Back",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-31",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "IND@PDX",
+      "player_name": "Dantas, Damiris",
+      "reason": "Not With Team",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-31",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "IND@PDX",
+      "player_name": "Barker, Sarah Ashlee",
+      "reason": "Injury/Illness - Left Knee; Injury",
+      "team": "Portland Fire"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-07-31",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "IND@PDX",
+      "player_name": "Feagin, Sania",
+      "reason": "Injury/Illness - Left Knee; Injury",
+      "team": "Portland Fire"
+    }
+  ],
+  "observed_at_utc": "2026-07-31T04:30:08.208471+00:00",
+  "report_at_utc": "2026-07-31T04:15:00+00:00",
+  "schema_version": "1",
+  "source": "official_wnba_injury_report",
+  "source_index_url": "https://www.wnba.com/api/injury-reports",
+  "source_pdf_sha256": "67199f37fc9f13744de7a1ddb2ece1118f8a118134416512a3f582fcb705cd32",
+  "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-07-31_12_15AM.pdf",
+  "sport": "wnba",
+  "team_matchups": {
+    "Atlanta Dream": "SEA@ATL",
+    "Chicago Sky": "LVA@CHI",
+    "Indiana Fever": "IND@PDX",
+    "Las Vegas Aces": "LVA@CHI",
+    "New York Liberty": "NYL@PHX",
+    "Phoenix Mercury": "NYL@PHX",
+    "Portland Fire": "IND@PDX",
+    "Seattle Storm": "SEA@ATL"
+  },
+  "team_report_status": {
+    "Atlanta Dream": "submitted",
+    "Chicago Sky": "not_yet_submitted",
+    "Indiana Fever": "submitted",
+    "Las Vegas Aces": "not_yet_submitted",
+    "New York Liberty": "not_yet_submitted",
+    "Phoenix Mercury": "not_yet_submitted",
+    "Portland Fire": "submitted",
+    "Seattle Storm": "submitted"
+  },
+  "teams_listed": [
+    "Atlanta Dream",
+    "Chicago Sky",
+    "Indiana Fever",
+    "Las Vegas Aces",
+    "New York Liberty",
+    "Phoenix Mercury",
+    "Portland Fire",
+    "Seattle Storm"
+  ]
+}

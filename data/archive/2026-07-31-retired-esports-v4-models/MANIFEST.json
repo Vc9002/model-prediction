@@ -1,0 +1,20 @@
+{
+  "created_utc": "2026-07-31",
+  "reason": "K-factor/confidence-threshold selection methodology was rebuilt 2026-07-31 (proper scoring rule -- min Brier -- for K instead of a raw flat-stake P&L proxy that pinned 4 of 5 titles' K to the exact top of the search grid; widened both search grids; removed the SPORT_K_OVERRIDE hand-picks entirely). Every row logged under -v4 used the old, disproven methodology. Archived per operator direction to match the -v5 rebuild.",
+  "verified_final_state": "0 -v4 rows remain in any research or gated_research ledger (re-checked directly against the live ledger files after archival)",
+  "archived_settled": {
+    "research_lol": 60,
+    "research_cs2": 105,
+    "research_dota2": 23,
+    "research_valorant": 17,
+    "gated_lol": 4,
+    "gated_cs2": 7,
+    "gated_dota2": 2,
+    "gated_valorant": 2,
+    "total": 220
+  },
+  "removed_open": {
+    "note": "62 removed directly by this archival's remove_open_rows calls. A further 6 LOL-gated rows visible in the pre-archival count were independently cleared by the system's own automatic re-forecast-replacement mechanism around the same time (unrelated background daily-pipeline activity, confirmed via separate 'pick_removed'/'re-forecast replacement' audit events, not part of this archival) -- final ledger state is correct either way.",
+    "total_removed_by_this_archival": 62
+  }
+}

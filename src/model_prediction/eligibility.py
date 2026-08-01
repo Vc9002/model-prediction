@@ -167,32 +167,50 @@ def evaluate_gated_research_eligibility(
         return eligibility
     if not model_inputs_valid:
         return _downgrade_research_call(
+            request,
             eligibility,
             NoCallReason.MODEL_UNVALIDATED.value,
+            policy,
         )
     executable_edge = request.model_probability - implied_probability(request.american_odds)
     if executable_edge < minimum_edge:
         return _downgrade_research_call(
+            request,
             eligibility,
             NoCallReason.LOW_EDGE.value,
+            policy,
         )
     if abs(request.model_probability - 0.5) < minimum_confidence:
         return _downgrade_research_call(
+            request,
             eligibility,
             NoCallReason.LOW_EDGE.value,
+            policy,
         )
     return eligibility
 
 
 def _downgrade_research_call(
+    request: PickRequest,
     eligibility: EligibilityResult,
     reason_code: str,
+    policy: UnitPolicy,
 ) -> EligibilityResult:
+    """Downgrade a Gated Research CALL to a Research-only observation.
+
+    This only ever removes the row from Gated Research (the caller checks
+    ``decision == "CALL"`` separately to decide gated-ledger mirroring) --
+    it must not also zero the row's own Research-ledger size. Every logged
+    pick carries a real, model-derived paper size (operator directive,
+    2026-07-31: "every pick should have units and pnl, hard code this").
+    """
+    uncertainty = request.model_uncertainty or 0.05
+    units = edge_scaled_units(request.model_probability, uncertainty, request.american_odds, policy)
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
         "NO_CALL",
         reason_code,
-        0,
+        units,
         eligibility.confidence_score,
         eligibility.edge,
         eligibility.adjusted_edge,
@@ -245,10 +263,14 @@ def _research(
     reason: NoCallReason,
     policy: UnitPolicy,
 ) -> EligibilityResult:
-    """Hard-zero NO_CALL for reasons where the decision itself can't be
-    trusted (banned team, stale/missing data, unvalidated model). Disagreement,
-    exposure, and low-edge no longer route here at all -- see _call_result --
-    so every reason actually reaching this function stays zero-unit.
+    """NO_CALL for reasons where the decision itself can't be trusted (banned
+    team, stale/missing data, unvalidated model). These still get logged as
+    real Research/Gated-Research rows, and every logged pick carries a real,
+    model-derived paper size (operator directive, 2026-07-31: "every pick
+    should have units and pnl, hard code this") -- with one exception: a
+    banned team is never sized, paper or real, regardless of model opinion
+    (matches ledger._append_record's dedicated call_type="no_call" handling
+    for NO_CALL_TEAM_BANNED).
     """
     uncertainty = request.model_uncertainty or 0
     recommendation = recommend_units(
@@ -259,11 +281,16 @@ def _research(
         policy,
         validated_model=False,
     )
+    units = (
+        0.0
+        if reason is NoCallReason.TEAM_BANNED
+        else edge_scaled_units(request.model_probability, uncertainty or 0.05, request.american_odds, policy)
+    )
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
         "NO_CALL",
         reason.value,
-        0,
+        units,
         recommendation.confidence_score,
         recommendation.edge,
         recommendation.adjusted_edge,

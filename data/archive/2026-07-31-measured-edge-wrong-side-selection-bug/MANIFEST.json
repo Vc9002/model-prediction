@@ -1,0 +1,7 @@
+{
+  "created_utc": "2026-07-31",
+  "reason": "forward.py's _paired_event_candidates selected the MLB spread/total side by expected value (probability * decimal_odds - 1) instead of the model's actual favored side (highest probability) -- operator directive (2026-07-30/31): every model picks the side it thinks wins, period, edge/price is informational only. Fixed in forward.py 2026-07-31. Row's own model_probability < 0.5 proves it was logged on the side the model did NOT actually favor.",
+  "settled_archived": 3,
+  "open_removed": 4,
+  "scope": "MLB Measured Edge (spread/total) Flat rows only -- moneyline (any sport, any ledger) unaffected"
+}

@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433514",
+      "current_status": "Questionable",
+      "player_name": "Saniya Rivers",
+      "raw_status": "Day-To-Day",
+      "reason": "Ankle",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-27T20:45:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4433408",
+      "current_status": "Questionable",
+      "player_name": "Aaliyah Edwards",
+      "raw_status": "Day-To-Day",
+      "reason": "Knee",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-27T20:42:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "2490553",
+      "current_status": "Out",
+      "player_name": "Brittney Griner",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-27T20:40:00+00:00",
+      "team": "Connecticut Sun"
+    }
+  ],
+  "event_id": "401857092",
+  "observed_at_utc": "2026-07-28T20:31:52.856224+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "689202a564f30b3e9f58a7023b07e1d2f807b507fe6c234a4a460b36e23dda52",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

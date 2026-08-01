@@ -49,7 +49,10 @@ def test_research_is_zero_unit_excluded_from_exposure_roi_but_in_calibration(
     research_gate = evaluate_eligibility(research_request, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     research_row = ledger.append_evaluated(research_request, research_gate, NOW)
     assert research_row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
-    assert float(research_row["units"]) == 0
+    # Every logged pick carries a real paper size now (operator directive,
+    # 2026-07-31) -- what stays excluded is exposure/ROI accounting below,
+    # which filters on record_type, not on units being zero.
+    assert float(research_row["units"]) > 0
     ledger.settle(research_row["pick_id"], 2, 3)
 
     qualified_request = request("qualified")
@@ -85,8 +88,10 @@ def test_research_can_auto_score_one_hypothetical_unit_on_settlement(
 
     settled = ledger.settle(row["pick_id"], 2, 3)
 
-    assert settled["units"] == "0.00"
-    assert settled["pnl_units"] == "0.0000"
+    # units/pnl_units are the row's own real paper size now (operator
+    # directive, 2026-07-31); research_score_units/research_pnl_units remain
+    # the separate, independently-configured hypothetical-scoring columns.
+    assert float(settled["units"]) > 0
     assert settled["research_score_units"] == "1.0000"
     assert float(settled["research_pnl_units"]) > 0
     assert settled["research_scoring_note"] == "one-unit hypothetical policy"
@@ -108,7 +113,7 @@ def test_research_can_keep_model_recommended_units_on_settlement(
 
     settled = ledger.settle(row["pick_id"], 3, 2)
 
-    assert settled["units"] == "0.00"
+    assert float(settled["units"]) > 0
     assert settled["research_score_units"] == "2.0000"
     assert settled["research_pnl_units"] == "-2.000000"
     assert settled["research_scoring_note"] == "decision-time model size"

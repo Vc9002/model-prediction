@@ -2664,6 +2664,15 @@ def _reconcile_orders() -> None:
         _save_orders(payload)
 
 
+def _event_already_started(row: dict) -> bool:
+    event_start = str(row.get("event_start_utc") or "")
+    try:
+        game_time = datetime.fromisoformat(event_start.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return False
+    return game_time < datetime.now(timezone.utc)
+
+
 def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if row.get("status") != "open":
         return False, "pick is not open"
@@ -2685,13 +2694,8 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if quote.get("market_state") != "MARKET_STATE_OPEN":
         return False, "market is not open"
     # Block orders on past games
-    event_start = str(row.get("event_start_utc") or "")
-    try:
-        game_time = datetime.fromisoformat(event_start.replace("Z", "+00:00"))
-        if game_time < datetime.now(timezone.utc):
-            return False, "game has already started"
-    except (ValueError, TypeError):
-        pass
+    if _event_already_started(row):
+        return False, "game has already started"
     missing = [name for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY") if not os.environ.get(name)]
     if missing:
         return False, f"missing {' and '.join(missing)}"
@@ -2752,7 +2756,17 @@ def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dic
         or 0
     )
     display_pnl = _number(row.get("pnl_units")) or _number(row.get("research_pnl_units"))
-    # Fallback: compute P&L from american_odds when research_pnl_units is absent
+    # Fallback: compute P&L from american_odds when research_pnl_units is
+    # absent. Confirmed 2026-08-01: this never fires against real data --
+    # every row settle() ever touches already has a real pnl_units/
+    # research_pnl_units -- it's a defensive net for malformed/legacy rows
+    # only. Deliberately NOT importing pricing.profit_units here (this file
+    # has zero dependencies on the model_prediction package by design, kept
+    # runnable standalone); this formula must instead be kept in exact sync
+    # with pricing.profit_units by hand -- see
+    # tests/test_dashboard_server.py's
+    # test_pnl_fallback_formula_matches_pricing_profit_units, which fails
+    # loudly if the two ever diverge.
     if display_pnl == 0 and row.get("result") in ("win", "loss") and row.get("american_odds"):
         try:
             odds = int(row["american_odds"])
@@ -2866,7 +2880,16 @@ def preview_order(payload: dict) -> dict:
     if action == "sell":
         # A resting SELL limit must sit AT OR ABOVE the current bid (post-only:
         # do not cross into the bid). No dollar cost cap — a sell returns
-        # capital. Proceeds are informational.
+        # capital. Proceeds are informational. Sells are otherwise less
+        # restricted than buys (you can always try to close a position you
+        # hold) -- but _pick_quote never returns a snapshot observed at or
+        # after event_start_utc, so once a game has started the only
+        # available quote is a frozen pregame snapshot that can never
+        # update again. Validating a resting sell's "don't cross the bid"
+        # check against that frozen number would be actively misleading,
+        # not just imprecise, so this one case is still blocked.
+        if _event_already_started(row):
+            return {"status": "refused", "error": "game has already started; quote can no longer update"}
         bid = quote.get("bid")
         if bid is not None and price <= float(bid):
             return {
@@ -2947,6 +2970,12 @@ def submit_order(payload: dict) -> dict:
         return {"status": "refused", "error": "market changed; preview the order again"}
     action = ticket.get("action", "buy")
     if action == "sell":
+        # See the matching comment in preview_order: a game already in
+        # progress has no live quote to validate against (_pick_quote only
+        # ever returns pregame snapshots), so re-check here too rather than
+        # trust that preview-time state still holds at submission time.
+        if _event_already_started(row):
+            return {"status": "refused", "error": "game has already started; quote can no longer update"}
         bid = quote.get("bid")
         if bid is not None and ticket["price"] <= float(bid):
             return {"status": "refused", "error": "bid moved above your limit; preview the sell again"}

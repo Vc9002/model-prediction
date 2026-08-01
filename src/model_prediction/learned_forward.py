@@ -15,6 +15,10 @@ from .domain import parse_utc
 from .features.base import FeatureStore
 from .features.bullpen import bullpen_profile, team_recent_relief_lines
 from .features.elo_ratings import build_elo
+from .features.mlb_player_availability import FEATURE_NAMES as MLB_AVAILABILITY_FEATURE_NAMES
+from .features.mlb_player_availability import (
+    matchup_player_availability as matchup_mlb_player_availability,
+)
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
 from .features.schedule_load import matchup_schedule_load
@@ -116,6 +120,35 @@ def _compute_features(
                 str(error).split(":", 1)[0].strip()
                 or "wnba_availability_unavailable"
             )
+    if wanted & MLB_AVAILABILITY_FEATURE_NAMES:
+        # Shadow-only: no production artifact lists these feature names in
+        # its own feature_names config today, so this branch is inert in
+        # live production until a future artifact opts in explicitly. See
+        # features/mlb_player_availability.py's module docstring.
+        if sport != "mlb":
+            raise ValueError(
+                "NO_CALL_MLB_AVAILABILITY_UNSUPPORTED: probable-starter availability feature is MLB-only"
+            )
+        try:
+            mlb_availability = matchup_mlb_player_availability(
+                data_root=data_root,
+                home_team=home_team,
+                away_team=away_team,
+                game_date=game_date,
+                observed_at=observed_at,
+                event_start=event_start,
+                event_id=event_id,
+            )
+            features.update(
+                {name: value for name, value in mlb_availability.items() if name in wanted}
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            for name in wanted & MLB_AVAILABILITY_FEATURE_NAMES:
+                features[name] = 0.0
+            unavailable.append(
+                str(error).split(":", 1)[0].strip()
+                or "mlb_availability_unavailable"
+            )
     _init_providers()
     for name in wanted:
         if name in features:
@@ -124,7 +157,7 @@ def _compute_features(
         if not provider:
             continue
         try:
-            features[name] = provider(home_team, away_team, event_id, game_date)
+            features[name] = provider(home_team, away_team, event_id, game_date, event_start)
         except ValueError:
             # A per-game provider (e.g. probable_starter_era_gap: ESPN hasn't
             # posted both starters yet) can genuinely fail for one game
@@ -160,14 +193,22 @@ def _init_providers() -> None:
         return
     # Lazy imports to avoid circular dependencies
     from .features.park_factors import park_factor as _pf
-    _FEATURE_PROVIDERS["park_factor"] = lambda h, a, eid, gd: float(_pf(h).get("park_factor", 1.0))
+    _FEATURE_PROVIDERS["park_factor"] = lambda h, a, eid, gd, es: float(_pf(h).get("park_factor", 1.0))
 
     from .features.weather import live_weather
-    _FEATURE_PROVIDERS["weather_factor"] = lambda h, a, eid, gd: float(live_weather(h).get("weather_run_factor", 1.0))
+    # Pass the real event start (not "now") -- a slate built hours before
+    # first pitch (e.g. a morning cron run) must get the forecast for game
+    # time, not the current-moment reading; live_weather's own hour-
+    # alignment logic expects exactly this, matching validation.py's
+    # training-time lookup which keys off game.start. Previously silently
+    # ignored, a real train/serve skew (found 2026-07-31).
+    _FEATURE_PROVIDERS["weather_factor"] = (
+        lambda h, a, eid, gd, es: float(live_weather(h, es.isoformat()).get("weather_run_factor", 1.0))
+    )
 
     from .data_sources.espn_probables import espn_pitcher_era_gap
     _FEATURE_PROVIDERS["probable_starter_era_gap"] = (
-        lambda h, a, eid, gd: espn_pitcher_era_gap(eid, h, a, gd.replace("-", ""))
+        lambda h, a, eid, gd, es: espn_pitcher_era_gap(eid, h, a, gd.replace("-", ""))
     )
 
 

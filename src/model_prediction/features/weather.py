@@ -104,7 +104,13 @@ BALLPARK_COORDS: dict[str, tuple[float, float]] = {
     "Minnesota Twins": (44.9817, -93.2776),
     "New York Mets": (40.7571, -73.8458),
     "New York Yankees": (40.8296, -73.9262),
-    "Oakland Athletics": (37.7516, -122.2005),
+    # Sutter Health Park, West Sacramento (current home park; renamed from
+    # "Oakland Athletics" to match ESPN's live displayName -- see
+    # park_factors.py's "Athletics" key and mlb_baseline_refresh.py's
+    # _LEGACY_PARK_NAMES exclusion). Was silently falling to
+    # status="unknown_park"/weather_run_factor=1.0 for every Athletics home
+    # game since the rename.
+    "Athletics": (38.5805, -121.5195),
     "Philadelphia Phillies": (39.9061, -75.1665),
     "Pittsburgh Pirates": (40.4469, -80.0057),
     "San Diego Padres": (32.7076, -117.1570),

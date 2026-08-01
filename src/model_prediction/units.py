@@ -12,7 +12,9 @@ class UnitPolicy:
     reference_units: float = 5.0
     kelly_fraction: float = 0.5
     min_edge: float = 0.02
-    min_pick_units: float = 0.5
+    # 1.0-2.0 (widened from 0.5-2.0, 2026-07-31): 1U is the floor for the
+    # least confident logged pick, 2U the ceiling for the most confident.
+    min_pick_units: float = 1.0
     max_pick_units: float = 2.0
     max_daily_units: float = 5.0
     max_league_daily_units: float = 3.0
@@ -45,14 +47,29 @@ def edge_scaled_units(
     american_odds: int,
     policy: UnitPolicy = UnitPolicy(),
 ) -> float:
-    """Scale units by model edge: 0.5U base + 10× edge above 50/50.
+    """Scale units by uncertainty-adjusted model edge: 0.5U base + 10× edge
+    above 50/50.
 
-    Proven +34.1U vs +13.3U flat on MLB walk-forward (2026-07-17).
-    Higher edge = more units. Lower edge = fewer units.
-    Caps at policy.max_pick_units, floors at policy.min_pick_units.
+    The +34.1U vs +13.3U flat MLB walk-forward result (2026-07-17) validated
+    the "scale by distance from 50/50" shape of this formula, using a
+    version that took `model_uncertainty` as a parameter but never actually
+    read it -- found 2026-07-31 (operator directive to fix): two picks with
+    identical model_probability got identically-sized stakes regardless of
+    whether the model's own uncertainty on that pick was 0.01 or 0.49. Since
+    this is the dominant sizing path project-wide (every real CALL, plus
+    every research observation after this session's "every pick has units"
+    fix), that meant model confidence had zero effect on stake size
+    anywhere in the system. Fixed by haircutting the raw distance from 50/50
+    by the model's own uncertainty before scaling -- the same
+    "probability minus uncertainty" conservatism `recommend_units`'s
+    accept/reject gate already applies below, just also applied to sizing,
+    which previously bypassed it entirely via this function.
+
+    Higher (uncertainty-adjusted) edge = more units. Lower edge = fewer
+    units. Caps at policy.max_pick_units, floors at policy.min_pick_units.
     """
-    edge = abs(model_probability - 0.5)
-    raw = policy.min_pick_units + edge * (policy.max_pick_units - policy.min_pick_units) / 0.15
+    adjusted_edge = max(0.0, abs(model_probability - 0.5) - max(0.0, model_uncertainty))
+    raw = policy.min_pick_units + adjusted_edge * (policy.max_pick_units - policy.min_pick_units) / 0.15
     units = max(policy.min_pick_units, min(policy.max_pick_units, raw))
     # Nearest increment (0.5 + 0.1235*10 = 1.735 -> 1.75U); caps above bound risk.
     units = round(units / policy.unit_increment) * policy.unit_increment

@@ -1,0 +1,80 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433633",
+      "current_status": "Out",
+      "player_name": "Kierstan Bell",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-30T00:15:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "2529458",
+      "current_status": "Out",
+      "player_name": "Cheyenne Parker-Tyus",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-01",
+      "status_at_utc": "2026-07-30T00:13:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4398776",
+      "current_status": "Questionable",
+      "player_name": "NaLyssa Smith",
+      "raw_status": "Day-To-Day",
+      "reason": "Undisclosed",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-30T00:11:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4565501",
+      "current_status": "Out",
+      "player_name": "Janiah Barker",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-15T23:46:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4281930",
+      "current_status": "Out",
+      "player_name": "Anneli Maley",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-31T00:22:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-31T00:20:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-30T21:57:00+00:00",
+      "team": "New York Liberty"
+    }
+  ],
+  "event_id": "401857101",
+  "observed_at_utc": "2026-07-31T00:55:49.023876+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "47bdb7919ca61cdb4d04ff917cc6ed70af25ad2e14ee2a5d131bb8b83ee6db8e",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

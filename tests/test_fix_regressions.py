@@ -22,7 +22,7 @@ from model_prediction.data_sources.polymarket_execute import (
     OrderTicket,
     PolymarketExecutor,
 )
-from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest
+from model_prediction.domain import EASTERN, League, MarketType, ModelOrigin, ModelState, PickRequest
 from model_prediction.eligibility import (
     evaluate_esports_eligibility,
     evaluate_gated_research_eligibility,
@@ -187,6 +187,66 @@ def test_esports_settlement_maps_winner_to_correct_side(
     assert result["result"] == expected
 
 
+def test_esports_settlement_populates_clv_from_captured_closing_snapshot(tmp_path, monkeypatch):
+    """Operator directive, 2026-07-31: CLV should be wired for every model,
+    not just MLB. Esports settlement should look up the last pregame
+    snapshot captured under data/odds/esports/{date}/ (the same file the
+    daily slate capture already writes) and record it as the row's closing
+    probability."""
+    from model_prediction.data_sources.polymarket_us import PolymarketSnapshotStore
+
+    event_start = (datetime.now(UTC) + timedelta(hours=6)).isoformat()
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    row = ledger.append_call(
+        _future_request(
+            selection="home",
+            event_id="clv-1",
+            event_start_utc=event_start,
+            rationale="Neutral Elo baseline; executable ask 0.5000 (market_slug=aec-lol-clv-2026).",
+        ),
+        0,
+        10,
+    )
+    # Must match _closing_probability_for_moneyline_pick's own game_date
+    # computation exactly (Eastern date, not raw UTC date) -- these can
+    # differ near a day boundary, which made this test flaky in exactly
+    # that way once real wall-clock time drifted close to one (found
+    # 2026-08-01).
+    game_date = datetime.fromisoformat(event_start).astimezone(EASTERN).date().isoformat()
+    store = PolymarketSnapshotStore.for_sport_date(tmp_path, "esports", game_date)
+    store.append(
+        {
+            "provider": "polymarket_us",
+            "market_slug": "aec-lol-clv-2026",
+            "observed_at_utc": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+            "long": {"description": "Team Home", "ask": 0.62},
+            "short": {"description": "Team Away", "ask": 0.41},
+        }
+    )
+    monkeypatch.setattr(
+        polymarket_us, "PolymarketUSClient", lambda: _ResolvedClient("Team Home", "Team Away")
+    )
+    result = _settle_esports_pick(row, ledger, data_root=tmp_path)
+    assert result is not None and result.get("settled") is True
+    settled_row = next(r for r in ledger.rows() if r["pick_id"] == row["pick_id"])
+    assert settled_row["probability_clv"] != ""
+    assert float(settled_row["closing_raw_implied_probability"]) == pytest.approx(0.62)
+
+
+def test_esports_settlement_leaves_clv_blank_without_data_root(tmp_path, monkeypatch):
+    """Existing callers that don't pass data_root keep working exactly as
+    before -- CLV is opportunistic, never required for settlement."""
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    row = ledger.append_call(_future_request(event_id="no-clv-1"), 0, 10)
+    monkeypatch.setattr(
+        polymarket_us, "PolymarketUSClient", lambda: _ResolvedClient("Team Home", "Team Away")
+    )
+    result = _settle_esports_pick(row, ledger)
+    assert result is not None and result.get("settled") is True
+    settled_row = next(r for r in ledger.rows() if r["pick_id"] == row["pick_id"])
+    assert settled_row["probability_clv"] == ""
+
+
 def test_esports_settlement_stays_pending_until_terminal_state(tmp_path, monkeypatch):
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     row = ledger.append_call(_future_request(event_id="pending-1"), 0, 10)
@@ -214,7 +274,9 @@ def test_esports_eligibility_qualifies_only_with_full_provenance():
     incomplete = _future_request(model_artifact_hash="")
     result = evaluate_esports_eligibility(incomplete, Exposure(), UnitPolicy())
     assert result.record_type.value == "RESEARCH_OBSERVATION"
-    assert result.units == 0
+    # Still gets a real paper size -- every logged pick has units and pnl
+    # (operator directive, 2026-07-31).
+    assert result.units > 0
 
 
 def test_esports_eligibility_fails_closed_on_stale_data():
@@ -223,7 +285,9 @@ def test_esports_eligibility_fails_closed_on_stale_data():
     )
     result = evaluate_esports_eligibility(stale, Exposure(), UnitPolicy())
     assert result.reason_code == "NO_CALL_STALE_DATA"
-    assert result.units == 0
+    # Still gets a real paper size (operator directive, 2026-07-31); it just
+    # can't become a real CALL.
+    assert result.units > 0
 
 
 def test_esports_eligibility_no_longer_gates_on_exposure_caps():
@@ -248,7 +312,9 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
     )
     assert result.decision == "NO_CALL"
     assert result.reason_code == "NO_CALL_LOW_EDGE"
-    assert result.units == 0
+    # Downgraded from Gated Research only -- it still gets a real paper size
+    # for the Research ledger (operator directive, 2026-07-31).
+    assert result.units > 0
 
     invalid_inputs = _future_request(model_probability=0.62, american_odds=100)
     result = evaluate_gated_research_eligibility(
@@ -260,7 +326,7 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
     )
     assert result.decision == "NO_CALL"
     assert result.reason_code == "NO_CALL_MODEL_UNVALIDATED"
-    assert result.units == 0
+    assert result.units > 0
 
     valid = evaluate_gated_research_eligibility(
         invalid_inputs,

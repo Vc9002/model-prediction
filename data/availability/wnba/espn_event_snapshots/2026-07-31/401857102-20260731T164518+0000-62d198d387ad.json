@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-28T21:27:00+00:00",
+      "team": "Atlanta Dream"
+    },
+    {
+      "athlete_id": "5106222",
+      "current_status": "Out",
+      "player_name": "Taina Mair",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-30T21:03:00+00:00",
+      "team": "Seattle Storm"
+    },
+    {
+      "athlete_id": "5220150",
+      "current_status": "Questionable",
+      "player_name": "Dominique Malonga",
+      "raw_status": "Day-To-Day",
+      "reason": "Back",
+      "return_date": "2026-07-31",
+      "status_at_utc": "2026-07-30T21:03:00+00:00",
+      "team": "Seattle Storm"
+    }
+  ],
+  "event_id": "401857102",
+  "observed_at_utc": "2026-07-31T16:45:18.517239+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "62d198d387adbee550e0b8ba7756b9c46af02a1d6a908f525bf1d34b98978d0c",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

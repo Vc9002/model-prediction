@@ -15,6 +15,19 @@ from .base import FeatureContext, GameRecord, register_feature
 
 DEFAULT_ELO = 1500.0
 
+
+def expected_win_probability(rating_a: float, rating_b: float, advantage: float = 0.0) -> float:
+    """The one Elo logistic formula, shared by every Elo implementation in
+    this project (team-sport, esports, KBO/NPB, tennis) so a future K-factor
+    or sign correction only needs to happen once. ``advantage`` is added to
+    ``rating_a`` before comparison -- home-field advantage for team sports,
+    0.0 for a neutral-venue esports match. Each caller's own rating-update
+    rule (margin-of-victory scaling, recency/tier weighting, offseason
+    regression, tie handling) is genuinely sport-specific and stays local to
+    that caller; only this core formula is shared.
+    """
+    return 1.0 / (1.0 + 10.0 ** (-(rating_a + advantage - rating_b) / 400.0))
+
 # Per-sport tuning; falls back to the generic row.
 ELO_CONFIG: dict[str, dict[str, float]] = {
     "mlb":     {"k": 4.0,  "home_advantage": 24.0, "offseason_regression": 0.00},
@@ -37,13 +50,11 @@ class EloBook:
         return self.ratings.get(team, DEFAULT_ELO)
 
     def expected_home_win(self, home: str, away: str) -> float:
-        difference = self.rating(home) + self.home_advantage - self.rating(away)
-        return 1.0 / (1.0 + 10.0 ** (-difference / 400.0))
+        return expected_win_probability(self.rating(home), self.rating(away), self.home_advantage)
 
     def expected_neutral_win(self, first_team: str, second_team: str) -> float:
         """Venue-neutral win probability from the same point-in-time ratings."""
-        difference = self.rating(first_team) - self.rating(second_team)
-        return 1.0 / (1.0 + 10.0 ** (-difference / 400.0))
+        return expected_win_probability(self.rating(first_team), self.rating(second_team))
 
     def update(self, game: GameRecord) -> None:
         expected = self.expected_home_win(game.home_team, game.away_team)

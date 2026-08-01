@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from ..features.elo_ratings import expected_win_probability
 from .base import GamePrediction
 
 TENNIS_MODEL_VERSION = "tennis-surface-elo-v1"
@@ -75,7 +76,7 @@ class TennisModel:
             ):
                 rating_w = book.get(key_w, DEFAULT_ELO)  # type: ignore[arg-type]
                 rating_l = book.get(key_l, DEFAULT_ELO)  # type: ignore[arg-type]
-                expected = 1.0 / (1.0 + 10.0 ** (-(rating_w - rating_l) / 400.0))
+                expected = expected_win_probability(rating_w, rating_l)
                 book[key_w] = rating_w + K_FACTOR * (1 - expected)  # type: ignore[index]
                 book[key_l] = rating_l - K_FACTOR * (1 - expected)  # type: ignore[index]
         return overall, by_surface
@@ -97,7 +98,7 @@ class TennisModel:
             surface_weight * by_surface.get((player_two, surface), DEFAULT_ELO)
             + (1 - surface_weight) * overall.get(player_two, DEFAULT_ELO)
         )
-        return 1.0 / (1.0 + 10.0 ** (-(blend_one - blend_two) / 400.0))
+        return expected_win_probability(blend_one, blend_two)
 
     def predict_games(
         self,

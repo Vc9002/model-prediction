@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3065570",
+      "current_status": "Out",
+      "player_name": "Kelsey Plum",
+      "raw_status": "Out",
+      "reason": "Lower Leg",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-28T00:22:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-28T15:00:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4038379",
+      "current_status": "Out",
+      "player_name": "Marine Johannes",
+      "raw_status": "Out",
+      "reason": "Ankle",
+      "return_date": "2026-07-28",
+      "status_at_utc": "2026-07-27T23:22:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-17T14:45:00+00:00",
+      "team": "New York Liberty"
+    }
+  ],
+  "event_id": "401857096",
+  "observed_at_utc": "2026-07-28T16:02:36.067628+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "d2524e6d5e4592c04a267215110f602c5c0daf643a8a87ac1c4c33ccd31d24ba",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -1379,3 +1379,131 @@ def test_cached_short_trade_is_side_adjusted_in_history_summary(monkeypatch) -> 
     assert trade["exchange_price"] == 0.56
     assert trade["outcome_side"] == "short"
     assert trade["model_pick"]["pick_id"] == "indiana"
+
+
+def test_sell_refuses_once_the_game_has_already_started(monkeypatch) -> None:
+    """Operator directive, 2026-08-01: _pick_quote never returns a snapshot
+    observed at or after event_start_utc, so once a game starts the only
+    available quote is a frozen pregame snapshot that can never update
+    again. Validating a resting sell's "don't cross the bid" check against
+    that frozen number would be actively misleading -- unlike ordinary
+    pregame staleness, which sells are still allowed to try against."""
+    pick = {
+        "pick_id": "held-in-progress",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+        "event_start_utc": "2020-01-01T00:00:00Z",
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_decorate_pick",
+        lambda row: {**row, "buy_ready": True, "buy_block_reason": "ready",
+                      "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}},
+    )
+
+    result = dashboard_server.preview_order(
+        {"pick_id": "held-in-progress", "action": "sell", "price": 0.50, "size_shares": 10}
+    )
+
+    assert result["status"] == "refused"
+    assert "already started" in result["error"]
+
+
+def test_sell_still_allowed_before_the_game_starts(monkeypatch) -> None:
+    pick = {
+        "pick_id": "held-pregame",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+        "event_start_utc": "2099-01-01T00:00:00Z",
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_decorate_pick",
+        lambda row: {**row, "buy_ready": True, "buy_block_reason": "ready",
+                      "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}},
+    )
+
+    result = dashboard_server.preview_order(
+        {"pick_id": "held-pregame", "action": "sell", "price": 0.50, "size_shares": 10}
+    )
+
+    assert result["status"] == "preview"
+
+
+def test_submit_sell_also_refuses_once_the_game_has_already_started(monkeypatch, tmp_path: Path) -> None:
+    # A preview created before the game started, then submitted after it
+    # started, must be caught at submission time too -- not just preview
+    # time -- since state can change between the two calls.
+    pick = {
+        "pick_id": "held-race",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+        "event_start_utc": "2099-01-01T00:00:00Z",
+    }
+    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
+    monkeypatch.setattr(
+        dashboard_server,
+        "_decorate_pick",
+        lambda row: {**row, "buy_ready": True, "buy_block_reason": "ready",
+                      "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}},
+    )
+    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
+
+    preview = dashboard_server.preview_order(
+        {"pick_id": "held-race", "action": "sell", "price": 0.50, "size_shares": 10}
+    )
+    assert preview["status"] == "preview"
+
+    # Game has since started -- flip the row and the quote lookup used by submit_order.
+    pick["event_start_utc"] = "2020-01-01T00:00:00Z"
+    monkeypatch.setattr(
+        dashboard_server,
+        "_pick_quote",
+        lambda row: {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+    )
+
+    result = dashboard_server.submit_order({"nonce": preview["nonce"]})
+
+    assert result["status"] == "refused"
+    assert "already started" in result["error"]
+
+
+def test_pnl_fallback_formula_matches_pricing_profit_units() -> None:
+    """dashboard_server.py has zero dependencies on the model_prediction
+    package by design (kept runnable standalone) -- so _decorate_pick's
+    P&L fallback (american_odds -> P&L, used only when a settled row is
+    somehow missing a real pnl_units/research_pnl_units, which never
+    happens against real data as of 2026-08-01) is a hand-maintained
+    second copy of pricing.profit_units's math, not an import. This test
+    is the safeguard: it fails loudly the moment the two diverge, across a
+    representative sweep of American odds and unit sizes."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from model_prediction.domain import PickResult
+    from model_prediction.pricing import american_to_decimal, profit_units
+
+    def dashboard_formula(units: float, odds: int, result: str) -> float:
+        if odds > 0:
+            pnl = units * odds / 100
+        else:
+            pnl = units * 100 / abs(odds)
+        if result == "loss":
+            pnl = -units
+        return pnl
+
+    for odds in (-500, -200, -110, 100, 150, 300, 1000):
+        for units in (0.5, 1.0, 1.25, 1.75, 2.0):
+            for result, pick_result in (("win", PickResult.WIN), ("loss", PickResult.LOSS)):
+                dashboard_value = dashboard_formula(units, odds, result)
+                real_value = profit_units(pick_result, units, american_to_decimal(odds))
+                assert dashboard_value == pytest.approx(real_value), (
+                    f"diverged at odds={odds}, units={units}, result={result}: "
+                    f"dashboard={dashboard_value} vs pricing.profit_units={real_value}"
+                )

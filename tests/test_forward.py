@@ -154,9 +154,9 @@ def test_teams_reads_home_away_from_competitors() -> None:
     assert home == "Home Team"
 
 
-def test_paired_event_candidates_selects_the_positive_edge_side() -> None:
-    # Home team is a strong model favorite (65%) at a market price implying
-    # only 56.5% (-130) -- home should be the moneyline/spread selection.
+def test_paired_event_candidates_selects_the_model_favorite() -> None:
+    # Home team is the model favorite (65%) -- home should be the
+    # moneyline/spread selection regardless of what the market price is.
     candidates = _paired_event_candidates(
         _event(),
         _odds_snapshot(),
@@ -184,14 +184,42 @@ def test_paired_event_candidates_selects_the_positive_edge_side() -> None:
     assert total.line == 8.5
 
 
-def test_paired_event_candidates_switches_to_the_underdog_when_price_justifies_it() -> None:
-    # Home team is only a 40% model favorite, but +150 pays enough that the
-    # away side (60% modeled) still has to be checked on its own edge --
-    # here the away side is the clear pick on both probability and price.
+def test_paired_event_candidates_never_switches_to_the_underdog_for_a_better_price() -> None:
+    # Home is only a 30% model favorite, but priced as the big plus-money
+    # underdog (+400) while away (70% modeled) is priced as the expensive
+    # favorite (-900). Expected-value math would favor home here (0.30*5.0-1
+    # = +0.5 vs away's 0.70*1.111-1 = -0.22) -- that used to flip the
+    # selection to the side the model does NOT think will win. Operator
+    # directive (2026-07-30/31): models pick the side they think wins,
+    # period; edge/price is informational only, never a selection factor.
+    odds = MLBGameOdds(
+        event_id="999",
+        event_start_utc="2026-07-01T23:00:00Z",
+        away_team="Away Team",
+        home_team="Home Team",
+        provider="polymarket_us",
+        observed_at_utc="2026-07-01T20:00:00Z",
+        markets={
+            "moneyline": {
+                "away": MarketSideQuote("away", None, -900, 0.9, None),
+                "home": MarketSideQuote("home", None, 400, 0.2, None),
+            },
+            "spread": {
+                "away": MarketSideQuote("away", 1.5, -900, 0.9, None),
+                "home": MarketSideQuote("home", -1.5, 400, 0.2, None),
+            },
+            "total": {
+                "over": MarketSideQuote("over", 8.5, -110, 0.524, None),
+                "under": MarketSideQuote("under", 8.5, -110, 0.524, None),
+            },
+        },
+        raw_response={},
+        snapshot_hash="snaphash",
+    )
     candidates = _paired_event_candidates(
         _event(),
-        _odds_snapshot(),
-        _margin_output(home_win_probability=0.40),
+        odds,
+        _margin_output(home_win_probability=0.30),
         _totals_output(over_probability=0.45),
         _FakeMeasuredEdgeModel(),
         _FakeMeasuredEdgeModel(),
@@ -199,6 +227,7 @@ def test_paired_event_candidates_switches_to_the_underdog_when_price_justifies_i
     )
     by_market = {c.market_type: c for c in candidates}
     assert by_market[MarketType.MONEYLINE].selection == "away"
+    assert by_market[MarketType.SPREAD].selection == "away"
     assert by_market[MarketType.TOTAL].selection == "under"
 
 

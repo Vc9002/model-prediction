@@ -1,0 +1,9 @@
+{
+  "entries": [],
+  "event_id": "401857103",
+  "observed_at_utc": "2026-07-31T21:04:03.076184+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "d241f1a7e6423b391740b71e2f8a9f7707dabba13f9d2efc1ac566d67fdc9e94",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

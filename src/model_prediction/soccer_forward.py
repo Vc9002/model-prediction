@@ -20,7 +20,17 @@ from .features.base import FeatureStore
 from .models.soccer import UpcomingMatch, soccer_model
 
 _PARTIAL_MARKERS = ("-fh-", "-h1-", "-h2-", "-1h-", "-2h-")
-_GENERIC_TEAM_WORDS = {"fc", "sc", "cf", "club", "city", "united"}
+# Corporate-suffix words only -- never a word that legitimately distinguishes
+# two real clubs. "city"/"united" were removed 2026-07-31: stripping them
+# collapsed same-city derby pairs onto the same "distinctive" token (e.g.
+# "Manchester United" -> {"manchester"} and "Manchester City" -> {"manchester"},
+# a false match; same for "AC Milan" vs "Inter Milan" via generic "club"-style
+# treatment of short words). When both that team's own market snapshot AND its
+# derby rival's snapshot are present for one event, the resulting ambiguity is
+# still caught downstream (len(matching) != 1); the real danger was the
+# common case where only ONE side's snapshot is present, which silently
+# priced the wrong team's contract.
+_GENERIC_TEAM_WORDS = {"fc", "sc", "cf", "club"}
 
 
 def _teams(event: dict[str, Any]) -> tuple[str, str]:
@@ -378,10 +388,19 @@ def build_soccer_total_slate(
         # call is also good enough value to become a real pick.
         selection = max(("home", "away"), key=lambda side: prediction.probabilities[side])
         selected_team = prediction.home_team if selection == "home" else prediction.away_team
+        opponent_team = prediction.away_team if selection == "home" else prediction.home_team
         matching = [
             snapshot
             for snapshot in candidates
             if _team_matches_title(selected_team, str(snapshot.get("team") or ""))
+            # A same-city/shared-mascot derby pair (e.g. "AC Milan" vs "Inter
+            # Milan", or a short club prefix too short to survive
+            # _team_matches_title's word-length filter) can both fuzzy-match
+            # the same snapshot title. If the OPPONENT also matches this
+            # snapshot, it's ambiguous or actually belongs to the opponent --
+            # never guess; exclude it rather than risk pricing the wrong
+            # team's contract.
+            and not _team_matches_title(opponent_team, str(snapshot.get("team") or ""))
         ]
         if len(matching) != 1:
             unmatched.append(

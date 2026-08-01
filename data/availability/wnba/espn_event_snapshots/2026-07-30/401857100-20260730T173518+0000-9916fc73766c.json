@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4066548",
+      "current_status": "Out",
+      "player_name": "DiJonai Carrington",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-07-30",
+      "status_at_utc": "2026-07-29T22:07:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "3142010",
+      "current_status": "Out",
+      "player_name": "Azura Stevens",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-01",
+      "status_at_utc": "2026-07-29T22:02:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-27T18:50:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433408",
+      "current_status": "Out",
+      "player_name": "Aaliyah Edwards",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-29T20:37:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "2490553",
+      "current_status": "Out",
+      "player_name": "Brittney Griner",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-29T20:35:00+00:00",
+      "team": "Connecticut Sun"
+    }
+  ],
+  "event_id": "401857100",
+  "observed_at_utc": "2026-07-30T17:35:18.736964+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "9916fc73766cb9de5aa75d2e6e6db4aa23651220a6b764f755faf7807406425d",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

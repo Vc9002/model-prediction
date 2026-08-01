@@ -163,6 +163,32 @@ def test_prospective_capture_archives_observation_and_is_usable_before_first_pit
     assert archived[0]["provenance"] == "prospective_pregame"
 
 
+def test_point_in_time_probable_starters_exposes_names_not_just_era_gap(monkeypatch) -> None:
+    monkeypatch.setattr(
+        espn_probables.httpx,
+        "get",
+        lambda url, timeout: _Response(_scoreboard()),
+    )
+    espn_probables.capture_probable_starter_snapshot(
+        "2099-07-18",
+        observed_at=datetime(2099, 7, 18, 18, tzinfo=UTC),
+    )
+
+    starters = espn_probables.point_in_time_probable_starters(
+        "401816170",
+        datetime(2099, 7, 18, 22, tzinfo=UTC),
+    )
+
+    assert starters == {"home_starter": "J.T. Ginn", "away_starter": "Zack Littell"}
+
+
+def test_point_in_time_probable_starters_fails_closed_without_archive() -> None:
+    with pytest.raises(ValueError, match="NO_PIT_ARCHIVE"):
+        espn_probables.point_in_time_probable_starters(
+            "no-such-event", datetime(2099, 7, 18, 22, tzinfo=UTC)
+        )
+
+
 def test_retroactive_capture_is_archived_as_non_pit_and_rejected(monkeypatch) -> None:
     monkeypatch.setattr(
         espn_probables.httpx,

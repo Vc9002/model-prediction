@@ -9449,6 +9449,13 @@
     "source_team_id": 24918,
     "team_id": "bo3:1:24918"
   },
+  "bo3:1:24919": {
+    "acronym": null,
+    "name": "Trainwrecks eSports",
+    "slug": "trainwrecks-esports",
+    "source_team_id": 24919,
+    "team_id": "bo3:1:24919"
+  },
   "bo3:1:24924": {
     "acronym": null,
     "name": "Black Phoenix",
@@ -9476,6 +9483,20 @@
     "slug": "goldrashers",
     "source_team_id": 24943,
     "team_id": "bo3:1:24943"
+  },
+  "bo3:1:24944": {
+    "acronym": "RAY",
+    "name": "RayRay",
+    "slug": "rayray",
+    "source_team_id": 24944,
+    "team_id": "bo3:1:24944"
+  },
+  "bo3:1:24945": {
+    "acronym": "ZWAW",
+    "name": "ZWAW",
+    "slug": "zwaw",
+    "source_team_id": 24945,
+    "team_id": "bo3:1:24945"
   },
   "bo3:1:24946": {
     "acronym": null,
@@ -9505,12 +9526,26 @@
     "source_team_id": 2496,
     "team_id": "bo3:1:2496"
   },
+  "bo3:1:24967": {
+    "acronym": "GS",
+    "name": "GameSport",
+    "slug": "gamesport-ru",
+    "source_team_id": 24967,
+    "team_id": "bo3:1:24967"
+  },
   "bo3:1:24968": {
     "acronym": "GBC",
     "name": "Gothboiclique",
     "slug": "gothboiclique-ru",
     "source_team_id": 24968,
     "team_id": "bo3:1:24968"
+  },
+  "bo3:1:24977": {
+    "acronym": "TTBS",
+    "name": "Teletubisie",
+    "slug": "teletubisie",
+    "source_team_id": 24977,
+    "team_id": "bo3:1:24977"
   },
   "bo3:1:2498": {
     "acronym": "SAGA",
@@ -9525,6 +9560,13 @@
     "slug": "thor",
     "source_team_id": 2500,
     "team_id": "bo3:1:2500"
+  },
+  "bo3:1:25002": {
+    "acronym": "NPG",
+    "name": "Nordic Partners",
+    "slug": "nordic-partners-gaming",
+    "source_team_id": 25002,
+    "team_id": "bo3:1:25002"
   },
   "bo3:1:2506": {
     "acronym": null,

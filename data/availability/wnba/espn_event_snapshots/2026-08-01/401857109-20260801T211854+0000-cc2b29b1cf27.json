@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5345473",
+      "current_status": "Out",
+      "player_name": "Costanza Verona",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-31T22:39:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4595910",
+      "current_status": "Out",
+      "player_name": "Haley Jones",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-31T22:34:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4329370",
+      "current_status": "Out",
+      "player_name": "Maria Kliundikova",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-31T17:11:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "5106232",
+      "current_status": "Out",
+      "player_name": "Ashlon Jackson",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-30T23:09:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4433408",
+      "current_status": "Out",
+      "player_name": "Aaliyah Edwards",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-29T20:37:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "2490553",
+      "current_status": "Out",
+      "player_name": "Brittney Griner",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-29T20:35:00+00:00",
+      "team": "Connecticut Sun"
+    }
+  ],
+  "event_id": "401857109",
+  "observed_at_utc": "2026-08-01T21:18:54.152088+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "cc2b29b1cf2792c39758c1c0f422d51d20114ae9de9430e319d4562498bdc850",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

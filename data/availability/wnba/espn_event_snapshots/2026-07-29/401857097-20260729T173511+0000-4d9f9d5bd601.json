@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3913881",
+      "current_status": "Out",
+      "player_name": "Alanna Smith",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-07-29",
+      "status_at_utc": "2026-07-28T21:59:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-28T21:27:00+00:00",
+      "team": "Atlanta Dream"
+    },
+    {
+      "athlete_id": "5105740",
+      "current_status": "Out",
+      "player_name": "Indya Nivar",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-07-29",
+      "status_at_utc": "2026-07-19T19:09:00+00:00",
+      "team": "Atlanta Dream"
+    }
+  ],
+  "event_id": "401857097",
+  "observed_at_utc": "2026-07-29T17:35:11.665040+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "4d9f9d5bd601eaca860cfeb9b30e5165329d2954f3ae33dbe6377e7407239be0",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -488,6 +488,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
           <span>Settled: <b id="researchSettled">0</b></span>
           <span>Shown: <b id="researchShown">0</b></span>
         </div>
+        <div id="researchKpis" class="kpis" style="margin-bottom:16px"></div>
         <div style="overflow-x:auto"><table class="data" id="researchTable"></table></div>
       </div>
       <div class="card">
@@ -512,6 +513,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <span>Settled: <b id="gatedResearchSettled">0</b></span>
         <span>Shown: <b id="gatedResearchShown">0</b></span>
       </div>
+      <div id="gatedResearchKpis" class="kpis" style="margin-bottom:16px"></div>
       <div style="overflow-x:auto"><table class="data" id="gatedResearchTable"></table></div>
     </div>
   </section>
@@ -1315,7 +1317,7 @@ function onFilterChange(tab){
   if(tab==="L"){renderPicks();return;}
   renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();
 }
-let sortKey="event_start_utc",sortAsc=true;
+let sortKey="event_start_utc",sortAsc=false;
 function updateCounts(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
   $("#openCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
@@ -1511,7 +1513,7 @@ function renderFlatTable(){
     $("#settledCount_F").textContent=_flatCache.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
 
     let rows=filteredFlatRows();
-    rows.sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
+    rows.sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
 
     // KPI
     const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
@@ -1933,7 +1935,11 @@ function pickLabel(p){
   if(p.market_type==="spread"&&team!=null){
     const line=Number(p.line);
     const signed=isNaN(line)?"":(line>0?`+${line}`:`${line}`);
-    return `${team} ${signed}`.trim();
+    let plain="";
+    if(!isNaN(line)){
+      plain=line>0?` (covers unless losing by ${Math.ceil(line)}+)`:line<0?` (needs to win by ${Math.ceil(-line)}+)`:"";
+    }
+    return `YES: ${team} ${signed}${plain}`.trim();
   }
   if(p.market_type==="total")return `${sel.toUpperCase()} ${p.line??""}`.trim();
   return `${team||sel.toUpperCase()}${p.line?(" "+p.line):""}`;
@@ -2359,8 +2365,18 @@ function renderResearchTable(){
       $("#researchSettled").textContent=settled;
       $("#openCount_R").textContent=active;
       $("#settledCount_R").textContent=settled;
-      const rows=filteredResearchRows().sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
+      const rows=filteredResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
       $("#researchShown").textContent=rows.length;
+      const rSettled=rows.filter(p=>String(p.status||'').toLowerCase()==='settled'&&(p.result==='win'||p.result==='loss'));
+      const rWins=rSettled.filter(p=>p.result==='win').length,rLosses=rSettled.filter(p=>p.result==='loss').length;
+      const rHasSettled=rWins+rLosses>0;
+      const rPnl=rHasSettled?rSettled.reduce((s,p)=>s+pickPnl(p),0):null;
+      const rRisked=rSettled.reduce((s,p)=>s+(Number(p.units)||0),0);
+      $("#researchKpis").innerHTML=`
+        <div class="k"><b>${rows.length}</b><span>games</span></div>
+        <div class="k"><b>${rHasSettled?pct(rWins/(rWins+rLosses)):'—'}</b><span>win rate</span></div>
+        <div class="k"><b class="${rPnl==null?'':rPnl>=0?'green':'red'}">${fmt(rPnl)}</b><span>P&L (U)</span></div>
+        <div class="k"><b>${rHasSettled&&rRisked>0?pct(rPnl/rRisked):'—'}</b><span>ROI</span></div>`;
       let html=ledgerHeaderRow(false,"research");
       if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
       rows.forEach(p=>{html+=ledgerRowHtml(p,false,"research");});
@@ -2444,8 +2460,18 @@ function renderGatedResearchTable(){
     $("#gatedResearchSettled").textContent=settled;
     $("#openCount_G").textContent=active;
     $("#settledCount_G").textContent=settled;
-    const rows=filteredGatedResearchRows().sort((a,b)=>(a.event_start_utc||'').localeCompare(b.event_start_utc||''));
+    const rows=filteredGatedResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
     $("#gatedResearchShown").textContent=rows.length;
+    const gSettled=rows.filter(p=>String(p.status||'').toLowerCase()==='settled'&&(p.result==='win'||p.result==='loss'));
+    const gWins=gSettled.filter(p=>p.result==='win').length,gLosses=gSettled.filter(p=>p.result==='loss').length;
+    const gHasSettled=gWins+gLosses>0;
+    const gPnl=gHasSettled?gSettled.reduce((s,p)=>s+pickPnl(p),0):null;
+    const gRisked=gSettled.reduce((s,p)=>s+(Number(p.units)||0),0);
+    $("#gatedResearchKpis").innerHTML=`
+      <div class="k"><b>${rows.length}</b><span>games</span></div>
+      <div class="k"><b>${gHasSettled?pct(gWins/(gWins+gLosses)):'—'}</b><span>win rate</span></div>
+      <div class="k"><b class="${gPnl==null?'':gPnl>=0?'green':'red'}">${fmt(gPnl)}</b><span>P&L (U)</span></div>
+      <div class="k"><b>${gHasSettled&&gRisked>0?pct(gPnl/gRisked):'—'}</b><span>ROI</span></div>`;
     let html=ledgerHeaderRow(false,"gated");
     if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
     rows.forEach(p=>{html+=ledgerRowHtml(p,false,"gated");});

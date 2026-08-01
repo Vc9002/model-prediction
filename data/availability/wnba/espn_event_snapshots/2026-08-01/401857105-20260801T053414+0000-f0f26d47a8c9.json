@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3142010",
+      "current_status": "Out",
+      "player_name": "Azura Stevens",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-31T22:06:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-27T18:50:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2529458",
+      "current_status": "Out",
+      "player_name": "Cheyenne Parker-Tyus",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-07-31T22:21:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4433633",
+      "current_status": "Out",
+      "player_name": "Kierstan Bell",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-01",
+      "status_at_utc": "2026-07-31T22:20:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4565501",
+      "current_status": "Out",
+      "player_name": "Janiah Barker",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-15T23:46:00+00:00",
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "event_id": "401857105",
+  "observed_at_utc": "2026-08-01T05:34:14.682519+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "f0f26d47a8c99d881c79d15bda8c98fd436361a195309089b1e0af758fc7edf3",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

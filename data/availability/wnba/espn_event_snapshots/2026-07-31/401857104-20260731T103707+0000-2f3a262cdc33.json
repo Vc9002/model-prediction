@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4703794",
+      "current_status": "Out",
+      "player_name": "Sarah Ashlee Barker",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-24T15:18:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4433795",
+      "current_status": "Out",
+      "player_name": "Sania Feagin",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-09T23:15:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4432831",
+      "current_status": "Questionable",
+      "player_name": "Aliyah Boston",
+      "raw_status": "Day-To-Day",
+      "reason": "Lower Leg",
+      "return_date": "2026-07-31",
+      "status_at_utc": "2026-07-31T00:12:00+00:00",
+      "team": "Indiana Fever"
+    },
+    {
+      "athlete_id": "4433403",
+      "current_status": "Questionable",
+      "player_name": "Caitlin Clark",
+      "raw_status": "Day-To-Day",
+      "reason": "Back",
+      "return_date": "2026-07-31",
+      "status_at_utc": "2026-07-31T00:07:00+00:00",
+      "team": "Indiana Fever"
+    },
+    {
+      "athlete_id": "2955898",
+      "current_status": "Out",
+      "player_name": "Damiris Dantas",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-07-31T00:07:00+00:00",
+      "team": "Indiana Fever"
+    },
+    {
+      "athlete_id": "3142255",
+      "current_status": "Questionable",
+      "player_name": "Monique Billings",
+      "raw_status": "Day-To-Day",
+      "reason": "Hip",
+      "return_date": "2026-07-31",
+      "status_at_utc": "2026-07-31T00:03:00+00:00",
+      "team": "Indiana Fever"
+    }
+  ],
+  "event_id": "401857104",
+  "observed_at_utc": "2026-07-31T10:37:07.003360+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "2f3a262cdc33d8159fb6ea1d30fccb472647b52abe0fd9add28cfb4a0c3c1251",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

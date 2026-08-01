@@ -1,1 +1,2 @@
 {"status": "refused", "reason": "DAILY_WRITER_ALREADY_RUNNING", "lock": "data/locks/daily.lock"}
+{"status": "refused", "reason": "DAILY_WRITER_ALREADY_RUNNING", "lock": "data/locks/daily.lock"}

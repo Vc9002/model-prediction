@@ -83,7 +83,11 @@ def test_only_qualified_statistical_model_can_receive_units(registry, ban_list) 
         result = evaluate_eligibility(
             request(home="BAL", state=state), registry, ban_list, Exposure(), UnitPolicy(), NOW
         )
-        assert result.record_type is RecordType.RESEARCH_OBSERVATION and result.units == 0
+        # Every research observation still carries a real, model-derived
+        # paper size (operator directive, 2026-07-31: "every pick should
+        # have units and pnl, hard code this") -- only a banned team stays
+        # hard-zero, and none of these states are that.
+        assert result.record_type is RecordType.RESEARCH_OBSERVATION and result.units > 0
 
 
 def test_stale_missing_uncertainty_low_edge_and_exposure_become_research(registry, ban_list) -> None:
@@ -114,8 +118,9 @@ def test_stale_missing_uncertainty_low_edge_and_exposure_become_research(registr
     assert capped.reason_code == "QUALIFIED"
     assert low.units > 0
     assert capped.units > 0
-    # Stale data still can't be trusted at all -- hard zero.
-    assert stale.units == 0
+    # Stale data still can't be *trusted* as a real call, but it still gets a
+    # real paper size for research tracking (operator directive, 2026-07-31).
+    assert stale.units > 0
     assert low.units > 0
     assert capped.units > 0
     assert missing.units > 0  # qualified call gets positive units

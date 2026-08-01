@@ -1,0 +1,36 @@
+{
+  "artifact_hash": "8360b122264b796b0fb193095cfe4506c7e064e5f3f8c0a659aec41efd08dd25",
+  "base_score_model_version": "mlb-analyst-poisson-trend-v0.2",
+  "calibration_method": "flat_probability_shrinkage_toward_half",
+  "calibration_note": "Rebuilt against mlb-analyst-poisson-trend-v0.2's refit elasticities (scripts/mlb_elasticity_refit.py) and fresh game data (scripts/mlb_measured_edge_calibrate.py). Primary fit (this artifact's top-level scale/offset) is OLS of the rebuilt formula's raw simulated cover probability against real game outcomes over 290 games from data/historical/mlb_market_lines_reconstructed.jsonl -- ESPN's own postgame pickcenter reconstruction, hard-labeled timestamp_valid=False by ingest.py::reconstruct_mlb_markets; diagnostic only, NOT real historical Polymarket lines (correcting v1's calibration_note, which mischaracterized this same data source). Correlation with real outcomes: 0.2057. Flat -110 diagnostic: {'picks': 289, 'hit_rate': 0.5952, 'units': 39.36}. Real-market (genuine captured Polymarket BBO) corroboration: 65 games, scale=0.739, offset=0.1305, correlation=0.2268, flat -110: {'picks': 65, 'hit_rate': 0.6308, 'units': 13.27}.",
+  "calibration_version": "measured-edge-margin-v2",
+  "calibration_windows": {
+    "diagnostic": {
+      "correlation": 0.2057,
+      "flat_110_diagnostic": {
+        "hit_rate": 0.5952,
+        "picks": 289,
+        "units": 39.36
+      },
+      "games": 290,
+      "offset": 0.172,
+      "scale": 0.6561
+    },
+    "real_market": {
+      "correlation": 0.2268,
+      "flat_110_diagnostic": {
+        "hit_rate": 0.6308,
+        "picks": 65,
+        "units": 13.27
+      },
+      "games": 65,
+      "offset": 0.1305,
+      "scale": 0.739
+    }
+  },
+  "model_name": "Measured Edge Margin",
+  "model_version": "measured-edge-margin-v2",
+  "offset": 0.172,
+  "scale": 0.6561,
+  "trained_on_games": 290
+}

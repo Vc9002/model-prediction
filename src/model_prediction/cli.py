@@ -39,6 +39,11 @@ from .data_sources.espn import SPORT_LEAGUES, ESPNClient, ESPNMLBClient
 from .data_sources.espn_probables import capture_probable_starter_snapshot
 from .data_sources.espn_wnba_injuries import capture_espn_event_injuries
 from .data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
+from .data_sources.mlb_injuries import (
+    capture_roster_snapshot,
+    capture_transactions_snapshot,
+    team_id_for_name,
+)
 from .data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
 from .data_sources.polymarket_execute import (
     ExecutionGateError,
@@ -92,12 +97,13 @@ from .international_baseball import (
 from .international_baseball import (
     backfill_international_baseball,
     forecast_international_baseball_slate,
+    refresh_recent_international_baseball_matches,
     validate_all_international_baseball_baselines,
 )
 from .learned_forward import build_learned_moneyline_slate, match_executable_quote
 from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError, PickLedger
-from .models import MODEL_SPECS
 from .mlb_baseline_refresh import refresh_if_due
+from .models import MODEL_SPECS
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
 from .models.mlb import load_formula_spec
 from .research_ledgers import (
@@ -652,8 +658,8 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
         args_date,
         ESPNMLBClient(),
         spec,
-        PROJECT_ROOT / "config/models/measured-edge-margin-v1.json",
-        PROJECT_ROOT / "config/models/measured-edge-totals-v1.json",
+        PROJECT_ROOT / "config/models/measured-edge-margin-v2.json",
+        PROJECT_ROOT / "config/models/measured-edge-totals-v2.json",
         observed_at,
         odds_feed,
     )
@@ -727,7 +733,7 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
     return {
         "sport": "mlb",
         "model_name": "Measured Edge Paired Models",
-        "model_versions": ["measured-edge-margin-v1", "measured-edge-totals-v1"],
+        "model_versions": ["measured-edge-margin-v2", "measured-edge-totals-v2"],
         "game_date": args_date,
         "scheduled_games": scheduled,
         "market_calls_created": len(candidates),
@@ -765,6 +771,24 @@ def _refresh_esports_ratings(data_root) -> dict:
     return {"backfill": backfill_results, "validation": validation}
 
 
+def _refresh_international_baseball_ratings(data_root) -> dict:
+    """Keep KBO/NPB Elo ratings from going stale -- same problem, same fix
+    shape as _refresh_esports_ratings above (found 2026-07-31: nothing
+    equivalent existed for these two leagues; confirmed live artifacts were
+    6 and 14 days stale respectively with no alert anywhere surfacing it)."""
+    leagues = DAILY_INTERNATIONAL_BASEBALL_SPORTS
+    backfill_results = {
+        league: refresh_recent_international_baseball_matches(data_root, league) for league in leagues
+    }
+    validation = validate_all_international_baseball_baselines(
+        data_root, leagues, PROJECT_ROOT / "config/models"
+    )
+    report_path = PROJECT_ROOT / "outputs/latest/international-baseball-baseline-validation.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(validation, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    return {"backfill": backfill_results, "validation": validation}
+
+
 def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans, flat_ledger, audit) -> dict:
     """MLB total-runs and run-line picks (Measured Edge Monte-Carlo margin +
     totals models) into flat_picks.xlsx only -- no edge gate, never the main
@@ -790,8 +814,8 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
         args_date,
         ESPNMLBClient(),
         spec,
-        PROJECT_ROOT / "config/models/measured-edge-margin-v1.json",
-        PROJECT_ROOT / "config/models/measured-edge-totals-v1.json",
+        PROJECT_ROOT / "config/models/measured-edge-margin-v2.json",
+        PROJECT_ROOT / "config/models/measured-edge-totals-v2.json",
         observed_at,
         odds_feed,
     )
@@ -859,7 +883,7 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
     return {
         "sport": "mlb_totals",
         "model_name": "Measured Edge Totals + Spread",
-        "model_versions": ["measured-edge-totals-v1", "measured-edge-margin-v1"],
+        "model_versions": ["measured-edge-totals-v2", "measured-edge-margin-v2"],
         "game_date": args_date,
         "scheduled_games": scheduled,
         "market_candidates": len(totals_candidates),
@@ -1438,15 +1462,23 @@ def _forecast_international_sport(
         ask = float(best_side["executable_ask"])
         research_confidence_gate = float(model_config.get("research_confidence_gate", 0.0))
         selected_team = str(best_side["team"])
-        teams = list(contract["teams"])
-        # Polymarket orders teams [away, home] in event metadata; the forecast
-        # sides preserve that order.  Verify and fall back gracefully.
-        if len(teams) == 2:
-            home_team = teams[1]
-            away_team = teams[0]
+        # home_team/away_team are resolved tag-safely inside
+        # forecast_international_baseball_slate (via each side's own
+        # "selection" tag, not array position) -- market["sides"] has no
+        # ordering guarantee, so trusting position here would risk a silent
+        # home/away swap. Fall back to the (rare) old positional guess only
+        # if an older contract predates this field.
+        if contract.get("home_team") and contract.get("away_team"):
+            home_team = str(contract["home_team"])
+            away_team = str(contract["away_team"])
         else:
-            home_team = teams[0] if len(teams) > 0 else selected_team
-            away_team = selected_team if selected_team != home_team else ""
+            teams = list(contract["teams"])
+            if len(teams) == 2:
+                home_team = teams[1]
+                away_team = teams[0]
+            else:
+                home_team = teams[0] if len(teams) > 0 else selected_team
+                away_team = selected_team if selected_team != home_team else ""
         pick_is_home = selected_team == home_team
         american_odds = probability_to_american(ask)
         request = PickRequest(
@@ -1764,6 +1796,7 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
     now = utc_now()
     espn = ESPNClient()
     market_store = MarketOddsSnapshotStore(market_odds_snapshot_path(config))
+    data_root = Path(ledger_path(config)).parent
     settled, voided, pending, failures = [], [], [], []
     for row in ledger.rows():
         if row["status"] != "open":
@@ -1778,7 +1811,7 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             continue
         # Esports: settle via Polymarket contract resolution
         if row["league"] in ("LOL", "CS2", "DOTA2", "VALORANT", "RAINBOW_SIX"):
-            result = _settle_esports_pick(row, ledger)
+            result = _settle_esports_pick(row, ledger, data_root=data_root)
             if result is None:
                 pending.append(row["pick_id"])
             elif result.get("voided"):
@@ -1803,7 +1836,7 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
         # scoreboard shape doesn't fit `_find_espn_result` at all (see
         # `_find_tennis_result`).
         if row["league"] == "TENNIS":
-            result = _settle_tennis_pick(row, ledger, espn)
+            result = _settle_tennis_pick(row, ledger, espn, data_root=data_root)
             if result is None:
                 pending.append(row["pick_id"])
             elif result.get("settled"):
@@ -1842,6 +1875,31 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             closing_probability = float(quote["decision_probability"])
             if quote.get("line") is not None:
                 closing_line = float(quote["line"])
+        elif (
+            row["league"] == "SOCCER"
+            and row["market_type"] == "moneyline"
+            and row["selection"] in ("home", "away")
+        ):
+            # Soccer never writes into market_store (that's MLB's own
+            # snapshot store) -- its real snapshot history lives in the
+            # generic per-sport-date store the daily slate capture already
+            # writes for every sport. Draw selections are skipped here: the
+            # home/away team-matching helper below doesn't have a
+            # "neither side" case to resolve them against.
+            slug = _extract_market_slug(str(row.get("rationale", "")))
+            if slug is not None:
+                try:
+                    closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                        data_root,
+                        "soccer",
+                        slug,
+                        row["event_start_utc"],
+                        row["home_team"],
+                        row["away_team"],
+                        row["selection"],
+                    )
+                except (OSError, ValueError):
+                    logger.warning("soccer closing-snapshot lookup failed for slug %s", slug, exc_info=True)
         try:
             result = ledger.settle(
                 row["pick_id"],
@@ -1915,7 +1973,61 @@ _TERMINAL_MARKET_STATES = {
 }
 
 
-def _settle_esports_pick(row: dict, ledger) -> dict | None:
+def _closing_probability_for_moneyline_pick(
+    data_root,
+    sport_dir: str,
+    slug: str,
+    event_start_utc: str,
+    home_team: str,
+    away_team: str,
+    selection: str,
+) -> tuple[float | None, int | None]:
+    """Best-effort closing (last pregame) probability for a team/player-vs-
+    team/player moneyline pick, read from the same per-sport-date Polymarket
+    snapshot history the forecast pipeline already captures every day via
+    capture_slate_snapshots (data/odds/{sport}/{date}/polymarket_snapshots.jsonl).
+
+    Returns (raw_probability, american_odds) for the row's own selection, or
+    (None, None) if no matching pregame snapshot was ever captured for this
+    market -- CLV is then simply left blank for that row, same as today.
+    """
+    from .learned_forward import _team_matches
+
+    game_date = parse_utc(event_start_utc).astimezone(EASTERN).date().isoformat()
+    store = PolymarketSnapshotStore.for_sport_date(data_root, sport_dir, game_date)
+    snapshot = store.closing_snapshot(slug, event_start_utc)
+    if snapshot is None:
+        return None, None
+    selected_name = home_team if selection == "home" else away_team
+    long_desc = str((snapshot.get("long") or {}).get("description", ""))
+    short_desc = str((snapshot.get("short") or {}).get("description", ""))
+    matches_long = _team_matches(selected_name, long_desc)
+    matches_short = _team_matches(selected_name, short_desc)
+    if matches_long == matches_short:
+        return None, None  # ambiguous or no match -- never guess
+    side = snapshot.get("long" if matches_long else "short") or {}
+    ask = side.get("ask")
+    if ask is None or not 0 < float(ask) < 1:
+        return None, None
+    return round(float(ask), 6), probability_to_american(float(ask))
+
+
+def _extract_market_slug(rationale: str) -> str | None:
+    """Recover the Polymarket market slug embedded in a row's rationale text.
+
+    Two formats coexist across this project's history: ``market_slug=xxx``
+    (esports) and the older ``... (xxx).`` trailing-parenthetical (soccer/
+    tennis, and legacy esports rows).
+    """
+    import re
+
+    match = re.search(r"market_slug=([a-z0-9\-]+)", rationale)
+    if match is None:
+        match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
+    return match.group(1) if match else None
+
+
+def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
     """Settle an esports pick from the exchange's terminal market state.
 
     A resolved Polymarket market reports a terminal book state (verified live:
@@ -1926,17 +2038,12 @@ def _settle_esports_pick(row: dict, ledger) -> dict | None:
     time (teams[0]=home), so the winning description maps directly onto the
     ledger's home/away teams: home won -> scores (0, 1); away won -> (1, 0).
     """
-    import re
-
     from .data_sources.polymarket_us import PolymarketUSClient, _amount
 
     rationale = str(row.get("rationale", ""))
-    match = re.search(r"market_slug=([a-z0-9\-]+)", rationale)
-    if match is None:  # legacy rows: "... (slug)."
-        match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
-    if match is None:
+    slug = _extract_market_slug(rationale)
+    if slug is None:
         return {"pick_id": row["pick_id"], "reason": "no market slug recorded on row"}
-    slug = match.group(1)
     client = PolymarketUSClient()
     try:
         market = client.market(slug)
@@ -1982,8 +2089,29 @@ def _settle_esports_pick(row: dict, ledger) -> dict | None:
             "pick_id": row["pick_id"],
             "reason": f"winning side {winning_description!r} matches neither ledger team",
         }
+    closing_probability = closing_odds = None
+    if data_root is not None:
+        try:
+            closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                data_root,
+                "esports",
+                slug,
+                row["event_start_utc"],
+                row["home_team"],
+                row["away_team"],
+                row["selection"],
+            )
+        except (OSError, ValueError):
+            logger.warning("esports closing-snapshot lookup failed for slug %s", slug, exc_info=True)
     try:
-        result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
+        result = ledger.settle(
+            row["pick_id"],
+            away_score,
+            home_score,
+            None,
+            closing_odds,
+            closing_raw_probability=closing_probability,
+        )
         return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
     except (KeyError, ValueError) as error:
         return {"pick_id": row["pick_id"], "reason": str(error)}
@@ -2074,7 +2202,7 @@ def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | No
     return None
 
 
-def _settle_tennis_pick(row: dict, ledger, espn: ESPNClient) -> dict | None:
+def _settle_tennis_pick(row: dict, ledger, espn: ESPNClient, data_root=None) -> dict | None:
     try:
         start = parse_utc(row["event_start_utc"])
     except ValueError:
@@ -2083,8 +2211,31 @@ def _settle_tennis_pick(row: dict, ledger, espn: ESPNClient) -> dict | None:
     match = _find_tennis_result(espn, game_day, row)
     if match is None or not match.get("completed"):
         return None
+    closing_probability = closing_odds = None
+    if data_root is not None:
+        slug = _extract_market_slug(str(row.get("rationale", "")))
+        if slug is not None:
+            try:
+                closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                    data_root,
+                    "tennis",
+                    slug,
+                    row["event_start_utc"],
+                    row["home_team"],
+                    row["away_team"],
+                    row["selection"],
+                )
+            except (OSError, ValueError):
+                logger.warning("tennis closing-snapshot lookup failed for slug %s", slug, exc_info=True)
     try:
-        settled = ledger.settle(row["pick_id"], match["away_score"], match["home_score"])
+        settled = ledger.settle(
+            row["pick_id"],
+            match["away_score"],
+            match["home_score"],
+            None,
+            closing_odds,
+            closing_raw_probability=closing_probability,
+        )
         return {"pick_id": row["pick_id"], "result": settled["result"], "settled": True}
     except (KeyError, ValueError) as error:
         return {"pick_id": row["pick_id"], "reason": str(error)}
@@ -2727,13 +2878,62 @@ def main(argv: list[str] | None = None) -> None:
                         args.date,
                         exc_info=True,
                     )
-            with ThreadPoolExecutor(max_workers=5) as io_pool:
+            mlb_availability_result: dict[str, Any] = {"status": "skipped"}
+            def _capture_mlb_availability():
+                # Shadow feature (features/mlb_player_availability.py) --
+                # only captures raw roster/transaction data here; per-matchup
+                # feature computation happens lazily, only if a future
+                # artifact requests these feature names.
+                nonlocal mlb_availability_result
+                try:
+                    from .data_sources.espn import ESPNClient
+                    mlb_scoreboard = ESPNClient().scoreboard("MLB", args.date)
+                    team_ids: set[int] = set()
+                    for event in mlb_scoreboard.get("events", []):
+                        competitors = event.get("competitions", [{}])[0].get("competitors", [])
+                        for competitor in competitors:
+                            name = (competitor.get("team") or {}).get("displayName", "")
+                            try:
+                                team_ids.add(team_id_for_name(name))
+                            except ValueError:
+                                continue
+                    if not team_ids:
+                        mlb_availability_result = {"status": "no_games", "date": args.date}
+                        return
+                    now = utc_now()
+                    capture_roster_snapshot(data_root, sorted(team_ids), observed_at=now)
+                    # 60-day lookback covers even a 60-Day IL stint's full
+                    # placement-to-activation span; the end_date deliberately
+                    # extends through today's real date (not just args.date)
+                    # so one capture can serve any past cutoff_date's
+                    # point-in-time reconstruction, not only today's slate.
+                    transactions_start = (now.date() - timedelta(days=60)).isoformat()
+                    transactions_end = now.date().isoformat()
+                    txn_snapshot = capture_transactions_snapshot(
+                        data_root,
+                        sorted(team_ids),
+                        transactions_start,
+                        transactions_end,
+                        observed_at=now,
+                    )
+                    mlb_availability_result = {
+                        "status": "captured",
+                        "team_count": len(team_ids),
+                        "transaction_entries": len(txn_snapshot.get("entries", [])),
+                    }
+                except Exception:
+                    logger.warning(
+                        "MLB availability capture failed for %s", args.date, exc_info=True
+                    )
+                    mlb_availability_result = {"status": "error"}
+            with ThreadPoolExecutor(max_workers=6) as io_pool:
                 f0 = io_pool.submit(_polymarket_slate, slate_args, config)
                 f1 = io_pool.submit(_capture_wnba)
                 f2 = io_pool.submit(_build_priors)
                 f3 = io_pool.submit(_collect_soccer)
                 f4 = io_pool.submit(_capture_mlb_probables)
-                for f in (f1, f2, f3, f4):
+                f5 = io_pool.submit(_capture_mlb_availability)
+                for f in (f1, f2, f3, f4, f5):
                     f.result()  # Wait for all, surface exceptions
                 slate = f0.result()
             _clear_today_open(ledger, args.date, by_event_date=True)
@@ -2850,6 +3050,12 @@ def main(argv: list[str] | None = None) -> None:
                     flat_mode=False,
                     gated_ledger=research_ledger(data_directory, title, gated=True),
                 )
+            try:
+                forecast_result["_international_baseball_ratings_refresh"] = (
+                    _refresh_international_baseball_ratings(data_directory)
+                )
+            except Exception:
+                logger.warning("International baseball ratings refresh failed", exc_info=True)
             # International baseball — logged to research/gated ledgers (never main)
             for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS:
                 forecast_result[league] = _forecast_international_sport(
@@ -2966,6 +3172,7 @@ def main(argv: list[str] | None = None) -> None:
                 "step5b_wnba_availability": {
                     "priors": wnba_priors_result,
                 },
+                "step5c_mlb_availability": mlb_availability_result,
                 "step6_flat_forecast_and_log": flat_result,
                 "step7_flat_settlement": flat_settlement,
                 "step8_research_settlement": _research_settlement,

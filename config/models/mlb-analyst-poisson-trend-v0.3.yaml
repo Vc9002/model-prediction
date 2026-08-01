@@ -1,0 +1,66 @@
+_refit_note: 'Refit 2026-07 by scripts/mlb_elasticity_refit.py against 1136 real completed
+  games (see rows_collected in the script''s own stdout for the two-row-per-game design
+  matrix size). Held-out correlation by chronological expanding-window fold: fold0=0.1222,
+  fold1=0.1623, fold2=0.1046, fold3=0.1139. bullpen_elasticity stays forced to 0.0
+  unless a bullpen-included fit shows a positive coefficient in every fold (see bullpen_overturned_selection_bias_finding
+  in the script''s stdout); this run''s result is bullpen_elasticity=0.069018.'
+away_field_run_factor: 1.0
+bullpen_elasticity: 0.069018
+factor_bounds:
+  bullpen_weakness:
+  - 0.5
+  - 2.0
+  offense:
+  - 0.7
+  - 1.4
+  park:
+  - 0.8
+  - 1.3
+  starter_weakness:
+  - 0.5
+  - 2.0
+  weather:
+  - 0.85
+  - 1.2
+feature_schema_version: v3
+formula_version: mlb-analyst-poisson-trend-v0.3
+home_field_run_factor: 1.04
+league_runs_per_team_game: 4.5493
+league_starter_era: 4.1958
+league_strikeout_rate: 0.2193
+league_walk_rate: 0.0785
+offense_elasticity: 0.088237
+park_elasticity: 0.259048
+recent_half_life_games: 10.0
+recent_prior_strength_games: 12.0
+seed_method: stable_hash
+simulation:
+  extra_inning_home_probability_bounds:
+  - 0.5
+  - 0.55
+  seed: 42
+  shared_environment_variance: 0.06
+  simulations: 20000
+  team_specific_variance: 0.12
+starter_rate_prior_batters_faced: 60.0
+starter_recent_prior_innings: 20.0
+starter_recent_weight: 0.7
+starter_season_prior_innings: 40.0
+starter_season_weight: 0.3
+starter_weakness_elasticity: 0.281107
+strikeout_weight: 0.15
+uncertainty:
+  base: 0.02
+  bullpen_unavailable: 0.02
+  lineup_projected: 0.015
+  lineup_unavailable: 0.025
+  maximum: 0.15
+  minimum: 0.02
+  missing_wrc_plus: 0.01
+  missing_xfip: 0.01
+  model_form: 0.01
+  pitcher: 0.015
+  rookie_starter: 0.03
+  weather_unavailable: 0.01
+walk_weight: 0.1
+weather_elasticity: 0.040295

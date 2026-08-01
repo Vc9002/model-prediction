@@ -16,7 +16,7 @@ from .data_sources.espn import ESPNMLBClient
 from .data_sources.mlb_market_odds import MLBGameOdds, MLBMarketOddsFeed
 from .domain import MarketType, parse_utc
 from .models.mlb import FormulaSpec, MeasuredEdgeMarginModel, MeasuredEdgeTotalsModel
-from .pricing import american_to_decimal, normalize_no_vig
+from .pricing import normalize_no_vig
 
 
 @dataclass(frozen=True)
@@ -150,10 +150,13 @@ def _paired_event_candidates(
             sides[0]: distribution.first_win_probability,
             sides[1]: distribution.second_win_probability,
         }
-        selection = max(
-            sides,
-            key=lambda side: probabilities[side] * american_to_decimal(odds[side]) - 1,
-        )
+        # Pick the side the model thinks is more likely to win/cover, not the
+        # side with the best expected value against the market's price --
+        # operator directive, 2026-07-30 ("all models should be picking
+        # which side to win and logging that, not the edge"). Matches
+        # learned_forward.py's moneyline selection (probability argmax);
+        # this legacy path had never been updated to match.
+        selection = max(sides, key=lambda side: probabilities[side])
         raw_probability = probabilities[selection]
         calibrated_probability = model.calibrate_selected_side(raw_probability)
         no_vig = dict(
