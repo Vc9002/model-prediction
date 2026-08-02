@@ -22,6 +22,7 @@ import httpx
 from .domain import eastern_today
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
+from .research_io import backup_before_overwrite as _backup_before_overwrite
 from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
 from .research_io import sha256_file as _sha256
@@ -734,6 +735,7 @@ def validate_esports_baseline(
     artifact_path = None
     if artifact_dir is not None:
         artifact_path = Path(artifact_dir) / f"{title}-tiered-elo-{ESPORTS_MODEL_LINEAGE}.json"
+        _backup_before_overwrite(artifact_path)
         _atomic_write(artifact_path, json.dumps(artifact, indent=2, sort_keys=True) + "\n")
     return {
         "status": "ok",

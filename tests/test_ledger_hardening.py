@@ -45,7 +45,11 @@ def test_research_is_zero_unit_excluded_from_exposure_roi_but_in_calibration(
     registry, ban_list, tmp_path
 ) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
-    research_request = request("research", state=ModelState.RESEARCH)
+    # SUSPENDED, not RESEARCH -- operator directive, 2026-08-02: promotion
+    # tier no longer gates qualified calls, so RESEARCH now produces a real
+    # QUALIFIED_SHADOW_CALL too. SUSPENDED remains a hard stop, so it's what
+    # this test uses to reliably exercise a genuine RESEARCH_OBSERVATION row.
+    research_request = request("research", state=ModelState.SUSPENDED)
     research_gate = evaluate_eligibility(research_request, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     research_row = ledger.append_evaluated(research_request, research_gate, NOW)
     assert research_row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
@@ -82,7 +86,7 @@ def test_research_can_auto_score_one_hypothetical_unit_on_settlement(
         research_score_units=1.0,
         research_scoring_note="one-unit hypothetical policy",
     )
-    req = request("research-one-unit", state=ModelState.RESEARCH)
+    req = request("research-one-unit", state=ModelState.SUSPENDED)  # see the note above on why SUSPENDED, not RESEARCH
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
 
@@ -107,7 +111,7 @@ def test_research_can_keep_model_recommended_units_on_settlement(
         research_scoring_mode="model_recommended",
         research_scoring_note="decision-time model size",
     )
-    req = request("research-model-size", probability=0.672, state=ModelState.RESEARCH)
+    req = request("research-model-size", probability=0.672, state=ModelState.SUSPENDED)
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
 
@@ -129,7 +133,7 @@ def test_research_model_recommended_skips_scoring_without_uncertainty(
         research_scoring_mode="model_recommended",
         research_scoring_note="decision-time model size",
     )
-    req = request("research-missing-uncertainty", probability=0.672, state=ModelState.RESEARCH)
+    req = request("research-missing-uncertainty", probability=0.672, state=ModelState.SUSPENDED)
     req = PickRequest(**{**req.__dict__, "model_uncertainty": None})
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)

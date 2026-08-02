@@ -1298,6 +1298,7 @@ def _log_esports_forecast(
     """
     from .data_sources.polymarket_us import probability_to_american
     logged = 0
+    errors: list[dict] = []
     if flat_mode:
         # Research-only sports never write through flat-forecast. Keeping this
         # guard here protects direct `flat-forecast --sport <esport>` calls as
@@ -1413,9 +1414,23 @@ def _log_esports_forecast(
             logged += 1
         except DuplicatePickError:
             continue
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as error:
+            # Record the failure instead of silently discarding it -- a bare
+            # `continue` here previously left an entire league able to log
+            # zero real predictions for a day with nothing surfaced anywhere
+            # (see the KBO/NPB timestamp-ordering incident in DEBUG.md for
+            # how bad a silent per-contract swallow can get).
+            errors.append({
+                "event_id": contract.get("event_id"),
+                "reason": f"{type(error).__name__}: {error}",
+            })
+            logger.warning(
+                "esports forecast logging failed for event %s (%s): %s",
+                contract.get("event_id"), title, error,
+            )
             continue
 
+    forecast["errors"] = errors
     return logged
 
 
@@ -1461,6 +1476,7 @@ def _forecast_international_sport(
         return forecast
 
     logged = 0
+    errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         sides = contract.get("sides", [])
         if len(sides) != 2:
@@ -1548,9 +1564,20 @@ def _forecast_international_sport(
             logged += 1
         except DuplicatePickError:
             continue
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as error:
+            # Record the failure instead of silently discarding it -- see
+            # the matching comment in _log_esports_forecast.
+            errors.append({
+                "event_id": contract.get("event_id"),
+                "reason": f"{type(error).__name__}: {error}",
+            })
+            logger.warning(
+                "international baseball forecast logging failed for event %s (%s): %s",
+                contract.get("event_id"), league_upper, error,
+            )
             continue
     forecast["logged"] = logged
+    forecast["errors"] = errors
     forecast["logging_note"] = (
         "Every model-favored priced contract was evaluated for the research ledger; "
         "only trust-valid contracts clearing edge and confidence gates were mirrored "
@@ -1575,12 +1602,15 @@ def _forecast_soccer_sport(
     flat_ledger: every priced contract, no edge/confidence gate -- same
     "log everything" semantics flat mode uses for the learned sports.
     main_ledger: mirrors gated_ledger's existing "only when genuinely
-    eligible" append. Soccer's config currently sets status: research, which
-    means can_create_qualified_call() never returns True for it (see
-    lifecycle.py) -- so this wiring is correct and ready, but produces zero
-    real Main rows until soccer is promoted to shadow_qualified through the
-    same walk-forward/locked-holdout process the sports that already reach
-    Main went through. Not something this function decides on its own.
+    eligible" append. Soccer's config was set to status: shadow_qualified
+    via an explicit manual qualification_override (operator directive,
+    2026-08-02) rather than a genuine walk-forward/locked-holdout pass --
+    see config/model.yaml's SOCCER.qualification_override_reason for the
+    honest disclosure. Real Main-ledger rows now get produced whenever a
+    contract clears min_edge; _row_artifact_qualified (cli.py) still fails
+    closed for real execution since no genuinely-qualified soccer artifact
+    exists, so PolymarketExecutor.execute requires --manual-research-order
+    for any actual order on these rows.
     """
     from .data_sources.polymarket_us import probability_to_american
     model_config = config["models"].get("SOCCER", {})
@@ -1606,6 +1636,7 @@ def _forecast_soccer_sport(
     gated = 0
     flat_logged = 0
     main_logged = 0
+    errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
         request = PickRequest(
@@ -1703,12 +1734,25 @@ def _forecast_soccer_sport(
                         )
                         main_logged += 1
             logged += 1
-        except (DuplicatePickError, KeyError, ValueError):
+        except DuplicatePickError:
+            continue
+        except (KeyError, ValueError) as error:
+            # Record the failure instead of silently discarding it -- see
+            # the matching comment in _log_esports_forecast.
+            errors.append({
+                "event_id": contract.get("event_id"),
+                "reason": f"{type(error).__name__}: {error}",
+            })
+            logger.warning(
+                "soccer forecast logging failed for event %s: %s",
+                contract.get("event_id"), error,
+            )
             continue
     forecast["logged"] = logged
     forecast["gated_logged"] = gated
     forecast["flat_logged"] = flat_logged
     forecast["main_logged"] = main_logged
+    forecast["errors"] = errors
     return forecast
 
 
@@ -1739,6 +1783,7 @@ def _forecast_tennis_sport(
     observed_now = utc_now()
     logged = 0
     gated = 0
+    errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
         request = PickRequest(
@@ -1811,10 +1856,23 @@ def _forecast_tennis_sport(
                         )
                         gated += 1
             logged += 1
-        except (DuplicatePickError, KeyError, ValueError):
+        except DuplicatePickError:
+            continue
+        except (KeyError, ValueError) as error:
+            # Record the failure instead of silently discarding it -- see
+            # the matching comment in _log_esports_forecast.
+            errors.append({
+                "event_id": contract.get("event_id"),
+                "reason": f"{type(error).__name__}: {error}",
+            })
+            logger.warning(
+                "tennis forecast logging failed for event %s: %s",
+                contract.get("event_id"), error,
+            )
             continue
     forecast["logged"] = logged
     forecast["gated_logged"] = gated
+    forecast["errors"] = errors
     return forecast
 
 
@@ -2705,6 +2763,25 @@ def main(argv: list[str] | None = None) -> None:
                         args.date,
                         by_event_date=True,
                     )
+            elif replace_today and log and is_flat and "soccer" in {s.casefold() for s in sports}:
+                # Soccer's research/gated/main ledgers all get written
+                # together with flat regardless of which command ran (see
+                # _forecast_soccer_sport's docstring: main+flat and
+                # research+gated are each a pair) -- clearing only
+                # flat_ledger above (the is_flat branch) while leaving
+                # these three untouched means a second same-day
+                # flat-forecast run duplicates every soccer row in them,
+                # since only flat gets deduped via the clear. Every other
+                # flat-forecast sport only ever writes flat_ledger, so this
+                # stays soccer-specific rather than blanket-applied to
+                # every RESEARCH_LEDGER_SPORTS entry.
+                _clear_today_open(
+                    research_ledger(data_directory, "soccer"), args.date, by_event_date=True
+                )
+                _clear_today_open(
+                    research_ledger(data_directory, "soccer", gated=True), args.date, by_event_date=True
+                )
+                _clear_today_open(ledger, args.date, by_event_date=True)
             results = {}
             for sport in sports:
                 if sport == "esports":
@@ -2998,7 +3075,26 @@ def main(argv: list[str] | None = None) -> None:
                 f5 = io_pool.submit(_capture_mlb_availability)
                 for f in (f1, f2, f3, f4, f5):
                     f.result()  # Wait for all, surface exceptions
-                slate = f0.result()
+                try:
+                    slate = f0.result()
+                except Exception:
+                    # Real bug fixed 2026-08-02: this used to be an unhandled
+                    # f0.result() -- a transient Polymarket network error here
+                    # crashed the *entire* daily job (MLB, WNBA, NBA, NFL,
+                    # soccer, esports, KBO, NPB, tennis, none of it ran) even
+                    # though every per-sport forecast below fetches its own
+                    # market data independently and doesn't actually need this
+                    # step's result. This capture is a prospective BBO/event
+                    # snapshot for reporting, not a hard prerequisite for the
+                    # forecasts that follow -- log loudly and degrade instead
+                    # of taking down work that would have otherwise succeeded.
+                    logger.error("Polymarket slate/BBO capture failed for %s", args.date, exc_info=True)
+                    slate = {
+                        "status": "error",
+                        "event_count": 0,
+                        "events_by_league": {},
+                        "prospective_bbo_capture": {},
+                    }
             _clear_today_open(ledger, args.date, by_event_date=True)
             # Also clear and forecast for flat ledger
             flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
@@ -3090,6 +3186,16 @@ def main(argv: list[str] | None = None) -> None:
                 flat_ledger=flat_ledger,
                 main_ledger=ledger,
             )
+            # Not a hard failure -- these are separate leagues in one daily
+            # run, and a loud warning here (rather than an exception) is what
+            # would have surfaced the KBO/NPB silent-zero-picks incident
+            # immediately instead of it running unnoticed for months.
+            _priced_soccer = forecast_result["soccer"].get("priced_contracts") or []
+            if _priced_soccer and not forecast_result["soccer"].get("logged"):
+                logger.warning(
+                    "zero rows logged for soccer despite %d priced contracts",
+                    len(_priced_soccer),
+                )
             try:
                 forecast_result["tennis"] = _forecast_tennis_sport(
                     data_root=data_directory,
@@ -3098,6 +3204,12 @@ def main(argv: list[str] | None = None) -> None:
                     research_ledger=research_ledger(data_directory, "tennis"),
                     gated_ledger=research_ledger(data_directory, "tennis", gated=True),
                 )
+                _priced_tennis = forecast_result["tennis"].get("priced_contracts") or []
+                if _priced_tennis and not forecast_result["tennis"].get("logged"):
+                    logger.warning(
+                        "zero rows logged for tennis despite %d priced contracts",
+                        len(_priced_tennis),
+                    )
             except Exception:
                 logger.warning("Tennis forecast failed", exc_info=True)
             try:
@@ -3111,13 +3223,19 @@ def main(argv: list[str] | None = None) -> None:
                     title=title,
                     game_date=args.date,
                 )
-                _log_esports_forecast(
+                _esports_logged = _log_esports_forecast(
                     forecast_result[title],
                     config,
                     research_ledger(data_directory, title),
                     flat_mode=False,
                     gated_ledger=research_ledger(data_directory, title, gated=True),
                 )
+                _priced_esports = forecast_result[title].get("priced_contracts") or []
+                if _priced_esports and not _esports_logged:
+                    logger.warning(
+                        "zero rows logged for %s despite %d priced contracts",
+                        title, len(_priced_esports),
+                    )
             try:
                 forecast_result["_international_baseball_ratings_refresh"] = (
                     _refresh_international_baseball_ratings(data_directory)
@@ -3135,6 +3253,12 @@ def main(argv: list[str] | None = None) -> None:
                     research_ledger=research_ledger(data_directory, league),
                     gated_ledger=research_ledger(data_directory, league, gated=True),
                 )
+                _priced_intl = forecast_result[league].get("priced_contracts") or []
+                if _priced_intl and not forecast_result[league].get("logged"):
+                    logger.warning(
+                        "zero rows logged for %s despite %d priced contracts",
+                        league, len(_priced_intl),
+                    )
             flat_result = {
                 sport: forecast_result.get(
                     f"_flat_{sport}", forecast_result.get(sport, {})
@@ -3222,6 +3346,7 @@ def main(argv: list[str] | None = None) -> None:
                 "date": args.date,
                 "step0_mlb_baseline_refresh": mlb_baseline_refresh_result,
                 "step1_polymarket_search": {
+                    "status": slate.get("status", "ok"),
                     "event_count": slate["event_count"],
                     "leagues_with_events": [
                         league for league, items in slate["events_by_league"].items() if items

@@ -120,6 +120,12 @@ class MarketResidualModel:
     def save(self, path: str | Path) -> None:
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            raise FileExistsError(
+                f"refusing to overwrite existing versioned artifact {destination} -- "
+                "bump RESIDUAL_VERSION to a new, unused version before writing "
+                "market residual artifacts again"
+            )
         destination.write_text(json.dumps(self.to_artifact(), indent=2, sort_keys=True) + "\n")
 
     @classmethod

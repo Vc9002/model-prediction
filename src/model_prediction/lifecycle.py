@@ -112,7 +112,19 @@ def validate_transition(current: ModelState, target: ModelState) -> None:
 
 
 def can_create_qualified_call(state: ModelState, origin: ModelOrigin) -> bool:
-    return state is ModelState.SHADOW_QUALIFIED and origin is ModelOrigin.STATISTICAL_MODEL
+    """Operator directive, 2026-08-02: "remove all promotion qualification,
+    its up to me". This no longer distinguishes RESEARCH / SHADOW_CANDIDATE
+    / SHADOW_QUALIFIED / DEGRADED -- a model's walk-forward/locked-holdout
+    promotion tier no longer decides whether it can produce a real,
+    QUALIFIED_SHADOW_CALL-eligible pick; that's the operator's call, made
+    per-pick against whatever evidence the dashboard/ledger surfaces (see
+    the record_type/reason_code/edge/trade_candidate fields every row
+    already carries). RETIRED and SUSPENDED remain hard stops -- those are
+    explicit "this model is turned off right now" operator decisions, not
+    promotion-tier classifications, and are kept distinct from the
+    qualification gate this directive removes.
+    """
+    return state not in (ModelState.RETIRED, ModelState.SUSPENDED) and origin is ModelOrigin.STATISTICAL_MODEL
 
 
 def can_create_observation(state: ModelState) -> bool:

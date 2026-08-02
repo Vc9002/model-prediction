@@ -1,4 +1,7 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from model_prediction.domain import League, MarketType, PickRequest, RecordType
 from model_prediction.eligibility import EligibilityResult
@@ -96,6 +99,76 @@ def _qualified_call(units: float) -> EligibilityResult:
     return EligibilityResult(
         RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 70, 0.08, 0.08, AWAY, HOME
     )
+
+
+def test_trade_candidate_reflects_positive_edge_not_record_type(tmp_path) -> None:
+    """Operator directive, 2026-08-02: an honest label distinct from
+    record_type. QUALIFIED_SHADOW_CALL (evaluate_eligibility, MLB/WNBA/NBA/
+    NFL) no longer requires positive edge to become a real call (operator
+    directive 2026-07-26 removed that gate) -- trade_candidate makes "the
+    model favors this side" and "this is genuinely positive expected value"
+    visibly distinct instead of both hiding behind one QUALIFIED label."""
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    positive_edge_call = EligibilityResult(
+        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, 0.08, 0.08, AWAY, HOME
+    )
+    negative_edge_call = EligibilityResult(
+        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, -0.03, -0.03, AWAY, HOME
+    )
+    zero_edge_call = EligibilityResult(
+        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, 0.0, 0.0, AWAY, HOME
+    )
+
+    positive_row = ledger.append_evaluated(request(), positive_edge_call)
+    assert positive_row["trade_candidate"] == "True"
+
+    negative_row = ledger.append_evaluated(
+        replace(request(), event_id="event-2"), negative_edge_call
+    )
+    assert negative_row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value
+    assert negative_row["trade_candidate"] == "False"  # QUALIFIED but not actually positive EV
+
+    zero_row = ledger.append_evaluated(replace(request(), event_id="event-3"), zero_edge_call)
+    assert zero_row["trade_candidate"] == "False"  # edge > 0 strictly, not >=
+
+
+def test_append_evaluated_also_writes_the_new_per_model_ledger(tmp_path) -> None:
+    """Operator directive, 2026-08-02: every model also writes to its own
+    per-model ledger going forward (data/model_ledgers/<model-id>.xlsx),
+    additive alongside the existing PickLedger write, wired through the one
+    chokepoint every sport's append_evaluated/append_call already shares."""
+    from model_prediction.model_ledger import ModelLedger
+
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+
+    row = ledger.append_evaluated(request(), _qualified_call(1.5))
+
+    model_ledger_path = tmp_path / "model_ledgers" / "mlb-total-measured-edge.xlsx"
+    assert model_ledger_path.exists()
+    rows = ModelLedger(model_ledger_path).rows()
+    assert len(rows) == 1
+    assert rows[0]["event_id"] == row["event_id"]
+    assert float(rows[0]["model_market_difference"]) == pytest.approx(float(row["edge"]))
+
+
+def test_a_model_ledger_write_failure_never_breaks_the_primary_ledger_write(
+    tmp_path, monkeypatch
+) -> None:
+    """The primary PickLedger write is real, working, and already succeeded
+    by the time the new-schema write happens -- a bug or lock timeout in the
+    additive path must never turn into a lost/failed real pick."""
+    import model_prediction.ledger as ledger_module
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated model_ledger failure")
+
+    monkeypatch.setattr(ledger_module, "record_from_pick_request", _boom)
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+
+    row = ledger.append_evaluated(request(), _qualified_call(1.5))
+
+    assert row["pick_id"]
+    assert ledger.report()["open"] == 1
 
 
 def test_recompute_research_sizing_fills_in_a_zero_unit_sizable_reason(tmp_path) -> None:

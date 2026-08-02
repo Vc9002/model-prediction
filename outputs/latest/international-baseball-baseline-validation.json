@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-08-02T10:00:49.682863Z",
+  "generated_at_utc": "2026-08-02T13:08:31.637340Z",
   "leagues": {
     "kbo": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/kbo-tie-aware-elo-v1.json",
-      "artifact_hash": "86e1a4b83a2c52b41547802e0282dd7da8fa6c8411f806bc0bf72adba2fcf314",
+      "artifact_hash": "bafa84ad8b0392837eed518132775315f58d8f63876b7ff8fd006bb80a05f684",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0
@@ -11,7 +11,7 @@
       "chronological_split": {
         "locked_test": {
           "from_date": "2024-05-31",
-          "n": 1670,
+          "n": 1674,
           "through_date": "2026-08-02"
         },
         "train": {
@@ -32,18 +32,18 @@
         "Locked-test metrics are diagnostic; v1 remains unqualified and zero-unit."
       ],
       "locked_test": {
-        "accuracy_decisive": 0.551235,
-        "brier_settlement": 0.24044,
-        "calls": 1620,
-        "hits": 893,
-        "mae_settlement": 0.480292,
-        "observations": 1670,
+        "accuracy_decisive": 0.551724,
+        "brier_settlement": 0.240419,
+        "calls": 1624,
+        "hits": 896,
+        "mae_settlement": 0.480285,
+        "observations": 1674,
         "ties": 50,
-        "units_at_minus_110": 84.818182
+        "units_at_minus_110": 86.545455
       },
       "model_state": "research",
       "model_version": "kbo-tie-aware-elo-v2",
-      "observations": 7049,
+      "observations": 7053,
       "parameter_selection_on_validation": [
         {
           "accuracy_decisive": 0.560662,
@@ -11390,12 +11390,12 @@
       "profitability": "not_established_no_point_in_time_market_prices",
       "promotion_eligible": false,
       "status": "ok",
-      "tie_rate": 0.024259,
+      "tie_rate": 0.024245,
       "units": 0
     },
     "npb": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/npb-tie-aware-elo-v1.json",
-      "artifact_hash": "b33490db984131002966577fd9f127a96bf9bbb6bdaf16ae5a07605724a74188",
+      "artifact_hash": "7d8b2dae5e08608da6d337f18c12bb34defb01e822ff089f150387f52a8ee73d",
       "chosen": {
         "home_advantage": 35.0,
         "k": 8.0

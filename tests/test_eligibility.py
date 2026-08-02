@@ -70,16 +70,25 @@ def test_ban_cannot_be_bypassed_by_origin(registry, ban_list, origin) -> None:
     assert result.reason_code == "NO_CALL_TEAM_BANNED" and result.units == 0
 
 
-def test_only_qualified_statistical_model_can_receive_units(registry, ban_list) -> None:
-    qualified = evaluate_eligibility(request(home="BAL"), registry, ban_list, Exposure(), UnitPolicy(), NOW)
-    assert qualified.record_type is RecordType.QUALIFIED_SHADOW_CALL and qualified.units > 0
+def test_promotion_tier_no_longer_gates_qualified_calls(registry, ban_list) -> None:
+    """Operator directive, 2026-08-02: "remove all promotion qualification,
+    its up to me". RESEARCH/SHADOW_CANDIDATE/DEGRADED/SHADOW_QUALIFIED all
+    now equally produce a real QUALIFIED_SHADOW_CALL -- a model's
+    walk-forward/locked-holdout promotion tier no longer decides eligibility.
+    RETIRED and SUSPENDED remain hard stops (explicit "off" states, not
+    promotion tiers -- see lifecycle.can_create_qualified_call)."""
     for state in (
+        ModelState.SHADOW_QUALIFIED,
         ModelState.RESEARCH,
         ModelState.SHADOW_CANDIDATE,
         ModelState.DEGRADED,
-        ModelState.SUSPENDED,
-        ModelState.RETIRED,
     ):
+        result = evaluate_eligibility(
+            request(home="BAL", state=state), registry, ban_list, Exposure(), UnitPolicy(), NOW
+        )
+        assert result.record_type is RecordType.QUALIFIED_SHADOW_CALL and result.units > 0
+
+    for state in (ModelState.SUSPENDED, ModelState.RETIRED):
         result = evaluate_eligibility(
             request(home="BAL", state=state), registry, ban_list, Exposure(), UnitPolicy(), NOW
         )

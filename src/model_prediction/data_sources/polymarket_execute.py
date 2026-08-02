@@ -41,10 +41,26 @@ import httpx
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from ..audit import AuditLog
-from ..domain import RecordType, iso_utc, utc_now
+from ..domain import iso_utc, parse_utc, utc_now
 
 _MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9\-]+)")
 _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9\-]+)\)\.?\s*$")
+_LIVE_QUOTE_MAXIMUM_AGE_SECONDS = 300
+
+
+def _team_name_matches(team_name: str, side_description: str) -> bool:
+    """Same loose match dashboard_server.py's _pick_quote already uses to
+    resolve a row's home/away team to a market side's long/short
+    description -- duplicated rather than imported because dashboard_server
+    deliberately has zero imports from this package (see DEBUG.md)."""
+    team = " ".join(team_name.casefold().split())
+    description = " ".join(side_description.casefold().split())
+    if not team or not description:
+        return False
+    if team == description:
+        return True
+    shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
+    return f" {shorter} " in f" {longer} "
 
 KEY_ID_ENV = "POLYMARKET_KEY_ID"
 SECRET_KEY_ENV = "POLYMARKET_SECRET_KEY"
@@ -97,10 +113,14 @@ class PolymarketExecutor:
         audit: AuditLog,
         confirm: Callable[[str], str] = input,
         environ: dict[str, str] | None = None,
+        live_quote: Callable[[str], dict[str, Any]] | None = None,
     ) -> None:
         self.audit = audit
         self.confirm = confirm
         self.environ = environ if environ is not None else dict(os.environ)
+        # Injectable so tests can supply a fake quote without a real network
+        # call or a live Polymarket US account; defaults to the real client.
+        self._live_quote = live_quote
 
     # ------------------------------------------------------------------ gate
 
@@ -115,18 +135,15 @@ class PolymarketExecutor:
     ) -> dict[str, Any]:
         """Run the full gate; submit only if every condition passes.
 
-        ``artifact_qualified`` is the ledger row's backing model ARTIFACT's
-        own ``qualified`` field (from its JSON file), not the config-declared
-        ``status``. A config ``qualification_override`` can make a row's
-        ``record_type`` read ``QUALIFIED_SHADOW_CALL`` for legitimate
-        observation purposes even when the artifact itself never cleared
-        holdout validation (e.g. MLB v6, 2026-07: "qualified=false in the
-        artifact itself; running live for observation"). That distinction is
-        fine for shadow logging, but real-money execution must not treat an
-        override-only qualification as equivalent to a genuinely validated
-        one — the caller must pass the real artifact value here, defaulting
-        True only preserves existing callers that don't yet distinguish the
-        two (see cli.py's ``execute``/``sell-position`` handlers).
+        ``manual_research_order`` and ``artifact_qualified`` no longer gate
+        anything (operator directive, 2026-08-02: execution is not
+        restricted by record_type or artifact qualification -- that's the
+        operator's discretion). Both parameters are kept for call-site
+        compatibility and because their values still get written to the
+        audit event (``source_record_type``/``source_artifact_qualified``)
+        as a permanent, honest record of what a pick's classification WAS
+        at execution time -- that history is worth keeping even though it no
+        longer decides whether the order can be submitted.
         """
         # Gate 1: explicit user command. The CLI sets this True only for the
         # `execute` subcommand; nothing else may.
@@ -165,6 +182,33 @@ class PolymarketExecutor:
                 f"REFUSED: ticket market_slug {ticket.market_slug!r} does not match "
                 f"the market this pick was actually priced against ({row_slug!r})."
             )
+        # single_order policy: one approved BUY should produce one exchange
+        # instruction. Nothing upstream (dashboard nonce/expiry, CLI args)
+        # stopped a caller from previewing+submitting a second, independent
+        # order against the same still-open pick_id -- each one cleared every
+        # check separately. Checked against the audit chain itself (not
+        # orders.json, which is dashboard-only) so this protects the raw CLI
+        # `execute` path too, not just the dashboard. A SELL is exempt: it's
+        # how a bought position is legitimately closed, not accumulated.
+        if ticket.action == "buy":
+            prior_buy = next(
+                (
+                    event
+                    for event in reversed(self.audit.events())
+                    if event.get("event_type") == "order_executed"
+                    and event.get("subject_id") == ticket.pick_id
+                    and event.get("payload", {}).get("action") == "buy"
+                ),
+                None,
+            )
+            if prior_buy is not None:
+                raise ExecutionGateError(
+                    f"REFUSED: a buy order was already submitted for pick {ticket.pick_id} "
+                    f"(order {prior_buy['payload'].get('order_id')} at "
+                    f"{prior_buy['payload'].get('submitted_at_utc')}); single_order policy "
+                    "refuses a second buy against the same pick. Use `sell-position` or "
+                    "`execute --action sell` to close the existing position, not to accumulate."
+                )
         # Cost is recomputed server-side rather than trusted from the
         # caller-supplied ticket field, so a stale/incorrect estimated_cost_usd
         # can't understate what the unit cap actually checks against.
@@ -174,21 +218,19 @@ class PolymarketExecutor:
                 f"REFUSED: ticket estimated_cost_usd ${ticket.estimated_cost_usd:.2f} does not "
                 f"match price * size_shares = ${recomputed_cost:.2f}."
             )
-        # Gate 6: qualified model call, or an explicit manual authorization
-        # whose active-model/edge/ban checks were completed by the CLI.
-        qualified = pick_row.get("record_type") == RecordType.QUALIFIED_SHADOW_CALL.value
-        if not qualified and not manual_research_order:
-            raise ExecutionGateError(
-                "REFUSED: research picks require the explicit manual-research-order override. "
-                f"This pick is {pick_row.get('record_type') or 'unknown'}."
-            )
-        if qualified and not artifact_qualified and not manual_research_order:
-            raise ExecutionGateError(
-                "REFUSED: this pick's record_type is QUALIFIED_SHADOW_CALL, but the "
-                "backing model artifact itself is not qualified (config "
-                "qualification_override, not a real holdout pass) -- resubmit with "
-                "--manual-research-order to execute anyway under research-order scrutiny."
-            )
+        # Operator directive, 2026-08-02: execution is no longer gated on
+        # record_type/artifact qualification -- "no restrictions, up to my
+        # discretion" (removing the earlier "QUALIFIED_SHADOW_CALL, or
+        # explicit manual-research-order" requirement and the "genuinely
+        # qualified artifact vs config override" distinction below it).
+        # source_record_type/source_reason_code/source_artifact_qualified
+        # still get written to the audit event below -- what a pick's
+        # classification WAS remains a permanent, honest record; it just no
+        # longer decides whether an order can be submitted. Every other gate
+        # (explicit command, --execute flag, credentials, ticket-to-row
+        # binding, cost recompute, single_order dedup, live side/pregame/
+        # quote-freshness verification, price/size sanity, interactive
+        # confirmation, audit chain) is unchanged and still enforced.
         if pick_row.get("status") != "open":
             raise ExecutionGateError("REFUSED: pick is not open.")
         # Gate 5 is upstream (unit engine sized the pick); re-assert sanity.
@@ -213,6 +255,16 @@ class PolymarketExecutor:
             raise ExecutionGateError(
                 "REFUSED: supported order types are post-only GTC and marketable IOC limits."
             )
+        # Live side/pregame/freshness verification, independent of whatever
+        # the caller already checked. dashboard_server.py's preview/submit
+        # flow derives token_side from the row's own quote before ever
+        # building a ticket, but the raw CLI `execute` command builds one
+        # straight from user-typed --side/--action args with no such check
+        # -- and this executor is the one chokepoint both paths share.
+        # Without this, a caller (or a bug/typo in either path) could submit
+        # token_side="short" for a pick whose real selection was the long
+        # side, and nothing upstream of here would catch it.
+        self._verify_live_side_and_timing(ticket, pick_row)
         # Gate 4: interactive confirmation with exact order details.
         answer = self.confirm(f"{ticket.describe()} Confirm? (Y/N): ").strip().casefold()
         if answer not in {"y", "yes"}:
@@ -249,6 +301,78 @@ class PolymarketExecutor:
             },
         )
         return {"status": "submitted", **submission}
+
+    # ------------------------------------------------------ live verification
+
+    def _verify_live_side_and_timing(self, ticket: OrderTicket, pick_row: dict[str, str]) -> None:
+        """Fetch a fresh quote and independently confirm token_side, market
+        state, and pregame status -- rather than trusting whatever the
+        caller already derived.
+
+        Only implemented for moneyline: it's the one market type with an
+        unambiguous two-team side mapping (home/away -> long/short via team
+        name match, the same resolution dashboard_server.py's _pick_quote
+        already does for its own preview path). Spread/total/btts rows keep
+        relying on the market_slug-from-rationale binding above; giving them
+        the same side check would need a real line/selection-to-side
+        resolver this project doesn't have yet.
+        """
+        if pick_row.get("market_type") != "moneyline":
+            return
+        try:
+            event_start = parse_utc(str(pick_row.get("event_start_utc", "")))
+        except ValueError as error:
+            raise ExecutionGateError(
+                "REFUSED: pick row has no valid event_start_utc to verify against."
+            ) from error
+        if utc_now() >= event_start:
+            raise ExecutionGateError("REFUSED: event has already started.")
+        from .polymarket_us import PolymarketUSClient
+
+        try:
+            snapshot = (self._live_quote or PolymarketUSClient().snapshot)(ticket.market_slug)
+        except ExecutionGateError:
+            raise
+        except Exception as error:
+            raise ExecutionGateError(
+                f"REFUSED: could not fetch a live quote to verify this order ({type(error).__name__})."
+            ) from error
+        try:
+            observed_at = parse_utc(str(snapshot["observed_at_utc"]))
+        except (KeyError, ValueError) as error:
+            raise ExecutionGateError("REFUSED: live quote has no valid observed_at_utc.") from error
+        if (utc_now() - observed_at).total_seconds() > _LIVE_QUOTE_MAXIMUM_AGE_SECONDS:
+            raise ExecutionGateError(
+                "REFUSED: live quote is stale (older than "
+                f"{_LIVE_QUOTE_MAXIMUM_AGE_SECONDS}s); refresh and resubmit."
+            )
+        if snapshot.get("market_state") not in (None, "MARKET_STATE_OPEN"):
+            raise ExecutionGateError(
+                f"REFUSED: market is not open (state={snapshot.get('market_state')})."
+            )
+        home_team = str(pick_row.get("home_team", ""))
+        away_team = str(pick_row.get("away_team", ""))
+        selection = str(pick_row.get("selection", "")).casefold()
+        selected_team = (
+            home_team if selection == "home" else away_team if selection == "away" else None
+        )
+        if not selected_team:
+            raise ExecutionGateError(
+                f"REFUSED: unrecognized selection {pick_row.get('selection')!r} "
+                "for live side verification."
+            )
+        matches_long = _team_name_matches(selected_team, str(snapshot["long"]["description"]))
+        matches_short = _team_name_matches(selected_team, str(snapshot["short"]["description"]))
+        if matches_long == matches_short:
+            raise ExecutionGateError(
+                "REFUSED: could not unambiguously resolve the picked team to a live market side."
+            )
+        expected_side = "long" if matches_long else "short"
+        if ticket.token_side != expected_side:
+            raise ExecutionGateError(
+                f"REFUSED: ticket token_side {ticket.token_side!r} does not match the "
+                f"live market side for the picked team ({expected_side!r})."
+            )
 
     # ---------------------------------------------------------------- submit
 

@@ -10,7 +10,32 @@ from model_prediction.validation import (
     historical_pitcher_feature_audit,
     multi_market_readiness,
     run_sport_validation,
+    write_production_artifacts,
 )
+
+
+def _fake_validation_report(sport: str = "nba") -> dict:
+    return {
+        "sport": sport,
+        "threshold_source": "validation only",
+        "split": {
+            "train": {"start": "2024-01-01", "end": "2024-06-01", "observations": 100},
+            "validation": {"start": "2024-06-02", "end": "2024-08-01", "observations": 60},
+            "locked_holdout": {"start": "2024-08-02", "end": "2024-10-01", "observations": 80},
+        },
+        "variants": {
+            "elo_trend": {
+                "features": ["elo_probability", "trend_gap"],
+                "coefficients": {"elo_probability": 2.5, "trend_gap": 0.1},
+                "intercept": -1.2,
+                "primary_65": {
+                    "status": "evaluated",
+                    "learned_threshold": 0.62,
+                    "locked_holdout": {"qualified": True, "calls": 60, "hit_rate": 0.67},
+                },
+            }
+        },
+    }
 
 
 def test_validation_uses_three_disjoint_chronological_cohorts(tmp_path) -> None:
@@ -73,6 +98,25 @@ def test_production_artifact_pins_audited_coefficients_threshold_and_qualificati
     assert artifact["market_models"]["moneyline"]["confidence_threshold"] == 0.62
     assert artifact["qualification"]["qualified"] is True
     assert len(artifact["artifact_hash"]) == 64
+
+
+def test_write_production_artifacts_refuses_to_overwrite_existing_version(tmp_path) -> None:
+    """Real bug fixed 2026-08-02: LEARNED_ARTIFACT_VERSIONS silently drifted
+    stale for mlb (still said v5 after production moved to v7), and this
+    writer had no guard -- rerunning validate-models --write-artifacts would
+    have silently overwritten the kept v5 rollback file in place. Every
+    other sport's constant already matched its live production file, so a
+    rerun there would have quietly rewritten the *active* artifact under the
+    same filename. The writer must now refuse outright, regardless of
+    whether the version constant is current."""
+    report = {"sports": {"nba": _fake_validation_report("nba")}}
+
+    first = write_production_artifacts(report, tmp_path)
+    assert (tmp_path / "nba-elo-trend-lr-v4.json").exists()
+    assert first["nba"] == str(tmp_path / "nba-elo-trend-lr-v4.json")
+
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        write_production_artifacts(report, tmp_path)
 
 
 def test_primary_qualification_rejects_a_negative_called_month() -> None:

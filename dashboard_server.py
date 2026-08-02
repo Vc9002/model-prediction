@@ -99,6 +99,13 @@ GATEWAY = "https://gateway.polymarket.us"
 RESEARCH_ONLY_LEAGUES = frozenset(
     {"SOCCER", "TENNIS", "LOL", "CS2", "DOTA2", "VALORANT", "RAINBOW_SIX", "KBO", "NPB"}
 )
+# Soccer is the one research-only league that also writes real rows into
+# flat_picks.xlsx (_forecast_soccer_sport logs every contract there, no edge
+# gate -- see cli.py). RESEARCH_ONLY_LEAGUES must still hide it from the Main
+# dashboard (genuinely_eligible is currently always False for soccer, so it
+# has zero real Main-ledger rows), but hiding it from the *flat* views too
+# would just make real, already-written data invisible for no reason.
+FLAT_HIDDEN_LEAGUES = RESEARCH_ONLY_LEAGUES - {"SOCCER"}
 
 _CACHE: dict[str, tuple[float, object]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -112,6 +119,43 @@ _ORDER_PREVIEWS: dict[str, dict] = {}
 _ORDER_LOCK = threading.Lock()
 _MARKET_QUESTION_CACHE: dict[str, str | None] = {}
 _MARKET_QUESTION_LOCK = threading.Lock()
+
+# Real gap fixed 2026-08-02: this dashboard has real order-execution
+# capability (POST /api/order/submit shells out to `execute --execute`) but
+# previously had no authentication at all -- only an Origin/Host CSRF check
+# (blocks a malicious webpage tricking the browser) and a client-supplied
+# confirm:true flag (not a credential; any caller can set it). Neither stops
+# a different local process or user account on the same machine from
+# curling the API directly and placing a real order. Generated fresh per
+# process start (a restart naturally invalidates any leaked/old token); the
+# served dashboard.html gets it injected server-side (see do_GET) and
+# attaches it to every POST automatically, so the browser UI keeps working
+# with no manual step -- only a caller who never loaded the real page (or
+# is on a different machine, blocked by the 127.0.0.1 bind regardless)
+# lacks it.
+_DASHBOARD_TOKEN = secrets.token_urlsafe(32)
+
+
+def _inject_dashboard_token(html: bytes) -> bytes:
+    """Embed the session token and a fetch wrapper that auto-attaches it to
+    every POST, so the served UI keeps working with no manual step. Falls
+    back to serving the page unmodified (POSTs then need the token supplied
+    some other way) if the expected <script> opening isn't found, rather
+    than raising and breaking the whole page load over a missing feature."""
+    marker = b'<script>\n"use strict";'
+    injected = (
+        b'<script>\n"use strict";\nwindow.__DASH_TOKEN__=' + json.dumps(_DASHBOARD_TOKEN).encode()
+        + b";\nconst __nativeFetch__=window.fetch.bind(window);"
+        b"\nwindow.fetch=(input,init)=>{"
+        b'\n  if(init&&init.method==="POST"){'
+        b"\n    init={...init,headers:{...(init.headers||{}),'X-Dashboard-Token':window.__DASH_TOKEN__}};"
+        b"\n  }"
+        b"\n  return __nativeFetch__(input,init);"
+        b"\n};"
+    )
+    if marker not in html:
+        return html
+    return html.replace(marker, injected, 1)
 
 
 def _resolve_runner() -> list[str]:
@@ -379,6 +423,7 @@ def _parse_picks(path: Path) -> list[dict]:
         "model_probability",
         "model_uncertainty",
         "edge",
+        "trade_candidate",
         "confidence_score",
         "units",
         "model_version",
@@ -396,6 +441,8 @@ def _parse_picks(path: Path) -> list[dict]:
         "research_pnl_units",
         "sportsbook",
         "decision_no_vig_probability",
+        "rationale",
+        "risks",
         "unavailable_features",
         "elo_probability",
         "trend_gap",
@@ -1436,6 +1483,166 @@ def _feature_registry_evidence() -> dict:
     }
 
 
+def _read_model_ledger_rows(path: Path) -> list[dict]:
+    """Plain read of a data/model_ledgers/<model-id>.xlsx file -- same
+    shape as _parse_picks but for the new per-model schema's "Predictions"
+    sheet. Deliberately not an import from the model_prediction package
+    (dashboard_server.py has zero imports from it) -- a small, duplicated
+    reader here, matching how _parse_picks already duplicates rather than
+    imports PickLedger's own reading logic."""
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        sheet = wb["Predictions"] if "Predictions" in wb.sheetnames else wb.active
+        rows_iter = sheet.iter_rows(values_only=True)
+        try:
+            headers = [str(h) if h is not None else "" for h in next(rows_iter)]
+        except StopIteration:
+            return []
+        rows = []
+        for values in rows_iter:
+            if values is None or all(value is None for value in values):
+                continue
+            row = {header: ("" if value is None else str(value)) for header, value in zip(headers, values, strict=False)}
+            if row.get("prediction_id"):
+                rows.append(row)
+        return rows
+    finally:
+        wb.close()
+
+
+def _model_evidence_from_rows(model_id: str, rows: list[dict]) -> dict:
+    """Lighter-weight duplicate of model_ledger.compute_model_evidence's
+    Brier/log-loss/sample-size math for dashboard display -- no calibration
+    buckets/ECE/logistic fit here, just what the design spec's evidence
+    columns actually need. Same push-exclusion rule as ledger.py's own
+    calibration_rows filter: settled win/loss only, a push is never folded
+    in as a loss."""
+    open_rows = [r for r in rows if r.get("status") == "open"]
+    settled = [r for r in rows if r.get("status") == "settled"]
+    failed = [r for r in rows if r.get("status") == "failed"]
+    calibration_rows = [
+        r for r in settled if r.get("result") in ("win", "loss") and r.get("model_probability")
+    ]
+    brier = log_loss = None
+    if len(calibration_rows) >= 30:
+        pairs = [
+            (min(1 - 1e-12, max(1e-12, float(r["model_probability"]))), 1 if r["result"] == "win" else 0)
+            for r in calibration_rows
+        ]
+        brier = sum((p - y) ** 2 for p, y in pairs) / len(pairs)
+        log_loss = -sum(y * math.log(p) + (1 - y) * math.log(1 - p) for p, y in pairs) / len(pairs)
+    clv_values = [float(r["probability_clv"]) for r in settled if r.get("probability_clv")]
+    pnl_values = [float(r["pnl_units"]) for r in settled if r.get("pnl_units")]
+    missing_input_rows = [r for r in rows if r.get("missing_inputs")]
+    observed = sorted(r["observed_at_utc"] for r in rows if r.get("observed_at_utc"))
+    return {
+        "model_id": model_id,
+        "total": len(rows),
+        "open": len(open_rows),
+        "settled": len(settled),
+        "failed": len(failed),
+        "wins": sum(1 for r in calibration_rows if r["result"] == "win"),
+        "losses": sum(1 for r in calibration_rows if r["result"] == "loss"),
+        "pushes": sum(1 for r in settled if r.get("result") not in ("win", "loss")),
+        "pnl_units": round(sum(pnl_values), 4),
+        "brier_score": brier,
+        "log_loss": log_loss,
+        "clv_coverage": round(len(clv_values) / len(settled), 4) if settled else None,
+        "mean_clv": round(sum(clv_values) / len(clv_values), 6) if clv_values else None,
+        "missing_input_rate": round(len(missing_input_rows) / len(rows), 4) if rows else None,
+        "latest_observed_at_utc": observed[-1] if observed else None,
+    }
+
+
+def model_ledger_comparison() -> dict:
+    """One row per event, one column per applicable model -- the
+    operator's dashboard design spec. No qualified/research classification
+    badges: evidence only (sample size, Brier, log loss, CLV, ROI,
+    missing-input rate, data age), read straight from data/model_ledgers/.
+    """
+    ledgers_dir = DATA / "model_ledgers"
+    if not ledgers_dir.exists():
+        return {"generated_at": datetime.now(UTC).isoformat(), "events": [], "models": {}}
+    evidence_by_model: dict[str, dict] = {}
+    predictions_by_event: dict[str, list[dict]] = {}
+    for path in sorted(ledgers_dir.glob("*.xlsx")):
+        model_id = path.stem
+        rows = _read_model_ledger_rows(path)
+        evidence_by_model[model_id] = _model_evidence_from_rows(model_id, rows)
+        for row in rows:
+            if row.get("status") != "open":
+                continue  # open predictions only -- settled history lives in the model's own evidence
+            predictions_by_event.setdefault(row["event_id"], []).append(
+                {
+                    "model_id": model_id,
+                    "prediction_id": row.get("prediction_id"),
+                    "market_type": row.get("market_type"),
+                    "selection": row.get("selection"),
+                    "line": row.get("line") or None,
+                    "model_probability": _number(row.get("model_probability"), None),
+                    "decision_price": _number(row.get("decision_price"), None),
+                    "model_market_difference": _number(row.get("model_market_difference"), None),
+                    "input_availability": row.get("input_availability") or None,
+                    "event_start_utc": row.get("event_start_utc"),
+                    "operator_decision": row.get("operator_decision") or None,
+                }
+            )
+    events = [
+        {"event_id": event_id, "predictions": predictions}
+        for event_id, predictions in sorted(
+            predictions_by_event.items(),
+            key=lambda item: min((p["event_start_utc"] or "" for p in item[1]), default=""),
+        )
+    ]
+    return {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "events": events,
+        "models": evidence_by_model,
+    }
+
+
+def record_model_ledger_decision(payload: dict) -> dict:
+    """Store the operator's own event-level decision for one prediction,
+    separate from the model's own output. "Not model promotion. It is an
+    event-level decision... must not change the model's ledger,
+    classification, historical statistics, or dashboard evidence."
+
+    Reuses the real, lock-protected ModelLedger.record_operator_decision
+    (a local, function-scoped import -- see dedupe_ledger's identical
+    "heavy import" precedent -- rather than duplicating a second,
+    potentially unlocked write path for the same file here).
+    """
+    model_id = str(payload.get("model_id") or "")
+    prediction_id = str(payload.get("prediction_id") or "")
+    decision = str(payload.get("decision") or "")
+    if not model_id or not prediction_id or not decision:
+        return {"status": "refused", "error": "model_id, prediction_id, and decision are required"}
+    path = DATA / "model_ledgers" / f"{model_id}.xlsx"
+    if not path.exists():
+        return {"status": "refused", "error": f"unknown model_id {model_id!r}"}
+
+    from model_prediction.model_ledger import ModelLedger  # local: heavy import
+
+    ledger = ModelLedger(path)
+    units = payload.get("units")
+    try:
+        row = ledger.record_operator_decision(
+            prediction_id,
+            decision=decision,
+            selected_model=payload.get("selected_model") or None,
+            selected_market=payload.get("selected_market") or None,
+            units=None if units in (None, "") else float(units),
+            note=payload.get("note") or None,
+        )
+    except KeyError:
+        return {"status": "refused", "error": f"unknown prediction_id {prediction_id!r} in {model_id}"}
+    except (TypeError, ValueError) as error:
+        return {"status": "refused", "error": str(error)}
+    with _CACHE_LOCK:
+        _CACHE.pop("model-ledgers", None)
+    return {"status": "ok", "row": row}
+
+
 def production_evidence() -> dict:
     """Read-only, fail-closed evidence for every configured production artifact."""
     config = _config_payload()
@@ -1843,6 +2050,21 @@ def status() -> dict:
         )
 
     tests = _LAST_ACTION.get("run_tests") or _latest_persisted_action("run_tests")
+    # Real bug fixed 2026-08-02: promotion_allowed used to be read straight
+    # off a static termination-audit-*.json snapshot (whatever the latest
+    # dated file on disk happened to say, sometimes weeks stale), completely
+    # independent of /api/production-evidence's own live computation --
+    # so the two endpoints could (and did) directly contradict each other:
+    # one screen said "allowed", the authoritative evidence calculation said
+    # "not established". promotion_allowed is now the live intersection of
+    # every model's real evidence (production_evidence()'s own
+    # all_production_evidence_valid, itself an AND over each model's
+    # artifact/lineage validity and prospective performance completeness)
+    # and operational health (no error-level alert active) -- any incomplete
+    # input yields False, not a stale flag sitting next to a contradicting panel.
+    evidence = _cached("production-evidence", 30, production_evidence)
+    operational_checks_green = not any(alert.get("level") == "error" for alert in alerts)
+    promotion_allowed = bool(evidence.get("all_production_evidence_valid")) and operational_checks_green
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "models_loaded": len(models),
@@ -1856,7 +2078,7 @@ def status() -> dict:
         "alerts": alerts,
         "tests": tests or {"status": "not_run_this_session"},
         "validation_status": termination.get("status") or validation.get("status"),
-        "promotion_allowed": termination.get("promotion_allowed"),
+        "promotion_allowed": promotion_allowed,
         "polymarket_odds": odds_summary(),
         "polymarket_configured": bool(os.environ.get("POLYMARKET_KEY_ID") and os.environ.get("POLYMARKET_SECRET_KEY")),
         "edge_filter_min": 0.02,
@@ -2613,7 +2835,22 @@ def _dashboard_order_status(exchange_state: str | None) -> str:
 
 
 def _reconcile_orders() -> None:
-    """Replace local submission state with the exchange's current order state."""
+    """Replace local submission state with the exchange's current order state.
+
+    Real race fixed 2026-08-02: this used to read+write orders.json without
+    holding _ORDER_LOCK, unlike submit_order/preview_position_sell/etc.
+    Called from dashboard_picks() on essentially every /api/picks request,
+    so it could run concurrently with a real order submission -- read a
+    stale snapshot (before the new order was appended), then write that
+    stale snapshot back after submit_order's own locked append completed,
+    silently erasing the just-submitted order record. Held under the lock
+    now, matching every other read-modify-write of this file.
+    """
+    with _ORDER_LOCK:
+        _reconcile_orders_locked()
+
+
+def _reconcile_orders_locked() -> None:
     payload = _load_orders()
     active = [
         order for order in payload["orders"] if order.get("status") == "submitted" and order.get("order_id")
@@ -3536,7 +3773,7 @@ class Handler(BaseHTTPRequestHandler):
             if route in ("/", "/dashboard.html"):
                 page = ROOT / "dashboard.html"
                 if page.exists():
-                    self._send(page.read_bytes(), "text/html; charset=utf-8")
+                    self._send(_inject_dashboard_token(page.read_bytes()), "text/html; charset=utf-8")
                 else:
                     self._send({"error": "dashboard.html missing"}, code=404)
             elif route == "/api/status":
@@ -3545,6 +3782,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("matrix", 60, matrix))
             elif route == "/api/production-evidence":
                 self._send(_cached("production-evidence", 30, production_evidence))
+            elif route == "/api/model-ledgers":
+                self._send(_cached("model-ledgers", 30, model_ledger_comparison))
             elif route == "/api/picks":
                 self._send(_cached("picks", 30, dashboard_picks))
             elif route == "/api/flat-picks":
@@ -3553,7 +3792,7 @@ class Handler(BaseHTTPRequestHandler):
                     flat = (
                         _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
                     )
-                    flat = [r for r in flat if str(r.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES]
+                    flat = [r for r in flat if str(r.get("league", "")).upper() not in FLAT_HIDDEN_LEAGUES]
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
                     return [_decorate_pick(row, orders, portfolio) for row in flat]
@@ -3571,7 +3810,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/flat-performance":
                 sport = str(query.get("sport") or "").strip()
                 flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
-                flat = [r for r in flat if str(r.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES]
+                flat = [r for r in flat if str(r.get("league", "")).upper() not in FLAT_HIDDEN_LEAGUES]
                 self._send(
                     _cached(
                         f"flat-performance:{sport.casefold() or 'all'}",
@@ -3673,6 +3912,9 @@ class Handler(BaseHTTPRequestHandler):
         if not self._local_origin_ok():
             self._send({"status": "refused", "error": "cross-origin request rejected"}, code=403)
             return
+        if not secrets.compare_digest(str(self.headers.get("X-Dashboard-Token") or ""), _DASHBOARD_TOKEN):
+            self._send({"status": "refused", "error": "missing or invalid dashboard session token"}, code=401)
+            return
         parsed = urlparse(self.path)
         length = int(self.headers.get("Content-Length") or 0)
         try:
@@ -3690,6 +3932,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(archive_action(action, scope or []))
         elif parsed.path == "/api/dedupe":
             self._send(dedupe_ledger())
+        elif parsed.path == "/api/model-ledgers/decision":
+            self._send(record_model_ledger_decision(payload))
         elif parsed.path == "/api/action":
             self._send(start_action(str(payload.get("action")), payload))
         elif parsed.path == "/api/order/preview":
@@ -4680,6 +4924,7 @@ def main() -> None:
         server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
         PID_FILE.write_text(str(my_pid))  # Write only after successful bind
         print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
+        print(f"dashboard: session token (for direct API calls): {_DASHBOARD_TOKEN}")
         server.serve_forever()
     except OSError as exc:
         if exc.errno == 48:

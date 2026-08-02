@@ -246,6 +246,63 @@ def test_matrix_reads_active_version_from_live_config(monkeypatch, tmp_path: Pat
     assert "v6 artifact" not in mlb["model"]
 
 
+def _minimal_status_environment(monkeypatch, tmp_path: Path) -> None:
+    """Just enough on-disk state for status() to run end to end without
+    crashing on missing files -- config/data/outputs directories that exist
+    but are otherwise empty."""
+    data = tmp_path / "data"
+    data.mkdir()
+    outputs = tmp_path / "outputs" / "latest"
+    outputs.mkdir(parents=True)
+    config = tmp_path / "model.yaml"
+    config.write_text("models: {}\n", encoding="utf-8")
+    (tmp_path / "config" / "models").mkdir(parents=True)
+    monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
+    monkeypatch.setattr(dashboard_server, "DATA", data)
+    monkeypatch.setattr(dashboard_server, "OUTPUTS", outputs)
+    monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config)
+    dashboard_server._CACHE.clear()
+
+
+def test_promotion_allowed_reflects_live_production_evidence_not_a_stale_snapshot(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Real bug fixed 2026-08-02: /api/status used to read promotion_allowed
+    straight off a static termination-audit-*.json snapshot, completely
+    independent of /api/production-evidence's own live computation -- the
+    two endpoints could (and did) directly contradict each other. Even with
+    a termination-audit file on disk claiming promotion_allowed: true,
+    status() must now defer to the live evidence calculation."""
+    _minimal_status_environment(monkeypatch, tmp_path)
+    (tmp_path / "outputs" / "latest" / "termination-audit-2026-07-17.json").write_text(
+        json.dumps({"status": "5_qualified_models_production", "promotion_allowed": True}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        dashboard_server, "production_evidence", lambda: {"all_production_evidence_valid": False}
+    )
+
+    result = dashboard_server.status()
+
+    assert result["promotion_allowed"] is False
+    assert result["validation_status"] == "5_qualified_models_production"  # unrelated field, unaffected
+
+
+def test_promotion_allowed_true_only_when_evidence_valid_and_no_error_alerts(
+    monkeypatch, tmp_path: Path
+) -> None:
+    _minimal_status_environment(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        dashboard_server, "production_evidence", lambda: {"all_production_evidence_valid": True}
+    )
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+
+    result = dashboard_server.status()
+
+    assert result["promotion_allowed"] is True
+
+
 def test_data_inventory_uses_each_sports_real_storage_layout(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -577,6 +634,73 @@ def test_reconcile_order_preserves_submission_when_exchange_is_unavailable(
 
     saved = json.loads(orders_path.read_text(encoding="utf-8"))["orders"][0]
     assert saved["status"] == "submitted"
+
+
+def test_reconcile_orders_holds_the_order_lock_around_read_and_write(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Real race fixed 2026-08-02: _reconcile_orders used to read+write
+    orders.json without holding _ORDER_LOCK, unlike submit_order and every
+    other read-modify-write of this file. It's called from dashboard_picks()
+    on essentially every /api/picks request, so it could interleave with a
+    real order submission: read a stale snapshot before the new order was
+    appended, then write that stale snapshot back afterward, silently
+    erasing the just-submitted order record."""
+    orders_path = tmp_path / "orders.json"
+    orders_path.write_text(
+        json.dumps(
+            {"orders": [{"pick_id": "model-pick-1", "status": "submitted", "order_id": "order-1"}]}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", orders_path)
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["runner"])
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "status": "live",
+                    "orders": [
+                        {
+                            "order_id": "order-1",
+                            "order_state": "ORDER_STATE_FILLED",
+                            "cum_quantity": 5,
+                            "leaves_quantity": 0,
+                        }
+                    ],
+                    "observed_at_utc": "2026-08-02T16:00:00Z",
+                }
+            ),
+            stderr="",
+        ),
+    )
+    dashboard_server._CACHE.clear()
+
+    lock_held_on_read: list[bool] = []
+    lock_held_on_write: list[bool] = []
+    original_load, original_save = dashboard_server._load_orders, dashboard_server._save_orders
+
+    def spy_load():
+        lock_held_on_read.append(dashboard_server._ORDER_LOCK.locked())
+        return original_load()
+
+    def spy_save(payload):
+        lock_held_on_write.append(dashboard_server._ORDER_LOCK.locked())
+        return original_save(payload)
+
+    monkeypatch.setattr(dashboard_server, "_load_orders", spy_load)
+    monkeypatch.setattr(dashboard_server, "_save_orders", spy_save)
+
+    dashboard_server._reconcile_orders()
+
+    assert lock_held_on_read == [True]
+    assert lock_held_on_write == [True]
+    # Sanity: the lock is released again afterward, not left held.
+    assert not dashboard_server._ORDER_LOCK.locked()
 
 
 def test_position_sell_refuses_more_than_available(monkeypatch) -> None:

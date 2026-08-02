@@ -625,11 +625,325 @@ def test_production_evidence_route_is_get_only(monkeypatch) -> None:
             "POST",
             "/api/production-evidence",
             body=json.dumps({"confirm": True}),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Dashboard-Token": dashboard_server._DASHBOARD_TOKEN,
+            },
         )
         response = connection.getresponse()
         assert response.status == 404
         assert json.loads(response.read()) == {"error": "unknown route"}
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_post_without_dashboard_token_is_refused(monkeypatch) -> None:
+    """Real gap fixed 2026-08-02: this dashboard has real order-execution
+    capability (POST /api/order/submit shells out to `execute --execute`)
+    but had no authentication -- only an Origin/Host CSRF check and a
+    client-supplied confirm:true flag, neither of which stops a different
+    local process/user on the same machine from curling the API directly."""
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request(
+            "POST",
+            "/api/dedupe",
+            body=json.dumps({"confirm": True}),
+            headers={"Content-Type": "application/json"},  # no X-Dashboard-Token
+        )
+        response = connection.getresponse()
+        assert response.status == 401
+        assert json.loads(response.read())["status"] == "refused"
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_post_with_wrong_dashboard_token_is_refused() -> None:
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request(
+            "POST",
+            "/api/dedupe",
+            body=json.dumps({"confirm": True}),
+            headers={"Content-Type": "application/json", "X-Dashboard-Token": "not-the-real-token"},
+        )
+        response = connection.getresponse()
+        assert response.status == 401
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_post_with_correct_dashboard_token_passes_auth(monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "dedupe_ledger", lambda: {"status": "ok", "removed": 0})
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request(
+            "POST",
+            "/api/dedupe",
+            body=json.dumps({"confirm": True}),
+            headers={
+                "Content-Type": "application/json",
+                "X-Dashboard-Token": dashboard_server._DASHBOARD_TOKEN,
+            },
+        )
+        response = connection.getresponse()
+        assert response.status == 200
+        assert json.loads(response.read()) == {"status": "ok", "removed": 0}
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_get_requests_do_not_require_the_dashboard_token() -> None:
+    """Only state-changing POST routes are gated -- read-only GET endpoints
+    stay open, matching this project's existing read-only dashboard API."""
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request("GET", "/api/status")
+        response = connection.getresponse()
+        response.read()
+        assert response.status == 200
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def _write_model_ledger(path: Path, rows: list[dict]) -> None:
+    from model_prediction.model_ledger import FIELDNAMES  # only used to build a real fixture file
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Predictions"
+    sheet.append(FIELDNAMES)
+    for row in rows:
+        sheet.append([row.get(field, "") for field in FIELDNAMES])
+    workbook.save(path)
+
+
+def test_model_ledger_comparison_groups_open_predictions_by_event(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+    _write_model_ledger(
+        tmp_path / "model_ledgers" / "mlb-moneyline-elo-trend-lr.xlsx",
+        [
+            {
+                "prediction_id": "p1",
+                "model_id": "mlb-moneyline-elo-trend-lr",
+                "event_id": "event-1",
+                "market_type": "moneyline",
+                "selection": "home",
+                "model_probability": "0.62",
+                "decision_price": "0.58",
+                "model_market_difference": "0.04",
+                "event_start_utc": "2026-08-03T00:00:00Z",
+                "status": "open",
+            },
+            {
+                "prediction_id": "p2",
+                "model_id": "mlb-moneyline-elo-trend-lr",
+                "event_id": "event-2",
+                "market_type": "moneyline",
+                "status": "settled",
+                "result": "win",
+                "pnl_units": "0.75",
+            },
+        ],
+    )
+    _write_model_ledger(
+        tmp_path / "model_ledgers" / "mlb-spread-measured-edge.xlsx",
+        [
+            {
+                "prediction_id": "p3",
+                "model_id": "mlb-spread-measured-edge",
+                "event_id": "event-1",
+                "market_type": "spread",
+                "selection": "home",
+                "line": "-1.5",
+                "status": "open",
+                "event_start_utc": "2026-08-03T00:00:00Z",
+            }
+        ],
+    )
+
+    result = dashboard_server.model_ledger_comparison()
+
+    assert set(result["models"]) == {"mlb-moneyline-elo-trend-lr", "mlb-spread-measured-edge"}
+    assert result["models"]["mlb-moneyline-elo-trend-lr"]["settled"] == 1
+    assert result["models"]["mlb-moneyline-elo-trend-lr"]["pnl_units"] == 0.75
+    events = {e["event_id"]: e for e in result["events"]}
+    assert set(events) == {"event-1"}  # event-2's only row is settled -- not in the open comparison view
+    model_ids_for_event_1 = {p["model_id"] for p in events["event-1"]["predictions"]}
+    assert model_ids_for_event_1 == {"mlb-moneyline-elo-trend-lr", "mlb-spread-measured-edge"}
+
+
+def test_model_ledger_comparison_empty_when_no_ledgers_exist(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+
+    result = dashboard_server.model_ledger_comparison()
+
+    assert result["events"] == []
+    assert result["models"] == {}
+
+
+def test_model_ledgers_route_is_reachable_over_http(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server, "model_ledger_comparison", lambda: {"events": [], "models": {}}
+    )
+    with dashboard_server._CACHE_LOCK:
+        dashboard_server._CACHE.clear()
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request("GET", "/api/model-ledgers")
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        assert response.status == 200
+        assert payload == {"events": [], "models": {}}
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_record_model_ledger_decision_writes_operator_fields_only(tmp_path, monkeypatch) -> None:
+    """"Not model promotion. It is an event-level decision... must not
+    change the model's ledger, classification, historical statistics, or
+    dashboard evidence." -- the model's own fields must be byte-for-byte
+    unchanged after recording an operator decision."""
+    from model_prediction.model_ledger import ModelLedger
+
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+    ledger = ModelLedger(tmp_path / "model_ledgers" / "mlb-moneyline-elo-trend-lr.xlsx")
+    original = ledger.append_prediction(
+        {"model_id": "mlb-moneyline-elo-trend-lr", "model_version": "v7", "event_id": "e1", "model_probability": "0.62"}
+    )
+
+    result = dashboard_server.record_model_ledger_decision(
+        {
+            "model_id": "mlb-moneyline-elo-trend-lr",
+            "prediction_id": original["prediction_id"],
+            "decision": "executed",
+            "units": 1.5,
+            "note": "clean edge",
+        }
+    )
+
+    assert result["status"] == "ok"
+    row = result["row"]
+    assert row["operator_decision"] == "executed"
+    assert row["operator_units"] == "1.5"
+    assert row["operator_timestamp"]
+    from model_prediction.model_ledger import MODEL_FIELDS
+
+    for field in MODEL_FIELDS:
+        assert row[field] == original[field]
+
+
+def test_record_model_ledger_decision_refuses_unknown_model(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+
+    result = dashboard_server.record_model_ledger_decision(
+        {"model_id": "does-not-exist", "prediction_id": "p1", "decision": "executed"}
+    )
+
+    assert result["status"] == "refused"
+    assert "unknown model_id" in result["error"]
+
+
+def test_record_model_ledger_decision_refuses_unknown_prediction_id(tmp_path, monkeypatch) -> None:
+    from model_prediction.model_ledger import ModelLedger
+
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+    ModelLedger(tmp_path / "model_ledgers" / "mlb-moneyline-elo-trend-lr.xlsx").append_prediction(
+        {"model_id": "mlb-moneyline-elo-trend-lr", "model_version": "v7", "event_id": "e1"}
+    )
+
+    result = dashboard_server.record_model_ledger_decision(
+        {"model_id": "mlb-moneyline-elo-trend-lr", "prediction_id": "does-not-exist", "decision": "executed"}
+    )
+
+    assert result["status"] == "refused"
+    assert "unknown prediction_id" in result["error"]
+
+
+def test_record_model_ledger_decision_requires_the_core_fields(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+
+    result = dashboard_server.record_model_ledger_decision({"model_id": "x"})
+
+    assert result["status"] == "refused"
+    assert "required" in result["error"]
+
+
+def test_model_ledger_decision_route_requires_the_dashboard_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dashboard_server, "record_model_ledger_decision", lambda payload: {"status": "ok", "row": {}}
+    )
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request(
+            "POST",
+            "/api/model-ledgers/decision",
+            body=json.dumps({"confirm": True, "model_id": "x", "prediction_id": "p1", "decision": "executed"}),
+            headers={"Content-Type": "application/json"},  # no X-Dashboard-Token
+        )
+        response = connection.getresponse()
+        assert response.status == 401
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_served_dashboard_html_embeds_the_real_session_token(tmp_path, monkeypatch) -> None:
+    page = tmp_path / "dashboard.html"
+    page.write_text('<head></head><body><script>\n"use strict";\nconsole.log(1);</script></body>', encoding="utf-8")
+    monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
+    server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request("GET", "/")
+        response = connection.getresponse()
+        body = response.read().decode()
+        assert response.status == 200
+        assert dashboard_server._DASHBOARD_TOKEN in body
+        assert "X-Dashboard-Token" in body
     finally:
         connection.close()
         server.shutdown()

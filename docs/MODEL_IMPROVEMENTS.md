@@ -829,6 +829,42 @@ cohort...") starts from a genuinely empty real cohort as of this fix —
 there is no backlog of silently-discarded real picks to recover, only a
 clock going forward from today.
 
+### Real bug fixed 2026-08-02 (later): settlement fallback silently destroyed NPB history
+
+A second, separate, more serious bug in the same file: `find_international_
+baseball_result`'s settlement-time cache-miss fallback called `backfill_
+international_baseball(data_root, league, f"{year}-01-01")` directly — the
+same function used for an explicit, operator-invoked full re-sync, which
+*overwrites* `games.jsonl` with only whatever `from_date..today` returns.
+The first time a just-finished NPB game wasn't in the cache yet (a normal,
+expected occurrence), this silently collapsed NPB's real history from 3,936
+games (back to 2022-03-25) to 566 games (this year only) — already
+committed to the repo before this was caught. `npb-tie-aware-elo-v1.json`
+kept claiming 3,936 training observations and the old `games_sha256` the
+whole time; nothing in the forecast or validation path checks that the
+artifact's recorded source hash still matches the file on disk, so this
+would have gone undetected indefinitely. KBO was not affected (no cache
+miss ever hit its fallback path).
+
+Fixed by extracting the existing merge-by-`game_id` logic (already used by
+`refresh_recent_international_baseball_matches`) into a shared helper, and
+having the settlement fallback call that instead of the destructive
+full-overwrite — it can now only add/update the target year's rows, never
+drop any other year. Restored NPB's `games.jsonl`/`manifest.json` from the
+pre-damage commit merged with the post-damage file; confirmed zero real
+games were actually lost (the post-damage file's newest date wasn't ahead
+of the pre-damage file's) and the restored file's SHA-256 exactly matches
+what the artifact already recorded. Added a regression test, verified it
+fails against the reverted (old) code before confirming the fix.
+
+**Not yet done, worth adding**: a fail-closed check in the forecast path
+comparing the artifact's recorded `games_sha256` against the live file
+isn't straightforward to add naively — `games.jsonl` legitimately grows
+every day via the merge refresh, so exact-hash equality would fail
+permanently the day after any artifact is validated. The right invariant
+is closer to "the current file's game count for years the artifact trained
+on hasn't shrunk," not byte-for-byte equality. Flagged, not implemented.
+
 ---
 
 ## 11. Experiment design

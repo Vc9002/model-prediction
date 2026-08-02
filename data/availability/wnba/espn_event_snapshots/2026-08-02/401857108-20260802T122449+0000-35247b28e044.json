@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4703794",
+      "current_status": "Out",
+      "player_name": "Sarah Ashlee Barker",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-24T15:18:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4433795",
+      "current_status": "Out",
+      "player_name": "Sania Feagin",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-09T23:15:00+00:00",
+      "team": "Portland Fire"
+    }
+  ],
+  "event_id": "401857108",
+  "observed_at_utc": "2026-08-02T12:24:49.099979+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "35247b28e044f5a3c15ae5b710579822d6c2ba12a7bd85d6fd594d550b861f4d",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

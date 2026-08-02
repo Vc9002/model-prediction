@@ -28,6 +28,7 @@ import httpx
 from .domain import eastern_today
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
+from .research_io import backup_before_overwrite as _backup_before_overwrite
 from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
 from .research_io import sha256_file as _sha256
@@ -627,6 +628,28 @@ def _load_games(path: Path) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda row: (row["game_date"], row["game_id"]))
 
 
+def _training_prefix_sha256(rows: list[dict[str, Any]], through_date: str) -> str:
+    """Hash exactly the rows a rating artifact trained on, keyed by date.
+
+    Unlike hashing the whole games.jsonl file, this stays valid forever as
+    the file grows with new completed games -- `refresh_recent_
+    international_baseball_matches` and the settlement fallback can only
+    ever add/update rows for the *current* year (see
+    `_merge_year_into_international_baseball_history`), so a training
+    artifact's own prefix (every row up to `trained_through_date`) never
+    changes on a healthy history. If it ever does mismatch, the training
+    window itself was altered after the fact -- exactly what the 2026-08-02
+    NPB destructive-overwrite bug did.
+    """
+    prefix = sorted(
+        (row for row in rows if str(row["game_date"]) <= through_date),
+        key=lambda row: (row["game_date"], row["game_id"]),
+    )
+    return hashlib.sha256(
+        "".join(_canonical_json(row) + "\n" for row in prefix).encode("utf-8")
+    ).hexdigest()
+
+
 def _batched_predictions(
     book: HomeElo,
     rows: Iterable[dict[str, Any]],
@@ -794,6 +817,7 @@ def validate_international_baseball_baseline(
         "ratings": {team: round(rating, 6) for team, rating in sorted(all_book.ratings.items())},
         "source_manifest_sha256": _sha256(manifest_path),
         "games_sha256": source_manifest["games_sha256"],
+        "training_prefix_sha256": _training_prefix_sha256(rows, rows[-1]["game_date"]),
         "qualified_for_betting": False,
         "units": 0,
     }
@@ -801,6 +825,7 @@ def validate_international_baseball_baseline(
     artifact_path = None
     if artifact_dir is not None:
         artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v1.json"
+        _backup_before_overwrite(artifact_path)
         _atomic_write(artifact_path, json.dumps(artifact, indent=2, sort_keys=True) + "\n")
     return {
         "status": "ok",
@@ -880,6 +905,30 @@ def forecast_international_baseball_slate(
     if not artifact_path.exists():
         raise FileNotFoundError(f"missing research artifact: {artifact_path}")
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    expected_prefix_hash = artifact.get("training_prefix_sha256")
+    if expected_prefix_hash is not None:
+        # Real bug fixed 2026-08-02: NPB's settlement fallback silently
+        # collapsed games.jsonl to a fraction of its real history while this
+        # artifact kept using ratings trained on the destroyed data, with
+        # nothing ever checking that the two still agreed. games_sha256
+        # alone can't catch this prospectively (it hashes the *whole* file,
+        # which legitimately grows every day) -- training_prefix_sha256
+        # hashes only the rows through trained_through_date, which a
+        # healthy history can never change. Older artifacts predating this
+        # field (no training_prefix_sha256 key) are not retroactively
+        # checked; they get the protection on their next real validation run.
+        games_path = directory / "games.jsonl"
+        current_prefix_hash = _training_prefix_sha256(
+            _load_games(games_path), str(artifact["trained_through_date"])
+        )
+        if current_prefix_hash != expected_prefix_hash:
+            raise ValueError(
+                f"REFUSED: {league} training history has changed since "
+                f"{artifact_path.name} was validated (training_prefix_sha256 "
+                f"mismatch through {artifact['trained_through_date']}) -- "
+                "re-run validate-international-baseball before forecasting "
+                "with this artifact again."
+            )
     teams = json.loads((directory / "teams.json").read_text(encoding="utf-8"))
     aliases = _team_alias_index(teams)
     market_client = client or PolymarketUSClient()

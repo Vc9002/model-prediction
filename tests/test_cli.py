@@ -241,6 +241,61 @@ def test_esports_flat_mode_never_writes_research_or_gated(monkeypatch) -> None:
     assert gated.appended == []
 
 
+def test_esports_logging_failure_is_recorded_not_silently_discarded(monkeypatch) -> None:
+    """A per-contract ValueError/KeyError during logging (e.g. request.
+    validate() rejecting a malformed event_start_utc) must be recorded in
+    the forecast's errors list and logged via logger.warning -- not
+    silently swallowed by a bare `except ...: continue` -- while every
+    other contract in the same batch still gets processed normally."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    config = {
+        "models": {
+            "LOL": {
+                "min_edge": 0.02,
+                "research_confidence_gate": 0.0,
+                "status": "shadow_qualified",
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+    forecast = _esports_forecast()
+    forecast["priced_contracts"].append(
+        {
+            "event_id": "bad-event",
+            "market_slug": "bad-event",
+            "teams": ["Team A", "Team B"],
+            "observed_at_utc": "2026-07-26T10:00:00Z",
+            "artifact_hash": "artifact-hash",
+            # Already started relative to the mocked utc_now() above ->
+            # request.validate() raises ValueError.
+            "event_start_utc": "2020-01-01T00:00:00Z",
+            "gated_research_eligible": True,
+            "sides": [
+                {"team": "Team A", "model_probability": 0.60, "executable_ask": 0.55},
+                {"team": "Team B", "model_probability": 0.40, "executable_ask": 0.45},
+            ],
+        }
+    )
+
+    logged = cli._log_esports_forecast(forecast, config, research, gated_ledger=gated)
+
+    # The three originally-valid contracts are unaffected by the bad one.
+    assert logged == 3
+    assert len(research.appended) == 3
+    assert forecast["errors"] == [
+        {
+            "event_id": "bad-event",
+            "reason": "ValueError: cannot create a call after the event has started",
+        }
+    ]
+
+
 def _mlb_totals_candidate(market_type: MarketType, selection: str, line: float | None) -> MLBForwardCandidate:
     return MLBForwardCandidate(
         event_id="mlb-totals-1",
@@ -338,13 +393,16 @@ def _soccer_config(*, status: str, min_edge: float = 0.05) -> dict:
     }
 
 
-def test_soccer_flat_ledger_logs_every_contract_even_when_model_state_blocks_a_call(
+def test_soccer_flat_ledger_logs_every_contract_regardless_of_eligibility(
     monkeypatch,
 ) -> None:
-    """Soccer's config status is "research" today, so every contract is a
-    NO_CALL_MODEL_UNVALIDATED research observation (can_create_qualified_call
-    requires shadow_qualified) -- flat mode must still log it, same "show
-    everything" semantics every other sport's flat forecast uses."""
+    """Flat mode logs every priced contract regardless of the eligibility
+    outcome -- same "show everything" semantics every other sport's flat
+    forecast uses. (Operator directive, 2026-08-02, "remove all promotion
+    qualification": status="research" no longer blocks a call the way it
+    used to -- can_create_qualified_call no longer gates on promotion tier
+    -- so this fixture's contract, well clear of min_edge, is QUALIFIED even
+    at status="research" now; flat still logs it either way.)"""
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
     monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
     flat_ledger = _CaptureLedger()
@@ -363,7 +421,7 @@ def test_soccer_flat_ledger_logs_every_contract_even_when_model_state_blocks_a_c
     assert len(flat_ledger.appended) == 1
     request, eligibility = flat_ledger.appended[0]
     assert request.event_id == "soccer-1"
-    assert eligibility.reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert eligibility.reason_code == "QUALIFIED"
 
 
 def test_soccer_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
@@ -418,6 +476,110 @@ def test_soccer_main_ledger_stays_empty_when_gated_ledger_does(monkeypatch) -> N
     assert gated.appended == []
     assert main.appended == []
     assert len(research.appended) == 1
+
+
+def test_flat_forecast_replace_today_clears_soccer_research_gated_main_symmetrically(
+    monkeypatch, tmp_path
+) -> None:
+    """Real gap fixed 2026-08-02: flat-forecast's replace_today only ever
+    cleared flat_ledger before this fix. Soccer now writes research/gated/
+    main together with flat on every command variant (main+flat and
+    research+gated are each a pair -- see _forecast_soccer_sport's
+    docstring), so a second same-day flat-forecast run duplicated every
+    soccer row in the three ledgers that never got cleared -- only flat
+    stayed deduped.
+
+    Note: this replicates the same clear-then-forecast sequence cli.py's
+    dispatch runs, proving the pattern itself is idempotent -- it does not
+    invoke main()/argparse (no test in this suite does), so it won't catch a
+    future regression in the dispatch's own branch condition. That condition
+    (`elif replace_today and log and is_flat and "soccer" in {...}:` in
+    cli.py) was verified by direct reading, not by this test alone."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    config = _soccer_config(status="shadow_qualified", min_edge=0.02)
+    research = PickLedger(tmp_path / "research" / "soccer.xlsx")
+    gated = PickLedger(tmp_path / "gated_research" / "soccer.xlsx")
+    flat = PickLedger(tmp_path / "flat_picks.xlsx")
+    main = PickLedger(tmp_path / "picks.xlsx")
+
+    def run_one_flat_forecast_cycle() -> None:
+        # Mirrors cli.py's `elif replace_today and log and is_flat and
+        # "soccer" in {...}:` branch exactly: clear research/gated/main,
+        # clear flat (the pre-existing is_flat branch), then forecast.
+        _clear_today_open(research, "2026-07-27", by_event_date=True)
+        _clear_today_open(gated, "2026-07-27", by_event_date=True)
+        _clear_today_open(main, "2026-07-27", by_event_date=True)
+        _clear_today_open(flat, "2026-07-27", by_event_date=True)
+        cli._forecast_soccer_sport(
+            data_root="unused",
+            args_date="2026-07-27",
+            config=config,
+            research_ledger=research,
+            gated_ledger=gated,
+            flat_ledger=flat,
+            main_ledger=main,
+        )
+
+    run_one_flat_forecast_cycle()
+    run_one_flat_forecast_cycle()
+
+    assert len(research.rows()) == 1
+    assert len(gated.rows()) == 1
+    assert len(flat.rows()) == 1
+    assert len(main.rows()) == 1
+
+
+def test_soccer_logging_failure_is_recorded_not_silently_discarded(monkeypatch) -> None:
+    """A per-contract ValueError (malformed event_start_utc) must be
+    recorded in the forecast's errors list, not silently swallowed by the
+    bare `except (DuplicatePickError, KeyError, ValueError): continue` this
+    used to be -- and the other, valid contract in the same batch must
+    still get logged."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    forecast = _soccer_forecast()
+    forecast["priced_contracts"].append(
+        {
+            "event_id": "soccer-bad",
+            # Already started relative to the mocked utc_now() above ->
+            # request.validate() raises ValueError.
+            "event_start_utc": "2020-01-01T00:00:00Z",
+            "away_team": "Away FC",
+            "home_team": "Home FC",
+            "market_type": "total",
+            "selection": "over",
+            "line": 2.5,
+            "executable_ask": 0.40,
+            "model_probability": 0.60,
+            "model_uncertainty": 0.03,
+            "model_version": "soccer-poisson-dc-v1",
+            "rationale": "fixture-bad",
+            "market_slug": "soccer-bad-total",
+            "observed_at_utc": "2026-07-27T10:00:00Z",
+        }
+    )
+    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: forecast)
+    research = _CaptureLedger()
+
+    result = cli._forecast_soccer_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_soccer_config(status="research"),
+        research_ledger=research,
+        gated_ledger=None,
+        flat_ledger=None,
+        main_ledger=None,
+    )
+
+    assert result["logged"] == 1
+    assert len(research.appended) == 1
+    assert research.appended[0][0].event_id == "soccer-1"
+    assert result["errors"] == [
+        {
+            "event_id": "soccer-bad",
+            "reason": "ValueError: cannot create a call after the event has started",
+        }
+    ]
 
 
 def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_leagues() -> None:
@@ -519,6 +681,91 @@ def test_find_tennis_result_pending_while_match_not_yet_completed() -> None:
     espn = _FakeTennisESPN(_tennis_scoreboard(completed=False))
     result = _find_tennis_result(espn, "2026-07-27", _tennis_row())
     assert result["completed"] is False
+
+
+def _tennis_forecast() -> dict:
+    return {
+        "model_code_hash": "tennis-code-hash",
+        "priced_contracts": [
+            {
+                "event_id": "tennis-1",
+                "event_start_utc": "2026-07-27T19:00:00Z",
+                "away_team": "Alpha Player",
+                "home_team": "Beta Player",
+                "market_type": "moneyline",
+                "selection": "away",
+                "line": None,
+                "executable_ask": 0.45,
+                "model_probability": 0.55,
+                "model_uncertainty": 0.05,
+                "model_version": "tennis-surface-elo-v1",
+                "rationale": "fixture",
+                "market_slug": "wta-alpha-beta-2026",
+                "observed_at_utc": "2026-07-27T10:00:00Z",
+            }
+        ],
+    }
+
+
+def _tennis_config(*, status: str, min_edge: float = 0.05) -> dict:
+    return {
+        "models": {"TENNIS": {"status": status, "min_edge": min_edge}},
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+
+
+def test_tennis_logging_failure_is_recorded_not_silently_discarded(monkeypatch) -> None:
+    """A per-contract ValueError (malformed event_start_utc) must be
+    recorded in the forecast's errors list, not silently swallowed by the
+    bare `except (DuplicatePickError, KeyError, ValueError): continue` this
+    used to be -- and the other, valid contract in the same batch must
+    still get logged."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    forecast = _tennis_forecast()
+    forecast["priced_contracts"].append(
+        {
+            "event_id": "tennis-bad",
+            # Already started relative to the mocked utc_now() above ->
+            # request.validate() raises ValueError.
+            "event_start_utc": "2020-01-01T00:00:00Z",
+            "away_team": "Gamma Player",
+            "home_team": "Delta Player",
+            "market_type": "moneyline",
+            "selection": "away",
+            "line": None,
+            "executable_ask": 0.45,
+            "model_probability": 0.55,
+            "model_uncertainty": 0.05,
+            "model_version": "tennis-surface-elo-v1",
+            "rationale": "fixture-bad",
+            "market_slug": "wta-gamma-delta-2026",
+            "observed_at_utc": "2026-07-27T10:00:00Z",
+        }
+    )
+    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: forecast)
+    research = _CaptureLedger()
+
+    result = cli._forecast_tennis_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_tennis_config(status="shadow_qualified", min_edge=0.02),
+        research_ledger=research,
+        gated_ledger=None,
+    )
+
+    assert result["logged"] == 1
+    assert len(research.appended) == 1
+    assert research.appended[0][0].event_id == "tennis-1"
+    assert result["errors"] == [
+        {
+            "event_id": "tennis-bad",
+            "reason": "ValueError: cannot create a call after the event has started",
+        }
+    ]
 
 
 def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path) -> None:
@@ -884,6 +1131,69 @@ def test_international_forecast_logs_low_edge_to_research_but_not_gated(
     assert research.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
     assert research.appended[0][1].reason_code == "NO_CALL_LOW_EDGE"
     assert gated.appended == []
+
+
+def test_international_forecast_logging_failure_is_recorded_not_silently_discarded(
+    monkeypatch, tmp_path
+) -> None:
+    """A per-contract ValueError (malformed event_start_utc) must be
+    recorded in the forecast's errors list, not silently swallowed by the
+    bare `except (ValueError, KeyError): continue` this used to be -- and
+    the other, valid contract in the same batch must still get logged."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    forecast = _international_forecast()
+    forecast["priced_contracts"].append(
+        {
+            # Already started relative to the mocked utc_now() above ->
+            # request.validate() raises ValueError.
+            "event_start_utc": "2020-01-01T00:00:00Z",
+            "event_id": "kbo-bad",
+            "market_slug": "kbo-bad",
+            "teams": ["Lotte", "Kia"],
+            "observed_at_utc": "2026-07-26T10:00:00Z",
+            "artifact_hash": "artifact-hash",
+            "sides": [
+                {
+                    "team": "Lotte",
+                    "model_fair_settlement_value": 0.40,
+                    "executable_ask": 0.45,
+                    "tie_probability": 0.04,
+                },
+                {
+                    "team": "Kia",
+                    "model_fair_settlement_value": 0.60,
+                    "executable_ask": 0.55,
+                    "tie_probability": 0.04,
+                },
+            ],
+        }
+    )
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.forecast_international_baseball_slate",
+        lambda *args, **kwargs: forecast,
+    )
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+
+    result = cli._forecast_international_sport(
+        tmp_path,
+        tmp_path,
+        "kbo",
+        "2026-07-27",
+        _international_config(min_edge=0.10),
+        research,
+        gated,
+    )
+
+    assert result["logged"] == 1
+    assert len(research.appended) == 1
+    assert research.appended[0][0].event_id == "kbo-game-1"
+    assert result["errors"] == [
+        {
+            "event_id": "kbo-bad",
+            "reason": "ValueError: cannot create a call after the event has started",
+        }
+    ]
 
 
 def test_international_forecast_mirrors_only_strategy_qualified_calls(

@@ -311,6 +311,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <button data-tab="perf">Performance</button>
     </div>
     <div class="rail-group">
+      <div class="rail-label">Models</div>
+      <button data-tab="models">Models</button>
+    </div>
+    <div class="rail-group">
       <div class="rail-label">Portfolio</div>
       <button data-tab="folio">Portfolio</button>
     </div>
@@ -351,6 +355,25 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <div class="card"><h2>Active Alerts</h2><div id="healthAlerts"></div></div>
         <div class="card"><h2>Dashboard Integrity</h2><div id="integrityChecks" class="integrity-list"></div></div>
       </div>
+    </div>
+  </section>
+
+  <section id="tab-models" style="display:none">
+    <div class="card">
+      <h2>Model Evidence</h2>
+      <div class="small dim">Every model runs in production and writes to its own ledger -- no qualified/research classification, no automatic promotion or suppression. This is evidence, not a badge: sample size, calibration, CLV, and P&amp;L per model. You decide what to act on.</div>
+      <div class="small mono dim" id="modelLedgersGenerated" style="margin-top:7px">Generated: --</div>
+    </div>
+    <div class="card">
+      <div style="overflow-x:auto"><table class="data evidence-table" id="modelEvidenceTable">
+        <thead><tr><th>Model</th><th>Total</th><th>Open</th><th>Settled</th><th>Record (W-L-P)</th><th>P&amp;L (U)</th><th>Brier</th><th>Log loss</th><th>CLV coverage</th><th>Mean CLV</th><th>Missing-input rate</th><th>Latest data</th></tr></thead>
+        <tbody><tr><td colspan="12" class="dim">Loading model evidence...</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>Live Comparison — one event, every applicable model</h2>
+      <div class="small dim">Open predictions only; settled history is in the evidence table above.</div>
+      <div id="modelLedgerEvents" style="margin-top:9px"><div class="dim">Loading...</div></div>
     </div>
   </section>
 
@@ -794,6 +817,65 @@ function syncStatusbarHeight(){
   const height=$("#statusbar")?.offsetHeight;
   if(height)document.documentElement.style.setProperty("--statusbar-h",height+"px");
 }
+
+/* ---------- model ledgers (per-model comparison + evidence) ---------- */
+function modelEvidenceRow(ev){
+  const record=`${ev.wins}-${ev.losses}-${ev.pushes}`;
+  const pnl=ev.settled>0?`${ev.pnl_units>=0?"+":""}${fmt(ev.pnl_units)}`:"—";
+  const brier=ev.brier_score==null?"—":fmt(ev.brier_score,4);
+  const logLoss=ev.log_loss==null?"—":fmt(ev.log_loss,4);
+  const clvCov=ev.clv_coverage==null?"—":pct(ev.clv_coverage);
+  const meanClv=ev.mean_clv==null?"—":`${ev.mean_clv>=0?"+":""}${(ev.mean_clv*100).toFixed(2)}pp`;
+  const missing=ev.missing_input_rate==null?"—":pct(ev.missing_input_rate);
+  const latest=ev.latest_observed_at_utc?ev.latest_observed_at_utc.slice(0,10):"—";
+  return `<tr><td class="mono">${esc(ev.model_id)}</td><td>${ev.total}</td><td>${ev.open}</td><td>${ev.settled}</td>`+
+    `<td>${record}</td><td>${esc(pnl)}</td><td>${brier}</td><td>${logLoss}</td><td>${clvCov}</td><td>${esc(meanClv)}</td><td>${missing}</td><td class="mono dim">${latest}</td></tr>`;
+}
+function modelPredictionCard(p){
+  const diff=p.model_market_difference==null?"—":`${p.model_market_difference>=0?"+":""}${(p.model_market_difference*100).toFixed(1)}pp`;
+  const decisionBtn=p.operator_decision
+    ?`<span class="small dim">you: ${esc(p.operator_decision)}</span>`
+    :`<button class="small" onclick="recordModelDecision('${esc(p.model_id)}','${esc(p.prediction_id)}')">Record decision</button>`;
+  return `<div class="detail-grid" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">`+
+    `<dt>${esc(p.model_id)}</dt><dd>${esc(marketLabel(p.market_type))} ${p.line!=null?esc(String(p.line)):""} ${esc(p.selection||"")} — `+
+    `${p.model_probability==null?"—":pct(p.model_probability)} model vs ${p.decision_price==null?"—":cents(p.decision_price)} price (${diff}) `+
+    `· inputs: ${esc(p.input_availability||"unknown")} ${decisionBtn}</dd></div>`;
+}
+async function recordModelDecision(modelId,predictionId){
+  const decision=prompt("Your decision for this prediction (e.g. executed, passed, watching)?","executed");
+  if(!decision)return;
+  const unitsRaw=prompt("Units (optional, blank to skip)?","");
+  const note=prompt("Note (optional)?","")||"";
+  try{
+    const r=await fetch("/api/model-ledgers/decision",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({confirm:true,model_id:modelId,prediction_id:predictionId,decision,
+        units:unitsRaw===""?null:Number(unitsRaw),note})});
+    const d=await r.json();
+    if(d.status!=="ok"){alert(d.error||"failed");return;}
+    await refreshAll();
+  }catch(e){alert("server unreachable: "+e.message);}
+}
+window.recordModelDecision=recordModelDecision;
+function renderModelLedgers(payload){
+  if(!payload)return;
+  $("#modelLedgersGenerated").textContent=`Generated: ${evidenceText(payload.generated_at)}`;
+  const models=Object.values(payload.models||{}).sort((a,b)=>String(a.model_id).localeCompare(String(b.model_id)));
+  const tbody=models.length?models.map(modelEvidenceRow).join(""):`<tr><td colspan="12" class="dim">No model ledgers found yet.</td></tr>`;
+  $("#modelEvidenceTable tbody").innerHTML=tbody;
+  const events=payload.events||[];
+  $("#modelLedgerEvents").innerHTML=events.length?events.map(e=>{
+    const start=e.predictions[0]?.event_start_utc;
+    return `<div class="card" style="margin-bottom:8px"><div class="mono" style="font-weight:600">${esc(e.event_id)}${start?` · ${gameTimeET(start)}`:""}</div>`+
+      e.predictions.map(modelPredictionCard).join("")+`</div>`;
+  }).join(""):`<div class="dim">No open predictions right now.</div>`;
+}
+/* Note: this section intentionally sits before the "production model
+   evidence" marker below, not inside it -- tests/test_dashboard_html.py
+   extracts everything between that marker and "matrix" in isolation (no
+   `window`/`$`/DOM available) to unit-test productionEvidenceHtml. A
+   top-level `window.x=...` assignment inside that boundary crashes the
+   extraction; this whole block failed exactly that way once already
+   (2026-08-02) before being moved out here. */
 
 /* ---------- production model evidence ---------- */
 const EVIDENCE_MISSING="--";
@@ -2581,7 +2663,8 @@ function showPickDrawer(p){
     ["Size",p.status==="settled"||Number(p.units)>0?`${fmt(p.display_units??p.units)}U`:"—"],
     ["P&L",p.status==="settled"?`${fmt(pickPnl(p))}U`:"—"],
     ["Purchase state",p.buy_ready===true?"Ready":`Blocked — ${p.buy_block_reason||"not authorized"}`],
-    ["Model version",p.model_version||"—"],["Pick ID",p.pick_id||"—"]
+    ["Model version",p.model_version||"—"],["Pick ID",p.pick_id||"—"],
+    ["Rationale",p.rationale||"—"],["Risks",p.risks||"—"]
   ]));
 }
 function showPickDrawerById(pickId,mode){
@@ -2657,9 +2740,9 @@ function resetTimer(){
 }
 async function refreshAll(){
   const core=await Promise.allSettled([
-    api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence")
+    api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence"),api("/api/model-ledgers")
   ]);
-  const [statusResult,matrixResult,picksResult,perfResult,evidenceResult]=core;
+  const [statusResult,matrixResult,picksResult,perfResult,evidenceResult,modelLedgersResult]=core;
   if(statusResult.status==="fulfilled")renderStatus(statusResult.value);
   else setPanelState("healthMeta","error",`Health request failed: ${statusResult.reason?.message||"unknown error"}`,"refreshAll()");
   if(matrixResult.status==="fulfilled")renderMatrix(matrixResult.value);
@@ -2667,6 +2750,7 @@ async function refreshAll(){
   if(perfResult.status==="fulfilled")renderPerf(perfResult.value);
   else setPanelState("perfMeta","error",`Performance request failed: ${perfResult.reason?.message||"unknown error"}`,"performanceControlChanged()");
   if(evidenceResult.status==="fulfilled")renderProductionEvidence(evidenceResult.value);
+  if(modelLedgersResult.status==="fulfilled")renderModelLedgers(modelLedgersResult.value);
   const panels=await Promise.allSettled([renderToday(),renderFolio(),loadMarket()]);
   // populateFilters() reads every cache, so it must run after the ledger
   // requests settle. One failed source no longer blanks every other panel.

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import logging
 import shutil
 import time
 import uuid
@@ -54,6 +55,7 @@ from .domain import (
     utc_now,
 )
 from .eligibility import EligibilityResult
+from .model_ledger import record_from_pick_request
 from .pricing import american_to_decimal, grade_pick, implied_probability, profit_units
 from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
@@ -189,6 +191,16 @@ FIELDNAMES = [*LEGACY_FIELDNAMES,
     "back_to_back_gap",
     "games_last_7_gap",
     "schedule_missingness",
+    # Operator directive, 2026-08-02: an honest label distinct from
+    # record_type. QUALIFIED_SHADOW_CALL means "cleared this sport's trust/
+    # provenance/edge gates" -- for MLB/WNBA/NBA/NFL (evaluate_eligibility)
+    # that no longer requires positive edge at all (operator directive,
+    # 2026-07-26: disagreement/exposure/edge stopped gating CALL vs NO_CALL).
+    # trade_candidate = edge > 0 always, regardless of record_type or which
+    # ledger a row lands in, so "the model favors this side" and "this is
+    # genuinely positive expected value against the executable price" stay
+    # visibly distinct instead of both hiding behind one QUALIFIED label.
+    "trade_candidate",
 ]
 DECISION_FIELDS = {
     "pick_id",
@@ -208,6 +220,7 @@ DECISION_FIELDS = {
     "model_probability",
     "model_uncertainty",
     "edge",
+    "trade_candidate",
     "confidence_score",
     "units",
     "model_version",
@@ -490,6 +503,7 @@ class PickLedger:
                     if request.model_uncertainty is None
                     else f"{request.model_uncertainty:.6f}",
                     "edge": f"{eligibility.edge:.6f}",
+                    "trade_candidate": str(eligibility.edge > 0),
                     "confidence_score": str(eligibility.confidence_score),
                     "units": f"{eligibility.units:.2f}",
                     "status": PickStatus.OPEN.value,
@@ -555,6 +569,20 @@ class PickLedger:
                     {"reason_code": eligibility.reason_code, "record_type": eligibility.record_type.value},
                 )
             self._write_rows(existing)
+        # Operator directive, 2026-08-02: every model also writes to its own
+        # per-model ledger going forward (data/model_ledgers/<model-id>.xlsx,
+        # see model_ledger.py) -- additive, alongside this real, working
+        # write, never instead of it. Must never let a failure here (e.g. an
+        # unmapped league/market, a lock timeout on the new file) take down
+        # the primary ledger append that already succeeded above.
+        try:
+            record_from_pick_request(self.path.parent / "model_ledgers", request, eligibility)
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "model_ledger write failed for pick %s (primary ledger write already succeeded)",
+                pick_id,
+                exc_info=True,
+            )
         return row
 
     def settle(

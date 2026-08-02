@@ -42,8 +42,20 @@ MINIMUM_MONTHLY_CALLS = 10
 # v5/v4/v2 lineage (2026-07-21): Eastern-time point-in-time cutoff (was UTC)
 # and unified train/serve feature definitions (pitcher_era_gap = shared rolling
 # runs-allowed gap). Bump again on any further change to the training basis.
+#
+# Real bug fixed 2026-08-02: this dict is the *only* thing that decided the
+# output filename in write_production_artifacts, and it silently fell out of
+# sync with production (mlb rebuilt to v7 on 2026-07-30; this constant still
+# said v5). Running validate-models --write-artifacts today would have
+# silently overwritten mlb-elo-trend-lr-v5.json -- the immutable rollback
+# target v7's own qualification_override_reason explicitly relies on staying
+# available -- while the other four sports' constants already matched their
+# current production file, meaning a rerun would have quietly rewritten the
+# *live* artifact in place with a fresh fit under the same filename. Bumped
+# mlb to the next unused version and added a hard overwrite guard below so
+# this can't happen silently again regardless of whether this dict drifts.
 LEARNED_ARTIFACT_VERSIONS = {
-    "mlb": "mlb-elo-trend-lr-v5",
+    "mlb": "mlb-elo-trend-lr-v8",
     "nba": "nba-elo-trend-lr-v4",
     "wnba": "wnba-elo-trend-lr-v4",
     "nfl": "nfl-elo-trend-lr-v4",
@@ -843,13 +855,26 @@ def build_production_artifact(sport_report: Mapping[str, Any]) -> dict[str, Any]
 
 
 def write_production_artifacts(report: Mapping[str, Any], destination: str | Path) -> dict[str, str]:
-    """Write one immutable, hash-verified artifact per audited sport."""
+    """Write one immutable, hash-verified artifact per audited sport.
+
+    Refuses to overwrite an existing versioned artifact file -- these are
+    rollback/promotion targets other config (qualification_override_reason,
+    legacy_research_rollback pointers) relies on staying exactly as written.
+    A stale or unbumped LEARNED_ARTIFACT_VERSIONS entry must fail loudly here,
+    not silently rewrite production or a kept rollback artifact in place.
+    """
     root = Path(destination)
     root.mkdir(parents=True, exist_ok=True)
     paths: dict[str, str] = {}
     for sport, sport_report in report["sports"].items():
         artifact = build_production_artifact(sport_report)
         path = root / f"{artifact['model_version']}.json"
+        if path.exists():
+            raise FileExistsError(
+                f"refusing to overwrite existing versioned artifact {path} -- "
+                f"bump LEARNED_ARTIFACT_VERSIONS[{sport!r}] to a new, unused "
+                "version before writing production artifacts again"
+            )
         path.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         paths[sport] = str(path)
     return paths

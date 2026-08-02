@@ -3,9 +3,10 @@
 This document covers everything `model_improvements.md` does not: software
 architecture, dead code, test coverage, dashboard/product features, and
 model-layer ideas that sit above any single sport (staking, ensembling,
-cross-market consistency). It is a review snapshot from 2026-07-20 against the
-current working tree. Nothing here changes model config, artifacts, the
-ledger, or execution behavior — it is a punch list, not a completed change.
+cross-market consistency).
+
+**Last reviewed**: 2026-07-20 (original snapshot). **Updated**: 2026-08-02
+(removed completed items, updated line counts and statuses).
 
 ---
 
@@ -37,7 +38,7 @@ rescan-from-dashboard isn't wanted.
 
 ---
 
-## 2. Dead code: 11 orphaned modules, ~1,800 lines
+## 2. Dead code: 12 orphaned modules, ~1,800 lines
 
 These files are never imported by any other `src/` module and never
 referenced by any test — verified by grepping every source file and test file
@@ -87,19 +88,26 @@ is code nothing catches when it's wrong.
 
 ## 3. File-size / single-responsibility gaps
 
-| File | Lines | Concerns mixed together |
+| File | Lines (as of 2026-08-02) | Concerns mixed together |
 |---|---:|---|
-| `dashboard_server.py` | 2,978 | HTTP transport (`BaseHTTPRequestHandler`, manual if/elif routing for ~20 GET + 8 POST routes), pick/portfolio decoration, order preview/submission (real-money surface), audit tail, job status, caching |
-| `cli.py` | 1,831 | argparse wiring for ~25 subcommands across forecast/ledger/backfill/esports/international-baseball/validation, **zero dedicated test file** |
+| `dashboard_server.py` | 4,782 (was 2,978) | HTTP transport (`BaseHTTPRequestHandler`, manual if/elif routing for ~20 GET + 8 POST routes), pick/portfolio decoration, order preview/submission (real-money surface), audit tail, job status, caching, token-based auth |
+| `cli.py` | 3,943 (was 1,831) | argparse wiring for ~25 subcommands across forecast/ledger/backfill/esports/international-baseball/validation, **still no dedicated test file** (`tests/test_cli.py` doesn't exist) |
 | `validation.py` | 1,179 | per-sport walk-forward feature construction, chronological split, calibration, promotion-gate reporting |
-| `roadmap_challenger.py` | 1,029 | (new, from this session's review) — factorial experiment harness; large but single-purpose and well-isolated, lower priority to split |
+| `roadmap_challenger.py` | 1,029 | factorial experiment harness; large but single-purpose and well-isolated, lower priority to split |
 | `ledger.py` | 1,028 | append, settlement, closing-price capture, review workflow, reporting |
 | `backtester.py` | 796 | — not reviewed in depth this pass |
+
+**Notable**: `dashboard_server.py` has grown from 2,978 to 4,782 lines since
+the original review — a 60% increase, nearly all of it in the same monolithic
+file. The token-based auth, SELL-path P&L fix, portfolio-history, and
+multi-ledger scan all landed in this same file. The split recommended below
+is now *more* urgent, not less.
 
 `cli.py` having no direct unit test despite being the largest file in the repo
 is the sharpest gap: argument parsing, default-date wiring (the Eastern-time
 work from this session lives here), and command dispatch are only exercised
 indirectly through whatever other tests happen to call CLI functions.
+
 Recommended split, in order of value:
 
 1. **`cli.py` → `cli/` package.** One module per command family
@@ -123,64 +131,46 @@ Recommended split, in order of value:
 
 ---
 
-## 4. No CI backstop
+## ~~4. No CI backstop~~ ✅ DONE (2026-08-02)
 
-There is no `.github/workflows/`. The only automated gate is the local
-pre-push hook installed this session (pytest blocking, mypy advisory). That
-hook only runs on this machine, only on `git push`, and is bypassable with
-`--no-verify`. Given there's a second, concurrent agent (Codex) actively
-committing to this same repo, a server-side check that runs regardless of
-which machine or agent pushes is worth adding:
+`.github/workflows/ci.yml` now exists — runs `ruff check` and `pytest` on
+every push and PR. Python 3.12 on ubuntu-latest.
 
-```yaml
-# .github/workflows/ci.yml
-name: ci
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: macos-latest   # matches local Python 3.14 .venv behavior
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }   # matches pyproject.toml's declared version
-      - run: pip install -e .
-      - run: PYTHONPATH=src:. python -m pytest tests/ -q
-      - run: pip install ruff && ruff check src/ tests/
-```
-
-This is also the natural place to eventually pin down the
-Python-3.14-venv-vs-3.11-pyproject.toml mismatch that currently makes mypy
-advisory-only in the pre-push hook — CI running the *declared* interpreter
-version would surface real version-specific type errors that the local venv
-currently can't.
+The local pre-push hook (pytest blocking, mypy advisory) remains as a
+complement, not a replacement.
 
 ---
 
-## 5. Untested new infrastructure from this session
+## 5. Missing or thin test coverage
 
-`research_io.py` (the shared `utc_now`/`canonical_json`/`sha256_file`/
-`atomic_write`/`identity_key` helpers extracted from esports.py and
-international_baseball.py this session) has no dedicated test file — it's
-only exercised indirectly through its two callers' test suites. A small
-`tests/test_research_io.py` covering each helper directly (especially
-`atomic_write`'s crash-safety guarantee and `canonical_json`'s
-key-ordering/float-formatting stability, since other code hashes its output)
-would close this gap cheaply.
+Existing gaps (2026-08-02 check):
+
+- **`cli.py`**: still has no direct test file (`tests/test_cli.py` does not
+  exist). The 3,943-line file has *zero* dedicated unit tests.
+- **`dashboard_server.py`**: `tests/test_dashboard_server.py` exists (65
+  tests) but the monolithic server file has nearly doubled in size.
+- **Execution-ticket binding**: no test injects a mismatched ticket to
+  confirm the cap-recomputation path rejects it.
+- **Audit-failure recovery**: no test injects an audit failure between
+  ledger-write and audit-append to confirm the gap is surfaced.
+- **Secret-redaction / future-timestamp**: no dedicated test.
+
+~~- `tests/test_research_io.py`~~ ✅ DONE — file exists now.
 
 ---
 
-## 6. Data-layer fragility: Excel as the ledger's system of record
+## 6. Ledger storage: spreadsheets, no schema, no transactions
 
-`data/picks.xlsx` and `data/flat_picks.xlsx` (openpyxl-backed) are read and
-rewritten on every relevant CLI/dashboard operation. This session's ledger
-audit found real corruption from this shape of storage: blank scores on
-forced-call rows, inconsistent odds-field precision, one sign error in
-`research_pnl_units` — none caused by a single catastrophic bug, but by the
-accumulated drift you get from a spreadsheet acting as a database (no
-schema enforcement, no transactions, full-file rewrite on every append, easy
-to hand-edit inconsistently). Two concurrent writers (this session and
-Codex's) touching the same `.xlsx` files raises real corruption risk with no
-locking.
+Multiple real ledger bugs have been caused or made harder to catch by the
+Excel-based storage layer: inconsistent odds-field precision, sign errors in
+`research_pnl_units`, spreadsheet-as-database drift (no schema enforcement,
+no transactions, full-file rewrite on every append). The new `ModelLedger`
+(`model_ledger.py`, 2026-08-02) is also Excel-based by design — following the
+existing pattern rather than fixing it at the storage layer.
+
+Two concurrent writers touching the same `.xlsx` files raises real corruption
+risk. The `.lock` files (via `fcntl.flock`) mitigate this but do not provide
+ACID guarantees — a crash during write leaves a partially-written file.
 
 **Suggestion:** migrate the ledger to SQLite (`data/ledger.db`), a single
 file with no server, ACID transactions, and a real schema — while keeping an
@@ -195,13 +185,18 @@ uncovered in the current storage layer.
 
 ## 7. Dashboard product gaps
 
-| Gap | Why it matters | What exists already that this would build on |
+| Gap | Why it matters | What exists already |
 |---|---|---|
-| No push notifications | Dashboard is pull-only; the live WNBA "stale filled order-control" bug fixed this session was only caught because you happened to be looking at the dashboard. A local macOS notification (`osascript -e 'display notification'`) or a Slack webhook on new qualified pick / settlement / stale-order-state would catch these without requiring you to keep the tab open. | `_daily_pipeline_status()` (this session) already detects staleness; the settlement path already knows when a position closes |
-| No CLV/edge-decay chart | `cli.py clv` already computes closing-line-value; it's never rendered. | The CLI command and its output format already exist — this is a rendering gap, not a data gap |
-| No drawdown/exposure chart | `economic_gate.py` (this session) already computes `max_drawdown` and bootstrap CIs; it's backend-only. | Same — data exists, no dashboard tab consumes it |
-| No BBO-capture health view | This session left an open question ("theres alot of games in npb and kbo and esports... future events tho") about live slate-discovery counts that was never resolved because there's no view showing captured-vs-discovered counts per sport/day. | `market_snapshots()`/`_pick_quote()` and the odds directories already contain everything needed to compute discovered-vs-captured deltas per sport per day |
+| No push notifications | Dashboard is pull-only; the live WNBA "stale filled order-control" bug was only caught by looking directly. A local macOS notification or Slack webhook on new qualified pick/settlement/stale-order would catch these without requiring the tab open. | `_daily_pipeline_status()` already detects staleness |
+| No CLV/edge-decay chart | `cli.py clv` already computes closing-line-value; it's never rendered. | The CLI command and output format already exist |
+| No drawdown/exposure chart | `economic_gate.py` already computes `max_drawdown` and bootstrap CIs; backend-only. | Data exists, no dashboard tab consumes it |
+| No BBO-capture health view | Open question about live slate-discovery counts never resolved — no view showing captured-vs-discovered per sport/day. | `market_snapshots()`/`_pick_quote()` and odds directories contain everything needed |
 | No export/report | No CSV/weekly-summary export for offline review outside the dashboard. | `performance()`/`bets_view()` already assemble the underlying rows |
+| Dashboard startup uses `pkill -f` | CHECKLIST.md flag; should use PID-file approach instead. | `.codewhale/instructions.md` explicitly forbids `pkill` on dashboard |
+
+~~Uncertainty-aware staking~~ ✅ DONE (2026-07-31) — `edge_scaled_units` in
+`units.py` now actually reads `model_uncertainty` and haircuts the raw edge
+before scaling. Unit range widened to 1.0U-2.0U.
 
 ---
 
@@ -211,38 +206,23 @@ uncovered in the current storage layer.
 currently sits *above* individual sport models. Four ideas that don't require
 new data sources — only combining evidence that's already collected:
 
-1. **Uncertainty-aware staking.** Units currently appear to be fixed-size per
-   pick (e.g. `0.50U`, per the WNBA bug this session). A fractional-Kelly
-   sizing layer — stake scaled by `(model edge, model calibration confidence,
-   current bankroll drawdown)` rather than a flat unit — would use
-   `economic_gate.py`'s existing drawdown/CI machinery and each artifact's
-   own calibration metrics, with no new provider integration required.
-2. **Cross-market internal consistency check.** Within Polymarket itself, a
-   game's moneyline, spread, and total markets imply related no-vig
-   probabilities. A large mismatch between what moneyline-implied and
-   spread-implied win probability say about the same game is itself a
-   signal — either a data-quality problem (stale/mismatched snapshot) or a
-   genuine mispricing worth a closer look. This is buildable entirely from
-   BBO data already being captured; no new source needed.
+1. ~~**Uncertainty-aware staking.**~~ ✅ DONE (2026-07-31). `edge_scaled_units`
+   now uses `model_uncertainty` to haircut the edge, and unit range is 1.0-2.0U.
+2. **Cross-market internal consistency check.** Within Polymarket, a game's
+   moneyline, spread, and total markets imply related no-vig probabilities.
+   A large mismatch is either a data-quality problem or a genuine mispricing.
+   Buildable from existing BBO data.
 3. **CLV-triggered health monitoring.** `clv` is already computed on demand;
-   nothing currently watches it over time. A rolling check — "has realized
-   CLV trended negative over the last N graded picks for this artifact?" —
-   could flag automatic-review-needed rather than relying on someone running
-   `clv` and reading it manually. This is the natural automated complement to
-   the manual "Immediate repair order" review process `PROJECT_STATUS.md`
-   currently asks a human to do by hand.
-4. **Simple ensembling across sport families.** MLB/NBA/WNBA/NFL currently
-   train fully independent artifacts. Nothing pools their calibration
-   behavior even though they share a validation/reporting pipeline
-   (`validation.py`). A shared meta-calibrator (e.g., one isotonic/Platt
-   layer fit across all four sports' out-of-fold predictions) could correct
-   for a systematic miscalibration mode common to the shared feature-
-   engineering pipeline, separate from each sport's own coefficients.
+   nothing watches it over time. A rolling check — "has realized CLV trended
+   negative over the last N graded picks?" — could flag automatic-review-needed.
+4. **Simple ensembling across sport families.** MLB/NBA/WNBA/NFL train fully
+   independent artifacts. A shared meta-calibrator (one isotonic/Platt layer
+   across all four sports' out-of-fold predictions) could correct systematic
+   miscalibration common to the shared feature-engineering pipeline.
 
 None of these are sport-specific research (they don't touch
 `model_improvements.md`'s per-league tables) and none require a new paid or
-authenticated data source — they're purely about better use of evidence
-already flowing through the ledger, BBO snapshots, and validation reports.
+authenticated data source.
 
 ---
 
@@ -251,34 +231,30 @@ already flowing through the ledger, BBO snapshots, and validation reports.
 - **Kalshi cross-venue arbitrage/best-execution.** `data_sources/kalshi.py`
   is a deliberate `KalshiDeferredError` stub: the account holder is outside
   the US and Kalshi requires US residency (CFTC-regulated). There is nothing
-  to build here until that changes — noting it so it isn't mistaken for an
-  unfinished integration.
-- **Dashboard authentication.** The server binds to `127.0.0.1` only
-  (`dashboard_server.py`, `ThreadingHTTPServer(("127.0.0.1", options.port), ...)`);
-  it's a single-user local tool, so adding auth would be complexity with no
-  corresponding threat model change.
+  to build here until that changes.
+- ~~**Dashboard authentication.**~~ ✅ DONE (2026-08-02). The dashboard now
+  has per-session token-based auth on the real-money order-execution endpoint
+  (`POST /api/order/submit`). The token is generated at server start, injected
+  into the served page, and required on every POST. Localhost bind still
+  provides the primary security boundary.
 
 ---
 
-## Suggested order
+## Suggested order (updated 2026-08-02)
 
-1. Fix or delete `/api/scan` (small, isolated, verified bug).
-2. Delete or wire-in the 11 orphaned modules (removes false signal about
-   what's actually active; low risk since nothing currently depends on them).
-3. Add the GitHub Actions CI workflow (small, immediately valuable given the
-   concurrent-agent situation).
-4. Add `tests/test_research_io.py` (small, closes a gap from this session's
-   own new code).
-5. Split `cli.py` and add `tests/test_cli.py` (moderate effort, closes the
-   single biggest test-coverage gap in the repo).
-6. Split `dashboard_server.py` (moderate effort, most valuable done together
-   with #1 since the route-table refactor is what would have caught it).
-7. Dashboard product gaps (section 7) — pick whichever is most useful to you
-   day-to-day; CLV/drawdown charts are the cheapest since the data already
-   exists.
-8. Portfolio/meta-model layer (section 8) — genuinely new modeling work,
-   sequence behind the per-sport P0 items already queued in
-   `model_improvements.md`.
-9. SQLite ledger migration (section 6) — largest effort, highest integrity
+1. Fix or delete `/api/scan` (small, isolated, verified bug — still present).
+2. Delete the 12 orphaned modules (removes false signal about what's active;
+   low risk since nothing depends on them).
+3. Add `tests/test_cli.py` (closes the single biggest test-coverage gap in the
+   repo — 3,943-line file with zero dedicated tests).
+4. Split `cli.py` → `cli/` package (moderate effort, enables testing).
+5. Split `dashboard_server.py` → `dashboard/` package (moderate effort, 4,782
+   lines and growing; the route-table refactor would have caught `/api/scan`).
+6. Dashboard product gaps (section 7) — push notifications and BBO-capture
+   health view are the highest-value since they catch real problems.
+7. Portfolio/meta-model layer (section 8, items 2-4) — genuinely new modeling
+   work; CLV-triggered monitoring is the cheapest since data already exists.
+8. SQLite ledger migration (section 6) — largest effort, highest integrity
    payoff; do this once the smaller fixes above stop competing for the same
    files.
+9. Replace `pkill -f` dashboard startup with PID-file approach.

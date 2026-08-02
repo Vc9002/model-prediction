@@ -223,6 +223,69 @@ def test_forecast_uses_home_away_and_current_asks_but_stays_zero_unit(tmp_path) 
     assert all(side["executable_ask"] is not None for side in contract["sides"])
 
 
+def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) -> None:
+    """Real bug this guards against, 2026-08-02: NPB's settlement fallback
+    silently collapsed games.jsonl to a fraction of its real history while
+    the ratings artifact kept being used as if nothing had changed --
+    nothing ever checked that the two still agreed. games_sha256 alone
+    can't catch this prospectively (the file legitimately grows every day),
+    so training_prefix_sha256 hashes only the rows through
+    trained_through_date, which a healthy history can never change."""
+    from model_prediction.international_baseball import _training_prefix_sha256
+
+    directory = tmp_path / "international_baseball/kbo"
+    directory.mkdir(parents=True)
+    (directory / "teams.json").write_text(
+        json.dumps(
+            {
+                "KIA": {"name": "Kia Tigers", "aliases": ["KIA"]},
+                "LG": {"name": "LG Twins", "aliases": ["LG"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    game_row = {
+        "game_id": "kbo:1", "game_date": "2099-07-18",
+        "home_team_id": "LG", "away_team_id": "KIA",
+        "home_score": 4, "away_score": 2, "tie": False,
+    }
+    (directory / "games.jsonl").write_text(json.dumps(game_row) + "\n", encoding="utf-8")
+    real_prefix_hash = _training_prefix_sha256([game_row], "2099-07-18")
+
+    models = tmp_path / "models"
+    models.mkdir()
+
+    def _artifact(prefix_hash: str) -> dict:
+        return {
+            "model_version": "kbo-tie-aware-elo-v1",
+            "artifact_hash": "abc",
+            "k": 20,
+            "home_advantage": 50,
+            "tie_probability": 0.04,
+            "trained_through_date": "2099-07-18",
+            "training_prefix_sha256": prefix_hash,
+            "ratings": {"KIA": 1500, "LG": 1520},
+        }
+
+    # Wrong hash (as if the history was altered after this artifact trained) -> refused.
+    (models / "kbo-tie-aware-elo-v1.json").write_text(
+        json.dumps(_artifact("0" * 64)), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="training history has changed"):
+        forecast_international_baseball_slate(
+            tmp_path, models, "kbo", "2099-07-20", client=_MarketClient()
+        )
+
+    # Real matching hash -> forecast proceeds normally.
+    (models / "kbo-tie-aware-elo-v1.json").write_text(
+        json.dumps(_artifact(real_prefix_hash)), encoding="utf-8"
+    )
+    output = forecast_international_baseball_slate(
+        tmp_path, models, "kbo", "2099-07-20", client=_MarketClient()
+    )
+    assert output["priced_count"] == 1
+
+
 class _HomeFirstMarketClient(_MarketClient):
     """Same event as _MarketClient, but the gateway lists home before away --
     market["sides"] has no ordering guarantee (see

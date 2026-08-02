@@ -2,6 +2,66 @@
 
 **Last audited**: 2026-08-02 (see new section directly below)
 
+## 2026-08-02 (later still) — Per-model ledger architecture: new schema, `ModelLedger`, real data migrated
+
+Operator directive: "recompile all models will be production in its own
+ledger, the clafiication of benchmarks or shadow should not exist, there
+should be no calssification, all models are the same. i decide to pormote
+it or not." Followed by explicit confirmation to build the full thing
+("all of it in order").
+
+**What shipped:**
+- `src/model_prediction/model_ledger.py` — new `ModelLedger` class, one
+  `.xlsx` file per model identity (not per sport/routing-destination).
+  New common schema (`model_id`, `model_version`, `artifact_hash`,
+  `code_revision`, `feature_schema_version`, `model_probability`,
+  `model_projection`, `model_uncertainty`, `decision_price`,
+  `market_no_vig_probability`, `model_market_difference`,
+  `observed_at_utc`, `event_start_utc`, `input_availability`,
+  `missing_inputs`, `source_lineage`, `status`, `result`, `closing_price`,
+  `probability_clv`, `pnl_units`, `settled_at_utc`) plus a separate
+  operator-decision block (`operator_decision`, `operator_selected_model`,
+  `operator_selected_market`, `operator_units`, `operator_timestamp`,
+  `operator_note`) that `record_operator_decision()` writes without ever
+  touching the model's own fields. No `record_type`/`model_state`/
+  `qualified_for_betting`-style classification field anywhere in this
+  schema — deliberately, per the directive. `append_failure()` only
+  accepts one of a fixed `INTEGRITY_FAILURE_REASONS` set (event started,
+  identity unresolved, bad artifact hash, stale feature timestamp, wrong
+  market, unmapped side, calculation failure, undefined missing-input
+  behavior) — the only things allowed to block a numeric prediction now.
+  12 new tests in `tests/test_model_ledger.py`.
+- `scripts/migrate_to_model_ledgers.py` — read-only against every existing
+  source ledger (`data/picks.xlsx`, `data/flat_picks.xlsx`,
+  `data/research/*.xlsx`, `data/gated_research/*.xlsx`), maps
+  `(league, market_type)` to a model identity (soccer's moneyline+total
+  both map to `soccer-poisson-dc` — one model, two market types, not two
+  models), and dedupes by the same market-identity key `ledger.py`'s own
+  `_market_duplicate_key` uses (event/market/line/sportsbook/model_version),
+  preferring a settled copy over an open one when the same real decision
+  was logged to more than one old destination. Real numbers: 688 source
+  rows scanned across 4 old destination types → 483 genuinely unique
+  decisions written across 12 real models. Spot-verified against numbers
+  already independently confirmed this session (soccer: 81, matching the
+  earlier flat-ledger backfill count exactly; MLB moneyline: 110→55, a
+  clean 2x consistent with Main+Flat being the only two destinations that
+  sport ever wrote to). Idempotent — re-run against already-migrated data
+  writes 0 new rows, skips all 483 by `prediction_id`.
+
+**Explicitly not done in this pass** (real, large, separate remaining
+work — see the conversation transcript for the full breakdown given to
+the operator): cutting the *live* forecast pipeline (`cli.py`'s ~15
+forecast functions, `daily`) over to write through `ModelLedger` instead
+of the old `PickLedger`; the dashboard redesign (one row per event, one
+column per model, evidence columns, no classification badges); every
+challenger/ensemble model named in the plan (total-score Ridge, tennis
+point-Markov, roster-aware esports Elo variants, joint Negative Binomial
+totals) — none of that modeling code exists yet. `PickLedger`/`ledger.py`
+is completely untouched; the live pipeline still writes through it exactly
+as before. `data/model_ledgers/*.xlsx` is a real, verified, additive
+backfill of historical data into the new shape — not yet the system of
+record.
+
 ## 2026-08-02 (really final) — MLB position-player availability shipped; a real starter-quality candidate tested honestly and NOT promoted; CLAUDE.md added
 
 ### MLB position-player (lineup) availability -- shipped

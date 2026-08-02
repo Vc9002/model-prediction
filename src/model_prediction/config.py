@@ -34,6 +34,92 @@ def _project_root() -> Path:
 PROJECT_ROOT = _project_root()
 
 
+_VALID_MODEL_STATES = frozenset(
+    {"research", "shadow_candidate", "shadow_qualified", "degraded", "suspended", "retired"}
+)
+_VALID_MODEL_ORIGINS = frozenset(
+    {"statistical_model", "analyst_estimate", "market_baseline", "synthetic_test"}
+)
+
+
+def validate_config(config: dict[str, Any]) -> None:
+    """Fail loudly at load time on a structurally broken config.
+
+    Real bug class this guards against: a typo like ``status: reserach``
+    previously surfaced as a cryptic ``ValueError: 'reserach' is not a valid
+    ModelState`` deep inside a forecast call (or, worse, inside
+    ``ModelState(configured_state)`` on a code path wrapped in a broad
+    ``except (ValueError, KeyError): continue`` -- see the four cli.py
+    forecast loops fixed 2026-08-02 -- which would have silently swallowed
+    it and logged nothing for that entire sport). This is intentionally not
+    an exhaustive schema: it checks the specific fields whose bad values
+    cause a real runtime failure or silent misbehavior elsewhere in this
+    codebase, not every key in the file.
+    """
+    errors: list[str] = []
+
+    def require_section(name: str) -> dict[str, Any]:
+        section = config.get(name)
+        if not isinstance(section, dict):
+            errors.append(f"'{name}' section is missing or not a mapping")
+            return {}
+        return section
+
+    project = require_section("project")
+    for key in ("ledger_path", "audit_path"):
+        value = project.get(key)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"project.{key} must be a non-empty string")
+    max_age = project.get("maximum_data_age_hours")
+    if max_age is not None and (not isinstance(max_age, (int, float)) or max_age <= 0):
+        errors.append("project.maximum_data_age_hours must be a positive number")
+
+    bankroll = require_section("bankroll")
+    unit_value = bankroll.get("unit_value_usd")
+    if not isinstance(unit_value, (int, float)) or unit_value <= 0:
+        errors.append("bankroll.unit_value_usd must be a positive number")
+    kelly = bankroll.get("kelly_fraction")
+    if kelly is not None and (not isinstance(kelly, (int, float)) or not 0 < kelly <= 1):
+        errors.append("bankroll.kelly_fraction must be in (0, 1] when set")
+    min_units, max_units = bankroll.get("min_pick_units"), bankroll.get("max_pick_units")
+    for key, value in (("min_pick_units", min_units), ("max_pick_units", max_units)):
+        if value is not None and (not isinstance(value, (int, float)) or value < 0):
+            errors.append(f"bankroll.{key} must be a non-negative number when set")
+    if (
+        isinstance(min_units, (int, float))
+        and isinstance(max_units, (int, float))
+        and min_units > max_units
+    ):
+        errors.append("bankroll.min_pick_units must not exceed bankroll.max_pick_units")
+
+    require_section("execution")
+
+    models = require_section("models")
+    for name, spec in models.items():
+        if not isinstance(spec, dict) or "status" not in spec:
+            continue  # not a per-sport model entry (e.g. shared_features, market_residual, promotion)
+        status = spec.get("status")
+        if status not in _VALID_MODEL_STATES:
+            errors.append(
+                f"models.{name}.status {status!r} is not a valid ModelState "
+                f"(expected one of {sorted(_VALID_MODEL_STATES)})"
+            )
+        origin = spec.get("origin")
+        if origin is not None and origin not in _VALID_MODEL_ORIGINS:
+            errors.append(
+                f"models.{name}.origin {origin!r} is not a valid ModelOrigin "
+                f"(expected one of {sorted(_VALID_MODEL_ORIGINS)})"
+            )
+        min_edge = spec.get("min_edge")
+        if min_edge is not None and (not isinstance(min_edge, (int, float)) or not 0 <= min_edge < 1):
+            errors.append(f"models.{name}.min_edge must be in [0, 1) when set")
+
+    if errors:
+        raise ValueError(
+            "config/model.yaml failed validation:\n" + "\n".join(f"  - {error}" for error in errors)
+        )
+
+
 def load_config() -> dict[str, Any]:
     path = config_path()
     with path.open(encoding="utf-8") as handle:
@@ -41,6 +127,7 @@ def load_config() -> dict[str, Any]:
     # Individual artifacts remain immutable for reproducibility; research moves
     # forward by creating and evaluating a new version.
     config["model_iteration_policy"] = CONTINUOUS_MODEL_ITERATION_POLICY.copy()
+    validate_config(config)
     return config
 
 

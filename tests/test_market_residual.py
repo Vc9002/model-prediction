@@ -1,5 +1,7 @@
 import random
 
+import pytest
+
 from model_prediction.models.market_residual import (
     MarketResidualModel,
     ResidualTrainingRow,
@@ -55,3 +57,20 @@ def test_artifact_round_trip_with_hash(tmp_path) -> None:
     except (ValueError, KeyError):
         raised = True
     assert raised
+
+
+def test_save_refuses_to_overwrite_existing_version(tmp_path) -> None:
+    """RESIDUAL_VERSION is a fixed module-level string, not bumped per training
+    run, so a path derived from model.version is a versioned artifact target --
+    the same class of bug fixed 2026-08-02 in validation.py's
+    write_production_artifacts. save() had no existence guard, so retraining
+    and re-saving would silently overwrite a prior artifact under the same
+    filename. It must now refuse outright."""
+    model = MarketResidualModel.train(synthetic_rows(300))
+    path = tmp_path / "residual.json"
+
+    model.save(path)
+    assert path.exists()
+
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        model.save(path)

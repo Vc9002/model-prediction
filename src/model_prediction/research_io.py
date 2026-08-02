@@ -50,6 +50,27 @@ def atomic_write(path: Path, content: str) -> None:
         raise
 
 
+def backup_before_overwrite(path: Path) -> Path | None:
+    """Copy an artifact's current content to a `.previous` sibling before it
+    gets overwritten in place, giving a one-step rollback path.
+
+    For esports/KBO/NPB ratings artifacts, staying current is the whole
+    point (see refresh_recent_matches/_refresh_esports_ratings): they're
+    intentionally overwritten under a stable filename every day by `daily`,
+    unlike MLB's versioned production artifacts (mlb-elo-trend-lr-vN.json),
+    so a FileExistsError-style immutability guard would just break the
+    intended refresh. The real gap this closes instead: nothing preserved
+    the artifact a bad refresh replaced, so a corrupted day's ratings had no
+    recovery path. Keeps exactly one prior version -- not a full history --
+    matching how much rollback protection was actually asked for.
+    """
+    if not path.exists():
+        return None
+    backup_path = path.with_suffix(".previous" + path.suffix)
+    backup_path.write_bytes(path.read_bytes())
+    return backup_path
+
+
 def identity_key(value: str) -> str:
     return "".join(
         character

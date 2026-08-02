@@ -12,7 +12,14 @@ def test_model_freeze_cannot_be_enabled_by_configuration(tmp_path, monkeypatch) 
                 "model_iteration_policy": {
                     "status": "frozen",
                     "parameter_freezes_allowed": True,
-                }
+                },
+                # Minimum sections validate_config requires -- this test's
+                # only concern is model_iteration_policy, but load_config now
+                # validates the whole file's structure at load time.
+                "project": {"ledger_path": "data/picks.xlsx", "audit_path": "data/events.jsonl"},
+                "bankroll": {"unit_value_usd": 5.0},
+                "execution": {"status": "paper"},
+                "models": {},
             }
         ),
         encoding="utf-8",
@@ -26,6 +33,101 @@ def test_model_freeze_cannot_be_enabled_by_configuration(tmp_path, monkeypatch) 
     assert policy["require_versioned_change"] is True
     assert policy["require_walk_forward_ablation"] is True
     assert policy["require_locked_holdout_before_promotion"] is True
+
+
+def _minimal_valid_config(**overrides) -> dict:
+    config = {
+        "project": {"ledger_path": "data/picks.xlsx", "audit_path": "data/events.jsonl"},
+        "bankroll": {"unit_value_usd": 5.0},
+        "execution": {"status": "paper"},
+        "models": {"MLB": {"status": "shadow_qualified", "origin": "statistical_model", "min_edge": 0.02}},
+    }
+    config.update(overrides)
+    return config
+
+
+def test_validate_config_accepts_the_real_project_config() -> None:
+    """The live config/model.yaml itself must always pass -- this is the
+    file every CLI invocation actually loads."""
+    from model_prediction.config import validate_config
+
+    validate_config(load_config())  # raises on failure; no assertion needed
+
+
+def test_validate_config_rejects_a_typo_in_model_status() -> None:
+    """Real bug class this guards against: a typo like status: reserach
+    used to surface as a cryptic ValueError('reserach' is not a valid
+    ModelState) deep inside a forecast call, or get silently swallowed by a
+    broad except (ValueError, KeyError): continue -- see the four cli.py
+    forecast loops fixed 2026-08-02. Now caught at config-load time with a
+    clear message naming the exact bad field."""
+    from model_prediction.config import validate_config
+
+    config = _minimal_valid_config()
+    config["models"]["MLB"]["status"] = "reserach"
+    try:
+        validate_config(config)
+    except ValueError as error:
+        assert "models.MLB.status" in str(error)
+    else:
+        raise AssertionError("a typo'd model status was not rejected")
+
+
+def test_validate_config_rejects_missing_required_sections() -> None:
+    from model_prediction.config import validate_config
+
+    try:
+        validate_config({})
+    except ValueError as error:
+        message = str(error)
+        assert "'project' section" in message
+        assert "'bankroll' section" in message
+        assert "'execution' section" in message
+        assert "'models' section" in message
+    else:
+        raise AssertionError("an empty config was not rejected")
+
+
+def test_validate_config_rejects_non_positive_unit_value() -> None:
+    from model_prediction.config import validate_config
+
+    config = _minimal_valid_config()
+    config["bankroll"]["unit_value_usd"] = -5.0
+    try:
+        validate_config(config)
+    except ValueError as error:
+        assert "bankroll.unit_value_usd" in str(error)
+    else:
+        raise AssertionError("a negative unit_value_usd was not rejected")
+
+
+def test_validate_config_ignores_non_sport_model_entries() -> None:
+    """shared_features/market_residual/promotion have no status field -- they
+    must not be misread as a per-sport model entry with a missing status."""
+    from model_prediction.config import validate_config
+
+    config = _minimal_valid_config()
+    config["models"]["shared_features"] = {"trend_analysis": {"enabled": True}}
+    validate_config(config)  # must not raise
+
+
+def test_load_config_rejects_a_broken_config_file_on_disk(tmp_path, monkeypatch) -> None:
+    """Proves validate_config is actually wired into load_config, not just
+    independently correct -- a config file typo must be caught the moment
+    any CLI command starts, not deep inside whatever forecast call happens
+    to read the bad field first."""
+    config_path = tmp_path / "model.yaml"
+    broken = _minimal_valid_config()
+    broken["models"]["MLB"]["status"] = "reserach"
+    config_path.write_text(yaml.safe_dump(broken), encoding="utf-8")
+    monkeypatch.setenv("MODEL_PREDICTION_CONFIG", str(config_path))
+
+    try:
+        load_config()
+    except ValueError as error:
+        assert "models.MLB.status" in str(error)
+    else:
+        raise AssertionError("load_config() accepted a config with an invalid model status")
 
 
 def test_default_qualification_policy_is_accuracy_first() -> None:

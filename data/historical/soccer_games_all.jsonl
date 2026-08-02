@@ -9255,3 +9255,7 @@
 {"away_score":0,"away_team":"Pachuca","event_id":"oddsapi:soccer_mexico_ligamx:2026-08-02:e6a5870f","event_start_utc":"2026-08-02T01:00:00Z","home_score":1,"home_team":"Le\u00f3n","league":"LIGA_MX"}
 {"away_score":2,"away_team":"Monterrey","event_id":"oddsapi:soccer_mexico_ligamx:2026-08-02:495ceef5","event_start_utc":"2026-08-02T01:05:00Z","home_score":0,"home_team":"Atlas","league":"LIGA_MX"}
 {"away_score":3,"away_team":"Atlante FC","event_id":"oddsapi:soccer_mexico_ligamx:2026-08-02:4bbb0702","event_start_utc":"2026-08-02T03:00:00Z","home_score":2,"home_team":"Cruz Azul","league":"LIGA_MX"}
+{"away_score":0,"away_team":"Qingdao Hainiu FC","event_id":"oddsapi:soccer_china_superleague:2026-08-02:47420717","event_start_utc":"2026-08-02T10:00:00Z","home_score":2,"home_team":"Qingdao West Coast FC","league":"CSL"}
+{"away_score":0,"away_team":"Gwangju FC","event_id":"oddsapi:soccer_korea_kleague1:2026-08-02:6a855bbe","event_start_utc":"2026-08-02T10:30:00Z","home_score":2,"home_team":"Daejeon Citizen","league":"K_LEAGUE_1"}
+{"away_score":1,"away_team":"FC Anyang","event_id":"oddsapi:soccer_korea_kleague1:2026-08-02:5dae9531","event_start_utc":"2026-08-02T10:30:00Z","home_score":3,"home_team":"Ulsan Hyundai FC","league":"K_LEAGUE_1"}
+{"away_score":3,"away_team":"Incheon United","event_id":"oddsapi:soccer_korea_kleague1:2026-08-02:4410b703","event_start_utc":"2026-08-02T10:30:00Z","home_score":3,"home_team":"Jeju United FC","league":"K_LEAGUE_1"}
