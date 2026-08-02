@@ -1317,6 +1317,7 @@ def _log_esports_forecast(
     ledger: Any,
     flat_mode: bool = False,
     gated_ledger=None,
+    flat_ledger=None,
 ) -> int:
     """Log esports contracts through the real eligibility gates.
 
@@ -1332,10 +1333,11 @@ def _log_esports_forecast(
     from .data_sources.polymarket_us import probability_to_american
     logged = 0
     errors: list[dict] = []
-    if flat_mode:
-        # Research-only sports never write through flat-forecast. Keeping this
-        # guard here protects direct `flat-forecast --sport <esport>` calls as
-        # well as the normal --all routing.
+    if flat_mode and flat_ledger is None:
+        # Research-only sports only write to Flat when a flat_ledger is
+        # explicitly provided (Daily dispatches one). Direct
+        # `flat-forecast --sport <esport>` calls without --all routing
+        # still skip Flat for esports/KBO/NPB.
         return 0
     model_config = config["models"].get(forecast["title"].upper(), {})
     min_edge = float(model_config.get("min_edge", 0.02))
@@ -1438,6 +1440,10 @@ def _log_esports_forecast(
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
                 ledger.append_evaluated(request, eligibility, now=observed_now)
+                # Flat: every candidate, no edge gate (operator directive 2026-08-03).
+                if flat_ledger is not None:
+                    with suppress(DuplicatePickError):
+                        flat_ledger.append_evaluated(request, eligibility, now=observed_now)
                 # gated_ledger: curated subset of rows evaluate_esports_eligibility
                 # genuinely approved as a real call. Same relationship
                 # flat_picks.xlsx has to picks.xlsx, for research-only sports.
@@ -1475,8 +1481,9 @@ def _forecast_international_sport(
     config: dict,
     research_ledger,
     gated_ledger=None,
+    flat_ledger=None,
 ) -> dict:
-    """Forecast KBO/NPB slate and log to research/gated ledgers.
+    """Forecast KBO/NPB slate and log to research/gated/flat ledgers.
 
     Uses the centralized research gate because KBO/NPB teams are not yet in the
     canonical registry. Exact-input priced contracts go to the sport's Research
@@ -1591,6 +1598,10 @@ def _forecast_international_sport(
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
                 research_ledger.append_evaluated(request, eligibility, now=observed_now)
+                # Flat: every candidate, no edge gate (operator directive 2026-08-03).
+                if flat_ledger is not None:
+                    with suppress(DuplicatePickError):
+                        flat_ledger.append_evaluated(request, eligibility, now=observed_now)
                 if gated_ledger is not None and genuinely_eligible:
                     with suppress(DuplicatePickError):
                         gated_ledger.append_evaluated(request, eligibility, now=observed_now)
@@ -2881,6 +2892,7 @@ def main(argv: list[str] | None = None) -> None:
                             sport_research,
                             flat_mode=is_flat,
                             gated_ledger=sport_gated,
+                            flat_ledger=flat_ledger,
                         )
                 elif sport in ("kbo", "npb"):
                     results[sport] = _forecast_international_sport(
@@ -2899,6 +2911,7 @@ def main(argv: list[str] | None = None) -> None:
                             if log and not is_flat
                             else None
                         ),
+                        flat_ledger=flat_ledger,
                     )
                 elif sport == "soccer":
                     # Main+Flat only (operator directive 2026-08-03).
@@ -3281,6 +3294,7 @@ def main(argv: list[str] | None = None) -> None:
                     research_ledger(data_directory, title),
                     flat_mode=False,
                     gated_ledger=research_ledger(data_directory, title, gated=True),
+                    flat_ledger=flat_ledger,
                 )
                 _priced_esports = forecast_result[title].get("priced_contracts") or []
                 if _priced_esports and not _esports_logged:
@@ -3294,7 +3308,7 @@ def main(argv: list[str] | None = None) -> None:
                 )
             except Exception:
                 logger.warning("International baseball ratings refresh failed", exc_info=True)
-            # International baseball — logged to research/gated ledgers (never main)
+            # International baseball — logged to research/gated/flat ledgers
             for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS:
                 forecast_result[league] = _forecast_international_sport(
                     data_root=data_directory,
@@ -3304,6 +3318,7 @@ def main(argv: list[str] | None = None) -> None:
                     config=config,
                     research_ledger=research_ledger(data_directory, league),
                     gated_ledger=research_ledger(data_directory, league, gated=True),
+                    flat_ledger=flat_ledger,
                 )
                 _priced_intl = forecast_result[league].get("priced_contracts") or []
                 if _priced_intl and not forecast_result[league].get("logged"):
