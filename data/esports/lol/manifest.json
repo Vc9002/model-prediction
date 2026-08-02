@@ -3,7 +3,7 @@
     "from": "2024-01-01",
     "to": "2026-07-19"
   },
-  "extracted_at_utc": "2026-08-02T16:13:52.090290Z",
+  "extracted_at_utc": "2026-08-02T16:52:09.599338Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
@@ -14,7 +14,7 @@
   "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
   "request_pages": {
     "matches": 5,
-    "teams": 1
+    "teams": 28
   },
   "requested_window": {
     "from": "2026-07-19",

@@ -273,11 +273,25 @@ models:
     total_research_artifact: config/models/nfl-spread-baseline-v1.json
   TENNIS:
     family: surface_blended_elo
-    status: research
+    status: shadow_qualified
     origin: statistical_model
+    qualification_override: true
+    qualification_override_reason: 'Operator directive, 2026-08-03: promote tennis
+      into Main+Flat by explicit manual override, not genuine promotion, mirroring
+      SOCCER''s 2026-08-02 override. The active tennis-surface-elo-v1 model has
+      never been run through this project''s walk-forward/locked-holdout pipeline
+      (validation.py) -- no artifact file with a qualified/qualified_for_betting
+      field exists for it, unlike every other shadow_qualified league. Gated
+      Research and Main will now receive real, sized QUALIFIED_SHADOW_CALL rows
+      whenever a contract clears min_edge, same criterion as before.
+      _row_artifact_qualified (cli.py) fails closed for this override (no
+      matchable artifact => False), so PolymarketExecutor.execute still refuses
+      real execution on these rows without --manual-research-order -- this
+      override changes what gets logged/sized, not what can actually be traded
+      unattended.'
     active_research_version: tennis-surface-elo-v1
     min_edge: 0.05
-    note: WTA moneyline only -- Polymarket US has no ATP market and ESPN has no ITF scoreboard.
+    note: WTA and ATP moneyline (ATP added 2026-08-03) -- ESPN has no ITF scoreboard.
   LOL:
     family: neutral_series_elo
     status: shadow_qualified

@@ -5,13 +5,19 @@ draws (``roster``-shaped competitors) are excluded at the ingestion layer
 (``data_sources/espn.py::completed_tennis_singles_matches``) before this
 module ever sees them.
 
-Coverage is asymmetric and worth stating plainly: ESPN exposes ATP and WTA
-scoreboards, but Polymarket US only lists WTA and ITF (men's/women's)
-tennis leagues -- there is no ATP market on this gateway at all (verified via
-``POLYMARKET_SPORT_LEAGUES["tennis"]``). ESPN in turn has no ITF scoreboard
-path. The only tour where a real model prediction can ever be matched against
-a real executable Polymarket ask is therefore WTA; this module only builds
-that slate. It remains research-only until separately validated.
+WTA and ATP both price here (ATP added 2026-08-03 -- Polymarket US's "ATP has
+no market" was true as of 2026-07-16 but is stale; live-verified via
+``POLYMARKET_SPORT_LEAGUES["tennis"]`` that a real, operational ATP league
+now exists on the gateway, and ESPN already has a matching ATP scoreboard).
+ITF (men's/women's) still cannot ever be priced -- ESPN has no ITF scoreboard
+path at all, so those legs remain BBO-capture-only, same as before.
+
+Combined ATP+WTA tournaments (majors, most 500/1000s) return the SAME event
+from BOTH the ``tennis/atp`` and ``tennis/wta`` site-API paths -- exactly
+like ``completed_tennis_singles_matches``'s historical case, the tour is
+derived per match from the competition's own ``type.slug``, never from which
+endpoint served it, and matches are deduped by ``event_id`` across both
+endpoint fetches.
 """
 
 from __future__ import annotations
@@ -29,7 +35,7 @@ from .models.tennis import UpcomingMatch, tennis_model
 
 _PARTIAL_MARKERS = ("-fh-", "-h1-", "-h2-", "-1h-", "-set-")
 
-TENNIS_LEAGUE = "WTA"
+TENNIS_TOURS = ("WTA", "ATP")
 
 
 def _tennis_history_before(data_root: str | Path, as_of_date: str) -> list[dict[str, Any]]:
@@ -85,13 +91,12 @@ def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]
     """Same singles/doubles split as the historical parser, for live events
     that have not necessarily finished (or even started) yet.
 
-    Filters to Women's Singles specifically, not just "singles" generically:
-    combined ATP+WTA tournaments return the same event -- with BOTH gender
-    groupings -- from the WTA site-API path too (see
-    completed_tennis_singles_matches's docstring), so a generic "singles"
-    check here would also pick up Men's Singles matches, which can never be
-    priced (Polymarket US has no ATP market) and could collide with a
-    same-name WTA player's rating lookup.
+    Tour is derived per match from the competition's own ``type.slug``
+    ("womens-singles" -> WTA, "mens-singles" -> ATP), exactly like
+    ``completed_tennis_singles_matches`` -- never from which endpoint served
+    it, since combined ATP+WTA tournaments return the SAME event with BOTH
+    gender groupings from BOTH the ATP and WTA site-API paths. Tagging by
+    endpoint would misattribute one tour's matches to the other.
     """
     matches: list[dict[str, Any]] = []
     for event in scoreboard.get("events", []):
@@ -100,7 +105,10 @@ def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]
         for grouping in event.get("groupings", []):
             for competition in grouping.get("competitions", []):
                 slug = str(competition.get("type", {}).get("slug", ""))
-                if "womens-singles" not in slug:
+                if "singles" not in slug:
+                    continue
+                tour = "WTA" if "womens" in slug else "ATP" if "mens" in slug else None
+                if tour is None:
                     continue
                 competitors = competition.get("competitors", [])
                 if len(competitors) != 2:
@@ -121,6 +129,7 @@ def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]
                         "away_player": away_name,
                         "home_player": home_name,
                         "surface": surface,
+                        "tour": tour,
                     }
                 )
     return matches
@@ -167,44 +176,59 @@ def build_tennis_slate(
     client: Any,
     observed_at: datetime,
 ) -> dict[str, Any]:
-    history = [
-        game
-        for game in _tennis_history_before(data_root, game_date)
-        if str(game.get("league", "")).upper() == TENNIS_LEAGUE
-    ]
-    scoreboard = client.scoreboard(TENNIS_LEAGUE, game_date)
-    events = _upcoming_singles_matches(scoreboard)
+    all_history = _tennis_history_before(data_root, game_date)
 
-    upcoming: list[UpcomingMatch] = []
+    # Combined ATP+WTA tournaments return the SAME event from both the ATP
+    # and WTA site-API paths -- dedupe by event_id across both fetches
+    # (mirrors ingest.py's historical-side handling of the same overlap).
+    events_by_id: dict[str, dict[str, Any]] = {}
+    for tour in TENNIS_TOURS:
+        scoreboard = client.scoreboard(tour, game_date)
+        for item in _upcoming_singles_matches(scoreboard):
+            events_by_id[item["event_id"]] = item
+
+    upcoming_by_tour: dict[str, list[UpcomingMatch]] = {tour: [] for tour in TENNIS_TOURS}
     skipped: list[dict[str, str]] = []
-    for item in events:
+    for item in events_by_id.values():
         event_id = item["event_id"]
         try:
             start = parse_utc(str(item["event_start_utc"]))
             if start <= observed_at:
                 raise ValueError("event_started")
-            upcoming.append(
+            tour = str(item["tour"])
+            upcoming_by_tour[tour].append(
                 UpcomingMatch(
                     event_id=event_id,
                     event_start_utc=str(item["event_start_utc"]),
                     player_one=item["away_player"],
                     player_two=item["home_player"],
                     surface=str(item.get("surface") or "Hard"),
-                    tour=TENNIS_LEAGUE,
+                    tour=tour,
                 )
             )
         except (KeyError, TypeError, ValueError) as error:
             skipped.append({"event_id": event_id, "reason": str(error)})
 
     model = tennis_model()
-    predictions = model.predict_games(history, upcoming)
-    snapshots = _latest_moneyline_snapshots(data_root, game_date, TENNIS_LEAGUE)
+    # Elo built per tour, on that tour's own history only -- men's and
+    # women's tennis are separate competitive pools; blending them would
+    # corrupt ratings (and risk a same-name collision across tours).
+    predictions = []
+    for tour in TENNIS_TOURS:
+        tour_history = [
+            game for game in all_history if str(game.get("league", "")).upper() == tour
+        ]
+        predictions.extend(model.predict_games(tour_history, upcoming_by_tour[tour]))
+
+    snapshots_by_tour = {
+        tour: _latest_moneyline_snapshots(data_root, game_date, tour) for tour in TENNIS_TOURS
+    }
     priced: list[dict[str, Any]] = []
     unmatched: list[dict[str, str]] = []
     for prediction in predictions:
         start = parse_utc(prediction.event_start_utc)
         candidates = []
-        for snapshot in snapshots:
+        for snapshot in snapshots_by_tour[prediction.league]:
             try:
                 snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
                 snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
@@ -278,14 +302,13 @@ def build_tennis_slate(
         "status": "research",
         "model_version": model.version,
         "model_code_hash": code_hash,
-        "scheduled_games": len(upcoming),
+        "scheduled_games": sum(len(matches) for matches in upcoming_by_tour.values()),
         "priced_contracts": priced,
         "priced_count": len(priced),
         "unmatched": unmatched,
         "skipped": skipped,
         "note": (
-            "Surface-blended Elo priced against WTA moneyline only -- Polymarket US has no "
-            "ATP market and ESPN has no ITF scoreboard, so those legs can never be matched; "
-            "research-only pending locked validation."
+            "Surface-blended Elo priced against WTA and ATP moneyline (ATP added 2026-08-03) "
+            "-- ESPN has no ITF scoreboard, so those legs can never be matched."
         ),
     }

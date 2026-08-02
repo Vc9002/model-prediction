@@ -1790,9 +1790,23 @@ def _forecast_tennis_sport(
     config: dict,
     research_ledger,
     gated_ledger=None,
+    flat_ledger=None,
+    main_ledger=None,
 ) -> dict:
-    """Price the surface-blended Elo model against WTA moneyline markets only
-    -- see tennis_forward.py for why ATP and ITF can never be matched here."""
+    """Price the surface-blended Elo model against WTA and ATP moneyline
+    markets -- see tennis_forward.py for why ITF can never be matched here.
+
+    main_ledger: mirrors gated_ledger's "only when genuinely eligible"
+    append, same as _forecast_soccer_sport. TENNIS's config was set to
+    status: shadow_qualified via an explicit manual qualification_override
+    (operator directive, 2026-08-03) rather than a genuine walk-forward/
+    locked-holdout pass -- see config/model.yaml's TENNIS.
+    qualification_override_reason. Real Main-ledger rows now get produced
+    whenever a contract clears min_edge; _row_artifact_qualified (cli.py)
+    still fails closed for real execution since no genuinely-qualified
+    tennis artifact exists, so PolymarketExecutor.execute requires
+    --manual-research-order for any actual order on these rows.
+    """
     from .data_sources.polymarket_us import probability_to_american
     model_config = config["models"].get("TENNIS", {})
     forecast = build_tennis_slate(
@@ -1801,7 +1815,8 @@ def _forecast_tennis_sport(
         client=ESPNClient(),
         observed_at=utc_now(),
     )
-    if research_ledger is None:
+    exposure_source = research_ledger or flat_ledger
+    if exposure_source is None:
         forecast["logged"] = 0
         return forecast
 
@@ -1810,6 +1825,8 @@ def _forecast_tennis_sport(
     observed_now = utc_now()
     logged = 0
     gated = 0
+    flat_logged = 0
+    main_logged = 0
     errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
@@ -1832,8 +1849,9 @@ def _forecast_tennis_sport(
                 f"({contract['market_slug']})."
             ),
             risks=(
-                "Research-only surface-blended Elo model; singles only, "
-                "WTA-only market coverage, not yet locked-holdout qualified."
+                "Surface-blended Elo model; singles only, WTA+ATP market "
+                "coverage, not yet locked-holdout qualified -- promoted by "
+                "explicit operator directive, not genuine walk-forward validation."
             ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState(configured_state),
@@ -1852,7 +1870,7 @@ def _forecast_tennis_sport(
             with _LEDGER_LOCK:
                 eligibility = evaluate_gated_research_eligibility(
                     request,
-                    research_ledger.exposure(request, now=observed_now),
+                    exposure_source.exposure(request, now=observed_now),
                     unit_policy(config),
                     model_inputs_valid=True,
                     minimum_edge=min_edge,
@@ -1869,11 +1887,13 @@ def _forecast_tennis_sport(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                research_ledger.append_evaluated(
-                    request,
-                    eligibility,
-                    now=observed_now,
-                )
+                if research_ledger is not None:
+                    with suppress(DuplicatePickError):
+                        research_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
                 if gated_ledger is not None and genuinely_eligible:
                     with suppress(DuplicatePickError):
                         gated_ledger.append_evaluated(
@@ -1882,6 +1902,25 @@ def _forecast_tennis_sport(
                             now=observed_now,
                         )
                         gated += 1
+                if flat_ledger is not None:
+                    # Flat: log every priced contract regardless of
+                    # eligibility, same "show everything" semantics flat
+                    # mode uses for every other sport.
+                    with suppress(DuplicatePickError):
+                        flat_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
+                        flat_logged += 1
+                if main_ledger is not None and genuinely_eligible:
+                    with suppress(DuplicatePickError):
+                        main_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
+                        main_logged += 1
             logged += 1
         except DuplicatePickError:
             continue
@@ -1899,6 +1938,8 @@ def _forecast_tennis_sport(
             continue
     forecast["logged"] = logged
     forecast["gated_logged"] = gated
+    forecast["flat_logged"] = flat_logged
+    forecast["main_logged"] = main_logged
     forecast["errors"] = errors
     return forecast
 
@@ -2888,6 +2929,8 @@ def main(argv: list[str] | None = None) -> None:
                             if log and not is_flat
                             else None
                         ),
+                        main_ledger=(ledger if log else None),
+                        flat_ledger=(flat_ledger if log else None),
                     )
                 elif sport in LEARNED_PRODUCTION_SPORTS:
                     use_ledger = flat_ledger if is_flat else ledger
@@ -3230,6 +3273,8 @@ def main(argv: list[str] | None = None) -> None:
                     config=config,
                     research_ledger=research_ledger(data_directory, "tennis"),
                     gated_ledger=research_ledger(data_directory, "tennis", gated=True),
+                    main_ledger=ledger,
+                    flat_ledger=flat_ledger,
                 )
                 _priced_tennis = forecast_result["tennis"].get("priced_contracts") or []
                 if _priced_tennis and not forecast_result["tennis"].get("logged"):

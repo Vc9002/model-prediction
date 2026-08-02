@@ -46,10 +46,32 @@ def _write_snapshot(tmp_path, **overrides):
         handle.write(json.dumps(row) + "\n")
 
 
+def _write_atp_history(tmp_path, count=60):
+    history_path = tmp_path / "processed" / "tennis" / "games.jsonl"
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for index in range(count):
+        rows.append(
+            {
+                "event_id": f"atp-history-{index}",
+                "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+                "league": "ATP",
+                "winner": "Men Player One" if index % 2 else "Men Player Two",
+                "loser": "Men Player Two" if index % 2 else "Men Player One",
+                "surface": "Hard",
+                "match_date": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+            }
+        )
+    with history_path.open("a", encoding="utf-8") as handle:
+        handle.write("".join(json.dumps(row) + "\n" for row in rows))
+
+
 class Client:
     @staticmethod
     def scoreboard(league, game_date):
-        assert league == "WTA"
+        assert league in ("WTA", "ATP")
+        if league == "ATP":
+            return {"events": []}
         return {
             "events": [
                 {
@@ -116,15 +138,16 @@ class Client:
 
 
 class _CombinedTournamentClient(Client):
-    """The WTA endpoint returns the SAME combined event -- including its
-    Men's Singles grouping -- for shared ATP+WTA tournaments (verified live
-    2026-07-27). Discovery must filter to Women's Singles specifically, not
-    just "singles" generically, or a men's match would be treated as a WTA
-    match with no possible real Polymarket counterpart."""
+    """Combined ATP+WTA tournaments return the SAME event -- with BOTH the
+    Men's and Women's Singles groupings -- from BOTH the ATP and WTA
+    site-API paths (verified live 2026-07-27). Tour is derived per match
+    from the competition's own type.slug, so the Men's Singles match must
+    surface as an ATP match, and calling both endpoints for the same event
+    must not double-count either match."""
 
     @staticmethod
     def scoreboard(league, game_date):
-        payload = Client.scoreboard(league, game_date)
+        payload = Client.scoreboard("WTA", game_date)
         payload["events"][0]["groupings"].append(
             {
                 "grouping": {"displayName": "Men's Singles"},
@@ -145,9 +168,17 @@ class _CombinedTournamentClient(Client):
         return payload
 
 
-def test_tennis_forward_excludes_mens_singles_returned_by_the_wta_endpoint(tmp_path) -> None:
+def test_tennis_forward_prices_both_tours_and_dedupes_the_combined_event(tmp_path) -> None:
     _write_history(tmp_path)
+    _write_atp_history(tmp_path)
     _write_snapshot(tmp_path)
+    _write_snapshot(
+        tmp_path,
+        league="ATP",
+        market_slug="atp-menone-mentwo-2026-07-27",
+        long={"description": "Men Player One", "ask": 0.55},
+        short={"description": "Men Player Two", "ask": 0.47},
+    )
 
     result = build_tennis_slate(
         data_root=tmp_path,
@@ -156,11 +187,17 @@ def test_tennis_forward_excludes_mens_singles_returned_by_the_wta_endpoint(tmp_p
         observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
     )
 
-    assert result["scheduled_games"] == 1
-    assert all(
-        "Men Player" not in c["away_team"] and "Men Player" not in c["home_team"]
-        for c in result["priced_contracts"]
-    )
+    # One WTA match (c1) + one ATP match (c3), each counted once despite
+    # both the ATP and WTA endpoint calls returning the identical event.
+    assert result["scheduled_games"] == 2
+    assert result["priced_count"] == 2
+    event_ids = {c["event_id"] for c in result["priced_contracts"]}
+    assert len(event_ids) == 2
+    atp_contract = next(c for c in result["priced_contracts"] if "Men Player" in c["away_team"])
+    assert {atp_contract["away_team"], atp_contract["home_team"]} == {
+        "Men Player One",
+        "Men Player Two",
+    }
 
 
 def test_tennis_forward_prices_singles_moneyline_and_excludes_doubles(tmp_path) -> None:
@@ -205,7 +242,9 @@ def test_tennis_forward_reports_no_op_when_no_moneyline_snapshot_exists(tmp_path
 class _ClayTournamentClient(Client):
     @staticmethod
     def scoreboard(league, game_date):
-        payload = Client.scoreboard(league, game_date)
+        if league == "ATP":
+            return {"events": []}
+        payload = Client.scoreboard("WTA", game_date)
         payload["events"][0]["name"] = "Roland Garros"
         return payload
 

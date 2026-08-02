@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "c45e339e3e0d0d4c2d0fa531351f18cbdfb5c4443e9992e86f43b35d798ef67c",
+  "artifact_hash": "75adf09b1d72924ca26b59ad20ce5be1b3c90b1556fa6ce5f929d4bb39932512",
   "decay_rate": 0.001,
   "games_sha256": "c2f1fd60e1ce3671100286546a85a913d4f015f06160fc216ee979cbfd011fe8",
   "home_advantage": 20.0,
@@ -23,7 +23,7 @@
     "SSG": 1452.253154
   },
   "schema_version": "international-baseball-tie-aware-elo-v2",
-  "source_manifest_sha256": "0c5694645630ac43113c2b0fc5a6c3823b6e2bd7a6ebc2faa6c7385a1390da39",
+  "source_manifest_sha256": "972cc6b17a4eb33513a1da3369a98bfd70949e3891acbfc1d84c6414d39f72ee",
   "target": "expected moneyline settlement where a tie pays 0.50",
   "tie_method": "elo_gap",
   "tie_probability": 0.024245,

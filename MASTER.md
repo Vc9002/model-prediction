@@ -54,7 +54,7 @@ since it wasn't in this session's scope, flagged here so it isn't relied on.
 |---|---|---|---|---|
 | MLB moneyline | `mlb-elo-trend-lr-v7` | shadow_qualified (override) | 58.0%, +27.5u/-110 | Yes — Main ledger, 1.0-2.0U |
 | MLB spread | `measured-edge-margin-v2` | active_research | — | No — Flat only, zero-unit |
-| MLB totals | `measured-edge-totals-v2` | active_research | — | No — Flat only, zero-unit |
+| MLB totals | `measured-edge-totals-v2` | active_research | — | No — Flat only, zero-unit. **Real over-selection bias confirmed 2026-08-03, see P1-17** — 71% over-picked, overs losing 30% vs. unders' 55% |
 | NBA moneyline | `nba-elo-trend-lr-v4` | shadow_qualified | 73.66%, 88.2% called | No — Flat only |
 | WNBA moneyline | `wnba-elo-trend-lr-v4` | shadow_qualified | 67.48%, 100% called | Yes — Main ledger |
 | NFL moneyline | `nfl-elo-trend-lr-v4` | shadow_qualified (offseason) | 71.26%, 71.3% called | No — Flat only |
@@ -368,6 +368,27 @@ exactly, 0 new.
 **What**: Backup files from ledger cleanup operations (July 24-26) still sitting in the data directories. Clutter, not a bug, but they're tracked by git and add noise to every `git status`.
 **Source**: Git status 2026-08-02
 
+### P1-17: MLB totals model systematically over-picks "over," and those overs lose (2026-08-03 investigation)
+**Files**: `models/mlb.py::estimate_runs`/`simulate_game`/`derive_market_distribution`, `forward.py::_paired_event_candidates`, `config/models/mlb-analyst-poisson-trend-v0.2.yaml`, `config/models/measured-edge-totals-v2.json`
+**What's wrong**: Operator-reported pattern ("MLB total picks are almost always over"), confirmed real against the live ledger and traced to a precise, source-verified root cause — not speculation.
+
+**Confirmed real, with numbers** (`data/flat_picks.xlsx`, MLB totals, all logged as Flat/zero-unit — no real capital at risk today):
+- Selection split: **27 over vs. 11 under (71% over)**, n=38, all settled.
+- Settled record by side: **over 8-19 (30% hit rate)**, **under 6-5 (55% hit rate)**. The side the model picks 2.5x more often is the side that loses far more often — the opposite of what a genuine, exploitable edge would look like.
+
+**Root cause, traced through the real code path**:
+1. `estimate_runs()` computes each team's expected runs (λ) as `league_runs_per_team_game * offense_index**offense_elasticity * ... * park**park_elasticity * weather**weather_elasticity * field_run_factor`. The elasticities (fit 2026-07-30 via a real Poisson GLM against 629 games, per that file's own note) are all far below 1.0: `offense_elasticity=0.035`, `starter_weakness_elasticity=0.211`, `park_elasticity=0.222`, `weather_elasticity=0.021`. A team/park/weather factor at the extreme edge of its allowed range (e.g. offense_index=1.4, the upper `factor_bounds` clip) only moves that team's expected runs by `1.4**0.035 ≈ 1.2%` — the model's per-game λ barely moves away from the constant league-average baseline (`league_runs_per_team_game=4.5493`, i.e. ~9.28 combined with `home_field_run_factor=1.04`) regardless of the real matchup.
+2. **Verified directly against real logged picks**: parsed `Trend Engine projected X-Y` out of every real MLB-totals rationale (n=38) — model's projected combined total has **mean 9.24, stdev 0.447, range 8.27–10.23** (a ~2-run spread across the entire sample). The real Polymarket market lines those same picks were priced against have **mean 8.5, stdev 1.09, range 6.5–11.5** (2.4x more variable) — the real market correctly differentiates pitcher's-duel games from bandbox/hot-weather games; the model's λ barely does.
+3. `league_runs_per_team_game=4.5493` itself is **not** the problem — recomputing it fresh from `data/historical/mlb_games_all.jsonl`'s real completed games gives 4.5447 blended, and **4.6436 for 2026 specifically** (higher, not lower, than the config value) — ruled out as a contributing cause; if anything a refresh would worsen the bias slightly, not fix it.
+4. `simulate_game`/`derive_market_distribution` run a real Monte Carlo (Poisson-Gamma mixture) simulation and correctly derive `P(over)`/`P(under)` from the simulated distribution — the Poisson/right-skew itself is not the bug (verified: this is not a naive mean-vs-line comparison).
+5. **The actual selection mechanism** (`forward.py::_paired_event_candidates` line ~159): `selection = max(sides, key=lambda side: probabilities[side])` picks over/under by simple argmax on the *raw* simulated probability. `calibrate_selected_side()` (OLS `scale`/`offset`, "flat_probability_shrinkage_toward_half") runs **after** selection and only rescales confidence in the side already chosen — it cannot flip the pick back to the other side. So even honest, correctly-fit shrinkage-toward-0.5 calibration cannot repair a selection-stage bias.
+6. **The totals artifact honestly documents near-zero real skill**: `measured-edge-totals-v2.json`'s own `calibration_note` — correlation between raw simulated probability and real outcomes is **0.0585** (284-game diagnostic set) / **0.0689** (65-game real-Polymarket-BBO set). This is consistent with steps 1-2: if the model's λ barely varies by matchup, its raw P(over) carries almost no real signal — so a lopsided 71%-over selection rate is very likely a systematic estimation artifact, not genuine detected edge, exactly matching the poor 30% over/55% under real hit-rate split in step 0.
+
+**Impact**: Contained today — MLB totals are Flat-only/zero-unit (Quick Status table), so no real capital is at risk from this specific bias yet. It does actively corrupt the evidence this model is being evaluated on, and would need fixing before any promotion to real units.
+
+**Not yet fixed** (investigation only, per this session's scope — real elasticity/formula work needs its own fitting pass, not a mechanical patch): the fix is almost certainly to raise `offense_elasticity`/`park_elasticity`/`weather_elasticity`/`starter_weakness_elasticity` back toward something the true per-game run-total variance actually supports (or refit them specifically against total-runs outcomes rather than whatever the 2026-07-30 629-game fit targeted — worth checking directly, since a fit against margin/moneyline residuals could produce different optimal elasticities than a fit against totals), and/or moving side-selection to run after calibration rather than before. Both are real modeling changes requiring their own real fit/validation, not something to mechanically patch without re-running the fitting pipeline. Cross-referenced in the MLB roadmap (Part 2) as work item 5 ("coherent score-distribution model").
+**Source**: Operator report 2026-08-03, investigated and root-caused this session against live code and real data (not carried over from `DEBUG.md`).
+
 ---
 
 ## 🟡 P2 — Architecture and Maintainability
@@ -538,6 +559,7 @@ Never imported, never tested, dead code creating false signal:
 - [ ] Make WNBA availability fail closed — test malformed/conflicting source combinations
 - [ ] Verify KBO/NPB half-settlement P&L correctness (DEBUG.md repair order item 8 not clearly resolved)
 - [ ] Clean up 18 stale `.bak` data files in `data/` directories
+- [ ] **P1-17**: Fix MLB totals over-selection bias — root-caused 2026-08-03 to weak elasticities (offense/park/weather/starter) causing near-constant per-game run projections, plus selection happening before calibration in `forward.py`. Needs a real elasticity refit targeted at totals outcomes specifically and/or reordering selection after calibration — not a mechanical patch. Contained (Flat-only, zero-unit) but corrupts the model's own evidence.
 
 ## 🟡 Priority 2 — Architecture and Maintainability
 
@@ -600,7 +622,7 @@ Never imported, never tested, dead code creating false signal:
 2. **Rank 3**: Bullpen role availability — closer/setup/long relief status from Stats API boxscores (not just aggregate pitching-staff health; Stats API identifies position type, not bullpen role)
 3. Park-factor point-in-time fix — season-correct factors with timestamped provenance (currently static 2025 three-year table)
 4. Weather point-in-time fix — forecast issue time and lead time needed for production (currently has no timestamps)
-5. Build coherent score-distribution model: derive margin, total, spread, and moneyline from ONE distribution (not disconnected binary classifiers that can imply contradictory forecasts)
+5. Build coherent score-distribution model: derive margin, total, spread, and moneyline from ONE distribution (not disconnected binary classifiers that can imply contradictory forecasts). **See P1-17**: current totals elasticities are too weak to differentiate real per-game run environment from the league-average baseline, causing a systematic over-selection bias (71% over vs. 29% under in real logged picks, with overs losing far more often) — needs a real elasticity refit against totals outcomes specifically, likely alongside this item rather than as a standalone patch.
 6. Revisit `pitcher_era_gap` replacement — try interaction term instead of additive alongside Elo (the standalone correlation was promising; the ablation was negative)
 7. **Already done**: Starter ERA zero-shrinkage for small-innings samples, bullpen hardcoded-neutral fixed, park factors recomputed empirically, weather feature now wired (was completely dead), rehab-assignment marker, same-day transaction PIT safety
 8. **Formally rejected**: `starter_era_gap` (removal improves every metric), `starting_pitcher_fip` (84% coverage, zero effect, collinear), `trailing_home_win_rate_30d` (fell from 60.87% to 60.42%)
