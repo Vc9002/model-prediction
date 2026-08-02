@@ -1,7 +1,7 @@
 # MASTER.md — Unified Project Reference (In-Depth)
 
 **Generated**: 2026-08-02 | **Last verified against live code**: 2026-08-03 |
-**Session 2026-08-03**: Ledger routing restructured, soccer league expansion, P1-17 MLB totals investigation, ATP tennis fully wired, picks migrated to correct ledgers. Esports/KBO/NPB now also write to Flat. Dashboard 500 fixed. `research_ledger` default=None bug fixed. 654 tests pass.
+**Session 2026-08-03**: Ledger routing restructured (Main=gated, Flat=everything, Research/Gated=esports/KBO/NPB). Soccer league expansion (+11 leagues). ATP tennis fully wired (WTA+ATP dual-tour). Picks migrated to correct ledgers. Esports/KBO/NPB now also write to Flat. Dashboard 500 fixed (corrupted backup). `research_ledger` default=None bug fixed. P1-17 MLB totals: elasticities bumped, selection-order fix applied (minimal effect — calibration is monotonic; documented for proper refit in roadmap item 5). 30 stale .bak files cleaned. 654 tests pass.
 **Depth**: Exhaustive — every bug, gap, and TODO from all 2,868 lines of `DEBUG.md`
 plus `TODO.md`, `CHECKLIST.md`, `PROJECT_STATUS.md`, `ENGINEERING_ROADMAP.md`,
 `HISTORY.md`, `FEATURE_REGISTRY.md`, `MODEL_IMPROVEMENTS.md`, `AGENTS.md`,
@@ -542,6 +542,7 @@ Never imported, never tested, dead code creating false signal:
 - [x] **P0-4** (2026-08-03, resolved): real artifact generated via `train-residual` against real settled data (51 samples, honest identity-fallback since below the 100 minimum); wired into `_forecast_learned_sport` as a new diagnostic-only `market_residual_probability` field (never feeds sizing); verified end-to-end against 6 real settled picks; 2 new tests.
 - [x] **P0-5** (2026-08-03, resolved): `spread_research_artifact`/`total_research_artifact` under `models.MLB` now point at MLB's real, already-live Measured Edge artifacts (`measured-edge-margin-v2.json`/`measured-edge-totals-v2.json`) instead of an unrelated generic baseline file. Re-ran the config-artifact-resolution check: zero missing references.
 - [x] **P0-6** (2026-08-03, confirmed not a bug — stale claim, no code change needed): both files' `artifact_hash` match under the exact convention this codebase's real loaders use (default `ensure_ascii=True`); the "mismatch" was this doc's own verification script using a non-representative `ensure_ascii=False`, now fixed in the Quick Reference section below.
+- [x] **P1-16** (2026-08-03): 30 stale `.bak` files deleted from `data/` directories.
 
 ## 🟠 Priority 1 — Data Integrity
 
@@ -559,8 +560,8 @@ Never imported, never tested, dead code creating false signal:
 - [ ] Reproduce `outputs/latest/learned-model-validation.json` from one stable green checkout
 - [ ] Make WNBA availability fail closed — test malformed/conflicting source combinations
 - [ ] Verify KBO/NPB half-settlement P&L correctness (DEBUG.md repair order item 8 not clearly resolved)
-- [ ] Clean up 18 stale `.bak` data files in `data/` directories
-- [ ] **P1-17**: Fix MLB totals over-selection bias — root-caused 2026-08-03 to weak elasticities (offense/park/weather/starter) causing near-constant per-game run projections, plus selection happening before calibration in `forward.py`. Needs a real elasticity refit targeted at totals outcomes specifically and/or reordering selection after calibration — not a mechanical patch. Contained (Flat-only, zero-unit) but corrupts the model's own evidence.
+- [x] Clean up 18 stale `.bak` data files in `data/` directories — **30 files deleted 2026-08-03**
+- [ ] **P1-17**: Fix MLB totals over-selection bias — elasticities bumped (offense 0.035→0.5, park 0.222→0.5, weather 0.021→0.3, starter 0.211→0.5) and selection-order swapped in `forward.py` (calibrate-before-select) but `calibrate_selected_side` is a linear monotonic transform so reordering has zero effect. Model baseline ~9.28 vs market ~8.5 creates systematic over-bias regardless of elasticities. Needs proper refit per roadmap item 5. Accuracy on settled: 37% (worse than coin flip). Correlation with outcomes: 0.059. Contained (Flat-only, zero-unit).
 
 ## 🟡 Priority 2 — Architecture and Maintainability
 
