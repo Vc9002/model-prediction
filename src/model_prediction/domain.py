@@ -38,7 +38,7 @@ class League(StrEnum):
 # stray pick settle-stall forever. ESPN's historical scoreboard path for it
 # (data_sources/espn.py) is untouched -- that's a raw ingestion string key,
 # not this enum, and still works for backfilling already-played tournaments.
-PRODUCTION_SPORTS: tuple[str, ...] = ("mlb", "wnba")
+PRODUCTION_SPORTS: tuple[str, ...] = ("mlb",)
 LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = (
     "mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant", "rainbow_six",
 )

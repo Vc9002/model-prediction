@@ -789,10 +789,12 @@ def _refresh_international_baseball_ratings(data_root) -> dict:
     return {"backfill": backfill_results, "validation": validation}
 
 
-def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans, flat_ledger, audit) -> dict:
+def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans, flat_ledger, audit, main_ledger=None) -> dict:
     """MLB total-runs and run-line picks (Measured Edge Monte-Carlo margin +
-    totals models) into flat_picks.xlsx only -- no edge gate, never the main
-    ledger.
+    totals models) into flat_picks.xlsx + main ledger. Flat logs every
+    candidate (no edge gate); Main logs every candidate too (operator
+    directive, 2026-08-03: MLB spread + total belong in Main alongside
+    moneyline).
 
     Reuses build_mlb_slate's paired margin+totals output but keeps only the
     TOTAL and SPREAD candidates; MLB moneyline is already served live by
@@ -876,6 +878,10 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
                     )
                     # Flat: every evaluated candidate is logged, no edge gate.
                     logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
+                    # Main: same -- operator directive 2026-08-03.
+                    if main_ledger is not None:
+                        with suppress(DuplicatePickError):
+                            main_ledger.append_evaluated(request, eligibility, now=observed_at)
             except DuplicatePickError as error:
                 duplicates.append(error.pick_id)
             except (EntityResolutionError, ValueError) as error:
@@ -2895,40 +2901,20 @@ def main(argv: list[str] | None = None) -> None:
                         ),
                     )
                 elif sport == "soccer":
-                    # research/gated and flat/main are each a pair: soccer logs
-                    # every contract to research+flat, and eligible-only picks
-                    # to gated+main, regardless of which of forecast/log/
-                    # flat-forecast was invoked (matches the `daily` wiring).
+                    # Main+Flat only (operator directive 2026-08-03).
                     results[sport] = _forecast_soccer_sport(
                         data_root=data_directory,
                         args_date=args.date,
                         config=config,
-                        research_ledger=(
-                            research_ledger(data_directory, sport) if log else None
-                        ),
-                        gated_ledger=(
-                            research_ledger(data_directory, sport, gated=True)
-                            if log
-                            else None
-                        ),
                         main_ledger=(ledger if log else None),
                         flat_ledger=(flat_ledger if log else None),
                     )
                 elif sport == "tennis":
+                    # Main+Flat only (operator directive 2026-08-03).
                     results[sport] = _forecast_tennis_sport(
                         data_root=data_directory,
                         args_date=args.date,
                         config=config,
-                        research_ledger=(
-                            research_ledger(data_directory, sport)
-                            if log and not is_flat
-                            else None
-                        ),
-                        gated_ledger=(
-                            research_ledger(data_directory, sport, gated=True)
-                            if log and not is_flat
-                            else None
-                        ),
                         main_ledger=(ledger if log else None),
                         flat_ledger=(flat_ledger if log else None),
                     )
@@ -3239,20 +3225,16 @@ def main(argv: list[str] | None = None) -> None:
             # already ran above via the learned production path).
             try:
                 forecast_result["mlb_totals"] = _forecast_mlb_totals_flat(
-                    args.date, True, config, registry, bans, flat_ledger, audit
+                    args.date, True, config, registry, bans, flat_ledger, audit,
+                    main_ledger=ledger,
                 )
             except Exception:
                 logger.warning("MLB totals flat forecast failed", exc_info=True)
-            # Soccer: research + flat always; gated/main only for picks that
-            # clear evaluate_gated_research_eligibility (currently zero,
-            # since config/model.yaml's SOCCER.status is still "research" --
-            # see _forecast_soccer_sport's docstring).
+            # Soccer: Main+Flat only (operator directive 2026-08-03).
             forecast_result["soccer"] = _forecast_soccer_sport(
                 data_root=data_directory,
                 args_date=args.date,
                 config=config,
-                research_ledger=research_ledger(data_directory, "soccer"),
-                gated_ledger=research_ledger(data_directory, "soccer", gated=True),
                 flat_ledger=flat_ledger,
                 main_ledger=ledger,
             )
@@ -3271,8 +3253,6 @@ def main(argv: list[str] | None = None) -> None:
                     data_root=data_directory,
                     args_date=args.date,
                     config=config,
-                    research_ledger=research_ledger(data_directory, "tennis"),
-                    gated_ledger=research_ledger(data_directory, "tennis", gated=True),
                     main_ledger=ledger,
                     flat_ledger=flat_ledger,
                 )
