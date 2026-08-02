@@ -303,6 +303,58 @@ PITCHING_STAFF_FEATURE_NAMES = {
 }
 
 
+def _team_roster_group_availability(
+    *,
+    data_root: str | Path,
+    team: str,
+    observed_at: datetime,
+    group_label: str,
+    position_filter: Any,
+    maximum_report_age_hours: float = 24.0,
+) -> dict[str, Any]:
+    """Shared implementation: share of one roster subgroup (pitching staff
+    or position players, selected by ``position_filter``) currently
+    unavailable due to injury or an administrative list, from a fresh live
+    40-man roster snapshot.
+
+    Excludes players optioned to the minors (``Reassigned to Minors``) from
+    both numerator and denominator -- that status is routine 40-man-vs-
+    26-man roster depth management, present for every team on any given
+    day regardless of health, not a meaningful availability signal.
+    Including it would swamp the real signal (actual injuries, typically a
+    handful of players) with structural noise (routinely a third or more
+    of a 40-man roster on any given day).
+    """
+    team_id = team_id_for_name(team)
+    root = Path(data_root)
+    roster = _latest_roster_snapshot(root, team_id, observed_at, maximum_report_age_hours)
+    if roster is None:
+        raise ValueError(f"NO_CALL_MLB_{group_label}_UNAVAILABLE: no fresh roster snapshot for {team}")
+    matching = [
+        entry
+        for entry in roster.get("entries", [])
+        if entry.get("team_id") == team_id and position_filter(str(entry.get("position_type") or ""))
+    ]
+    group = [entry for entry in matching if str(entry.get("current_status") or "") != "Reassigned to Minors"]
+    if not group:
+        raise ValueError(f"NO_CALL_MLB_{group_label}_UNAVAILABLE: no matching players found on roster for {team}")
+    unknown = [
+        entry for entry in group if str(entry.get("current_status") or "") not in STATUS_ACTIVE_PROBABILITIES
+    ]
+    if unknown:
+        raise ValueError(
+            "NO_CALL_MLB_AVAILABILITY_STATUS_UNKNOWN: unrecognized roster status "
+            f"{unknown[0].get('current_status')!r} for {unknown[0].get('player_name')}"
+        )
+    unavailable = [entry for entry in group if str(entry["current_status"]) in INJURY_OR_ADMIN_LIST_STATUSES]
+    return {
+        "total": len(group),
+        "unavailable": len(unavailable),
+        "unavailable_share": round(len(unavailable) / len(group), 10),
+        "report_captured_at_utc": str(roster["observed_at_utc"]),
+    }
+
+
 def team_pitching_staff_availability(
     *,
     data_root: str | Path,
@@ -311,45 +363,56 @@ def team_pitching_staff_availability(
     maximum_report_age_hours: float = 24.0,
 ) -> dict[str, Any]:
     """Share of ``team``'s current pitching staff unavailable due to injury
-    or an administrative list, from a fresh live 40-man roster snapshot.
-
-    "Current pitching staff" excludes pitchers optioned to the minors
-    (``Reassigned to Minors``) from both numerator and denominator -- that
-    status is routine 40-man-vs-26-man roster depth management, present for
-    every team on any given day regardless of health, not a meaningful
-    availability signal. Including it would swamp the real signal (actual
-    injuries, typically a handful of players) with structural noise
-    (routinely a third or more of a 40-man roster on any given day).
-    """
-    team_id = team_id_for_name(team)
-    root = Path(data_root)
-    roster = _latest_roster_snapshot(root, team_id, observed_at, maximum_report_age_hours)
-    if roster is None:
-        raise ValueError(
-            f"NO_CALL_MLB_PITCHING_STAFF_UNAVAILABLE: no fresh roster snapshot for {team}"
-        )
-    all_pitchers = [
-        entry
-        for entry in roster.get("entries", [])
-        if entry.get("team_id") == team_id and entry.get("position_type") == "Pitcher"
-    ]
-    staff = [entry for entry in all_pitchers if str(entry.get("current_status") or "") != "Reassigned to Minors"]
-    if not staff:
-        raise ValueError(f"NO_CALL_MLB_PITCHING_STAFF_UNAVAILABLE: no pitchers found on roster for {team}")
-    unknown = [
-        entry for entry in staff if str(entry.get("current_status") or "") not in STATUS_ACTIVE_PROBABILITIES
-    ]
-    if unknown:
-        raise ValueError(
-            "NO_CALL_MLB_AVAILABILITY_STATUS_UNKNOWN: unrecognized roster status "
-            f"{unknown[0].get('current_status')!r} for {unknown[0].get('player_name')}"
-        )
-    unavailable = [entry for entry in staff if str(entry["current_status"]) in INJURY_OR_ADMIN_LIST_STATUSES]
+    or an administrative list. See ``_team_roster_group_availability``."""
+    result = _team_roster_group_availability(
+        data_root=data_root,
+        team=team,
+        observed_at=observed_at,
+        group_label="PITCHING_STAFF",
+        position_filter=lambda position: position == "Pitcher",
+        maximum_report_age_hours=maximum_report_age_hours,
+    )
     return {
-        "pitching_staff_total": len(staff),
-        "pitching_staff_unavailable": len(unavailable),
-        "pitching_staff_unavailable_share": round(len(unavailable) / len(staff), 10),
-        "report_captured_at_utc": str(roster["observed_at_utc"]),
+        "pitching_staff_total": result["total"],
+        "pitching_staff_unavailable": result["unavailable"],
+        "pitching_staff_unavailable_share": result["unavailable_share"],
+        "report_captured_at_utc": result["report_captured_at_utc"],
+    }
+
+
+def team_position_player_availability(
+    *,
+    data_root: str | Path,
+    team: str,
+    observed_at: datetime,
+    maximum_report_age_hours: float = 24.0,
+) -> dict[str, Any]:
+    """Share of ``team``'s current non-pitcher roster (the real batting-
+    order pool: infielders, outfielders, catchers, DH/two-way players)
+    unavailable due to injury or an administrative list.
+
+    A necessary component of roadmap rank-2 ("confirmed vs. projected
+    lineup quality") -- availability, not full batting-order-weighted
+    quality (that needs Statcast xwOBA/barrel-rate data this project
+    doesn't have yet). Catches the real case where a team's best hitters
+    are unexpectedly out, distinct from and complementary to the pitching
+    side above. Position type ``""`` (missing -- e.g. a roster snapshot
+    captured before ``position_type`` was added to the capture schema) is
+    excluded rather than assumed to be a position player.
+    """
+    result = _team_roster_group_availability(
+        data_root=data_root,
+        team=team,
+        observed_at=observed_at,
+        group_label="POSITION_PLAYERS",
+        position_filter=lambda position: position not in ("Pitcher", ""),
+        maximum_report_age_hours=maximum_report_age_hours,
+    )
+    return {
+        "position_players_total": result["total"],
+        "position_players_unavailable": result["unavailable"],
+        "position_players_unavailable_share": result["unavailable_share"],
+        "report_captured_at_utc": result["report_captured_at_utc"],
     }
 
 
@@ -392,4 +455,55 @@ def matchup_pitching_staff_availability(
         ),
         "home_pitching_staff_total": home["pitching_staff_total"],
         "away_pitching_staff_total": away["pitching_staff_total"],
+    }
+
+
+POSITION_PLAYER_FEATURE_NAMES = {
+    "position_players_unavailable_share_home",
+    "position_players_unavailable_share_away",
+    "position_players_unavailable_share_gap",
+}
+
+
+def matchup_position_player_availability(
+    *,
+    data_root: str | Path,
+    home_team: str,
+    away_team: str,
+    observed_at: datetime,
+    event_start: datetime,
+    maximum_report_age_hours: float = 24.0,
+) -> dict[str, Any]:
+    """Home-oriented position-player (lineup pool) availability gap, or
+    fail closed.
+
+    Positive gap means the away team's non-pitcher roster has a larger
+    unavailable share -- favors home -- same sign convention as
+    matchup_pitching_staff_availability and
+    features/player_availability.py's availability_points_gap.
+    """
+    observed = parse_utc(observed_at.isoformat())
+    start = parse_utc(event_start.isoformat())
+    if observed >= start:
+        raise ValueError("NO_CALL_MLB_POSITION_PLAYERS_INVALID_TIME: observation is not pregame")
+    home = team_position_player_availability(
+        data_root=data_root,
+        team=home_team,
+        observed_at=observed_at,
+        maximum_report_age_hours=maximum_report_age_hours,
+    )
+    away = team_position_player_availability(
+        data_root=data_root,
+        team=away_team,
+        observed_at=observed_at,
+        maximum_report_age_hours=maximum_report_age_hours,
+    )
+    return {
+        "position_players_unavailable_share_home": home["position_players_unavailable_share"],
+        "position_players_unavailable_share_away": away["position_players_unavailable_share"],
+        "position_players_unavailable_share_gap": round(
+            away["position_players_unavailable_share"] - home["position_players_unavailable_share"], 10
+        ),
+        "home_position_players_total": home["position_players_total"],
+        "away_position_players_total": away["position_players_total"],
     }

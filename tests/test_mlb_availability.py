@@ -867,3 +867,119 @@ def test_matchup_pitching_staff_rejects_postgame_observation(tmp_path) -> None:
             observed_at=datetime(2026, 8, 2, tzinfo=UTC),
             event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
         )
+
+
+# ── position-player (lineup) availability ───────────────────────────────
+
+
+def test_position_players_excludes_pitchers_and_optioned_players(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147],
+        entries=[
+            _roster_entry(147, "Starting Pitcher", "Active", position_type="Pitcher"),
+            _roster_entry(147, "Active Outfielder", "Active", position_type="Outfielder"),
+            _roster_entry(147, "Injured Infielder", "Injured 10-Day", position_type="Infielder"),
+            _roster_entry(147, "AAA Catcher", "Reassigned to Minors", position_type="Catcher"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    result = mlb_player_availability.team_position_player_availability(
+        data_root=tmp_path,
+        team="New York Yankees",
+        observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+    )
+
+    # Denominator is 2 (Active Outfielder + Injured Infielder) -- the
+    # pitcher and the optioned catcher are both excluded.
+    assert result["position_players_total"] == 2
+    assert result["position_players_unavailable"] == 1
+    assert result["position_players_unavailable_share"] == pytest.approx(0.5)
+
+
+def test_position_players_excludes_missing_position_type(tmp_path) -> None:
+    """A roster snapshot captured before position_type was added to the
+    capture schema has entries with position_type missing/empty -- must
+    not be silently counted as a position player."""
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147],
+        entries=[
+            _roster_entry(147, "Active Outfielder", "Active", position_type="Outfielder"),
+            {"team_id": 147, "player_id": 2, "player_name": "Legacy Entry", "current_status": "Injured 10-Day"},
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    result = mlb_player_availability.team_position_player_availability(
+        data_root=tmp_path,
+        team="New York Yankees",
+        observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+    )
+
+    assert result["position_players_total"] == 1
+    assert result["position_players_unavailable"] == 0
+
+
+def test_matchup_position_players_gap_favors_home_when_away_is_worse(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147, 119],
+        entries=[
+            _roster_entry(147, "Yankees Hitter A", "Active", position_type="Outfielder"),
+            _roster_entry(147, "Yankees Hitter B", "Active", position_type="Infielder"),
+            _roster_entry(119, "Dodgers Hitter A", "Injured 60-Day", position_type="Outfielder"),
+            _roster_entry(119, "Dodgers Hitter B", "Active", position_type="Infielder"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    result = mlb_player_availability.matchup_position_player_availability(
+        data_root=tmp_path,
+        home_team="New York Yankees",
+        away_team="Los Angeles Dodgers",
+        observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
+    )
+
+    assert result["position_players_unavailable_share_home"] == pytest.approx(0.0)
+    assert result["position_players_unavailable_share_away"] == pytest.approx(0.5)
+    assert result["position_players_unavailable_share_gap"] == pytest.approx(0.5)
+
+
+def test_position_players_no_matching_players_fails_closed(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147],
+        entries=[_roster_entry(147, "Only A Pitcher", "Active", position_type="Pitcher")],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    with pytest.raises(ValueError, match="NO_CALL_MLB_POSITION_PLAYERS_UNAVAILABLE"):
+        mlb_player_availability.team_position_player_availability(
+            data_root=tmp_path,
+            team="New York Yankees",
+            observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        )
+
+
+def test_matchup_position_players_rejects_postgame_observation(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147, 119],
+        entries=[
+            _roster_entry(147, "Yankees Hitter", "Active", position_type="Outfielder"),
+            _roster_entry(119, "Dodgers Hitter", "Active", position_type="Outfielder"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    with pytest.raises(ValueError, match="NO_CALL_MLB_POSITION_PLAYERS_INVALID_TIME"):
+        mlb_player_availability.matchup_position_player_availability(
+            data_root=tmp_path,
+            home_team="New York Yankees",
+            away_team="Los Angeles Dodgers",
+            observed_at=datetime(2026, 8, 2, tzinfo=UTC),
+            event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
+        )

@@ -20,7 +20,11 @@ from .features.mlb_player_availability import (
     PITCHING_STAFF_FEATURE_NAMES as MLB_PITCHING_STAFF_FEATURE_NAMES,
 )
 from .features.mlb_player_availability import (
+    POSITION_PLAYER_FEATURE_NAMES as MLB_POSITION_PLAYER_FEATURE_NAMES,
+)
+from .features.mlb_player_availability import (
     matchup_pitching_staff_availability,
+    matchup_position_player_availability,
 )
 from .features.mlb_player_availability import (
     matchup_player_availability as matchup_mlb_player_availability,
@@ -180,6 +184,31 @@ def _compute_features(
             unavailable.append(
                 str(error).split(":", 1)[0].strip()
                 or "mlb_pitching_staff_unavailable"
+            )
+    if wanted & MLB_POSITION_PLAYER_FEATURE_NAMES:
+        # Shadow-only, same inert-until-requested design as the other MLB
+        # availability branches above.
+        if sport != "mlb":
+            raise ValueError(
+                "NO_CALL_MLB_POSITION_PLAYERS_UNSUPPORTED: position-player availability feature is MLB-only"
+            )
+        try:
+            position_players = matchup_position_player_availability(
+                data_root=data_root,
+                home_team=home_team,
+                away_team=away_team,
+                observed_at=observed_at,
+                event_start=event_start,
+            )
+            features.update(
+                {name: value for name, value in position_players.items() if name in wanted}
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            for name in wanted & MLB_POSITION_PLAYER_FEATURE_NAMES:
+                features[name] = 0.0
+            unavailable.append(
+                str(error).split(":", 1)[0].strip()
+                or "mlb_position_players_unavailable"
             )
     _init_providers()
     for name in wanted:

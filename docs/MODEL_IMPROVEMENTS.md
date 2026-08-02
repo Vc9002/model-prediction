@@ -550,6 +550,30 @@ its own dispatch branch and feature-name constant
 design as every other availability feature. 7 new tests in
 `tests/test_mlb_availability.py`.
 
+### MLB position-player (lineup) availability — 2026-08-02
+
+Implemented, shadow only: a real component of rank-2's "confirmed vs.
+projected lineup" — availability, not the full batting-order-weighted
+xwOBA/K%/BB%/barrel-rate quality that row describes (that needs Statcast
+data this project doesn't have wired in yet). Refactored the pitching-
+staff function above into a shared `_team_roster_group_availability`
+helper parameterized by a position-type filter, then added
+`team_position_player_availability`/`matchup_position_player_availability`
+as the non-pitcher counterpart (infielders, outfielders, catchers, DH/
+two-way players — everyone with a `position_type` other than `"Pitcher"`
+or missing/empty, the latter excluded so a roster snapshot captured before
+`position_type` existed in the schema isn't silently miscounted).
+
+Re-verified live: Yankees 18.75% (3/16) unavailable, Dodgers 7.1% (1/14).
+Cross-checked the Yankees number against the real roster entries directly
+— Aaron Judge (Injured 60-Day), Cody Bellinger (Injured 10-Day), Giancarlo
+Stanton (Injured 10-Day), all real, all genuinely on the IL, matches
+well-documented real 2026 Yankees injuries. Same live-only constraint as
+pitching-staff availability (no transactions-based fallback, forward-only
+from today). Wired into `learned_forward.py` with its own dispatch branch
+and feature-name constant (`POSITION_PLAYER_FEATURE_NAMES`), same
+shadow-only design. 5 new tests in `tests/test_mlb_availability.py`.
+
 ---
 
 ## 9. NFL feature roadmap
