@@ -150,15 +150,18 @@ def _paired_event_candidates(
             sides[0]: distribution.first_win_probability,
             sides[1]: distribution.second_win_probability,
         }
-        # Pick the side the model thinks is more likely to win/cover, not the
-        # side with the best expected value against the market's price --
-        # operator directive, 2026-07-30 ("all models should be picking
-        # which side to win and logging that, not the edge"). Matches
-        # learned_forward.py's moneyline selection (probability argmax);
-        # this legacy path had never been updated to match.
-        selection = max(sides, key=lambda side: probabilities[side])
+        # Calibrate first, then pick -- calibration shrinks toward 0.5
+        # and can flip a raw over/under preference when both sides are
+        # close, fixing the systematic over-selection bias (P1-17).
+        # Swapped from the pre-2026-08-03 order (pick then calibrate)
+        # where calibration could only rescale confidence in the already-
+        # chosen side, never flip the pick back to the other side.
+        calibrated_on_both = {
+            side: model.calibrate_selected_side(probabilities[side]) for side in sides
+        }
+        selection = max(sides, key=lambda side: calibrated_on_both[side])
         raw_probability = probabilities[selection]
-        calibrated_probability = model.calibrate_selected_side(raw_probability)
+        calibrated_probability = calibrated_on_both[selection]
         no_vig = dict(
             zip(
                 sides,

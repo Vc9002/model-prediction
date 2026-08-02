@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3142328",
+      "current_status": "Questionable",
+      "player_name": "Gabby Williams",
+      "raw_status": "Day-To-Day",
+      "reason": "Not Injury Related",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-08-02T00:07:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "4790263",
+      "current_status": "Out",
+      "player_name": "Iliana Rupert",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-07T15:18:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "4684384",
+      "current_status": "Out",
+      "player_name": "Aneesah Morrow",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-08-04",
+      "status_at_utc": "2026-08-01T23:59:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "3904576",
+      "current_status": "Questionable",
+      "player_name": "Marina Mabrey",
+      "raw_status": "Day-To-Day",
+      "reason": "Neck",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-08-01T23:56:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "2988756",
+      "current_status": "Out",
+      "player_name": "Brittney Sykes",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-26T18:40:00+00:00",
+      "team": "Toronto Tempo"
+    }
+  ],
+  "event_id": "401857110",
+  "observed_at_utc": "2026-08-02T18:19:23.348170+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "62569921b3ae9092b7952d4721159051b53038abfb6c115660e5dc95ddb6f3b0",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

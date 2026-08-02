@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4703794",
+      "current_status": "Out",
+      "player_name": "Sarah Ashlee Barker",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-24T15:18:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4433795",
+      "current_status": "Out",
+      "player_name": "Sania Feagin",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-09T23:15:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "5274110",
+      "current_status": "Out",
+      "player_name": "Monique Akoa Makani",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-08-02T06:33:00+00:00",
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "event_id": "401857108",
+  "observed_at_utc": "2026-08-02T18:19:21.599810+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "308fa4db2dfb597fb210896692c804978074bd901b821c812fc172725405bcbd",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}
