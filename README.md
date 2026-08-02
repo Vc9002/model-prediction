@@ -60,6 +60,235 @@ validated" — it's "is this model actually running, and on what data."
 - **Dashboard auth**: per-session token on the real-money order-execution endpoint
   (added 2026-08-02; was previously unauthenticated).
 
+## Pipelines & Workflows
+
+Everything in this repo ultimately feeds one of four ledgers. The diagram below
+is the full path from raw data to a settled, reviewed pick; the sections after
+it walk through each distinct workflow (scheduled daily run, manual forecast,
+settlement, backfill, dashboard, and the separate real-money surface).
+
+```mermaid
+flowchart TD
+    subgraph Sources["Data Sources"]
+        ESPN["ESPN scoreboards\n(MLB/NBA/WNBA/NFL)"]
+        POLY["Polymarket\n(US market prices + resolution)"]
+        SCRAPE["KBO/NPB scrapers,\nesports series feeds, WTA results"]
+        ODDS["The Odds API\n(sportsbook lines, soccer scores)"]
+    end
+
+    subgraph Ingest["Ingestion & Backfill"]
+        INGESTC["cli ingest --sport --date\n(historical/*_games_all.jsonl)"]
+        BOOTC["cli bootstrap --sport --from --to\n(idempotent historical backfill)"]
+        ENTC["cli bootstrap-entities\n(CanonicalTeam registry merge)"]
+    end
+
+    subgraph FeatComp["Feature Computation"]
+        FS["FeatureStore.games_before()\nElo, trend, park, pitcher ERA gap"]
+        SNAP["cli features\npoint-in-time snapshot + hash, no lookahead"]
+    end
+
+    subgraph ModelStep["Per-Sport Models"]
+        MLB["learned_forward.py\nElo + trend logistic regression (v7)"]
+        MLBTOT["models/mlb.py MeasuredEdgeTotalsModel\nGamma-Poisson Monte Carlo totals/spread"]
+        SOCCER["Poisson-Dixon-Coles v1\nmoneyline / totals / BTTS"]
+        ESPORTS["Platt-scaled neutral series Elo v5\nLOL / CS2 / Dota2 / Valorant / R6"]
+        TIEAWARE["Tie-aware Elo v2\nKBO / NPB"]
+        TENNIS["WTA surface Elo v1"]
+    end
+
+    subgraph GateStep["Confidence & Edge Gates"]
+        CONF["candidate.call threshold\nmodel's own confidence floor"]
+        ASK["ask-edge gate (cli.py)\nmodel_prob - executable_ask >= min_edge\n(vig-inclusive, e.g. 5% for MLB)"]
+    end
+
+    subgraph EligStep["Eligibility (eligibility.py)"]
+        ELIG["evaluate_eligibility /\nevaluate_esports_eligibility\ntrust-boundary checks only:\nbanned team, stale data, model validation/provenance\n(disagreement/exposure/low-edge no longer gate CALL, 2026-07-26)"]
+        GATED["evaluate_gated_research_eligibility\nmodel_inputs_valid + min edge + min confidence"]
+    end
+
+    subgraph LedgerStep["Ledger Routing"]
+        MAIN["Main: picks.xlsx\nMLB / WNBA / Soccer -- show everything, operator decides"]
+        FLAT["Flat: flat_picks.xlsx\nall learned sports, complete-slate baseline"]
+        RESEARCH["Research: data/research/{sport}.xlsx\none workbook per sport"]
+        GATEDR["Gated Research: data/gated_research/{sport}.xlsx\ncurated subset"]
+        MODELL["Model Ledger: data/model_ledgers/{model-id}.xlsx\nadditive, per-model-identity (new, not yet cut over)"]
+    end
+
+    subgraph SettleStep["Settlement & Review"]
+        SETTLE["cli settle --all-unsettled\nESPN scores / Polymarket resolution"]
+        VOID["void picks on expired,\nnon-binary Polymarket settlement"]
+        REVIEW["review-loss, update-closing\nprobability_clv, calibration"]
+    end
+
+    subgraph DashStep["Dashboard (dashboard_server.py)"]
+        DASHUI["localhost:8765\nRun Tests / Daily / Forecast /\nRefresh Prices / Settle / Bootstrap"]
+    end
+
+    ESPN --> INGESTC
+    ODDS --> INGESTC
+    SCRAPE --> INGESTC
+    POLY --> EligStep
+    INGESTC --> FS
+    BOOTC --> ENTC --> FS
+    FS --> SNAP --> ModelStep
+    ModelStep --> CONF --> ASK --> ELIG
+    ELIG --> MAIN
+    ELIG --> FLAT
+    ELIG --> RESEARCH
+    RESEARCH --> GATED --> GATEDR
+    MAIN --> MODELL
+    FLAT --> MODELL
+    RESEARCH --> MODELL
+    MAIN --> SETTLE
+    FLAT --> SETTLE
+    RESEARCH --> SETTLE
+    GATEDR --> SETTLE
+    SETTLE --> VOID
+    SETTLE --> REVIEW
+    DASHUI -.triggers.-> INGESTC
+    DASHUI -.triggers.-> ModelStep
+    DASHUI -.triggers.-> SETTLE
+    DASHUI -.triggers.-> BOOTC
+    DASHUI -.reads.-> LedgerStep
+```
+
+### 1. Scheduled daily pipeline (`scripts/run_daily.sh`, launchd every 3h)
+
+`~/Library/LaunchAgents/com.modelprediction.daily.plist` fires this script
+every `StartInterval=10800` (3h), with a `TimeOut=1800` (30min) watchdog. The
+script wraps its entire body in a single OS-level lock so an overlapping
+scheduled run and a manual invocation can never interleave and corrupt a
+ledger write:
+
+```mermaid
+sequenceDiagram
+    participant L as launchd (3h cadence)
+    participant Lock as daily_lock.py (fcntl.flock, non-blocking)
+    participant S as Step 1: settle --all-unsettled
+    participant I as Step 1b: ingest (mlb/nba/wnba/nfl, yesterday+today)
+    participant D as Step 2: cli daily --date --skip-settlement
+    participant Log as data/logs/daily_<date>.log
+
+    L->>Lock: run_daily.sh
+    alt lock already held by another run
+        Lock-->>L: exit 75 (LOCK_BUSY_EXIT), no-op
+    else lock acquired
+        Lock->>S: settle both ledgers (idempotent)
+        S->>Log: exit code
+        Lock->>I: backfill historical/*_games_all.jsonl
+        I->>Log: exit code
+        Lock->>D: unified slate + forecast + log\n(Main/Flat/Research/Gated in one pass)
+        D->>Log: exit code
+        Lock-->>L: exit 1 if any step failed, else 0
+    end
+```
+
+- **Step 1 — Settlement**: grades every open pick that has started, across
+  both Main and Flat, from ESPN scoreboards (US sports) or Polymarket
+  resolution (esports/soccer). Idempotent — safe to re-run.
+- **Step 1b — Historical ingestion**: feeds completed games into
+  `data/historical/*_games_all.jsonl`, the dataset every rolling feature
+  (Elo, trend, park, pitcher ERA gap) reads via `FeatureStore.games_before()`.
+  This is separate from settlement — settlement grades ledger picks, ingestion
+  advances the model's own historical record. Runs for yesterday and today so
+  a single missed run self-heals on the next one.
+- **Step 2 — Unified daily forecast**: one `cli daily --date ... --skip-settlement`
+  call computes the day's slate once and fans it out to every ledger (Main,
+  Flat, Research, Gated Research) in a single pass, replacing the older
+  two-step forecast/flat-forecast approach.
+
+### 2. Per-pick evaluation (forecast / flat-forecast / esports-forecast / international-forecast)
+
+For every candidate game, in order:
+
+1. A per-sport model produces `model_probability` and `model_uncertainty`.
+2. **`candidate.call`** — the model's own confidence threshold (e.g. v7's
+   MLB threshold) must clear first, or the game never reaches the gates below.
+3. **Ask-edge gate** — `model_probability - executable_ask >= min_edge`
+   (e.g. 5% for MLB), using the real vig-inclusive tradeable price. This is
+   stricter than the no-vig "Decision edge" shown on the dashboard.
+4. **`eligibility.py`** — `evaluate_eligibility`/`evaluate_esports_eligibility`
+   run only trust-boundary checks (banned team, stale data, model
+   validation/provenance). Per the 2026-07-26 operator directive, market
+   disagreement, exposure caps, and low edge no longer block a CALL — they
+   only affect sizing (`edge_scaled_units()`), never the decision itself.
+5. **`evaluate_gated_research_eligibility`** — a second, additive filter that
+   only applies to the Research → Gated Research promotion (esports/soccer/
+   tennis/KBO/NPB), requiring `model_inputs_valid`, a minimum edge, and a
+   minimum confidence.
+
+### 3. Ledger routing
+
+See [`docs/LEDGER_ROUTING.md`](docs/LEDGER_ROUTING.md) for the authoritative
+per-sport rules. In short:
+
+- **Main** (`picks.xlsx`) — MLB, WNBA, Soccer. "Show everything, operator
+  decides." No gate hides a real candidate from Main.
+- **Flat** (`flat_picks.xlsx`) — every learned sport, complete slate,
+  zero-exposure-aware diagnostic baseline for comparing against Main.
+- **Research** (`data/research/{sport}.xlsx`) — one workbook per sport for
+  esports/soccer/tennis/KBO/NPB; always logs every candidate, including
+  zero-unit `NO_CALL_*` rows.
+- **Gated Research** (`data/gated_research/{sport}.xlsx`) — the curated
+  subset of Research that clears `evaluate_gated_research_eligibility`.
+- **Model Ledger** (`data/model_ledgers/{model-id}.xlsx`) — new, additive,
+  one workbook per model identity (e.g. `mlb-moneyline-elo-trend-lr.xlsx`),
+  written alongside the existing `PickLedger` on every `append_evaluated`
+  call. Not yet the primary source of truth — a parallel structure, not a
+  replacement.
+
+### 4. Settlement & review
+
+`cli settle --all-unsettled` grades every open pick across all ledgers.
+Esports picks whose Polymarket market expired with a non-binary settlement
+price (e.g. 0.09/0.91, never resolved to 0/1) are voided rather than left
+open forever. Settled losses get flagged `review_required` until
+`cli review-loss` records a cause and disposition; `cli update-closing`
+attaches verified closing lines/odds after the fact for CLV calculation
+without mutating the original decision.
+
+### 5. Manual / one-off commands
+
+| Command | Purpose |
+|---|---|
+| `bootstrap` / `bootstrap-entities` | idempotent historical backfill from ESPN; merge team lists into the entity registry |
+| `esports-backfill` / `international-backfill` | historical backfill for esports and KBO/NPB |
+| `features` | compute a point-in-time feature snapshot on demand |
+| `backtest` / `validate` / `total-validate` | walk-forward chronological backtests and model validation |
+| `call` | freeze one pre-game prediction manually, bypassing the automated slate |
+| `void` / `review-loss` / `update-closing` | manual ledger corrections and settlement follow-up |
+| `ban-team [add\|remove\|list]` | manage the team ban list used by the trust-boundary check |
+| `verify-chain` | replay the audit log and confirm no ledger row was mutated out-of-band |
+| `polymarket-ledger-prices` / `polymarket-clv` | refresh live quotes for open picks; compute probability CLV |
+| `collect-scores` | pull recent soccer scores from The Odds API |
+| `score-research` | compute reason/edge for a research candidate without logging it |
+
+### 6. Dashboard (`dashboard_server.py`, `localhost:8765`)
+
+The dashboard is a thin trigger + read layer over the same CLI — its buttons
+shell out to the identical commands used by the scheduled pipeline, so there
+is only one forecast/settlement code path regardless of how it's invoked:
+
+| Dashboard button | Command it runs |
+|---|---|
+| Run Tests | `pytest tests/ -q --no-header` |
+| Daily | `scripts/run_daily.sh` (full locked settle → ingest → daily pipeline) |
+| Ledger / Research / Gated tabs → Forecast | `cli forecast --all --date ... --log --replace-today --model learned` |
+| Flat tab → Forecast | `cli flat-forecast --all --date ... --log` |
+| Refresh Prices | `cli polymarket-ledger-prices --date ...` (one `--contract` per open, unarchived pick) |
+| Settle | `cli settle --all-unsettled` |
+| Bootstrap | `cli bootstrap --sport ... --from ... [--to ...]` |
+
+### 7. Real-money execution surface (separate, heavily gated)
+
+`execute` and `sell-position` place and close real Polymarket orders. This
+path is architecturally separate from every shadow ledger above, requires
+its own authenticated dashboard endpoint (added 2026-08-02), and is currently
+**blocked** per [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) pending
+repair of known execution-binding and ledger/audit transaction defects. None
+of the workflows above ever touch real money — Main, Flat, Research, and
+Gated Research are shadow/paper-trading only.
+
 ## Quick start
 
 ```bash

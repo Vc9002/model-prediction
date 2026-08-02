@@ -264,6 +264,30 @@ def test_record_from_pick_request_does_not_dedupe_different_events(tmp_path) -> 
     assert len(ledger.rows()) == 2
 
 
+def test_record_from_pick_request_does_not_dedupe_a_refreshed_forecast(tmp_path) -> None:
+    """Real bug found live 2026-08-02: a still-open pick that gets replaced
+    by a fresh forecast (same event/market/line/model_version, but new
+    model_probability/decision_price and a new observed_at_utc) was being
+    silently treated as the same decision already on file and dropped --
+    the per-model track record kept a stale row instead of the real,
+    current one. This must not happen: a different observed_at_utc always
+    means a distinct real-world decision."""
+    eligibility = _eligibility()
+    first = record_from_pick_request(
+        tmp_path, _pick_request(observed_at_utc="2026-08-02T12:00:00Z"), eligibility
+    )
+    second = record_from_pick_request(
+        tmp_path,
+        _pick_request(observed_at_utc="2026-08-02T15:00:00Z", model_probability=0.71),
+        eligibility,
+    )
+
+    assert first is not None
+    assert second is not None
+    ledger = ModelLedger(tmp_path / "mlb-moneyline-elo-trend-lr.xlsx")
+    assert len(ledger.rows()) == 2
+
+
 def test_record_from_pick_request_returns_none_for_an_unmapped_league(tmp_path) -> None:
     """Must degrade gracefully -- this always runs alongside the real,
     working PickLedger write and can never break it."""

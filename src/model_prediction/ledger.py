@@ -623,7 +623,12 @@ class PickLedger:
                 float(row["decision_line"] or row["line"]) if (row["decision_line"] or row["line"]) else None
             )
             result = grade_pick(
-                MarketType(row["market_type"]), row["selection"], line, away_score, home_score
+                MarketType(row["market_type"]),
+                row["selection"],
+                line,
+                away_score,
+                home_score,
+                league=row["league"],
             )
             if binary_contract_settlement_value is not None:
                 if not 0 <= binary_contract_settlement_value <= 1:

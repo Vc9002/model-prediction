@@ -173,14 +173,25 @@ def model_id_for(league: str, market_type: str) -> str | None:
     return MODEL_ID_BY_LEAGUE_AND_MARKET.get((str(league).upper(), str(market_type)))
 
 
-def _prediction_dedupe_key(row: dict[str, str]) -> tuple[str, str, str, str]:
+def _prediction_dedupe_key(row: dict[str, str]) -> tuple[str, str, str, str, str]:
     """One real decision, regardless of which old destination ledger(s)
     logged it. No `sportsbook` component: unlike ledger.py's
     `_market_duplicate_key`, this schema has no sportsbook field at all
     (every row in this system is polymarket_us; see the operator's own
     common-schema spec) -- including it here would compare a caller-
     supplied value against a stored row that can never have it, which
-    would never match and silently defeat the dedupe check entirely."""
+    would never match and silently defeat the dedupe check entirely.
+
+    `observed_at_utc` IS included -- cli.py's Main/Flat/Research/Gated
+    calls for one real decision all share the exact same `PickRequest`
+    object (and therefore an identical `observed_at_utc`), so they still
+    collapse into one row here. But an event whose still-open pick later
+    gets replaced by a fresh forecast (a real, distinct decision with new
+    probabilities/prices, same event/market/line/model_version) gets a new
+    `observed_at_utc` and must NOT be silently dropped as a duplicate --
+    found live 2026-08-02: a re-forecast WNBA pick with updated
+    model_probability/decision_price was skipped entirely because only the
+    stale, previously-migrated row's key was checked."""
     line = str(row.get("line") or "")
     with suppress(ValueError):
         line = str(abs(float(line))) if line else ""
@@ -189,6 +200,7 @@ def _prediction_dedupe_key(row: dict[str, str]) -> tuple[str, str, str, str]:
         str(row.get("market_type") or ""),
         line,
         str(row.get("model_version") or ""),
+        str(row.get("observed_at_utc") or ""),
     )
 
 

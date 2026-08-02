@@ -9568,6 +9568,13 @@
     "source_team_id": 25002,
     "team_id": "bo3:1:25002"
   },
+  "bo3:1:25026": {
+    "acronym": null,
+    "name": "ex-1win",
+    "slug": "ex-1win",
+    "source_team_id": 25026,
+    "team_id": "bo3:1:25026"
+  },
   "bo3:1:2506": {
     "acronym": null,
     "name": "Rare Atom",

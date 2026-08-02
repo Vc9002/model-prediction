@@ -28,6 +28,7 @@ def grade_pick(
     line: float | None,
     away_score: int,
     home_score: int,
+    league: str | None = None,
 ) -> PickResult:
     selection = selection.lower()
     if market_type is MarketType.MONEYLINE:
@@ -38,6 +39,15 @@ def grade_pick(
             # into the "not home" -> away-margin case above and got graded
             # as a straight away-moneyline bet, which is a different market.
             return PickResult.WIN if home_score == away_score else PickResult.LOSS
+        if league == "SOCCER" and home_score == away_score:
+            # Soccer's Polymarket win market is not one 2-outcome market
+            # with a tie -- it's three independent Yes/No contracts (home
+            # wins / draw / away wins). A "home" or "away" pick is a bet on
+            # that contract resolving YES; a draw resolves it NO, a full
+            # loss of stake, not a refunded push (unlike KBO/NPB, which
+            # really are 2-outcome markets settled 50/50 on a tie -- see
+            # ledger.py's binary_contract_settlement_value handling).
+            return PickResult.LOSS
         margin: float = home_score - away_score if selection == "home" else away_score - home_score
     elif market_type is MarketType.SPREAD:
         if line is None:
