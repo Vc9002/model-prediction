@@ -1,6 +1,7 @@
 # MASTER.md — Unified Project Reference (In-Depth)
 
-**Generated**: 2026-08-02 | **Last verified against live code**: 2026-08-02 (later) |
+**Generated**: 2026-08-02 | **Last verified against live code**: 2026-08-03 |
+**Session 2026-08-03**: Ledger routing restructured, soccer league expansion, P1-17 MLB totals investigation, ATP tennis fully wired, picks migrated to correct ledgers. See Quick Status and ledger sections for current state.
 **Depth**: Exhaustive — every bug, gap, and TODO from all 2,868 lines of `DEBUG.md`
 plus `TODO.md`, `CHECKLIST.md`, `PROJECT_STATUS.md`, `ENGINEERING_ROADMAP.md`,
 `HISTORY.md`, `FEATURE_REGISTRY.md`, `MODEL_IMPROVEMENTS.md`, `AGENTS.md`,
