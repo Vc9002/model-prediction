@@ -2,6 +2,79 @@
 
 **Last audited**: 2026-08-02 (see new section directly below)
 
+## 2026-08-02 (final) — three-agent model review results, one real fix applied, one real gap found and NOT yet fixed (needs a scope decision)
+
+Three parallel agents reviewed (1) all MLB code touched today, (2) esports/
+KBO-NPB/soccer wiring, (3) the core ledger/eligibility/units invariants.
+**Process learning, worth remembering**: two of the three ran with
+`isolation: "worktree"`, which checks out a git *commit* into an isolated
+copy -- it cannot see uncommitted working-directory changes. At the time
+they ran, substantial real, tested, verified work (soccer flat/Main wiring,
+the KBO/NPB timestamp fix, the MLB pitching-staff feature) was sitting
+uncommitted. One agent correctly self-diagnosed this (used `git archive`
+against the right commit and flagged the mismatch explicitly) and its
+findings about the state *at that commit* were accurate, just about
+already-superseded code. The other did not self-diagnose it and instead
+concluded several already-fixed things (`edge_scaled_units` ignoring
+`model_uncertainty`, `min_pick_units` still 0.5, `archive_settled_rows`
+not existing) must have been "reverted" -- **all three directly
+re-verified false** against the actual current code (see below). Lesson:
+worktree-isolated review agents need either a fresh commit right before
+launch, or explicit instruction to read the shared checkout path directly
+(the way the third, reliable agent did) whenever there's known uncommitted
+work.
+
+### Real bug, fixed: same-day MLB transactions could leak into a decision
+
+Covered in detail above this section's neighbor entries -- MLB Stats API's
+transaction `date` field has no time-of-day component, so a transaction
+reported the same calendar day as the decision could have happened before
+or after it, with no way to tell. `_starter_status` now excludes same-day
+transactions entirely and derives its cutoff from the decision's own
+timestamp rather than `game_date`. Verified the regression test actually
+catches the bug (reverted the fix, confirmed the test failed, restored
+it). Also added a regression test locking in that `ENGINE_VERSION` rejects
+the un-promoted v0.3 elasticity refit, and fixed two research scripts'
+docstrings that referenced the wrong formula version.
+
+### Real gap, found, NOT fixed: team-ban enforcement doesn't work for esports/soccer/KBO/NPB/tennis
+
+Independently re-verified myself, not just trusted from the review (the
+reporting agent's environment was unreliable per above, but this specific
+finding checks out against the current live code): `evaluate_esports_
+eligibility` (`eligibility.py`) -- the eligibility path used by every
+sport routed through the canonical-registry-free "name-based" pattern
+(esports, soccer, KBO, NPB, tennis) -- takes no `TeamBanList` parameter
+and never checks one. Confirmed no call site (`_forecast_soccer_sport`,
+`_log_esports_forecast`, `_forecast_international_sport`,
+`_forecast_tennis_sport` in `cli.py`) passes bans through either. Contrast
+with `evaluate_eligibility` (the MLB/WNBA/NBA/NFL path), which checks
+`ban_list.check(...)` first, before anything else.
+
+It goes deeper than a missing parameter: `TeamBanList.check`/`.add`/
+`.remove` (`bans.py`) all call `self.registry.resolve(league, team_input)`
+internally, and esports/soccer/KBO/NPB teams are deliberately **not** in
+the canonical registry (confirmed live: `registry.resolve(League.LOL,
+"T1")` raises `EntityResolutionError`). So `model-prediction ban add
+--league LOL --team X` would itself fail today, not just the eligibility
+check -- the entire ban mechanism is built around registry resolution, and
+these sports were deliberately built registry-free. `config/model.yaml`'s
+`team_ban_list.teams` does have (empty) `LOL`/`CS2`/`KBO`/`NPB`/`TENNIS`
+sections, suggesting the intent to support this was there; the enforcement
+never got built. Soccer/DOTA2/VALORANT/RAINBOW_SIX don't even have a
+config section.
+
+**Zero live impact today**: every one of those league sections is
+currently empty (no team is banned in any of these sports right now), so
+nothing is silently slipping through *right now*. But if the user ever
+bans a team in one of these sports expecting it to actually block future
+picks, it would silently not work. Properly fixing this means building a
+genuinely separate, name-based ban mechanism for these sports (bypassing
+`TeamBanList`'s registry coupling entirely, not just adding a parameter),
+which is a real, non-trivial, cross-cutting change touching real-money-
+adjacent eligibility logic in 4+ sports -- flagged for a scope decision
+rather than built unilaterally in the same pass as everything else today.
+
 ## 2026-08-02 (still later) — MLB pitching-staff availability (new shadow feature, roadmap item), plus a full model review in progress
 
 New feature: `features/mlb_player_availability.py::team_pitching_staff_availability`/
