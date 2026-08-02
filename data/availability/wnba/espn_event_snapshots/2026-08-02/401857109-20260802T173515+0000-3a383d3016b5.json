@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "2490553",
+      "current_status": "Out",
+      "player_name": "Brittney Griner",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-02",
+      "status_at_utc": "2026-08-01T22:05:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4433408",
+      "current_status": "Out",
+      "player_name": "Aaliyah Edwards",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-07",
+      "status_at_utc": "2026-08-01T22:04:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4329370",
+      "current_status": "Out",
+      "player_name": "Maria Kliundikova",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-31T17:11:00+00:00",
+      "team": "Connecticut Sun"
+    }
+  ],
+  "event_id": "401857109",
+  "observed_at_utc": "2026-08-02T17:35:15.081905+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "3a383d3016b5bea1345aa9c9b8ca2f707ed3a6e3201a858829da46c49b0f4b71",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}
