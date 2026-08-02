@@ -41,6 +41,17 @@ LEAGUE_SLUGS = {
     "SUDAMERICANA": "sud",
     "FRIENDLIES": "intf",
     "CLUB_FRIENDLIES": "clbf",
+    "LIGA_MX": "lmx",
+    "NWSL": "nwsl",
+    "SCOTTISH_PREM": "scp",
+    "CSL": "csl",
+    "ALLSVENSKAN": "alsv",
+    "AUSTRIAN_BUND": "atbl",
+    "DANISH_SUPER": "sld",
+    "RUSSIAN_PREM": "rpl",
+    "NORWEGIAN_ELITE": "els",
+    "UEL": "uel",
+    "UECL": "uecl",
     "WTA": "wta",
     "ATP": "atp",
     # "itfm"/"itfw" are now dead league slugs on the live gateway (0 events
@@ -75,6 +86,9 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
         "BRASILEIRAO", "BRAZIL_SERIE_B", "ARGENTINA", "ARGENTINA_2",
         "COLOMBIA", "CHILE", "URUGUAY", "ECUADOR", "PERU", "SUDAMERICANA",
         "FRIENDLIES", "CLUB_FRIENDLIES",
+        "LIGA_MX", "NWSL", "SCOTTISH_PREM", "CSL", "ALLSVENSKAN",
+        "AUSTRIAN_BUND", "DANISH_SUPER", "RUSSIAN_PREM", "NORWEGIAN_ELITE",
+        "UEL", "UECL",
     ),
     # ATP added 2026-08-03: live-verified against GET /v2/sports (real
     # operational league, 88 events including real matches with executable
