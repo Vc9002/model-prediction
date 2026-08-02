@@ -1290,9 +1290,11 @@ def _log_esports_forecast(
     Esports promotion to shadow_qualified units is a DELIBERATE config
     decision (models.<TITLE>.status). This path enforces the same gates as
     every other sport — staleness, model/market disagreement, exposure caps,
-    and unit-engine sizing — via ``evaluate_esports_eligibility``. Entity and
-    ban resolution is name-based because esports teams are not yet in the
-    canonical registry. Returns the count of logged rows.
+    and unit-engine sizing — via ``evaluate_esports_eligibility``. Entities
+    are name-based because esports teams are not in the canonical registry
+    -- unlike MLB/WNBA/NBA/NFL, there is no team-ban check here at all (see
+    ``evaluate_esports_eligibility``'s own docstring for why). Returns the
+    count of logged rows.
     """
     from .data_sources.polymarket_us import probability_to_american
     logged = 0

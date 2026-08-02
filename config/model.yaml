@@ -14,16 +14,23 @@ project:
   maximum_unreviewed_market_disagreement: 0.1
 team_ban_list:
   enabled: true
+  # Only leagues in the canonical entity registry (MLB/NBA/WNBA/NFL) belong
+  # here. Removed 2026-08-02 (review finding, DEBUG.md): TENNIS/LOL/CS2/KBO/
+  # NPB stub sections implied ban support that didn't actually work --
+  # TeamBanList.check/.add/.remove all resolve through the canonical
+  # registry (bans.py), and these sports are deliberately registry-free
+  # (name-based placeholder CanonicalTeams; confirmed live that
+  # registry.resolve(League.LOL, "T1") raises EntityResolutionError). A
+  # real fix would need a genuinely separate, registry-free ban mechanism
+  # for these sports; not built, since nothing was ever actually banned in
+  # any of them (every section was empty) -- removing the misleading stub
+  # is more honest than leaving a config section that silently doesn't do
+  # what it looks like it does.
   teams:
     MLB: []
     NBA: []
     WNBA: []
     NFL: []
-    TENNIS: []
-    LOL: []
-    CS2: []
-    KBO: []
-    NPB: []
   allowed_reasons:
   - data_quality
   - injury_uncertainty

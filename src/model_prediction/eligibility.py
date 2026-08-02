@@ -95,15 +95,23 @@ def evaluate_esports_eligibility(
     maximum_age_hours: float = 12,
     maximum_unreviewed_disagreement: float = 0.10,
 ) -> EligibilityResult:
-    """Standard eligibility gates for esports contracts without registry entities.
+    """Standard eligibility gates for esports/soccer/KBO/NPB/tennis contracts
+    without registry entities.
 
-    Esports teams are not in the canonical registry yet, so entity and ban
-    resolution is name-based (placeholder CanonicalTeams). Every OTHER gate is
-    identical to ``evaluate_eligibility``: model-state/origin, data staleness,
-    provenance completeness, model/market disagreement, exposure caps, and the
-    unit engine. Config may deliberately promote a title to shadow_qualified;
-    this function makes that promotion pass through real checks instead of a
-    hand-built qualified result.
+    These leagues' teams are not in the canonical registry, so entities are
+    name-based placeholder ``CanonicalTeam`` objects. Unlike
+    ``evaluate_eligibility``, there is deliberately no team-ban check here:
+    ``TeamBanList`` resolves through the canonical registry
+    (``bans.py``), which these leagues don't participate in, and no team
+    has ever actually been banned in any of them (removed the misleading
+    stub config sections 2026-08-02 rather than pretend this works --
+    building a real, registry-free ban mechanism for these leagues is a
+    separate, not-yet-scoped change). Every OTHER gate matches
+    ``evaluate_eligibility``: model-state/origin, data staleness,
+    provenance completeness, model/market disagreement, exposure caps, and
+    the unit engine. Config may deliberately promote a title to
+    shadow_qualified; this function makes that promotion pass through real
+    checks instead of a hand-built qualified result.
     """
     current = now or utc_now()
     away = CanonicalTeam(
