@@ -1,7 +1,7 @@
 {
   "lookback_team_games": 10,
   "method": "last_5_appearance_minutes_normalized_200_shrunk_box_plus_minus_v1",
-  "observed_at_utc": "2026-08-02T17:19:20.361648+00:00",
+  "observed_at_utc": "2026-08-02T17:25:57.143765+00:00",
   "players": [
     {
       "impact_points_per_100": 4.757085,
