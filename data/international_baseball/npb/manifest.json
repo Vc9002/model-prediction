@@ -3,9 +3,9 @@
     "from": "2022-03-25",
     "to": "2026-08-02"
   },
-  "extracted_at_utc": "2026-08-02T17:49:07.892511Z",
-  "game_count": 3936,
-  "games_sha256": "2ee6d74edd08534c3600990557cfe91d6c7afcc4ff9158a54ff4ff4400af72d9",
+  "extracted_at_utc": "2026-08-02T18:13:14.728997Z",
+  "game_count": 3942,
+  "games_sha256": "210d4786d6b0fb6193133aadcb0b62402f55c0e987aa6552d0e4be0777030fe8",
   "league": "npb",
   "league_name": "Nippon Professional Baseball",
   "limitations": [

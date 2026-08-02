@@ -3,14 +3,14 @@
     "from": "2020-01-01",
     "to": "2026-07-27"
   },
-  "extracted_at_utc": "2026-08-02T17:47:14.566775Z",
+  "extracted_at_utc": "2026-08-02T18:12:07.338171Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
     "Team IDs do not encode point-in-time rosters or substitutions."
   ],
-  "match_count": 14625,
-  "matches_sha256": "3de78609858b9e752ba2354d3241cd54e7ca7d881b04e2f1ead3a5a6a3a93557",
+  "match_count": 14626,
+  "matches_sha256": "36d103a80e04d9589e53b8f833597867f61ee48003a0e8d3787a048f3ad7dd44",
   "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
   "request_pages": {
     "matches": 3,

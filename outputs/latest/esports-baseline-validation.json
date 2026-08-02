@@ -1,297 +1,297 @@
 {
-  "generated_at_utc": "2026-08-02T17:48:12.563883Z",
+  "generated_at_utc": "2026-08-02T18:12:13.430574Z",
   "promotion_eligible": false,
   "scope": "research-only separate-title series-winner baselines",
   "titles": {
     "cs2": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/cs2-tiered-elo-v5.json",
-      "artifact_hash": "a4e21a1af368f0354dc5f9a4308bc7027cac0942d4270c2251f9210a7793ef91",
+      "artifact_hash": "97de5c5903ba33e53441b5088cf4e6c4cee4d2e8611df656dcf52f1b3af7f6f4",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 32.0,
-        "platt_intercept": 0.10785685869761044,
-        "platt_slope": 0.9122536865227233
+        "platt_intercept": 0.1079042127383142,
+        "platt_slope": 0.9130740044966817
       },
       "chronological_split": {
         "locked_test": {
-          "from_utc": "2026-01-31T16:40:00Z",
+          "from_utc": "2026-01-31T16:45:00Z",
           "n": 7673,
           "through_utc": "2026-08-02T16:00:00Z"
         },
         "train": {
-          "n": 23016,
+          "n": 23017,
           "through_utc": "2025-07-11T08:00:00Z"
         },
         "validation": {
           "from_utc": "2025-07-11T08:00:00Z",
           "n": 7672,
-          "through_utc": "2026-01-31T16:30:00Z"
+          "through_utc": "2026-01-31T16:40:00Z"
         }
       },
       "confidence_selection_on_validation": [
         {
-          "accuracy": 0.631908,
-          "brier": 0.224082,
+          "accuracy": 0.632039,
+          "brier": 0.224048,
           "calls": 7672,
-          "ece_10_bin": 0.011316,
-          "hits": 4848,
-          "log_loss": 0.638767,
+          "ece_10_bin": 0.011293,
+          "hits": 4849,
+          "log_loss": 0.638696,
           "observations": 7672,
           "threshold": 0.0,
-          "units_at_minus_110": 1583.272727
+          "units_at_minus_110": 1585.181818
         },
         {
-          "accuracy": 0.652433,
-          "brier": 0.219783,
-          "calls": 6557,
-          "ece_10_bin": 0.011102,
-          "hits": 4278,
-          "log_loss": 0.629737,
-          "observations": 6557,
+          "accuracy": 0.652638,
+          "brier": 0.219744,
+          "calls": 6558,
+          "ece_10_bin": 0.010884,
+          "hits": 4280,
+          "log_loss": 0.629655,
+          "observations": 6558,
           "threshold": 0.03,
-          "units_at_minus_110": 1610.090909
+          "units_at_minus_110": 1612.909091
         },
         {
-          "accuracy": 0.663206,
-          "brier": 0.216659,
-          "calls": 5876,
-          "ece_10_bin": 0.011664,
-          "hits": 3897,
-          "log_loss": 0.623147,
-          "observations": 5876,
+          "accuracy": 0.663434,
+          "brier": 0.21661,
+          "calls": 5877,
+          "ece_10_bin": 0.011555,
+          "hits": 3899,
+          "log_loss": 0.623045,
+          "observations": 5877,
           "threshold": 0.05,
-          "units_at_minus_110": 1563.727273
+          "units_at_minus_110": 1566.545455
         },
         {
-          "accuracy": 0.683716,
-          "brier": 0.210337,
-          "calls": 4790,
-          "ece_10_bin": 0.013254,
+          "accuracy": 0.683859,
+          "brier": 0.210281,
+          "calls": 4789,
+          "ece_10_bin": 0.013136,
           "hits": 3275,
-          "log_loss": 0.609759,
-          "observations": 4790,
+          "log_loss": 0.609642,
+          "observations": 4789,
           "threshold": 0.08,
-          "units_at_minus_110": 1462.272727
+          "units_at_minus_110": 1463.272727
         },
         {
-          "accuracy": 0.69864,
-          "brier": 0.205562,
-          "calls": 4191,
-          "ece_10_bin": 0.013632,
-          "hits": 2928,
-          "log_loss": 0.599636,
-          "observations": 4191,
+          "accuracy": 0.69895,
+          "brier": 0.205476,
+          "calls": 4192,
+          "ece_10_bin": 0.013288,
+          "hits": 2930,
+          "log_loss": 0.599458,
+          "observations": 4192,
           "threshold": 0.1,
-          "units_at_minus_110": 1398.818182
+          "units_at_minus_110": 1401.636364
         },
         {
-          "accuracy": 0.713653,
-          "brier": 0.200242,
-          "calls": 3611,
-          "ece_10_bin": 0.016072,
-          "hits": 2577,
-          "log_loss": 0.588282,
-          "observations": 3611,
+          "accuracy": 0.714009,
+          "brier": 0.200134,
+          "calls": 3612,
+          "ece_10_bin": 0.015453,
+          "hits": 2579,
+          "log_loss": 0.58806,
+          "observations": 3612,
           "threshold": 0.12,
-          "units_at_minus_110": 1308.727273
+          "units_at_minus_110": 1311.545455
         },
         {
-          "accuracy": 0.731027,
-          "brier": 0.192837,
-          "calls": 2833,
-          "ece_10_bin": 0.015159,
+          "accuracy": 0.730769,
+          "brier": 0.1929,
+          "calls": 2834,
+          "ece_10_bin": 0.013697,
           "hits": 2071,
-          "log_loss": 0.572205,
-          "observations": 2833,
+          "log_loss": 0.572333,
+          "observations": 2834,
           "threshold": 0.15,
-          "units_at_minus_110": 1120.727273
+          "units_at_minus_110": 1119.727273
         },
         {
-          "accuracy": 0.746214,
-          "brier": 0.185531,
-          "calls": 2179,
-          "ece_10_bin": 0.015395,
-          "hits": 1626,
-          "log_loss": 0.556074,
-          "observations": 2179,
+          "accuracy": 0.746905,
+          "brier": 0.185285,
+          "calls": 2181,
+          "ece_10_bin": 0.014532,
+          "hits": 1629,
+          "log_loss": 0.555564,
+          "observations": 2181,
           "threshold": 0.18,
-          "units_at_minus_110": 925.181818
+          "units_at_minus_110": 928.909091
         },
         {
-          "accuracy": 0.778637,
-          "brier": 0.169286,
-          "calls": 1423,
-          "ece_10_bin": 0.013078,
-          "hits": 1108,
-          "log_loss": 0.520061,
-          "observations": 1423,
+          "accuracy": 0.778246,
+          "brier": 0.169469,
+          "calls": 1425,
+          "ece_10_bin": 0.012592,
+          "hits": 1109,
+          "log_loss": 0.520459,
+          "observations": 1425,
           "threshold": 0.22,
-          "units_at_minus_110": 692.272727
+          "units_at_minus_110": 692.181818
         },
         {
-          "accuracy": 0.817654,
-          "brier": 0.14799,
-          "calls": 861,
-          "ece_10_bin": 0.010064,
-          "hits": 704,
-          "log_loss": 0.472099,
-          "observations": 861,
+          "accuracy": 0.818287,
+          "brier": 0.147674,
+          "calls": 864,
+          "ece_10_bin": 0.010683,
+          "hits": 707,
+          "log_loss": 0.471409,
+          "observations": 864,
           "threshold": 0.26,
-          "units_at_minus_110": 483.0
+          "units_at_minus_110": 485.727273
         },
         {
-          "accuracy": 0.849462,
-          "brier": 0.127838,
-          "calls": 465,
-          "ece_10_bin": 0.017617,
-          "hits": 395,
-          "log_loss": 0.425177,
-          "observations": 465,
+          "accuracy": 0.847966,
+          "brier": 0.128744,
+          "calls": 467,
+          "ece_10_bin": 0.016087,
+          "hits": 396,
+          "log_loss": 0.427277,
+          "observations": 467,
           "threshold": 0.3,
-          "units_at_minus_110": 289.090909
+          "units_at_minus_110": 289.0
         }
       ],
       "k_selection_on_validation": [
         {
-          "accuracy": 0.611705,
-          "brier": 0.233584,
+          "accuracy": 0.611835,
+          "brier": 0.233559,
           "calls": 7672,
-          "ece_10_bin": 0.044611,
-          "hits": 4693,
+          "ece_10_bin": 0.04474,
+          "hits": 4694,
           "k": 8.0,
-          "log_loss": 0.659573,
+          "log_loss": 0.659523,
           "observations": 7672,
-          "units_at_minus_110": 1287.363636
+          "units_at_minus_110": 1289.272727
         },
         {
-          "accuracy": 0.617701,
-          "brier": 0.230048,
+          "accuracy": 0.617831,
+          "brier": 0.230018,
           "calls": 7672,
-          "ece_10_bin": 0.04156,
-          "hits": 4739,
+          "ece_10_bin": 0.041693,
+          "hits": 4740,
           "k": 12.0,
-          "log_loss": 0.651985,
+          "log_loss": 0.651926,
           "observations": 7672,
-          "units_at_minus_110": 1375.181818
+          "units_at_minus_110": 1377.090909
         },
         {
-          "accuracy": 0.622914,
-          "brier": 0.227807,
+          "accuracy": 0.623045,
+          "brier": 0.227775,
           "calls": 7672,
-          "ece_10_bin": 0.033109,
-          "hits": 4779,
+          "ece_10_bin": 0.03314,
+          "hits": 4780,
           "k": 16.0,
-          "log_loss": 0.647069,
+          "log_loss": 0.647003,
           "observations": 7672,
-          "units_at_minus_110": 1451.545455
+          "units_at_minus_110": 1453.454545
         },
         {
-          "accuracy": 0.626434,
-          "brier": 0.226372,
+          "accuracy": 0.626564,
+          "brier": 0.226338,
           "calls": 7672,
-          "ece_10_bin": 0.029055,
-          "hits": 4806,
+          "ece_10_bin": 0.029087,
+          "hits": 4807,
           "k": 20.0,
-          "log_loss": 0.643876,
+          "log_loss": 0.643806,
           "observations": 7672,
-          "units_at_minus_110": 1503.090909
+          "units_at_minus_110": 1505.0
         },
         {
-          "accuracy": 0.629823,
-          "brier": 0.225471,
+          "accuracy": 0.629953,
+          "brier": 0.225436,
           "calls": 7672,
-          "ece_10_bin": 0.02606,
-          "hits": 4832,
+          "ece_10_bin": 0.026092,
+          "hits": 4833,
           "k": 24.0,
-          "log_loss": 0.641867,
+          "log_loss": 0.641795,
           "observations": 7672,
-          "units_at_minus_110": 1552.727273
+          "units_at_minus_110": 1554.636364
         },
         {
-          "accuracy": 0.634124,
-          "brier": 0.224689,
+          "accuracy": 0.634254,
+          "brier": 0.224653,
           "calls": 7672,
-          "ece_10_bin": 0.024329,
-          "hits": 4865,
+          "ece_10_bin": 0.024362,
+          "hits": 4866,
           "k": 32.0,
-          "log_loss": 0.640231,
+          "log_loss": 0.640156,
           "observations": 7672,
-          "units_at_minus_110": 1615.727273
+          "units_at_minus_110": 1617.636364
         },
         {
-          "accuracy": 0.63269,
-          "brier": 0.224757,
+          "accuracy": 0.632821,
+          "brier": 0.224721,
           "calls": 7672,
-          "ece_10_bin": 0.027618,
-          "hits": 4854,
+          "ece_10_bin": 0.02765,
+          "hits": 4855,
           "k": 40.0,
-          "log_loss": 0.640713,
+          "log_loss": 0.640639,
           "observations": 7672,
-          "units_at_minus_110": 1594.727273
+          "units_at_minus_110": 1596.636364
         },
         {
-          "accuracy": 0.633342,
-          "brier": 0.225354,
+          "accuracy": 0.633472,
+          "brier": 0.225319,
           "calls": 7672,
-          "ece_10_bin": 0.032155,
-          "hits": 4859,
+          "ece_10_bin": 0.032184,
+          "hits": 4860,
           "k": 48.0,
-          "log_loss": 0.642633,
+          "log_loss": 0.64256,
           "observations": 7672,
-          "units_at_minus_110": 1604.272727
+          "units_at_minus_110": 1606.181818
         },
         {
           "accuracy": 0.632299,
-          "brier": 0.227513,
+          "brier": 0.227482,
           "calls": 7672,
-          "ece_10_bin": 0.046101,
+          "ece_10_bin": 0.046076,
           "hits": 4851,
           "k": 64.0,
-          "log_loss": 0.649433,
+          "log_loss": 0.649367,
           "observations": 7672,
           "units_at_minus_110": 1589.0
         },
         {
           "accuracy": 0.631126,
-          "brier": 0.230443,
+          "brier": 0.230416,
           "calls": 7672,
-          "ece_10_bin": 0.062561,
+          "ece_10_bin": 0.06254,
           "hits": 4842,
           "k": 80.0,
-          "log_loss": 0.659037,
+          "log_loss": 0.658979,
           "observations": 7672,
           "units_at_minus_110": 1571.818182
         },
         {
           "accuracy": 0.62865,
-          "brier": 0.233822,
+          "brier": 0.233799,
           "calls": 7672,
-          "ece_10_bin": 0.078267,
+          "ece_10_bin": 0.078249,
           "hits": 4823,
           "k": 96.0,
-          "log_loss": 0.670725,
+          "log_loss": 0.670676,
           "observations": 7672,
           "units_at_minus_110": 1535.545455
         },
         {
           "accuracy": 0.625782,
-          "brier": 0.237476,
+          "brier": 0.237459,
           "calls": 7672,
-          "ece_10_bin": 0.092947,
+          "ece_10_bin": 0.092934,
           "hits": 4801,
           "k": 112.0,
-          "log_loss": 0.684115,
+          "log_loss": 0.684077,
           "observations": 7672,
           "units_at_minus_110": 1493.545455
         },
         {
           "accuracy": 0.623827,
-          "brier": 0.241303,
+          "brier": 0.241291,
           "calls": 7672,
-          "ece_10_bin": 0.105595,
+          "ece_10_bin": 0.105586,
           "hits": 4786,
           "k": 128.0,
-          "log_loss": 0.698985,
+          "log_loss": 0.698958,
           "observations": 7672,
           "units_at_minus_110": 1464.909091
         }
@@ -304,29 +304,29 @@
       ],
       "locked_test": {
         "all_matches": {
-          "accuracy": 0.638342,
-          "brier": 0.221669,
+          "accuracy": 0.638603,
+          "brier": 0.221663,
           "calls": 7673,
-          "ece_10_bin": 0.012461,
-          "hits": 4898,
-          "log_loss": 0.633508,
+          "ece_10_bin": 0.011749,
+          "hits": 4900,
+          "log_loss": 0.633498,
           "observations": 7673,
-          "units_at_minus_110": 1677.727273
+          "units_at_minus_110": 1681.545455
         },
         "selected_matches": {
-          "accuracy": 0.657134,
-          "brier": 0.217217,
-          "calls": 6609,
-          "ece_10_bin": 0.012611,
+          "accuracy": 0.657035,
+          "brier": 0.217221,
+          "calls": 6610,
+          "ece_10_bin": 0.011705,
           "hits": 4343,
-          "log_loss": 0.624127,
-          "observations": 6609,
-          "units_at_minus_110": 1682.181818
+          "log_loss": 0.624134,
+          "observations": 6610,
+          "units_at_minus_110": 1681.181818
         }
       },
       "model_state": "research",
       "model_version": "cs2-tiered-elo-v5",
-      "observations": 38361,
+      "observations": 38362,
       "point_in_time": "ratings use completed matches strictly before each prediction",
       "profitability": "not_established_no_point_in_time_market_prices",
       "promotion_eligible": false,
@@ -336,7 +336,7 @@
     },
     "dota2": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/dota2-tiered-elo-v5.json",
-      "artifact_hash": "bcd7d4bdd1e2218dd22c32e053e9e1e56eeed1afdf8b775edd90e5369a90ae7e",
+      "artifact_hash": "ce95aa4e0460f03b576cfe378088aa52cf8dfca288629cf83064ab59e16ea594",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 40.0,
@@ -667,7 +667,7 @@
     },
     "lol": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/lol-tiered-elo-v5.json",
-      "artifact_hash": "94c9ecefe7862fcd0f8932ee0f8a5cf2fb1ce42b7196a6254eed26b3593462b8",
+      "artifact_hash": "4f36308eb4ef5b33d9e3dc1ce778f2d60fa81380dd8ffa234241836516487e8e",
       "chosen": {
         "confidence_threshold": 0.05,
         "k": 32.0,
@@ -998,7 +998,7 @@
     },
     "rainbow_six": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/rainbow_six-tiered-elo-v5.json",
-      "artifact_hash": "e845c4ea6292caa49333d5f1173e1ed949e7113878cc39a3081248094c1915df",
+      "artifact_hash": "f6351a7a96e4fd4ec1d454ec78596eb79d96eec7a014dd809de84a10af42edc0",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 32.0,
@@ -1329,7 +1329,7 @@
     },
     "valorant": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/valorant-tiered-elo-v5.json",
-      "artifact_hash": "58e5b3721cf8906aae10d08de8cbb41fd662d66dfb5fe49c8d3ab04bb0741ed6",
+      "artifact_hash": "2423c98b6a05dc2cea3a1dd163230ce49db5d6d9f7b9e23df0f802eca3d59a6c",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 48.0,
@@ -1339,8 +1339,8 @@
       "chronological_split": {
         "locked_test": {
           "from_utc": "2025-09-04T22:15:00Z",
-          "n": 2925,
-          "through_utc": "2026-08-02T11:15:00Z"
+          "n": 2926,
+          "through_utc": "2026-08-02T15:00:00Z"
         },
         "train": {
           "n": 8775,
@@ -1628,29 +1628,29 @@
       ],
       "locked_test": {
         "all_matches": {
-          "accuracy": 0.617778,
-          "brier": 0.229583,
-          "calls": 2925,
-          "ece_10_bin": 0.023955,
-          "hits": 1807,
-          "log_loss": 0.651121,
-          "observations": 2925,
-          "units_at_minus_110": 524.727273
+          "accuracy": 0.617908,
+          "brier": 0.229512,
+          "calls": 2926,
+          "ece_10_bin": 0.023897,
+          "hits": 1808,
+          "log_loss": 0.650953,
+          "observations": 2926,
+          "units_at_minus_110": 525.636364
         },
         "selected_matches": {
-          "accuracy": 0.632479,
-          "brier": 0.225869,
-          "calls": 2457,
-          "ece_10_bin": 0.025872,
-          "hits": 1554,
-          "log_loss": 0.643467,
-          "observations": 2457,
-          "units_at_minus_110": 509.727273
+          "accuracy": 0.632628,
+          "brier": 0.225786,
+          "calls": 2458,
+          "ece_10_bin": 0.025802,
+          "hits": 1555,
+          "log_loss": 0.64327,
+          "observations": 2458,
+          "units_at_minus_110": 510.636364
         }
       },
       "model_state": "research",
       "model_version": "valorant-tiered-elo-v5",
-      "observations": 14625,
+      "observations": 14626,
       "point_in_time": "ratings use completed matches strictly before each prediction",
       "profitability": "not_established_no_point_in_time_market_prices",
       "promotion_eligible": false,
