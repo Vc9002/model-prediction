@@ -574,6 +574,38 @@ from today). Wired into `learned_forward.py` with its own dispatch branch
 and feature-name constant (`POSITION_PLAYER_FEATURE_NAMES`), same
 shadow-only design. 5 new tests in `tests/test_mlb_availability.py`.
 
+### Rank-1 (true starter quality) tested honestly — real signal, did not clear the promotion bar — 2026-08-02
+
+The live v7 model's `pitcher_era_gap` is a team-level rolling-runs-allowed
+proxy, not starter-specific, despite the name — rank-1 has genuinely never
+been in the live model (the prior attempt, `probable_starter_era_gap` off
+ESPN live probables, was retired 2026-07-30 for train/serve skew).
+
+Found already-built, never-tested infrastructure:
+`validation.py::_starter_era_gap` — a real, point-in-time-safe rolling-
+5-start ERA gap from `mlb_statsapi` box-score snapshots (starter
+identified as `pitcher_order[0]`, history updated strictly after each
+game), already exposed as `ValidationRow.starter_era_gap` but never run
+through `production_feature_ablation.py`/`roadmap_challenger.py`.
+
+Ran the real ablation (`build_walk_forward_rows` + `chronological_split`,
+6,324 real MLB games, 2024-04-06..2026-08-01): incumbent v7 feature set
+vs. incumbent + `starter_era_gap`. Result: validation Brier 0.24637 ->
+0.24696 (**worse**), locked-holdout Brier 0.24683 -> 0.24585 (better).
+Mixed, not a clean win — the validation-set regression disqualifies it
+under this project's own promotion rule regardless of the holdout number
+(using holdout to override a validation regression would itself be the
+"peek at holdout" `docs/AGENTS.md` forbids). Coefficient sign is correct
+(-0.0193: worse home-starter ERA lowers home win probability) and the
+raw standalone correlation is real (0.14, correct direction, real bucket
+separation) — `elo_probability` (coefficient ~3.0) likely already
+captures most of what starter-quality trends proxy for over time, so the
+*additive* value on top of the existing feature set isn't there. **Not
+promoted.** Worth revisiting with a different functional form (e.g.
+replacing `pitcher_era_gap` outright rather than adding alongside it, or
+an interaction term) rather than repeating this exact test — see DEBUG.md
+for the full numbers.
+
 ---
 
 ## 9. NFL feature roadmap

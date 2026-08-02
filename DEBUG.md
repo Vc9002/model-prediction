@@ -2,6 +2,87 @@
 
 **Last audited**: 2026-08-02 (see new section directly below)
 
+## 2026-08-02 (really final) — MLB position-player availability shipped; a real starter-quality candidate tested honestly and NOT promoted; CLAUDE.md added
+
+### MLB position-player (lineup) availability -- shipped
+
+Extended the pitching-staff availability feature (refactored into a shared
+`_team_roster_group_availability` helper) to also cover non-pitchers --
+`team_position_player_availability`/`matchup_position_player_availability`.
+Real component of section 8 rank-2 ("confirmed vs. projected lineup").
+Verified live: Yankees 18.75% unavailable, cross-checked against the real
+roster (Aaron Judge, Cody Bellinger, Giancarlo Stanton, all genuinely on
+the IL). 12 new tests, wired into `learned_forward.py` shadow-only, same
+pattern as everything else this session.
+
+### A real, well-motivated model-improvement candidate tested honestly — did NOT clear the bar, not promoted
+
+Goal was explicit this round: find something that actually moves win rate/
+profitability, not just another shadow/availability feature. Found that
+the live MLB v7 model's `pitcher_era_gap` feature is a team-level rolling-
+runs-allowed proxy, **not** starter-specific, despite its name — the
+project's own roadmap ranks "true starting-pitcher quality" as MLB's #1
+priority, and it's genuinely never been in the live model. A prior
+attempt (`probable_starter_era_gap`, ESPN live probables) was built and
+then retired for being train/serve-skewed (2026-07-30).
+
+Found real, already-built, never-used infrastructure for this:
+`validation.py::_load_starter_era_map`/`_starter_era_gap` computes a
+genuinely point-in-time-safe rolling-5-start ERA gap from real
+`mlb_statsapi` box-score snapshots (each starter identified as
+`pitcher_order[0]`, history updated strictly *after* computing each game's
+feature) -- already wired into `ValidationRow.starter_era_gap`, but never
+tested in any ablation (grepped `production_feature_ablation.py`,
+`roadmap_challenger.py`, and `outputs/` -- zero hits).
+
+A quick standalone signal check (1055 games, the elasticity-refit feature
+cache) showed a real, promising correlation: 0.14 with home-win outcome,
+correct direction, real bucket separation (away-starter-much-better:
+46.0% home win rate; home-starter-much-better: 55.9%; baseline 51.6%).
+
+**Ran the real thing before trusting that**: `build_walk_forward_rows` +
+`chronological_split` (the project's own validated 60/20/20 chronological
+framework, reused rather than reimplemented) on the full real history --
+6,324 MLB games, 2024-04-06 through 2026-08-01, 5,186 with a real
+`starter_era_gap`. Fit the incumbent v7 feature set vs. incumbent +
+`starter_era_gap`, both ways, on train only:
+
+| | Validation Brier | Validation accuracy | Locked-holdout Brier | Locked-holdout accuracy |
+|---|---|---|---|---|
+| Incumbent (v7) | 0.24637 | 55.68% | 0.24683 | 55.65% |
+| + starter_era_gap | 0.24696 | 55.13% | 0.24585 | 56.51% |
+
+**Mixed, not a clean win — not promoted.** The candidate is *worse* on the
+validation set (the set this project's own promotion rule says decides
+whether a feature is worth including at all) and *better* on the locked
+holdout, both by small margins. Checking holdout to override a validation-
+set regression would itself be exactly the kind of "peek at holdout to
+justify inclusion" `docs/AGENTS.md` explicitly forbids. The coefficient
+sign is correct (`-0.0193`: a worse home starter ERA lowers home win
+probability, as expected) and the standalone correlation is real -- this
+isn't nothing -- but `elo_probability` (coefficient ~3.0) already captures
+most of what a team's pitching-staff-quality trend proxies for over time,
+and the genuinely *additive* value on top of the existing feature set
+doesn't clear this project's own bar. Documented honestly rather than
+force-promoted or suppressed: a real, validated-as-*not*-sufficient
+finding, worth revisiting if a future session tries a different
+functional form (e.g. an interaction term, or replacing `pitcher_era_gap`
+outright instead of adding alongside it) rather than repeating this exact
+test.
+
+### CLAUDE.md added
+
+Auto-loaded project guidelines: doc reading order, the point-in-time
+correctness invariant (dominant real-bug source all session), the
+shadow-feature pattern, promotion/validation conventions reusing existing
+tooling instead of reimplementing chronological splits, testing
+conventions, and the worktree-isolated-subagent staleness gotcha from
+earlier today.
+
+**Tests**: 571 passed (12 new: 5 position-player availability + the
+same-day-transaction and pitching-staff tests already counted above).
+`.venv/bin/ruff check src/ tests/` -> 117, at/under baseline.
+
 ## 2026-08-02 (final) — three-agent model review results, one real fix applied, one real gap found and NOT yet fixed (needs a scope decision)
 
 Three parallel agents reviewed (1) all MLB code touched today, (2) esports/
