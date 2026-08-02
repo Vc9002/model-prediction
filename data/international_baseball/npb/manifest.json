@@ -1,21 +1,22 @@
 {
   "effective_window": {
-    "from": "2022-03-25",
+    "from": "2026-01-01",
     "to": "2026-08-02"
   },
-  "extracted_at_utc": "2026-08-02T07:16:53.809677Z",
-  "game_count": 3936,
-  "games_sha256": "2ee6d74edd08534c3600990557cfe91d6c7afcc4ff9158a54ff4ff4400af72d9",
+  "extracted_at_utc": "2026-08-02T08:20:53.256311Z",
+  "game_count": 566,
+  "games_sha256": "58cdbcefe792635250d05c8fd393b26907174ed32797ecb25bdf0b8d8f8d00ab",
   "league": "npb",
   "league_name": "Nippon Professional Baseball",
   "limitations": [
     "Official pages do not provide a versioned bulk-data contract; cache and hashes preserve each extraction.",
     "The baseline excludes postseason and exhibition games.",
-    "Incremental refresh: only the current calendar year was re-fetched this run; prior years are carried forward unchanged from the last full backfill."
+    "NPB v1 ends on September 30 because the official October calendar mixes competitions.",
+    "NPB calendar rows omit scheduled first-pitch time; same-day games are frozen as one rating batch."
   ],
   "request_count": 6,
   "requested_window": {
-    "from": "2022-03-25",
+    "from": "2026-01-01",
     "to": "2026-08-02"
   },
   "requires_api_key": false,
@@ -26,5 +27,5 @@
     "https://npb.jp/bis/eng/"
   ],
   "teams_sha256": "d00c88aebcadeb3ae60980cf23bd44f8deb2d83fd9637a34651108125841953c",
-  "tie_count": 96
+  "tie_count": 11
 }

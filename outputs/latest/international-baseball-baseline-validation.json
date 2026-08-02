@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-08-02T07:17:10.440297Z",
+  "generated_at_utc": "2026-08-02T08:20:36.684785Z",
   "leagues": {
     "kbo": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/kbo-tie-aware-elo-v1.json",
-      "artifact_hash": "5c2fb36d913b70cf75e2c1e869cc3c67839c1187c5108a5fd3706111ad5baae3",
+      "artifact_hash": "9ed13cfd8d860b2670f938484c3c659d864654d10d93ca38480a7e8d77633502",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0
@@ -11,7 +11,7 @@
       "chronological_split": {
         "locked_test": {
           "from_date": "2024-05-31",
-          "n": 1667,
+          "n": 1669,
           "through_date": "2026-08-02"
         },
         "train": {
@@ -33,17 +33,17 @@
       ],
       "locked_test": {
         "accuracy_decisive": 0.551235,
-        "brier_settlement": 0.240863,
+        "brier_settlement": 0.240581,
         "calls": 1620,
         "hits": 893,
-        "mae_settlement": 0.481029,
-        "observations": 1667,
-        "ties": 47,
+        "mae_settlement": 0.480537,
+        "observations": 1669,
+        "ties": 49,
         "units_at_minus_110": 84.818182
       },
       "model_state": "research",
       "model_version": "kbo-tie-aware-elo-v2",
-      "observations": 7046,
+      "observations": 7048,
       "parameter_selection_on_validation": [
         {
           "accuracy_decisive": 0.560662,
@@ -11390,12 +11390,12 @@
       "profitability": "not_established_no_point_in_time_market_prices",
       "promotion_eligible": false,
       "status": "ok",
-      "tie_rate": 0.023843,
+      "tie_rate": 0.02412,
       "units": 0
     },
     "npb": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/npb-tie-aware-elo-v1.json",
-      "artifact_hash": "7bc7902a4eb8ef0d1e3f86c086eab30d4166d1bb4c513506b84d49652b442bb9",
+      "artifact_hash": "2a6cf3b60204b321f39347f04e6fe642c4fbe02fc5d69a03243771cd77d85043",
       "chosen": {
         "home_advantage": 35.0,
         "k": 8.0

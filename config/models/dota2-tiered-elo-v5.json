@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "9e5f3e455da6fe4a2d8dcc8c9466846303c6541f69893fd12aeb76cf2c918868",
+  "artifact_hash": "ba371790eb45b92bbd2fbfe5a33bbaab7ea5a0f07509006df65e77e32545f142",
   "confidence_threshold": 0.03,
   "home_or_order_advantage": 0.0,
   "initial_rating": 1500.0,
@@ -1048,7 +1048,7 @@
     "bo3:4:24955": 1440.340386
   },
   "schema_version": "esports-neutral-elo-v2",
-  "source_manifest_sha256": "da610dd7628799120250f92bb3f8e4c6438c31c7ee5fa381009fc57ca287a8de",
+  "source_manifest_sha256": "069e8e674fe9cd8f030f2b3a0ada4593acae7443342d7093a7024265e8489255",
   "target": "best-of match/series winner",
   "title": "dota2",
   "trained_through_utc": "2026-08-01T19:45:00Z",
