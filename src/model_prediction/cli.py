@@ -878,8 +878,8 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
                     )
                     # Flat: every evaluated candidate is logged, no edge gate.
                     logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
-                    # Main: same -- operator directive 2026-08-03.
-                    if main_ledger is not None:
+                    # Main: only genuinely eligible (CALL) rows — operator directive 2026-08-03.
+                    if main_ledger is not None and eligibility.decision == "CALL":
                         with suppress(DuplicatePickError):
                             main_ledger.append_evaluated(request, eligibility, now=observed_at)
             except DuplicatePickError as error:
