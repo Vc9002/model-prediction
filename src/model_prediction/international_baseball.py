@@ -365,10 +365,7 @@ def refresh_recent_international_baseball_matches(
     league = league.lower()
     if league not in LEAGUE_SPECS:
         raise ValueError(f"unsupported international baseball league: {league}")
-    directory = Path(data_root) / "international_baseball" / league
-    games_path = directory / "games.jsonl"
-    teams_path = directory / "teams.json"
-    manifest_path = directory / "manifest.json"
+    games_path = Path(data_root) / "international_baseball" / league / "games.jsonl"
 
     if not games_path.exists():
         return backfill_international_baseball(
@@ -378,17 +375,42 @@ def refresh_recent_international_baseball_matches(
             client=client,
         )
 
+    return _merge_year_into_international_baseball_history(
+        data_root, league, eastern_today().year, client=client
+    )
+
+
+def _merge_year_into_international_baseball_history(
+    data_root: str | Path,
+    league: str,
+    year: int,
+    client: OfficialInternationalBaseballClient | None = None,
+) -> dict[str, Any]:
+    """Re-fetch a single season and merge it into existing history by
+    `game_id`, leaving every other season's rows untouched.
+
+    Shared by `refresh_recent_international_baseball_matches` (always
+    `year=today.year`) and `find_international_baseball_result`'s cache-miss
+    fallback (`year=` the settled game's own year). Never used for a league
+    with no existing `games.jsonl` -- callers fall back to a full
+    `backfill_international_baseball` in that case, since there's no prior
+    history a partial-year overwrite could destroy.
+    """
+    directory = Path(data_root) / "international_baseball" / league
+    games_path = directory / "games.jsonl"
+    teams_path = directory / "teams.json"
+    manifest_path = directory / "manifest.json"
+
     existing_games: dict[str, dict[str, Any]] = {}
-    if games_path.exists():
-        with games_path.open(encoding="utf-8") as handle:
-            for line in handle:
-                if line.strip():
-                    row = json.loads(line)
-                    existing_games[str(row["game_id"])] = row
+    with games_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                row = json.loads(line)
+                existing_games[str(row["game_id"])] = row
 
     source = client or OfficialInternationalBaseballClient()
     today = eastern_today()
-    fresh, request_count = source.kbo_year(today.year) if league == "kbo" else source.npb_year(today.year)
+    fresh, request_count = source.kbo_year(year) if league == "kbo" else source.npb_year(year)
     minimum = date(int(LEAGUE_SPECS[league]["minimum_year"]), 1, 1)
     for row in fresh:
         if minimum <= date.fromisoformat(row["game_date"]) <= today:
@@ -428,7 +450,7 @@ def refresh_recent_international_baseball_matches(
         "limitations": [
             "Official pages do not provide a versioned bulk-data contract; cache and hashes preserve each extraction.",
             "The baseline excludes postseason and exhibition games.",
-            "Incremental refresh: only the current calendar year was re-fetched this run; prior years are carried forward unchanged from the last full backfill.",
+            f"Incremental refresh: only {year} was re-fetched this run; other years are carried forward unchanged from the last full backfill.",
         ],
     }
     _atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
@@ -458,6 +480,16 @@ def find_international_baseball_result(
     current season from the official source once before giving up.
     Returns None if the game can't be found (not yet played, or a genuine
     lookup miss) -- callers should leave the pick open rather than guess.
+
+    Real bug fixed 2026-08-02: this fallback used to call
+    `backfill_international_baseball(..., f"{year}-01-01")` directly, which
+    *overwrites* games.jsonl with only that from_date..today window --
+    silently deleting every earlier season on the very first settlement
+    cache-miss. This destroyed NPB's real history (3,936 games back to
+    2022-03-25, collapsed to 566 games from 2026-01-01 on) the first time a
+    just-finished NPB game wasn't yet in the cache. Now merges via the same
+    by-`game_id` logic `refresh_recent_international_baseball_matches` uses,
+    which can only add/update rows for the target year, never drop others.
     """
     league = league.lower()
     directory = Path(data_root) / "international_baseball" / league
@@ -486,7 +518,15 @@ def find_international_baseball_result(
     year = date.fromisoformat(game_date).year
     source = client or OfficialInternationalBaseballClient()
     with suppress(Exception):
-        backfill_international_baseball(data_root, league, f"{year}-01-01", client=source)
+        if games_path.exists():
+            _merge_year_into_international_baseball_history(data_root, league, year, client=source)
+        else:
+            backfill_international_baseball(
+                data_root,
+                league,
+                from_date=date(int(LEAGUE_SPECS[league]["minimum_year"]), 1, 1).isoformat(),
+                client=source,
+            )
     return _match()
 
 

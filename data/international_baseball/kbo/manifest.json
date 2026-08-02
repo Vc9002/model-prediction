@@ -3,15 +3,15 @@
     "from": "2015-03-28",
     "to": "2026-08-02"
   },
-  "extracted_at_utc": "2026-08-02T08:20:01.904450Z",
-  "game_count": 7048,
-  "games_sha256": "94309aa597ae188a074a2f3dbbcf7a2091e5f7fb3e6a0c3f82cfb19c5410df29",
+  "extracted_at_utc": "2026-08-02T10:00:29.384672Z",
+  "game_count": 7049,
+  "games_sha256": "19f28fb66de720234682e32c66358554a36f7026a0625a4007a5cea27a277708",
   "league": "kbo",
   "league_name": "Korea Baseball Organization",
   "limitations": [
     "Official pages do not provide a versioned bulk-data contract; cache and hashes preserve each extraction.",
     "The baseline excludes postseason and exhibition games.",
-    "Incremental refresh: only the current calendar year was re-fetched this run; prior years are carried forward unchanged from the last full backfill."
+    "Incremental refresh: only 2026 was re-fetched this run; other years are carried forward unchanged from the last full backfill."
   ],
   "request_count": 9,
   "requested_window": {
@@ -26,5 +26,5 @@
     "https://www.koreabaseball.com/Schedule/Schedule.aspx"
   ],
   "teams_sha256": "9833c7acb3326904a45e1a6d77d2626e2210815a6252d2196a6b37e0a3b31f82",
-  "tie_count": 170
+  "tie_count": 171
 }

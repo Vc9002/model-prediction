@@ -1,7 +1,7 @@
 {
-  "artifact_hash": "9ed13cfd8d860b2670f938484c3c659d864654d10d93ca38480a7e8d77633502",
+  "artifact_hash": "86e1a4b83a2c52b41547802e0282dd7da8fa6c8411f806bc0bf72adba2fcf314",
   "decay_rate": 0.001,
-  "games_sha256": "94309aa597ae188a074a2f3dbbcf7a2091e5f7fb3e6a0c3f82cfb19c5410df29",
+  "games_sha256": "19f28fb66de720234682e32c66358554a36f7026a0625a4007a5cea27a277708",
   "home_advantage": 20.0,
   "initial_rating": 1500.0,
   "k": 8.0,
@@ -13,21 +13,21 @@
   "ratings": {
     "DOOSAN": 1520.570051,
     "HANWHA": 1499.974589,
-    "KIA": 1506.365705,
-    "KIWOOM": 1452.363488,
+    "KIA": 1506.35298,
+    "KIWOOM": 1452.410933,
     "KT": 1552.029579,
     "LG": 1513.705409,
-    "LOTTE": 1478.270758,
-    "NC": 1486.692847,
-    "SAMSUNG": 1550.054232,
-    "SSG": 1456.01661
+    "LOTTE": 1478.867428,
+    "NC": 1486.719448,
+    "SAMSUNG": 1549.457563,
+    "SSG": 1456.060785
   },
   "schema_version": "international-baseball-tie-aware-elo-v2",
-  "source_manifest_sha256": "770d8bf94a5e92e95c0fb403ebd534592d5ab0ff222a3360a37b37b8e23832b4",
+  "source_manifest_sha256": "a37d5f903afae584252550284f82e8f2745e8457b5b668d23716b62984ade063",
   "target": "expected moneyline settlement where a tie pays 0.50",
   "tie_method": "elo_gap",
-  "tie_probability": 0.02412032,
+  "tie_probability": 0.02425876,
   "trained_through_date": "2026-08-02",
-  "training_observations": 7048,
+  "training_observations": 7049,
   "units": 0
 }

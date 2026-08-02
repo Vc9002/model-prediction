@@ -518,6 +518,61 @@ def test_refresh_merges_current_year_without_touching_older_seasons(tmp_path) ->
     assert result["game_count"] == 2
 
 
+def test_settlement_cache_miss_fallback_does_not_destroy_older_seasons(tmp_path) -> None:
+    """Real bug fixed 2026-08-02: find_international_baseball_result's
+    cache-miss fallback used to call the destructive full-overwrite
+    backfill_international_baseball(..., f"{year}-01-01"), which replaces
+    games.jsonl wholesale -- silently deleting every earlier season the
+    first time a just-finished game wasn't in the cache yet. This is
+    exactly what happened to real NPB history (3,936 games back to
+    2022-03-25, collapsed to 566 games from this year only). The fallback
+    must now merge by game_id like refresh_recent_international_baseball_matches
+    does, so older seasons survive a cache miss on a recent game."""
+    today = eastern_today()
+    directory = tmp_path / "international_baseball/npb"
+    directory.mkdir(parents=True)
+    # Real NPB team_ids/names -- _merge_year_into_international_baseball_history
+    # rewrites teams.json from the real LEAGUE_SPECS table on every call, so a
+    # fictional team_id would silently stop matching after the merge and mask
+    # the very regression this test exists to catch.
+    old_year_game = {
+        "game_id": "old-1",
+        "game_date": f"{today.year - 2}-05-01",
+        "home_team_id": "G",
+        "away_team_id": "T",
+        "home_score": 3,
+        "away_score": 2,
+        "tie": False,
+    }
+    (directory / "games.jsonl").write_text(json.dumps(old_year_game) + "\n", encoding="utf-8")
+    (directory / "teams.json").write_text("{}", encoding="utf-8")
+    (directory / "manifest.json").write_text("{}", encoding="utf-8")
+
+    missing_game = {
+        "game_id": "new-1",
+        "game_date": today.isoformat(),
+        "home_team_id": "G",
+        "away_team_id": "T",
+        "home_score": 5,
+        "away_score": 1,
+        "tie": False,
+    }
+    client = _FakeYearClient({today.year: [missing_game]})
+
+    result = find_international_baseball_result(
+        tmp_path, "npb", today.isoformat(), "Yomiuri Giants", "Hanshin Tigers", client=client
+    )
+
+    assert result == (1, 5)  # (away_score, home_score) -- the fallback fetch resolved it
+    assert client.requested_years == [today.year]  # only the missing game's year, nothing else
+    game_ids = {
+        json.loads(line)["game_id"]
+        for line in (directory / "games.jsonl").read_text().splitlines()
+        if line.strip()
+    }
+    assert game_ids == {"old-1", "new-1"}  # old season survived the cache-miss fallback
+
+
 def test_refresh_falls_back_to_full_backfill_when_no_history_exists(tmp_path) -> None:
     """If games.jsonl doesn't exist -- first run ever, or every prior daily
     attempt failed before writing anything -- a current-year-only refresh

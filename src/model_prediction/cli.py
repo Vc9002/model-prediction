@@ -2673,10 +2673,12 @@ def main(argv: list[str] | None = None) -> None:
                     else [args.sport or "mlb"]
                 )
             )
+            # Constructed unconditionally (not just when is_flat) so sports whose
+            # main/flat ledgers form a pair -- soccer, matching how its research/
+            # gated ledgers already pair -- can log to both from either command.
+            flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
+            flat_ledger = PickLedger(flat_ledger_path)
             if is_flat:
-                # Flat forecast: separate ledger, no edge gate
-                flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
-                flat_ledger = PickLedger(flat_ledger_path)
                 if replace_today and log:
                     _clear_today_open(flat_ledger, args.date, by_event_date=True)
             elif replace_today and log:
@@ -2748,22 +2750,24 @@ def main(argv: list[str] | None = None) -> None:
                         ),
                     )
                 elif sport == "soccer":
+                    # research/gated and flat/main are each a pair: soccer logs
+                    # every contract to research+flat, and eligible-only picks
+                    # to gated+main, regardless of which of forecast/log/
+                    # flat-forecast was invoked (matches the `daily` wiring).
                     results[sport] = _forecast_soccer_sport(
                         data_root=data_directory,
                         args_date=args.date,
                         config=config,
                         research_ledger=(
-                            research_ledger(data_directory, sport)
-                            if log and not is_flat
-                            else None
+                            research_ledger(data_directory, sport) if log else None
                         ),
                         gated_ledger=(
                             research_ledger(data_directory, sport, gated=True)
-                            if log and not is_flat
+                            if log
                             else None
                         ),
-                        main_ledger=(ledger if log and not is_flat else None),
-                        flat_ledger=(flat_ledger if log and is_flat else None),
+                        main_ledger=(ledger if log else None),
+                        flat_ledger=(flat_ledger if log else None),
                     )
                 elif sport == "tennis":
                     results[sport] = _forecast_tennis_sport(
