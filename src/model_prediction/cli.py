@@ -900,6 +900,26 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
     }
 
 
+def _load_market_residual_model(config) -> MarketResidualModel | None:
+    """Fail-soft load of the market-residual artifact (P0-4), diagnostic use only.
+
+    A missing config block, missing file, or hash mismatch all fall back to
+    None (no market_residual_probability recorded on the row) rather than
+    raising into the primary forecast path -- this layer must never be able
+    to block a real pick from being logged.
+    """
+    artifact_value = (config.get("models", {}).get("market_residual") or {}).get("artifact")
+    if not artifact_value:
+        return None
+    artifact_path = Path(artifact_value)
+    if not artifact_path.is_absolute():
+        artifact_path = PROJECT_ROOT / artifact_path
+    try:
+        return MarketResidualModel.load(artifact_path)
+    except (FileNotFoundError, ValueError, KeyError, json.JSONDecodeError):
+        return None
+
+
 def _forecast_learned_sport(
     sport: str,
     args_date: str,
@@ -934,6 +954,7 @@ def _forecast_learned_sport(
         else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
     )
     model_config = config["models"][sport.upper()]
+    residual_model = _load_market_residual_model(config)
     artifact_value = model_config.get("production_artifact")
     if not artifact_value:
         return {
@@ -1129,6 +1150,11 @@ def _forecast_learned_sport(
                     f" NOTE: {', '.join(row_unavailable_features)} unavailable for "
                     f"this game — defaulted to neutral, other features used normally."
                 )
+            market_residual_probability = (
+                residual_model.calibrated_probability(candidate.model_probability, decision_no_vig)
+                if residual_model is not None and decision_no_vig is not None
+                else None
+            )
             request = PickRequest(
                 event_start_utc=event_et,
                 event_id=candidate.event_id,
@@ -1163,6 +1189,7 @@ def _forecast_learned_sport(
                 weather_factor=candidate.feature_basis.get("weather_factor"),
                 pitcher_era_gap=candidate.feature_basis.get("pitcher_era_gap"),
                 probable_starter_era_gap=candidate.feature_basis.get("probable_starter_era_gap"),
+                market_residual_probability=market_residual_probability,
                 unavailable_features=(
                     ",".join(row_unavailable_features)
                     if row_unavailable_features

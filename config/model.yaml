@@ -171,8 +171,16 @@ models:
         compare_against:
         - measured-edge-v1
         - no_vig_market_probability
-    spread_research_artifact: config/models/mlb-spread-baseline-v1.json
-    total_research_artifact: config/models/mlb-spread-baseline-v1.json
+    # P0-5 (2026-08-03): these two used to both point at mlb-spread-baseline-v1.json
+    # -- an unrelated, unfitted heuristic baseline (elo_margin / league_avg_total)
+    # that no code in src/model_prediction ever reads for MLB. MLB's real, live,
+    # separately-fitted spread and totals research already exists as its own
+    # working pipeline (_forecast_mlb / _forecast_mlb_totals_flat in cli.py) --
+    # these keys now point at that pipeline's actual artifacts instead of a
+    # mismatched file, so a future consumer of this config key sees MLB's real
+    # spread/total model rather than the generic cross-sport baseline.
+    spread_research_artifact: config/models/measured-edge-margin-v2.json
+    total_research_artifact: config/models/measured-edge-totals-v2.json
   NBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified

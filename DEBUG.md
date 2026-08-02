@@ -2,6 +2,131 @@
 
 **Last audited**: 2026-08-02 (see new section directly below)
 
+## 2026-08-02 (latest) — Live-run verification of the per-model ledger architecture: 3 real bugs found and fixed, soccer draw settlement corrected
+
+Operator asked to run a real `daily` end-to-end and confirm the per-model
+ledger architecture (previous section) is genuinely working live, not just
+migrated. Separately asked about KBO/NPB push settlement -- confirmed
+correct as documented below -- which led to checking soccer's analogous
+case and finding it was wrong.
+
+**KBO/NPB tie/push settlement: confirmed correct, no change.** A tied KBO/
+NPB game really is a 2-outcome market (home wins / away wins) with no
+separate "draw" contract; Polymarket settles a tie at $0.50.
+`cli.py::_settle_international_baseball_pick` sets
+`binary_contract_settlement_value = 0.5` on a tie and `ledger.py::settle()`
+computes `pnl = units * (binary_contract_settlement_value /
+entry_probability - 1)` using the real pregame decision price as the
+buy-in. Verified against real settled Doosan Bears/Samsung Lions/KT Wiz
+push rows -- matches the formula exactly. This is the correct, intended
+implementation of "if it's a push, market resolves 50/50, use pregame
+price to determine buy-in, PnL from that price to 50/50" -- nothing to fix.
+
+**Real bug found: soccer moneyline draws were graded PUSH, should be
+LOSS.** Unlike KBO/NPB, Polymarket's soccer win market is not one 2-outcome
+market with a tie case -- `data_sources/polymarket_us.py`'s own comment
+(verified live 2026-07-27) documents it as three *independent* Yes/No
+contracts per game (home wins / draw / away wins). A "home" or "away" pick
+is a bet on that specific contract resolving YES; a draw resolves it NO --
+a full loss of stake, not a refunded push. `pricing.py::grade_pick` was
+reusing the generic moneyline "tied score -> PUSH" branch (correct for a
+real 2-outcome tie-refund market, wrong for soccer's independent-contract
+structure). Fixed: `grade_pick` now takes an optional `league` parameter;
+`league == "SOCCER"` with a tied score grades LOSS. `ledger.py::settle()`
+passes `row["league"]` through. 2 new tests in `test_pricing.py`
+(soccer-draw-is-a-loss, non-soccer-tie-is-still-a-push -- KBO/NPB's
+`binary_contract_settlement_value` special-case still depends on
+`grade_pick` returning PUSH for the generic case).
+
+**Real, quantified impact on already-logged data**: exactly 15 already-
+settled soccer rows (mirrored identically in `data/flat_picks.xlsx` and
+`data/research/soccer.xlsx`, since every soccer decision is logged to
+both) were graded push/$0.00 and should have been loss/-1 unit (two of the
+15 were sized at 1.25/1.5/2.0 units, not 1.0 -- pnl_units corrected
+accordingly). Corrected via the sanctioned mutation path (never raw
+edits): `archive_settled_rows` (with a real reason + archive reference,
+full row content preserved at
+`data/archive/2026-08-02-soccer-draw-push-bug/`), reset to `open`,
+`import_rows` back in under the same `pick_id`, then re-`settle()`d
+through the now-fixed `grade_pick` -- so every other derived field
+(review_status, audit trail) comes from the real settlement code path,
+not hand-computed. Verified zero `SOCCER`/`push` rows remain anywhere in
+the ledger tree afterward.
+
+**Real bug found: model ledger dedupe key silently dropped genuine
+re-forecasts.** Live-verified by actually running `daily` and cross-
+checking a real WNBA pick (event `401857107`, Indiana Fever @ Minnesota
+Lynx) against its corresponding `data/model_ledgers/wnba-moneyline-elo-
+trend-lr.xlsx` row. The Main-ledger pick_id had changed (an earlier open
+pick for the same event was replaced by a same-day re-forecast with new
+`model_probability`/`decision_price` and a fresh `observed_at_utc`), but
+`record_from_pick_request`'s dedupe key -- `(event_id, market_type, line,
+model_version)` -- didn't include `observed_at_utc`, so it matched the
+*old*, already-migrated row's key and silently skipped writing the new
+one. The per-model ledger was stuck showing stale numbers for any event
+whose open pick got replaced, exactly the "same real decision routed to
+Main+Flat" collapsing the key was designed for, over-applied to a
+genuinely different later decision. Fixed: `observed_at_utc` added to
+`_prediction_dedupe_key` (now a 5-tuple). Main/Flat/Research/Gated calls
+for one real decision still share the exact same `PickRequest` object (and
+therefore identical `observed_at_utc`), so they still collapse correctly;
+a later re-forecast gets a new `observed_at_utc` and now creates a new row
+instead of being silently dropped.
+
+Adding `observed_at_utc` to the key surfaced a second, related bug:
+`record_from_pick_request` wrote `request.observed_at_utc` verbatim, which
+is `None` for callers that don't explicitly set it (several test fixtures,
+possibly some real call sites) -- while `_append_record` (the primary
+ledger) falls back to `request.observed_at_utc or iso_utc(created)`. Sole
+result: every request with no explicit `observed_at_utc` was writing a
+blank value, so every one of *those* re-forecasts collapsed into the same
+blank-keyed row again, defeating the fix. `record_from_pick_request` now
+takes a `created` parameter and applies the identical fallback; `_append_
+record` passes its own `created` through. 1 new regression test
+(`test_record_from_pick_request_does_not_dedupe_a_refreshed_forecast`).
+
+Backfilled the 109 real rows this silently dropped by re-running
+`scripts/migrate_to_model_ledgers.py` (idempotent by design -- it re-scans
+every source ledger and skips anything already present by `prediction_id`,
+so re-running after a live code fix is safe): 109 written, 380 skipped as
+already migrated, 0 unmapped. Verified event `401857107` now has both the
+original (migrated) row and the new, real re-forecast row, and a dry-run
+immediately after writes 0.
+
+**Real bug found: `ModelLedger.settle()` existed but was never called.**
+The class had a working `settle()` method (used only by the dashboard's
+manual operator-decision endpoint's read path, never by the actual
+settlement pipeline). Nothing in `cli.py`'s real settlement paths
+(`_settle_all_unsettled`, soccer/tennis/esports/KBO/NPB settlement)  ever
+called it. Model ledger rows stayed `status: open` forever, even after
+`PickLedger.settle()` graded the real, equivalent pick days or weeks
+later -- meaning `compute_model_evidence`'s hit-rate/Brier/calibration
+numbers (the entire point of "operator decides using real per-model
+evidence") never actually populated past whatever the one-time migration
+captured. Fixed with the same fail-soft pattern as the append-side hook:
+new `model_ledger.settle_from_pick_row(model_ledgers_dir, row)` looks up
+the matching open row by the same 5-tuple dedupe identity and calls
+`ModelLedger.settle()` on it; wired into `PickLedger.settle()` right after
+its own write, wrapped in try/except so a bug here can never turn a real,
+successful settlement into a failure. 2 new tests in `test_ledger.py`
+(settle-also-settles-the-model-ledger, a-failure-here-never-breaks-the-
+primary-settle -- mirrors the existing append-side pair exactly).
+
+Every fix in this section verified via the project's revert-and-confirm
+convention (temporarily undo, confirm the new test fails, restore, confirm
+it passes) before being considered done. Full suite: 643 passed. Ruff:
+118 findings, matching the existing baseline exactly, 0 new.
+
+**Not yet live-verified**: the settle-side wiring above has full unit-test
+coverage but no live-run confirmation yet, because the day's real
+settlement had already run (via the independently-scheduled
+`com.modelprediction.daily.plist` launchd job, `scripts/run_daily.sh` --
+found running concurrently under a real, pre-existing OS lock at
+`data/locks/daily.lock` while investigating this, PID 32354 at the time)
+before this fix landed. The append-side fix *will* be live-exercised by
+that same scheduled run's forecast step. A live settle confirmation is the
+natural next check once that process finishes.
+
 ## 2026-08-02 (later still) — Per-model ledger architecture: new schema, `ModelLedger`, real data migrated
 
 Operator directive: "recompile all models will be production in its own

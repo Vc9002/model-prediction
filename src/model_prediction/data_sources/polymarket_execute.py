@@ -62,6 +62,117 @@ def _team_name_matches(team_name: str, side_description: str) -> bool:
     shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
     return f" {shorter} " in f" {longer} "
 
+
+def _lines_match(a: float, b: float) -> bool:
+    return abs(a - b) < 1e-6
+
+
+def _row_selected_team(pick_row: dict[str, str]) -> str | None:
+    home_team = str(pick_row.get("home_team", ""))
+    away_team = str(pick_row.get("away_team", ""))
+    selection = str(pick_row.get("selection", "")).casefold()
+    return home_team if selection == "home" else away_team if selection == "away" else None
+
+
+def _row_line(pick_row: dict[str, str]) -> float:
+    try:
+        return float(pick_row.get("line") or "")
+    except ValueError as error:
+        raise ExecutionGateError("REFUSED: pick row has no valid line to verify against.") from error
+
+
+def _resolve_moneyline_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> str:
+    selected_team = _row_selected_team(pick_row)
+    if not selected_team:
+        raise ExecutionGateError(
+            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} "
+            "for live side verification."
+        )
+    matches_long = _team_name_matches(selected_team, str(snapshot["long"]["description"]))
+    matches_short = _team_name_matches(selected_team, str(snapshot["short"]["description"]))
+    if matches_long == matches_short:
+        raise ExecutionGateError(
+            "REFUSED: could not unambiguously resolve the picked team to a live market side."
+        )
+    return "long" if matches_long else "short"
+
+
+def _resolve_spread_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> str:
+    """A spread market's own ``line``/``team`` always describe the LONG
+    side -- e.g. ``line=-1.5, team="Red Sox"`` means long="Red Sox -1.5" and
+    short is always the exact negation, the opponent's own +1.5. Verified
+    live 2026-08-03 against real captured Polymarket contracts: two
+    alternate-line markets for the same event (a "-1.5" market and a "+1.5"
+    market) each showed long.description == format(market.line) and
+    short.description == format(-market.line).
+
+    A row's own ``line`` is selection-relative (PickRequest.validate's own
+    rule: "spread calls require a selection-relative line"), so the picked
+    team's line only matches the market's long side when the picked team
+    IS the market's own team; for the opponent, the row's line must equal
+    the negation instead.
+    """
+    selected_team = _row_selected_team(pick_row)
+    if not selected_team:
+        raise ExecutionGateError(
+            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} "
+            "for live side verification."
+        )
+    row_line = _row_line(pick_row)
+    market_team = snapshot.get("team")
+    market_line = snapshot.get("line")
+    if market_team is None or market_line is None:
+        raise ExecutionGateError(
+            "REFUSED: live spread market has no team/line to verify against."
+        )
+    is_market_team = _team_name_matches(selected_team, str(market_team))
+    if is_market_team and _lines_match(row_line, float(market_line)):
+        return "long"
+    if not is_market_team and _lines_match(row_line, -float(market_line)):
+        return "short"
+    raise ExecutionGateError(
+        "REFUSED: could not unambiguously resolve the picked team/line to a live market side "
+        f"(row selection={selected_team!r} line={row_line}, live team={market_team!r} line={market_line})."
+    )
+
+
+def _resolve_total_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> str:
+    selection = str(pick_row.get("selection", "")).casefold().strip()
+    if selection not in {"over", "under"}:
+        raise ExecutionGateError(
+            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} for a total market."
+        )
+    row_line = _row_line(pick_row)
+    market_line = snapshot.get("line")
+    if market_line is None or not _lines_match(row_line, float(market_line)):
+        raise ExecutionGateError(
+            f"REFUSED: pick row line {row_line} does not match the live market's total line "
+            f"({market_line})."
+        )
+    return _resolve_exact_description_side(selection, snapshot)
+
+
+def _resolve_btts_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> str:
+    selection = str(pick_row.get("selection", "")).casefold().strip()
+    if selection not in {"yes", "no"}:
+        raise ExecutionGateError(
+            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} for a btts market."
+        )
+    return _resolve_exact_description_side(selection, snapshot)
+
+
+def _resolve_exact_description_side(selection: str, snapshot: dict[str, Any]) -> str:
+    long_desc = str(snapshot["long"]["description"]).casefold().strip()
+    short_desc = str(snapshot["short"]["description"]).casefold().strip()
+    matches_long = long_desc == selection
+    matches_short = short_desc == selection
+    if matches_long == matches_short:
+        raise ExecutionGateError(
+            f"REFUSED: could not unambiguously resolve {selection!r} to a live market side "
+            f"(long={long_desc!r}, short={short_desc!r})."
+        )
+    return "long" if matches_long else "short"
+
 KEY_ID_ENV = "POLYMARKET_KEY_ID"
 SECRET_KEY_ENV = "POLYMARKET_SECRET_KEY"
 API_HOST = "https://api.polymarket.us"
@@ -309,16 +420,26 @@ class PolymarketExecutor:
         state, and pregame status -- rather than trusting whatever the
         caller already derived.
 
-        Only implemented for moneyline: it's the one market type with an
-        unambiguous two-team side mapping (home/away -> long/short via team
-        name match, the same resolution dashboard_server.py's _pick_quote
-        already does for its own preview path). Spread/total/btts rows keep
-        relying on the market_slug-from-rationale binding above; giving them
-        the same side check would need a real line/selection-to-side
-        resolver this project doesn't have yet.
+        Covers every market type this project prices: moneyline (team-name
+        match), spread (team + signed-line match, P0-1 2026-08-03), total
+        (over/under description + line match), btts (yes/no description
+        match). An unrecognized/missing market_type refuses outright rather
+        than silently skipping the check -- every real row from the
+        pipeline always sets market_type (a required PickRequest field), so
+        an absent value here means the row is malformed, not that this is a
+        market type without a resolver.
         """
-        if pick_row.get("market_type") != "moneyline":
-            return
+        market_type = pick_row.get("market_type")
+        resolver = {
+            "moneyline": _resolve_moneyline_side,
+            "spread": _resolve_spread_side,
+            "total": _resolve_total_side,
+            "btts": _resolve_btts_side,
+        }.get(str(market_type))
+        if resolver is None:
+            raise ExecutionGateError(
+                f"REFUSED: no live side resolver for market_type {market_type!r}."
+            )
         try:
             event_start = parse_utc(str(pick_row.get("event_start_utc", "")))
         except ValueError as error:
@@ -350,28 +471,11 @@ class PolymarketExecutor:
             raise ExecutionGateError(
                 f"REFUSED: market is not open (state={snapshot.get('market_state')})."
             )
-        home_team = str(pick_row.get("home_team", ""))
-        away_team = str(pick_row.get("away_team", ""))
-        selection = str(pick_row.get("selection", "")).casefold()
-        selected_team = (
-            home_team if selection == "home" else away_team if selection == "away" else None
-        )
-        if not selected_team:
-            raise ExecutionGateError(
-                f"REFUSED: unrecognized selection {pick_row.get('selection')!r} "
-                "for live side verification."
-            )
-        matches_long = _team_name_matches(selected_team, str(snapshot["long"]["description"]))
-        matches_short = _team_name_matches(selected_team, str(snapshot["short"]["description"]))
-        if matches_long == matches_short:
-            raise ExecutionGateError(
-                "REFUSED: could not unambiguously resolve the picked team to a live market side."
-            )
-        expected_side = "long" if matches_long else "short"
+        expected_side = resolver(pick_row, snapshot)
         if ticket.token_side != expected_side:
             raise ExecutionGateError(
                 f"REFUSED: ticket token_side {ticket.token_side!r} does not match the "
-                f"live market side for the picked team ({expected_side!r})."
+                f"live market side for this pick ({expected_side!r})."
             )
 
     # ---------------------------------------------------------------- submit

@@ -185,6 +185,14 @@ class PickRequest:
     weather_factor: float | None = None
     pitcher_era_gap: float | None = None
     probable_starter_era_gap: float | None = None
+    # Diagnostic only, same rule as the feature block above (P0-4, 2026-08-03):
+    # the market-residual layer's calibrated_probability(model_p, market_p),
+    # recorded for evidence/dashboard visibility. Never read back to size or
+    # gate a real pick -- model_probability remains the only number eligibility
+    # and sizing consume. None whenever no executable market price was matched
+    # or the rolling settled window is still below the model's own minimum
+    # sample (identity-fallback artifact).
+    market_residual_probability: float | None = None
     # Comma-joined feature names that fell back to a neutral default for this
     # specific game (e.g. ESPN hasn't posted both starters yet) — surfaced as
     # a visible dashboard badge, not just buried in the rationale text.
@@ -280,5 +288,6 @@ class PickRequest:
             "weather_factor": self.weather_factor,
             "pitcher_era_gap": self.pitcher_era_gap,
             "probable_starter_era_gap": self.probable_starter_era_gap,
+            "market_residual_probability": self.market_residual_probability,
             "unavailable_features": self.unavailable_features,
         }

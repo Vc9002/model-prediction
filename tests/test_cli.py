@@ -1030,6 +1030,173 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
     assert request.event_id == "mlb-2"
 
 
+def test_market_residual_probability_recorded_when_artifact_configured(monkeypatch, tmp_path) -> None:
+    """P0-4: config.models.market_residual.artifact used to point at a file
+    that didn't exist and was never read by any code. Now a real artifact
+    (trained via `train-residual`, or the class's own identity fallback when
+    the rolling settled window is too small) gets loaded once per forecast
+    call and its calibrated_probability recorded as a diagnostic-only field
+    on the row -- it must never feed model_probability or sizing itself."""
+    from model_prediction.models.market_residual import MarketResidualModel
+
+    observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
+    residual_path = tmp_path / "market-residual-v1.json"
+    MarketResidualModel(coefficients=(0.1, 0.9, 0.2), sample_size=150).save(residual_path)
+    expected = MarketResidualModel.load(residual_path).calibrated_probability(0.62, 0.55)
+
+    candidate = LearnedForwardCandidate(
+        event_id="mlb-3",
+        event_start_utc="2026-07-27T00:00:00Z",
+        away_team="Boston Red Sox",
+        home_team="New York Yankees",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.62,
+        home_probability=0.62,
+        confidence_threshold=0.55,
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="CALL_LEARNED_CONFIDENCE",
+        model_version="mlb-test",
+        model_artifact_hash="artifact-hash",
+        model_qualified=True,
+        feature_basis={"elo_probability": 0.60, "trend_gap": 0.1},
+        feature_snapshot_hash="feature-hash-3",
+    )
+    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(
+        cli,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.55,
+            "market_slug": "mlb-3",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": True,
+            "no_vig_probability": 0.55,
+        },
+    )
+
+    class Registry:
+        version = "1"
+
+        @staticmethod
+        def resolve(league, team, event_start):
+            return AWAY if team == "Boston Red Sox" else HOME
+
+    monkeypatch.setattr(
+        cli,
+        "evaluate_eligibility",
+        lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
+            RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.0, 60, 0.07, 0.02, AWAY, HOME,
+        ),
+    )
+    ledger = _CaptureLedger()
+    config = {
+        "models": {
+            "MLB": {
+                "production_artifact": str(tmp_path / "artifact.json"),
+                "status": "shadow_qualified",
+                "min_edge": 0.02,
+            },
+            "market_residual": {"artifact": str(residual_path)},
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+        },
+        "bankroll": {},
+    }
+
+    result = cli._forecast_learned_sport(
+        "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
+    )
+
+    assert result["logged"] == 1
+    request, _eligibility = ledger.appended[0]
+    assert request.market_residual_probability == pytest.approx(expected)
+    assert request.model_probability == 0.62  # never overwritten by the residual layer
+
+
+def test_market_residual_probability_none_without_configured_artifact(monkeypatch, tmp_path) -> None:
+    """No market_residual config block (or a missing/corrupt artifact) must
+    fail soft to None rather than raising into the primary forecast path."""
+    observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
+    candidate = LearnedForwardCandidate(
+        event_id="mlb-4",
+        event_start_utc="2026-07-27T00:00:00Z",
+        away_team="Boston Red Sox",
+        home_team="New York Yankees",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.60,
+        home_probability=0.60,
+        confidence_threshold=0.55,
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="CALL_LEARNED_CONFIDENCE",
+        model_version="mlb-test",
+        model_artifact_hash="artifact-hash",
+        model_qualified=True,
+        feature_basis={"elo_probability": 0.60, "trend_gap": 0.1},
+        feature_snapshot_hash="feature-hash-4",
+    )
+    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(
+        cli,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.55,
+            "market_slug": "mlb-4",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": True,
+            "no_vig_probability": 0.55,
+        },
+    )
+
+    class Registry:
+        version = "1"
+
+        @staticmethod
+        def resolve(league, team, event_start):
+            return AWAY if team == "Boston Red Sox" else HOME
+
+    monkeypatch.setattr(
+        cli,
+        "evaluate_eligibility",
+        lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
+            RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.0, 60, 0.07, 0.02, AWAY, HOME,
+        ),
+    )
+    ledger = _CaptureLedger()
+    config = {
+        "models": {
+            "MLB": {
+                "production_artifact": str(tmp_path / "artifact.json"),
+                "status": "shadow_qualified",
+                "min_edge": 0.02,
+            },
+            "market_residual": {"artifact": str(tmp_path / "does-not-exist.json")},
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+        },
+        "bankroll": {},
+    }
+
+    result = cli._forecast_learned_sport(
+        "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
+    )
+
+    assert result["logged"] == 1
+    request, _eligibility = ledger.appended[0]
+    assert request.market_residual_probability is None
+
+
 def test_international_forecast_preview_never_requires_or_writes_a_ledger(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     monkeypatch.setattr(

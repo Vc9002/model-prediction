@@ -171,6 +171,45 @@ def test_a_model_ledger_write_failure_never_breaks_the_primary_ledger_write(
     assert ledger.report()["open"] == 1
 
 
+def test_settle_also_settles_the_new_per_model_ledger(tmp_path) -> None:
+    """Real bug found live 2026-08-02: ModelLedger.settle() existed but was
+    never called from anywhere -- model ledger rows stayed 'open' forever
+    even after the primary ledger settled the equivalent real pick, so
+    per-model hit-rate/Brier/calibration evidence never populated. Wired
+    through the one chokepoint every sport's settle() call already shares."""
+    from model_prediction.model_ledger import ModelLedger
+
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    logged = ledger.append_evaluated(request(), _qualified_call(1.5))
+
+    ledger.settle(logged["pick_id"], away_score=5, home_score=5)
+
+    model_ledger_path = tmp_path / "model_ledgers" / "mlb-total-measured-edge.xlsx"
+    rows = ModelLedger(model_ledger_path).rows()
+    assert len(rows) == 1
+    assert rows[0]["status"] == "settled"
+    assert rows[0]["result"] == "win"
+    assert float(rows[0]["pnl_units"]) > 0
+
+
+def test_a_model_ledger_settle_failure_never_breaks_the_primary_ledger_settle(
+    tmp_path, monkeypatch
+) -> None:
+    import model_prediction.ledger as ledger_module
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated model_ledger settle failure")
+
+    monkeypatch.setattr(ledger_module, "settle_from_pick_row", _boom)
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    logged = ledger.append_evaluated(request(), _qualified_call(1.5))
+
+    settled = ledger.settle(logged["pick_id"], away_score=5, home_score=5)
+
+    assert settled["result"] == "win"
+    assert ledger.report()["open"] == 0
+
+
 def test_recompute_research_sizing_fills_in_a_zero_unit_sizable_reason(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     row = ledger.append_evaluated(request(), _observation("NO_CALL_LOW_EDGE", 0.0))

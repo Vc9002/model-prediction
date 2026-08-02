@@ -451,6 +451,7 @@ def _parse_picks(path: Path) -> list[dict]:
         "weather_factor",
         "pitcher_era_gap",
         "probable_starter_era_gap",
+        "market_residual_probability",
     ]
     index = {name: headers.index(name) for name in keep if name in headers}
     picks = []

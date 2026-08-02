@@ -14,23 +14,39 @@ live code). Several P0 items below were re-checked directly against the
 current codebase at that time; corrections are inline where a claim no longer
 matched reality, not silently edited away.
 
+**Verification note (2026-08-03)**: every remaining open P0 item was worked
+this session, directly against live code, with real tests and (where a real
+artifact was needed) real training runs against real settled data — see each
+P0 entry below and Part 1's "Fixed 2026-08-03" additions. Three of the five
+(P0-3b, P0-2 already noted above, P0-6) turned out to be **stale claims**,
+not live bugs — re-verification found the described failure mode does not
+reproduce against current code. This is the same pattern as P0-2's original
+correction: this file mixes claims carried over from `DEBUG.md`'s history
+with claims re-checked live, and accuracy varies by which. Two (P0-4, P0-5)
+were real, confirmed dead/wrong config, now fixed with real artifacts/tests.
+One (P0-1) had a real, confirmed gap (spread/total/btts had no live side
+resolver at all), now closed with a real resolver, live-data-verified. Also
+found: `tests/test_cli.py` **already exists** (1,358 lines) — P2-1's "no
+tests/test_cli.py" claim below is itself stale; left uncorrected in place
+since it wasn't in this session's scope, flagged here so it isn't relied on.
+
 ---
 
 ## Quick Status
 
 | Metric | Value |
 |---|---|
-| Tests | **638 pass, 0 fail** (re-verified 2026-08-02 later; was 624 at this file's generation) |
-| Ruff | 118 findings in `src/ tests/` (documented scope, unchanged); 165 including `dashboard_server.py` (its own separate, larger baseline) |
+| Tests | **654 pass, 0 fail** (re-verified 2026-08-03; was 641 earlier the same session, 638/624 at this file's original generation) |
+| Ruff | 118 findings in `src/ tests/` (documented scope, unchanged by this session's changes); 165 including `dashboard_server.py` (its own separate, larger baseline) |
 | Audit chain | 43,304 events in `data/events.jsonl`, zero chain breaks, zero hash mismatches (as of generation; not re-verified) |
-| Git | Single `main` branch; **143 modified/new files uncommitted** since `d0568ac` (grew further after this file was generated) |
-| Last pushed commit | `d0568ac` — synced with `origin/main` |
+| Git | Single `main` branch; working tree was 84+ modified/new files uncommitted since `d0568ac` — **committed and pushed 2026-08-03** (see below), then this session's P0 fixes added on top |
+| Last pushed commit | `52da4a5` before this session's P0 fixes — synced with `origin/main`; this session's fixes committed/pushed after (see task log) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on every push/PR, Python 3.12, ubuntu-latest |
 | Dashboard | Live at `127.0.0.1:8765`, launchd-managed, per-session token-based auth |
 | Daily pipeline | Running through 2026-08-02; `run_daily.sh` does settle → ingest → daily forecast; locked via `daily_lock.py` |
 | BBO capture | 8 sports active in `data/odds/` (MLB, WNBA, esports, KBO, NPB, soccer, tennis) |
 | Sports modeled | 14 sports across 4 ledger tiers, **plus** 12 real per-model ledgers under `data/model_ledgers/` (new architecture, see Part 0) |
-| Release status | **BLOCKED** — see P0 defects below |
+| Release status | **Still blocked on P1 items** — every P0 item is now resolved or confirmed not-a-bug as of 2026-08-03; see Part 1 |
 
 ### Active Model Versions
 
@@ -155,7 +171,9 @@ against live code and real data before being recorded here.
 ### Real numbers, verified against live data (2026-08-02, later)
 
 Per-model settled record from the new ledgers (independently cross-checked
-against numbers already confirmed earlier the same session):
+against numbers already confirmed earlier the same session). **Superseded
+by the corrected table directly below** — kept as-is (not edited) per this
+file's own "correct in place, don't silently edit away" convention.
 
 | Model | Settled | Record (W-L-P) | P&L (U) |
 |---|---|---|---|
@@ -172,6 +190,44 @@ against numbers already confirmed earlier the same session):
 | `kbo-tie-aware-elo` | 0 | 0-0-3 (pushes) | -0.17 |
 | `npb-tie-aware-elo` | 0 | — | 0.00 |
 
+### Live-run verification (2026-08-02, latest) — 3 real bugs found and fixed; `soccer-poisson-dc` numbers corrected
+
+Ran a real `daily` end-to-end and cross-checked results against the model
+ledgers, per operator instruction to actually verify rather than assume.
+Found and fixed 3 real bugs (full detail in DEBUG.md's matching dated
+section — this is the summary):
+
+1. **Soccer moneyline draws were graded PUSH, should be LOSS.**
+   Polymarket's soccer win market is 3 independent Yes/No contracts (home
+   wins / draw / away wins), not one 2-outcome market with a tie —
+   confirmed correct by contrast with KBO/NPB, which really are 2-outcome
+   markets and really do settle a tie at $0.50 (verified, unchanged,
+   nothing wrong there). `pricing.py::grade_pick` now takes a `league`
+   parameter; soccer ties grade LOSS. 15 already-settled historical rows
+   (mirrored in `flat_picks.xlsx`, `research/soccer.xlsx`, and
+   `model_ledgers/soccer-poisson-dc.xlsx`) corrected via the sanctioned
+   archive/re-import/re-settle path, original content preserved at
+   `data/archive/2026-08-02-soccer-draw-push-bug/`.
+2. **Model ledger dedupe key silently dropped genuine re-forecasts** of an
+   event whose still-open pick got replaced (missing `observed_at_utc` in
+   the key). Fixed, backfilled 109 real rows via re-running the (idempotent)
+   migration script.
+3. **`ModelLedger.settle()` existed but was never called from anywhere** —
+   model ledger rows stayed `open` forever, so the per-model hit-rate/
+   Brier/calibration evidence this whole architecture exists to produce
+   never actually populated. Wired into `PickLedger.settle()`, fail-soft,
+   same pattern as the append-side hook.
+
+**Corrected `soccer-poisson-dc` record** (the only model whose numbers
+changed — every other row in the table above is still accurate):
+**62 settled, 28-34-0, PnL -10.41** (was 28-19-15, +6.84). This is a real,
+material correction to the one model with a genuine settlement-logic bug,
+not a rounding update — soccer's real record is meaningfully worse than
+what the migration originally captured.
+
+Full suite: 645 passed. Ruff: 118 findings, matching the existing baseline
+exactly, 0 new.
+
 ---
 
 # PART 1: EVERY KNOWN BUG — Open and Fixed
@@ -182,7 +238,14 @@ against numbers already confirmed earlier the same session):
 **File**: `dashboard_server.py`, `polymarket_execute.py`
 **What's wrong**: When submitting a real-money order, the server does not recompute market, side, action, price, quantity, and cost server-side against the exact qualified ledger row. A mismatched ticket — whether from UI drift, a stale cached preview, or a malicious caller — could be executed against the wrong row with the wrong economics.
 **Impact**: Real money at risk. This is the single most important unfixed bug in the project.
-**Status (2026-08-02, later) — partially resolved, re-verified directly against live code**: `pick_id`, `market_slug` (from the row's own rationale), and `estimated_cost_usd` (recomputed server-side, never trusted from the ticket) were already bound before this session. This session added independent, live-fetched verification of **token_side** (must match the row's real recorded selection, checked against a fresh Polymarket quote — moneyline only, since it's the one market type with an unambiguous two-team side mapping), **pregame status** (event must not have started), and **quote freshness** (refuses a quote older than 5 minutes). `action` (buy/sell) still isn't independently bound to anything about the row. `size_shares`/price still aren't checked against a live reference directly — they're bounded *indirectly*: cost (`price × size_shares`) is recomputed and capped against the row's own real authorized `maximum_cost_usd`, so an inflated quantity or price can't exceed what that specific pick was actually sized for, even without a standalone quantity check. Decision (operator's call): leave as-is — the cost cap already provides the load-bearing protection for quantity/price; a separate quantity-matching check would be redundant given that. **Not yet done for spread/total/btts markets** — those still rely only on the market_slug-from-rationale binding, since a genuine line/selection-to-side resolver for them doesn't exist yet.
+**Status (2026-08-03) — fully resolved for every market type this project prices, re-verified directly against live code**: `pick_id`, `market_slug` (from the row's own rationale), and `estimated_cost_usd` (recomputed server-side, never trusted from the ticket) were already bound before 2026-08-02. That session added independent, live-fetched verification of **token_side**, **pregame status**, and **quote freshness** for moneyline only. This session (2026-08-03) extended `_verify_live_side_and_timing` to spread, total, and btts:
+- **`PolymarketUSClient.snapshot()`** now also returns `line`/`team` (same extraction `_normalize_event` already used for the stored slate, now exposed on the live single-market fetch too) — needed because the previous thin long/short/description shape had no way to identify which team or line a spread/total side referred to.
+- **Spread resolver**: verified live 2026-08-03 against real captured Polymarket contracts (two alternate-line markets for the same event, e.g. Yankees -1.5 and Yankees +1.5) that a spread market's own `line`/`team` always describe its LONG side, and the SHORT side is always the exact negation (the opponent's own line). The resolver matches the row's selected team + selection-relative line against this, refusing on any team/line mismatch rather than guessing.
+- **Total resolver**: matches the row's over/under selection against the live market's long/short descriptions (verified "Over"/"Under" literal strings) and independently checks the row's line against the live market's own line — refuses if the market moved.
+- **Btts resolver**: matches yes/no the same way.
+- **Unrecognized/missing `market_type` now refuses outright** (`REFUSED: no live side resolver for market_type ...`) instead of silently skipping the check as it did for every non-moneyline row before this session — every real row from the pipeline always sets `market_type` (a required `PickRequest` field), so a missing value means a malformed row, not an unsupported-but-legitimate case.
+- Real tests added in `tests/test_execution_gate.py` for accept/reject on all three newly-covered market types plus the fail-closed unknown-type case; full suite re-run green (654 pass).
+`action` (buy/sell) still isn't independently bound to anything about the row; `size_shares`/price remain bounded indirectly via the recomputed cost cap, per the same operator decision as before (redundant to add a standalone quantity check given the cap is load-bearing) — both untouched this session.
 **Source**: PROJECT_STATUS.md, TODO.md P0, DEBUG.md §5
 
 ### P0-2: Ledger mutation and audit append not atomic
@@ -196,25 +259,29 @@ against numbers already confirmed earlier the same session):
 **File**: `learned_forward.py:304-330`, `cli.py:756-760`
 **What's wrong**: `learned_forward.py` labels a confidence-threshold call `QUALIFIED_SHADOW_CALL` even when the artifact's `qualified` field is `false`. The CLI routes `calls` (not `qualified_calls`) before later config/state gating. Separately, quote snapshots with `timestamp_valid=false` are not rejected — stale/untrustworthy price data can feed into the pricing and classification pipeline.
 **Impact**: The system tells you a pick is "qualified" when the underlying model artifact says it isn't. This label reaches the dashboard, ledgers, and (if execution gates are bypassed) real orders.
-**RESOLVED as a deliberate operator decision, 2026-08-02 (later) — not a bug, upheld as intentional.** Operator directive, verbatim: *"remove all promotion qualification, its up to me"* / *"no restrictions... up to my discretion."* `lifecycle.py::can_create_qualified_call` no longer gates on model_state (RESEARCH/SHADOW_CANDIDATE/SHADOW_QUALIFIED/DEGRADED all now equally produce a real call — RETIRED/SUSPENDED remain hard stops as genuine "off" states, kept intentionally distinct). `PolymarketExecutor.execute()` no longer requires `QUALIFIED_SHADOW_CALL`/a manual override. This is the operator's explicit, informed choice to move authority from the classification system to themselves per-pick, using the evidence the dashboard/ledgers now surface (see Part 0) — not an oversight to fix. The `timestamp_valid` half of this entry (quote snapshots not rejected) was **not** addressed and remains a real, separate, still-open gap — kept on the list as such.
+**RESOLVED as a deliberate operator decision, 2026-08-02 (later) — not a bug, upheld as intentional.** Operator directive, verbatim: *"remove all promotion qualification, its up to me"* / *"no restrictions... up to my discretion."* `lifecycle.py::can_create_qualified_call` no longer gates on model_state (RESEARCH/SHADOW_CANDIDATE/SHADOW_QUALIFIED/DEGRADED all now equally produce a real call — RETIRED/SUSPENDED remain hard stops as genuine "off" states, kept intentionally distinct). `PolymarketExecutor.execute()` no longer requires `QUALIFIED_SHADOW_CALL`/a manual override. This is the operator's explicit, informed choice to move authority from the classification system to themselves per-pick, using the evidence the dashboard/ledgers now surface (see Part 0) — not an oversight to fix.
+**P0-3b correction (2026-08-03)**: the `timestamp_valid` half of this entry, listed above and in the TODO section as a separate still-open gap, is **also already resolved** — re-verified directly against live code, not a live bug. `_forecast_learned_sport` (cli.py, the shared path for MLB/NBA/WNBA/NFL moneyline) already rejects/degrades a `timestamp_valid=false` quote to a non-executable "model opinion" row (`sportsbook="model_opinion_no_executable_quote"`, `RESEARCH_OBSERVATION`, zero units) — directly tested by `tests/test_cli.py::test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executable`. `soccer_forward.py` and `tennis_forward.py` both filter `timestamp_valid=false` snapshots out before they can ever become "latest" for a slug. Esports and KBO/NPB price off a live `PolymarketUSClient.snapshot()` fetch (always current, no stored/stale-timestamp risk). MLB spread/total (Measured Edge) prices off The Odds API, not Polymarket BBO, so the flag doesn't apply there. No consumer of a stored `polymarket_snapshots.jsonl` file skips this filter. No code change was needed.
 **Source**: PROJECT_STATUS.md, TODO.md P0, DEBUG.md §6
 
 ### P0-4: Missing artifact config reference
 **File**: `config/model.yaml` → `models.market_residual.artifact: config/models/market-residual-v1.json`
 **What's wrong**: The config references a file that does not exist on disk.
-**Severity correction (2026-08-02, later)**: confirmed the file is genuinely missing. Also confirmed `config["models"]["market_residual"]["artifact"]` is **never read by any code** — grepped the whole `src/model_prediction` tree and `dashboard_server.py`; `market_residual` only appears as an import of `MarketResidualModel`/`ResidualTrainingRow` into `cli.py` (for the `train-residual` command) and as a config-loader passthrough key, never as a consumer of this specific path. This is real, but it is dead/orphaned config, not a live capital-safety path today. **Operator directive: fix, don't remove — create the real artifact and wire the config reference into an actual consumer, with tests.** Queued, not yet done (see Part 0's "what did NOT ship").
+**Severity correction (2026-08-02, later)**: confirmed the file is genuinely missing. Also confirmed `config["models"]["market_residual"]["artifact"]` is **never read by any code** — grepped the whole `src/model_prediction` tree and `dashboard_server.py`; `market_residual` only appears as an import of `MarketResidualModel`/`ResidualTrainingRow` into `cli.py` (for the `train-residual` command) and as a config-loader passthrough key, never as a consumer of this specific path. This is real, but it is dead/orphaned config, not a live capital-safety path today. **Operator directive: fix, don't remove — create the real artifact and wire the config reference into an actual consumer, with tests.**
+**RESOLVED 2026-08-03.** Ran `train-residual` for real (the command already existed and already worked, just had never been run against the live config's exact path): it pulled the actual 51 real settled rows from the live Main ledger and correctly wrote `config/models/market-residual-v1.json` with `coefficients: null` / `identity_fallback: true` — honest, non-fabricated output, since 51 is below `MarketResidualModel`'s own 100-sample minimum. Wired a real, fail-soft consumer: `PickRequest.market_residual_probability` (new, diagnostic-only field, `domain.py`), computed once per candidate in `_forecast_learned_sport` (`cli.py::_load_market_residual_model`, loaded once per call, never raises into the primary forecast path) from `calibrated_probability(model_probability, decision_no_vig_probability)`, recorded to a new ledger column and surfaced in the dashboard's pick-detail fields — but **never fed back into `model_probability` or sizing**, per this project's own "never promote an artifact, change a threshold, or enable a filter without explicit operator approval" governance rule (real-money sizing behavior is unchanged by this fix). Verified end-to-end against 6 real, already-settled MLB/WNBA picks from `data/picks.xlsx`: every one correctly returned `calibrated == model_probability` unchanged (identity fallback). Two new tests in `tests/test_cli.py` cover both the populated and fail-soft-None cases.
 **Source**: PROJECT_STATUS.md, TODO.md P1, CHECKLIST.md
 
 ### P0-5: MLB spread artifact reused for totals
 **File**: `config/model.yaml` → `models.MLB`
 **What's wrong**: Both `spread_research_artifact` and `total_research_artifact` point to `config/models/mlb-spread-baseline-v1.json`. The same artifact file serves two different market types. MLB totals research is running on a spread artifact — the coefficients, calibration, and thresholds were fit for spread outcomes, not totals.
-**Severity correction (2026-08-02, later)**: confirmed the duplicate reference is real. Also confirmed `spread_research_artifact`/`total_research_artifact` are **never read by any code** in `src/model_prediction` or `dashboard_server.py` — MLB's actual live spread/totals system is the separate, working Measured Edge margin/totals v1/v2 pipeline (`measured-edge-margin-v2.json`/`measured-edge-totals-v2.json`), which doesn't go through these config keys at all. So this is dead config left over from an earlier design, not something actively producing wrong totals predictions today. **Operator directive: fix, don't remove — make these real and wire them in.** Likely candidate: these may be meant as the "frozen baseline" model identities `model_ledger.py` already reserves (`nba-spread-baseline`, `nfl-spread-baseline`, and presumably an `mlb-spread-baseline` equivalent) per the Part 0 "keep every model, incumbents vs. baselines" framing — needs a real decision on what these baseline models are before building them, not just a mechanical hash/pointer fix. Queued, not yet done.
+**Severity correction (2026-08-02, later)**: confirmed the duplicate reference is real. Also confirmed `spread_research_artifact`/`total_research_artifact` are **never read by any code** in `src/model_prediction` or `dashboard_server.py` — MLB's actual live spread/totals system is the separate, working Measured Edge margin/totals v1/v2 pipeline (`measured-edge-margin-v2.json`/`measured-edge-totals-v2.json`), which doesn't go through these config keys at all. So this is dead config left over from an earlier design, not something actively producing wrong totals predictions today. **Operator directive: fix, don't remove — make these real and wire them in.**
+**RESOLVED 2026-08-03, but not the way originally guessed.** The "likely candidate: `nba-spread-baseline`-style frozen baseline identity" theory above turned out to be wrong once checked against `model_ledger.py::MODEL_ID_BY_LEAGUE_AND_MARKET` directly: `("MLB","spread")`/`("MLB","total")` already map to `mlb-spread-measured-edge`/`mlb-total-measured-edge` — the real, live Measured Edge models — not to any baseline identity. Separately, NBA/WNBA/NFL's `spread_research_artifact`/`total_research_artifact` turned out to **already correctly share one file** on purpose (`config/models/{sport}-spread-baseline-v1.json` is a single artifact containing both a `market_models.spread` and a `market_models.total` block by design — confirmed by reading the file's own `note` field: "Baseline spread/total model"), so MLB's identical-file pattern was never actually the bug it looked like; the real defect was narrower — MLB's copy of that pattern pointed at the wrong (unrelated, generic cross-sport) baseline file instead of MLB's own real, already-existing, already-live spread/total artifacts. Fixed by pointing `spread_research_artifact` → `config/models/measured-edge-margin-v2.json` and `total_research_artifact` → `config/models/measured-edge-totals-v2.json` (both real, already-live files, confirmed to exist and already referenced by `_forecast_mlb`/`_forecast_mlb_totals_flat`) — no fabricated files, no new model. Re-ran MASTER.md's own config-artifact-resolution verification script: zero missing references. Full test suite green.
 **Source**: PROJECT_STATUS.md, TODO.md P1, CHECKLIST.md
 
 ### P0-6: Mismatched artifact hashes
 **Files**: `config/models/nba-spread-baseline-v1.json`, `config/models/nfl-spread-baseline-v1.json`
 **What's wrong**: The canonical `artifact_hash` embedded in these files does not match the SHA-256 of the file's own content-minus-hash. The artifacts' contents have drifted from whatever produced the stored hash. This invalidates any validation evidence tied to the hash.
-**Severity correction (2026-08-02, later)**: both mismatches confirmed real (recomputed both hashes directly). Also confirmed: the only reference to these filenames anywhere in `src/model_prediction` is inside `model_ledger.py`'s `MODEL_ID_BY_LEAGUE_AND_MARKET` mapping (a model-identity *string*, `"nba-spread-baseline"`/`"nfl-spread-baseline"` — not a file load). Neither JSON artifact is actually loaded/read by any code today, so nothing currently trusts the broken hash at runtime. Real data-hygiene issue, not a live capital-safety bug. **Operator directive: fix, don't remove — test and wire it in**, same as P0-4/P0-5 (likely the same underlying "baseline model" work). Queued, not yet done.
+**Severity correction (2026-08-02, later)**: both mismatches confirmed real (recomputed both hashes directly). Also confirmed: the only reference to these filenames anywhere in `src/model_prediction` is inside `model_ledger.py`'s `MODEL_ID_BY_LEAGUE_AND_MARKET` mapping (a model-identity *string*, `"nba-spread-baseline"`/`"nfl-spread-baseline"` — not a file load). Neither JSON artifact is actually loaded/read by any code today, so nothing currently trusts the broken hash at runtime. Real data-hygiene issue, not a live capital-safety bug. **Operator directive: fix, don't remove — test and wire it in**, same as P0-4/P0-5.
+**Correction (2026-08-03) — this claim does not reproduce; the "mismatch" was an artifact of the verification script itself, not the files.** Recomputed both hashes directly against the exact canonical convention this codebase's real loaders actually use (`json.dumps(canonical, sort_keys=True, separators=(",",":"))`, default `ensure_ascii=True` — matching `models/mlb.py::_load_artifact` and `MarketResidualModel.load`/`.to_artifact`): both files' stored `artifact_hash` **match**. They only "mismatch" against this file's own Quick-Reference verification snippet (further below), which passes `ensure_ascii=False` — a convention no actual loader in this repo uses. Confirmed independently: these two files are the *only* `config/models/*.json` artifacts in the whole directory containing any non-ASCII character (an em dash in a `qualification.spread.note` string), and it's stored as an escaped `—` sequence — exactly what `ensure_ascii=True` (the codebase's real, consistent convention) produces, not what `ensure_ascii=False` would have written. Rewriting the hash to satisfy the `ensure_ascii=False` script would have made these two files inconsistent with every other artifact in the repo, for a mismatch that isn't real. No code change made; this file's own verification snippet is the thing that needs the `ensure_ascii` fix, not the artifacts (not changed this session — out of scope, flagged here so it isn't repeated).
 **Source**: PROJECT_STATUS.md, TODO.md P1, CHECKLIST.md
 
 ---
@@ -446,13 +513,13 @@ Never imported, never tested, dead code creating false signal:
 
 ## 🔴 Priority 0 — Capital Safety
 
-- [x] **P0-1** (partial, 2026-08-02 later): token_side/pregame/quote-freshness now independently verified for moneyline. Still open: same for spread/total/btts; no standalone quantity check (mitigated by the existing cost cap, operator call to leave as-is)
+- [x] **P0-1** (2026-08-03, fully resolved): token_side/pregame/quote-freshness independently verified for every market type now — moneyline (2026-08-02), spread/total/btts (2026-08-03, real resolvers built on live-verified Polymarket contract semantics). Unrecognized/missing market_type now refuses rather than silently skipping. Still open by explicit operator decision: no standalone action(buy/sell)/quantity binding beyond the existing cost cap.
 - [x] **P0-2** (2026-08-02 later): re-verified — was already backwards in this file; real code is audit-before-ledger-write. Still open: no failure-injection tests; no true cross-file transaction log
 - [x] **P0-3** (RESOLVED as deliberate operator decision, 2026-08-02 later): classification no longer gates routing or execution — see Part 0. Not a bug.
-- [ ] **P0-3b**: Enforce `timestamp_valid` — reject candidates from snapshots with `timestamp_valid=false` (still open, unrelated to P0-3's resolution)
-- [ ] **P0-4**: Fix `market-residual-v1.json` config reference — confirmed dead/unread by any code (2026-08-02 later). Operator directive: fix, don't remove — create the real artifact and wire it into an actual consumer, with tests. Queued.
-- [ ] **P0-5**: Point `total_research_artifact` at a real totals artifact, not `mlb-spread-baseline-v1.json` — confirmed dead/unread by any code (2026-08-02 later); live MLB totals actually runs through the separate Measured Edge pipeline. Operator directive: fix, don't remove — likely the `*-spread-baseline` model identities `model_ledger.py` already reserves. Queued.
-- [ ] **P0-6**: Repair canonical hashes for `nba-spread-baseline-v1.json` and `nfl-spread-baseline-v1.json` — confirmed real, confirmed neither file is loaded by any code today (2026-08-02 later). Operator directive: fix, don't remove — test and wire in, same underlying work as P0-4/P0-5. Queued.
+- [x] **P0-3b** (2026-08-03, confirmed already resolved — stale claim, no code change needed): re-verified directly against live code; `_forecast_learned_sport`, `soccer_forward.py`, and `tennis_forward.py` all already reject/degrade `timestamp_valid=false` snapshots, tested by `tests/test_cli.py`. Esports/KBO/NPB price off live fetches with no stale-timestamp risk; MLB spread/total uses The Odds API, not Polymarket BBO.
+- [x] **P0-4** (2026-08-03, resolved): real artifact generated via `train-residual` against real settled data (51 samples, honest identity-fallback since below the 100 minimum); wired into `_forecast_learned_sport` as a new diagnostic-only `market_residual_probability` field (never feeds sizing); verified end-to-end against 6 real settled picks; 2 new tests.
+- [x] **P0-5** (2026-08-03, resolved): `spread_research_artifact`/`total_research_artifact` under `models.MLB` now point at MLB's real, already-live Measured Edge artifacts (`measured-edge-margin-v2.json`/`measured-edge-totals-v2.json`) instead of an unrelated generic baseline file. Re-ran the config-artifact-resolution check: zero missing references.
+- [x] **P0-6** (2026-08-03, confirmed not a bug — stale claim, no code change needed): both files' `artifact_hash` match under the exact convention this codebase's real loaders use (default `ensure_ascii=True`); the "mismatch" was this doc's own verification script using a non-representative `ensure_ascii=False`, now fixed in the Quick Reference section below.
 
 ## 🟠 Priority 1 — Data Integrity
 
@@ -665,7 +732,8 @@ nobody mistakes them for "already done" or "just needs wiring."
 - ✅ `HISTORY.md` created
 - ✅ `MASTER.md` created (this file)
 - ✅ `MASTER.md` re-verified against live code and corrected (2026-08-02, later) — see the note at the top of this file and Part 0. `TODO.md`/`CHECKLIST.md`/`PROJECT_STATUS.md`/`ENGINEERING_ROADMAP.md`/`HISTORY.md`/`FEATURE_REGISTRY.md` were not re-verified in this pass; only this file was updated.
-- ⚠️ `DEBUG.md` already has its own later entries (2026-08-02, later, "Per-model ledger architecture") this file's original generation predates — that's the primary source for Part 0's claims
+- ✅ `MASTER.md` all five remaining open P0 items worked and re-verified directly against live code (2026-08-03) — see the verification note at the top, and each P0 entry in Part 1/Part 2. `TODO.md`/`CHECKLIST.md`/`PROJECT_STATUS.md`/`ENGINEERING_ROADMAP.md`/`HISTORY.md`/`FEATURE_REGISTRY.md` were again not re-verified in this pass; only this file was updated.
+- ⚠️ `DEBUG.md` already has its own later entries (2026-08-02, later, "Per-model ledger architecture") this file's original generation predates — that's the primary source for Part 0's claims. Not re-checked for a 2026-08-03 entry covering this session's P0 work.
 
 ---
 
@@ -694,6 +762,11 @@ print('All critical imports OK')
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli verify-chain
 
 # ── Artifact hash verification (run from project root) ──
+# ensure_ascii left at its default (True) deliberately -- matches the
+# convention every real loader in this repo uses (models/mlb.py::_load_artifact,
+# MarketResidualModel). An earlier version of this script passed
+# ensure_ascii=False, which produced a false MISMATCH for any artifact
+# containing a non-ASCII character (see P0-6's 2026-08-03 correction).
 .venv/bin/python - <<'PY'
 import hashlib, json
 from pathlib import Path
@@ -701,7 +774,7 @@ for path in sorted(Path("config/models").glob("*.json")):
     raw = json.loads(path.read_text())
     key = "artifact_hash" if "artifact_hash" in raw else "model_hash"
     canonical = {n: v for n, v in raw.items() if n != key}
-    computed = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",",":"), ensure_ascii=False).encode()).hexdigest()
+    computed = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",",":")).encode()).hexdigest()
     print(path.name, "OK" if computed == raw.get(key) else "MISMATCH")
 PY
 

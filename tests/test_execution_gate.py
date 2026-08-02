@@ -24,12 +24,24 @@ def ticket() -> OrderTicket:
 
 
 def qualified_row() -> dict[str, str]:
+    # market_type/home_team/away_team/selection/event_start_utc default to a
+    # valid moneyline row (matching fresh_quote()'s long/short) so every
+    # pre-existing test that isn't specifically about side verification --
+    # single_order policy, cost caps, decline/confirm, submit conversion --
+    # still clears the live side/timing gate with the default fresh_quote()
+    # the executor() helper now supplies. Tests that care about a specific
+    # market type override these fields via moneyline_row()/spread_row()/etc.
     return {
         "pick_id": "pick-1",
         "record_type": "QUALIFIED_SHADOW_CALL",
         "status": "open",
         "rationale": "Learned LR call at threshold 0.55; executable ask 0.6200 "
         "(market_slug=aec-mlb-nyy-bos-2026-07-17).",
+        "market_type": "moneyline",
+        "home_team": "Boston Red Sox",
+        "away_team": "New York Yankees",
+        "selection": "home",
+        "event_start_utc": (datetime.now(UTC) + timedelta(hours=3)).isoformat(),
     }
 
 
@@ -38,21 +50,103 @@ def executor(tmp_path, answer="y", env=None, live_quote=None) -> PolymarketExecu
         AuditLog(tmp_path / "events.jsonl"),
         confirm=lambda prompt: answer,
         environ=env if env is not None else {},
-        live_quote=live_quote,
+        # Defaults to a quote matching qualified_row()'s moneyline shape so
+        # tests unrelated to side verification don't all need to configure
+        # one just to clear the (now real, for every market type) live
+        # side/timing gate. Explicit live_quote= still overrides normally.
+        live_quote=live_quote or (lambda slug: fresh_quote()),
     )
 
 
 def moneyline_row(**overrides) -> dict[str, str]:
+    row = {**qualified_row()}
+    row.update(overrides)
+    return row
+
+
+def spread_row(**overrides) -> dict[str, str]:
     row = {
         **qualified_row(),
-        "market_type": "moneyline",
+        "market_type": "spread",
         "home_team": "Boston Red Sox",
         "away_team": "New York Yankees",
-        "selection": "home",
+        "selection": "away",
+        "line": "-1.5",
         "event_start_utc": (datetime.now(UTC) + timedelta(hours=3)).isoformat(),
     }
     row.update(overrides)
     return row
+
+
+def total_row(**overrides) -> dict[str, str]:
+    row = {
+        **qualified_row(),
+        "market_type": "total",
+        "home_team": "Boston Red Sox",
+        "away_team": "New York Yankees",
+        "selection": "over",
+        "line": "8.5",
+        "event_start_utc": (datetime.now(UTC) + timedelta(hours=3)).isoformat(),
+    }
+    row.update(overrides)
+    return row
+
+
+def btts_row(**overrides) -> dict[str, str]:
+    row = {
+        **qualified_row(),
+        "market_type": "btts",
+        "home_team": "Boston Red Sox",
+        "away_team": "New York Yankees",
+        "selection": "yes",
+        "line": "",
+        "event_start_utc": (datetime.now(UTC) + timedelta(hours=3)).isoformat(),
+    }
+    row.update(overrides)
+    return row
+
+
+def spread_quote(**overrides) -> dict:
+    # Real shape verified live 2026-08-03 against captured Polymarket
+    # contracts: the market's own line/team describe the LONG side (here,
+    # "New York Yankees -1.5"); short is always the exact negation, the
+    # opponent's own +1.5 ("Boston Red Sox +1.5").
+    quote = {
+        "market_slug": "asc-mlb-nyy-bos-2026-07-17-neg-1pt5",
+        "observed_at_utc": datetime.now(UTC).isoformat(),
+        "market_state": "MARKET_STATE_OPEN",
+        "line": -1.5,
+        "team": "New York Yankees",
+        "long": {"description": "-1.50"},
+        "short": {"description": "+1.50"},
+    }
+    quote.update(overrides)
+    return quote
+
+
+def total_quote(**overrides) -> dict:
+    quote = {
+        "market_slug": "asc-mlb-nyy-bos-2026-07-17-total-8pt5",
+        "observed_at_utc": datetime.now(UTC).isoformat(),
+        "market_state": "MARKET_STATE_OPEN",
+        "line": 8.5,
+        "long": {"description": "Over"},
+        "short": {"description": "Under"},
+    }
+    quote.update(overrides)
+    return quote
+
+
+def btts_quote(**overrides) -> dict:
+    quote = {
+        "market_slug": "asc-mlb-nyy-bos-2026-07-17-btts",
+        "observed_at_utc": datetime.now(UTC).isoformat(),
+        "market_state": "MARKET_STATE_OPEN",
+        "long": {"description": "Yes"},
+        "short": {"description": "No"},
+    }
+    quote.update(overrides)
+    return quote
 
 
 def fresh_quote(**overrides) -> dict:
@@ -100,7 +194,7 @@ def test_research_observation_can_submit_without_manual_override(tmp_path, monke
     other still-enforced gate, not refused purely for its classification."""
     client = executor(tmp_path, env=US_CREDS)
     monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
-    row = {"record_type": "RESEARCH_OBSERVATION", "status": "open"}
+    row = {**moneyline_row(), "record_type": "RESEARCH_OBSERVATION"}
 
     result = client.execute(ticket(), row, execute_flag=True, user_command=True)
 
@@ -115,8 +209,8 @@ def test_explicit_manual_research_override_can_submit(tmp_path, monkeypatch) -> 
         lambda method, path, payload: {"id": "manual-order-123", "state": "ORDER_STATE_NEW"},
     )
     row = {
+        **moneyline_row(),
         "record_type": "RESEARCH_OBSERVATION",
-        "status": "open",
         "reason_code": "NO_CALL_MISSING_UNCERTAINTY",
     }
     manual_ticket = OrderTicket(
@@ -264,17 +358,95 @@ def test_live_side_check_refuses_after_event_start(tmp_path) -> None:
         client.execute(ticket(), started_row, execute_flag=True, user_command=True)
 
 
-def test_live_side_check_skipped_for_non_moneyline_market_types(tmp_path, monkeypatch) -> None:
-    """spread/total/btts rows have no unambiguous side resolver yet -- they
-    keep relying on the market_slug-from-rationale binding rather than being
-    refused outright for a check that can't be performed correctly."""
-    client = executor(tmp_path, env=US_CREDS)  # no live_quote configured
+def test_live_side_check_refuses_an_unrecognized_market_type(tmp_path) -> None:
+    """P0-1 (2026-08-03): previously an absent/unrecognized market_type
+    silently SKIPPED the live side check entirely, relying only on the
+    market_slug-from-rationale binding -- a malformed or unexpected row
+    would submit unverified. Every real row from the pipeline always sets
+    market_type (a required PickRequest field), so this must now fail
+    closed rather than silently pass through."""
+    client = executor(tmp_path, env=US_CREDS)
+    row = {**qualified_row(), "market_type": "unknown_market_type"}
+    with pytest.raises(ExecutionGateError, match="no live side resolver"):
+        client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+
+def test_live_side_check_accepts_a_spread_ticket_matching_the_row_selection(tmp_path, monkeypatch) -> None:
+    """Real gap closed 2026-08-03: spread/total/btts used to have no live
+    side resolver at all and fell through the check unverified. A spread
+    market's own line/team always describe its long side (verified live
+    against real captured Polymarket contracts -- see _resolve_spread_side);
+    the row here picks the away team (Yankees) at -1.5, matching the live
+    quote's long side exactly."""
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: spread_quote())
     monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
-    row = qualified_row()  # market_type absent, same as every pre-existing test row
+    row = spread_row(selection="away", line="-1.5")
 
     result = client.execute(ticket(), row, execute_flag=True, user_command=True)
 
     assert result["status"] == "submitted"
+
+
+def test_live_side_check_refuses_a_spread_ticket_on_the_wrong_side(tmp_path) -> None:
+    # ticket() is token_side="long"; the row picks the home team (Red Sox)
+    # at +1.5, which is the live quote's SHORT side (the negation of the
+    # market's own Yankees -1.5) -- a real --side typo this must catch.
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: spread_quote())
+    row = spread_row(selection="home", line="1.5")
+    with pytest.raises(ExecutionGateError, match="does not match the live market side"):
+        client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+
+def test_live_side_check_refuses_a_spread_ticket_on_a_stale_line(tmp_path) -> None:
+    """The market moved (or the ticket's line is simply wrong) -- Yankees
+    -2.5 no longer matches the live -1.5 contract this ticket's market_slug
+    actually resolves to. Must refuse rather than execute at the wrong
+    number."""
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: spread_quote())
+    row = spread_row(selection="away", line="-2.5")
+    with pytest.raises(ExecutionGateError, match="could not unambiguously resolve"):
+        client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+
+def test_live_side_check_accepts_a_total_ticket_matching_the_row_selection(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: total_quote())
+    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    row = total_row(selection="over", line="8.5")
+
+    result = client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+    assert result["status"] == "submitted"
+
+
+def test_live_side_check_refuses_a_total_ticket_on_the_wrong_side(tmp_path) -> None:
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: total_quote())
+    row = total_row(selection="under", line="8.5")
+    with pytest.raises(ExecutionGateError, match="does not match the live market side"):
+        client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+
+def test_live_side_check_refuses_a_total_ticket_on_a_stale_line(tmp_path) -> None:
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: total_quote())
+    row = total_row(selection="over", line="9.5")
+    with pytest.raises(ExecutionGateError, match="does not match the live market's total line"):
+        client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+
+def test_live_side_check_accepts_a_btts_ticket_matching_the_row_selection(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: btts_quote())
+    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    row = btts_row(selection="yes")
+
+    result = client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+    assert result["status"] == "submitted"
+
+
+def test_live_side_check_refuses_a_btts_ticket_on_the_wrong_side(tmp_path) -> None:
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: btts_quote())
+    row = btts_row(selection="no")
+    with pytest.raises(ExecutionGateError, match="does not match the live market side"):
+        client.execute(ticket(), row, execute_flag=True, user_command=True)
 
 
 def test_config_override_qualified_call_can_submit_without_manual_order(tmp_path, monkeypatch) -> None:
@@ -371,6 +543,7 @@ def test_submit_converts_selected_outcome_price_to_exchange_long_coordinate(
         AuditLog(audit_path),
         confirm=lambda prompt: "y",
         environ=US_CREDS,
+        live_quote=lambda slug: fresh_quote(),
     )
     payloads = []
 
@@ -388,9 +561,13 @@ def test_submit_converts_selected_outcome_price_to_exchange_long_coordinate(
         }
     )
 
+    # fresh_quote()'s long/short are Red Sox (home)/Yankees (away); the row's
+    # selection must match whichever side this case is exercising, or the
+    # live side check (real for every market type as of P0-1) would refuse
+    # a "short" ticket paired with the row's default home/long selection.
     result = client.execute(
         selected_ticket,
-        qualified_row(),
+        moneyline_row(selection="home" if token_side == "long" else "away"),
         execute_flag=True,
         user_command=True,
     )

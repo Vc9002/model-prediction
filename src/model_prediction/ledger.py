@@ -55,7 +55,7 @@ from .domain import (
     utc_now,
 )
 from .eligibility import EligibilityResult
-from .model_ledger import record_from_pick_request
+from .model_ledger import record_from_pick_request, settle_from_pick_row
 from .pricing import american_to_decimal, grade_pick, implied_probability, profit_units
 from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
@@ -191,6 +191,9 @@ FIELDNAMES = [*LEGACY_FIELDNAMES,
     "back_to_back_gap",
     "games_last_7_gap",
     "schedule_missingness",
+    # Market-residual layer's calibrated_probability(model_p, market_p),
+    # diagnostic only -- see PickRequest.market_residual_probability (P0-4).
+    "market_residual_probability",
     # Operator directive, 2026-08-02: an honest label distinct from
     # record_type. QUALIFIED_SHADOW_CALL means "cleared this sport's trust/
     # provenance/edge gates" -- for MLB/WNBA/NBA/NFL (evaluate_eligibility)
@@ -576,7 +579,7 @@ class PickLedger:
         # unmapped league/market, a lock timeout on the new file) take down
         # the primary ledger append that already succeeded above.
         try:
-            record_from_pick_request(self.path.parent / "model_ledgers", request, eligibility)
+            record_from_pick_request(self.path.parent / "model_ledgers", request, eligibility, created)
         except Exception:
             logging.getLogger(__name__).warning(
                 "model_ledger write failed for pick %s (primary ledger write already succeeded)",
@@ -763,6 +766,18 @@ class PickLedger:
                 },
             )
             self._write_rows(rows)
+        # Operator directive, 2026-08-02: settlement also mirrors into the
+        # per-model ledger, alongside this real, working write, never
+        # instead of it -- same fail-soft contract as _append_record's own
+        # model_ledger hook (see model_ledger.settle_from_pick_row).
+        try:
+            settle_from_pick_row(self.path.parent / "model_ledgers", row)
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "model_ledger settle failed for pick %s (primary ledger settle already succeeded)",
+                pick_id,
+                exc_info=True,
+            )
         return row
 
     def recompute_research_sizing(self, policy=None) -> int:

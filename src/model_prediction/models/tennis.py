@@ -108,12 +108,20 @@ class TennisModel:
         overall, by_surface = self.build_elo(matches)
         predictions = []
         for match in upcoming:
+            known_one = match.player_one in overall
+            known_two = match.player_two in overall
+            # Too many WTA/ITF matches run every day to call them all; a player
+            # missing from `overall` has zero real history, so their side of
+            # the prediction would silently fall back to DEFAULT_ELO (a coin
+            # flip dressed up as a model call) rather than a genuine edge.
+            # Hard skip instead of just widening uncertainty -- see project
+            # instruction to only call matches we actually have data for.
+            if not (known_one and known_two):
+                continue
             p_one = self.match_probability(
                 overall, by_surface, match.player_one, match.player_two, match.surface
             )
-            known_one = match.player_one in overall
-            known_two = match.player_two in overall
-            uncertainty = 0.05 if known_one and known_two else 0.20
+            uncertainty = 0.05
             predictions.append(
                 GamePrediction(
                     event_id=match.event_id,

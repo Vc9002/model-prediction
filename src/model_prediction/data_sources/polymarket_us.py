@@ -42,8 +42,13 @@ LEAGUE_SLUGS = {
     "FRIENDLIES": "intf",
     "CLUB_FRIENDLIES": "clbf",
     "WTA": "wta",
-    "ITF_MEN": "itfm",
-    "ITF_WOMEN": "itfw",
+    "ATP": "atp",
+    # "itfm"/"itfw" are now dead league slugs on the live gateway (0 events
+    # as of 2026-08-03, superseded by these -- verified via GET /v2/sports
+    # and GET /v2/leagues/<slug>/events, real ITF singles matches present
+    # under seriesSlug itf-mens-2026 / itf-womens-2026).
+    "ITF_MEN": "itfme",
+    "ITF_WOMEN": "itfwo",
     "LOL": "lol",
     "CS2": "cs2",
     "KBO": "kbo",
@@ -56,8 +61,9 @@ LEAGUE_SLUGS = {
     "RAINBOW_SIX": "r6",
 }
 
-# Gateway coverage per sport key. Ligue 1, Eredivisie, Primeira Liga,
-# Championship, and ATP have no Polymarket US league as of 2026-07-16.
+# Gateway coverage per sport key. Ligue 1, Eredivisie, Primeira Liga, and
+# Championship have no Polymarket US league as of 2026-07-16. ATP was added
+# to the gateway after that date -- re-verified operational 2026-08-03.
 POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "mlb": ("MLB",),
     "nba": ("NBA",),
@@ -70,7 +76,13 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
         "COLOMBIA", "CHILE", "URUGUAY", "ECUADOR", "PERU", "SUDAMERICANA",
         "FRIENDLIES", "CLUB_FRIENDLIES",
     ),
-    "tennis": ("WTA", "ITF_MEN", "ITF_WOMEN"),
+    # ATP added 2026-08-03: live-verified against GET /v2/sports (real
+    # operational league, 88 events including real matches with executable
+    # spread markets) -- the 2026-07-16 "ATP has no Polymarket US league"
+    # note is stale. ESPN already has a matching ATP scoreboard
+    # (LEAGUE_PATHS["ATP"]), closing the gap that previously made WTA the
+    # only tour tennis_forward.py could ever price.
+    "tennis": ("WTA", "ATP", "ITF_MEN", "ITF_WOMEN"),
     "esports": (
         "LOL",
         "CS2",
@@ -232,6 +244,20 @@ class PolymarketUSClient:
         short_bid = round(1 - best_ask, 6) if best_ask is not None else None
         short_ask = round(1 - best_bid, 6) if best_bid is not None else None
         short_midpoint = None if midpoint is None else round(1 - midpoint, 6)
+        # Same extraction _normalize_event uses for the stored slate: the
+        # market's own `line` is always expressed relative to whichever team
+        # `team` names (e.g. a spread market's `line=-1.5` with `team="Red
+        # Sox"` means the long side is "Red Sox -1.5"; the short side is
+        # always the negation, "Red Sox +1.5" == the opponent's own +1.5).
+        # None for market types with no team anchor (total, btts).
+        team = next(
+            (
+                (side.get("team") or {}).get("name")
+                for side in market["marketSides"]
+                if side.get("team")
+            ),
+            None,
+        )
         return {
             "provider": "polymarket_us",
             "market_id": str(market["id"]),
@@ -240,6 +266,8 @@ class PolymarketUSClient:
             "observed_at_utc": iso_utc(observed_at or utc_now()),
             "market_state": book.get("state"),
             "transact_time_utc": book.get("transactTime"),
+            "line": market.get("line"),
+            "team": team,
             "long": {
                 "description": long_side["description"],
                 "bid": best_bid,

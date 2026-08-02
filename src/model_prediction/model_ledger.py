@@ -208,6 +208,7 @@ def record_from_pick_request(
     model_ledgers_dir: str | Path,
     request: Any,
     eligibility: Any,
+    created: datetime | None = None,
 ) -> dict[str, str] | None:
     """Live-pipeline hook: write the equivalent ModelLedger row for a
     PickRequest/EligibilityResult pair the old PickLedger just logged.
@@ -224,6 +225,15 @@ def record_from_pick_request(
     this check every one of them would create a separate duplicate row
     here, even though old-ledger routing (Main/Flat/Research/Gated) is
     exactly the distinction this new schema doesn't have anymore.
+
+    ``observed_at_utc`` falls back to ``created`` (the pick's own append
+    timestamp) exactly like `_append_record`'s own `row["observed_at_utc"]`
+    does when `request.observed_at_utc` is unset -- found 2026-08-02 while
+    wiring `observed_at_utc` into the dedupe key: without matching that
+    fallback here, every request with no explicit `observed_at_utc` wrote a
+    blank value, so every re-forecast of that event collapsed into the
+    *same* blank-keyed row again, defeating the very fix that added
+    `observed_at_utc` to the key in the first place.
     """
     model_id = model_id_for(request.league.value, request.market_type.value)
     if model_id is None:
@@ -250,7 +260,7 @@ def record_from_pick_request(
         "decision_price": decision_price,
         "market_no_vig_probability": request.decision_no_vig_probability,
         "model_market_difference": getattr(eligibility, "edge", None),
-        "observed_at_utc": request.observed_at_utc,
+        "observed_at_utc": request.observed_at_utc or iso_utc(created or utc_now()),
         "event_start_utc": request.event_start_utc,
         "status": "open",
     }
@@ -259,6 +269,58 @@ def record_from_pick_request(
     if key in existing_keys:
         return None
     return ledger.append_prediction(record)
+
+
+def settle_from_pick_row(
+    model_ledgers_dir: str | Path, row: dict[str, Any]
+) -> dict[str, str] | None:
+    """Live-pipeline settlement hook, mirroring record_from_pick_request.
+
+    Found 2026-08-02 during a live-run verification: `ModelLedger.settle()`
+    existed but nothing ever called it -- every model ledger row stayed
+    "open" forever, even after PickLedger.settle() graded the real,
+    equivalent pick, so compute_model_evidence's hit-rate/Brier/calibration
+    numbers (the whole point of "operator decides using real evidence")
+    never actually populated. `PickLedger.settle()` calls this with the
+    just-settled row (result/pnl_units/probability_clv/closing_* already
+    set); this finds the matching open ModelLedger row by the same dedupe
+    identity used at append time and settles it too. Never raises: a
+    missing match (unmapped league/market, or the append-side hook never
+    fired for this pick, or it's already settled) degrades to a silent
+    no-op, same contract as the append hook.
+    """
+    model_id = model_id_for(str(row.get("league", "")), str(row.get("market_type", "")))
+    if model_id is None:
+        return None
+    path = Path(model_ledgers_dir) / f"{model_id}.xlsx"
+    if not path.exists():
+        return None
+    ledger = ModelLedger(path)
+    key = _prediction_dedupe_key(
+        {
+            "event_id": row.get("event_id", ""),
+            "market_type": row.get("market_type", ""),
+            "line": row.get("line", ""),
+            "model_version": row.get("model_version", ""),
+            "observed_at_utc": row.get("observed_at_utc", ""),
+        }
+    )
+    match = next(
+        (candidate for candidate in ledger.rows() if _prediction_dedupe_key(candidate) == key),
+        None,
+    )
+    if match is None or match["status"] == "settled":
+        return None
+    closing_price_raw = row.get("closing_raw_implied_probability") or row.get("closing_implied_probability")
+    probability_clv_raw = row.get("probability_clv")
+    pnl_units_raw = row.get("pnl_units")
+    return ledger.settle(
+        match["prediction_id"],
+        result=str(row.get("result", "")),
+        closing_price=float(closing_price_raw) if closing_price_raw not in (None, "") else None,
+        pnl_units=float(pnl_units_raw) if pnl_units_raw not in (None, "") else None,
+        probability_clv=float(probability_clv_raw) if probability_clv_raw not in (None, "") else None,
+    )
 
 
 class ModelLedger:

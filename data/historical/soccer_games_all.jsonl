@@ -9259,3 +9259,8 @@
 {"away_score":0,"away_team":"Gwangju FC","event_id":"oddsapi:soccer_korea_kleague1:2026-08-02:6a855bbe","event_start_utc":"2026-08-02T10:30:00Z","home_score":2,"home_team":"Daejeon Citizen","league":"K_LEAGUE_1"}
 {"away_score":1,"away_team":"FC Anyang","event_id":"oddsapi:soccer_korea_kleague1:2026-08-02:5dae9531","event_start_utc":"2026-08-02T10:30:00Z","home_score":3,"home_team":"Ulsan Hyundai FC","league":"K_LEAGUE_1"}
 {"away_score":3,"away_team":"Incheon United","event_id":"oddsapi:soccer_korea_kleague1:2026-08-02:4410b703","event_start_utc":"2026-08-02T10:30:00Z","home_score":3,"home_team":"Jeju United FC","league":"K_LEAGUE_1"}
+{"away_score":1,"away_team":"Shanghai Shenhua FC","event_id":"oddsapi:soccer_china_superleague:2026-08-02:a6f91c43","event_start_utc":"2026-08-02T11:35:00Z","home_score":3,"home_team":"Liaoning Tieren FC","league":"CSL"}
+{"away_score":0,"away_team":"Chongqing Tonglianglong FC","event_id":"oddsapi:soccer_china_superleague:2026-08-02:dad61dc9","event_start_utc":"2026-08-02T12:00:00Z","home_score":2,"home_team":"Shenzhen Peng City FC","league":"CSL"}
+{"away_score":1,"away_team":"AC Horsens","event_id":"oddsapi:soccer_denmark_superliga:2026-08-02:402f3ef6","event_start_utc":"2026-08-02T12:00:00Z","home_score":2,"home_team":"FC Midtjylland","league":"SUPERLIGA"}
+{"away_score":0,"away_team":"Randers FC","event_id":"oddsapi:soccer_denmark_superliga:2026-08-02:85649d52","event_start_utc":"2026-08-02T12:00:00Z","home_score":1,"home_team":"FC Nordsjaelland","league":"SUPERLIGA"}
+{"away_score":0,"away_team":"Viborg FF","event_id":"oddsapi:soccer_denmark_superliga:2026-08-02:2ad44a1b","event_start_utc":"2026-08-02T14:00:00Z","home_score":1,"home_team":"Brondby IF","league":"SUPERLIGA"}

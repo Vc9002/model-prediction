@@ -134,3 +134,44 @@ def test_tennis_model_flat_call_from_surface_elo() -> None:
     )
     assert predictions[0].probabilities["away"] > 0.6  # player_one slot
     assert abs(sum(predictions[0].probabilities.values()) - 1) < 1e-5
+
+
+def test_tennis_model_skips_matches_with_no_data_for_either_player() -> None:
+    """Too many WTA/ITF matches run daily to call them all -- a player absent
+    from history has no real edge, just a DEFAULT_ELO coin flip, so the model
+    must hard-skip rather than emit a low-confidence call."""
+    matches = [
+        {"winner": "Ace", "loser": "Journeyman", "surface": "Clay", "match_date": f"2026-03-{d:02d}"}
+        for d in range(1, 15)
+    ]
+    predictions = tennis_model().predict_games(
+        matches,
+        [
+            TennisMatch(
+                event_id="known-vs-unknown",
+                event_start_utc="2026-05-01T12:00:00Z",
+                player_one="Ace",
+                player_two="Nobody Everheard",
+                surface="Clay",
+                tour="WTA",
+            ),
+            TennisMatch(
+                event_id="unknown-vs-unknown",
+                event_start_utc="2026-05-01T12:00:00Z",
+                player_one="Nobody Everheard",
+                player_two="Also Unknown",
+                surface="Clay",
+                tour="WTA",
+            ),
+            TennisMatch(
+                event_id="known-vs-known",
+                event_start_utc="2026-05-01T12:00:00Z",
+                player_one="Ace",
+                player_two="Journeyman",
+                surface="Clay",
+                tour="WTA",
+            ),
+        ],
+    )
+    event_ids = {prediction.event_id for prediction in predictions}
+    assert event_ids == {"known-vs-known"}
