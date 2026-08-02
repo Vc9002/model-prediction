@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "97de5c5903ba33e53441b5088cf4e6c4cee4d2e8611df656dcf52f1b3af7f6f4",
+  "artifact_hash": "0393e290b17b4d34bf783a8173fb53c53aebc8558545e4c0778b6e017fd0a405",
   "confidence_threshold": 0.03,
   "home_or_order_advantage": 0.0,
   "initial_rating": 1500.0,
@@ -2050,7 +2050,7 @@
     "bo3:1:9996": 1423.842823
   },
   "schema_version": "esports-neutral-elo-v2",
-  "source_manifest_sha256": "9043120a976ae261eb286ff5fac8adf613cb446a93cc4a56e9c67157ea55fe5a",
+  "source_manifest_sha256": "f7a7cda1787d3360f29a4f39d75c3fde80e9ac3080ca0c15d4e1165808cf81ea",
   "target": "best-of match/series winner",
   "title": "cs2",
   "trained_through_utc": "2026-08-02T16:00:00Z",

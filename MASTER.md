@@ -549,13 +549,13 @@ Never imported, never tested, dead code creating false signal:
 - [ ] Atomic exposure-check-plus-append across processes
 - [ ] Preserve paired-ledger consistency (research ↔ gated)
 - [ ] Redact The Odds API key from all logged/returned errors
-- [ ] Reject future `observed_at_utc` values (negative age → fail freshness)
+- [x] Reject future `observed_at_utc` values — **already enforced at `domain.py:244`; stale claim**
 - [ ] Paginate Polymarket discovery; distinguish provider failure from empty slate; never hardcode `timestamp_valid=true`
 - [ ] Validate rows before adding event ID to feature-ingest dedup state
 - [ ] Surface narrow exception catches: esports, KBO/NPB, source-refresh failures must log, not silently discard
 - [ ] Build registry-free ban mechanism for esports/soccer/tennis/KBO/NPB (not coupled to `EntityRegistry.resolve`)
 - [ ] Fix `model-prediction models` CLI — report config-derived status, not static registry specs
-- [ ] Fix or delete `/api/scan` route — either call `capture_slate_snapshots` with real client+events or delete
+- [x] Fix or delete `/api/scan` route — **route does not exist in current `dashboard_server.py`; stale claim**
 - [ ] Fix 4 dashboard order-preview tests — pin unit value or use sizes within current `$5.00` cap
 - [ ] Reproduce `outputs/latest/learned-model-validation.json` from one stable green checkout
 - [ ] Make WNBA availability fail closed — test malformed/conflicting source combinations

@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4596309",
+      "current_status": "Out",
+      "player_name": "Liatu King",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-02T15:48:00+00:00",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "athlete_id": "5345322",
+      "current_status": "Out",
+      "player_name": "Emma Cechova",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-15T23:36:00+00:00",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "athlete_id": "4898383",
+      "current_status": "Out",
+      "player_name": "Bree Hall",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-02T16:18:00+00:00",
+      "team": "Indiana Fever"
+    },
+    {
+      "athlete_id": "4433744",
+      "current_status": "Out",
+      "player_name": "Ugonne Onyiah",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-01T23:34:00+00:00",
+      "team": "Indiana Fever"
+    },
+    {
+      "athlete_id": "2955898",
+      "current_status": "Out",
+      "player_name": "Damiris Dantas",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-01T22:14:00+00:00",
+      "team": "Indiana Fever"
+    }
+  ],
+  "event_id": "401857107",
+  "observed_at_utc": "2026-08-02T18:27:17.921610+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "76cc9d3b3c47bd472ca3d2c74a7eaeedebc70388674ea03a9717b6f7d6911cc6",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -41,12 +41,21 @@ class TheOddsAPIClient:
         self.base_url = base_url.rstrip("/")
         self.client = client or httpx.Client(timeout=30)
 
+    def _safe_get(self, url: str, **kwargs) -> httpx.Response:
+        """GET with API key redacted from any error message."""
+        try:
+            return self.client.get(url, **kwargs)
+        except Exception as exc:
+            # httpx errors embed the full URL in the message — redact the key
+            msg = str(exc).replace(str(self.api_key), "[REDACTED]")
+            raise type(exc)(msg) from None
+
     def odds(self, league: str, markets: str = "h2h,spreads,totals") -> list[dict[str, Any]]:
         sport = SPORT_KEYS[league.upper()]
         return self._odds_for_sport(sport, markets)
 
     def active_tennis_sports(self) -> list[dict[str, Any]]:
-        response = self.client.get(
+        response = self._safe_get(
             f"{self.base_url}/sports",
             params={"apiKey": self.api_key},
         )
@@ -69,7 +78,7 @@ class TheOddsAPIClient:
         return self._odds_for_sport(sport_key, markets)
 
     def _odds_for_sport(self, sport: str, markets: str) -> list[dict[str, Any]]:
-        response = self.client.get(
+        response = self._safe_get(
             f"{self.base_url}/sports/{sport}/odds",
             params={
                 "apiKey": self.api_key,
@@ -84,7 +93,7 @@ class TheOddsAPIClient:
 
     def scores(self, league: str, days_from: int = 3) -> list[dict[str, Any]]:
         sport = SPORT_KEYS[league.upper()]
-        response = self.client.get(
+        response = self._safe_get(
             f"{self.base_url}/sports/{sport}/scores",
             params={"apiKey": self.api_key, "daysFrom": days_from, "dateFormat": "iso"},
         )

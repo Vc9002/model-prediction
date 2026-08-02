@@ -1,11 +1,11 @@
 {
-  "generated_at_utc": "2026-08-02T18:12:13.430574Z",
+  "generated_at_utc": "2026-08-02T18:24:05.529192Z",
   "promotion_eligible": false,
   "scope": "research-only separate-title series-winner baselines",
   "titles": {
     "cs2": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/cs2-tiered-elo-v5.json",
-      "artifact_hash": "97de5c5903ba33e53441b5088cf4e6c4cee4d2e8611df656dcf52f1b3af7f6f4",
+      "artifact_hash": "0393e290b17b4d34bf783a8173fb53c53aebc8558545e4c0778b6e017fd0a405",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 32.0,
@@ -336,7 +336,7 @@
     },
     "dota2": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/dota2-tiered-elo-v5.json",
-      "artifact_hash": "ce95aa4e0460f03b576cfe378088aa52cf8dfca288629cf83064ab59e16ea594",
+      "artifact_hash": "cb2508545871cd245c79cd37a7ddf28f5f869bf875eba85e1d6069b628af9a62",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 40.0,
@@ -667,7 +667,7 @@
     },
     "lol": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/lol-tiered-elo-v5.json",
-      "artifact_hash": "4f36308eb4ef5b33d9e3dc1ce778f2d60fa81380dd8ffa234241836516487e8e",
+      "artifact_hash": "9874c87288f5592f0598f78c78d9cd54fcbdac231ba8fa0dfab5378878942df2",
       "chosen": {
         "confidence_threshold": 0.05,
         "k": 32.0,
@@ -998,7 +998,7 @@
     },
     "rainbow_six": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/rainbow_six-tiered-elo-v5.json",
-      "artifact_hash": "f6351a7a96e4fd4ec1d454ec78596eb79d96eec7a014dd809de84a10af42edc0",
+      "artifact_hash": "8b59577d553664a6e198202cc1c7c17f54ea92b762ef631bca5f2fe3223ccb5e",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 32.0,
@@ -1329,7 +1329,7 @@
     },
     "valorant": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/valorant-tiered-elo-v5.json",
-      "artifact_hash": "2423c98b6a05dc2cea3a1dd163230ce49db5d6d9f7b9e23df0f802eca3d59a6c",
+      "artifact_hash": "aa63798f2910846053904184b00fe7ab3d234b671e36f3972069106b36a79e32",
       "chosen": {
         "confidence_threshold": 0.03,
         "k": 48.0,

@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-08-02T18:13:33.216235Z",
+  "generated_at_utc": "2026-08-02T18:25:51.382131Z",
   "leagues": {
     "kbo": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/kbo-tie-aware-elo-v1.json",
-      "artifact_hash": "2185d069f8b63d9298d68398edfc714653c114b9b112daa168d8e52de9412ae3",
+      "artifact_hash": "4c999a9214e7fea627095d76bde7dec7f45bc3d485c8094da8216c35f8ef522e",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0
@@ -11395,7 +11395,7 @@
     },
     "npb": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/npb-tie-aware-elo-v1.json",
-      "artifact_hash": "511410a41efea98d7b14ad01d55b603e69cf747467905864b6b60305ac45223e",
+      "artifact_hash": "3d561c5018d3d4f6b153c97cf35e5cb3249408465d2dfda03ce71d613b5765ce",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0
