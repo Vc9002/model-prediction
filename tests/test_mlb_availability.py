@@ -402,6 +402,68 @@ def test_recent_il_placement_flags_starter_unavailable(tmp_path, monkeypatch) ->
     assert result["probable_starter_unavailable_away"] == 0.0
 
 
+def test_same_day_transaction_is_never_trusted_regardless_of_wall_clock_order(tmp_path, monkeypatch) -> None:
+    """Real gap found by review 2026-08-02: MLB Stats API's transaction
+    `date` field has no time-of-day component, only a calendar date. A
+    transaction reported on the SAME day as the decision could have
+    happened before or after the decision within that day -- there's no
+    way to tell from the data. Must be excluded entirely (not just
+    "excluded if literally later"), even when it happens to be an IL
+    placement that, in real wall-clock time, actually occurred before this
+    decision -- the point is we cannot safely know that from the data.
+    """
+    _stub_starters(monkeypatch)
+    _write_txn_snapshot(
+        tmp_path,
+        team_ids=[147, 119],
+        entries=[
+            # Reported the same calendar day as the decision below --
+            # ambiguous whether this happened before or after the decision.
+            _entry(147, "Gerrit Cole", "2026-08-01", "Injured List (15-Day)"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    result = mlb_player_availability.matchup_player_availability(
+        data_root=tmp_path,
+        home_team="New York Yankees",
+        away_team="Los Angeles Dodgers",
+        game_date="2026-08-01",
+        observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
+        event_id="game-1",
+    )
+
+    assert result["probable_starter_unavailable_home"] == 0.0
+
+
+def test_transaction_the_day_before_decision_is_still_trusted(tmp_path, monkeypatch) -> None:
+    """Contrast case for the test above: a transaction reported on a
+    strictly earlier calendar day than the decision remains genuinely
+    safe and must still be used."""
+    _stub_starters(monkeypatch)
+    _write_txn_snapshot(
+        tmp_path,
+        team_ids=[147, 119],
+        entries=[
+            _entry(147, "Gerrit Cole", "2026-07-31", "Injured List (15-Day)"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    result = mlb_player_availability.matchup_player_availability(
+        data_root=tmp_path,
+        home_team="New York Yankees",
+        away_team="Los Angeles Dodgers",
+        game_date="2026-08-01",
+        observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
+        event_id="game-1",
+    )
+
+    assert result["probable_starter_unavailable_home"] == 1.0
+
+
 def test_activation_after_placement_clears_the_flag(tmp_path, monkeypatch) -> None:
     _stub_starters(monkeypatch)
     _write_txn_snapshot(

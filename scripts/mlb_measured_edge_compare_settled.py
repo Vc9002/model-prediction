@@ -11,7 +11,7 @@ from scripts/mlb_measured_edge_calibrate.py.
 
 Usage:
     env PYTHONPATH=src:. .venv/bin/python scripts/mlb_measured_edge_compare_settled.py \
-        --formula config/models/mlb-analyst-poisson-trend-v0.3.yaml \
+        --formula config/models/mlb-analyst-poisson-trend-v0.2.yaml \
         --margin-artifact config/models/measured-edge-margin-v2.json \
         --totals-artifact config/models/measured-edge-totals-v2.json
 """

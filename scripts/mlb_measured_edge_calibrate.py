@@ -22,7 +22,7 @@ blended into it.
 
 Usage:
     env PYTHONPATH=src:. .venv/bin/python scripts/mlb_measured_edge_calibrate.py \
-        --formula config/models/mlb-analyst-poisson-trend-v0.3.yaml \
+        --formula config/models/mlb-analyst-poisson-trend-v0.2.yaml \
         --feature-cache data/research/mlb_elasticity_feature_cache.jsonl \
         --odds-start 2026-07-17 --odds-end 2026-08-02 \
         --output-margin config/models/measured-edge-margin-v2.json \

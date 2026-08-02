@@ -170,3 +170,20 @@ def test_fractional_elasticity_dampens_the_factors_swing(tmp_path):
         - estimate_runs(neutral_features, spec_half).away_expected_runs
     )
     assert abs(dampened_swing) < abs(full_swing)
+
+
+def test_engine_version_rejects_the_un_promoted_v03_elasticity_refit() -> None:
+    """Real safety net verified by review 2026-08-02: ENGINE_VERSION is the
+    ONLY thing preventing config/models/mlb-analyst-poisson-trend-v0.3.yaml
+    (a real fitted-elasticity refit, materially different from what's
+    promoted -- e.g. bullpen_elasticity=0.069 vs. the promoted 0.0) from
+    loading live. This locks that rejection in so a future edit to
+    load_formula_spec's version check can't silently stop enforcing it.
+    """
+    from pathlib import Path
+
+    v03_path = Path("config/models/mlb-analyst-poisson-trend-v0.3.yaml")
+    if not v03_path.exists():
+        pytest.skip("mlb-analyst-poisson-trend-v0.3.yaml not present in this checkout")
+    with pytest.raises(ValueError, match="does not match the Trend Engine code"):
+        load_formula_spec(v03_path)

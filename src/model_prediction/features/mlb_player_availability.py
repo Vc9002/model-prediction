@@ -83,10 +83,24 @@ def _latest_transactions_snapshot(
 
 
 def _starter_status(
-    payload: dict[str, Any], team_id: int, starter_name: str, cutoff_date: str
+    payload: dict[str, Any], team_id: int, starter_name: str, observed: datetime
 ) -> str:
-    """Status of ``starter_name`` as of ``cutoff_date``, from the latest
-    IL-relevant transaction with ``reported_date <= cutoff_date``.
+    """Status of ``starter_name`` as of ``observed``, from the latest
+    IL-relevant transaction reported strictly before ``observed``'s own
+    calendar day.
+
+    MLB Stats API's transaction ``date`` field (stored as ``reported_date``)
+    has no time-of-day component -- only a calendar date. A transaction
+    reported on the SAME calendar day as the decision could have happened
+    before or after the decision within that day, and there is no way to
+    tell which from the data alone. Same-day transactions are therefore
+    excluded entirely (strict ``<``, not ``<=``) rather than assumed safe --
+    the conservative, fail-closed choice, matching this project's standing
+    rule that ambiguous timing is treated as unknowable, not as knowable.
+    This also means a decision horizon set to a day before the game
+    (rather than game day itself) correctly gets a tighter cutoff, not the
+    game date's cutoff -- a real precision improvement over comparing
+    against game_date, not just a same-day patch.
 
     Real MLB Stats API ``type_desc`` is almost never discriminative for IL
     moves (both a placement and an activation typically read "Status
@@ -96,12 +110,13 @@ def _starter_status(
     say nothing about IL status (trades, options, recalls, waiver claims) --
     those are silently ignored rather than treated as an unrecognized/failed
     status, since only the IL-relevant subset is ordered to find the latest.
-    No IL-relevant history found (or none before cutoff_date) is treated as
+    No IL-relevant history found (or none before the cutoff) is treated as
     Active, not a fail-closed case -- the overwhelming majority of probable
     starters have a clean record, and requiring an explicit "Active"
     transaction for every start would make this feature fire NO_CALL for
     nearly every game.
     """
+    cutoff_date = observed.date().isoformat()
     relevant: list[tuple[str, str]] = []
     for entry in payload.get("entries", []):
         if entry.get("team_id") != team_id:
@@ -109,7 +124,7 @@ def _starter_status(
         if _identity(str(entry.get("player_name", ""))) != _identity(starter_name):
             continue
         reported = entry.get("reported_date")
-        if not reported or str(reported) > cutoff_date:
+        if not reported or str(reported) >= cutoff_date:
             continue
         description = str(entry.get("description") or "").casefold()
         if any(marker in description for marker in AVAILABLE_TRANSACTION_MARKERS):
@@ -193,7 +208,7 @@ def _side_status(
             status = "Active" if STATUS_ACTIVE_PROBABILITIES[roster_status] >= 1.0 else roster_status
             return status, parse_utc(str(roster["observed_at_utc"])), "roster"
     snapshot = _latest_transactions_snapshot(root, team_id, game_date)
-    status = _starter_status(snapshot, team_id, starter_name, game_date)
+    status = _starter_status(snapshot, team_id, starter_name, observed)
     return status, parse_utc(str(snapshot["observed_at_utc"])), "transactions"
 
 
