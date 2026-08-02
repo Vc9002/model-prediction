@@ -3,7 +3,7 @@
 Shadow-first multi-sport prediction, research, ledger, and local dashboard
 system with Polymarket US market-data integration.
 
-**Last updated**: 2026-08-02
+**Last updated**: 2026-08-03
 
 The current operational verdict and audit evidence live in
 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`DEBUG.md`](DEBUG.md).
@@ -15,7 +15,7 @@ defects are repaired.
 
 | Metric | Value |
 |--------|-------|
-| Tests | **624 pass** |
+| Tests | **654 pass** |
 | Ruff | 118 findings (79 EXE002 shebang, ~117 baseline) |
 | Git | single `main` branch (no other active branches, local or `origin`) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
@@ -32,12 +32,12 @@ validated" — it's "is this model actually running, and on what data."
 | Sport | Wired in `daily`? | Model / features it actually runs on | Ledger it writes to |
 |---|---|---|---|
 | MLB moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v7 artifact) | Main + Flat |
-| MLB totals & spread | Yes | `models/mlb.py` `MeasuredEdgeTotalsModel`/margin — Gamma-Poisson mixture Monte-Carlo, priced against real Polymarket lines | Flat only |
+| MLB totals & spread | Yes | `models/mlb.py` `MeasuredEdgeTotalsModel`/margin — Gamma-Poisson mixture Monte-Carlo, priced against real Polymarket lines | Main + Flat |
 | NBA moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Flat only (not promoted to Main) |
 | WNBA moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Main + Flat |
 | NFL moneyline | Yes (offseason) | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Flat only (not promoted to Main) |
-| Soccer | Yes | Poisson-Dixon-Coles (`soccer-poisson-dc-v1`) — moneyline, totals, BTTS | Main + Flat (operator override 2026-08-02) + Research |
-| Tennis | Yes | WTA surface Elo (`tennis-surface-elo-v1`) | Research + Gated Research |
+| Soccer | Yes | Poisson-Dixon-Coles (`soccer-poisson-dc-v1`) — moneyline, totals, BTTS | Main + Flat |
+| Tennis | Yes | WTA + ATP surface Elo (`tennis-surface-elo-v1`) | Main + Flat |
 | LOL | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
 | CS2 | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
 | Dota 2 | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
@@ -46,12 +46,14 @@ validated" — it's "is this model actually running, and on what data."
 | KBO | Yes | Tie-aware Elo (v2) | Research + Gated Research (no Polymarket markets exist) |
 | NPB | Yes | Tie-aware Elo (v2) | Research + Gated Research (no Polymarket markets exist) |
 
-## Key design decisions (as of 2026-08-02)
+## Key design decisions (as of 2026-08-03)
 
-- **Main ledger (MLB/WNBA)**: "show everything, I decide" — no automated gate hides
-  a real pick. Operator is the final filter.
-- **Gated Research (esports/soccer/tennis)**: "Research shows everything, Gated
-  should mean something" — curated tier is deliberately tightened.
+- **Main ledger (MLB/WNBA/Soccer/Tennis)**: "show everything, I decide" — no automated
+  gate hides a real pick. Operator is the final filter. MLB spreads/totals also route
+  to Main alongside moneyline.
+- **Gated Research (esports)**: "Research shows everything, Gated should mean
+  something" — curated tier is deliberately tightened. Soccer and tennis moved to
+  Main+Flat only per operator directive 2026-08-03.
 - **Unit sizing**: 1.0U–2.0U range, with `model_uncertainty` now actually
   haircutting the edge (was a dead parameter for months; fixed 2026-07-31).
 - **New Model Ledger** (`model_ledger.py`): additive architecture — one `.xlsx`
@@ -72,7 +74,7 @@ flowchart TD
     subgraph Sources["Data Sources"]
         ESPN["ESPN scoreboards\n(MLB/NBA/WNBA/NFL)"]
         POLY["Polymarket\n(US market prices + resolution)"]
-        SCRAPE["KBO/NPB scrapers,\nesports series feeds, WTA results"]
+        SCRAPE["KBO/NPB scrapers,\nesports series feeds, WTA/ATP results"]
         ODDS["The Odds API\n(sportsbook lines, soccer scores)"]
     end
 
@@ -93,7 +95,7 @@ flowchart TD
         SOCCER["Poisson-Dixon-Coles v1\nmoneyline / totals / BTTS"]
         ESPORTS["Platt-scaled neutral series Elo v5\nLOL / CS2 / Dota2 / Valorant / R6"]
         TIEAWARE["Tie-aware Elo v2\nKBO / NPB"]
-        TENNIS["WTA surface Elo v1"]
+        TENNIS["WTA + ATP surface Elo v1"]
     end
 
     subgraph GateStep["Confidence & Edge Gates"]
