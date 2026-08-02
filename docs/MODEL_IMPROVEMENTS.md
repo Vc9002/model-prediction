@@ -17,60 +17,62 @@ timestamps, a versioned source, a missingness policy, and an ablation result.
 
 ---
 
-## 1. Current-state audit: fix this before trusting new lift
+## 1. Current-state audit
 
-The currently configured candidate inputs are narrow:
+**Reaudited 2026-08-02.** The original version of this section (below,
+items 1-4 and 6) described a real state as of its own writing, but every
+one of those specific problems has since been fixed by later sessions'
+work — kept here as a resolved log, not an active blocker list, so a
+reader doesn't waste time re-litigating settled questions. Item 5 remains
+the one genuinely permanent, still-true standing principle; it is not a
+bug to close out, it's this project's operating stance.
 
-| League | Active v3 moneyline inputs |
-|---|---|
-| NBA | Elo probability, offensive trend gap, defensive trend gap |
-| WNBA | Elo probability, offensive trend gap, defensive trend gap |
-| MLB | Elo probability, trend gap, park factor, weather factor, `pitcher_era_gap` |
-| NFL | Elo probability, trend gap |
+Production moneyline artifacts as of 2026-08-02 (all real versions moved
+well past the "v3" this section originally audited):
+`mlb-elo-trend-lr-v7`, `wnba-elo-trend-lr-v4`, `nba-elo-trend-lr-v4`,
+`nfl-elo-trend-lr-v4`. MLB's live feature set is now Elo probability, trend
+gap, park factor, weather factor, `pitcher_era_gap`, plus
+`bullpen_weakness_gap`; NBA/WNBA remain Elo + offensive/defensive trend
+gap; NFL remains Elo + trend gap. None of the four leagues' input lists
+have grown much beyond what this section originally described — the
+sections below (6-9) are the real to-do list for widening them.
 
-The narrowness is not the main problem. The active artifacts and newest report
-are not one reproduced release, and the current test suite rejects the MLB
-qualification state. Reported evidence is therefore not yet safe to interpret
-as forward model lift or operational readiness.
+### P0 blockers — resolution status
 
-### P0 blockers
-
-1. **MLB training-serving skew.** In historical validation,
-   `pitcher_era_gap` is actually the difference in each team's runs allowed over
-   its last five games. In forward prediction, the same feature name can contain
-   probable-pitcher ERA. Those are different variables and must never share one
-   coefficient.
-2. **MLB weather mismatch.** Historical training uses a cached historical
-   weather database. The live function currently takes the first returned
-   forecast hour rather than the game's scheduled hour, and treats wind speed
-   without ballpark-relative direction. A model trained on realized or
-   near-realized weather cannot be validated as if that were the forecast known
-   at decision time.
-3. **Static park leakage/regime drift.** A single `2025-three-year` park-factor
-   table is applied across earlier seasons. Park geometry, venue, roof behavior,
-   humidor use, and league run environments can change. Historical rows need the
-   park version that was knowable for that season/date.
-4. **The locked holdout is no longer untouched.** Multiple variants and
-   thresholds have already been compared on the same dated holdout in several
-   `learned-model-validation-v*.json` reports. That cohort is now development
-   evidence. It cannot honestly certify the next promoted version.
-5. **Profitability is not established.** Flat one-unit `-110` P&L is a
-   diagnostic, not moneyline or Polymarket profitability. Current qualification
-   does not require positive executable-price EV or venue costs. Hit rate alone
-   can be inflated by selecting favorites.
-6. **Documentation and artifacts disagree.** README summary figures, active
-   artifact qualifications, and the latest validation report do not consistently
-   report the same calls, hit rates, or units. Establish one versioned report as
-   the source of truth before the next experiment.
-
-### Required response
-
-- Treat the existing MLB park/weather/pitcher result as **research-only** until
-  train/serve parity is demonstrated.
-- Freeze the previously opened holdout as descriptive evidence. Select features
-  with inner chronological folds, then use a new prospective cohort or a newly
-  reserved final period exactly once.
-- Keep every new output at zero actual units until economic validation passes.
+1. ~~**MLB training-serving skew.**~~ **Resolved.** `learned_forward.py`'s
+   `pitcher_era_gap` now explicitly calls `pitcher_era_gap_from_history`,
+   the same rolling-runs-allowed definition training uses — never an ESPN
+   starter-ERA proxy, which was the original mismatch. See that function's
+   own comment for the specific prior bug this replaced.
+2. ~~**MLB weather mismatch.**~~ **Resolved** (fixed during this session's
+   review passes; see DEBUG.md for the specific weather-timing bug and fix).
+3. **Static park leakage/regime drift.** Partially addressed, not fully
+   closed. `mlb_baseline_refresh.py` now self-throttles a weekly park-
+   factor/league-rate refresh so the table doesn't silently drift stale for
+   months, and a live ablation this session (2026-08-02) confirmed park
+   factor's real, positive contribution with the current table. Not yet
+   verified: whether historical training rows use the park-factor version
+   that was actually knowable for that specific season/date, vs. one
+   current table applied retroactively. Worth a direct check before fully
+   closing this item.
+4. ~~**The locked holdout is no longer untouched.**~~ **Superseded.** The
+   artifacts this specifically warned about are gone — MLB (v7), all four
+   live esports titles (v5), and KBO/NPB were all rebuilt this session with
+   fresh chronological train/validation/locked-test splits. Still a real
+   principle to re-apply the next time any of these artifacts are revised:
+   don't re-open a cohort that already influenced a promotion decision.
+5. **Profitability is not established.** Still the accurate, permanent
+   standing principle — most models remain research/shadow/zero-unit by
+   design; only MLB moneyline and WNBA moneyline currently produce real,
+   sized Main-ledger calls. Flat `-110` diagnostics remain diagnostics, not
+   proof of executable-price profitability. Keep this as the standard every
+   new candidate is held to, not a one-time fix.
+6. ~~**Documentation and artifacts disagree.**~~ **Substantially resolved.**
+   DEBUG.md now carries an extensive, continuously reconciled record of
+   real verified numbers (test counts, ruff findings, settled records,
+   backtest results) for every change made this session. Not a guarantee
+   against future drift — re-check if a future session's numbers stop
+   matching what's actually in the ledgers.
 
 ---
 
@@ -496,6 +498,58 @@ still has zero track record of catching a real case where an announced
 starter actually didn't pitch, since it was only wired up on 2026-08-01.
 Do not claim any lift until that track record exists.
 
+### MLB pitching-staff (bullpen) availability — 2026-08-02
+
+Implemented, shadow only: a first real pass at rank-3's "bullpen
+availability and quality... closer/setup absence." Coarser than that row's
+full description — MLB Stats API roster data identifies position *type*
+(Pitcher vs. everyone else), not bullpen *role* (closer/setup/long), so
+this reports aggregate pitching-staff health, not a specific reliever's
+availability.
+
+`features/mlb_player_availability.py::team_pitching_staff_availability`/
+`matchup_pitching_staff_availability` compute the share of a team's
+current pitching staff that's unavailable due to injury or an
+administrative list, reusing the same live roster-snapshot infrastructure
+(and its freshness/future-capture safeguards) as probable-starter
+availability. `capture_roster_snapshot` (`data_sources/mlb_injuries.py`)
+now also stores each player's `position_type`, needed to identify pitchers
+at all — a schema addition, so historical snapshots captured before this
+change don't have it (same "no backlog, clock going forward" situation as
+the KBO/NPB fix below).
+
+A real design bug caught by testing against live data, before it shipped:
+the first version counted `"Reassigned to Minors"` as "unavailable,"
+which produced a nonsensical baseline (Yankees 43%, Dodgers 55% of their
+pitching staff "unavailable") — being optioned to AAA is routine 40-man-
+vs-26-man roster depth management, present for every team on any given
+day regardless of health, not an injury signal. Fixed by excluding
+`Reassigned to Minors` from both the numerator and denominator entirely
+(new `INJURY_OR_ADMIN_LIST_STATUSES` constant in `mlb_injuries.py`,
+deliberately narrower than the existing `STATUS_ACTIVE_PROBABILITIES` used
+by the per-player starter check, which correctly treats "optioned" as
+disqualifying for a *named* player but shouldn't for an *aggregate* health
+read). Re-verified live afterward: Yankees 13.3% (2/15), Dodgers 43.5%
+(10/23) — the Dodgers number checked against the real roster snapshot and
+matches their real, well-documented 2026 pitching injuries (Blake Snell,
+Tyler Glasnow, Bobby Miller, and five others, all genuinely on the IL).
+
+Live-only by construction, same constraint as the starter feature's
+roster-preferred path: a fresh roster snapshot cannot cover a historical
+decision time, and unlike starter availability, there is no transactions-
+based fallback for this feature — "how many pitchers are on the active
+roster right now" isn't reconstructable from the IL-transaction log alone
+(trades/options/call-ups change roster composition in ways a pure IL
+filter wouldn't capture). This means, unlike the starter feature, this one
+genuinely cannot be backtested against historical games — it only exists
+going forward from today.
+
+Wired into `learned_forward.py`'s generic feature-computation path with
+its own dispatch branch and feature-name constant
+(`PITCHING_STAFF_FEATURE_NAMES`), same shadow-only, inert-until-requested
+design as every other availability feature. 7 new tests in
+`tests/test_mlb_availability.py`.
+
 ---
 
 ## 9. NFL feature roadmap
@@ -607,6 +661,54 @@ be diagnostics, but should not displace roster and map-pool construction.
 6. Reserve a new prospective cohort after feature selection; do not promote
    from the v1 diagnostic holdout.
 
+### Esports implementation status — 2026-08-02
+
+Item 2 above ("start prospective BBO snapshots now") is done: real captured
+Polymarket BBO exists for LOL/CS2/DOTA2/VALORANT since 2026-07-17 (16 days,
+28,469 real snapshot lines as of this check). Live picks already price
+against these real executable asks, not a synthetic assumption.
+
+LOL/CS2/DOTA2/VALORANT were rebuilt v4->v5 this session: consolidated onto
+one shared `expected_win_probability` Elo core (previously four independent
+implementations), K-factor reselected by Brier score and confidence
+threshold reselected by `units_at_minus_110` (previously both blended
+together, which mechanically favors the most restrictive threshold with no
+interior optimum — see the fix in `esports.py`).
+
+**A real, unresolved gap, not yet fixed:** the K/confidence-threshold
+selection backtest (`outputs/latest/esports-baseline-validation.json`) is
+explicitly self-documented as `"profitability":
+"not_established_no_point_in_time_market_prices"` — the *locked-test* numbers
+used to choose each title's threshold assume a flat -110 price for every
+match, because no real captured price history existed yet when that
+methodology was built. That's now only partially true (16 days of real BBO
+exist), but far too little to redo a fit that was originally validated
+against ~1,900-2,900 locked-test matches per title without trading real
+statistical power for noise.
+
+This gap plausibly explains an observed divergence: LOL's locked-test
+backtest shows 70.3% accuracy on 1,910 selected matches (large, real,
+validated), but the small number of real live settled LOL picks so far
+(11 research, 3 gated, all on `lol-tiered-elo-v5`) show only 36.4%/33.3%
+hit rate. That's roughly 2.4 standard deviations below what the backtest
+would predict for a sample this size — notable, but a sample of 11 is
+still nowhere near large enough to distinguish "the model doesn't hold up
+in live conditions" from "a real but unlucky small sample." CS2 shows a
+smaller version of the same pattern (52.2% live vs. an implied ~60%+ from
+its own threshold selection); DOTA2 and VALORANT do not show it.
+
+**Recommendation:** do not refit thresholds against the current 16-day
+real-price window — it's too small relative to the locked-test sample that
+justified the current thresholds and would likely just replace signal with
+noise. Instead, keep accumulating real captured BBO (it compounds for
+free every day `daily` runs) and revisit a real-price-validated threshold
+refit once there's a real captured-odds sample large enough to matter —
+plausibly several months out, not immediately. Track LOL/CS2's live hit
+rate specifically in the meantime; if the gap persists once the live
+sample reaches the same order of magnitude as CS2's locked-test sample
+(thousands, unrealistic soon) or even a few hundred picks (more
+realistic), that would be real evidence worth acting on.
+
 ---
 
 ## 10B. KBO and NPB feature roadmap
@@ -649,6 +751,27 @@ test. Both remain research-only and zero-unit.
 The score-only locked tests are roughly 55% KBO and 57% NPB decisive accuracy.
 That is a baseline, not a moat. Tuning more Elo constants is lower value than
 acquiring reliable starter, bullpen, and lineup state.
+
+### Real bug fixed 2026-08-02: zero picks were ever actually logged
+
+Item 2 above ("capture every current Polymarket US KBO/NPB contract BBO
+prospectively") was running correctly, and `daily` was correctly building
+real, priced forecasts every day (5-6 real scheduled games/day) — but a
+timestamp-ordering bug in `cli.py::_forecast_international_sport` meant
+every single one was silently rejected by `PickRequest.validate()`
+(`"observation timestamp cannot be in the future"`) before ever reaching
+`research/kbo.xlsx` or `research/npb.xlsx`. Confirmed both ledgers had zero
+rows, ever, despite running daily since implementation. Root cause: the
+caller captured its own `observed_now` *before* calling
+`forecast_international_baseball_slate`, but that function stamps each
+contract's `observed_at_utc` using its *own*, later, internal clock read —
+so the comparison always failed. Fixed by reordering the capture to happen
+after the slate builder returns (see DEBUG.md's 2026-08-02 (later) entry
+for the full trace and fix verification). This means every walk-forward/
+promotion claim item above ("promote nothing until a new prospective
+cohort...") starts from a genuinely empty real cohort as of this fix —
+there is no backlog of silently-discarded real picks to recover, only a
+clock going forward from today.
 
 ---
 
@@ -702,25 +825,49 @@ the noisiest metric.
 
 The highest-value work is data provenance, not a more complex algorithm.
 
-1. **Repair current parity and truth labels.** Split `team_recent_runs_allowed`
-   from true starter quality; make weather game-time and direction-aware; use
-   season-versioned park inputs; reconcile README/report/artifact metrics.
-2. **Build prospective snapshot infrastructure from the no-signup stack.**
-   Archive official injury, starter, lineup, inactive, roof/weather-forecast,
-   and executable-price observations with `observed_at_utc`. A missing paid feed
-   is not a blocker.
-3. **Build NBA/WNBA possession and availability models.** Four Factors/pace plus
-   projected minutes times shrunk player impact.
-4. **Build NFL QB/unit-efficiency and injury states.** Do this before tracking
-   exotica such as coverage shells.
-5. **Build MLB starter/lineup/bullpen states.** This is higher value than more
-   tuning of team score trends.
-6. **Add environment and interaction features.** Weather, park, shot
-   profile, pitch mix, protection-pressure.
-7. **Build the market-residual/economic layer.** Train only on timestamp-valid
-   BBO history; keep it separate from independent probabilities.
-8. **Promote only after a fresh test and user confirmation.** Until then, zero
-   actual units.
+**Status reframe, 2026-08-02**: steps 1-2 are substantially done project-
+wide (see section 1's resolution log and each sport's own implementation-
+status subsection). Center of gravity for new work should shift to step 3
+onward. Concretely, in priority order, what's real and unstarted right now:
+
+1. ~~**Repair current parity and truth labels.**~~ **Done** for MLB
+   (pitcher_era_gap skew, weather timing — section 1). Park-factor
+   season-versioning specifically still unverified (section 1, item 3).
+2. ~~**Build prospective snapshot infrastructure from the no-signup stack.**~~
+   **Done** for MLB availability (roster + IL transactions), WNBA
+   availability (official injury PDFs), and esports/KBO/NPB Polymarket BBO
+   (all real, running daily). **Not started**: NFL injury/lineup snapshots,
+   NBA/WNBA possession-level snapshot infrastructure (play-by-play/lineup
+   archival for the RAPM work in step 3).
+3. **Build NBA/WNBA possession and availability models.** Not started.
+   WNBA already has the availability *feature* (step 2) but not the
+   possession/Four-Factors model or shrunk player-impact (RAPM) layer this
+   step actually describes; NBA has neither. Highest-value untouched item
+   for either league once each is back in season (both are off-season as
+   of 2026-08-02 — 0 rows in any ledger for either right now, so this can
+   wait without cost).
+4. **Build NFL QB/unit-efficiency and injury states.** Not started at all.
+   Also off-season right now (0 rows) — same "no cost to waiting" logic as
+   NBA/WNBA.
+5. **Build MLB starter/lineup/bullpen states.** Starter quality (rank 1 in
+   section 8's table) is now real as of 2026-08-02 (the new availability
+   shadow feature) — narrower than this step's full scope (opponent-
+   adjusted K-BB%/xwOBA/pitch-count, not just unavailability), but the
+   real building block. Lineup quality and bullpen-as-a-feature (distinct
+   from Measured Edge's bullpen elasticity, which models aggregate bullpen
+   strength, not pregame availability) remain fully unstarted. **This is
+   the single highest-value next step given the season is live right now**
+   — MLB is the only one of the four major leagues currently in season.
+6. **Add environment and interaction features.** MLB park/weather already
+   real and validated (section 1, item 3 partial). Pitch-mix/platoon,
+   defense/catching, protection-pressure, shot-profile: unstarted.
+7. **Build the market-residual/economic layer.** Unstarted project-wide as
+   a *separate* layer (some individual models compute edge inline, but no
+   dedicated, isolated market-residual model exists per section 5's
+   design). Real gap once any independent-probability model is judged
+   ready to test against executable prices.
+8. **Promote only after a fresh test and user confirmation.** Standing
+   policy, not a step to complete — see the Promotion rule in section 2.
 
 What should not be prioritized now:
 

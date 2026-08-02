@@ -82,8 +82,16 @@ def _write_roster_snapshot(
     (snapshot_dir / "roster-fixture.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _roster_entry(team_id: int, player_name: str, current_status: str) -> dict[str, Any]:
-    return {"team_id": team_id, "player_id": 1, "player_name": player_name, "current_status": current_status}
+def _roster_entry(
+    team_id: int, player_name: str, current_status: str, position_type: str = "Outfielder"
+) -> dict[str, Any]:
+    return {
+        "team_id": team_id,
+        "player_id": 1,
+        "player_name": player_name,
+        "current_status": current_status,
+        "position_type": position_type,
+    }
 
 
 def _entry(team_id: int, player_name: str, reported_date: str, type_desc: str,
@@ -127,10 +135,12 @@ def test_capture_roster_snapshot_writes_raw_and_normalized_files(tmp_path) -> No
                 {
                     "person": {"id": 1, "fullName": "Gerrit Cole"},
                     "status": {"description": "Active"},
+                    "position": {"type": "Pitcher"},
                 },
                 {
                     "person": {"id": 2, "fullName": "Some Reliever"},
                     "status": {"description": "Injured 15-Day"},
+                    "position": {"type": "Pitcher"},
                 },
             ]
         }
@@ -142,8 +152,14 @@ def test_capture_roster_snapshot_writes_raw_and_normalized_files(tmp_path) -> No
     )
 
     assert payload["entries"] == [
-        {"team_id": 147, "player_id": 1, "player_name": "Gerrit Cole", "current_status": "Active"},
-        {"team_id": 147, "player_id": 2, "player_name": "Some Reliever", "current_status": "Injured 15-Day"},
+        {
+            "team_id": 147, "player_id": 1, "player_name": "Gerrit Cole",
+            "current_status": "Active", "position_type": "Pitcher",
+        },
+        {
+            "team_id": 147, "player_id": 2, "player_name": "Some Reliever",
+            "current_status": "Injured 15-Day", "position_type": "Pitcher",
+        },
     ]
     written = list((tmp_path / "availability" / "mlb" / "snapshots" / "2026-08-01").glob("roster-*.json"))
     assert len(written) == 1
@@ -665,4 +681,127 @@ def test_postgame_observation_is_rejected(tmp_path, monkeypatch) -> None:
             observed_at=datetime(2026, 8, 2, tzinfo=UTC),
             event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
             event_id="game-1",
+        )
+
+
+# ── pitching-staff (bullpen) availability ───────────────────────────────
+
+
+def test_pitching_staff_excludes_optioned_players_from_numerator_and_denominator(tmp_path) -> None:
+    """The real bug caught by testing against live data: "Reassigned to
+    Minors" is routine roster depth churn present for every team daily,
+    not a health signal -- it must not inflate the unavailable share."""
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147],
+        entries=[
+            _roster_entry(147, "Active Starter", "Active", position_type="Pitcher"),
+            _roster_entry(147, "Injured Reliever", "Injured 15-Day", position_type="Pitcher"),
+            _roster_entry(147, "AAA Depth", "Reassigned to Minors", position_type="Pitcher"),
+            _roster_entry(147, "Some Catcher", "Active", position_type="Catcher"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    result = mlb_player_availability.team_pitching_staff_availability(
+        data_root=tmp_path,
+        team="New York Yankees",
+        observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+    )
+
+    # Denominator is 2 (Active Starter + Injured Reliever) -- the optioned
+    # player and the non-pitcher are both excluded.
+    assert result["pitching_staff_total"] == 2
+    assert result["pitching_staff_unavailable"] == 1
+    assert result["pitching_staff_unavailable_share"] == pytest.approx(0.5)
+
+
+def test_matchup_pitching_staff_gap_favors_home_when_away_staff_is_worse(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147, 119],
+        entries=[
+            _roster_entry(147, "Yankees Pitcher A", "Active", position_type="Pitcher"),
+            _roster_entry(147, "Yankees Pitcher B", "Active", position_type="Pitcher"),
+            _roster_entry(119, "Dodgers Pitcher A", "Injured 60-Day", position_type="Pitcher"),
+            _roster_entry(119, "Dodgers Pitcher B", "Active", position_type="Pitcher"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    result = mlb_player_availability.matchup_pitching_staff_availability(
+        data_root=tmp_path,
+        home_team="New York Yankees",
+        away_team="Los Angeles Dodgers",
+        observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
+    )
+
+    assert result["pitching_staff_unavailable_share_home"] == pytest.approx(0.0)
+    assert result["pitching_staff_unavailable_share_away"] == pytest.approx(0.5)
+    assert result["pitching_staff_unavailable_share_gap"] == pytest.approx(0.5)
+
+
+def test_pitching_staff_no_pitchers_found_fails_closed(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147],
+        entries=[_roster_entry(147, "Some Catcher", "Active", position_type="Catcher")],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    with pytest.raises(ValueError, match="NO_CALL_MLB_PITCHING_STAFF_UNAVAILABLE"):
+        mlb_player_availability.team_pitching_staff_availability(
+            data_root=tmp_path,
+            team="New York Yankees",
+            observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        )
+
+
+def test_pitching_staff_no_roster_snapshot_fails_closed(tmp_path) -> None:
+    with pytest.raises(ValueError, match="NO_CALL_MLB_PITCHING_STAFF_UNAVAILABLE"):
+        mlb_player_availability.team_pitching_staff_availability(
+            data_root=tmp_path,
+            team="New York Yankees",
+            observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        )
+
+
+def test_pitching_staff_unrecognized_status_fails_closed(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147],
+        entries=[
+            _roster_entry(147, "Active Starter", "Active", position_type="Pitcher"),
+            _roster_entry(147, "Mystery Pitcher", "Some New Status", position_type="Pitcher"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    with pytest.raises(ValueError, match="NO_CALL_MLB_AVAILABILITY_STATUS_UNKNOWN"):
+        mlb_player_availability.team_pitching_staff_availability(
+            data_root=tmp_path,
+            team="New York Yankees",
+            observed_at=datetime(2026, 8, 1, 18, tzinfo=UTC),
+        )
+
+
+def test_matchup_pitching_staff_rejects_postgame_observation(tmp_path) -> None:
+    _write_roster_snapshot(
+        tmp_path,
+        team_ids=[147, 119],
+        entries=[
+            _roster_entry(147, "Yankees Pitcher", "Active", position_type="Pitcher"),
+            _roster_entry(119, "Dodgers Pitcher", "Active", position_type="Pitcher"),
+        ],
+        observed_at_utc="2026-08-01T12:00:00Z",
+    )
+
+    with pytest.raises(ValueError, match="NO_CALL_MLB_PITCHING_STAFF_INVALID_TIME"):
+        mlb_player_availability.matchup_pitching_staff_availability(
+            data_root=tmp_path,
+            home_team="New York Yankees",
+            away_team="Los Angeles Dodgers",
+            observed_at=datetime(2026, 8, 2, tzinfo=UTC),
+            event_start=datetime(2026, 8, 1, 23, tzinfo=UTC),
         )

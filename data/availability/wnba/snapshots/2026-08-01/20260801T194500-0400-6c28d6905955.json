@@ -1,0 +1,243 @@
+{
+  "entries": [
+    {
+      "current_status": "Available",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Bell, Kierstan",
+      "reason": "Injury/Illness - Right Leg; right leg",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Parker- Tyus, Cheyenne",
+      "reason": "Not With Team",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Diggins, Skylar",
+      "reason": "Injury/Illness - Right Knee; Right Knee",
+      "team": "Chicago Sky"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Stevens, Azura",
+      "reason": "Personal Reasons",
+      "team": "Chicago Sky"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "LVA@CHI",
+      "player_name": "Westbeld, Maddy",
+      "reason": "Coach's Decision",
+      "team": "Chicago Sky"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "NYL@PHX",
+      "player_name": "Fiebich, Leonie",
+      "reason": "Injury/Illness - Left Foot; L. Foot",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "NYL@PHX",
+      "player_name": "Maley, Anneli",
+      "reason": "Coach's Decision - Developmental Player",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "NYL@PHX",
+      "player_name": "Sabally, Satou",
+      "reason": "Concussion Protocol",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "NYL@PHX",
+      "player_name": "Ciezki, Shay",
+      "reason": "Coach's Decision - Developmental Player",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-01",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "NYL@PHX",
+      "player_name": "Dunn, Kara",
+      "reason": "Coach's Decision - Developmental Player",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-08-02",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "IND@MIN",
+      "player_name": "Boston, Aliyah",
+      "reason": "Injury/Illness - Right Leg; Lower",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-08-02",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "IND@MIN",
+      "player_name": "Clark, Caitlin",
+      "reason": "Injury/Illness - Back; Back",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-02",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "IND@MIN",
+      "player_name": "Dantas, Damiris",
+      "reason": "Not With Team",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-02",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "IND@MIN",
+      "player_name": "Onyiah, Ugonne",
+      "reason": "Not With Team",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-02",
+      "game_time_et": "01:00 (ET)",
+      "matchup": "IND@MIN",
+      "player_name": "Cechova, Emma",
+      "reason": "Injury/Illness - Right Knee; Right Knee",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-08-02",
+      "game_time_et": "03:30 (ET)",
+      "matchup": "LAS@PDX",
+      "player_name": "Plum, Kelsey",
+      "reason": "Injury/Illness - Left Lower Leg; L Lower Leg",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-02",
+      "game_time_et": "07:00 (ET)",
+      "matchup": "CON@DAL",
+      "player_name": "Edwards, Aaliyah",
+      "reason": "Injury/Illness - Right Knee; -",
+      "team": "Connecticut Sun"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-02",
+      "game_time_et": "07:00 (ET)",
+      "matchup": "CON@DAL",
+      "player_name": "Griner, Brittney",
+      "reason": "Injury/Illness - Left Knee; -",
+      "team": "Connecticut Sun"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-02",
+      "game_time_et": "08:30 (ET)",
+      "matchup": "TOR@GSV",
+      "player_name": "Mabrey, Marina",
+      "reason": "Injury/Illness - Neck; Injury",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-02",
+      "game_time_et": "08:30 (ET)",
+      "matchup": "TOR@GSV",
+      "player_name": "Morrow, Aneesah",
+      "reason": "Return to Competition Reconditioning",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-02",
+      "game_time_et": "08:30 (ET)",
+      "matchup": "TOR@GSV",
+      "player_name": "Sykes, Brittney",
+      "reason": "Injury/Illness - Left Foot; Injury",
+      "team": "Toronto Tempo"
+    }
+  ],
+  "observed_at_utc": "2026-08-01T23:51:26.802142+00:00",
+  "report_at_utc": "2026-08-01T23:45:00+00:00",
+  "schema_version": "1",
+  "source": "official_wnba_injury_report",
+  "source_index_url": "https://www.wnba.com/api/injury-reports",
+  "source_pdf_sha256": "6c28d690595560e55a492402d6521449e00a10135262427277e96247b8872c3b",
+  "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-08-01_07_45PM.pdf",
+  "sport": "wnba",
+  "team_matchups": {
+    "Chicago Sky": "LVA@CHI",
+    "Connecticut Sun": "CON@DAL",
+    "Dallas Wings": "CON@DAL",
+    "Golden State Valkyries": "TOR@GSV",
+    "Indiana Fever": "IND@MIN",
+    "Las Vegas Aces": "LVA@CHI",
+    "Los Angeles Sparks": "LAS@PDX",
+    "Minnesota Lynx": "IND@MIN",
+    "New York Liberty": "NYL@PHX",
+    "Phoenix Mercury": "NYL@PHX",
+    "Portland Fire": "LAS@PDX",
+    "Toronto Tempo": "TOR@GSV"
+  },
+  "team_report_status": {
+    "Chicago Sky": "submitted",
+    "Connecticut Sun": "submitted",
+    "Dallas Wings": "submitted_no_entries",
+    "Golden State Valkyries": "not_yet_submitted",
+    "Indiana Fever": "submitted",
+    "Las Vegas Aces": "submitted",
+    "Los Angeles Sparks": "submitted",
+    "Minnesota Lynx": "submitted",
+    "New York Liberty": "submitted",
+    "Phoenix Mercury": "submitted",
+    "Portland Fire": "not_yet_submitted",
+    "Toronto Tempo": "submitted"
+  },
+  "teams_listed": [
+    "Chicago Sky",
+    "Connecticut Sun",
+    "Dallas Wings",
+    "Golden State Valkyries",
+    "Indiana Fever",
+    "Las Vegas Aces",
+    "Los Angeles Sparks",
+    "Minnesota Lynx",
+    "New York Liberty",
+    "Phoenix Mercury",
+    "Portland Fire",
+    "Toronto Tempo"
+  ]
+}

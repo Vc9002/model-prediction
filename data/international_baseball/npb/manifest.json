@@ -1,9 +1,9 @@
 {
   "effective_window": {
     "from": "2022-03-25",
-    "to": "2026-08-01"
+    "to": "2026-08-02"
   },
-  "extracted_at_utc": "2026-08-01T21:24:51.640150Z",
+  "extracted_at_utc": "2026-08-02T07:16:53.809677Z",
   "game_count": 3936,
   "games_sha256": "2ee6d74edd08534c3600990557cfe91d6c7afcc4ff9158a54ff4ff4400af72d9",
   "league": "npb",
@@ -16,7 +16,7 @@
   "request_count": 6,
   "requested_window": {
     "from": "2022-03-25",
-    "to": "2026-08-01"
+    "to": "2026-08-02"
   },
   "requires_api_key": false,
   "requires_signup": false,

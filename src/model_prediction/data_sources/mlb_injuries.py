@@ -60,6 +60,18 @@ STATUS_ACTIVE_PROBABILITIES: dict[str, float] = {
     "Injured 60-Day": 0.0,
     "Suspended List": 0.0,
 }
+# Subset of the above that reflects genuine injury/administrative-list
+# unavailability -- deliberately EXCLUDES "Reassigned to Minors". A named
+# probable starter reassigned to AAA is definitely not starting today's
+# game (STATUS_ACTIVE_PROBABILITIES is correct for that per-player check),
+# but for an AGGREGATE pitching-staff-health signal, routine 40-man-vs-
+# 26-man roster depth movement is not a meaningful health signal -- every
+# team has pitchers optioned to AAA on any given day regardless of injury
+# status, so including it would swamp the real signal (actual injuries)
+# with structural noise present for every team, every day.
+INJURY_OR_ADMIN_LIST_STATUSES = frozenset(
+    status for status in STATUS_ACTIVE_PROBABILITIES if status not in ("Active", "Reassigned to Minors")
+)
 # Real MLB Stats API transactions almost never carry a discriminative
 # typeDesc for IL moves -- both a placement and an activation are typically
 # typeDesc "Status Change". The actual detail lives in the free-text
@@ -196,6 +208,7 @@ def capture_roster_snapshot(
                     "player_id": person.get("id"),
                     "player_name": person.get("fullName"),
                     "current_status": str((row.get("status") or {}).get("description", "")),
+                    "position_type": str((row.get("position") or {}).get("type", "")),
                 }
             )
     day, stamp, digest = _stamp_and_digest(observed, entries)

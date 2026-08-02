@@ -17,6 +17,12 @@ from .features.bullpen import bullpen_profile, team_recent_relief_lines
 from .features.elo_ratings import build_elo
 from .features.mlb_player_availability import FEATURE_NAMES as MLB_AVAILABILITY_FEATURE_NAMES
 from .features.mlb_player_availability import (
+    PITCHING_STAFF_FEATURE_NAMES as MLB_PITCHING_STAFF_FEATURE_NAMES,
+)
+from .features.mlb_player_availability import (
+    matchup_pitching_staff_availability,
+)
+from .features.mlb_player_availability import (
     matchup_player_availability as matchup_mlb_player_availability,
 )
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
@@ -148,6 +154,32 @@ def _compute_features(
             unavailable.append(
                 str(error).split(":", 1)[0].strip()
                 or "mlb_availability_unavailable"
+            )
+    if wanted & MLB_PITCHING_STAFF_FEATURE_NAMES:
+        # Shadow-only, same inert-until-requested design as the starter
+        # availability branch above -- see
+        # features/mlb_player_availability.py's pitching-staff section.
+        if sport != "mlb":
+            raise ValueError(
+                "NO_CALL_MLB_PITCHING_STAFF_UNSUPPORTED: pitching-staff availability feature is MLB-only"
+            )
+        try:
+            pitching_staff = matchup_pitching_staff_availability(
+                data_root=data_root,
+                home_team=home_team,
+                away_team=away_team,
+                observed_at=observed_at,
+                event_start=event_start,
+            )
+            features.update(
+                {name: value for name, value in pitching_staff.items() if name in wanted}
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            for name in wanted & MLB_PITCHING_STAFF_FEATURE_NAMES:
+                features[name] = 0.0
+            unavailable.append(
+                str(error).split(":", 1)[0].strip()
+                or "mlb_pitching_staff_unavailable"
             )
     _init_providers()
     for name in wanted:

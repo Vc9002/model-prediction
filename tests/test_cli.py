@@ -10,7 +10,7 @@ session for both its date-matching and started-game guards).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -301,6 +301,123 @@ def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touc
     )
     assert spread_request.line == -1.5
     assert spread_request.selection == "away"
+
+
+def _soccer_forecast() -> dict:
+    return {
+        "model_code_hash": "soccer-code-hash",
+        "priced_contracts": [
+            {
+                "event_id": "soccer-1",
+                "event_start_utc": "2026-07-27T19:00:00Z",
+                "away_team": "Away FC",
+                "home_team": "Home FC",
+                "market_type": "total",
+                "selection": "over",
+                "line": 2.5,
+                "executable_ask": 0.40,
+                "model_probability": 0.60,
+                "model_uncertainty": 0.03,
+                "model_version": "soccer-poisson-dc-v1",
+                "rationale": "fixture",
+                "market_slug": "soccer-1-total",
+                "observed_at_utc": "2026-07-27T10:00:00Z",
+            }
+        ],
+    }
+
+
+def _soccer_config(*, status: str, min_edge: float = 0.05) -> dict:
+    return {
+        "models": {"SOCCER": {"status": status, "min_edge": min_edge}},
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+
+
+def test_soccer_flat_ledger_logs_every_contract_even_when_model_state_blocks_a_call(
+    monkeypatch,
+) -> None:
+    """Soccer's config status is "research" today, so every contract is a
+    NO_CALL_MODEL_UNVALIDATED research observation (can_create_qualified_call
+    requires shadow_qualified) -- flat mode must still log it, same "show
+    everything" semantics every other sport's flat forecast uses."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    flat_ledger = _CaptureLedger()
+
+    result = cli._forecast_soccer_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_soccer_config(status="research"),
+        research_ledger=None,
+        gated_ledger=None,
+        flat_ledger=flat_ledger,
+        main_ledger=None,
+    )
+
+    assert result["flat_logged"] == 1
+    assert len(flat_ledger.appended) == 1
+    request, eligibility = flat_ledger.appended[0]
+    assert request.event_id == "soccer-1"
+    assert eligibility.reason_code == "NO_CALL_MODEL_UNVALIDATED"
+
+
+def test_soccer_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
+    """main_ledger must receive a pick if and only if gated_ledger does --
+    same eligibility result, same genuinely_eligible gate. Uses
+    status=shadow_qualified here (not soccer's current real config) purely
+    to exercise the CALL path this test targets."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    main = _CaptureLedger()
+
+    result = cli._forecast_soccer_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_soccer_config(status="shadow_qualified", min_edge=0.02),
+        research_ledger=research,
+        gated_ledger=gated,
+        flat_ledger=None,
+        main_ledger=main,
+    )
+
+    assert result["gated_logged"] == 1
+    assert result["main_logged"] == 1
+    assert len(gated.appended) == 1
+    assert len(main.appended) == 1
+    assert gated.appended[0][0].event_id == main.appended[0][0].event_id == "soccer-1"
+
+
+def test_soccer_main_ledger_stays_empty_when_gated_ledger_does(monkeypatch) -> None:
+    """A high min_edge that blocks Gated Research must also block Main --
+    they share one eligibility computation."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    main = _CaptureLedger()
+
+    result = cli._forecast_soccer_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_soccer_config(status="shadow_qualified", min_edge=0.90),
+        research_ledger=research,
+        gated_ledger=gated,
+        flat_ledger=None,
+        main_ledger=main,
+    )
+
+    assert result["gated_logged"] == 0
+    assert result["main_logged"] == 0
+    assert gated.appended == []
+    assert main.appended == []
+    assert len(research.appended) == 1
 
 
 def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_leagues() -> None:
@@ -685,6 +802,60 @@ def test_international_forecast_preview_never_requires_or_writes_a_ledger(monkey
     assert result["logged"] == 0
     assert result["priced_contracts"]
     assert "Preview only" in result["logging_note"]
+
+
+def test_international_forecast_observed_now_is_captured_after_slate_building_not_before(
+    monkeypatch, tmp_path
+) -> None:
+    """Regression: forecast_international_baseball_slate stamps each
+    contract's own observed_at_utc using ITS OWN internal utc_now() call. If
+    the caller captured its own observed_now BEFORE calling the (real, slow)
+    slate builder, that captured value was always earlier than the
+    contract's own stamped time once any real work happened in between --
+    request.validate(now=...) then always saw an observation "in the
+    future" and rejected every single contract. Real-world impact before
+    this fix: KBO/NPB logged zero picks, every single day, despite real
+    scheduled games (5-6 events/day), because the two timestamps were
+    captured on opposite sides of the slow forecast-building call.
+    """
+    clock = {"now": datetime(2026, 7, 26, 12, 0, 0, tzinfo=UTC)}
+
+    def fake_utc_now():
+        return clock["now"]
+
+    def fake_slate(*args, **kwargs):
+        # Simulate real wall-clock time passing while building the forecast
+        # (real network calls, in production) -- by the time this returns,
+        # "now" has moved past whatever the caller captured before calling it.
+        clock["now"] = clock["now"] + timedelta(seconds=5)
+        forecast = _international_forecast()
+        stamp = clock["now"].isoformat().replace("+00:00", "Z")
+        start = (clock["now"] + timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+        for contract in forecast["priced_contracts"]:
+            contract["observed_at_utc"] = stamp
+            contract["event_start_utc"] = start
+        return forecast
+
+    monkeypatch.setattr(cli, "utc_now", fake_utc_now)
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.forecast_international_baseball_slate",
+        fake_slate,
+    )
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+
+    result = cli._forecast_international_sport(
+        tmp_path,
+        tmp_path,
+        "kbo",
+        "2026-07-27",
+        _international_config(min_edge=0.10),
+        research,
+        gated,
+    )
+
+    assert result["logged"] == 1
+    assert len(research.appended) == 1
 
 
 def test_international_forecast_logs_low_edge_to_research_but_not_gated(

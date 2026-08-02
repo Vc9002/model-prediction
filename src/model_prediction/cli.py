@@ -1440,10 +1440,19 @@ def _forecast_international_sport(
     model_config = config["models"].get(league_upper, {})
     min_edge = float(model_config.get("min_edge", 0.02))
     configured_state = str(model_config.get("status", "research"))
-    observed_now = utc_now()
     forecast = forecast_international_baseball_slate(
         data_root, artifact_dir, league, args_date,
     )
+    # Captured AFTER the slate builder, not before: forecast_international_
+    # baseball_slate stamps each contract's own observed_at_utc with ITS OWN
+    # internal utc_now() call, which -- since real fetch/compute time passes
+    # inside that call -- always lands strictly after any observed_now
+    # captured before calling it. request.validate(now=observed_now) then
+    # ALWAYS saw an observation timestamp "in the future" and rejected every
+    # single contract, unconditionally: real events=5/6 daily, logged=0
+    # every single day this ran. Same ordering _forecast_soccer_sport/
+    # _forecast_tennis_sport already use correctly.
+    observed_now = utc_now()
     if research_ledger is None:
         forecast["logged"] = 0
         forecast["logging_note"] = "Preview only; no ledger was supplied and no rows were written."
@@ -1555,9 +1564,22 @@ def _forecast_soccer_sport(
     config: dict,
     research_ledger,
     gated_ledger=None,
+    flat_ledger=None,
+    main_ledger=None,
 ) -> dict:
     """Price the draw-aware soccer score model: full-game 2.5 totals, plus
-    moneyline whenever Polymarket lists a matching two-sided win market."""
+    moneyline whenever Polymarket lists a matching two-sided win market.
+
+    flat_ledger: every priced contract, no edge/confidence gate -- same
+    "log everything" semantics flat mode uses for the learned sports.
+    main_ledger: mirrors gated_ledger's existing "only when genuinely
+    eligible" append. Soccer's config currently sets status: research, which
+    means can_create_qualified_call() never returns True for it (see
+    lifecycle.py) -- so this wiring is correct and ready, but produces zero
+    real Main rows until soccer is promoted to shadow_qualified through the
+    same walk-forward/locked-holdout process the sports that already reach
+    Main went through. Not something this function decides on its own.
+    """
     from .data_sources.polymarket_us import probability_to_american
     model_config = config["models"].get("SOCCER", {})
     forecast = build_soccer_total_slate(
@@ -1567,7 +1589,11 @@ def _forecast_soccer_sport(
         leagues=tuple(model_config.get("leagues") or ()),
         observed_at=utc_now(),
     )
-    if research_ledger is None:
+    # research_ledger is the usual exposure/eligibility context; a flat-only
+    # call (research_ledger=None, flat_ledger set) still needs somewhere to
+    # compute exposure against, so fall back to flat_ledger in that case.
+    exposure_source = research_ledger or flat_ledger
+    if exposure_source is None:
         forecast["logged"] = 0
         return forecast
 
@@ -1576,6 +1602,8 @@ def _forecast_soccer_sport(
     observed_now = utc_now()
     logged = 0
     gated = 0
+    flat_logged = 0
+    main_logged = 0
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
         request = PickRequest(
@@ -1617,7 +1645,7 @@ def _forecast_soccer_sport(
             with _LEDGER_LOCK:
                 eligibility = evaluate_gated_research_eligibility(
                     request,
-                    research_ledger.exposure(request, now=observed_now),
+                    exposure_source.exposure(request, now=observed_now),
                     unit_policy(config),
                     model_inputs_valid=True,
                     minimum_edge=min_edge,
@@ -1634,11 +1662,13 @@ def _forecast_soccer_sport(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                research_ledger.append_evaluated(
-                    request,
-                    eligibility,
-                    now=observed_now,
-                )
+                if research_ledger is not None:
+                    with suppress(DuplicatePickError):
+                        research_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
                 if gated_ledger is not None and genuinely_eligible:
                     with suppress(DuplicatePickError):
                         gated_ledger.append_evaluated(
@@ -1647,11 +1677,36 @@ def _forecast_soccer_sport(
                             now=observed_now,
                         )
                         gated += 1
+                if flat_ledger is not None:
+                    # Flat: log every priced contract regardless of
+                    # eligibility, same "show everything" semantics flat
+                    # mode uses for every other sport.
+                    with suppress(DuplicatePickError):
+                        flat_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
+                        flat_logged += 1
+                if main_ledger is not None and genuinely_eligible:
+                    # Mirrors gated_ledger exactly -- same eligibility
+                    # result, same "only when genuinely eligible" gate. See
+                    # this function's docstring: inert until soccer is
+                    # promoted past status: research in config/model.yaml.
+                    with suppress(DuplicatePickError):
+                        main_ledger.append_evaluated(
+                            request,
+                            eligibility,
+                            now=observed_now,
+                        )
+                        main_logged += 1
             logged += 1
         except (DuplicatePickError, KeyError, ValueError):
             continue
     forecast["logged"] = logged
     forecast["gated_logged"] = gated
+    forecast["flat_logged"] = flat_logged
+    forecast["main_logged"] = main_logged
     return forecast
 
 
@@ -2608,7 +2663,7 @@ def main(argv: list[str] | None = None) -> None:
             replace_today = getattr(args, "replace_today", False) or args.command == "flat-forecast"
             is_flat = args.command == "flat-forecast"
             sports = (
-                list(FLAT_LEDGER_SPORTS)
+                [*FLAT_LEDGER_SPORTS, "soccer"]
                 if is_flat and getattr(args, "all", False)
                 else (
                     list(SPORTS) + list(ESPORTS_TITLES)
@@ -2705,6 +2760,8 @@ def main(argv: list[str] | None = None) -> None:
                             if log and not is_flat
                             else None
                         ),
+                        main_ledger=(ledger if log and not is_flat else None),
+                        flat_ledger=(flat_ledger if log and is_flat else None),
                     )
                 elif sport == "tennis":
                     results[sport] = _forecast_tennis_sport(
@@ -3014,13 +3071,18 @@ def main(argv: list[str] | None = None) -> None:
                 )
             except Exception:
                 logger.warning("MLB totals flat forecast failed", exc_info=True)
-            # Esports run serially — logged to research ledger only (never main ledger)
+            # Soccer: research + flat always; gated/main only for picks that
+            # clear evaluate_gated_research_eligibility (currently zero,
+            # since config/model.yaml's SOCCER.status is still "research" --
+            # see _forecast_soccer_sport's docstring).
             forecast_result["soccer"] = _forecast_soccer_sport(
                 data_root=data_directory,
                 args_date=args.date,
                 config=config,
                 research_ledger=research_ledger(data_directory, "soccer"),
                 gated_ledger=research_ledger(data_directory, "soccer", gated=True),
+                flat_ledger=flat_ledger,
+                main_ledger=ledger,
             )
             try:
                 forecast_result["tennis"] = _forecast_tennis_sport(

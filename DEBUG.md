@@ -2,6 +2,199 @@
 
 **Last audited**: 2026-08-02 (see new section directly below)
 
+## 2026-08-02 (still later) — MLB pitching-staff availability (new shadow feature, roadmap item), plus a full model review in progress
+
+New feature: `features/mlb_player_availability.py::team_pitching_staff_availability`/
+`matchup_pitching_staff_availability` — the first real pass at
+`docs/MODEL_IMPROVEMENTS.md` section 8's rank-3 roadmap item ("bullpen
+availability... closer/setup absence"), picked as the concrete next step
+after reframing the roadmap's priority order (see the doc's own section 1/
+12 updates from earlier today): MLB is the only one of the four major
+leagues currently in season, and this reuses the exact live-roster-
+snapshot infrastructure already built and validated today for starter
+availability, rather than starting a new data source.
+
+Coarser than the roadmap's full description -- MLB Stats API roster data
+identifies position *type* (Pitcher vs. everyone else), not bullpen *role*
+(closer/setup/long) -- so this reports aggregate pitching-staff health
+(share of the current staff on the IL or an admin list), not a specific
+reliever's availability. `capture_roster_snapshot` now also stores each
+player's `position_type` (a schema addition -- pre-existing captured
+snapshots don't have it, so this feature only works going forward from
+today, same "clock going forward, no backlog" situation as the KBO/NPB fix).
+
+**A real design bug caught by testing against live data before it
+shipped**: the first version's "unavailable" bucket included `"Reassigned
+to Minors"`, producing a nonsensical baseline (Yankees 43%, Dodgers 55% of
+their pitching staff "unavailable"). Being optioned to AAA is routine
+40-man-vs-26-man roster depth management, present for every team on any
+given day regardless of health -- not an injury signal, and it swamped the
+real signal with structural noise. Fixed with a new, narrower
+`INJURY_OR_ADMIN_LIST_STATUSES` constant (`data_sources/mlb_injuries.py`)
+that explicitly excludes `Reassigned to Minors` from both the numerator
+and denominator, kept deliberately separate from the existing
+`STATUS_ACTIVE_PROBABILITIES` (which correctly treats "optioned" as
+disqualifying for a *named* player's starter-availability check, but
+shouldn't for this *aggregate* health read -- same status, different
+question, different answer). Re-verified live after the fix: Yankees
+13.3% (2/15 pitchers), Dodgers 43.5% (10/23) -- cross-checked the Dodgers
+number against the real roster entries directly (Blake Snell, Tyler
+Glasnow, Bobby Miller, Brusdar Graterol, Gavin Stone, Ben Casparius, Blake
+Treinen, Brock Stewart, Will Klein, Jake Cousins -- all real, all
+genuinely on the IL, matches well-documented real 2026 Dodgers pitching
+injuries).
+
+Live-only by construction, and unlike the starter-availability feature,
+this one has **no transactions-based historical fallback** -- "how many
+pitchers are on the active roster right now" isn't reconstructable from
+the IL-transaction log alone (trades/options/call-ups change roster
+composition in ways a pure IL filter can't capture), so this feature
+genuinely cannot backtest against past games, only forward from today.
+
+Wired into `learned_forward.py`'s generic feature-computation path with
+its own dispatch branch and feature-name constant
+(`PITCHING_STAFF_FEATURE_NAMES`), same shadow-only, inert-until-requested
+design as every other availability feature in this project -- no
+production artifact requests these feature names, so this is dead code in
+live production today by design, exactly like starter availability was
+until an artifact opts in.
+
+**Tests**: 7 new (`test_pitching_staff_excludes_optioned_players_from_numerator_and_denominator`,
+`test_matchup_pitching_staff_gap_favors_home_when_away_staff_is_worse`,
+`test_pitching_staff_no_pitchers_found_fails_closed`,
+`test_pitching_staff_no_roster_snapshot_fails_closed`,
+`test_pitching_staff_unrecognized_status_fails_closed`,
+`test_matchup_pitching_staff_rejects_postgame_observation`, plus one
+existing capture-schema test updated for the new `position_type` field).
+Full suite: **563 passed**, 0 failed. `.venv/bin/ruff check src/ tests/` ->
+117 findings, still at/under the 118 baseline.
+
+**In progress, not yet reported**: three parallel review agents launched
+against (1) all MLB code touched today, (2) esports/KBO-NPB/soccer wiring
+(specifically re-checking every other `_forecast_*` function in `cli.py`
+for the same timestamp-ordering bug class that broke KBO/NPB), and (3) the
+core ledger/eligibility/units invariants. Findings and any resulting fixes
+will be appended here once they land.
+
+## 2026-08-02 (later) — soccer wired to flat/Main-gated, esports live-vs-backtest investigation, a real KBO/NPB zero-logging bug found and fixed
+
+### Soccer: wired into flat forecast and Main (gated), same eligibility bar as Gated Research
+
+`_forecast_soccer_sport` (`cli.py`) gained `flat_ledger`/`main_ledger`
+parameters. `flat_ledger`: every priced contract logged unconditionally,
+same "show everything" semantics every other sport's flat forecast already
+uses -- previously soccer's `research_ledger is None` early-return meant a
+flat-only call did nothing at all; fixed by falling back to `flat_ledger`
+as the exposure-computation source when `research_ledger` isn't provided.
+`main_ledger`: mirrors `gated_ledger` exactly, same eligibility result,
+same "only when genuinely eligible" gate (operator-confirmed: same bar as
+Gated Research, not a separate/stricter one).
+
+**This wiring is correct and live-verified (19 real rows now flowing into
+`data/flat_picks.xlsx` via a real `flat-forecast --sport soccer` run), but
+produces zero Main rows today.** `config/model.yaml`'s `SOCCER.status` is
+still `"research"`, and `lifecycle.py::can_create_qualified_call` requires
+`ModelState.SHADOW_QUALIFIED` before any request can become a real CALL --
+confirmed this is exactly why 100% of soccer's 62 real research picks carry
+`NO_CALL_MODEL_UNVALIDATED`, unrelated to edge or confidence. Promoting
+soccer to `shadow_qualified` (the same status LOL/CS2/DOTA2/VALORANT/MLB/
+NBA/WNBA/NFL/KBO/NPB already carry) is a real model-promotion decision this
+change deliberately does not make on its own -- soccer's real settled
+research record (28-19, +6.84u) is a plausible case for it, but promotion
+in this project's own stated governance requires the same walk-forward/
+locked-holdout process those other sports went through, not a side effect
+of wiring two ledgers.
+
+Four new tests in `tests/test_cli.py` (`_soccer_forecast`/`_soccer_config`
+fixtures): flat logs everything even when blocked at the model-state gate;
+main mirrors gated exactly on both a real CALL and a blocked one.
+
+### Esports: live-vs-backtest divergence investigated, not (yet) acted on
+
+Real settled record since the v4->v5 rebuild: LOL 4-7 (-5.73u research),
+1-2 (-1.83u gated); CS2 12-11 (-0.79u), 4-6 (-1.43u gated); DOTA2 8-5
+(+3.33u), 3-2 (+1.68u gated); VALORANT 4-3 (+1.36u), 2-1 (+2.02u gated).
+Rainbow Six: zero picks, but confirmed as a real data-availability gap
+(zero scheduled Polymarket R6 events today), not a code issue --
+`matches.jsonl` has 2,969 real historical matches for backtesting, there's
+just no live market right now.
+
+Checked calibration (predicted probability vs. actual hit rate) per title.
+DOTA2 and VALORANT are fine (predicted ~59%/56%, actual ~62%/57%). LOL and
+CS2 both run overconfident on their live samples: LOL predicted 58.9%
+research-wide / 62.1% gated, actual 36.4%/33.3% -- roughly 2.4 standard
+deviations below what LOL's own locked-test backtest (70.3% accuracy,
+n=1,910, a real, large, validated number) would predict for a sample this
+size. Investigated the likely explanation rather than guessing: the
+backtest's own K/threshold selection is self-labeled
+`"profitability": "not_established_no_point_in_time_market_prices"` --
+it assumes a flat -110 price for every match, because no real captured
+Polymarket price history existed when that methodology was built. That's
+now only partially true: 16 days of real captured BBO exist (28,469 lines
+across LOL/CS2/DOTA2/VALORANT since 2026-07-17), and live picks already
+price against real executable asks (confirmed: `esports.py` sources
+`executable_ask` from a live `PolymarketUSClient` call, not a synthetic
+assumption) -- so the live PnL numbers above are real, not an artifact of
+the backtest's own pricing assumption.
+
+**Deliberately not acted on**: refitting confidence thresholds against the
+current 16-day real-price window would trade the ~1,900-2,900-match locked-
+test sample that justified each title's current threshold for one two
+orders of magnitude smaller -- likely replacing real signal with noise, not
+fixing anything. Documented as a real, open gap in
+`docs/MODEL_IMPROVEMENTS.md` section 10 with a concrete recommendation: keep
+accumulating real captured BBO (free, compounds daily) and revisit a real-
+price threshold refit once the sample is large enough to matter.
+
+### Real bug found and fixed: KBO/NPB have logged zero picks, ever, despite real games every day
+
+Found while pulling a full cross-sport performance summary (`research_kbo`/
+`research_npb` both showed 0 total rows -- not just 0 settled -- and
+`research/kbo.xlsx`'s file mtime was 2026-07-28, untouched by any `daily`
+run since). Today's real `daily` log showed `kbo: {"events": 5, "logged":
+0}` / `npb: {"events": 6, "logged": 0}` -- real scheduled games, real
+priced contracts with real team names/probabilities, zero logged. Traced
+directly (wrapped `PickRequest.validate` to print the real exception): every
+single contract failed with `"observation timestamp cannot be in the
+future"`.
+
+Root cause: `_forecast_international_sport` (`cli.py`) captured
+`observed_now = utc_now()` **before** calling
+`forecast_international_baseball_slate(...)` -- but that function stamps
+each contract's own `observed_at_utc` using **its own internal** `utc_now()`
+call, which happens strictly later (real fetch/compute time passes inside
+the call). `request.validate(now=observed_now)` then always compared the
+contract's own (later) timestamp against an (earlier) `now`, unconditionally
+rejecting every contract as "in the future." `_forecast_soccer_sport`/
+`_forecast_tennis_sport` already capture `observed_now` in the correct
+order (after the slate builder returns); international baseball was the
+one holdout. Fixed by moving the capture to after the slate-build call,
+matching the correct pattern.
+
+Verified three ways: (1) a direct call against real live KBO data went
+from `logged=0` (with the real `ValueError` printed) to `logged=4`
+matching `priced=4`; (2) a new regression test
+(`test_international_forecast_observed_now_is_captured_after_slate_building_not_before`
+in `tests/test_cli.py`) using a mock clock that genuinely advances during
+the mocked slate-build call -- confirmed to fail against the pre-fix
+ordering (`0 == 1`) and pass against the fix; (3) existing tests never
+caught this because they freeze `utc_now()` to one fixed value everywhere,
+which trivially satisfies `observed <= now` regardless of call order --
+a real gap in the existing test fixture, not just in the production code.
+
+This means every KBO/NPB research/gated pick this project has ever
+"forecasted" was silently discarded before reaching any ledger, for as
+long as this ordering bug existed. Re-ran the real `daily` command after
+the fix to confirm live recovery (see Verification below).
+
+**Tests**: full suite passes; 5 new tests (`test_soccer_flat_ledger_logs_every_contract_even_when_model_state_blocks_a_call`,
+`test_soccer_main_ledger_mirrors_gated_ledger_exactly`,
+`test_soccer_main_ledger_stays_empty_when_gated_ledger_does`,
+`test_daily_forecast_roster_includes_soccer_and_both_international_baseball_leagues`
+[pre-existing, unaffected], `test_international_forecast_observed_now_is_captured_after_slate_building_not_before`).
+`.venv/bin/ruff check src/ tests/` -> 117 findings, at/under the 118
+baseline.
+
 ## 2026-08-02 (latest) — MLB player availability (shadow feature) + Measured Edge margin/totals rebuild with fresh data
 
 Two-part session, both parts of a single approved plan.
