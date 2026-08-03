@@ -55,6 +55,12 @@ if _ENV_PATH.exists():
 
 DATA = ROOT / "data"
 OUTPUTS = ROOT / "outputs" / "latest"
+# Main/Flat split from one shared file per tier into one file per sport,
+# 2026-08-03 (see model_prediction.main_ledgers for the real module this
+# mirrors -- duplicated here as a plain tuple rather than importing that
+# module at load time, matching this file's existing pattern of keeping
+# model_prediction imports lazy/local to the functions that need them).
+_MAIN_LEDGER_SPORTS = ("mlb", "wnba", "soccer", "tennis")
 DASH_DIR = ROOT / "dashboard"
 PID_FILE = DASH_DIR / "server.pid"
 LOG_FILE = DASH_DIR / "server.log"
@@ -96,16 +102,6 @@ SPORTS = (
     "npb",
 )
 GATEWAY = "https://gateway.polymarket.us"
-RESEARCH_ONLY_LEAGUES = frozenset(
-    {"SOCCER", "TENNIS", "LOL", "CS2", "DOTA2", "VALORANT", "RAINBOW_SIX", "KBO", "NPB"}
-)
-# Soccer is the one research-only league that also writes real rows into
-# flat_picks.xlsx (_forecast_soccer_sport logs every contract there, no edge
-# gate -- see cli.py). RESEARCH_ONLY_LEAGUES must still hide it from the Main
-# dashboard (genuinely_eligible is currently always False for soccer, so it
-# has zero real Main-ledger rows), but hiding it from the *flat* views too
-# would just make real, already-written data invisible for no reason.
-FLAT_HIDDEN_LEAGUES = RESEARCH_ONLY_LEAGUES - {"SOCCER"}
 
 _CACHE: dict[str, tuple[float, object]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -365,38 +361,59 @@ def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
 
 
 _PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+_FLAT_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
 # ── SECTION: Picks & Performance ────────────────────────────────────
 
 
-def read_picks() -> list[dict]:
-    """Parse picks.xlsx only when its mtime changes — parsing is the single
-    most expensive repeated operation the dashboard performs."""
-    path = DATA / "picks.xlsx"
-    if load_workbook is None or not path.exists():
+def _main_ledger_paths() -> list[Path]:
+    return [DATA / "main" / f"{sport}.xlsx" for sport in _MAIN_LEDGER_SPORTS]
+
+
+def _flat_ledger_paths() -> list[Path]:
+    return [DATA / "flat" / f"{sport}.xlsx" for sport in _MAIN_LEDGER_SPORTS]
+
+
+def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]:
+    """Aggregate rows across one tier's per-sport files (Main or Flat),
+    keyed on the combined mtime of every file that actually exists so any
+    single sport's file changing invalidates the cache -- same "only
+    re-parse on change" principle read_picks() always used, just extended
+    to N files instead of one."""
+    if load_workbook is None:
         return []
-    mtime = path.stat().st_mtime
+    existing = [path for path in paths if path.exists()]
+    if not existing:
+        return []
+    mtime_key = tuple(sorted((str(path), path.stat().st_mtime) for path in existing))
     with _CACHE_LOCK:
-        if _PICKS_CACHE["mtime"] == mtime:
-            return _PICKS_CACHE["rows"]  # type: ignore[return-value]
-    rows_out = _parse_picks(path)
+        if cache["mtime"] == mtime_key:
+            return cache["rows"]  # type: ignore[return-value]
+    rows_out = [row for path in existing for row in _parse_picks(path)]
     with _CACHE_LOCK:
-        _PICKS_CACHE["mtime"] = mtime
-        _PICKS_CACHE["rows"] = rows_out
+        cache["mtime"] = mtime_key
+        cache["rows"] = rows_out
     return rows_out
+
+
+def read_picks() -> list[dict]:
+    """Parse every sport's Main ledger (data/main/<sport>.xlsx), only
+    re-parsing a file whose mtime changed -- parsing is the single most
+    expensive repeated operation the dashboard performs."""
+    return _read_split_picks(_main_ledger_paths(), _PICKS_CACHE)
+
+
+def read_flat_picks() -> list[dict]:
+    """Parse every sport's Flat ledger (data/flat/<sport>.xlsx), same
+    change-detection caching as read_picks()."""
+    return _read_split_picks(_flat_ledger_paths(), _FLAT_PICKS_CACHE)
 
 
 def _find_pick_by_id(pick_id: str) -> dict | None:
     """Search both main and flat ledgers for a pick by pick_id."""
-    # Try main ledger first
     row = next((item for item in read_picks() if str(item.get("pick_id")) == pick_id), None)
     if row is not None:
         return row
-    # Try flat ledger
-    flat_path = DATA / "flat_picks.xlsx"
-    if flat_path.exists():
-        flat_picks = _parse_picks(flat_path)
-        return next((item for item in flat_picks if str(item.get("pick_id")) == pick_id), None)
-    return None
+    return next((item for item in read_flat_picks() if str(item.get("pick_id")) == pick_id), None)
 
 
 def _parse_picks(path: Path) -> list[dict]:
@@ -1653,8 +1670,8 @@ def production_evidence() -> dict:
         _read_json(OUTPUTS / "international-baseball-baseline-validation.json") or {}
     )
     ledger_paths = (
-        DATA / "picks.xlsx",
-        DATA / "flat_picks.xlsx",
+        *_main_ledger_paths(),
+        *_flat_ledger_paths(),
         *_research_ledger_paths(),
     )
     rows_by_source = {str(path.relative_to(ROOT)): _read_evidence_ledger(path) for path in ledger_paths}
@@ -1705,21 +1722,28 @@ def production_evidence() -> dict:
                     ),
                 }
             )
+        # Main/Flat are per-sport files now (data/main/<sport>.xlsx,
+        # data/flat/<sport>.xlsx) -- only sports in _MAIN_LEDGER_SPORTS
+        # (mlb/wnba/soccer/tennis) have one; every other configured sport
+        # (nba/nfl/esports/kbo/npb) correctly gets empty evidence here since
+        # rows_by_source has no entry for a file that was never created.
+        main_source = f"data/main/{str(sport).casefold()}.xlsx"
         main_ledger = _ledger_evidence_for_source(
             str(sport),
             model_config,
             version,
-            "data/picks.xlsx",
-            rows_by_source.get("data/picks.xlsx", []),
+            main_source,
+            rows_by_source.get(main_source, []),
             artifact,
             feature_names,
         )
+        flat_source = f"data/flat/{str(sport).casefold()}.xlsx"
         flat_ledger = _ledger_evidence_for_source(
             str(sport),
             model_config,
             version,
-            "data/flat_picks.xlsx",
-            rows_by_source.get("data/flat_picks.xlsx", []),
+            flat_source,
+            rows_by_source.get(flat_source, []),
             artifact,
             feature_names,
         )
@@ -3073,6 +3097,13 @@ def dashboard_picks() -> list[dict]:
     _reconcile_orders()
     archived = set(_load_archive()["pick_ids"])
     orders, portfolio_history = _load_orders(), _load_portfolio_history()
+    # No RESEARCH_ONLY_LEAGUES filter needed here anymore: read_picks() only
+    # ever sources from data/main/<sport>.xlsx for _MAIN_LEDGER_SPORTS
+    # (mlb/wnba/soccer/tennis), so it's now physically impossible for a
+    # research-only league's row to appear here. The old filter was
+    # actively wrong for soccer and tennis specifically -- both have real
+    # Main-ledger rows since their 2026-08-02/08-03 promotion, but
+    # RESEARCH_ONLY_LEAGUES was never updated and was silently hiding them.
     return [
         {
             **_decorate_pick(row, orders, portfolio_history),
@@ -3080,7 +3111,6 @@ def dashboard_picks() -> list[dict]:
             "suggested_paper_units": _suggested_units(row),
         }
         for row in _dedupe_picks(read_picks())
-        if str(row.get("league", "")).upper() not in RESEARCH_ONLY_LEAGUES
     ]
 
 
@@ -3509,7 +3539,7 @@ def _all_ledger_rows_for_price_scan() -> list[dict]:
     """
     return (
         read_picks()
-        + _parse_picks(DATA / "flat_picks.xlsx")
+        + read_flat_picks()
         + _parse_research_picks(gated=False)
         + _parse_research_picks(gated=True)
     )
@@ -3790,10 +3820,15 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/flat-picks":
 
                 def _flat_picks_decorated():
-                    flat = (
-                        _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
-                    )
-                    flat = [r for r in flat if str(r.get("league", "")).upper() not in FLAT_HIDDEN_LEAGUES]
+                    # Flat is now split per sport (data/flat/<sport>.xlsx),
+                    # populated only for the sports that actually pair with
+                    # Main -- esports/KBO/NPB physically can't appear here
+                    # anymore (see main_ledgers.py), so the old
+                    # FLAT_HIDDEN_LEAGUES filter is redundant for them and
+                    # was actively wrong for tennis (real flat rows exist for
+                    # it, same as soccer, but the set never got updated when
+                    # tennis was promoted alongside soccer on 2026-08-03).
+                    flat = read_flat_picks()
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
                     return [_decorate_pick(row, orders, portfolio) for row in flat]
@@ -3810,8 +3845,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             elif route == "/api/flat-performance":
                 sport = str(query.get("sport") or "").strip()
-                flat = _parse_picks(DATA / "flat_picks.xlsx") if (DATA / "flat_picks.xlsx").exists() else []
-                flat = [r for r in flat if str(r.get("league", "")).upper() not in FLAT_HIDDEN_LEAGUES]
+                flat = read_flat_picks()
                 self._send(
                     _cached(
                         f"flat-performance:{sport.casefold() or 'all'}",
@@ -4681,14 +4715,15 @@ def dedupe_ledger() -> dict:
     identity — the newest model version — and removes the rest via
     ``PickLedger.remove_open_rows`` (ledger lock + ``pick_removed`` audit
     events). Settled rows are results and are never touched; staked open rows
-    are never deleted. picks.xlsx is backed up first.
+    are never deleted. Every per-sport Main file (data/main/<sport>.xlsx)
+    that exists is backed up first.
     """
-    from model_prediction.ledger import PickLedger  # local: heavy import
+    from model_prediction.main_ledgers import MultiSportPickLedger  # local: heavy import
 
-    path = DATA / "picks.xlsx"
-    if not path.exists():
-        return {"status": "refused", "error": "picks.xlsx not found"}
-    ledger = PickLedger(path, DATA / "events.jsonl")
+    existing_main_paths = [path for path in _main_ledger_paths() if path.exists()]
+    if not existing_main_paths:
+        return {"status": "refused", "error": "no Main ledger files found under data/main/"}
+    ledger = MultiSportPickLedger(DATA)
     try:
         rows = ledger.rows()
     except ValueError as error:
@@ -4709,10 +4744,14 @@ def dedupe_ledger() -> dict:
         to_remove.extend(str(m.get("pick_id") or "") for m in unstaked if m is not survivor)
     if not to_remove:
         return {"status": "ok", "removed": 0, "kept": len(rows), "note": "No open duplicate contracts found."}
-    backup = path.with_suffix(f".xlsx.dedupe-bak-{int(time.time())}")
     import shutil
 
-    shutil.copy2(path, backup)
+    stamp = int(time.time())
+    backups = []
+    for path in existing_main_paths:
+        backup = path.with_suffix(f".xlsx.dedupe-bak-{stamp}")
+        shutil.copy2(path, backup)
+        backups.append(backup.name)
     removed_ids = ledger.remove_open_rows(to_remove, reason="dashboard duplicate-contract dedupe")
     # Prune archived ids that no longer exist so the counter stays honest.
     surviving = {str(r.get("pick_id")) for r in ledger.rows()}
@@ -4725,14 +4764,14 @@ def dedupe_ledger() -> dict:
     with _CACHE_LOCK:
         _CACHE.clear()
         _PICKS_CACHE["mtime"] = None
-    _log(f"dedupe: removed {len(removed_ids)} open duplicate rows, backup {backup.name}")
+    _log(f"dedupe: removed {len(removed_ids)} open duplicate rows, backups {', '.join(backups)}")
     return {
         "status": "ok",
         "removed": len(removed_ids),
         "kept": len(surviving),
-        "backup": backup.name,
+        "backups": backups,
         "removed_pick_ids": removed_ids[:50],
-        "note": f"Removed {len(removed_ids)} open duplicates via the audited ledger path. Backup: {backup.name}.",
+        "note": f"Removed {len(removed_ids)} open duplicates via the audited ledger path. Backups: {', '.join(backups)}.",
     }
 
 

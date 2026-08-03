@@ -103,7 +103,8 @@ from .international_baseball import (
     validate_all_international_baseball_baselines,
 )
 from .learned_forward import build_learned_moneyline_slate, match_executable_quote
-from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError, PickLedger
+from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError
+from .main_ledgers import MultiSportPickLedger
 from .mlb_baseline_refresh import refresh_if_due
 from .models import MODEL_SPECS
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
@@ -2810,14 +2811,21 @@ def main(argv: list[str] | None = None) -> None:
     research_score_units = (
         float(research_scoring["default_units"]) if research_scoring.get("auto_score_on_settlement") else None
     )
-    ledger = PickLedger(
-        ledger_path(config),
-        audit_path(config),
+    data_root = Path(ledger_path(config)).parent
+    # Main used to be one file (data/picks.xlsx) holding every sport, mixed
+    # together and distinguished only by a `league` column. Split 2026-08-03
+    # into one file per sport (data/main/<sport>.xlsx), same as Research/
+    # Gated Research always worked. MultiSportPickLedger presents the exact
+    # same interface a single PickLedger always had, routing each call to
+    # the right per-sport file underneath -- every command below keeps
+    # working unchanged. See main_ledgers.py for the real behavior change
+    # this implies (exposure caps are now independent per sport).
+    ledger = MultiSportPickLedger(
+        data_root,
         research_score_units=research_score_units,
         research_scoring_mode=str(research_scoring.get("sizing", "fixed")),
         research_scoring_note=research_scoring.get("note", "fixed-stake hypothetical research scoring"),
     )
-    data_root = Path(ledger_path(config)).parent
     try:
         if args.command == "init-ledger":
             ledger.initialize()
@@ -2919,8 +2927,7 @@ def main(argv: list[str] | None = None) -> None:
             # Constructed unconditionally (not just when is_flat) so sports whose
             # main/flat ledgers form a pair -- soccer, matching how its research/
             # gated ledgers already pair -- can log to both from either command.
-            flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
-            flat_ledger = PickLedger(flat_ledger_path)
+            flat_ledger = MultiSportPickLedger(data_root, flat=True)
             if is_flat:
                 if replace_today and log:
                     _clear_today_open(flat_ledger, args.date, by_event_date=True)
@@ -2986,15 +2993,20 @@ def main(argv: list[str] | None = None) -> None:
                         game_date=args.date,
                     )
                     if log and ledger is not None:
+                        # Esports never reaches Main, so no Flat row either
+                        # (operator directive, 2026-08-03) -- Research is
+                        # already its "every candidate" companion.
                         _log_esports_forecast(
                             results[sport],
                             config,
                             sport_research,
                             flat_mode=is_flat,
                             gated_ledger=sport_gated,
-                            flat_ledger=flat_ledger,
                         )
                 elif sport in ("kbo", "npb"):
+                    # KBO/NPB never reach Main, so no Flat row either
+                    # (operator directive, 2026-08-03) -- same reasoning as
+                    # esports above.
                     results[sport] = _forecast_international_sport(
                         data_root=data_directory,
                         artifact_dir=PROJECT_ROOT / "config/models",
@@ -3011,7 +3023,6 @@ def main(argv: list[str] | None = None) -> None:
                             if log and not is_flat
                             else None
                         ),
-                        flat_ledger=flat_ledger,
                     )
                 elif sport == "soccer":
                     # Main+Flat only (operator directive 2026-08-03).
@@ -3056,10 +3067,8 @@ def main(argv: list[str] | None = None) -> None:
             if args.all_unsettled:
                 output = _settle_all_unsettled(args, config, ledger)
                 # Also settle the flat ledger
-                flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
-                if flat_ledger_path.exists():
-                    flat_ledger = PickLedger(flat_ledger_path)
-                    output["flat_settlement"] = _settle_all_unsettled(args, config, flat_ledger)
+                flat_ledger = MultiSportPickLedger(data_root, flat=True)
+                output["flat_settlement"] = _settle_all_unsettled(args, config, flat_ledger)
                 data_directory = Path(ledger_path(config)).parent
                 research_settlement = {}
                 for sport_ledger in existing_research_ledgers(data_directory):
@@ -3266,8 +3275,7 @@ def main(argv: list[str] | None = None) -> None:
                     }
             _clear_today_open(ledger, args.date, by_event_date=True)
             # Also clear and forecast for flat ledger
-            flat_ledger_path = Path(ledger_path(config)).parent / "flat_picks.xlsx"
-            flat_ledger = PickLedger(flat_ledger_path)
+            flat_ledger = MultiSportPickLedger(data_root, flat=True)
             _clear_today_open(flat_ledger, args.date, by_event_date=True)
             max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
             max_disagreement = float(config["project"].get("maximum_unreviewed_market_disagreement", 0.10))
@@ -3409,13 +3417,16 @@ def main(argv: list[str] | None = None) -> None:
                     title=title,
                     game_date=args.date,
                 )
+                # Esports never reaches Main, so it no longer gets a Flat
+                # row either (operator directive, 2026-08-03) -- Research is
+                # already its "every candidate, no gate" companion, the same
+                # relationship Flat has to Main.
                 _esports_logged = _log_esports_forecast(
                     forecast_result[title],
                     config,
                     research_ledger(data_directory, title),
                     flat_mode=False,
                     gated_ledger=research_ledger(data_directory, title, gated=True),
-                    flat_ledger=flat_ledger,
                 )
                 _priced_esports = forecast_result[title].get("priced_contracts") or []
                 if _priced_esports and not _esports_logged:
@@ -3444,6 +3455,8 @@ def main(argv: list[str] | None = None) -> None:
                             logger.warning("Esports forecast failed for title %s", title, exc_info=True)
 
             def _intl_baseball_league_task(league: str) -> None:
+                # KBO/NPB never reach Main, so no Flat row either (operator
+                # directive, 2026-08-03) -- same reasoning as esports above.
                 forecast_result[league] = _forecast_international_sport(
                     data_root=data_directory,
                     artifact_dir=PROJECT_ROOT / "config/models",
@@ -3452,7 +3465,6 @@ def main(argv: list[str] | None = None) -> None:
                     config=config,
                     research_ledger=research_ledger(data_directory, league),
                     gated_ledger=research_ledger(data_directory, league, gated=True),
-                    flat_ledger=flat_ledger,
                 )
                 _priced_intl = forecast_result[league].get("priced_contracts") or []
                 if _priced_intl and not forecast_result[league].get("logged"):

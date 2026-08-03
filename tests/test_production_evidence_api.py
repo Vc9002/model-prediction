@@ -279,7 +279,7 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
     monkeypatch.setattr(
         dashboard_server,
         "_read_evidence_ledger",
-        lambda path: main if path.name == "picks.xlsx" else flat,
+        lambda path: main if path.parent.name == "main" else flat,
     )
 
     model = dashboard_server.production_evidence()["models"][0]

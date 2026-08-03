@@ -2016,12 +2016,27 @@ function pickLabel(p){
   if(p.market_type==="moneyline")return team?`${team} ML`:sel.toUpperCase();
   if(p.market_type==="spread"&&team!=null){
     const line=Number(p.line);
-    const signed=isNaN(line)?"":(line>0?`+${line}`:`${line}`);
-    let plain="";
-    if(!isNaN(line)){
-      plain=line>0?` (covers unless losing by ${Math.ceil(line)}+)`:line<0?` (needs to win by ${Math.ceil(-line)}+)`:"";
+    // The picked team's own line always describes ITS side directly (e.g.
+    // away team +1.5 = away covers a 1.5-point handicap) -- this was
+    // previously mislabeled "YES: <team> <line>", which doesn't match how
+    // Polymarket's own spread contract is framed: the market question is
+    // asked about the favorite covering the negative line (e.g. "will
+    // Astros win by 1.5+?"), and picking the underdog's own +line is
+    // answering NO to that question, not a "yes" on the underdog's line.
+    const oppTeam = sel==="home" ? p.away_team : p.home_team;
+    if(!isNaN(line) && oppTeam){
+      const oppLine=-line;
+      const oppSigned=oppLine>0?`+${oppLine}`:`${oppLine}`;
+      return line<0
+        // Picked team IS the favorite (negative line): this is a real YES
+        // on that team's own line, no opponent-framing needed.
+        ? `YES: ${team} ${line}`
+        // Picked team is the underdog (positive line): phrase as NO on the
+        // favorite's negative line, matching the market's real question.
+        : `NO: ${oppTeam} ${oppSigned}`;
     }
-    return `YES: ${team} ${signed}${plain}`.trim();
+    const signed=isNaN(line)?"":(line>0?`+${line}`:`${line}`);
+    return `${team} ${signed}`.trim();
   }
   if(p.market_type==="total")return `${sel.toUpperCase()} ${p.line??""}`.trim();
   return `${team||sel.toUpperCase()}${p.line?(" "+p.line):""}`;
