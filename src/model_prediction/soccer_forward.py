@@ -229,6 +229,23 @@ def build_soccer_total_slate(
         with ThreadPoolExecutor(max_workers=min(18, len(leagues))) as pool:
             for scoreboard in pool.map(lambda league: client.scoreboard(league, game_date), leagues):
                 events.extend(scoreboard.get("events", []))
+    # Some competitions (e.g. a continental/cup fixture also listed under a
+    # domestic league endpoint) return the SAME event from more than one of
+    # the leagues above -- deduped by event_id, same as tennis_forward.py's
+    # combined ATP+WTA tournament handling. Without this, a real duplicate
+    # priced_contracts row (same event_id/market/selection, two separate
+    # pick_ids) reached flat_picks.xlsx for every affected match (found
+    # 2026-08-03 via 5 real duplicate pairs in production).
+    seen_event_ids: set[str] = set()
+    deduped_events: list[dict[str, Any]] = []
+    for event in events:
+        event_id = str(event.get("id", ""))
+        if event_id and event_id in seen_event_ids:
+            continue
+        if event_id:
+            seen_event_ids.add(event_id)
+        deduped_events.append(event)
+    events = deduped_events
 
     upcoming: list[UpcomingMatch] = []
     skipped: list[dict[str, str]] = []

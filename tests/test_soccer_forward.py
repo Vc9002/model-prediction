@@ -98,6 +98,65 @@ def test_soccer_forward_prices_draw_aware_full_game_total_from_exact_bbo(tmp_pat
     assert contract["timestamp_valid"] is True
 
 
+def test_soccer_forward_dedupes_same_event_returned_by_two_leagues(tmp_path) -> None:
+    """Real bug found 2026-08-03: some competitions (e.g. a continental cup
+    fixture also listed under a domestic league endpoint) return the SAME
+    event_id from more than one configured league. Without deduping by
+    event_id, that produced a real duplicate priced_contracts row (same
+    event/market/selection, two separate pick_ids) for every affected match,
+    which reached flat_picks.xlsx twice in production. Same fix shape as
+    tennis_forward.py's combined ATP+WTA dedup."""
+    history_path = tmp_path / "processed" / "soccer" / "games.jsonl"
+    history_path.parent.mkdir(parents=True)
+    history = []
+    for index in range(60):
+        history.append(
+            {
+                "event_id": f"history-{index}",
+                "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+                "league": "SOCCER",
+                "away_team": "Alpha FC" if index % 2 else "Beta FC",
+                "home_team": "Beta FC" if index % 2 else "Alpha FC",
+                "away_score": index % 3,
+                "home_score": (index + 1) % 4,
+            }
+        )
+    history_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in history),
+        encoding="utf-8",
+    )
+
+    same_event = {
+        "id": "espn-shared-1",
+        "date": "2026-07-27T20:00:00Z",
+        "competitions": [
+            {
+                "competitors": [
+                    {"homeAway": "away", "team": {"displayName": "Alpha FC"}},
+                    {"homeAway": "home", "team": {"displayName": "Beta FC"}},
+                ]
+            }
+        ],
+    }
+
+    class Client:
+        @staticmethod
+        def scoreboard(league, game_date):
+            # Both leagues return the identical event_id -- exactly the
+            # shared-fixture case this dedup guards against.
+            return {"events": [same_event]}
+
+    result = build_soccer_total_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        leagues=("MLS", "CLUB_FRIENDLIES"),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    assert result["scheduled_games"] == 1
+
+
 def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) -> None:
     """Polymarket prices soccer full-time result as three SEPARATE Yes/No
     team_win markets per event (home wins / draw / away wins), not one
