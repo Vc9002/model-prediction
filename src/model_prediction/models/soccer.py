@@ -163,6 +163,12 @@ class SoccerModel:
                     "away_goal_rate": round(away_rate, 4),
                     "league_goals_per_team": round(baseline, 4),
                     "history_games": len(history),
+                    # Real per-team observation count (0.0 for a team never
+                    # seen in `history`, i.e. still resting on the neutral
+                    # attack=defense=1.0 cold-start default) -- lets callers
+                    # gate on "both teams have real learned ratings" instead
+                    # of trusting a synthetic-prior matchup silently.
+                    "min_team_games": sample,
                 },
             }
             rationale = (

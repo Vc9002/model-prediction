@@ -57,13 +57,17 @@ class TennisModel:
 
     def build_elo(
         self, matches: Sequence[dict[str, Any]]
-    ) -> tuple[dict[str, float], dict[tuple[str, str], float]]:
+    ) -> tuple[dict[str, float], dict[tuple[str, str], float], dict[str, int]]:
         """Chronological overall and per-surface Elo from match dicts.
 
         Matches need keys: winner, loser, surface, match_date (sortable).
+        Also returns a real per-player match count -- "known" (present in
+        `overall`) only means at least one real match; a player one win/loss
+        away from cold-start still isn't a genuine model opinion.
         """
         overall: dict[str, float] = {}
         by_surface: dict[tuple[str, str], float] = {}
+        counts: dict[str, int] = {}
         for match in sorted(matches, key=lambda item: str(item.get("match_date", ""))):
             winner = str(match.get("winner", ""))
             loser = str(match.get("loser", ""))
@@ -79,7 +83,9 @@ class TennisModel:
                 expected = expected_win_probability(rating_w, rating_l)
                 book[key_w] = rating_w + K_FACTOR * (1 - expected)  # type: ignore[index]
                 book[key_l] = rating_l - K_FACTOR * (1 - expected)  # type: ignore[index]
-        return overall, by_surface
+            counts[winner] = counts.get(winner, 0) + 1
+            counts[loser] = counts.get(loser, 0) + 1
+        return overall, by_surface, counts
 
     def match_probability(
         self,
@@ -105,7 +111,7 @@ class TennisModel:
         matches: Sequence[dict[str, Any]],
         upcoming: Sequence[UpcomingMatch],
     ) -> list[GamePrediction]:
-        overall, by_surface = self.build_elo(matches)
+        overall, by_surface, counts = self.build_elo(matches)
         predictions = []
         for match in upcoming:
             known_one = match.player_one in overall
@@ -142,6 +148,9 @@ class TennisModel:
                         "elo_p1_surface": round(by_surface.get((match.player_one, match.surface), DEFAULT_ELO), 1),
                         "elo_p2_surface": round(by_surface.get((match.player_two, match.surface), DEFAULT_ELO), 1),
                         "history_matches": len(matches),
+                        # Real per-player match count -- "known" above only
+                        # means at least one, which is a thin, noisy rating.
+                        "min_player_matches": min(counts.get(match.player_one, 0), counts.get(match.player_two, 0)),
                     },
                     rationale=(
                         f"Surface-blended Elo on {match.surface}: "

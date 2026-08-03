@@ -1258,13 +1258,32 @@ def _forecast_learned_sport(
                             reason_code="NO_CALL_MARKET_UNAVAILABLE",
                             units=0,
                         )
-                    # evaluate_eligibility now returns a real QUALIFIED_SHADOW_CALL
-                    # for every candidate that clears the trust-boundary checks
-                    # (banned team, stale/missing data, unvalidated model) --
-                    # disagreement, exposure, and low edge no longer produce
-                    # NO_CALL at all (operator directive, 2026-07-26; see
-                    # eligibility._call_result). What's still NO_CALL here is
-                    # always one of those hard trust-boundary reasons.
+                    # evaluate_eligibility itself no longer gates on
+                    # disagreement, exposure, or edge (operator directive,
+                    # 2026-07-26; see eligibility._call_result) -- those
+                    # remain deliberately removed. Confidence is restored
+                    # here as an explicit, separate gate (operator
+                    # directive, reversing F-34/F-35): candidate.
+                    # confidence_threshold is each sport's own real,
+                    # walk-forward-learned value (MLB v7: 0.62419, learned
+                    # on validation at a 65% target hit rate; WNBA v4:
+                    # 0.50013, i.e. already-effectively-ungated because the
+                    # model clears almost every game) -- not a fabricated
+                    # number, the same one already computed and shown as a
+                    # reference/label on every candidate.
+                    if (
+                        eligibility.decision == "CALL"
+                        and candidate.model_probability < candidate.confidence_threshold
+                    ):
+                        eligibility = replace(
+                            eligibility,
+                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            decision="NO_CALL",
+                            reason_code="NO_CALL_BELOW_LEARNED_CONFIDENCE",
+                            units=0,
+                        )
+                    # What's still NO_CALL here is always a hard trust-
+                    # boundary reason or the confidence gate just above.
                     genuinely_eligible = eligibility.decision == "CALL"
                     # Main ledger (MLB/WNBA, non-flat, non-research-routed) holds
                     # ONLY genuine qualified calls -- any remaining NO_CALL is a
@@ -1524,6 +1543,15 @@ def _forecast_international_sport(
     league_upper = league.upper()
     model_config = config["models"].get(league_upper, {})
     min_edge = float(model_config.get("min_edge", 0.02))
+    # Both teams must have real, observed history beyond the bare minimum
+    # forecast_international_baseball_slate already hard-requires (it
+    # NO_CALLs entirely if either team_id is missing from the artifact's
+    # ratings -- see NO_CALL_MODEL_UNVALIDATED_NEW_TEAM there -- but one
+    # game away from cold-start is still a thin, noisy rating).
+    # MINIMUM_TEAM_GAMES matches this project's existing "enough to say
+    # something" convention (validation.MINIMUM_MONTHLY_CALLS = 10), same
+    # reasoning as soccer/tennis.
+    MINIMUM_TEAM_GAMES = 10
     configured_state = str(model_config.get("status", "research"))
     forecast = forecast_international_baseball_slate(
         data_root, artifact_dir, league, args_date,
@@ -1556,6 +1584,7 @@ def _forecast_international_sport(
             continue
         ask = float(best_side["executable_ask"])
         research_confidence_gate = float(model_config.get("research_confidence_gate", 0.0))
+        model_inputs_valid = float(contract.get("min_team_games", 0)) >= MINIMUM_TEAM_GAMES
         selected_team = str(best_side["team"])
         # home_team/away_team are resolved tag-safely inside
         # forecast_international_baseball_slate (via each side's own
@@ -1615,7 +1644,7 @@ def _forecast_international_sport(
                     request,
                     exposure,
                     unit_policy(config),
-                    model_inputs_valid=True,
+                    model_inputs_valid=model_inputs_valid,
                     minimum_edge=min_edge,
                     minimum_confidence=research_confidence_gate,
                     now=observed_now,
@@ -1702,7 +1731,27 @@ def _forecast_soccer_sport(
         return forecast
 
     min_edge = float(model_config.get("min_edge", 0.05))
+    # Real edge/confidence validation for soccer's primary market lives in
+    # validation.qualify_soccer_total_model (chronological 60/20/20 split,
+    # learned confidence threshold, locked-holdout units_at_minus_110 +
+    # monthly-consistency check -- same rigor as every other model in this
+    # project). Read from config, same mechanism as esports/KBO/NPB, so a
+    # validated value can be set here without another code change; defaults
+    # to 0.0 (no gate) until that value is set.
+    research_confidence_gate = float(model_config.get("research_confidence_gate", 0.0))
+    # Both teams must have real, observed history (not the neutral
+    # attack=defense=1.0 cold-start default SoccerModel._strengths falls
+    # back to for a team it's never seen) before a call counts as resting
+    # on a genuine model opinion. Mirrors esports' gated_research_eligible
+    # check; MINIMUM_TEAM_GAMES matches this project's existing "enough to
+    # say something" convention (validation.MINIMUM_MONTHLY_CALLS = 10).
+    MINIMUM_TEAM_GAMES = 10
     configured_state = str(model_config.get("status", "research"))
+    # build_soccer_total_slate hardcodes "status": "research" in its return
+    # dict (it has no config access) -- overwrite with the real configured
+    # promotion tier so the dashboard/diagnostic output doesn't show a stale
+    # "research" label when config actually has soccer at shadow_qualified.
+    forecast["status"] = configured_state
     observed_now = utc_now()
     logged = 0
     gated = 0
@@ -1711,6 +1760,10 @@ def _forecast_soccer_sport(
     errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
+        min_team_games = float(
+            (contract.get("feature_basis") or {}).get("min_team_games", 0.0)
+        )
+        model_inputs_valid = min_team_games >= MINIMUM_TEAM_GAMES
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -1752,9 +1805,9 @@ def _forecast_soccer_sport(
                     request,
                     exposure_source.exposure(request, now=observed_now),
                     unit_policy(config),
-                    model_inputs_valid=True,
+                    model_inputs_valid=model_inputs_valid,
                     minimum_edge=min_edge,
-                    minimum_confidence=0.0,
+                    minimum_confidence=research_confidence_gate,
                     now=observed_now,
                     maximum_age_hours=float(
                         config["project"].get("maximum_data_age_hours", 12)
@@ -1866,6 +1919,21 @@ def _forecast_tennis_sport(
         return forecast
 
     min_edge = float(model_config.get("min_edge", 0.05))
+    # Real edge/confidence validation lives in validation.qualify_tennis_elo_model
+    # (chronological 60/20/20 split, learned confidence threshold, locked-
+    # holdout units_at_minus_110 + monthly-consistency check -- same rigor
+    # as every other model in this project). Read from config, same
+    # mechanism as esports/KBO/NPB/soccer, so a validated value can be set
+    # here without another code change; defaults to 0.0 (no gate) until set.
+    research_confidence_gate = float(model_config.get("research_confidence_gate", 0.0))
+    # Both players must have real, observed match history beyond the bare
+    # minimum TennisModel.predict_games already hard-requires (it skips a
+    # match entirely if either player has zero history at all -- see that
+    # function's own comment -- but one win/loss is still a thin, noisy
+    # rating). MINIMUM_PLAYER_MATCHES matches this project's existing
+    # "enough to say something" convention (validation.MINIMUM_MONTHLY_CALLS
+    # = 10), same reasoning as soccer's MINIMUM_TEAM_GAMES.
+    MINIMUM_PLAYER_MATCHES = 10
     configured_state = str(model_config.get("status", "research"))
     observed_now = utc_now()
     logged = 0
@@ -1875,6 +1943,10 @@ def _forecast_tennis_sport(
     errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
+        min_player_matches = float(
+            (contract.get("feature_basis") or {}).get("min_player_matches", 0.0)
+        )
+        model_inputs_valid = min_player_matches >= MINIMUM_PLAYER_MATCHES
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -1917,9 +1989,9 @@ def _forecast_tennis_sport(
                     request,
                     exposure_source.exposure(request, now=observed_now),
                     unit_policy(config),
-                    model_inputs_valid=True,
+                    model_inputs_valid=model_inputs_valid,
                     minimum_edge=min_edge,
-                    minimum_confidence=0.0,
+                    minimum_confidence=research_confidence_gate,
                     now=observed_now,
                     maximum_age_hours=float(
                         config["project"].get("maximum_data_age_hours", 12)
@@ -3437,8 +3509,13 @@ def main(argv: list[str] | None = None) -> None:
             for result in forecast_result.values():
                 result.pop("candidates", None)
             # Read back stored Polymarket odds snapshots for per-sport summaries.
+            # Tennis/KBO/NPB are captured and forecasted the same as every
+            # other sport (see BBO_CAPTURE_SPORTS in polymarket_us.py) but
+            # were missing from LEARNED_PRODUCTION_SPORTS, so this summary
+            # silently never showed their snapshot counts even though their
+            # capture and forecasting worked correctly the whole time.
             odds_by_sport = {}
-            for sport in LEARNED_PRODUCTION_SPORTS:
+            for sport in (*LEARNED_PRODUCTION_SPORTS, "tennis", "kbo", "npb"):
                 odds_sport = "esports" if sport in ESPORTS_TITLES else sport
                 snap_path = (
                     Path(ledger_path(config)).parent

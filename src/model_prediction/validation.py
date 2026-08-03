@@ -1312,6 +1312,294 @@ def qualify_soccer_poisson_model(store: FeatureStore, minimum_history_games: int
     }
 
 
+def qualify_soccer_total_model(store: FeatureStore, minimum_history_games: int = 200) -> dict[str, Any]:
+    """Walk-forward qualify the soccer model's full-game 2.5-goal TOTAL market
+    on the same locked 60/20/20 date split and hit-rate/monthly-consistency
+    gate as ``qualify_soccer_poisson_model`` above.
+
+    Deliberately separate from that function rather than a shared helper:
+    the two markets have different outcome definitions (3-way win/draw/loss
+    vs. binary over/under) and, more importantly, different confidence
+    semantics -- moneyline's natural confidence is the 3-way argmax
+    probability, while total's is ``abs(p_over - 0.5)``, the SAME quantity
+    ``evaluate_gated_research_eligibility``'s ``minimum_confidence`` check
+    actually gates on for every non-moneyline contract. Totals is soccer's
+    primary priced market (build_soccer_total_slate's own name, and the only
+    one with real historical Polymarket depth) so this is the qualification
+    that actually matters for tuning that gate, not the moneyline one.
+    """
+    from .models.soccer import SoccerModel, UpcomingMatch
+
+    rows = build_walk_forward_rows(store, "soccer")
+    _train, validation, holdout, _split = chronological_split(rows)
+    validation_ids = {row.event_id for row in validation}
+    holdout_ids = {row.event_id for row in holdout}
+
+    games = store.load_games("soccer")
+    by_date: dict[str, list[GameRecord]] = defaultdict(list)
+    for game in games:
+        by_date[game.start.astimezone(EASTERN).date().isoformat()].append(game)
+    dates = sorted(by_date)
+
+    model = SoccerModel()
+    history: list[GameRecord] = []
+    val_confidences: list[float] = []
+    val_hits: list[int] = []
+    ho_confidences: list[float] = []
+    ho_hits: list[int] = []
+    ho_dates: list[str] = []
+
+    for day in dates:
+        day_games = by_date[day]
+        if len(history) >= minimum_history_games:
+            relevant = [game for game in day_games if game.event_id in validation_ids or game.event_id in holdout_ids]
+            if relevant:
+                upcoming = [
+                    UpcomingMatch(game.event_id, game.start.isoformat(), game.away_team, game.home_team, "SOCCER")
+                    for game in relevant
+                ]
+                predictions = {
+                    prediction.event_id: prediction
+                    for prediction in model.predict_games(history, upcoming)
+                    if prediction.market_type == "total"
+                }
+                for game in relevant:
+                    prediction = predictions.get(game.event_id)
+                    if prediction is None:
+                        continue
+                    p_over = prediction.probabilities["over"]
+                    true_over = 1 if (game.home_score + game.away_score) > 2.5 else 0
+                    selection_over = p_over >= 0.5
+                    hit = 1 if selection_over == bool(true_over) else 0
+                    confidence = abs(p_over - 0.5)
+                    if game.event_id in validation_ids:
+                        val_confidences.append(confidence)
+                        val_hits.append(hit)
+                    else:
+                        ho_confidences.append(confidence)
+                        ho_hits.append(hit)
+                        ho_dates.append(day)
+        history.extend(day_games)
+
+    try:
+        threshold, val_stats = _learn_threshold_from_confidence_hit(
+            val_confidences, val_hits,
+            target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+            minimum_calls=MINIMUM_CALLS,
+        )
+    except ValueError as error:
+        return {
+            "model": SoccerModel.version,
+            "market": "total_2.5",
+            "primary_65": {"status": "no_validation_threshold", "reason": str(error)},
+        }
+
+    calls = hits = 0
+    selected_for_grade: list[tuple[float, int, str]] = []
+    for confidence, hit, day in zip(ho_confidences, ho_hits, ho_dates, strict=True):
+        if confidence < threshold:
+            continue
+        calls += 1
+        hits += hit
+        selected_for_grade.append((confidence, hit, day))
+    hit_rate = hits / calls if calls else 0.0
+    units = hits * (10 / 11) - (calls - hits) if calls else 0.0
+    holdout_end = (
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()
+    )
+    monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
+    every_month_positive = all(
+        month["units_at_minus_110"] > 0 for month in monthly_list if month["qualification_status"] == "qualifying"
+    )
+    qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
+
+    return {
+        "model": SoccerModel.version,
+        "market": "total_2.5",
+        "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": threshold,
+            "validation": val_stats,
+            "locked_holdout": {
+                "qualified": qualified,
+                "calls": calls,
+                "hits": hits,
+                "hit_rate": round(hit_rate, 6),
+                "units_at_minus_110": round(units, 6),
+                "called_rate": round(calls / len(ho_confidences), 6) if ho_confidences else 0,
+                "qualification_eligible": True,
+                "failures": [] if qualified else ["below qualification gate"],
+                "locked_holdout": True,
+                "monthly_at_minus_110": monthly_list,
+                "monthly_minimum_calls": MINIMUM_MONTHLY_CALLS,
+                "every_called_month_positive_at_minus_110": every_month_positive,
+                "every_qualifying_month_positive_at_minus_110": every_month_positive,
+                "total_predictions": len(ho_confidences),
+                "selectivity": round(calls / len(ho_confidences), 6) if ho_confidences else 0,
+            },
+        },
+    }
+
+
+def qualify_tennis_elo_model(
+    data_root: str | Path, minimum_history_matches: int = 200
+) -> dict[str, Any]:
+    """Walk-forward qualify TennisModel's surface-blended Elo, same locked
+    60/20/20 date split and hit-rate/monthly-consistency gate as
+    ``qualify_soccer_poisson_model``/``qualify_soccer_total_model`` above.
+
+    Self-contained rather than reusing ``build_walk_forward_rows``/
+    ``chronological_split``: those are tied to ``FeatureStore.load_games``'s
+    ``GameRecord`` shape, which tennis rows are structurally incompatible
+    with (player-vs-player winner/loser, no scores -- see
+    ``tennis_forward._tennis_history_before``'s docstring for the same
+    incompatibility that silently zeroed every point-in-time tennis feature
+    before that was fixed). Reads ``data/processed/tennis/games.jsonl``
+    directly instead.
+
+    Binary market (no draw), so confidence is ``abs(p_one - 0.5)`` --
+    already the SAME quantity ``evaluate_gated_research_eligibility``'s
+    ``minimum_confidence`` checks, unlike soccer moneyline's 3-way argmax.
+    """
+    from .models.tennis import TennisModel, UpcomingMatch
+
+    path = Path(data_root) / "processed" / "tennis" / "games.jsonl"
+    rows: list[dict[str, Any]] = []
+    if path.exists():
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                    row["_date"] = str(row["event_start_utc"])[:10]
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    continue
+                rows.append(row)
+    if not rows:
+        return {"model": TennisModel.version, "primary_65": {"status": "no_validation_threshold", "reason": "no history"}}
+
+    dates = sorted({row["_date"] for row in rows})
+    if len(dates) < 5:
+        return {
+            "model": TennisModel.version,
+            "primary_65": {"status": "no_validation_threshold", "reason": "fewer than five distinct match dates"},
+        }
+    train_count = max(1, math.floor(len(dates) * 0.60))
+    validation_count = max(1, math.floor(len(dates) * 0.20))
+    holdout_start_index = min(train_count + validation_count, len(dates) - 1)
+    validation_start = dates[train_count]
+    holdout_start = dates[holdout_start_index]
+    validation_ids = {row["event_id"] for row in rows if validation_start <= row["_date"] < holdout_start}
+    holdout_ids = {row["event_id"] for row in rows if row["_date"] >= holdout_start}
+
+    by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        by_date[row["_date"]].append(row)
+
+    model = TennisModel()
+    history: list[dict[str, Any]] = []
+    val_confidences: list[float] = []
+    val_hits: list[int] = []
+    ho_confidences: list[float] = []
+    ho_hits: list[int] = []
+    ho_dates: list[str] = []
+
+    for day in dates:
+        day_rows = by_date[day]
+        if len(history) >= minimum_history_matches:
+            relevant = [row for row in day_rows if row["event_id"] in validation_ids or row["event_id"] in holdout_ids]
+            if relevant:
+                # player_one is always the real winner here -- the model
+                # doesn't care about upcoming-match slot order (Elo lookup is
+                # by name, not position), and fixing it this way turns "did
+                # the model favor player_one" directly into the hit label.
+                upcoming = [
+                    UpcomingMatch(
+                        str(row["event_id"]), str(row["event_start_utc"]),
+                        str(row["winner"]), str(row["loser"]),
+                        str(row.get("surface", "Hard")), str(row.get("league", "ATP")),
+                    )
+                    for row in relevant
+                ]
+                predictions = {
+                    prediction.event_id: prediction
+                    for prediction in model.predict_games(history, upcoming)
+                }
+                for row in relevant:
+                    prediction = predictions.get(str(row["event_id"]))
+                    if prediction is None:
+                        continue
+                    p_one = prediction.probabilities["away"]
+                    hit = 1 if p_one >= 0.5 else 0
+                    confidence = abs(p_one - 0.5)
+                    if row["event_id"] in validation_ids:
+                        val_confidences.append(confidence)
+                        val_hits.append(hit)
+                    else:
+                        ho_confidences.append(confidence)
+                        ho_hits.append(hit)
+                        ho_dates.append(day)
+        history.extend(day_rows)
+
+    try:
+        threshold, val_stats = _learn_threshold_from_confidence_hit(
+            val_confidences, val_hits,
+            target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+            minimum_calls=MINIMUM_CALLS,
+        )
+    except ValueError as error:
+        return {
+            "model": TennisModel.version,
+            "primary_65": {"status": "no_validation_threshold", "reason": str(error)},
+        }
+
+    calls = hits = 0
+    selected_for_grade: list[tuple[float, int, str]] = []
+    for confidence, hit, day in zip(ho_confidences, ho_hits, ho_dates, strict=True):
+        if confidence < threshold:
+            continue
+        calls += 1
+        hits += hit
+        selected_for_grade.append((confidence, hit, day))
+    hit_rate = hits / calls if calls else 0.0
+    units = hits * (10 / 11) - (calls - hits) if calls else 0.0
+    holdout_end = (
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()
+    )
+    monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
+    every_month_positive = all(
+        month["units_at_minus_110"] > 0 for month in monthly_list if month["qualification_status"] == "qualifying"
+    )
+    qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
+
+    return {
+        "model": TennisModel.version,
+        "primary_65": {
+            "status": "evaluated",
+            "learned_threshold": threshold,
+            "validation": val_stats,
+            "locked_holdout": {
+                "qualified": qualified,
+                "calls": calls,
+                "hits": hits,
+                "hit_rate": round(hit_rate, 6),
+                "units_at_minus_110": round(units, 6),
+                "called_rate": round(calls / len(ho_confidences), 6) if ho_confidences else 0,
+                "qualification_eligible": True,
+                "failures": [] if qualified else ["below qualification gate"],
+                "locked_holdout": True,
+                "monthly_at_minus_110": monthly_list,
+                "monthly_minimum_calls": MINIMUM_MONTHLY_CALLS,
+                "every_called_month_positive_at_minus_110": every_month_positive,
+                "every_qualifying_month_positive_at_minus_110": every_month_positive,
+                "total_predictions": len(ho_confidences),
+                "selectivity": round(calls / len(ho_confidences), 6) if ho_confidences else 0,
+            },
+        },
+    }
+
+
 def _fit(rows: Sequence[ValidationRow], feature_names: Sequence[str]) -> LogisticRegression:
     model = LogisticRegression(max_iter=2_000, solver="lbfgs")
     model.fit(_matrix(rows, feature_names), [row.outcome for row in rows])

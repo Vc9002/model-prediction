@@ -92,6 +92,7 @@ def _international_forecast() -> dict:
                         "tie_probability": 0.04,
                     },
                 ],
+                "min_team_games": 20,
             }
         ],
     }
@@ -377,6 +378,7 @@ def _soccer_forecast() -> dict:
                 "rationale": "fixture",
                 "market_slug": "soccer-1-total",
                 "observed_at_utc": "2026-07-27T10:00:00Z",
+                "feature_basis": {"min_team_games": 20},
             }
         ],
     }
@@ -465,6 +467,37 @@ def test_soccer_main_ledger_stays_empty_when_gated_ledger_does(monkeypatch) -> N
         data_root="unused",
         args_date="2026-07-27",
         config=_soccer_config(status="shadow_qualified", min_edge=0.90),
+        research_ledger=research,
+        gated_ledger=gated,
+        flat_ledger=None,
+        main_ledger=main,
+    )
+
+    assert result["gated_logged"] == 0
+    assert result["main_logged"] == 0
+    assert gated.appended == []
+    assert main.appended == []
+    assert len(research.appended) == 1
+
+
+def test_soccer_gated_and_main_blocked_when_either_team_lacks_real_history(monkeypatch) -> None:
+    """A contract whose feature_basis shows a team resting on the neutral
+    cold-start default (min_team_games below MINIMUM_TEAM_GAMES) must not
+    reach Gated Research or Main even with a comfortably clearing edge --
+    "genuinely eligible" requires a real model opinion, not just a
+    synthetic-prior matchup that happens to price with high edge."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    forecast = _soccer_forecast()
+    forecast["priced_contracts"][0]["feature_basis"] = {"min_team_games": 3}
+    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: forecast)
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    main = _CaptureLedger()
+
+    result = cli._forecast_soccer_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_soccer_config(status="shadow_qualified", min_edge=0.02),
         research_ledger=research,
         gated_ledger=gated,
         flat_ledger=None,
@@ -702,6 +735,7 @@ def _tennis_forecast() -> dict:
                 "rationale": "fixture",
                 "market_slug": "wta-alpha-beta-2026",
                 "observed_at_utc": "2026-07-27T10:00:00Z",
+                "feature_basis": {"min_player_matches": 20},
             }
         ],
     }
@@ -766,6 +800,57 @@ def test_tennis_logging_failure_is_recorded_not_silently_discarded(monkeypatch) 
             "reason": "ValueError: cannot create a call after the event has started",
         }
     ]
+
+
+def test_tennis_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
+    """Same relationship as soccer's equivalent test: main_ledger receives a
+    pick if and only if gated_ledger does -- one shared eligibility result."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: _tennis_forecast())
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    main = _CaptureLedger()
+
+    result = cli._forecast_tennis_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_tennis_config(status="shadow_qualified", min_edge=0.02),
+        research_ledger=research,
+        gated_ledger=gated,
+        main_ledger=main,
+    )
+
+    assert result["gated_logged"] == 1
+    assert result["main_logged"] == 1
+    assert gated.appended[0][0].event_id == main.appended[0][0].event_id == "tennis-1"
+
+
+def test_tennis_gated_and_main_blocked_when_either_player_lacks_real_history(monkeypatch) -> None:
+    """A contract whose feature_basis shows a player resting on thin history
+    (min_player_matches below MINIMUM_PLAYER_MATCHES) must not reach Gated
+    Research or Main even with a comfortably clearing edge."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    forecast = _tennis_forecast()
+    forecast["priced_contracts"][0]["feature_basis"] = {"min_player_matches": 3}
+    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: forecast)
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+    main = _CaptureLedger()
+
+    result = cli._forecast_tennis_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_tennis_config(status="shadow_qualified", min_edge=0.02),
+        research_ledger=research,
+        gated_ledger=gated,
+        main_ledger=main,
+    )
+
+    assert result["gated_logged"] == 0
+    assert result["main_logged"] == 0
+    assert gated.appended == []
+    assert main.appended == []
+    assert len(research.appended) == 1
 
 
 def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path) -> None:
@@ -1028,6 +1113,98 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
     assert "logged anyway" in result["edge_blocked"][0]["reason"]
     request, _eligibility = ledger.appended[0]
     assert request.event_id == "mlb-2"
+
+
+def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeypatch, tmp_path) -> None:
+    """Operator directive reversing F-34/F-35: unlike the min-edge-vs-market
+    number above (still just a visible note, never exclusionary), the
+    model's own learned confidence_threshold IS restored as a real gate. A
+    candidate whose model_probability falls short of it must be downgraded
+    from CALL to a NO_CALL research observation, and -- same as any other
+    hard NO_CALL reason for a production sport in non-flat mode -- kept off
+    Main entirely rather than muddying it."""
+    observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
+    candidate = LearnedForwardCandidate(
+        event_id="mlb-conf",
+        event_start_utc="2026-07-27T00:00:00Z",
+        away_team="Boston Red Sox",
+        home_team="New York Yankees",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.55,
+        home_probability=0.55,
+        confidence_threshold=0.65,  # candidate falls short of this
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="CALL_BELOW_LEARNED_CONFIDENCE_OPERATOR_REVIEW",
+        model_version="mlb-test",
+        model_artifact_hash="artifact-hash",
+        model_qualified=True,
+        feature_basis={"elo_probability": 0.55, "trend_gap": 0.0},
+        feature_snapshot_hash="feature-hash-conf",
+    )
+    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(
+        cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1),
+    )
+    monkeypatch.setattr(
+        cli,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.56,
+            "market_slug": "mlb-conf",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": True,
+        },
+    )
+
+    class Registry:
+        version = "1"
+
+        @staticmethod
+        def resolve(league, team, event_start):
+            return AWAY if team == "Boston Red Sox" else HOME
+
+    monkeypatch.setattr(
+        cli,
+        "evaluate_eligibility",
+        lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
+            RecordType.QUALIFIED_SHADOW_CALL,
+            "CALL",
+            "QUALIFIED",
+            1.0,
+            60,
+            0.07,
+            0.02,
+            AWAY,
+            HOME,
+        ),
+    )
+    ledger = _CaptureLedger()
+    config = {
+        "models": {
+            "MLB": {
+                "production_artifact": str(tmp_path / "artifact.json"),
+                "status": "shadow_qualified",
+                "min_edge": 0.05,
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+        },
+        "bankroll": {},
+    }
+
+    result = cli._forecast_learned_sport(
+        "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
+    )
+
+    # Kept off Main entirely (mirrors any other hard NO_CALL reason for a
+    # production sport in non-flat mode).
+    assert result["logged"] == 0
+    assert ledger.appended == []
 
 
 def test_market_residual_probability_recorded_when_artifact_configured(monkeypatch, tmp_path) -> None:
@@ -1387,6 +1564,37 @@ def test_international_forecast_mirrors_only_strategy_qualified_calls(
     assert result["logged"] == 1
     assert research.appended[0][1].decision == "CALL"
     assert gated.appended[0][1].decision == "CALL"
+
+
+def test_international_forecast_gated_blocked_when_team_lacks_real_history(
+    monkeypatch, tmp_path
+) -> None:
+    """A contract whose min_team_games is below MINIMUM_TEAM_GAMES must not
+    reach Gated Research even with a comfortably clearing edge -- same
+    reasoning as soccer/tennis's equivalent test."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    forecast = _international_forecast()
+    forecast["priced_contracts"][0]["min_team_games"] = 3
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.forecast_international_baseball_slate",
+        lambda *args, **kwargs: forecast,
+    )
+    research = _CaptureLedger()
+    gated = _CaptureLedger()
+
+    result = cli._forecast_international_sport(
+        tmp_path,
+        tmp_path,
+        "kbo",
+        "2026-07-27",
+        _international_config(min_edge=0.02),
+        research,
+        gated,
+    )
+
+    assert result["logged"] == 1
+    assert research.appended[0][1].decision == "NO_CALL"
+    assert gated.appended == []
 
 
 def _log_pick(ledger: PickLedger, *, event_start_utc: str, created_at, units: float = 1.0) -> dict:

@@ -33,6 +33,14 @@ from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
 from .research_io import sha256_file as _sha256
 from .research_io import utc_now as _utc_now
+from .validation import (
+    MINIMUM_CALLS,
+    MINIMUM_MONTHLY_CALLS,
+    PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+    QUALIFICATION_MINIMUM_HIT_RATE,
+    _learn_threshold_from_confidence_hit,
+    _monthly_grade,
+)
 
 KBO_SCHEDULE_PAGE = "https://www.koreabaseball.com/Schedule/Schedule.aspx"
 KBO_RESULTS_ENDPOINT = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList"
@@ -539,11 +547,19 @@ class HomeElo:
     margin_weight: float = 0.0
     decay_rate: float = 0.0
     _last_active: dict[str, str] | None = None
+    _games_played: dict[str, int] | None = None
 
     def decisive_home_probability(self, away_id: str, home_id: str) -> float:
         away = self.ratings.get(away_id, 1500.0)
         home = self.ratings.get(home_id, 1500.0)
         return expected_win_probability(home, away, self.home_advantage)
+
+    def games_played(self, team_id: str) -> int:
+        """Real completed games this team has updated ratings from -- a
+        team never seen still resolves to the neutral 1500.0 default in
+        `ratings`, which is indistinguishable from a genuine 1500 rating
+        without this count."""
+        return (self._games_played or {}).get(team_id, 0)
 
     def _apply_decay(self, game_date: str) -> None:
         if self.decay_rate <= 0 or self._last_active is None:
@@ -587,6 +603,10 @@ class HomeElo:
         self.ratings[row["home_team_id"]] = self.ratings.get(row["home_team_id"], 1500.0) + delta
         self.ratings[row["away_team_id"]] = self.ratings.get(row["away_team_id"], 1500.0) - delta
         self._mark_active([row["home_team_id"], row["away_team_id"]], game_date)
+        if self._games_played is None:
+            self._games_played = {}
+        for team_id in (row["home_team_id"], row["away_team_id"]):
+            self._games_played[team_id] = self._games_played.get(team_id, 0) + 1
 
 
 def tie_aware_fair_values(decisive_home_probability: float, tie_probability: float) -> tuple[float, float]:
@@ -670,7 +690,10 @@ def _batched_predictions(
             )
             _, fair_home = tie_aware_fair_values(decisive_home, game_tie_p)
             outcome = 0.5 if row["tie"] else float(row["home_score"] > row["away_score"])
-            output.append({"probability": fair_home, "outcome": outcome, "tie": bool(row["tie"])})
+            output.append({
+                "probability": fair_home, "outcome": outcome, "tie": bool(row["tie"]),
+                "game_date": game_date,
+            })
             pending.append((row, decisive_home, game_tie_p))
         for row, probability, _tie_p in pending:
             book.update(row, probability)
@@ -793,6 +816,71 @@ def validate_international_baseball_baseline(
         [*train, *validation], test, chosen_k, chosen_home,
         margin_weight=chosen_margin, decay_rate=chosen_decay, tie_method=chosen_tie,
     )
+    # Confidence-threshold selection: same methodology as
+    # validation.qualify_soccer_total_model/qualify_tennis_elo_model --
+    # learn a threshold on the validation split (target 65% hit rate, >= 50
+    # calls), then grade it on the SAME locked test cohort as the parameter
+    # selection above, never the validation cohort it was learned on.
+    # Ties are excluded from confidence/hit pairs entirely (matching
+    # _metrics' own exclusion from accuracy_decisive) -- a tie settles at
+    # 0.50 regardless of the model's selected side, so it is neither a hit
+    # nor a miss for a confidence-gated call.
+    _, chosen_validation_predictions = _fit_and_score(
+        train, validation, chosen_k, chosen_home,
+        margin_weight=chosen_margin, decay_rate=chosen_decay, tie_method=chosen_tie,
+    )
+    val_confidences = [abs(row["probability"] - 0.5) for row in chosen_validation_predictions if not row["tie"]]
+    val_hits = [
+        int((row["probability"] >= 0.5) == bool(row["outcome"]))
+        for row in chosen_validation_predictions if not row["tie"]
+    ]
+    try:
+        confidence_threshold, confidence_val_stats = _learn_threshold_from_confidence_hit(
+            val_confidences, val_hits,
+            target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+            minimum_calls=MINIMUM_CALLS,
+        )
+        test_decisive = [row for row in test_predictions if not row["tie"]]
+        selected_for_grade = [
+            (abs(row["probability"] - 0.5), int((row["probability"] >= 0.5) == bool(row["outcome"])), row["game_date"])
+            for row in test_decisive
+            if abs(row["probability"] - 0.5) >= confidence_threshold
+        ]
+        gate_calls = len(selected_for_grade)
+        gate_hits = sum(hit for _, hit, _ in selected_for_grade)
+        gate_hit_rate = gate_hits / gate_calls if gate_calls else 0.0
+        gate_units = gate_hits * (10 / 11) - (gate_calls - gate_hits) if gate_calls else 0.0
+        gate_holdout_end = (
+            max(date.fromisoformat(day) for _, _, day in selected_for_grade)
+            if selected_for_grade else date.today()
+        )
+        gate_monthly = _monthly_grade(selected_for_grade, holdout_end=gate_holdout_end)
+        gate_every_month_positive = all(
+            month["units_at_minus_110"] > 0 for month in gate_monthly if month["qualification_status"] == "qualifying"
+        )
+        confidence_gate_report: dict[str, Any] = {
+            "status": "evaluated",
+            "learned_threshold": confidence_threshold,
+            "validation": confidence_val_stats,
+            "locked_holdout": {
+                "qualified": (
+                    gate_calls >= MINIMUM_CALLS
+                    and gate_hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE
+                    and gate_every_month_positive
+                ),
+                "calls": gate_calls,
+                "hits": gate_hits,
+                "hit_rate": round(gate_hit_rate, 6),
+                "units_at_minus_110": round(gate_units, 6),
+                "called_rate": round(gate_calls / len(test_decisive), 6) if test_decisive else 0,
+                "monthly_at_minus_110": gate_monthly,
+                "monthly_minimum_calls": MINIMUM_MONTHLY_CALLS,
+                "every_qualifying_month_positive_at_minus_110": gate_every_month_positive,
+                "total_predictions": len(test_decisive),
+            },
+        }
+    except ValueError as error:
+        confidence_gate_report = {"status": "no_validation_threshold", "reason": str(error)}
     all_book = HomeElo(
         k=chosen_k, home_advantage=chosen_home, ratings={},
         margin_weight=chosen_margin, decay_rate=chosen_decay,
@@ -815,6 +903,13 @@ def validate_international_baseball_baseline(
         "training_observations": len(rows),
         "trained_through_date": rows[-1]["game_date"],
         "ratings": {team: round(rating, 6) for team, rating in sorted(all_book.ratings.items())},
+        # Real per-team game count -- "team_id in ratings" alone (the check
+        # forecast_international_baseball_slate already makes) only means at
+        # least one real game; a team one game away from cold-start still
+        # isn't a genuine model opinion. Lets the forecast path gate on both
+        # teams having enough real history instead of trusting any presence.
+        "games_played": {team: count for team, count in sorted((all_book._games_played or {}).items())},
+        "confidence_threshold": confidence_gate_report.get("learned_threshold"),
         "source_manifest_sha256": _sha256(manifest_path),
         "games_sha256": source_manifest["games_sha256"],
         "training_prefix_sha256": _training_prefix_sha256(rows, rows[-1]["game_date"]),
@@ -843,6 +938,7 @@ def validate_international_baseball_baseline(
         "parameter_selection_on_validation": candidates,
         "chosen": {"k": chosen_k, "home_advantage": chosen_home},
         "locked_test": _metrics(test_predictions),
+        "primary_65": confidence_gate_report,
         "artifact": str(artifact_path) if artifact_path else None,
         "artifact_hash": artifact["artifact_hash"],
         "point_in_time": "all games on one local date are predicted before that date updates ratings",
@@ -938,6 +1034,7 @@ def forecast_international_baseball_slate(
         timezone_name,
     )
     ratings = {key: float(value) for key, value in artifact["ratings"].items()}
+    games_played = {key: int(value) for key, value in artifact.get("games_played", {}).items()}
     margin_weight = float(artifact.get("margin_weight", 0))
     decay_rate = float(artifact.get("decay_rate", 0))
     tie_method = str(artifact.get("tie_method", "flat"))
@@ -1053,6 +1150,12 @@ def forecast_international_baseball_slate(
                     "record_type": "RESEARCH_OBSERVATION",
                     "qualification": "NO_CALL_MODEL_UNVALIDATED",
                     "units": 0,
+                    # Real per-team game count, not just "present in ratings"
+                    # (which forecast_international_baseball_slate's own
+                    # NO_CALL_MODEL_UNVALIDATED_NEW_TEAM check above already
+                    # requires) -- lets callers gate on both teams having
+                    # enough real history, same as soccer/tennis.
+                    "min_team_games": min(games_played.get(team_id, 0) for team_id in team_ids),
                 }
             )
     return {
