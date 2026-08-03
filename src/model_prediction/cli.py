@@ -21,6 +21,8 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from .audit import AuditLog
 from .backtester import walk_forward_backtest
 from .bans import TeamBanList
@@ -608,10 +610,36 @@ def _polymarket_slate(args, config) -> dict:
         events = {args.league.upper(): client.slate(args.league, game_date, args.timezone)}
     elif args.all:
         events = {}
-        for sport in SPORTS:
-            result = client.sport_slate(sport, game_date, args.timezone)
-            events.update(result.events)
-            league_errors.update(result.errors)
+        # Every sport's leagues, flattened into one list and fetched through
+        # ONE shared pool. Deliberately NOT "9 sports concurrently, each
+        # calling sport_slate which itself fans its own leagues out
+        # concurrently" -- that nests two pools sharing the same
+        # PolymarketUSClient connection pool, and at peak (e.g. soccer's ~30
+        # leagues alongside esports'/tennis'/etc.) pushes concurrent
+        # in-flight requests well past what the gateway tolerates: measured
+        # directly, request latency is flat around 0.6s per call up through
+        # ~16 concurrent requests, then degrades to 3-5s per call (and
+        # starts raising SSL EOF connection errors) at 24-32. One flat pool
+        # capped at 16 keeps every fetch (30+ leagues) under that ceiling
+        # instead of silently multiplying concurrency across nested pools.
+        all_leagues = [
+            (sport, league)
+            for sport in SPORTS
+            for league in POLYMARKET_SPORT_LEAGUES[sport]
+        ]
+
+        def _fetch_league_slate(entry: tuple[str, str]) -> tuple[str, str, list[dict[str, Any]], str | None]:
+            sport, league = entry
+            try:
+                return sport, league, client.slate(league, game_date, args.timezone), None
+            except httpx.HTTPError as exc:
+                return sport, league, [], str(exc)[:200]
+
+        with ThreadPoolExecutor(max_workers=min(16, len(all_leagues))) as pool:
+            for sport, league, league_events, error in pool.map(_fetch_league_slate, all_leagues):
+                events[league] = league_events
+                if error is not None:
+                    league_errors[league] = error
     elif args.sport:
         result = client.sport_slate(args.sport, game_date, args.timezone)
         events = result.events
@@ -3234,54 +3262,75 @@ def main(argv: list[str] | None = None) -> None:
                         forecast_result[f"_flat_{sport}"] = future.result()
                     except Exception:
                         logger.warning("Flat forecast failed for sport %s", sport, exc_info=True)
-            # MLB totals + spread: Measured Edge models, flat only (moneyline
-            # already ran above via the learned production path).
-            try:
-                forecast_result["mlb_totals"] = _forecast_mlb_totals_flat(
-                    args.date, True, config, registry, bans, flat_ledger, audit,
-                    main_ledger=ledger,
-                )
-            except Exception:
-                logger.warning("MLB totals flat forecast failed", exc_info=True)
-            # Soccer: Main+Flat only (operator directive 2026-08-03).
-            forecast_result["soccer"] = _forecast_soccer_sport(
-                data_root=data_directory,
-                args_date=args.date,
-                config=config,
-                flat_ledger=flat_ledger,
-                main_ledger=ledger,
-            )
-            # Not a hard failure -- these are separate leagues in one daily
-            # run, and a loud warning here (rather than an exception) is what
-            # would have surfaced the KBO/NPB silent-zero-picks incident
-            # immediately instead of it running unnoticed for months.
-            _priced_soccer = forecast_result["soccer"].get("priced_contracts") or []
-            if _priced_soccer and not forecast_result["soccer"].get("logged"):
-                logger.warning(
-                    "zero rows logged for soccer despite %d priced contracts",
-                    len(_priced_soccer),
-                )
-            try:
-                forecast_result["tennis"] = _forecast_tennis_sport(
-                    data_root=data_directory,
-                    args_date=args.date,
-                    config=config,
-                    main_ledger=ledger,
-                    flat_ledger=flat_ledger,
-                )
-                _priced_tennis = forecast_result["tennis"].get("priced_contracts") or []
-                if _priced_tennis and not forecast_result["tennis"].get("logged"):
-                    logger.warning(
-                        "zero rows logged for tennis despite %d priced contracts",
-                        len(_priced_tennis),
+            # MLB totals, soccer, tennis, esports, and international baseball
+            # are independent of each other and of the four learned sports
+            # above (already logged by the pool before this point) -- they
+            # used to run one after another and were the dominant share of
+            # daily's wall-clock time (soccer alone fans out to 18 ESPN
+            # leagues, tennis reads the largest historical dataset in the
+            # project). Run them concurrently instead. This is safe to do
+            # because every one of these already guards its own ledger
+            # appends with the same in-process _LEDGER_LOCK the four learned
+            # sports' pool above already relies on for concurrent writes to
+            # the same ledger files (see _log_esports_forecast's lock
+            # comment, mirrored in _forecast_soccer_sport/_forecast_tennis_sport/
+            # _forecast_international_sport/_forecast_mlb_totals_flat).
+            def _mlb_totals_task() -> None:
+                try:
+                    forecast_result["mlb_totals"] = _forecast_mlb_totals_flat(
+                        args.date, True, config, registry, bans, flat_ledger, audit,
+                        main_ledger=ledger,
                     )
-            except Exception:
-                logger.warning("Tennis forecast failed", exc_info=True)
-            try:
-                forecast_result["_esports_ratings_refresh"] = _refresh_esports_ratings(data_directory)
-            except Exception:
-                logger.warning("Esports ratings refresh failed", exc_info=True)
-            for title in ESPORTS_TITLES:
+                except Exception:
+                    logger.warning("MLB totals flat forecast failed", exc_info=True)
+
+            def _soccer_task() -> None:
+                # Soccer: Main+Flat only (operator directive 2026-08-03).
+                # Previously uncaught here (a crash would have taken down
+                # tennis/esports/international-baseball/settlement below it
+                # too) -- now caught like its siblings so one failing block
+                # can't wedge the concurrent pool's other independent tasks.
+                try:
+                    forecast_result["soccer"] = _forecast_soccer_sport(
+                        data_root=data_directory,
+                        args_date=args.date,
+                        config=config,
+                        flat_ledger=flat_ledger,
+                        main_ledger=ledger,
+                    )
+                except Exception:
+                    logger.warning("Soccer forecast failed", exc_info=True)
+                    return
+                # Not a hard failure -- these are separate leagues in one daily
+                # run, and a loud warning here (rather than an exception) is what
+                # would have surfaced the KBO/NPB silent-zero-picks incident
+                # immediately instead of it running unnoticed for months.
+                _priced_soccer = forecast_result["soccer"].get("priced_contracts") or []
+                if _priced_soccer and not forecast_result["soccer"].get("logged"):
+                    logger.warning(
+                        "zero rows logged for soccer despite %d priced contracts",
+                        len(_priced_soccer),
+                    )
+
+            def _tennis_task() -> None:
+                try:
+                    forecast_result["tennis"] = _forecast_tennis_sport(
+                        data_root=data_directory,
+                        args_date=args.date,
+                        config=config,
+                        main_ledger=ledger,
+                        flat_ledger=flat_ledger,
+                    )
+                    _priced_tennis = forecast_result["tennis"].get("priced_contracts") or []
+                    if _priced_tennis and not forecast_result["tennis"].get("logged"):
+                        logger.warning(
+                            "zero rows logged for tennis despite %d priced contracts",
+                            len(_priced_tennis),
+                        )
+                except Exception:
+                    logger.warning("Tennis forecast failed", exc_info=True)
+
+            def _esports_title_task(title: str) -> None:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=data_directory,
                     artifact_dir=PROJECT_ROOT / "config/models",
@@ -3302,14 +3351,27 @@ def main(argv: list[str] | None = None) -> None:
                         "zero rows logged for %s despite %d priced contracts",
                         title, len(_priced_esports),
                     )
-            try:
-                forecast_result["_international_baseball_ratings_refresh"] = (
-                    _refresh_international_baseball_ratings(data_directory)
-                )
-            except Exception:
-                logger.warning("International baseball ratings refresh failed", exc_info=True)
-            # International baseball — logged to research/gated/flat ledgers
-            for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS:
+
+            def _esports_block() -> None:
+                try:
+                    forecast_result["_esports_ratings_refresh"] = _refresh_esports_ratings(data_directory)
+                except Exception:
+                    logger.warning("Esports ratings refresh failed", exc_info=True)
+                # Titles are independent of each other once ratings are
+                # refreshed above -- fan them out too instead of one at a time.
+                with ThreadPoolExecutor(max_workers=len(ESPORTS_TITLES)) as title_pool:
+                    title_futures = {
+                        title_pool.submit(_esports_title_task, title): title
+                        for title in ESPORTS_TITLES
+                    }
+                    for future in as_completed(title_futures):
+                        title = title_futures[future]
+                        try:
+                            future.result()
+                        except Exception:
+                            logger.warning("Esports forecast failed for title %s", title, exc_info=True)
+
+            def _intl_baseball_league_task(league: str) -> None:
                 forecast_result[league] = _forecast_international_sport(
                     data_root=data_directory,
                     artifact_dir=PROJECT_ROOT / "config/models",
@@ -3326,6 +3388,46 @@ def main(argv: list[str] | None = None) -> None:
                         "zero rows logged for %s despite %d priced contracts",
                         league, len(_priced_intl),
                     )
+
+            def _intl_baseball_block() -> None:
+                try:
+                    forecast_result["_international_baseball_ratings_refresh"] = (
+                        _refresh_international_baseball_ratings(data_directory)
+                    )
+                except Exception:
+                    logger.warning("International baseball ratings refresh failed", exc_info=True)
+                # International baseball — logged to research/gated/flat ledgers
+                with ThreadPoolExecutor(
+                    max_workers=len(DAILY_INTERNATIONAL_BASEBALL_SPORTS)
+                ) as league_pool:
+                    league_futures = {
+                        league_pool.submit(_intl_baseball_league_task, league): league
+                        for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS
+                    }
+                    for future in as_completed(league_futures):
+                        league = league_futures[future]
+                        try:
+                            future.result()
+                        except Exception:
+                            logger.warning(
+                                "International baseball forecast failed for league %s",
+                                league, exc_info=True,
+                            )
+
+            with ThreadPoolExecutor(max_workers=5) as research_pool:
+                research_futures = [
+                    research_pool.submit(_mlb_totals_task),
+                    research_pool.submit(_soccer_task),
+                    research_pool.submit(_tennis_task),
+                    research_pool.submit(_esports_block),
+                    research_pool.submit(_intl_baseball_block),
+                ]
+                # Each task above already catches and logs its own real
+                # forecast errors; .result() here only re-raises a bug in the
+                # wrapper itself (e.g. a NameError), which should still stop
+                # the run loudly rather than be swallowed.
+                for future in as_completed(research_futures):
+                    future.result()
             flat_result = {
                 sport: forecast_result.get(
                     f"_flat_{sport}", forecast_result.get(sport, {})

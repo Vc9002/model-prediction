@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -193,16 +194,17 @@ def capture_roster_snapshot(
     """
     observed = parse_utc((observed_at or utc_now()).isoformat())
     http = client or httpx.Client(timeout=15)
-    entries: list[dict[str, Any]] = []
-    for team_id in team_ids:
+
+    def _fetch_team(team_id: int) -> list[dict[str, Any]]:
         response = http.get(
             ROSTER_URL_TEMPLATE.format(team_id=team_id), params={"rosterType": "40Man"}
         )
         response.raise_for_status()
         payload = response.json()
+        team_entries: list[dict[str, Any]] = []
         for row in payload.get("roster", []):
             person = row.get("person", {})
-            entries.append(
+            team_entries.append(
                 {
                     "team_id": team_id,
                     "player_id": person.get("id"),
@@ -211,6 +213,19 @@ def capture_roster_snapshot(
                     "position_type": str((row.get("position") or {}).get("type", "")),
                 }
             )
+        return team_entries
+
+    entries: list[dict[str, Any]] = []
+    if team_ids:
+        # One HTTP call per team, previously issued one at a time -- fetch
+        # concurrently but merge with pool.map (not as_completed) so entries
+        # stays in team_ids order regardless of which response lands first;
+        # _stamp_and_digest's digest is order-sensitive and feeds the
+        # snapshot's filename, so nondeterministic ordering would make an
+        # identical roster hash differently across runs.
+        with ThreadPoolExecutor(max_workers=min(16, len(team_ids))) as pool:
+            for team_entries in pool.map(_fetch_team, team_ids):
+                entries.extend(team_entries)
     day, stamp, digest = _stamp_and_digest(observed, entries)
     payload_out = {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
@@ -246,17 +261,18 @@ def capture_transactions_snapshot(
     """
     observed = parse_utc((observed_at or utc_now()).isoformat())
     http = client or httpx.Client(timeout=15)
-    entries: list[dict[str, Any]] = []
-    for team_id in team_ids:
+
+    def _fetch_team(team_id: int) -> list[dict[str, Any]]:
         response = http.get(
             TRANSACTIONS_URL,
             params={"teamId": team_id, "startDate": start_date, "endDate": end_date},
         )
         response.raise_for_status()
         payload = response.json()
+        team_entries: list[dict[str, Any]] = []
         for row in payload.get("transactions", []):
             person = row.get("person", {})
-            entries.append(
+            team_entries.append(
                 {
                     "team_id": team_id,
                     "player_id": person.get("id"),
@@ -267,6 +283,16 @@ def capture_transactions_snapshot(
                     "description": row.get("description"),
                 }
             )
+        return team_entries
+
+    entries: list[dict[str, Any]] = []
+    if team_ids:
+        # Same rationale as capture_roster_snapshot: fetch all teams
+        # concurrently, merge in team_ids order (pool.map, not as_completed)
+        # to keep _stamp_and_digest's digest deterministic.
+        with ThreadPoolExecutor(max_workers=min(16, len(team_ids))) as pool:
+            for team_entries in pool.map(_fetch_team, team_ids):
+                entries.extend(team_entries)
     day, stamp, digest = _stamp_and_digest(observed, entries)
     payload_out = {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,

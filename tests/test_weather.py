@@ -37,6 +37,10 @@ def test_live_weather_uses_forecast_hour_nearest_game_start(monkeypatch) -> None
         "model_prediction.features.weather.httpx.get",
         lambda *args, **kwargs: Response(),
     )
+    # live_weather caches the raw hourly payload per team (see
+    # prefetch_live_weather) -- reset it so this test doesn't see a payload
+    # left behind by another test that already fetched this same team.
+    monkeypatch.setattr("model_prediction.features.weather._FORECAST_CACHE", {})
 
     result = live_weather("Boston Red Sox", "2026-07-26T11:45:00Z")
 

@@ -351,6 +351,21 @@ def build_learned_moneyline_slate(
     for league in espn_leagues:
         scoreboard = client.scoreboard(league, game_date)
         events.extend(scoreboard.get("events", []))
+    wanted = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
+    if "weather_factor" in wanted:
+        # The per-event loop below is sequential and each event's
+        # weather_factor otherwise makes its own blocking Open-Meteo call
+        # inline (via _FEATURE_PROVIDERS) -- warm every distinct home team's
+        # forecast concurrently up front instead of one HTTP round trip per
+        # event in turn.
+        from .features.weather import prefetch_live_weather
+        home_teams = []
+        for event in events:
+            try:
+                home_teams.append(_teams(event)[1])
+            except (KeyError, TypeError, ValueError):
+                continue
+        prefetch_live_weather(home_teams)
     elo = build_elo(history, key)
     trends = TrendEngine(history)
     candidates: list[LearnedForwardCandidate] = []

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -221,8 +222,13 @@ def build_soccer_total_slate(
     store = FeatureStore(data_root)
     history = store.games_before("soccer", game_date)
     events: list[dict[str, Any]] = []
-    for league in leagues:
-        events.extend(client.scoreboard(league, game_date).get("events", []))
+    # One ESPN scoreboard call per league (soccer spans ~18 leagues in
+    # config/model.yaml's SOCCER.leagues) -- independent reads, fetch
+    # concurrently instead of one league at a time.
+    if leagues:
+        with ThreadPoolExecutor(max_workers=min(18, len(leagues))) as pool:
+            for scoreboard in pool.map(lambda league: client.scoreboard(league, game_date), leagues):
+                events.extend(scoreboard.get("events", []))
 
     upcoming: list[UpcomingMatch] = []
     skipped: list[dict[str, str]] = []

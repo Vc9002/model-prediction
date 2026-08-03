@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -73,14 +74,30 @@ def collect_soccer_scores(
 
     results: dict[str, Any] = {}
     total_new = 0
-    for league_name, odds_key in sorted(ODDS_SOCCER_KEYS.items()):
+    ordered_leagues = sorted(ODDS_SOCCER_KEYS.items())
+
+    # Fetch every league's scores concurrently (12 independent HTTP calls to
+    # The Odds API, previously issued one at a time) -- dedup/write below
+    # still runs in the original sequential order since it mutates the
+    # shared existing_ids set and appends to one shared file.
+    def _fetch(league_name: str) -> tuple[list[Any] | None, str | None]:
         try:
-            matches = client.scores(league_name, days_from=days_from)
+            return client.scores(league_name, days_from=days_from), None
         except Exception as exc:
-            results[league_name] = {
-                "status": "error",
-                "error": _redact_api_key(str(exc), api_key)[:100],
-            }
+            return None, _redact_api_key(str(exc), api_key)[:100]
+
+    with ThreadPoolExecutor(max_workers=min(12, len(ordered_leagues)) or 1) as pool:
+        fetched = dict(
+            zip(
+                (league_name for league_name, _ in ordered_leagues),
+                pool.map(lambda item: _fetch(item[0]), ordered_leagues),
+            )
+        )
+
+    for league_name, odds_key in ordered_leagues:
+        matches, fetch_error = fetched[league_name]
+        if matches is None:
+            results[league_name] = {"status": "error", "error": fetch_error}
             continue
 
         new_games = 0

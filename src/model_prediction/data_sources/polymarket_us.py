@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -226,12 +227,23 @@ class PolymarketUSClient:
             )
         events: dict[str, list[dict[str, Any]]] = {}
         errors: dict[str, str] = {}
-        for league in leagues:
+
+        def _fetch_league(league: str) -> tuple[list[dict[str, Any]], str | None]:
             try:
-                events[league] = self.slate(league, game_date, timezone_name)
+                return self.slate(league, game_date, timezone_name), None
             except httpx.HTTPError as exc:
-                events[league] = []
-                errors[league] = str(exc)[:200]
+                return [], str(exc)[:200]
+
+        # Each league is one independent event-list HTTP call (soccer alone
+        # is ~30 leagues) -- this used to be fully sequential and, across
+        # every sport daily calls sport_slate for, was the single largest
+        # contributor to daily's wall-clock time (measured: ~6 minutes on
+        # its own, far more than the BBO-capture step downstream of it).
+        with ThreadPoolExecutor(max_workers=min(16, len(leagues))) as pool:
+            for league, (league_events, error) in zip(leagues, pool.map(_fetch_league, leagues), strict=True):
+                events[league] = league_events
+                if error is not None:
+                    errors[league] = error
         return SportSlateResult(events=events, errors=errors)
 
     def market(self, slug: str) -> dict[str, Any]:
@@ -460,6 +472,22 @@ def capture_slate_snapshots(
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
     skipped_summer_league = timestamp_invalid = 0
     failure_details: list[dict[str, str]] = []
+
+    # Skip summer league / preseason events — they offer only moneyline
+    # markets and pollute the spread/total readiness counts.
+    _SUMMER_LEAGUE_PATTERNS = (
+        "nbasl",   # NBA Summer League
+    )
+
+    # Build one flat contract list across every qualifying league instead of
+    # fetching league-by-league with a fresh 8-worker pool per league (which
+    # serialized the ~18 leagues against each other). Every contract is an
+    # independent HTTP fetch, so pooling them all together lets one shared
+    # pool of workers stay saturated across the whole slate at once --
+    # each snapshot is two HTTP round-trips; ~200 serial contracts took
+    # minutes before this and per-league-only pooling still wastes it
+    # whenever any one league has fewer contracts than there are workers.
+    all_contracts: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = []
     for league, events in events_by_league.items():
         sport = league_to_sport.get(league.upper())
         if sport is None:
@@ -471,85 +499,91 @@ def capture_slate_snapshots(
                 len(event.get("markets", [])) for event in events
             )
             continue
-        store = PolymarketSnapshotStore.for_sport_date(data_root, sport, game_date)
-        # Collect every contract for the league, fetch BBOs concurrently
-        # (each snapshot is two HTTP round-trips; ~200 serial contracts took
-        # minutes), then append serially so the JSONL stays clean.
-        #
-        # Skip summer league / preseason events — they offer only moneyline
-        # markets and pollute the spread/total readiness counts.
-        _SUMMER_LEAGUE_PATTERNS = (
-            "nbasl",   # NBA Summer League
-        )
-        all_contracts = [
-            (str(market.get("market_slug") or ""), event, market)
+        league_contracts = [
+            (league, sport, event, market)
             for event in events
             for market in event.get("markets", [])
             if market.get("market_slug")
         ]
-        contracts = [
-            entry for entry in all_contracts
+        kept = [
+            entry for entry in league_contracts
             if not (
                 any(
-                    pattern in str(entry[0]).casefold()
+                    pattern in str(entry[3].get("market_slug", "")).casefold()
                     for pattern in _SUMMER_LEAGUE_PATTERNS
                 )
-                or _is_preseason_event(entry[1], league)
+                or _is_preseason_event(entry[2], league)
             )
         ]
-        skipped_summer_league += len(all_contracts) - len(contracts)
+        skipped_summer_league += len(league_contracts) - len(kept)
+        all_contracts.extend(kept)
 
-        def _fetch(entry, league_name=league):
-            slug, event, market = entry
-            try:
-                snapshot = client.snapshot(slug)
-                observed = parse_utc(snapshot["observed_at_utc"])
-                event_start = parse_utc(snapshot["event_start_utc"])
-                snapshot.update(
-                    {
-                        "league": league_name.upper(),
-                        "event_id": str(event.get("event_id", "")),
-                        "event_slug": str(event.get("event_slug", "")),
-                        "event_title": str(event.get("title", "")),
-                        "market_type": market.get("market_type"),
-                        "line": market.get("line"),
-                        # Which team this specific market concerns, e.g. for
-                        # team_win markets (soccer's "Will X win?" Yes/No,
-                        # one market per team, unlike moneyline's single
-                        # combined market) -- None where not team-specific.
-                        "team": next(
-                            (side.get("team") for side in market.get("sides", []) if side.get("team")),
-                            None,
-                        ),
-                        "timestamp_valid": observed <= event_start,
-                        "usage": "prospective_executable_bbo",
-                    }
-                )
-                return slug, snapshot, None
-            except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as exc:
-                return slug, None, str(exc)[:200]
+    def _fetch(entry):
+        league, sport, event, market = entry
+        slug = str(market.get("market_slug") or "")
+        try:
+            snapshot = client.snapshot(slug)
+            observed = parse_utc(snapshot["observed_at_utc"])
+            event_start = parse_utc(snapshot["event_start_utc"])
+            snapshot.update(
+                {
+                    "league": league.upper(),
+                    "event_id": str(event.get("event_id", "")),
+                    "event_slug": str(event.get("event_slug", "")),
+                    "event_title": str(event.get("title", "")),
+                    "market_type": market.get("market_type"),
+                    "line": market.get("line"),
+                    # Which team this specific market concerns, e.g. for
+                    # team_win markets (soccer's "Will X win?" Yes/No,
+                    # one market per team, unlike moneyline's single
+                    # combined market) -- None where not team-specific.
+                    "team": next(
+                        (side.get("team") for side in market.get("sides", []) if side.get("team")),
+                        None,
+                    ),
+                    "timestamp_valid": observed <= event_start,
+                    "usage": "prospective_executable_bbo",
+                }
+            )
+            return league, sport, slug, snapshot, None
+        except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as exc:
+            return league, sport, slug, None, str(exc)[:200]
 
-        from concurrent.futures import ThreadPoolExecutor
+    # Fetch every league's contracts through one shared pool, then append
+    # per-sport-store serially (grouped below) so each JSONL still only
+    # ever sees one writer at a time. Capped at 16 workers, not scaled up
+    # with contract count: measured directly against the live gateway,
+    # snapshot() latency is flat (~0.6s) up through ~16 concurrent in-flight
+    # requests, then degrades sharply (3-5s per call, plus intermittent SSL
+    # EOF connection errors) at 24-32 -- past a certain point more workers
+    # makes this slower, not faster.
+    results: list[tuple[str, str, str, dict[str, Any] | None, str | None]] = []
+    if all_contracts:
+        with ThreadPoolExecutor(max_workers=min(16, len(all_contracts))) as pool:
+            results = list(pool.map(_fetch, all_contracts))
 
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            results = list(pool.map(_fetch, contracts))
-        for slug, snapshot, fetch_error in results:
-            if snapshot is None:
-                failures += 1
-                failure_details.append(
-                    {
-                        "league": league,
-                        "market_slug": slug,
-                        "reason": fetch_error or "",
-                    }
-                )
-                continue
-            store.append(snapshot)
-            captured += 1
-            if snapshot["long"].get("ask") is None or snapshot["short"].get("ask") is None:
-                missing_bbo += 1
-            if not snapshot.get("timestamp_valid", True):
-                timestamp_invalid += 1
+    stores: dict[str, PolymarketSnapshotStore] = {}
+    for league, sport, slug, snapshot, fetch_error in results:
+        if snapshot is None:
+            failures += 1
+            failure_details.append(
+                {
+                    "league": league,
+                    "market_slug": slug,
+                    "reason": fetch_error or "",
+                }
+            )
+            continue
+        store = stores.get(sport)
+        if store is None:
+            store = PolymarketSnapshotStore.for_sport_date(data_root, sport, game_date)
+            stores[sport] = store
+        store.append(snapshot)
+        captured += 1
+        if snapshot["long"].get("ask") is None or snapshot["short"].get("ask") is None:
+            missing_bbo += 1
+        if not snapshot.get("timestamp_valid", True):
+            timestamp_invalid += 1
     return {
         "status": (
             "ok" if failures == 0 and missing_bbo == 0 and timestamp_invalid == 0 else "partial"
