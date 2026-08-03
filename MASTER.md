@@ -563,22 +563,18 @@ Never imported, never tested, dead code creating false signal:
 - [x] Clean up 18 stale `.bak` data files in `data/` directories — **30 files deleted 2026-08-03**
 - [ ] **P1-17**: Fix MLB totals over-selection bias — elasticities bumped (offense 0.035→0.5, park 0.222→0.5, weather 0.021→0.3, starter 0.211→0.5) and selection-order swapped in `forward.py` (calibrate-before-select) but `calibrate_selected_side` is a linear monotonic transform so reordering has zero effect. Model baseline ~9.28 vs market ~8.5 creates systematic over-bias regardless of elasticities. Needs proper refit per roadmap item 5. Accuracy on settled: 37% (worse than coin flip). Correlation with outcomes: 0.059. Contained (Flat-only, zero-unit).
 
-### DEBUG.md repair order cross-reference (2026-08-03)
+### DEBUG.md repair order — remaining items (2026-08-03)
 
-| # | Item | Status |
+Done (6/12): #1 ticket binding, #2 audit atomicity, #4 artifact qualification, #6 green tests, #7 artifact hashes, #10 API key + timestamp + soccer draw.
+
+| # | Item | Directive |
 |---|---|---|
-| 1 | Execution ticket binding | ✅ P0-1 resolved |
-| 2 | Ledger mutation + audit atomicity | ✅ Confirmed audit-before-write |
-| 3 | Probable-starter provenance | ❌ |
-| 4 | Artifact qualification + timestamp_valid | ✅ Operator decision |
-| 5 | WNBA availability fail closed | ❌ |
-| 6 | Green tests | ✅ 654 pass |
-| 7 | Artifact hashes/config refs | ✅ P0-5/6 resolved |
-| 8 | KBO/NPB half-settlement P&L | ❌ |
-| 9 | Transactional exposure-check-plus-append | ❌ |
-| 10 | API key redaction + timestamp age + soccer draw | ✅ All done |
-| 11 | Economic CI gate | ❌ |
-| 12 | Reproduce versioned report | ❌ |
+| **3** | Probable-starter provenance | Keep the feature — fix it so each record has genuine pregame `observed_at_utc` instead of removing starter data from validation |
+| **5** | WNBA availability fail closed | Fix the feature — reject/flag malformed or conflicting source combinations instead of falling through to a call |
+| **8** | KBO/NPB half-settlement P&L | Fix — correct the P&L formula for tie/push edge cases |
+| **9** | Transactional exposure-check-plus-append | Fix — make exposure check + ledger append atomic across processes, preserve paired-ledger consistency |
+| **11** | Economic CI gate | Fix — a zero-crossing confidence interval must not pass as evidence of positive ROI |
+| **12** | Reproduce versioned report | Fix — generate `outputs/latest/learned-model-validation.json` from one stable green checkout |
 
 ## 🟡 Priority 2 — Architecture and Maintainability
 
