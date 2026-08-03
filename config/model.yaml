@@ -233,12 +233,22 @@ models:
       matchable artifact => False), so PolymarketExecutor.execute still
       refuses real execution on these rows without --manual-research-order
       -- this override changes what gets logged/sized, not what can
-      actually be traded unattended.'
+      actually be traded unattended.
+
+      Update 2026-08-03: "same criterion as before" above is now stale --
+      validation.qualify_soccer_total_model ran for the first time this
+      session (chronological 60/20/20 split, confidence threshold learned
+      on validation at a 65% target hit rate, graded on a separate locked
+      holdout): totals (the market min_edge was actually describing)
+      qualified true, 66.7% hit rate on 162 locked-holdout calls,
+      +44.2 units at -110, every qualifying month positive. Operator
+      approved wiring research_confidence_gate below from that real result.'
     model_type: multinomial_3way
     active_research_version: soccer-poisson-dc-v1
     legacy_binary_research_version: soccer-elo-trend-lr-v2
     legacy_binary_research_artifact: config/models/soccer-elo-trend-lr-v2.json
     min_edge: 0.05
+    research_confidence_gate: 0.230157
     leagues:
     - EPL
     - LA_LIGA
@@ -288,9 +298,19 @@ models:
       matchable artifact => False), so PolymarketExecutor.execute still refuses
       real execution on these rows without --manual-research-order -- this
       override changes what gets logged/sized, not what can actually be traded
-      unattended.'
+      unattended.
+
+      Update 2026-08-03: "same criterion as before" above is now stale --
+      validation.qualify_tennis_elo_model ran for the first time this
+      session (same chronological 60/20/20 split, learned-threshold
+      methodology as soccer above): qualified true, 65.5% hit rate on 4269
+      locked-holdout calls, +1070.7 units at -110, every qualifying month
+      positive -- the strongest result of any sport checked this session.
+      Operator approved wiring research_confidence_gate below from that
+      real result.'
     active_research_version: tennis-surface-elo-v1
     min_edge: 0.05
+    research_confidence_gate: 0.037239
     note: WTA and ATP moneyline (ATP added 2026-08-03) -- ESPN has no ITF scoreboard.
   LOL:
     family: neutral_series_elo
@@ -391,6 +411,14 @@ models:
     research_outputs_zero_units: true
     active_production_version: kbo-tie-aware-elo-v2
     production_artifact: config/models/kbo-tie-aware-elo-v1.json
+    # Honest disclosure (2026-08-03): international_baseball.py's new
+    # confidence-threshold sweep learned 0.123889 on the validation split
+    # (65% hit rate there) but did NOT generalize to the locked holdout --
+    # 55.4% hit rate on 65 calls, qualified=false. Set anyway for
+    # structural consistency with every other Gated Research sport
+    # (operator decision, 2026-08-03), not because the evidence supports
+    # it as real curation. Revisit if/when more KBO history accumulates.
+    research_confidence_gate: 0.123889
   NPB:
     family: tie_aware_home_elo
     status: shadow_qualified
@@ -405,6 +433,13 @@ models:
     research_outputs_zero_units: true
     active_production_version: npb-tie-aware-elo-v2
     production_artifact: config/models/npb-tie-aware-elo-v1.json
+    # Honest disclosure (2026-08-03): same story as KBO above -- learned
+    # 0.090624 on validation (65% hit rate there), did NOT generalize to
+    # the locked holdout (55.7% hit rate on 176 calls, qualified=false,
+    # one non-positive month). Set anyway for structural consistency
+    # (operator decision, 2026-08-03), not because the evidence supports
+    # it as real curation.
+    research_confidence_gate: 0.090624
   market_residual:
     method: logistic_regression
     rolling_window_days: 90
