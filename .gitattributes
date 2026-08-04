@@ -1,0 +1,9 @@
+# Git LFS (2026-08-05, forward-only): these two append-only files grow
+# daily and already exceed GitHub's 50MB recommended size (see
+# docs/PROJECT_STATUS.md's "Repair order"). Deliberately NOT rewriting
+# existing git history to move already-committed blobs into LFS (operator
+# choice: "track going forward only, safe") -- every commit already made
+# keeps its full-size blob; only commits made after this file exists store
+# new versions of these two paths as LFS pointers.
+data/mlb_statsapi/game_snapshots.jsonl filter=lfs diff=lfs merge=lfs -text
+data/events.jsonl filter=lfs diff=lfs merge=lfs -text
