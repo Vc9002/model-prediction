@@ -27,7 +27,7 @@ from model_prediction.eligibility import EligibilityResult, RecordType
 from model_prediction.entities import CanonicalTeam
 from model_prediction.forward import MLBForwardCandidate
 from model_prediction.learned_forward import LearnedForwardCandidate
-from model_prediction.ledger import PickLedger
+from model_prediction.ledger import DuplicatePickError, PickLedger
 from model_prediction.units import Exposure
 
 AWAY = CanonicalTeam("mlb-bos", League.MLB, "Boston Red Sox", "BOS", True, None, None, ())
@@ -48,6 +48,21 @@ class _CaptureLedger:
     def append_evaluated(self, request, eligibility, now=None):
         self.appended.append((request, eligibility))
         return {"pick_id": f"pick-{len(self.appended)}"}
+
+
+class _DuplicateLedger:
+    """Always raises DuplicatePickError -- for DD-2 regression tests proving
+    a secondary-ledger duplicate is now tracked in the returned result dict
+    instead of silently discarded by a bare suppress(DuplicatePickError)."""
+
+    def __init__(self, existing_pick_id: str = "existing-pick-1") -> None:
+        self.existing_pick_id = existing_pick_id
+
+    def exposure(self, request, now=None, **kwargs):
+        return Exposure()
+
+    def append_evaluated(self, request, eligibility, now=None):
+        raise DuplicatePickError(self.existing_pick_id)
 
 
 def _international_config(*, min_edge: float) -> dict:
@@ -178,6 +193,40 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
     by_event = {request.event_id: eligibility for request, eligibility in research.appended}
     assert by_event["negative-edge"].reason_code == "NO_CALL_LOW_EDGE"
     assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
+
+
+def test_esports_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypatch) -> None:
+    """DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
+    used to be a bare `with suppress(DuplicatePickError):` -- a genuine
+    duplicate was completely invisible. Confirms it now shows up in the
+    forecast dict this function mutates in place (it returns only an int
+    count of successfully logged rows, not a dict)."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    research = _CaptureLedger()
+    gated = _DuplicateLedger("gated-existing-esports-1")
+    config = {
+        "models": {
+            "LOL": {
+                "min_edge": 0.02,
+                "research_confidence_gate": 0.0,
+                "status": "shadow_qualified",
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+    forecast = _esports_forecast()
+
+    logged = cli._log_esports_forecast(forecast, config, research, gated_ledger=gated)
+
+    # The one "valid" contract clears gated eligibility and hits the
+    # duplicate; primary (research) writes are unaffected.
+    assert logged == 3
+    assert forecast["duplicates"]["gated_ledger"] == 1
+    assert forecast["duplicates"]["primary_ledger"] == 0
 
 
 def test_esports_exposure_check_happens_while_ledger_lock_is_held(monkeypatch) -> None:
@@ -359,6 +408,38 @@ def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touc
     assert spread_request.selection == "away"
 
 
+def test_mlb_totals_main_ledger_duplicate_is_tracked_not_silently_dropped(
+    monkeypatch, registry, ban_list
+) -> None:
+    """DD-2 (deep debug audit, 2026-08-04): main_ledger's secondary write
+    used to be a bare `with suppress(DuplicatePickError):` -- a genuine
+    duplicate was completely invisible."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
+    monkeypatch.setattr(cli, "load_formula_spec", lambda path: object())
+    monkeypatch.setattr(cli, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
+
+    candidates = [_mlb_totals_candidate(MarketType.TOTAL, "over", 8.5)]
+    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
+
+    flat_ledger = _CaptureLedger()
+    main_ledger = _DuplicateLedger("main-existing-1")
+    config = {"project": {}, "bankroll": {}}
+
+    result = cli._forecast_mlb_totals_flat(
+        "2026-07-27", True, config, registry, ban_list, flat_ledger, None, main_ledger=main_ledger
+    )
+
+    assert len(flat_ledger.appended) == 1  # flat always logs, unaffected
+    _request, eligibility = flat_ledger.appended[0]
+    if eligibility.decision == "CALL":
+        assert result["main_ledger_duplicate_event_ids"] == ["main-existing-1"]
+    else:
+        pytest.skip(
+            f"fixture candidate did not clear CALL eligibility ({eligibility.reason_code}); "
+            "adjust _mlb_totals_candidate's probability/uncertainty to exercise this path"
+        )
+
+
 def _soccer_forecast() -> dict:
     return {
         "model_code_hash": "soccer-code-hash",
@@ -452,6 +533,38 @@ def test_soccer_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
     assert len(gated.appended) == 1
     assert len(main.appended) == 1
     assert gated.appended[0][0].event_id == main.appended[0][0].event_id == "soccer-1"
+
+
+def test_soccer_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypatch) -> None:
+    """DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
+    used to be a bare `with suppress(DuplicatePickError):` -- a genuine
+    duplicate (this exact market already logged to gated_ledger) was
+    completely invisible, indistinguishable from "the model produced
+    nothing here." Confirms the duplicate now shows up in the returned
+    result dict, with the existing pick's own id."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    research = _CaptureLedger()
+    gated = _DuplicateLedger("gated-existing-1")
+    main = _CaptureLedger()
+
+    result = cli._forecast_soccer_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_soccer_config(status="shadow_qualified", min_edge=0.02),
+        research_ledger=research,
+        gated_ledger=gated,
+        flat_ledger=None,
+        main_ledger=main,
+    )
+
+    assert result["gated_logged"] == 0
+    assert result["duplicates"]["gated_ledger"] == 1
+    # main_ledger is a completely separate write (mirrors gated_ledger's
+    # ELIGIBILITY, not its success/failure) -- must still succeed even
+    # though gated_ledger hit a duplicate.
+    assert result["main_logged"] == 1
+    assert len(main.appended) == 1
 
 
 def test_soccer_main_ledger_stays_empty_when_gated_ledger_does(monkeypatch) -> None:
@@ -836,6 +949,30 @@ def test_tennis_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
     assert gated.appended[0][0].event_id == main.appended[0][0].event_id == "tennis-1"
 
 
+def test_tennis_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypatch) -> None:
+    """DD-2 (deep debug audit, 2026-08-04): same regression as soccer's
+    equivalent test -- gated_ledger's secondary write used to silently
+    discard a duplicate."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: _tennis_forecast())
+    research = _CaptureLedger()
+    gated = _DuplicateLedger("gated-existing-2")
+    main = _CaptureLedger()
+
+    result = cli._forecast_tennis_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=_tennis_config(status="shadow_qualified", min_edge=0.02),
+        research_ledger=research,
+        gated_ledger=gated,
+        main_ledger=main,
+    )
+
+    assert result["gated_logged"] == 0
+    assert result["duplicates"]["gated_ledger"] == 1
+    assert result["main_logged"] == 1
+
+
 def test_tennis_gated_and_main_blocked_when_either_player_lacks_real_history(monkeypatch) -> None:
     """A contract whose feature_basis shows a player resting on thin history
     (min_player_matches below MINIMUM_PLAYER_MATCHES) must not reach Gated
@@ -1124,6 +1261,90 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
     assert "logged anyway" in result["edge_blocked"][0]["reason"]
     request, _eligibility = ledger.appended[0]
     assert request.event_id == "mlb-2"
+
+
+def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(
+    monkeypatch, tmp_path
+) -> None:
+    """DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
+    used to be a bare `with suppress(DuplicatePickError):` -- a genuine
+    duplicate was completely invisible. research_routed (the gate on this
+    branch) requires a non-PRODUCTION_SPORTS sport with a real
+    research_ledger passed -- traced the one real call site (cli.py's daily
+    dispatch) and confirmed this path is currently dead in production (it
+    always passes research_ledger=None), but it's still a real, tested part
+    of this function's API contract."""
+    observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
+    candidate = LearnedForwardCandidate(
+        event_id="nba-1",
+        event_start_utc="2026-07-27T00:00:00Z",
+        away_team="Boston Red Sox",
+        home_team="New York Yankees",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.60,
+        home_probability=0.60,
+        confidence_threshold=0.50,
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="CALL_LEARNED_CONFIDENCE",
+        model_version="nba-test",
+        model_artifact_hash="artifact-hash",
+        model_qualified=True,
+        feature_basis={"elo_probability": 0.60, "trend_gap": 0.0},
+        feature_snapshot_hash="feature-hash-nba-1",
+    )
+    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(
+        cli,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.55,
+            "market_slug": "nba-1",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": True,
+        },
+    )
+
+    class Registry:
+        version = "1"
+
+        @staticmethod
+        def resolve(league, team, event_start):
+            return AWAY if team == "Boston Red Sox" else HOME
+
+    monkeypatch.setattr(
+        cli,
+        "evaluate_eligibility",
+        lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
+            RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.0, 60, 0.07, 0.02, AWAY, HOME,
+        ),
+    )
+    research_ledger = _CaptureLedger()
+    gated_ledger = _DuplicateLedger("gated-existing-learned-1")
+    config = {
+        "models": {
+            "NBA": {
+                "production_artifact": str(tmp_path / "artifact.json"),
+                "status": "shadow_qualified",
+                "min_edge": 0.02,
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+        },
+        "bankroll": {},
+    }
+
+    result = cli._forecast_learned_sport(
+        "nba", "2026-07-26", True, config, Registry(), object(), research_ledger,
+        research_ledger=research_ledger, gated_ledger=gated_ledger,
+    )
+
+    assert result["gated_ledger_duplicate_pick_ids"] == ["gated-existing-learned-1"]
 
 
 def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeypatch, tmp_path) -> None:
@@ -1575,6 +1796,35 @@ def test_international_forecast_mirrors_only_strategy_qualified_calls(
     assert result["logged"] == 1
     assert research.appended[0][1].decision == "CALL"
     assert gated.appended[0][1].decision == "CALL"
+
+
+def test_international_forecast_gated_ledger_duplicate_is_tracked_not_silently_dropped(
+    monkeypatch, tmp_path
+) -> None:
+    """DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
+    used to be a bare `with suppress(DuplicatePickError):` -- a genuine
+    duplicate was completely invisible."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.forecast_international_baseball_slate",
+        lambda *args, **kwargs: _international_forecast(),
+    )
+    research = _CaptureLedger()
+    gated = _DuplicateLedger("gated-existing-intl-1")
+
+    result = cli._forecast_international_sport(
+        tmp_path,
+        tmp_path,
+        "kbo",
+        "2026-07-27",
+        _international_config(min_edge=0.02),
+        research,
+        gated,
+    )
+
+    assert result["logged"] == 1
+    assert result["duplicates"]["gated_ledger"] == 1
+    assert result["duplicates"]["research_ledger"] == 0
 
 
 def test_international_forecast_gated_blocked_when_team_lacks_real_history(

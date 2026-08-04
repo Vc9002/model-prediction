@@ -15,7 +15,6 @@ import os
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import suppress
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -107,9 +106,9 @@ from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError
 from .main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from .mlb_baseline_refresh import refresh_if_due
 from .models import MODEL_SPECS
-from .models.registry import model_spec
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
 from .models.mlb import load_formula_spec
+from .models.registry import model_spec
 from .research_ledgers import (
     RESEARCH_LEDGER_SPORTS,
     existing_research_ledgers,
@@ -145,6 +144,35 @@ RESEARCH_ONLY_DAILY_SPORTS = (
 logger = logging.getLogger(__name__)
 
 _LEDGER_LOCK = threading.Lock()
+
+
+def _append_secondary_ledger(
+    ledger: Any, request: PickRequest, eligibility: Any, now: datetime, ledger_name: str
+) -> str | None:
+    """Append a request/eligibility pair to a secondary ledger (Flat/Gated
+    Research/Main mirroring a primary write already logged elsewhere in the
+    same forecast loop). Returns None on a genuinely new row, or the
+    already-logged pick's own pick_id on a duplicate -- matching this
+    codebase's existing `duplicates.append(error.pick_id)` convention for
+    primary-ledger duplicates, so a secondary duplicate is now traceable
+    back to the exact row that blocked it, not just a count.
+
+    DD-2 (deep debug audit, 2026-08-04): every one of this project's
+    per-sport forecast functions writes to more than one ledger per
+    candidate, and previously guarded every secondary write with a bare
+    `with suppress(DuplicatePickError):` -- a genuine "this exact market
+    was already logged to <ledger>" event was completely invisible, with no
+    way for an operator to tell it apart from "the model just didn't
+    produce a candidate here."
+    """
+    try:
+        ledger.append_evaluated(request, eligibility, now=now)
+        return None
+    except DuplicatePickError as error:
+        logger.debug(
+            "%s: duplicate suppressed for existing pick %s", ledger_name, error.pick_id
+        )
+        return error.pick_id
 
 # League value on a ledger row -> ESPN league key(s) to search for results.
 # WORLD_CUP dropped 2026-07: tournament is over, no games left to forecast or settle.
@@ -865,6 +893,12 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
         if candidate.market_type in (MarketType.TOTAL, MarketType.SPREAD)
     ]
     logged, duplicates = [], []
+    # DD-2 (deep debug audit, 2026-08-04): main_ledger's secondary write
+    # below used to silently drop a duplicate with no trace at all --
+    # `duplicates` above only ever tracked flat_ledger's own (the outer
+    # except DuplicatePickError catches flat_ledger.append_evaluated, since
+    # that call sits outside the suppress block).
+    main_duplicates = []
     if log:
         for candidate in totals_candidates:
             request = PickRequest(
@@ -918,8 +952,11 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
                     logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
                     # Main: only genuinely eligible (CALL) rows — operator directive 2026-08-03.
                     if main_ledger is not None and eligibility.decision == "CALL":
-                        with suppress(DuplicatePickError):
-                            main_ledger.append_evaluated(request, eligibility, now=observed_at)
+                        existing_pick_id = _append_secondary_ledger(
+                            main_ledger, request, eligibility, observed_at, "mlb_totals:main_ledger"
+                        )
+                        if existing_pick_id is not None:
+                            main_duplicates.append(existing_pick_id)
             except DuplicatePickError as error:
                 duplicates.append(error.pick_id)
             except (EntityResolutionError, ValueError) as error:
@@ -936,9 +973,11 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
         "logged": len(logged),
         "logged_pick_ids": [row["pick_id"] for row in logged],
         "duplicate_pick_ids": duplicates,
+        "main_ledger_duplicate_event_ids": main_duplicates,
         "skipped": skipped,
         "note": (
-            "Flat only, no main-ledger promotion; MLB moneyline is served "
+            "Spread/total go to Flat always and Main when genuinely eligible "
+            "(operator directive, 2026-08-03); MLB moneyline is served "
             "separately by the learned production path."
         ),
     }
@@ -1041,6 +1080,10 @@ def _forecast_learned_sport(
     to_log = candidates if flat_mode else calls
     logged: list[dict] = []
     duplicates: list[str] = []
+    # DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
+    # below used to silently drop a duplicate with no trace at all --
+    # `duplicates` above only ever tracked the primary `ledger`'s own.
+    gated_duplicates: list[str] = []
     unmatched: list[dict] = []
     edge_blocked: list[dict] = []
     if log and to_log and registry is not None and bans is not None and ledger is not None:
@@ -1322,12 +1365,11 @@ def _forecast_learned_sport(
                     # flat_picks.xlsx has to picks.xlsx, but for research-only
                     # sports.
                     if gated_ledger is not None and research_routed and genuinely_eligible:
-                        with suppress(DuplicatePickError):
-                            gated_ledger.append_evaluated(
-                                request,
-                                eligibility,
-                                now=effective_now,
-                            )
+                        existing_pick_id = _append_secondary_ledger(
+                            gated_ledger, request, eligibility, effective_now, "learned:gated_ledger"
+                        )
+                        if existing_pick_id is not None:
+                            gated_duplicates.append(existing_pick_id)
             except DuplicatePickError as error:
                 duplicates.append(error.pick_id)
             except (EntityResolutionError, ValueError) as error:
@@ -1362,6 +1404,7 @@ def _forecast_learned_sport(
         "logged": len(logged),
         "logged_pick_ids": [row["pick_id"] for row in logged],
         "duplicate_pick_ids": duplicates,
+        "gated_ledger_duplicate_pick_ids": gated_duplicates,
         "unmatched_quotes": unmatched,
         "edge_blocked": edge_blocked,
         "skipped": skipped,
@@ -1392,6 +1435,12 @@ def _log_esports_forecast(
     from .data_sources.polymarket_us import probability_to_american
     logged = 0
     errors: list[dict] = []
+    # DD-2 (deep debug audit, 2026-08-04): see _append_secondary_ledger's
+    # docstring -- these count duplicates the primary/flat/gated writes
+    # below used to silently drop with no trace at all.
+    primary_duplicates = 0
+    flat_duplicates = 0
+    gated_duplicates = 0
     if flat_mode and flat_ledger is None:
         # Research-only sports only write to Flat when a flat_ledger is
         # explicitly provided (Daily dispatches one). Direct
@@ -1500,17 +1549,28 @@ def _log_esports_forecast(
                 genuinely_eligible = eligibility.decision == "CALL"
                 ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
-                if flat_ledger is not None:
-                    with suppress(DuplicatePickError):
-                        flat_ledger.append_evaluated(request, eligibility, now=observed_now)
+                if flat_ledger is not None and _append_secondary_ledger(
+                    flat_ledger, request, eligibility, observed_now, f"{title}:flat_ledger"
+                ) is not None:
+                    flat_duplicates += 1
                 # gated_ledger: curated subset of rows evaluate_esports_eligibility
                 # genuinely approved as a real call. Same relationship
                 # flat_picks.xlsx has to picks.xlsx, for research-only sports.
-                if gated_ledger is not None and genuinely_eligible:
-                    with suppress(DuplicatePickError):
-                        gated_ledger.append_evaluated(request, eligibility, now=observed_now)
+                if gated_ledger is not None and genuinely_eligible and _append_secondary_ledger(
+                    gated_ledger, request, eligibility, observed_now, f"{title}:gated_ledger"
+                ) is not None:
+                    gated_duplicates += 1
             logged += 1
-        except DuplicatePickError:
+        except DuplicatePickError as error:
+            # Primary ledger write only -- flat/gated are handled above via
+            # _append_secondary_ledger, which never raises. DD-2: this used
+            # to be a bare `continue` with no trace of which pick already
+            # existed.
+            primary_duplicates += 1
+            logger.debug(
+                "%s: duplicate suppressed for existing pick %s (primary ledger)",
+                title, error.pick_id,
+            )
             continue
         except (ValueError, KeyError) as error:
             # Record the failure instead of silently discarding it -- a bare
@@ -1529,6 +1589,11 @@ def _log_esports_forecast(
             continue
 
     forecast["errors"] = errors
+    forecast["duplicates"] = {
+        "primary_ledger": primary_duplicates,
+        "flat_ledger": flat_duplicates,
+        "gated_ledger": gated_duplicates,
+    }
     return logged
 
 
@@ -1585,6 +1650,12 @@ def _forecast_international_sport(
 
     logged = 0
     errors: list[dict] = []
+    # DD-2 (deep debug audit, 2026-08-04): see _append_secondary_ledger's
+    # docstring -- these count duplicates the research/flat/gated writes
+    # below used to silently drop with no trace at all.
+    research_duplicates = 0
+    flat_duplicates = 0
+    gated_duplicates = 0
     for contract in forecast.get("priced_contracts", []):
         sides = contract.get("sides", [])
         if len(sides) != 2:
@@ -1668,14 +1739,25 @@ def _forecast_international_sport(
                 genuinely_eligible = eligibility.decision == "CALL"
                 research_ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
-                if flat_ledger is not None:
-                    with suppress(DuplicatePickError):
-                        flat_ledger.append_evaluated(request, eligibility, now=observed_now)
-                if gated_ledger is not None and genuinely_eligible:
-                    with suppress(DuplicatePickError):
-                        gated_ledger.append_evaluated(request, eligibility, now=observed_now)
+                if flat_ledger is not None and _append_secondary_ledger(
+                    flat_ledger, request, eligibility, observed_now, f"{league_upper}:flat_ledger"
+                ) is not None:
+                    flat_duplicates += 1
+                if gated_ledger is not None and genuinely_eligible and _append_secondary_ledger(
+                    gated_ledger, request, eligibility, observed_now, f"{league_upper}:gated_ledger"
+                ) is not None:
+                    gated_duplicates += 1
             logged += 1
-        except DuplicatePickError:
+        except DuplicatePickError as error:
+            # Primary (research_ledger) write only -- flat/gated are handled
+            # above via _append_secondary_ledger, which never raises. DD-2:
+            # this used to be a bare `continue` with no trace of which pick
+            # already existed.
+            research_duplicates += 1
+            logger.debug(
+                "%s: duplicate suppressed for existing pick %s (research_ledger)",
+                league_upper, error.pick_id,
+            )
             continue
         except (ValueError, KeyError) as error:
             # Record the failure instead of silently discarding it -- see
@@ -1691,6 +1773,11 @@ def _forecast_international_sport(
             continue
     forecast["logged"] = logged
     forecast["errors"] = errors
+    forecast["duplicates"] = {
+        "research_ledger": research_duplicates,
+        "flat_ledger": flat_duplicates,
+        "gated_ledger": gated_duplicates,
+    }
     forecast["logging_note"] = (
         "Every model-favored priced contract was evaluated for the research ledger; "
         "only trust-valid contracts clearing edge and confidence gates were mirrored "
@@ -1774,6 +1861,15 @@ def _forecast_soccer_sport(
     gated = 0
     flat_logged = 0
     main_logged = 0
+    # DD-2 (deep debug audit, 2026-08-04): these count duplicates the same
+    # four ledger writes below silently dropped before this fix (each was a
+    # bare suppress(DuplicatePickError), with no way to tell "this exact
+    # market was already logged" apart from "the model produced nothing
+    # here"). See _append_secondary_ledger's docstring for the full context.
+    research_duplicates = 0
+    gated_duplicates = 0
+    flat_duplicates = 0
+    main_duplicates = 0
     errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
@@ -1837,44 +1933,38 @@ def _forecast_soccer_sport(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                if research_ledger is not None:
-                    with suppress(DuplicatePickError):
-                        research_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                if research_ledger is not None and _append_secondary_ledger(
+                    research_ledger, request, eligibility, observed_now, "soccer:research_ledger"
+                ) is not None:
+                    research_duplicates += 1
                 if gated_ledger is not None and genuinely_eligible:
-                    with suppress(DuplicatePickError):
-                        gated_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                    if _append_secondary_ledger(
+                        gated_ledger, request, eligibility, observed_now, "soccer:gated_ledger"
+                    ) is None:
                         gated += 1
+                    else:
+                        gated_duplicates += 1
                 if flat_ledger is not None:
                     # Flat: log every priced contract regardless of
                     # eligibility, same "show everything" semantics flat
                     # mode uses for every other sport.
-                    with suppress(DuplicatePickError):
-                        flat_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                    if _append_secondary_ledger(
+                        flat_ledger, request, eligibility, observed_now, "soccer:flat_ledger"
+                    ) is None:
                         flat_logged += 1
+                    else:
+                        flat_duplicates += 1
                 if main_ledger is not None and genuinely_eligible:
                     # Mirrors gated_ledger exactly -- same eligibility
                     # result, same "only when genuinely eligible" gate. See
                     # this function's docstring: inert until soccer is
                     # promoted past status: research in config/model.yaml.
-                    with suppress(DuplicatePickError):
-                        main_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                    if _append_secondary_ledger(
+                        main_ledger, request, eligibility, observed_now, "soccer:main_ledger"
+                    ) is None:
                         main_logged += 1
+                    else:
+                        main_duplicates += 1
             logged += 1
         except DuplicatePickError:
             continue
@@ -1894,6 +1984,12 @@ def _forecast_soccer_sport(
     forecast["gated_logged"] = gated
     forecast["flat_logged"] = flat_logged
     forecast["main_logged"] = main_logged
+    forecast["duplicates"] = {
+        "research_ledger": research_duplicates,
+        "gated_ledger": gated_duplicates,
+        "flat_ledger": flat_duplicates,
+        "main_ledger": main_duplicates,
+    }
     forecast["errors"] = errors
     return forecast
 
@@ -1959,6 +2055,13 @@ def _forecast_tennis_sport(
     gated = 0
     flat_logged = 0
     main_logged = 0
+    # DD-2 (deep debug audit, 2026-08-04): see _append_secondary_ledger's
+    # docstring -- these count duplicates the four ledger writes below used
+    # to silently drop.
+    research_duplicates = 0
+    gated_duplicates = 0
+    flat_duplicates = 0
+    main_duplicates = 0
     errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
@@ -2023,40 +2126,34 @@ def _forecast_tennis_sport(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                if research_ledger is not None:
-                    with suppress(DuplicatePickError):
-                        research_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                if research_ledger is not None and _append_secondary_ledger(
+                    research_ledger, request, eligibility, observed_now, "tennis:research_ledger"
+                ) is not None:
+                    research_duplicates += 1
                 if gated_ledger is not None and genuinely_eligible:
-                    with suppress(DuplicatePickError):
-                        gated_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                    if _append_secondary_ledger(
+                        gated_ledger, request, eligibility, observed_now, "tennis:gated_ledger"
+                    ) is None:
                         gated += 1
+                    else:
+                        gated_duplicates += 1
                 if flat_ledger is not None:
                     # Flat: log every priced contract regardless of
                     # eligibility, same "show everything" semantics flat
                     # mode uses for every other sport.
-                    with suppress(DuplicatePickError):
-                        flat_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                    if _append_secondary_ledger(
+                        flat_ledger, request, eligibility, observed_now, "tennis:flat_ledger"
+                    ) is None:
                         flat_logged += 1
+                    else:
+                        flat_duplicates += 1
                 if main_ledger is not None and genuinely_eligible:
-                    with suppress(DuplicatePickError):
-                        main_ledger.append_evaluated(
-                            request,
-                            eligibility,
-                            now=observed_now,
-                        )
+                    if _append_secondary_ledger(
+                        main_ledger, request, eligibility, observed_now, "tennis:main_ledger"
+                    ) is None:
                         main_logged += 1
+                    else:
+                        main_duplicates += 1
             logged += 1
         except DuplicatePickError:
             continue
@@ -2076,6 +2173,12 @@ def _forecast_tennis_sport(
     forecast["gated_logged"] = gated
     forecast["flat_logged"] = flat_logged
     forecast["main_logged"] = main_logged
+    forecast["duplicates"] = {
+        "research_ledger": research_duplicates,
+        "gated_ledger": gated_duplicates,
+        "flat_ledger": flat_duplicates,
+        "main_ledger": main_duplicates,
+    }
     forecast["errors"] = errors
     return forecast
 
