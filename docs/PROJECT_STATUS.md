@@ -58,7 +58,7 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 - **Console entry point**: `.venv/bin/model-prediction` works
 - **BBO capture**: Active across 8 sports (`data/odds/`)
 - **Known, unresolved, non-code issue**: The Odds API key appears genuinely invalid — all 12 configured soccer leagues on that provider return `401 Unauthorized` (verified live 2026-08-04). Soccer's ESPN-sourced leagues are unaffected. Needs a real key rotation, not a code fix.
-- **Repo hygiene flag**: `data/mlb_statsapi/game_snapshots.jsonl` (71MB) and `data/events.jsonl` (60MB) both exceed GitHub's 50MB recommended file size (warned, not yet blocked, on push 2026-08-04). Will hit the hard 100MB cap eventually given both grow daily; Git LFS would be the fix, not yet done.
+- **Repo hygiene**: `data/mlb_statsapi/game_snapshots.jsonl` (85MB) and `data/events.jsonl` (61MB) both exceeded GitHub's 50MB recommended file size and were growing toward the 100MB hard cap. **Fixed 2026-08-05**: both now tracked via Git LFS (forward-only, per explicit operator choice — existing git history untouched, every commit from this point forward stores these two paths as LFS pointers instead of full blobs). Verified: `git lfs status` shows both objects successfully pushed, full test suite green with LFS active, `.git/hooks/pre-push`'s existing pytest/mypy gate merged with (not overwritten by) the LFS pre-push hook.
 
 ## Release verdict
 
@@ -105,6 +105,6 @@ state. They require separate authorization appropriate to the risk.
 2. Build a real absolute-run-environment signal for MLB totals (P1-17/F-62's own next step: `totals_specific_market_residual` or `branched_absolute_run_intensity_head`, per `config/model.yaml`'s `problem_cohorts.totals`) — a relative-elasticity refit was tried 2026-08-04 and honestly did not help.
 3. ~~Add confidence discount / inactivity decay to the esports `NeutralElo` model.~~ Done 2026-08-04, see F-63.
 4. Rotate The Odds API key.
-5. Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.
+5. ~~Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.~~ Done 2026-08-05, forward-only (see F-65).
 6. Split `cli.py` and `dashboard_server.py` into packages (both remain large, growing files).
 7. Migrate ledger storage to SQLite for ACID guarantees (long-standing item, unchanged).
