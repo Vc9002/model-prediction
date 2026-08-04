@@ -177,6 +177,55 @@ def test_snapshot_observed_after_decision_is_not_backfilled(tmp_path) -> None:
         )
 
 
+def test_matchup_level_espn_conflict_propagates_as_no_call(tmp_path) -> None:
+    """P1: merge_availability_sources' default conflict_policy is
+    fail_closed, but matchup_player_availability wraps both the ESPN-lookup
+    AND the merge call in the same `suppress(ValueError, ...)` -- meant only
+    to handle "no ESPN snapshot exists yet". That wrapper was silently
+    swallowing genuine source conflicts too (e.g. ESPN says a star is Out,
+    the official report still says Available), discarding real injury
+    signal and reporting zero conflicts instead of forcing the fail-closed
+    NO_CALL the function's docstring promises. Regression test for the real
+    conflict path end-to-end, not just the merge_availability_sources unit
+    tests above."""
+    _write_inputs(tmp_path, home_status="Available")
+    espn_dir = tmp_path / "availability/wnba/espn_event_snapshots/2026-07-19"
+    # Overwrite _write_inputs' own (empty-entries, later-timestamped) ESPN
+    # snapshot rather than adding a competing one -- _latest_espn_snapshot
+    # picks the single latest point-in-time-eligible snapshot, so a second,
+    # earlier file would just lose the selection and never be merged.
+    (espn_dir / "target-20260719T200000+0000-test.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "sport": "wnba",
+                "source": "espn_event_injuries",
+                "event_id": "target",
+                "observed_at_utc": "2026-07-19T20:00:00+00:00",
+                "entries": [
+                    {
+                        "team": "Home Team",
+                        "player_name": "Star, Home",
+                        "current_status": "Out",
+                        "status_at_utc": "2026-07-19T19:50:00+00:00",
+                        "reason": "Injury",
+                    }
+                ],
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="SOURCE_CONFLICT"):
+        matchup_player_availability(
+            data_root=tmp_path,
+            home_team="Home Team",
+            away_team="Away Team",
+            game_date="2026-07-19",
+            observed_at=datetime(2026, 7, 19, 20, tzinfo=UTC),
+            event_start=datetime(2026, 7, 19, 21, tzinfo=UTC),
+            event_id="target",
+        )
+
+
 def test_espn_explicit_out_fills_official_omission() -> None:
     official = {"entries": []}
     espn = {

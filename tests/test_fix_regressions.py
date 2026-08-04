@@ -290,6 +290,19 @@ def test_esports_eligibility_fails_closed_on_stale_data():
     assert result.units > 0
 
 
+def test_esports_eligibility_fails_closed_on_future_data():
+    """P1-4: a timestamp ahead of `now` used to pass the freshness check
+    outright -- only the "too old" direction was ever guarded. Mirrors
+    test_esports_eligibility_fails_closed_on_stale_data but for the other
+    side of the clock."""
+    future = _future_request(
+        observed_at_utc=(datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    )
+    result = evaluate_esports_eligibility(future, Exposure(), UnitPolicy())
+    assert result.reason_code == "NO_CALL_STALE_DATA"
+    assert result.units > 0
+
+
 def test_esports_eligibility_no_longer_gates_on_exposure_caps():
     """Exposure caps no longer block CALL at all (operator directive,
     2026-07-26) -- a saturated exposure state still produces a real

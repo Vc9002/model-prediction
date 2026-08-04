@@ -99,6 +99,25 @@ def test_promotion_tier_no_longer_gates_qualified_calls(registry, ban_list) -> N
         assert result.record_type is RecordType.RESEARCH_OBSERVATION and result.units > 0
 
 
+def test_future_observed_at_becomes_research(registry, ban_list) -> None:
+    """P1-4: a timestamp ahead of `now` used to pass the freshness check
+    outright (only the "too old" direction was ever guarded), letting a
+    clock-skewed or malformed observed_at_utc slip through as trusted,
+    current data. Confirms the future-timestamp branch fires before the
+    stale-data branch and produces the same NO_CALL_STALE_DATA outcome."""
+    future = evaluate_eligibility(
+        request(home="BAL", observed_at="2026-07-13T13:00:00Z"),
+        registry,
+        ban_list,
+        Exposure(),
+        UnitPolicy(),
+        NOW,
+    )
+    assert future.reason_code == "NO_CALL_STALE_DATA"
+    assert future.record_type is RecordType.RESEARCH_OBSERVATION
+    assert future.units > 0
+
+
 def test_stale_missing_uncertainty_low_edge_and_exposure_become_research(registry, ban_list) -> None:
     stale = evaluate_eligibility(
         request(home="BAL", observed_at="2026-07-12T00:00:00Z"),

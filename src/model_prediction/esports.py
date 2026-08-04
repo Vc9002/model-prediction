@@ -7,9 +7,9 @@ advantage, and never claims market profitability without point-in-time prices.
 
 from __future__ import annotations
 
-import logging
 import hashlib
 import json
+import logging
 import math
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -519,7 +519,6 @@ class NeutralElo:
                 k_eff *= 1.0 + (RECENCY_MAX_BOOST - 1.0) * decay
             except (ValueError, TypeError) as exc:
                 logger.debug("esports Elo: skipping row with unparseable date: %s", exc)
-                pass
 
         # Tournament tier bonus: higher-tier matches get more weight
         tier = str(row.get("tier") or "").lower().strip()

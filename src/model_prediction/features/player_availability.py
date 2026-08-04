@@ -293,12 +293,20 @@ def matchup_player_availability(
     root = Path(data_root)
     snapshot = _latest_snapshot(root, observed, game_date)
     if event_id is not None:
+        espn_snapshot: dict[str, Any] | None = None
         with suppress(ValueError, KeyError, TypeError, OSError):
-            snapshot = merge_availability_sources(
-                snapshot,
-                _latest_espn_snapshot(root, event_id, observed),
-                game_date=game_date,
-            )
+            # Missing/malformed ESPN data is a routine, silent fall-back to
+            # official-only -- ESPN often hasn't posted an event snapshot
+            # yet. A genuine two-source *conflict* is not: merge_availability_sources
+            # (default conflict_policy="fail_closed") must be called outside
+            # this suppress, or its NO_CALL_AVAILABILITY_SOURCE_CONFLICT
+            # ValueError gets silently swallowed here too, silently
+            # discarding real disagreement (e.g. ESPN says a star is Out,
+            # official still says Available) instead of forcing the
+            # fail-closed NO_CALL this function's docstring promises.
+            espn_snapshot = _latest_espn_snapshot(root, event_id, observed)
+        if espn_snapshot is not None:
+            snapshot = merge_availability_sources(snapshot, espn_snapshot, game_date=game_date)
     priors = _load_priors(root, game_date, observed, maximum_age_hours=maximum_prior_age_hours)
     result = matchup_player_availability_from_payloads(
         snapshot=snapshot,

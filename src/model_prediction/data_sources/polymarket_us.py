@@ -194,7 +194,14 @@ class PolymarketUSClient:
         slug = LEAGUE_SLUGS[league.upper()]
         all_events: list[dict[str, Any]] = []
         offset = 0
-        while True:
+        # A real sport-league slate is a few hundred events at most; a
+        # hard page cap turns an API that ignores `offset` (returning the
+        # same full page forever) into a clear error instead of an
+        # unbounded, ever-growing-memory network hang in the daily
+        # pipeline -- matches this codebase's convention of bounding every
+        # other `while True` loop (see audit.py's lock-wait timeout).
+        max_pages = 50
+        for _ in range(max_pages):
             payload = self._get(
                 f"/v2/leagues/{slug}/events",
                 {"limit": limit, "offset": offset, "section": "general", "type": "sport"},
@@ -206,6 +213,12 @@ class PolymarketUSClient:
             if len(page) < limit:
                 break
             offset += limit
+        else:
+            raise RuntimeError(
+                f"polymarket_us events() for league={league!r} did not terminate within "
+                f"{max_pages} pages ({max_pages * limit} events) -- the API may be ignoring "
+                "the offset parameter"
+            )
         return all_events
 
     def slate(

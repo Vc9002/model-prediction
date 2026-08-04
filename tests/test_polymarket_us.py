@@ -13,6 +13,45 @@ from model_prediction.data_sources.polymarket_us import (
 )
 
 
+def test_events_paginates_across_multiple_pages() -> None:
+    """events() used to hard-cap at a single page (limit=200) -- a league
+    with more events than that silently lost the rest. Confirms pagination
+    walks pages via `offset` until a short page signals the last one."""
+    pages = {
+        0: [{"id": f"evt-{i}"} for i in range(3)],
+        3: [{"id": f"evt-{i}"} for i in range(3, 5)],
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        offset = int(request.url.params.get("offset", "0"))
+        assert int(request.url.params["limit"]) == 3
+        return httpx.Response(200, json={"events": pages.get(offset, [])})
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    events = PolymarketUSClient("https://example.test", http_client).events("WNBA", limit=3)
+    assert [event["id"] for event in events] == [f"evt-{i}" for i in range(5)]
+
+
+def test_events_raises_instead_of_looping_forever_on_a_runaway_api() -> None:
+    """P1: the pagination loop added for the above fix had no upper bound --
+    an API that ignores `offset` and always returns a full page would hang
+    the daily pipeline in an unbounded network loop with ever-growing
+    memory. Confirms a buggy/malicious always-full-page API raises a clear
+    error instead."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"events": [{"id": "same"}] * 3})
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = PolymarketUSClient("https://example.test", http_client)
+    try:
+        client.events("WNBA", limit=3)
+    except RuntimeError as error:
+        assert "did not terminate" in str(error)
+    else:
+        raise AssertionError("a runaway paginated API did not raise")
+
+
 def test_all_qualification_sports_are_available_to_slate_and_cli() -> None:
     assert {"mlb", "nba", "wnba", "nfl"} <= set(POLYMARKET_SPORT_LEAGUES)
     assert "esports" in POLYMARKET_SPORT_LEAGUES

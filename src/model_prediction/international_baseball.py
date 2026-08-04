@@ -12,10 +12,10 @@ observations and require exact team identity plus a current executable ask.
 
 from __future__ import annotations
 
-import logging
 import hashlib
 import html
 import json
+import logging
 import re
 from collections.abc import Iterable, Sequence
 from contextlib import suppress
@@ -479,7 +479,7 @@ def find_international_baseball_result(
     game_date: str,
     home_team: str,
     away_team: str,
-    client: "OfficialInternationalBaseballClient | None" = None,
+    client: OfficialInternationalBaseballClient | None = None,
 ) -> tuple[int, int] | None:
     """Find (away_score, home_score) for a completed KBO/NPB game.
 

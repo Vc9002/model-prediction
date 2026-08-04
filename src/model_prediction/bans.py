@@ -97,8 +97,8 @@ class TeamBanList:
             return team, team.canonical_team_id in banned_ids
         except EntityResolutionError:
             # Registry-free sports (esports, soccer, tennis, KBO, NPB) use
-            # name-based PlaceholderTeam objects — fall back to matching the
-            # raw team_input string against ban config entries.
+            # name-based placeholder CanonicalTeam objects — fall back to
+            # matching the raw team_input string against ban config entries.
             return _registry_free_check(League(league), team_input, self.list())
 
     def add(
@@ -113,6 +113,19 @@ class TeamBanList:
     def remove(self, league: League | str, team_input: str) -> tuple[BanEntry, bool]:
         return self._mutate(League(league), team_input, add=False)
 
+    def _resolve_or_placeholder(self, league: League, team_input: str) -> CanonicalTeam:
+        """Same registry-free fallback `check()` uses, shared here so
+        add()/remove() work for esports/soccer/tennis/KBO/NPB too -- these
+        three call sites (main resolve, existing-entry comparison, removal
+        filter) all previously called `self.registry.resolve` directly with
+        no fallback, so banning/unbanning a registry-free team via this
+        API would have raised EntityResolutionError, even after the
+        registry-free fallback was added to check()/_entries()."""
+        try:
+            return self.registry.resolve(league, team_input)
+        except EntityResolutionError:
+            return CanonicalTeam(team_input, league, team_input, team_input, True, None, None, ())
+
     def _mutate(
         self,
         league: League,
@@ -121,7 +134,7 @@ class TeamBanList:
         reason: str = "manual_governance",
         review_after: str | None = None,
     ) -> tuple[BanEntry, bool]:
-        team = self.registry.resolve(league, team_input)
+        team = self._resolve_or_placeholder(league, team_input)
         entry = BanEntry(
             league, team.canonical_team_id, team.canonical_name, team_input, reason, review_after
         )
@@ -144,7 +157,7 @@ class TeamBanList:
                         if isinstance(value, dict)
                         else value
                     )
-                    resolved_id = self.registry.resolve(league, str(raw)).canonical_team_id
+                    resolved_id = self._resolve_or_placeholder(league, str(raw)).canonical_team_id
                     resolved_ids.append(resolved_id)
                     if resolved_id == team.canonical_team_id:
                         existing_value = value
@@ -173,7 +186,7 @@ class TeamBanList:
                     values = [
                         value
                         for value in values
-                        if self.registry.resolve(
+                        if self._resolve_or_placeholder(
                             league,
                             str(
                                 value.get("input", value.get("canonical_team_id"))
@@ -227,13 +240,20 @@ def _registry_free_check(
 ) -> tuple[CanonicalTeam, bool]:
     """Check a ban for registry-free sports (esports, soccer, tennis, KBO, NPB).
 
-    These sports use name-based PlaceholderTeam objects that cannot be
-    resolved through EntityRegistry — match against the raw team_input
-    string and the configured_input field on BanEntry instead.
-    """
-    from .entities import PlaceholderTeam
+    These sports use name-based placeholder `CanonicalTeam` objects (same
+    construction `evaluate_esports_eligibility` in eligibility.py already
+    uses) that cannot be resolved through EntityRegistry — match against the
+    raw team_input string and the configured_input field on BanEntry instead.
 
-    team = PlaceholderTeam(team_input, league)
+    Real bug found 2026-08-04: this referenced `entities.PlaceholderTeam`,
+    a class that has never existed in this codebase (`entities.py` only
+    defines `CanonicalTeam`/`SourceTeamAlias`/`EntityRegistry`) — every real
+    call into this function would have raised `ImportError` immediately,
+    the moment a registry-free sport's team was ever actually checked
+    against the ban list. The P1-7 fix this belongs to (making banning work
+    for esports/soccer/tennis/KBO/NPB) was itself unreachable.
+    """
+    team = CanonicalTeam(team_input, league, team_input, team_input, True, None, None, ())
     team_input_lower = team_input.strip().casefold()
     for entry in entries:
         if entry.league == league and entry.configured_input.strip().casefold() == team_input_lower:
