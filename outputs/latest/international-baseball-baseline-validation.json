@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-08-04T08:55:25.508711Z",
+  "generated_at_utc": "2026-08-04T14:26:06.588340Z",
   "leagues": {
     "kbo": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/kbo-tie-aware-elo-v1.json",
-      "artifact_hash": "ed3011bd159f6231451a9fe0e125e5f3fe12152fa880d63d1c0f52c74fa66b4f",
+      "artifact_hash": "91f764ccc3e48038ce4e04d246300a3349177dcdb5014c37dc68362253dcab2b",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0
@@ -11,7 +11,7 @@
       "chronological_split": {
         "locked_test": {
           "from_date": "2024-05-31",
-          "n": 1677,
+          "n": 1680,
           "through_date": "2026-08-04"
         },
         "train": {
@@ -32,18 +32,18 @@
         "Locked-test metrics are diagnostic; v1 remains unqualified and zero-unit."
       ],
       "locked_test": {
-        "accuracy_decisive": 0.551724,
-        "brier_settlement": 0.239999,
-        "calls": 1624,
-        "hits": 896,
-        "mae_settlement": 0.479552,
-        "observations": 1677,
+        "accuracy_decisive": 0.551321,
+        "brier_settlement": 0.240074,
+        "calls": 1627,
+        "hits": 897,
+        "mae_settlement": 0.479637,
+        "observations": 1680,
         "ties": 53,
-        "units_at_minus_110": 86.545455
+        "units_at_minus_110": 85.454545
       },
       "model_state": "research",
       "model_version": "kbo-tie-aware-elo-v2",
-      "observations": 7056,
+      "observations": 7059,
       "parameter_selection_on_validation": [
         {
           "accuracy_decisive": 0.560662,
@@ -11390,7 +11390,7 @@
       "primary_65": {
         "learned_threshold": 0.12388935616968044,
         "locked_holdout": {
-          "called_rate": 0.040025,
+          "called_rate": 0.039951,
           "calls": 65,
           "every_qualifying_month_positive_at_minus_110": true,
           "hit_rate": 0.553846,
@@ -11527,7 +11527,7 @@
           ],
           "monthly_minimum_calls": 10,
           "qualified": false,
-          "total_predictions": 1624,
+          "total_predictions": 1627,
           "units_at_minus_110": 3.727273
         },
         "status": "evaluated",
@@ -11542,12 +11542,12 @@
       "profitability": "not_established_no_point_in_time_market_prices",
       "promotion_eligible": false,
       "status": "ok",
-      "tie_rate": 0.02466,
+      "tie_rate": 0.024649,
       "units": 0
     },
     "npb": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/npb-tie-aware-elo-v1.json",
-      "artifact_hash": "bc4fda3fccd78fdc3bca8f7cc4fb910c9fcb1d51c5557416c7b46467f043e355",
+      "artifact_hash": "57001c663c182e7da0734a1f106865f2560b484e57dc5093af7a390ab5016b6f",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0

@@ -191,6 +191,10 @@ FIELDNAMES = [*LEGACY_FIELDNAMES,
     # comment for why this was silently blank on every real pick since v7
     # shipped 2026-07-30.
     "bullpen_weakness_gap",
+    # Active MLB v8 moneyline feature (features/starter_history.py); same
+    # recurrence as bullpen_weakness_gap above, caught 2026-08-04 within
+    # hours of that fix shipping.
+    "starter_era_gap",
     # Schedule / roadmap challenger feature columns
     "rest_disparity",
     "back_to_back_gap",

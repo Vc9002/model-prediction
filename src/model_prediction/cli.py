@@ -1234,6 +1234,7 @@ def _forecast_learned_sport(
                 pitcher_era_gap=candidate.feature_basis.get("pitcher_era_gap"),
                 probable_starter_era_gap=candidate.feature_basis.get("probable_starter_era_gap"),
                 bullpen_weakness_gap=candidate.feature_basis.get("bullpen_weakness_gap"),
+                starter_era_gap=candidate.feature_basis.get("starter_era_gap"),
                 market_residual_probability=market_residual_probability,
                 unavailable_features=(
                     ",".join(row_unavailable_features)

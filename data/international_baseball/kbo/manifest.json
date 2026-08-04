@@ -3,9 +3,9 @@
     "from": "2015-03-28",
     "to": "2026-08-04"
   },
-  "extracted_at_utc": "2026-08-04T08:55:04.020096Z",
-  "game_count": 7056,
-  "games_sha256": "938dad1d9803714f650ad7d907066899ce736bcc51915b753f4c5588dd6573bd",
+  "extracted_at_utc": "2026-08-04T14:25:21.723218Z",
+  "game_count": 7059,
+  "games_sha256": "92f03fc86ba9ccad412956ae06541de05f8188646bc584a57af6c8a0de8328a5",
   "league": "kbo",
   "league_name": "Korea Baseball Organization",
   "limitations": [

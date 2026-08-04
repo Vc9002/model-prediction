@@ -215,12 +215,15 @@ def test_as_dict_includes_core_and_feature_attribution_fields() -> None:
         "pitcher_era_gap",
         "probable_starter_era_gap",
         "bullpen_weakness_gap",
+        "starter_era_gap",
         "market_residual_probability",
     ],
 )
 def test_as_dict_serializes_every_diagnostic_feature_field(field) -> None:
     """Real, recurring bug class (pitcher_era_gap until 2026-07-25;
-    defensive_trend_gap and bullpen_weakness_gap until 2026-08-04): a field
+    defensive_trend_gap and bullpen_weakness_gap until 2026-08-04;
+    starter_era_gap until later the same day -- caught live in the first
+    real v8-logged pick before this test was even updated): a field
     can exist on PickRequest, have a reserved ledger.py column, and be
     correctly populated by a caller -- and still end up permanently blank in
     every real pick if as_dict() (domain.py) never lists it. defensive_trend_gap

@@ -50,8 +50,21 @@ class TheOddsAPIClient:
         except Exception as exc:
             # Both transport errors and HTTP status errors embed the URL —
             # redact the API key from the message before re-raising.
+            #
+            # Real bug found 2026-08-04 (first live daily run after this
+            # redaction landed): `type(exc)(msg)` reconstructs the SAME
+            # exception class with only the redacted message as a single
+            # positional arg. That's fine for a plain transport error, but
+            # httpx.HTTPStatusError.__init__ requires `request`/`response` as
+            # additional keyword-only args -- reconstructing it this way
+            # raised its own TypeError instead of the redacted error,
+            # breaking soccer score collection for every league on this
+            # provider. Every real caller catches the httpx.HTTPError base
+            # class (mlb_market_odds.py, cli.py), not a specific subtype, and
+            # httpx.HTTPError itself only takes a message -- raise that
+            # directly instead of trying to preserve the exact original type.
             msg = str(exc).replace(str(self.api_key), "[REDACTED]")
-            raise type(exc)(msg) from None
+            raise httpx.HTTPError(msg) from None
 
     def odds(self, league: str, markets: str = "h2h,spreads,totals") -> list[dict[str, Any]]:
         sport = SPORT_KEYS[league.upper()]

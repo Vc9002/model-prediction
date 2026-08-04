@@ -196,6 +196,13 @@ class PickRequest:
     # features dict directly, not this diagnostic passthrough) -- only the
     # audit trail was blind to what these two features actually saw.
     bullpen_weakness_gap: float | None = None
+    # Same recurrence again, caught 2026-08-04 within hours of the fix above
+    # shipping: starter_era_gap (active in MLB v8's fitted coefficients,
+    # features/starter_history.py) was wired into candidate.feature_basis and
+    # scored correctly, but never added here or to as_dict() -- confirmed
+    # blank on the very first real live-logged v8 pick. Model probability
+    # unaffected for the same reason as the bug above; audit trail only.
+    starter_era_gap: float | None = None
     # Diagnostic only, same rule as the feature block above (P0-4, 2026-08-03):
     # the market-residual layer's calibrated_probability(model_p, market_p),
     # recorded for evidence/dashboard visibility. Never read back to size or
@@ -301,6 +308,7 @@ class PickRequest:
             "pitcher_era_gap": self.pitcher_era_gap,
             "probable_starter_era_gap": self.probable_starter_era_gap,
             "bullpen_weakness_gap": self.bullpen_weakness_gap,
+            "starter_era_gap": self.starter_era_gap,
             "market_residual_probability": self.market_residual_probability,
             "unavailable_features": self.unavailable_features,
         }
