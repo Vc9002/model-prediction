@@ -19,7 +19,7 @@ amount. The registry also preserves the stricter multiplicity-adjusted decision.
 `KEEP` with blocked point-in-time provenance means research retention only; it does not
 make the feature production-safe or establish profitability.
 
-## Current state: 27 features tracked, 5 keep, 3 remove candidates, 3 reject, 1 remove, 4 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
+## Current state: 24 features tracked, 5 keep, 3 remove candidates, 3 reject, 1 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
 
 ### Production features (active in current models)
 
@@ -52,10 +52,7 @@ make the feature production-safe or establish profitability.
 | `starting_pitcher_fip` | MLB | **reject** | 84% coverage, zero effect. Collinear with `pitcher_era_gap`. |
 | `head_to_head` | all 5 | **reject** | +0.11pp to +0.61pp, all inside 1 SE. |
 | `lineup_strength` | NBA/WNBA | **reject** | +0.05pp / 0.00pp. Noise. |
-| `market_signals` | — | **exclude** | Architectural. Violates market isolation. |
-| `guaranteed_signal` | — | **exclude** | Post-hoc tag, not an input. |
 | `tennis_surface` | TENNIS | **exclude** | No active tennis model consuming it. |
-| `confidence_gate` | — | **exclude** | Infrastructure, not a model input. |
 
 ### Untested or blocked
 

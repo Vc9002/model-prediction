@@ -462,7 +462,7 @@ def test_current_configured_production_artifacts_all_valid(monkeypatch) -> None:
     assert {model["sport"]: model["active_model_version"] for model in result["models"]} == configured
     assert result["all_model_definitions_and_backfills_valid"] is True
     assert result["feature_registry"]["valid"] is True
-    assert len(result["feature_registry"]["features"]) == 27
+    assert len(result["feature_registry"]["features"]) == 24
     assert len(result["feature_registry"]["production_ablation_summary"]) == 15
     for model in result["models"]:
         assert model["artifact"]["version_matches_config"] is True

@@ -83,6 +83,7 @@ class ValidationRow:
     defensive_trend_gap: float = 0.0
     pitcher_era_gap: float = 0.0
     starter_era_gap: float = 0.0
+    starter_fip_gap: float = 0.0
     probable_starter_era_gap: float = 0.0
     probable_starter_available: bool = False
     bullpen_weakness_gap: float = 0.0
@@ -133,6 +134,12 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "park_factor",
         "starter_era_gap",
     ),
+    "elo_trend_park_starter_fip": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "starter_fip_gap",
+    ),
     "elo_trend_park_weather_pitcher": (
         "elo_probability",
         "trend_gap",
@@ -146,6 +153,31 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "park_factor",
         "weather_factor",
         "pitcher_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "elo_trend_park_weather_starter_bullpen": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "elo_trend_park_weather_starter_bullpen_fip": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_fip_gap",
+        "bullpen_weakness_gap",
+    ),
+    "elo_trend_park_weather_starter_bullpen_era_fip": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "starter_fip_gap",
         "bullpen_weakness_gap",
     ),
     "elo_trend_park_weather_pitcher_bullpen_fatigue": (
@@ -229,6 +261,8 @@ def build_walk_forward_rows(
                 
                 # Real starter ERA gap from MLB Stats API snapshots (point-in-time)
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
+                # Real starter FIP gap (same methodology, FIP instead of ERA)
+                starter_fip_gap = _starter_fip_gap(game.event_id) if sport.lower() == "mlb" else 0.0
 
                 # Real bullpen weakness gap from MLB Stats API snapshots (point-in-time)
                 bullpen_gap, bullpen_ok = (
@@ -304,6 +338,7 @@ def build_walk_forward_rows(
                         weather_factor=float(weather.get("run_factor", 1.0)),
                         pitcher_era_gap=pitcher_gap,
                         starter_era_gap=starter_gap,
+                        starter_fip_gap=starter_fip_gap,
                         probable_starter_era_gap=probable_gap,
                         probable_starter_available=probable_available,
                         bullpen_weakness_gap=bullpen_gap,
@@ -2115,6 +2150,100 @@ def _load_starter_era_map() -> dict[str, float]:
 def _starter_era_gap(event_id: str) -> float:
     """Get the real starter ERA gap for a given event, or 0.0 if unavailable."""
     return _load_starter_era_map().get(event_id, 0.0)
+
+
+# ── Starter FIP gap (same methodology, FIP instead of ERA) ──────────────
+
+_STARTER_FIP_MAP: dict[str, float] | None = None
+_FIP_CONSTANT = 3.10
+
+
+def _load_starter_fip_map() -> dict[str, float]:
+    """Build point-in-time starter FIP gap map from mlb_statsapi snapshots.
+
+    Mirrors ``_load_starter_era_map`` exactly — same chronological point-in-time
+    logic, same rolling 5-start window, same >=2 prior starts minimum, same
+    crosswalk — but stores FIP components (SO, BB, HR, HBP) alongside IP and
+    computes FIP instead of ERA."""
+    global _STARTER_FIP_MAP
+    if _STARTER_FIP_MAP is not None:
+        return _STARTER_FIP_MAP
+
+    import json as _json
+
+    snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
+    crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
+    if not snap_path.exists() or not crosswalk_path.exists():
+        _STARTER_FIP_MAP = {}
+        return _STARTER_FIP_MAP
+
+    def _ip_float(v):
+        w, _, f = v.partition(".")
+        return int(w) + {"0": 0.0, "1": 1 / 3, "2": 2 / 3}.get(f, 0.0)
+
+    crosswalk = {}
+    with crosswalk_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            g = _json.loads(line)
+            crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
+
+    with snap_path.open(encoding="utf-8") as f:
+        snaps = [_json.loads(line) for line in f if line.strip()]
+    snaps.sort(key=lambda r: r["game_start_utc"])
+
+    history: dict[int, list[dict]] = {}
+    result: dict[str, float] = {}
+
+    for snap in snaps:
+        key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
+        eid = crosswalk.get(key)
+        if not eid:
+            continue
+
+        home_fip = away_fip = None
+        for side_key, side_data in [("home", snap["home"]), ("away", snap["away"])]:
+            order = side_data.get("pitcher_order") or []
+            if not order:
+                continue
+            pid = order[0]
+            player = next((p for p in side_data["players"] if p["player_id"] == pid), None)
+            if not player or "inningsPitched" not in player.get("pitching", {}):
+                continue
+            stats = player["pitching"]
+            ip = _ip_float(stats["inningsPitched"])
+            so = int(stats.get("strikeOuts", 0) or 0)
+            bb = int(stats.get("baseOnBalls", 0) or 0)
+            hr = int(stats.get("homeRuns", 0) or 0)
+            hbp = int(stats.get("hitBatsmen", 0) or 0)
+
+            prior = history.get(pid, [])
+            if len(prior) >= 2:
+                recent = prior[-5:]
+                pip = sum(g["ip"] for g in recent)
+                if pip > 0:
+                    fip = ((13 * sum(g["hr"] for g in recent)
+                            + 3 * (sum(g["bb"] for g in recent) + sum(g["hbp"] for g in recent))
+                            - 2 * sum(g["so"] for g in recent))
+                           / pip) + _FIP_CONSTANT
+                    if side_key == "home":
+                        home_fip = fip
+                    else:
+                        away_fip = fip
+
+            history.setdefault(pid, []).append({"ip": ip, "so": so, "bb": bb, "hr": hr, "hbp": hbp})
+
+        if home_fip is not None and away_fip is not None:
+            result[eid] = round(home_fip - away_fip, 6)
+
+    _STARTER_FIP_MAP = result
+    return result
+
+
+def _starter_fip_gap(event_id: str) -> float:
+    """Get the real starter FIP gap for a given event, or 0.0 if unavailable."""
+    return _load_starter_fip_map().get(event_id, 0.0)
 
 
 # ── Bullpen weakness gap from MLB Stats API snapshots ────────────────────
