@@ -4,6 +4,7 @@ import hashlib
 import json
 from datetime import date, timedelta
 
+import httpx
 import pytest
 
 from model_prediction.data_sources.polymarket_us import LEAGUE_SLUGS, POLYMARKET_SPORT_LEAGUES
@@ -19,6 +20,20 @@ from model_prediction.international_baseball import (
     tie_aware_fair_values,
     validate_international_baseball_baseline,
 )
+
+
+class _UnavailableClient:
+    """Stands in for a real client that's genuinely unreachable (e.g. the
+    official source is down) -- raises the same exception type
+    find_international_baseball_result's refresh fallback is actually meant
+    to catch (DD-1: narrowed from a blanket suppress(Exception), which used
+    to also swallow real bugs like a missing/renamed method)."""
+
+    def kbo_year(self, year: int) -> tuple[list[dict], int]:
+        raise httpx.HTTPError("simulated unreachable official source")
+
+    def npb_year(self, year: int) -> tuple[list[dict], int]:
+        raise httpx.HTTPError("simulated unreachable official source")
 
 
 def test_polymarket_taxonomy_includes_separate_kbo_npb_leagues() -> None:
@@ -494,7 +509,7 @@ def test_find_international_baseball_result_returns_none_for_unplayed_game(tmp_p
     # Same teams, a different date the cache has no row for, and no live
     # client passed -- must return None (pick stays open), never guess.
     result = find_international_baseball_result(
-        tmp_path, "kbo", "2026-05-02", "Doosan", "Hanwha", client=object()
+        tmp_path, "kbo", "2026-05-02", "Doosan", "Hanwha", client=_UnavailableClient()
     )
     assert result is None
 
@@ -519,9 +534,44 @@ def test_find_international_baseball_result_none_when_teams_json_missing(tmp_pat
         encoding="utf-8",
     )
     result = find_international_baseball_result(
-        tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha", client=object()
+        tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha", client=_UnavailableClient()
     )
     assert result is None
+
+
+def test_find_international_baseball_result_propagates_a_real_bug_in_the_client(tmp_path) -> None:
+    """DD-1 (deep debug audit, 2026-08-04): the refresh fallback used to be
+    suppress(Exception), swallowing a genuinely broken client (e.g. a typo'd
+    method name, an AttributeError from a real code bug) the exact same way
+    it swallowed an expected network failure -- indistinguishable from
+    "game not found" with no way to ever notice. Narrowed to
+    (httpx.HTTPError, KeyError, TypeError, ValueError, OSError); confirms a
+    real bug now propagates instead of silently returning None."""
+    _write_completed_games(
+        tmp_path,
+        "kbo",
+        [
+            {
+                "game_id": "kbo:1",
+                "league": "kbo",
+                "game_date": "2026-05-01",
+                "home_team_id": "DOOSAN",
+                "away_team_id": "HANWHA",
+                "home_score": 6,
+                "away_score": 4,
+                "tie": False,
+            }
+        ],
+    )
+
+    class _BrokenClient:
+        def kbo_year(self, year: int):
+            raise AttributeError("simulated real bug -- e.g. a renamed method")
+
+    with pytest.raises(AttributeError, match="simulated real bug"):
+        find_international_baseball_result(
+            tmp_path, "kbo", "2026-05-02", "Doosan", "Hanwha", client=_BrokenClient()
+        )
 
 
 class _FakeYearClient:

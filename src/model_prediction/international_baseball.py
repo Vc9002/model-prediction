@@ -530,7 +530,16 @@ def find_international_baseball_result(
 
     year = date.fromisoformat(game_date).year
     source = client or OfficialInternationalBaseballClient()
-    with suppress(Exception):
+    # DD-1 (deep debug audit, 2026-08-04): this used to be suppress(Exception),
+    # which also swallows KeyboardInterrupt/SystemExit and any real
+    # programming bug in the refresh/backfill path -- narrowed to the actual
+    # expected failure modes (network, malformed source data, file I/O),
+    # matching this module's own established convention elsewhere (e.g. the
+    # (httpx.HTTPError, KeyError, TypeError, ValueError) set already used for
+    # similar refresh fallbacks). A genuine failure here now propagates
+    # instead of silently reporting "game not found" indistinguishably from
+    # a real settlement miss.
+    with suppress(httpx.HTTPError, KeyError, TypeError, ValueError, OSError):
         if games_path.exists():
             _merge_year_into_international_baseball_history(data_root, league, year, client=source)
         else:
