@@ -38,6 +38,15 @@ from sklearn.linear_model import PoissonRegressor
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+
+# BASE_SPEC_PATH is, by construction, whatever formula this script is
+# refitting FROM -- not necessarily the live ENGINE_VERSION (that's exactly
+# what a promotion moves forward). Uses the unchecked loader (same one
+# mlb_measured_edge_calibrate.py relies on for the identical reason) so this
+# script keeps working across a promotion instead of hard-failing the moment
+# BASE_SPEC_PATH's own file stops being the live ENGINE_VERSION.
+from mlb_measured_edge_calibrate import load_formula_spec_unchecked as load_formula_spec
 
 from model_prediction.data_sources.espn import ESPNMLBClient
 from model_prediction.models.mlb import (
@@ -47,7 +56,6 @@ from model_prediction.models.mlb import (
     _clip,
     _offense_index,
     _starter_weakness,
-    load_formula_spec,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

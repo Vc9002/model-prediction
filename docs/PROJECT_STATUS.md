@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-04, single `main` branch, HEAD `31d3b7c`. **686 tests pass, 0 fail.**
+**Last verified**: 2026-08-04, single `main` branch, HEAD past `31d3b7c` (F-58 through F-62 committed after). **694 tests pass, 0 fail.**
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -21,8 +21,8 @@ specifically, and remains unchanged by wiring work.
 | Sport | Active artifact | Status | Hit rate | Qualification |
 |---|---|---|---|---|
 | MLB moneyline | `mlb-elo-trend-lr-v8` | shadow_qualified (override) | 58.5% locked-holdout at the operator-lowered threshold (target_hit_rate=0.60) | `qualified=false` — validation Brier regressed vs. v7's retired feature set, and holdout no longer clears the 60% bar at this looser, coverage-optimized threshold either. Both honestly listed in the artifact's own `qualification.failures`. Real per-starter `starter_era_gap` feature (`features/starter_history.py`), replacing v7's team-level `pitcher_era_gap`. |
-| MLB spread | `measured-edge-margin-v2` | active_research | — | Real, sized Main-ledger rows (gated on both confirmed starters, matching moneyline) |
-| MLB totals | `measured-edge-totals-v2` | active_research | — | Real, sized Main-ledger rows. **Known bias, not fixed**: systematically over-picks "over" — elasticities too weak to differentiate real per-game run environment (P1-17 in `MASTER.md`) |
+| MLB spread | `measured-edge-margin-v3` | active_research | — | Real, sized Main-ledger rows (gated on both confirmed starters, matching moneyline). Real Poisson-GLM elasticity refit promoted 2026-08-04 (F-62): diagnostic correlation 0.2057→0.208, hit rate 59.5%→60.0% |
+| MLB totals | `measured-edge-totals-v3` | active_research | — | Real, sized Main-ledger rows. **Still not fixed** — same elasticity refit promoted 2026-08-04 (shared Trend Engine with spread), but totals specifically got marginally *worse* (correlation 0.0585→0.0414, hit rate 55.3%→52.9%). The previously-reported 71% over-pick figure could not be reproduced against the full diagnostic dataset in either formula version; confirms rather than resolves the standing diagnosis that totals needs an absolute-run-environment signal, not better relative elasticities (P1-17/F-62 in `MASTER.md`) |
 | NBA moneyline | `nba-elo-trend-lr-v4` | shadow_qualified | 73.66% | `qualified=true` |
 | WNBA moneyline | `wnba-elo-trend-lr-v4` | shadow_qualified | 67.48% | `qualified=true` |
 | NFL moneyline | `nfl-elo-trend-lr-v4` | shadow_qualified | 71.26% | `qualified=true` (offseason) |
@@ -74,7 +74,7 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 **That does not mean real-money execution should be turned on.** Separate from the 6 original defects:
 
 - MLB v8 (the active moneyline artifact) is honestly `qualified: false` — real, positive signal (58.5% holdout hit rate, well above the 50% coin-flip line) but does not clear this project's own 60% promotion bar, on top of a validation-set Brier regression vs. the feature set it replaced. It is live via the same operator-override mechanism v7 used, not because it passed cleanly.
-- MLB totals has a known, unfixed systematic bias (over-picks "over"; P1-17).
+- MLB totals still has a known, unfixed accuracy gap — a real elasticity refit was attempted and promoted 2026-08-04 but honestly did not improve it (P1-17/F-62); needs an absolute-run-environment-specific model change, not another elasticity refit.
 - Esports Elo has a known, unfixed thin/stale-data overconfidence gap producing the largest edges in the system.
 - The general cross-file ledger/audit atomicity gap (item 2 above) is real, if lower-severity than originally described.
 
@@ -83,7 +83,7 @@ Do not infer executable profitability from artifact hit rates, synthetic
 
 ## Bugs found and fixed since last verification (2026-08-02 → 2026-08-04)
 
-See `MASTER.md`'s Fixed Bugs log (F-47 through F-56) for full evidence on each. Highlights: dual-ledger duplicate-row gap for soccer/tennis re-runs (F-47); two active model coefficients (`bullpen_weakness_gap`, `defensive_trend_gap`, then `starter_era_gap`) silently missing from the audit ledger despite scoring correctly — the same recurring bug class, three times (F-48, F-55); dashboard order-readiness moneyline-only gate blocking every real MLB spread/total order (F-53); MLB v8 promotion with a real starter-identity feature and its own live infrastructure (F-54); a redaction fix that crashed instead of redacting, breaking soccer score collection (F-56).
+See `MASTER.md`'s Fixed Bugs log (F-47 through F-62) for full evidence on each. Highlights: dual-ledger duplicate-row gap for soccer/tennis re-runs (F-47); two active model coefficients (`bullpen_weakness_gap`, `defensive_trend_gap`, then `starter_era_gap`) silently missing from the audit ledger despite scoring correctly — the same recurring bug class, three times (F-48, F-55); dashboard order-readiness moneyline-only gate blocking every real MLB spread/total order (F-53); MLB v8 promotion with a real starter-identity feature and its own live infrastructure (F-54); a redaction fix that crashed instead of redacting, breaking soccer score collection (F-56); registry-free team-ban support completely non-functional in two independent ways (F-58); a WNBA availability fail-closed fix silently defeated by a pre-existing exception wrapper written for a different purpose (F-59); an unbounded pagination loop hardened with a page cap (F-60); MLB totals elasticity refit promoted with an honest (partially negative) result, plus a real bug in the calibration script that would have broken it (F-62).
 
 ## Safe command forms
 
@@ -102,7 +102,7 @@ state. They require separate authorization appropriate to the risk.
 ## Repair order (remaining, real, lower-severity than the original P0 list)
 
 1. Give cross-file ledger-mutation-plus-audit-append real transactional recovery (retry/failure-injection tests) — the original "silent data loss" framing was wrong, but true atomicity still doesn't exist.
-2. Re-fit MLB totals' elasticities against real totals outcomes specifically (P1-17) — needs its own fitting pass, not a mechanical patch.
+2. Build a real absolute-run-environment signal for MLB totals (P1-17/F-62's own next step: `totals_specific_market_residual` or `branched_absolute_run_intensity_head`, per `config/model.yaml`'s `problem_cohorts.totals`) — a relative-elasticity refit was tried 2026-08-04 and honestly did not help.
 3. Add confidence discount / inactivity decay to the esports `NeutralElo` model.
 4. Rotate The Odds API key.
 5. Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.

@@ -501,11 +501,11 @@ def main() -> None:
     totals_real_market = calibrate_market(real_market_rows, "total", "total_line")
 
     write_artifact(
-        args.output_margin, "Measured Edge Margin", "measured-edge-margin-v2",
+        args.output_margin, "Measured Edge Margin", Path(args.output_margin).stem,
         spec.formula_version, margin_diagnostic, margin_real_market,
     )
     write_artifact(
-        args.output_totals, "Measured Edge Totals", "measured-edge-totals-v2",
+        args.output_totals, "Measured Edge Totals", Path(args.output_totals).stem,
         spec.formula_version, totals_diagnostic, totals_real_market,
     )
 

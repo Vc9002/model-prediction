@@ -290,7 +290,7 @@ def refresh_if_due(
         result["park_factors"] = {"n_teams": len(factors), "date_range": [park_start, park_end]}
     if rates:
         update_league_rates_in_formula_spec(
-            project_root / "config/models/mlb-analyst-poisson-trend-v0.2.yaml", rates
+            project_root / "config/models/mlb-analyst-poisson-trend-v0.3.yaml", rates
         )
         if "league_relief_era" in rates:
             update_league_relief_era_in_bullpen_module(

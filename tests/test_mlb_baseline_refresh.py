@@ -240,7 +240,7 @@ def test_refresh_if_due_runs_when_forced_even_if_recent(tmp_path):
         ],
     )
     (data_root / "mlb_statsapi" / "game_snapshots.jsonl").write_text("", encoding="utf-8")
-    (project_root / "config/models/mlb-analyst-poisson-trend-v0.2.yaml").write_text(
+    (project_root / "config/models/mlb-analyst-poisson-trend-v0.3.yaml").write_text(
         "league_runs_per_team_game: 4.5\n", encoding="utf-8"
     )
     (project_root / "src/model_prediction/features/bullpen.py").write_text(

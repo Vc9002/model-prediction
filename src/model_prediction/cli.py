@@ -683,7 +683,7 @@ def _polymarket_slate(args, config) -> dict:
 
 def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, audit) -> dict:
     """Legacy Measured Edge research path retained as an explicit rollback."""
-    spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.2.yaml")
+    spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
     observed_at = utc_now()
     odds_api_key = os.getenv("THE_ODDS_API_KEY")
     odds_feed = MLBMarketOddsFeed(
@@ -696,8 +696,8 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
         args_date,
         ESPNMLBClient(),
         spec,
-        PROJECT_ROOT / "config/models/measured-edge-margin-v2.json",
-        PROJECT_ROOT / "config/models/measured-edge-totals-v2.json",
+        PROJECT_ROOT / "config/models/measured-edge-margin-v3.json",
+        PROJECT_ROOT / "config/models/measured-edge-totals-v3.json",
         observed_at,
         odds_feed,
     )
@@ -771,7 +771,7 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
     return {
         "sport": "mlb",
         "model_name": "Measured Edge Paired Models",
-        "model_versions": ["measured-edge-margin-v2", "measured-edge-totals-v2"],
+        "model_versions": ["measured-edge-margin-v3", "measured-edge-totals-v3"],
         "game_date": args_date,
         "scheduled_games": scheduled,
         "market_calls_created": len(candidates),
@@ -841,7 +841,7 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
     against is already the main/most-balanced line, not an alternate (see
     mlb_market_odds._select_full_game_market's `_market_balance`).
     """
-    spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.2.yaml")
+    spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
     observed_at = utc_now()
     odds_api_key = os.getenv("THE_ODDS_API_KEY")
     odds_feed = MLBMarketOddsFeed(
@@ -854,8 +854,8 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
         args_date,
         ESPNMLBClient(),
         spec,
-        PROJECT_ROOT / "config/models/measured-edge-margin-v2.json",
-        PROJECT_ROOT / "config/models/measured-edge-totals-v2.json",
+        PROJECT_ROOT / "config/models/measured-edge-margin-v3.json",
+        PROJECT_ROOT / "config/models/measured-edge-totals-v3.json",
         observed_at,
         odds_feed,
     )
@@ -927,7 +927,7 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
     return {
         "sport": "mlb_totals",
         "model_name": "Measured Edge Totals + Spread",
-        "model_versions": ["measured-edge-totals-v2", "measured-edge-margin-v2"],
+        "model_versions": ["measured-edge-totals-v3", "measured-edge-margin-v3"],
         "game_date": args_date,
         "scheduled_games": scheduled,
         "market_candidates": len(totals_candidates),

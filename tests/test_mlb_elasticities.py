@@ -29,7 +29,7 @@ factor_bounds:
   offense: [0.7, 1.4]
   starter_weakness: [0.5, 2.0]
 feature_schema_version: v3
-formula_version: mlb-analyst-poisson-trend-v0.2
+formula_version: mlb-analyst-poisson-trend-v0.3
 home_field_run_factor: 1.0
 league_runs_per_team_game: 4.5
 league_starter_era: 4.2
@@ -172,18 +172,22 @@ def test_fractional_elasticity_dampens_the_factors_swing(tmp_path):
     assert abs(dampened_swing) < abs(full_swing)
 
 
-def test_engine_version_rejects_the_un_promoted_v03_elasticity_refit() -> None:
-    """Real safety net verified by review 2026-08-02: ENGINE_VERSION is the
-    ONLY thing preventing config/models/mlb-analyst-poisson-trend-v0.3.yaml
-    (a real fitted-elasticity refit, materially different from what's
-    promoted -- e.g. bullpen_elasticity=0.069 vs. the promoted 0.0) from
-    loading live. This locks that rejection in so a future edit to
+def test_engine_version_rejects_the_retired_v02_hand_tuned_elasticities() -> None:
+    """P1-17 (2026-08-04): promoted mlb-analyst-poisson-trend-v0.3.yaml, a
+    real Poisson-GLM elasticity refit (scripts/mlb_elasticity_refit.py, held-out
+    correlation 0.10-0.16 across 4 chronological folds) over v0.2's hand-bumped
+    round-number elasticities (offense/starter_weakness/park=0.5, weather=0.3)
+    that were never fit against real outcomes. ENGINE_VERSION is the only thing
+    preventing the now-retired v0.2 formula from loading live -- this test
+    (successor to the 2026-08-02 test that asserted the opposite direction,
+    guarding v0.3 from ACCIDENTAL premature promotion before this deliberate
+    one) locks the rejection in for the retired file so a future edit to
     load_formula_spec's version check can't silently stop enforcing it.
     """
     from pathlib import Path
 
-    v03_path = Path("config/models/mlb-analyst-poisson-trend-v0.3.yaml")
-    if not v03_path.exists():
-        pytest.skip("mlb-analyst-poisson-trend-v0.3.yaml not present in this checkout")
+    v02_path = Path("config/models/mlb-analyst-poisson-trend-v0.2.yaml")
+    if not v02_path.exists():
+        pytest.skip("mlb-analyst-poisson-trend-v0.2.yaml not present in this checkout")
     with pytest.raises(ValueError, match="does not match the Trend Engine code"):
-        load_formula_spec(v03_path)
+        load_formula_spec(v02_path)

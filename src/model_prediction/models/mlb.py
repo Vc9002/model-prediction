@@ -25,9 +25,9 @@ import yaml
 from ..domain import MarketType
 from .base import ScoreSimulation
 
-ENGINE_VERSION = "mlb-analyst-poisson-trend-v0.2"
-MARGIN_MODEL_VERSION = "measured-edge-margin-v2"
-TOTALS_MODEL_VERSION = "measured-edge-totals-v2"
+ENGINE_VERSION = "mlb-analyst-poisson-trend-v0.3"
+MARGIN_MODEL_VERSION = "measured-edge-margin-v3"
+TOTALS_MODEL_VERSION = "measured-edge-totals-v3"
 
 # Backwards-compatible alias kept for artifact validation strings.
 MODEL_VERSION = ENGINE_VERSION

@@ -34,8 +34,10 @@ def refit():
 
 @pytest.fixture
 def spec(refit):
-    from model_prediction.models.mlb import load_formula_spec
-    return load_formula_spec(refit.BASE_SPEC_PATH)
+    # refit.load_formula_spec is aliased to load_formula_spec_unchecked
+    # (mlb_measured_edge_calibrate.py) -- BASE_SPEC_PATH is whatever formula
+    # this script refits FROM, not necessarily the live ENGINE_VERSION.
+    return refit.load_formula_spec(refit.BASE_SPEC_PATH)
 
 
 def _synthetic_row(event_id: str, game_date: str, away_score: int, home_score: int) -> dict:

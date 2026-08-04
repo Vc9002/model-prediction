@@ -169,6 +169,30 @@ models:
       totals:
         status: active_research
         diagnosis: absolute_run_environment_miss
+        # P1-17 (2026-08-04): promoted a real Poisson-GLM elasticity refit
+        # (mlb-analyst-poisson-trend-v0.3, scripts/mlb_elasticity_refit.py,
+        # held-out correlation 0.10-0.16 across 4 chronological folds against
+        # 1136 real completed games) replacing v0.2's hand-bumped round-number
+        # elasticities. This DID NOT resolve the totals miss: rebuilding
+        # measured-edge-totals-v3 against the new formula and the same 284-game
+        # diagnostic window shows correlation regressed slightly (0.0585->0.0414)
+        # and diagnostic hit rate/units fell (55.3%/+6.82u -> 52.9%/+0.73u).
+        # Directly checking the raw model's own selected-side split across the
+        # full diagnostic set (not just real, edge-gated logged picks) found it
+        # near-balanced in BOTH the old and new formula (~52-53% over either
+        # way) -- the previously-reported 71% over-pick figure could not be
+        # reproduced at this level, suggesting it reflects a smaller,
+        # higher-variance sample of real edge-gated picks rather than a
+        # structural property the raw model exhibits across all games. This is
+        # consistent with (and sharpens) the diagnosis below: elasticities
+        # govern each team's *relative* run differentiation, which helps
+        # margin/spread; totals needs the *absolute* run-environment signal
+        # this refit was never expected to supply on its own. Margin/spread
+        # DID improve, marginally but really: correlation 0.2057->0.208, hit
+        # rate 59.5%->60.0%, diagnostic units +39.36->+41.45 (see F-62,
+        # MASTER.md). Promoted per explicit operator directive (both markets
+        # share one Trend Engine simulation -- there is no way to promote
+        # margin's improvement without moving totals onto the same formula).
         experiments_in_order:
         - totals_specific_market_residual
         - branched_absolute_run_intensity_head
@@ -185,8 +209,12 @@ models:
     # these keys now point at that pipeline's actual artifacts instead of a
     # mismatched file, so a future consumer of this config key sees MLB's real
     # spread/total model rather than the generic cross-sport baseline.
-    spread_research_artifact: config/models/measured-edge-margin-v2.json
-    total_research_artifact: config/models/measured-edge-totals-v2.json
+    # P1-17 (2026-08-04): v2 -> v3, rebuilt against the promoted
+    # mlb-analyst-poisson-trend-v0.3 formula (both models share one Trend
+    # Engine simulation, so both artifacts move together). See the
+    # problem_cohorts.totals note above for the honest totals-specific result.
+    spread_research_artifact: config/models/measured-edge-margin-v3.json
+    total_research_artifact: config/models/measured-edge-totals-v3.json
   NBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
