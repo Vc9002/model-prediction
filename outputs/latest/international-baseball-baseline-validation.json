@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-08-04T03:59:14.997713Z",
+  "generated_at_utc": "2026-08-04T08:55:25.508711Z",
   "leagues": {
     "kbo": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/kbo-tie-aware-elo-v1.json",
-      "artifact_hash": "9e56194db0cb4052f62e925a99fed9f8225904734f86e31ce825ba388de80f0a",
+      "artifact_hash": "ed3011bd159f6231451a9fe0e125e5f3fe12152fa880d63d1c0f52c74fa66b4f",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0
@@ -11,8 +11,8 @@
       "chronological_split": {
         "locked_test": {
           "from_date": "2024-05-31",
-          "n": 1674,
-          "through_date": "2026-08-02"
+          "n": 1677,
+          "through_date": "2026-08-04"
         },
         "train": {
           "n": 3717,
@@ -33,17 +33,17 @@
       ],
       "locked_test": {
         "accuracy_decisive": 0.551724,
-        "brier_settlement": 0.240419,
+        "brier_settlement": 0.239999,
         "calls": 1624,
         "hits": 896,
-        "mae_settlement": 0.480285,
-        "observations": 1674,
-        "ties": 50,
+        "mae_settlement": 0.479552,
+        "observations": 1677,
+        "ties": 53,
         "units_at_minus_110": 86.545455
       },
       "model_state": "research",
       "model_version": "kbo-tie-aware-elo-v2",
-      "observations": 7053,
+      "observations": 7056,
       "parameter_selection_on_validation": [
         {
           "accuracy_decisive": 0.560662,
@@ -11542,12 +11542,12 @@
       "profitability": "not_established_no_point_in_time_market_prices",
       "promotion_eligible": false,
       "status": "ok",
-      "tie_rate": 0.024245,
+      "tie_rate": 0.02466,
       "units": 0
     },
     "npb": {
       "artifact": "/Users/vincentc9002/model prediction/config/models/npb-tie-aware-elo-v1.json",
-      "artifact_hash": "39905f6efd490fafdb7621bd543b18b8a310a59d4f7396f0104b378e99717485",
+      "artifact_hash": "bc4fda3fccd78fdc3bca8f7cc4fb910c9fcb1d51c5557416c7b46467f043e355",
       "chosen": {
         "home_advantage": 20.0,
         "k": 8.0

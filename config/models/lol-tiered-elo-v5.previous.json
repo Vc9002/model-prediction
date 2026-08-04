@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "c0f2a708ccc94d5696faff9ca4ff9d58f719424636136d100ed9404e22178026",
+  "artifact_hash": "3cad1698285ce067945fffa86d78b132eab6a11da046a54b1a9513fa3414e5e2",
   "confidence_threshold": 0.05,
   "home_or_order_advantage": 0.0,
   "initial_rating": 1500.0,
@@ -711,7 +711,7 @@
     "bo3:3:25006": 1515.155002
   },
   "schema_version": "esports-neutral-elo-v2",
-  "source_manifest_sha256": "c976cad35363600edee8801ae9a518147b069b55b1122bd483ae4598184ad56b",
+  "source_manifest_sha256": "6f52770707666b006eda7ff26dc050a6a0e0d88d56e3045651fc0c7017e5c523",
   "target": "best-of match/series winner",
   "title": "lol",
   "trained_through_utc": "2026-08-03T23:00:00Z",

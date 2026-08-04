@@ -3,7 +3,7 @@
     "from": "2024-01-01",
     "to": "2026-07-19"
   },
-  "extracted_at_utc": "2026-08-04T03:59:19.156459Z",
+  "extracted_at_utc": "2026-08-04T08:55:45.384327Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
@@ -17,8 +17,8 @@
     "teams": 84
   },
   "requested_window": {
-    "from": "2026-07-20",
-    "to": "2026-08-03"
+    "from": "2026-07-21",
+    "to": "2026-08-04"
   },
   "requires_api_key": false,
   "requires_signup": false,

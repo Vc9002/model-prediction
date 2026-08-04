@@ -51,40 +51,55 @@ class TeamBanList:
                 input_value = (
                     value.get("input", value.get("canonical_team_id")) if isinstance(value, dict) else value
                 )
-                try:
-                    team = self.registry.resolve(league, str(input_value))
-                except EntityResolutionError:
-                    self.audit_log.append(
-                        "ban_entry_unresolved",
-                        str(input_value),
-                        {"league": league.value, "input_alias": str(input_value)},
-                    )
-                    continue
                 reason = (
                     value.get("reason", "manual_governance")
                     if isinstance(value, dict)
                     else "manual_governance"
                 )
                 review_after = value.get("review_after") if isinstance(value, dict) else None
+                try:
+                    team = self.registry.resolve(league, str(input_value))
+                    canonical_id = team.canonical_team_id
+                    canonical_name = team.canonical_name
+                except EntityResolutionError:
+                    # Registry-free sport (esports, soccer, tennis, KBO, NPB) —
+                    # use the input string as the identifier.
+                    canonical_id = str(input_value)
+                    canonical_name = str(input_value)
                 entries.append(
                     BanEntry(
                         league,
-                        team.canonical_team_id,
-                        team.canonical_name,
+                        canonical_id,
+                        canonical_name,
                         str(input_value),
                         reason,
                         review_after,
                     )
                 )
-        return entries
+
+        # Remove the old duplicate append block after this.
+        _deduped: list[BanEntry] = []
+        seen: set[tuple[League, str]] = set()
+        for e in entries:
+            key = (e.league, e.canonical_team_id)
+            if key not in seen:
+                seen.add(key)
+                _deduped.append(e)
+        return _deduped
 
     def list(self) -> list[BanEntry]:
         return self._entries(self._load())
 
     def check(self, league: League | str, team_input: str) -> tuple[CanonicalTeam, bool]:
-        team = self.registry.resolve(League(league), team_input)
-        banned_ids = {entry.canonical_team_id for entry in self.list()}
-        return team, team.canonical_team_id in banned_ids
+        try:
+            team = self.registry.resolve(League(league), team_input)
+            banned_ids = {entry.canonical_team_id for entry in self.list()}
+            return team, team.canonical_team_id in banned_ids
+        except EntityResolutionError:
+            # Registry-free sports (esports, soccer, tennis, KBO, NPB) use
+            # name-based PlaceholderTeam objects — fall back to matching the
+            # raw team_input string against ban config entries.
+            return _registry_free_check(League(league), team_input, self.list())
 
     def add(
         self,
@@ -205,3 +220,22 @@ class TeamBanList:
             if os.path.exists(temporary):
                 os.unlink(temporary)
             raise
+
+
+def _registry_free_check(
+    league: League, team_input: str, entries: list[BanEntry]
+) -> tuple[CanonicalTeam, bool]:
+    """Check a ban for registry-free sports (esports, soccer, tennis, KBO, NPB).
+
+    These sports use name-based PlaceholderTeam objects that cannot be
+    resolved through EntityRegistry — match against the raw team_input
+    string and the configured_input field on BanEntry instead.
+    """
+    from .entities import PlaceholderTeam
+
+    team = PlaceholderTeam(team_input, league)
+    team_input_lower = team_input.strip().casefold()
+    for entry in entries:
+        if entry.league == league and entry.configured_input.strip().casefold() == team_input_lower:
+            return team, True
+    return team, False

@@ -153,15 +153,16 @@ def merge_availability_sources(
     espn_snapshot: Mapping[str, Any] | None,
     *,
     game_date: str,
-    conflict_policy: str = "most_conservative",
+    conflict_policy: str = "fail_closed",
 ) -> dict[str, Any]:
-    """Merge explicit ESPN statuses into the official report without hiding conflicts.
+    """Merge explicit ESPN statuses into the official report; fail closed on conflicts.
 
     An omission is not an explicit Available status, so a timestamped ESPN Out
     fills it. Two explicit, different statuses are a source conflict and force
-    the downstream forecast to fail closed by default. ``most_conservative``
-    exists only for labeled research sensitivity and selects the lower active
-    probability while preserving the conflict in metadata.
+    the downstream forecast to fail closed.  ``most_conservative`` exists
+    only for labeled research sensitivity and selects the lower active
+    probability while preserving the conflict in metadata — it must be
+    explicitly requested; the default is fail_closed.
     """
     if conflict_policy not in {"fail_closed", "most_conservative"}:
         raise ValueError(f"unknown availability conflict policy: {conflict_policy}")

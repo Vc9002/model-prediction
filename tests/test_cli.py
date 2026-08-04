@@ -511,58 +511,6 @@ def test_soccer_gated_and_main_blocked_when_either_team_lacks_real_history(monke
     assert len(research.appended) == 1
 
 
-def test_flat_forecast_replace_today_clears_soccer_research_gated_main_symmetrically(
-    monkeypatch, tmp_path
-) -> None:
-    """Real gap fixed 2026-08-02: flat-forecast's replace_today only ever
-    cleared flat_ledger before this fix. Soccer now writes research/gated/
-    main together with flat on every command variant (main+flat and
-    research+gated are each a pair -- see _forecast_soccer_sport's
-    docstring), so a second same-day flat-forecast run duplicated every
-    soccer row in the three ledgers that never got cleared -- only flat
-    stayed deduped.
-
-    Note: this replicates the same clear-then-forecast sequence cli.py's
-    dispatch runs, proving the pattern itself is idempotent -- it does not
-    invoke main()/argparse (no test in this suite does), so it won't catch a
-    future regression in the dispatch's own branch condition. That condition
-    (`elif replace_today and log and is_flat and "soccer" in {...}:` in
-    cli.py) was verified by direct reading, not by this test alone."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
-    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
-    config = _soccer_config(status="shadow_qualified", min_edge=0.02)
-    research = PickLedger(tmp_path / "research" / "soccer.xlsx")
-    gated = PickLedger(tmp_path / "gated_research" / "soccer.xlsx")
-    flat = PickLedger(tmp_path / "flat_picks.xlsx")
-    main = PickLedger(tmp_path / "picks.xlsx")
-
-    def run_one_flat_forecast_cycle() -> None:
-        # Mirrors cli.py's `elif replace_today and log and is_flat and
-        # "soccer" in {...}:` branch exactly: clear research/gated/main,
-        # clear flat (the pre-existing is_flat branch), then forecast.
-        _clear_today_open(research, "2026-07-27", by_event_date=True)
-        _clear_today_open(gated, "2026-07-27", by_event_date=True)
-        _clear_today_open(main, "2026-07-27", by_event_date=True)
-        _clear_today_open(flat, "2026-07-27", by_event_date=True)
-        cli._forecast_soccer_sport(
-            data_root="unused",
-            args_date="2026-07-27",
-            config=config,
-            research_ledger=research,
-            gated_ledger=gated,
-            flat_ledger=flat,
-            main_ledger=main,
-        )
-
-    run_one_flat_forecast_cycle()
-    run_one_flat_forecast_cycle()
-
-    assert len(research.rows()) == 1
-    assert len(gated.rows()) == 1
-    assert len(flat.rows()) == 1
-    assert len(main.rows()) == 1
-
-
 def test_soccer_logging_failure_is_recorded_not_silently_discarded(monkeypatch) -> None:
     """A per-contract ValueError (malformed event_start_utc) must be
     recorded in the forecast's errors list, not silently swallowed by the
@@ -750,6 +698,69 @@ def _tennis_config(*, status: str, min_edge: float = 0.05) -> dict:
         },
         "bankroll": {},
     }
+
+
+@pytest.mark.parametrize(
+    "sport, build_slate_target, forecast_fn_name, forecast_fixture, config_fixture",
+    [
+        ("soccer", "build_soccer_total_slate", "_forecast_soccer_sport", _soccer_forecast, _soccer_config),
+        ("tennis", "build_tennis_slate", "_forecast_tennis_sport", _tennis_forecast, _tennis_config),
+    ],
+)
+def test_replace_today_clears_the_ledger_the_other_command_variant_writes(
+    monkeypatch, tmp_path, sport, build_slate_target, forecast_fn_name, forecast_fixture, config_fixture
+) -> None:
+    """Soccer and tennis are the two DUAL_LEDGER_SPORTS -- their forecast
+    functions write BOTH main_ledger and flat_ledger unconditionally
+    whenever log=True, regardless of which command ran. Real gap fixed
+    2026-08-02 for soccer only, then found still open for tennis (never
+    added to the special case) and for the *symmetric* direction (a
+    non-flat `forecast --sport soccer --log` run duplicating Flat rows,
+    since only `flat-forecast` ever cleared the other ledger) on 2026-08-04.
+
+    Covers both directions: an is_flat cycle followed by a non-flat cycle
+    must not duplicate Main rows, and vice versa must not duplicate Flat
+    rows -- for both soccer and tennis.
+
+    Note: this replicates the exact clear-then-forecast sequence cli.py's
+    dispatch runs (using the real DUAL_LEDGER_SPORTS constant, not a
+    hardcoded set), proving the pattern itself is idempotent -- it does not
+    invoke main()/argparse (no test in this suite does), so it won't catch a
+    future regression in the dispatch's own branch structure independent of
+    this constant."""
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli, build_slate_target, lambda **kwargs: forecast_fixture())
+    config = config_fixture(status="shadow_qualified", min_edge=0.02)
+    flat = PickLedger(tmp_path / "flat_picks.xlsx")
+    main = PickLedger(tmp_path / "picks.xlsx")
+    forecast_fn = getattr(cli, forecast_fn_name)
+    assert sport in cli.DUAL_LEDGER_SPORTS
+
+    def run_one_cycle(*, is_flat: bool) -> None:
+        # Mirrors cli.py's dispatch exactly: is_flat clears flat_ledger
+        # unconditionally then main_ledger via the dual_ledger_sports elif;
+        # non-flat clears main_ledger unconditionally then flat_ledger via
+        # the dual_ledger_sports branch inside the research if-block.
+        if is_flat:
+            _clear_today_open(flat, "2026-07-27", by_event_date=True)
+            _clear_today_open(main, "2026-07-27", by_event_date=True, leagues={sport})
+        else:
+            _clear_today_open(main, "2026-07-27", by_event_date=True)
+            _clear_today_open(flat, "2026-07-27", by_event_date=True, leagues={sport})
+        forecast_fn(
+            data_root="unused",
+            args_date="2026-07-27",
+            config=config,
+            flat_ledger=flat,
+            main_ledger=main,
+        )
+
+    run_one_cycle(is_flat=True)
+    run_one_cycle(is_flat=False)
+    run_one_cycle(is_flat=True)
+
+    assert len(flat.rows()) == 1
+    assert len(main.rows()) == 1
 
 
 def test_tennis_logging_failure_is_recorded_not_silently_discarded(monkeypatch) -> None:

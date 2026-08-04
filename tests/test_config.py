@@ -163,17 +163,18 @@ def test_configured_production_artifact_state_matches_locked_audit() -> None:
         assert artifact.qualified is qualified
 
 
-def test_mlb_v7_reports_its_real_holdout_shortfall() -> None:
-    """MLB v7 (2026-07-30) replaced v6's contaminated probable_starter_era_gap
-    experiment with a real walk-forward fit on the full historical dataset
-    (3784 train / 1076 validation / 1370 locked-holdout games), using only
-    point-in-time-safe features (elo_probability, trend_gap, park_factor,
-    weather_factor, pitcher_era_gap, bullpen_fatigue_gap -- no ESPN live
-    probables). It is honestly unqualified on real numbers, not contaminated:
-    58.0% locked-holdout hit rate is genuinely below this project's 60% bar,
-    and April 2026 was a real losing month. This test pins that real shortfall
-    so a future re-evaluation can't silently mark it qualified without the
-    underlying numbers actually clearing the bar.
+def test_mlb_v8_is_honestly_unqualified_despite_clearing_holdout() -> None:
+    """MLB v8 (2026-08-04) replaced v7's pitcher_era_gap (team-level rolling
+    runs-allowed) with starter_era_gap (real per-starter rolling ERA from
+    mlb_statsapi boxscore history, features/starter_history.py), via a real
+    walk-forward test matching v7's own methodology. Unlike v7 (58.0%
+    locked-holdout, genuinely below the 60% bar), v8's locked-holdout DOES
+    clear this project's 60%/50-call bar on its own -- but validation Brier
+    regressed vs the incumbent feature set it replaced, the exact "peek at
+    holdout" pattern docs/AGENTS.md's promotion rule exists to catch. This
+    test pins that real, honest state (meets holdout metrics, still
+    correctly marked unqualified) so a future re-evaluation can't silently
+    read "meets_primary_holdout_metrics: true" as "cleared the real bar."
     """
     config = load_config()
     artifact_path = PROJECT_ROOT / config["models"]["MLB"]["production_artifact"]
@@ -181,7 +182,11 @@ def test_mlb_v7_reports_its_real_holdout_shortfall() -> None:
     # yaml.safe_load also parses JSON (a strict subset); avoids a second import.
     qualification = raw["qualification"]
     assert qualification["qualified"] is False
-    assert qualification["meets_primary_holdout_metrics"] is False
-    assert qualification["hit_rate"] < 0.60
-    assert not any("CONTAMINATED_FEATURE" in failure for failure in qualification["failures"])
-    assert "probable_starter_era_gap" not in raw["market_models"]["moneyline"]["feature_names"]
+    assert qualification["meets_primary_holdout_metrics"] is True
+    assert qualification["hit_rate"] >= 0.60
+    assert qualification["validation_brier_score"] > qualification["brier_score"]
+    assert any(
+        "validation Brier regressed" in failure for failure in qualification["failures"]
+    )
+    assert "starter_era_gap" in raw["market_models"]["moneyline"]["feature_names"]
+    assert "pitcher_era_gap" not in raw["market_models"]["moneyline"]["feature_names"]

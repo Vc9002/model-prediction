@@ -204,6 +204,36 @@ def test_as_dict_includes_core_and_feature_attribution_fields() -> None:
     assert isinstance(payload["correlation_tags"], list)
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap",
+        "park_factor",
+        "weather_factor",
+        "pitcher_era_gap",
+        "probable_starter_era_gap",
+        "bullpen_weakness_gap",
+        "market_residual_probability",
+    ],
+)
+def test_as_dict_serializes_every_diagnostic_feature_field(field) -> None:
+    """Real, recurring bug class (pitcher_era_gap until 2026-07-25;
+    defensive_trend_gap and bullpen_weakness_gap until 2026-08-04): a field
+    can exist on PickRequest, have a reserved ledger.py column, and be
+    correctly populated by a caller -- and still end up permanently blank in
+    every real pick if as_dict() (domain.py) never lists it. defensive_trend_gap
+    is an active NBA/WNBA v4 moneyline feature and bullpen_weakness_gap is an
+    active MLB v7 moneyline feature, so this isn't cosmetic -- it silently
+    blinded the audit trail for what a live model artifact actually scored
+    on. Parametrized over every diagnostic field so a future addition that
+    misses as_dict() fails loudly here instead of shipping unnoticed."""
+    payload = _request(**{field: 0.4242}).as_dict()
+    assert field in payload, f"{field} missing from PickRequest.as_dict()"
+    assert payload[field] == 0.4242
+
+
 def test_model_state_defaults_to_research() -> None:
     request = _request()
     assert request.model_state is ModelState.RESEARCH

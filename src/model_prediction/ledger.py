@@ -186,6 +186,11 @@ FIELDNAMES = [*LEGACY_FIELDNAMES,
     "unavailable_features",
     "defensive_trend_gap",
     "neutral_elo_rating_difference",
+    # Active MLB v7 moneyline feature (features/bullpen.py); column existed
+    # nowhere until 2026-08-04 -- see PickRequest.bullpen_weakness_gap's
+    # comment for why this was silently blank on every real pick since v7
+    # shipped 2026-07-30.
+    "bullpen_weakness_gap",
     # Schedule / roadmap challenger feature columns
     "rest_disparity",
     "back_to_back_gap",
@@ -298,6 +303,18 @@ class PickLedger:
         self.research_score_units = research_score_units
         self.research_scoring_mode = research_scoring_mode
         self.research_scoring_note = research_scoring_note
+
+    @contextmanager
+    def lock_exclusive(self) -> Iterator[None]:
+        """Hold the ledger file lock across exposure-sensitive operations.
+
+        Use this when you need to read-ed-check-append as one atomic step
+        (e.g. reading current exposure, verifying caps, then appending a
+        new pick).  The daily pipeline already serializes via daily_lock,
+        but manual CLI re-runs can race without this.
+        """
+        with self._lock():
+            yield
 
     @contextmanager
     def _lock(self) -> Iterator[None]:

@@ -107,6 +107,7 @@ from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError
 from .main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from .mlb_baseline_refresh import refresh_if_due
 from .models import MODEL_SPECS
+from .models.registry import model_spec
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
 from .models.mlb import load_formula_spec
 from .research_ledgers import (
@@ -126,6 +127,14 @@ ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant", "rainbow_six")
 DAILY_LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl")
 DAILY_INTERNATIONAL_BASEBALL_SPORTS = ("kbo", "npb")
 FLAT_LEDGER_SPORTS = DAILY_LEARNED_SPORTS
+# Sports whose _forecast_*_sport function writes BOTH main_ledger and
+# flat_ledger unconditionally whenever log=True, regardless of which command
+# (forecast/log vs. flat-forecast) ran -- every other sport only ever writes
+# the one ledger matching is_flat. Any single-sport replace_today re-run must
+# clear the *other* ledger too for sports in this set, or a second same-day
+# run of the other command duplicates that sport's rows there (see the
+# dual_ledger_sports handling in the forecast/log/flat-forecast dispatch).
+DUAL_LEDGER_SPORTS = frozenset({"soccer", "tennis"})
 RESEARCH_ONLY_DAILY_SPORTS = (
     "soccer",
     "tennis",
@@ -1224,6 +1233,7 @@ def _forecast_learned_sport(
                 weather_factor=candidate.feature_basis.get("weather_factor"),
                 pitcher_era_gap=candidate.feature_basis.get("pitcher_era_gap"),
                 probable_starter_era_gap=candidate.feature_basis.get("probable_starter_era_gap"),
+                bullpen_weakness_gap=candidate.feature_basis.get("bullpen_weakness_gap"),
                 market_residual_probability=market_residual_probability,
                 unavailable_features=(
                     ",".join(row_unavailable_features)
@@ -2876,7 +2886,7 @@ def main(argv: list[str] | None = None) -> None:
             }
             output = ledger.report(filters, by_odds_range=args.by_odds_range)
         elif args.command == "models":
-            output = {league.value: asdict(spec) for league, spec in MODEL_SPECS.items()}
+            output = {league.value: asdict(model_spec(league)) for league in MODEL_SPECS}
         elif args.command == "summary":
             output = _summary(config, ledger)
         elif args.command == "live-portfolio":
@@ -2975,6 +2985,23 @@ def main(argv: list[str] | None = None) -> None:
             elif replace_today and log:
                 _clear_today_open(ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
             data_directory = Path(ledger_path(config)).parent
+            # Soccer and tennis are the two sports whose forecast functions
+            # write BOTH main_ledger and flat_ledger unconditionally whenever
+            # `log` is true, regardless of which command ran (see
+            # _forecast_soccer_sport/_forecast_tennis_sport call sites below:
+            # `main_ledger=(ledger if log else None), flat_ledger=(flat_ledger
+            # if log else None)`) -- every other sport only ever writes the
+            # one ledger matching is_flat. The is_flat/not-is_flat branches
+            # above only clear the ledger matching the command that ran, so
+            # without this, a second same-day run of the *other* command
+            # (`forecast --sport soccer --log` after an earlier `flat-forecast`,
+            # or vice versa) duplicates that sport's rows in the ledger this
+            # run doesn't otherwise touch. Originally patched for soccer only
+            # (2026-08-03) after it was caught duplicating Main rows; tennis
+            # was added to Main+Flat the same day but missed this fix, and the
+            # symmetric non-flat-run-duplicates-Flat gap was never covered for
+            # either sport.
+            dual_ledger_sports = {s.casefold() for s in sports} & DUAL_LEDGER_SPORTS
             if replace_today and log and not is_flat:
                 selected_research_sports = (
                     RESEARCH_LEDGER_SPORTS
@@ -2996,21 +3023,20 @@ def main(argv: list[str] | None = None) -> None:
                         args.date,
                         by_event_date=True,
                     )
-            elif replace_today and log and is_flat and "soccer" in {s.casefold() for s in sports}:
-                # Soccer's main ledger gets written together with flat
-                # regardless of which command ran (constructed unconditionally
-                # above) -- clearing only flat_ledger in the is_flat branch
-                # while leaving main untouched means a second same-day
-                # flat-forecast run duplicates every soccer row there. Every
-                # other flat-forecast sport only ever writes flat_ledger, so
-                # this stays soccer-specific rather than blanket-applied.
-                # NOTE: soccer's research/gated ledgers stopped being written
-                # to entirely as of the 2026-08-03 Main+Flat-only directive
-                # (RESEARCH_LEDGER_SPORTS no longer includes "soccer") -- this
-                # used to also clear those two files, but research_ledger()
+                if dual_ledger_sports:
+                    _clear_today_open(
+                        flat_ledger, args.date, by_event_date=True, leagues=dual_ledger_sports
+                    )
+            elif replace_today and log and is_flat and dual_ledger_sports:
+                # NOTE: soccer/tennis's research/gated ledgers stopped being
+                # written to entirely as of the 2026-08-03 Main+Flat-only
+                # directive (RESEARCH_LEDGER_SPORTS no longer includes either)
+                # -- this used to also clear those files, but research_ledger()
                 # now raises ValueError for a sport outside RESEARCH_LEDGER_SPORTS,
                 # so clearing them here would crash rather than no-op. Removed.
-                _clear_today_open(ledger, args.date, by_event_date=True, leagues={"soccer"})
+                _clear_today_open(
+                    ledger, args.date, by_event_date=True, leagues=dual_ledger_sports
+                )
             results = {}
             for sport in sports:
                 if sport == "esports":
@@ -3281,14 +3307,52 @@ def main(argv: list[str] | None = None) -> None:
                         "MLB availability capture failed for %s", args.date, exc_info=True
                     )
                     mlb_availability_result = {"status": "error"}
-            with ThreadPoolExecutor(max_workers=6) as io_pool:
+            mlb_starter_snapshot_result: dict[str, Any] = {"status": "skipped"}
+            def _capture_mlb_starter_snapshots():
+                # Keeps data/mlb_statsapi/game_snapshots.jsonl current --
+                # features/starter_history.py's live starter_era_gap provider
+                # (added 2026-08-04) reads real per-starter innings/earned-runs
+                # history from this file. Before this capture step existed,
+                # the file was a one-time static dump (last refreshed
+                # 2026-07-20) that would have gone stale the instant a live
+                # provider started depending on it -- same silent-staleness
+                # bug class as the NPB destructive-overwrite incident.
+                # 3-day lookback (not just yesterday) so one skipped/failed
+                # run auto-heals on the next, matching the historical-game
+                # ingestion step's own reasoning above.
+                nonlocal mlb_starter_snapshot_result
+                try:
+                    from .data_sources.mlb_statsapi import MLBStatsAPIClient, collect_game_snapshots
+                    lookback_start = (
+                        datetime.fromisoformat(args.date).date() - timedelta(days=3)
+                    ).isoformat()
+                    result = collect_game_snapshots(
+                        MLBStatsAPIClient(),
+                        lookback_start,
+                        args.date,
+                        data_root / "mlb_statsapi" / "game_snapshots.jsonl",
+                        progress_every=0,
+                    )
+                    mlb_starter_snapshot_result = {
+                        "status": "captured",
+                        "scheduled": result.scheduled,
+                        "written": result.written,
+                        "skipped": len(result.skipped),
+                    }
+                except Exception:
+                    logger.warning(
+                        "MLB starter snapshot capture failed for %s", args.date, exc_info=True
+                    )
+                    mlb_starter_snapshot_result = {"status": "error"}
+            with ThreadPoolExecutor(max_workers=7) as io_pool:
                 f0 = io_pool.submit(_polymarket_slate, slate_args, config)
                 f1 = io_pool.submit(_capture_wnba)
                 f2 = io_pool.submit(_build_priors)
                 f3 = io_pool.submit(_collect_soccer)
                 f4 = io_pool.submit(_capture_mlb_probables)
                 f5 = io_pool.submit(_capture_mlb_availability)
-                for f in (f1, f2, f3, f4, f5):
+                f6 = io_pool.submit(_capture_mlb_starter_snapshots)
+                for f in (f1, f2, f3, f4, f5, f6):
                     f.result()  # Wait for all, surface exceptions
                 try:
                     slate = f0.result()
@@ -3661,6 +3725,7 @@ def main(argv: list[str] | None = None) -> None:
                     "priors": wnba_priors_result,
                 },
                 "step5c_mlb_availability": mlb_availability_result,
+                "step5d_mlb_starter_snapshots": mlb_starter_snapshot_result,
                 "step6_flat_forecast_and_log": flat_result,
                 "step7_flat_settlement": flat_settlement,
                 "step8_research_settlement": _research_settlement,

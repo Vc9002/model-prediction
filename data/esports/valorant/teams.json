@@ -5123,6 +5123,13 @@
     "source_team_id": 24843,
     "team_id": "bo3:2:24843"
   },
+  "bo3:2:24844": {
+    "acronym": "REV",
+    "name": "Revitalize GC",
+    "slug": "revitalize-gc",
+    "source_team_id": 24844,
+    "team_id": "bo3:2:24844"
+  },
   "bo3:2:24845": {
     "acronym": "HIM",
     "name": "HIMMERS",

@@ -177,10 +177,10 @@ class Ingestor:
                 key = str(game.get("event_id"))
                 if key in existing:
                     continue
-                existing.add(key)
                 line = json.dumps(game, sort_keys=True, separators=(",", ":")) + "\n"
                 processed_handle.write(line)
                 historical_handle.write(line)
+                existing.add(key)
                 appended += 1
         return appended
 

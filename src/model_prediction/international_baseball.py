@@ -12,6 +12,7 @@ observations and require exact team identity plus a current executable ask.
 
 from __future__ import annotations
 
+import logging
 import hashlib
 import html
 import json
@@ -24,6 +25,8 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from .domain import eastern_today
 from .features.elo_ratings import expected_win_probability
@@ -151,7 +154,8 @@ def parse_kbo_rows(payload: dict[str, Any], year: int) -> list[dict[str, Any]]:
         try:
             away_score, home_score = int(values[vs_index - 1]), int(values[vs_index + 1])
             away_id, home_id = lookup[away_name], lookup[home_name]
-        except (KeyError, ValueError):
+        except (KeyError, ValueError) as exc:
+            logger.debug("KBO/NPB scraper: skipping row with unparseable score or unknown team: %s", exc)
             continue
         relay = next((str(cell.get("Text") or "") for cell in cells if cell.get("Class") == "relay"), "")
         game_match = _KBO_GAME_ID_RE.search(relay)

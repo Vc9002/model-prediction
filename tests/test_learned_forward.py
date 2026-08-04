@@ -1,6 +1,8 @@
 import json
 from datetime import UTC, datetime
 
+import pytest
+
 from model_prediction import learned_forward
 from model_prediction.data_sources import espn_probables
 from model_prediction.features.base import FeatureStore
@@ -23,10 +25,22 @@ class FakeESPN:
                                 {
                                     "homeAway": "away",
                                     "team": {"displayName": "Away Team"},
+                                    "probables": [
+                                        {
+                                            "name": "probableStartingPitcher",
+                                            "athlete": {"displayName": "Away Pitcher Name"},
+                                        }
+                                    ],
                                 },
                                 {
                                     "homeAway": "home",
                                     "team": {"displayName": "Home Team"},
+                                    "probables": [
+                                        {
+                                            "name": "probableStartingPitcher",
+                                            "athlete": {"displayName": "Home Pitcher Name"},
+                                        }
+                                    ],
                                 },
                             ]
                         }
@@ -115,13 +129,18 @@ def test_unqualified_artifact_can_only_create_research_observation(tmp_path) -> 
     assert candidates[0].action == "QUALIFIED_SHADOW_CALL"  # All calls treated equally; user decides
 
 
-def test_pitcher_gap_served_from_history_and_starter_gap_fails_closed(
+def test_pitcher_gap_served_from_history_and_starter_gap_defaults_neutral_when_unresolved(
     tmp_path, monkeypatch
 ) -> None:
     """Train/serve unification: pitcher_era_gap is the shared rolling
     runs-allowed gap computed from cached history (never an ESPN starter
-    lookup), and an artifact requiring starter_era_gap — which has no valid
-    forward source — fails closed instead of silently serving 0.0."""
+    lookup). starter_era_gap (real live provider added 2026-08-04, see
+    features/starter_history.py) must default to neutral 0.0 + an
+    unavailable-features note when its underlying mlb_statsapi history is
+    unresolvable, exactly matching validation.py's own training-time
+    fallback for the identical case (_load_starter_era_map.get(event_id,
+    0.0)) -- never fail the whole game closed, which would silently
+    diverge live behavior from what was actually walk-forward validated."""
     _write_history(tmp_path)
     artifact_path = tmp_path / "artifact.json"
     artifact = build_artifact(
@@ -188,10 +207,102 @@ def test_pitcher_gap_served_from_history_and_starter_gap_fails_closed(
 
     learned_forward._FEATURE_PROVIDERS.clear()
     assert scheduled == 1
-    assert candidates == []
-    assert skipped == [
-        {"event_id": "future-1", "reason": "moneyline missing learned features: ['starter_era_gap']"}
+    assert skipped == []  # neutral default, not a skip
+    assert len(candidates) == 1
+    assert candidates[0].feature_basis["starter_era_gap"] == 0.0
+    assert "NO_CALL_STARTER_ERA_GAP" in candidates[0].unavailable_features[0]
+
+
+def test_starter_era_gap_served_live_from_real_matching_starter_history(tmp_path, monkeypatch) -> None:
+    """The other side of the fallback test above: when both confirmed
+    starters DO have resolvable real history, starter_era_gap must compute
+    the real value (features/starter_history.py), not the neutral default —
+    proving the end-to-end wiring (ESPN probable name -> mlb_statsapi
+    snapshot lookup -> _compute_features) actually works, not just that it
+    fails safe when it can't."""
+    _write_history(tmp_path)
+    snapshot_path = tmp_path / "mlb_statsapi_snapshots.jsonl"
+
+    def _start(date_str, player_id, name, side, earned_runs):
+        other = "away" if side == "home" else "home"
+        return {
+            "game_start_utc": date_str,
+            side: {
+                "team_name": "X",
+                "pitcher_order": [player_id],
+                "players": [
+                    {
+                        "player_id": player_id,
+                        "name": name,
+                        "pitching": {"inningsPitched": "6.0", "earnedRuns": earned_runs},
+                    }
+                ],
+            },
+            other: {"team_name": "Y", "pitcher_order": [], "players": []},
+        }
+
+    # Home starter: 1 ER/start (ERA 1.5). Away starter: 4 ER/start (ERA 6.0).
+    # gap = home - away = 1.5 - 6.0 = -4.5 -- unambiguously a real computed
+    # value, not the 0.0 neutral fallback the test above already covers.
+    rows = [
+        _start(f"2026-05-{d:02d}T18:00:00Z", 1, "Home Pitcher Name", "home", 1) for d in (1, 8, 15)
+    ] + [
+        _start(f"2026-05-{d:02d}T18:00:00Z", 2, "Away Pitcher Name", "away", 4) for d in (1, 8, 15)
     ]
+    snapshot_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    # starter_era_gap_live's snapshot_path default is bound at function-
+    # definition time, not looked up dynamically -- patching the module
+    # constant alone doesn't reach a call that omits snapshot_path=, so
+    # patch the name learned_forward's own `from ... import` binding
+    # points at instead, forcing the real function to always use this
+    # test's isolated path.
+    from model_prediction.features import starter_history
+    starter_history._STARTER_INDEX_CACHE.clear()
+    real_starter_era_gap_live = starter_history.starter_era_gap_live
+    monkeypatch.setattr(
+        learned_forward,
+        "starter_era_gap_live",
+        lambda home, away, decision: real_starter_era_gap_live(
+            home, away, decision, snapshot_path=snapshot_path
+        ),
+    )
+
+    artifact_path = tmp_path / "artifact.json"
+    artifact = build_artifact(
+        sport="mlb",
+        model_version="mlb-starter-era-live-test",
+        market_models={
+            "moneyline": {
+                "feature_names": ["starter_era_gap"],
+                "coefficients": [-1.0],
+                "intercept": 3.0,
+                "confidence_threshold": 0.8,
+                "positive_class": "home",
+            }
+        },
+        training={"market_inputs_used": False},
+        qualification={"qualified": False},
+    )
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+    learned_forward._FEATURE_PROVIDERS.clear()
+    learned_forward._slate_cache.clear()
+
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="mlb",
+        game_date="2026-07-17",
+        store=FeatureStore(tmp_path),
+        client=FakeESPN(),
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
+    )
+
+    learned_forward._FEATURE_PROVIDERS.clear()
+    assert scheduled == 1
+    assert skipped == []
+    assert len(candidates) == 1
+    assert candidates[0].feature_basis["starter_era_gap"] == pytest.approx(-4.5)
+    assert candidates[0].unavailable_features == ()
 
 
 def test_bullpen_weakness_gap_served_live_from_real_relief_functions(tmp_path, monkeypatch) -> None:

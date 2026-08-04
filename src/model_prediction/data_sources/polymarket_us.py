@@ -184,13 +184,29 @@ class PolymarketUSClient:
         response.raise_for_status()
         return response.json()
 
-    def events(self, league: str, limit: int = 200) -> list[dict[str, Any]]:
+    def events(self, league: str, limit: int = 500) -> list[dict[str, Any]]:
+        """Fetch all events for a league, paginating until exhaustion.
+
+        The Polymarket Gamma API returns at most *limit* events per page.
+        When we receive fewer than the requested limit we have reached the
+        last page and stop.
+        """
         slug = LEAGUE_SLUGS[league.upper()]
-        payload = self._get(
-            f"/v2/leagues/{slug}/events",
-            {"limit": limit, "section": "general", "type": "sport"},
-        )
-        return payload.get("events", [])
+        all_events: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            payload = self._get(
+                f"/v2/leagues/{slug}/events",
+                {"limit": limit, "offset": offset, "section": "general", "type": "sport"},
+            )
+            page = payload.get("events", [])
+            if not page:
+                break
+            all_events.extend(page)
+            if len(page) < limit:
+                break
+            offset += limit
+        return all_events
 
     def slate(
         self,

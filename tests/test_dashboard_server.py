@@ -1349,6 +1349,158 @@ def test_pick_quote_freezes_last_valid_pregame_price(monkeypatch, tmp_path: Path
     assert quote["seconds_before_start"] == 213
 
 
+def _mlb_slate_snapshots(day: str, event_start: str) -> list[dict]:
+    """Two real games' worth of spread/total snapshots, both using the same
+    -1.5 spread line and the same 8.5 total line -- deliberately shaped to
+    reproduce the cross-game collision bug found 2026-08-04 while building
+    this matching: without an event-identity check, a row for one game
+    would match the OTHER game's snapshot purely because the line negation
+    happened to line up."""
+    base = {
+        "market_state": "MARKET_STATE_OPEN",
+        "event_start_utc": event_start,
+        "observed_at_utc": "2026-08-04T05:15:55Z",
+        "timestamp_valid": True,
+    }
+    return [
+        {
+            **base,
+            "market_type": "spread",
+            "market_slug": "asc-mlb-lad-chc-2026-08-04-neg-1pt5",
+            "event_title": "Los Angeles Dodgers vs. Chicago Cubs",
+            "team": "Los Angeles Dodgers",
+            "line": -1.5,
+            "long": {"description": "-1.50", "ask": 0.56},
+            "short": {"description": "+1.50", "ask": 0.46},
+        },
+        {
+            **base,
+            "market_type": "spread",
+            "market_slug": "asc-mlb-min-kc-2026-08-04-pos-1pt5",
+            "event_title": "Minnesota Twins vs. Kansas City Royals",
+            "team": "Minnesota Twins",
+            "line": 1.5,
+            "long": {"description": "+1.50", "ask": 0.60},
+            "short": {"description": "-1.50", "ask": 0.42},
+        },
+        {
+            **base,
+            "market_type": "total",
+            "market_slug": "tsc-mlb-lad-chc-2026-08-04-8pt5",
+            "event_title": "Los Angeles Dodgers vs. Chicago Cubs",
+            "team": None,
+            "line": 8.5,
+            "long": {"description": "Over", "ask": 0.51},
+            "short": {"description": "Under", "ask": 0.53},
+        },
+        {
+            **base,
+            "market_type": "total",
+            "market_slug": "tsc-mlb-min-kc-2026-08-04-8pt5",
+            "event_title": "Minnesota Twins vs. Kansas City Royals",
+            "team": None,
+            "line": 8.5,
+            "long": {"description": "Over", "ask": 0.58},
+            "short": {"description": "Under", "ask": 0.44},
+        },
+    ]
+
+
+def test_pick_quote_matches_the_exact_spread_line_and_team(monkeypatch, tmp_path: Path) -> None:
+    """Real bug fixed 2026-08-04: _pick_quote was moneyline-only, so every
+    real, sized MLB spread pick returned None ("no exact executable
+    Polymarket US market mapping") even when the live market genuinely
+    existed. Row picks the SHORT side (Cubs, the opponent of the market's
+    own team/line: Dodgers -1.5 means Cubs is +1.5, row.line stores that
+    selection-relative +1.5)."""
+    day = "2026-08-04"
+    event_start = "2026-08-05T00:05:00Z"
+    path = tmp_path / "data" / "odds" / "mlb" / day / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "\n".join(json.dumps(item) for item in _mlb_slate_snapshots(day, event_start)) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path / "data")
+    row = {
+        "league": "MLB",
+        "market_type": "spread",
+        "away_team": "Los Angeles Dodgers",
+        "home_team": "Chicago Cubs",
+        "selection": "home",
+        "line": "1.5",
+        "event_start_utc": event_start,
+    }
+
+    quote = dashboard_server._pick_quote(row)
+
+    assert quote is not None
+    assert quote["market_slug"] == "asc-mlb-lad-chc-2026-08-04-neg-1pt5"
+    assert quote["side"] == "short"
+    assert quote["ask"] == 0.46
+
+
+def test_pick_quote_matches_the_exact_total_line_and_game(monkeypatch, tmp_path: Path) -> None:
+    """Same fix as the spread test, for total -- and specifically exercises
+    the cross-game collision this matching must NOT make: two different
+    real games both have an 8.5 total line in the fixture, and this row
+    must resolve to its own game's snapshot only."""
+    day = "2026-08-04"
+    event_start = "2026-08-05T00:05:00Z"
+    path = tmp_path / "data" / "odds" / "mlb" / day / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "\n".join(json.dumps(item) for item in _mlb_slate_snapshots(day, event_start)) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path / "data")
+    row = {
+        "league": "MLB",
+        "market_type": "total",
+        "away_team": "Minnesota Twins",
+        "home_team": "Kansas City Royals",
+        "selection": "under",
+        "line": "8.5",
+        "event_start_utc": event_start,
+    }
+
+    quote = dashboard_server._pick_quote(row)
+
+    assert quote is not None
+    assert quote["market_slug"] == "tsc-mlb-min-kc-2026-08-04-8pt5"
+    assert quote["side"] == "short"
+    assert quote["ask"] == 0.44
+
+
+def test_pick_quote_never_cross_matches_another_games_spread_line(monkeypatch, tmp_path: Path) -> None:
+    """Direct regression test for the bug caught while building this fix
+    (never shipped): _spread_side_for_row's line-negation branch, before
+    _row_matches_snapshot_event existed, matched ANY other game's spread
+    whose line happened to be the exact negation of this row's line. A row
+    for a team not present in either fixture game must return None, not
+    silently pick one of them."""
+    day = "2026-08-04"
+    event_start = "2026-08-05T00:05:00Z"
+    path = tmp_path / "data" / "odds" / "mlb" / day / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "\n".join(json.dumps(item) for item in _mlb_slate_snapshots(day, event_start)) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_server, "DATA", tmp_path / "data")
+    row = {
+        "league": "MLB",
+        "market_type": "spread",
+        "away_team": "Seattle Mariners",
+        "home_team": "Oakland Athletics",
+        "selection": "away",
+        "line": "1.5",
+        "event_start_utc": event_start,
+    }
+
+    assert dashboard_server._pick_quote(row) is None
+
+
 def test_filled_entry_uses_selected_side_exchange_fill(monkeypatch) -> None:
     monkeypatch.setattr(
         dashboard_server,

@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .data_sources.espn import _probable
 from .domain import parse_utc
 from .features.base import FeatureStore
 from .features.bullpen import bullpen_profile, team_recent_relief_lines
@@ -32,6 +33,7 @@ from .features.mlb_player_availability import (
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
 from .features.schedule_load import matchup_schedule_load
+from .features.starter_history import starter_era_gap_live
 from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
 from .models.learned_market import LearnedMarketArtifact
@@ -63,6 +65,8 @@ def _compute_features(
     away_trend: Any,
     data_root: Path,
     observed_at: datetime,
+    home_starter_name: str | None = None,
+    away_starter_name: str | None = None,
 ) -> tuple[dict[str, float], tuple[str, ...]]:
     unavailable: list[str] = []
     features: dict[str, float] = {
@@ -91,6 +95,26 @@ def _compute_features(
         features["pitcher_era_gap"] = pitcher_era_gap_from_history(
             history, home_team, away_team
         )
+    if "starter_era_gap" in wanted:
+        # Real per-starter rolling ERA from mlb_statsapi boxscore snapshots
+        # (features/starter_history.py), same exact definition validation.py's
+        # _load_starter_era_map uses for training (walk-forward validated
+        # 2026-08-04, operator-directed promotion despite a validation-Brier
+        # regression -- see config/models/mlb-elo-trend-lr-v8.json's own
+        # training note). That training builder defaults an event's gap to
+        # 0.0 (not excluded from the fit) whenever either starter lacked
+        # sufficient real history -- this must match that fallback exactly,
+        # not fail the whole game closed, or live behavior would silently
+        # diverge from what was actually validated.
+        try:
+            if not home_starter_name or not away_starter_name:
+                raise ValueError("NO_CALL_STARTER_ERA_GAP_NO_CONFIRMED_STARTER")
+            features["starter_era_gap"] = starter_era_gap_live(
+                home_starter_name, away_starter_name, event_start
+            )
+        except ValueError as error:
+            features["starter_era_gap"] = 0.0
+            unavailable.append(str(error).split(":", 1)[0].strip() or "starter_era_gap_unavailable")
     if "bullpen_weakness_gap" in wanted:
         # Real per-team relief-appearance history (mlb_statsapi.py's boxscore
         # snapshots), same functions Measured Edge already serves live with
@@ -378,6 +402,25 @@ def build_learned_moneyline_slate(
             if start <= observed_at:
                 raise ValueError("event_started")
             away_team, home_team = _teams(event)
+            away_starter_name: str | None = None
+            home_starter_name: str | None = None
+            if key == "mlb":
+                # Caution gate, operator directive 2026-08-04: even a live
+                # provider for starter_era_gap (added same day, see below)
+                # needs a confirmed probable starter identity to look up --
+                # an unresolved starter has nothing to key that lookup on,
+                # same requirement Measured Edge's reconstructed_features
+                # already enforces for spread/total.
+                competitors = {
+                    item.get("homeAway"): item
+                    for item in (event.get("competitions") or [{}])[0].get("competitors", [])
+                }
+                away_probable = _probable(competitors.get("away") or {})
+                home_probable = _probable(competitors.get("home") or {})
+                if away_probable is None or home_probable is None:
+                    raise ValueError(f"event {event_id} has an unresolved probable starter")
+                away_starter_name = (away_probable.get("athlete") or {}).get("displayName")
+                home_starter_name = (home_probable.get("athlete") or {}).get("displayName")
             home_trend = trends.team_trend(home_team)
             away_trend = trends.team_trend(away_team)
             if min(home_trend.games_played, away_trend.games_played) < minimum_team_history_games:
@@ -401,6 +444,8 @@ def build_learned_moneyline_slate(
                 away_trend,
                 store.data_root,
                 observed_at,
+                home_starter_name=home_starter_name,
+                away_starter_name=away_starter_name,
             )
             home_probability = artifact.probability("moneyline", features)
             confidence_threshold = artifact.raw.get("market_models", {}).get("moneyline", {}).get("confidence_threshold", 0.50)

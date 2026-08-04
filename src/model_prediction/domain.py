@@ -185,6 +185,17 @@ class PickRequest:
     weather_factor: float | None = None
     pitcher_era_gap: float | None = None
     probable_starter_era_gap: float | None = None
+    # Recurrence of the exact bug this block's own comment describes, found
+    # 2026-08-04: defensive_trend_gap (active in NBA/WNBA v4's fitted
+    # coefficients) and bullpen_weakness_gap (active in MLB v7's) both had a
+    # reserved ledger.py column and a real value flowing through
+    # candidate.feature_basis, but as_dict() below never serialized either
+    # one -- silently blank for every real pick since each was added,
+    # exactly like pitcher_era_gap was until 2026-07-25. Model probability
+    # itself was never affected (artifact.probability() scores off the full
+    # features dict directly, not this diagnostic passthrough) -- only the
+    # audit trail was blind to what these two features actually saw.
+    bullpen_weakness_gap: float | None = None
     # Diagnostic only, same rule as the feature block above (P0-4, 2026-08-03):
     # the market-residual layer's calibrated_probability(model_p, market_p),
     # recorded for evidence/dashboard visibility. Never read back to size or
@@ -284,10 +295,12 @@ class PickRequest:
             "decision_consensus_line": self.decision_consensus_line,
             "elo_probability": self.elo_probability,
             "trend_gap": self.trend_gap,
+            "defensive_trend_gap": self.defensive_trend_gap,
             "park_factor": self.park_factor,
             "weather_factor": self.weather_factor,
             "pitcher_era_gap": self.pitcher_era_gap,
             "probable_starter_era_gap": self.probable_starter_era_gap,
+            "bullpen_weakness_gap": self.bullpen_weakness_gap,
             "market_residual_probability": self.market_residual_probability,
             "unavailable_features": self.unavailable_features,
         }

@@ -7,6 +7,7 @@ advantage, and never claims market profitability without point-in-time prices.
 
 from __future__ import annotations
 
+import logging
 import hashlib
 import json
 import math
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from .domain import eastern_today
 from .features.elo_ratings import expected_win_probability
@@ -243,7 +246,8 @@ class Bo3EsportsClient:
                 try:
                     score1 = int(row["team1_score"])
                     score2 = int(row["team2_score"])
-                except (KeyError, TypeError, ValueError):
+                except (KeyError, TypeError, ValueError) as exc:
+                    logger.debug("skipping esports match row with unparseable scores: %s", exc)
                     continue
                 if score1 == score2:
                     continue
@@ -513,7 +517,8 @@ class NeutralElo:
                 age_days = max(0, (ref_dt - match_dt).days)
                 decay = 2 ** (-age_days / RECENCY_HALF_LIFE_DAYS)
                 k_eff *= 1.0 + (RECENCY_MAX_BOOST - 1.0) * decay
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as exc:
+                logger.debug("esports Elo: skipping row with unparseable date: %s", exc)
                 pass
 
         # Tournament tier bonus: higher-tier matches get more weight
@@ -806,7 +811,8 @@ def _load_manual_aliases(data_root: str | Path) -> dict[str, dict[str, str]]:
             for title, mappings in raw.items()
             if not title.startswith("_") and isinstance(mappings, dict)
         }
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to load esports team name mappings: %s", exc)
         return {}
 
 

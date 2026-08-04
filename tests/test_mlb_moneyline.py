@@ -75,8 +75,16 @@ class _FakeESPN:
             "date": event_time,
             "competitions": [{
                 "competitors": [
-                    {"homeAway": "away", "team": {"displayName": away}},
-                    {"homeAway": "home", "team": {"displayName": home}},
+                    {
+                        "homeAway": "away",
+                        "team": {"displayName": away},
+                        "probables": [{"name": "probableStartingPitcher", "athlete": {"displayName": "Away Pitcher"}}],
+                    },
+                    {
+                        "homeAway": "home",
+                        "team": {"displayName": home},
+                        "probables": [{"name": "probableStartingPitcher", "athlete": {"displayName": "Home Pitcher"}}],
+                    },
                 ]
             }],
         }]
@@ -241,6 +249,70 @@ def test_insufficient_team_history_skips_event(tmp_path):
     assert "insufficient_team_history" in skipped[0]["reason"]
 
 
+def test_unresolved_probable_starter_skips_the_event(tmp_path):
+    """Operator directive 2026-08-04: gate MLB moneyline on both starters
+    being confirmed, same as the Measured Edge spread/total path already
+    does via ESPNClient.reconstructed_features -- a caution/consistency
+    measure, not because v7's own coefficients need starter identity (they
+    don't; see docs/MODEL_IMPROVEMENTS.md's "Rank-1 tested honestly"
+    section). Either team missing a probableStartingPitcher entry must
+    skip the event, never silently price it."""
+    _write_history(tmp_path)
+    artifact_path = tmp_path / "artifact.json"
+    _write_artifact(artifact_path)
+    event_no_probables = {
+        "id": "future-1",
+        "date": "2026-07-17T23:00:00Z",
+        "competitions": [{
+            "competitors": [
+                {"homeAway": "away", "team": {"displayName": "Away Team"}},
+                {
+                    "homeAway": "home",
+                    "team": {"displayName": "Home Team"},
+                    "probables": [{"name": "probableStartingPitcher"}],
+                },
+            ]
+        }],
+    }
+
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="mlb",
+        game_date="2026-07-17",
+        store=FeatureStore(tmp_path),
+        client=_FakeESPN(events=[event_no_probables]),
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
+    )
+
+    assert scheduled == 1
+    assert candidates == []
+    assert len(skipped) == 1
+    assert "unresolved probable starter" in skipped[0]["reason"]
+
+
+def test_resolved_probable_starters_are_not_gated(tmp_path):
+    """The other side of the same gate: once both teams have a
+    probableStartingPitcher entry (regardless of "confirmed" vs "probable"
+    status -- this gate matches Measured Edge's own bar, presence only),
+    the game must price normally, not stay stuck skipped forever."""
+    _write_history(tmp_path)
+    artifact_path = tmp_path / "artifact.json"
+    _write_artifact(artifact_path)
+
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="mlb",
+        game_date="2026-07-17",
+        store=FeatureStore(tmp_path),
+        client=_FakeESPN(),  # default fixture now includes both probables
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
+    )
+
+    assert scheduled == 1
+    assert skipped == []
+    assert len(candidates) == 1
+
+
 def test_below_threshold_still_produces_a_real_call(tmp_path):
     """Operator directive (2026-07-30): the learned confidence threshold no
     longer gates whether a candidate is a real, sized call -- every
@@ -302,8 +374,16 @@ def test_multi_game_slate_returns_all_candidates(tmp_path):
     events = [
         {"id": f"game-{i}", "date": f"2026-07-17T{20+i:02d}:00:00Z",
          "competitions": [{"competitors": [
-             {"homeAway": "away", "team": {"displayName": "Away Team"}},
-             {"homeAway": "home", "team": {"displayName": "Home Team"}},
+             {
+                 "homeAway": "away",
+                 "team": {"displayName": "Away Team"},
+                 "probables": [{"name": "probableStartingPitcher"}],
+             },
+             {
+                 "homeAway": "home",
+                 "team": {"displayName": "Home Team"},
+                 "probables": [{"name": "probableStartingPitcher"}],
+             },
          ]}]}
         for i in range(3)
     ]

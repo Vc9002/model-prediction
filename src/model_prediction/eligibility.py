@@ -62,6 +62,12 @@ def evaluate_eligibility(
     if (
         request.observed_at_utc
         and request.observed_at_utc.strip()
+        and parse_utc(request.observed_at_utc) > current
+    ):
+        return _research(request, away, home, NoCallReason.STALE_DATA, policy)
+    if (
+        request.observed_at_utc
+        and request.observed_at_utc.strip()
         and (current - parse_utc(request.observed_at_utc)).total_seconds() > maximum_age_hours * 3600
     ):
         return _research(request, away, home, NoCallReason.STALE_DATA, policy)
@@ -122,6 +128,12 @@ def evaluate_esports_eligibility(
     )
     if request.model_state is ModelState.RETIRED:
         return _research(request, away, home, NoCallReason.MODEL_INELIGIBLE, policy)
+    if (
+        request.observed_at_utc
+        and request.observed_at_utc.strip()
+        and parse_utc(request.observed_at_utc) > current
+    ):
+        return _research(request, away, home, NoCallReason.STALE_DATA, policy)
     if (
         request.observed_at_utc
         and request.observed_at_utc.strip()

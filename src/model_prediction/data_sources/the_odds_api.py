@@ -42,11 +42,14 @@ class TheOddsAPIClient:
         self.client = client or httpx.Client(timeout=30)
 
     def _safe_get(self, url: str, **kwargs) -> httpx.Response:
-        """GET with API key redacted from any error message."""
+        """GET + raise_for_status, with API key redacted from any error message."""
         try:
-            return self.client.get(url, **kwargs)
+            response = self.client.get(url, **kwargs)
+            response.raise_for_status()
+            return response
         except Exception as exc:
-            # httpx errors embed the full URL in the message — redact the key
+            # Both transport errors and HTTP status errors embed the URL —
+            # redact the API key from the message before re-raising.
             msg = str(exc).replace(str(self.api_key), "[REDACTED]")
             raise type(exc)(msg) from None
 
