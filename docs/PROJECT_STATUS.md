@@ -1,11 +1,14 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-02, single `main` branch. **624 tests pass, 0 fail.**
+**Last verified**: 2026-08-04, single `main` branch, HEAD `31d3b7c`. **686 tests pass, 0 fail.**
 
-This document is the operational status entry point. `DEBUG.md` contains the
-full audit evidence and reproduction commands. Historical metrics in old
-reports, changelog entries, model cards, and rollback artifacts are not current
-operational truth.
+This document is the operational status entry point. `MASTER.md` (repo root)
+is now the most current, most detailed running log of real bugs found/fixed
+with full evidence — trust it over this file when they disagree on specifics;
+this file exists to be the short, current summary someone can read first.
+`DEBUG.md` contains older audit evidence and reproduction commands.
+Historical metrics in old reports, changelog entries, model cards, and
+rollback artifacts are not current operational truth.
 
 **Operating note**: day-to-day work on this project prioritizes *wiring and
 features* over validation metrics — is a model actually running in `daily`,
@@ -13,74 +16,74 @@ and on what data, not its hit rate or promotion-gate status. The release
 verdict below is a separate, narrower claim about real-money execution safety
 specifically, and remains unchanged by wiring work.
 
-## Active model versions (2026-08-02)
+## Active model versions (2026-08-04)
 
 | Sport | Active artifact | Status | Hit rate | Qualification |
 |---|---|---|---|---|
-| MLB moneyline | `mlb-elo-trend-lr-v7` | shadow_qualified (override) | 58.0% locked-holdout | `qualified=false` (does not clear 60% bar); honest rebuild, no broken coefficient |
-| MLB spread | `measured-edge-margin-v2` | active_research | — | Flat only, zero-unit |
-| MLB totals | `measured-edge-totals-v2` | active_research | — | Flat only, zero-unit |
+| MLB moneyline | `mlb-elo-trend-lr-v8` | shadow_qualified (override) | 58.5% locked-holdout at the operator-lowered threshold (target_hit_rate=0.60) | `qualified=false` — validation Brier regressed vs. v7's retired feature set, and holdout no longer clears the 60% bar at this looser, coverage-optimized threshold either. Both honestly listed in the artifact's own `qualification.failures`. Real per-starter `starter_era_gap` feature (`features/starter_history.py`), replacing v7's team-level `pitcher_era_gap`. |
+| MLB spread | `measured-edge-margin-v2` | active_research | — | Real, sized Main-ledger rows (gated on both confirmed starters, matching moneyline) |
+| MLB totals | `measured-edge-totals-v2` | active_research | — | Real, sized Main-ledger rows. **Known bias, not fixed**: systematically over-picks "over" — elasticities too weak to differentiate real per-game run environment (P1-17 in `MASTER.md`) |
 | NBA moneyline | `nba-elo-trend-lr-v4` | shadow_qualified | 73.66% | `qualified=true` |
 | WNBA moneyline | `wnba-elo-trend-lr-v4` | shadow_qualified | 67.48% | `qualified=true` |
 | NFL moneyline | `nfl-elo-trend-lr-v4` | shadow_qualified | 71.26% | `qualified=true` (offseason) |
 | Soccer | `soccer-poisson-dc-v1` | shadow_qualified (operator override) | 62.5% locked-holdout | No walk-forward artifact exists; override not genuine promotion |
-| LOL | `lol-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled, proper scoring rules |
-| CS2 | `cs2-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled |
+| LOL | `lol-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled. **Known gap**: no confidence discount or inactivity decay for stale/thin-data teams — produces the largest, least-trustworthy edges in the system (25-38%), not fixed |
+| CS2 | `cs2-tiered-elo-v5` | shadow_qualified (override) | — | Same known gap as LOL |
 | Dota 2 | `dota2-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled |
 | Valorant | `valorant-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled |
 | Rainbow Six | `rainbow_six-tiered-elo-v5` | research | — | v5 Platt-scaled |
 | KBO | `kbo-tie-aware-elo-v2` | shadow_qualified (override) | — | Tie-aware, zero-unit research only |
 | NPB | `npb-tie-aware-elo-v2` | shadow_qualified (override) | — | Tie-aware, zero-unit research only |
-| Tennis | `tennis-surface-elo-v1` | research | — | WTA only |
+| Tennis | `tennis-surface-elo-v1` | research | — | WTA + ATP (ATP added 2026-08-03; ITF still unbuildable — no ESPN data source) |
 
-## Ledger routing (definitive: `docs/LEDGER_ROUTING.md`)
+## Ledger routing (definitive: `docs/LEDGER_ROUTING.md` — itself stale, verify against `main_ledgers.py`/`research_ledgers.py` directly)
 
-- **Main** (`picks.xlsx`): MLB moneyline, WNBA moneyline, Soccer (override) — real-sized calls
-- **Flat** (`flat_picks.xlsx`): NBA, NFL moneyline (zero-unit) + MLB spread/totals (zero-unit)
-- **Research** (`data/research/{sport}.xlsx`): Esports (5 titles), Tennis, KBO, NPB — all candidates
+Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one shared workbook.
+
+- **Main** (`data/main/{sport}.xlsx`: mlb, wnba, soccer, tennis): MLB (moneyline/spread/total, no edge gate — trust/provenance only, separate confidence-threshold gate in `cli.py`), WNBA moneyline (same), soccer/tennis (real edge+confidence gate) — real-sized calls
+- **Flat** (`data/flat/{sport}.xlsx`: mlb, nba, nfl, wnba, soccer, tennis): every candidate, every one of those sports, no gate at all
+- **Research** (`data/research/{sport}.xlsx`): Esports (5 titles), KBO, NPB — all candidates
 - **Gated Research** (`data/gated_research/{sport}.xlsx`): Curated subset clearing per-sport edge/confidence bars
-- **Model Ledgers** (`data/model_ledgers/`): New per-model-identity architecture (additive; existing pipeline unchanged)
+- **Model Ledgers** (`data/model_ledgers/`): per-model-identity architecture (additive; existing pipeline unchanged)
 
-## Runtime snapshot (2026-08-02)
+## Runtime snapshot (2026-08-04)
 
-- **Tests**: 624 passed, 0 failed
-- **Ruff**: 118 findings (79 are EXE002 shebang-on-test-files; 47 of those are in dashboard_server.py which is excluded from the main `src/` count; baseline ≈117)
-- **Audit chain**: 43,304 events, 0 breaks, 0 hash mismatches
-- **Git**: Single `main` branch; working tree has 82 dirty files (session 2026-08-02 work uncommitted)
+- **Tests**: 686 passed, 0 failed
+- **Ruff**: 126 findings in `src/ tests/` (baseline; not chased — mostly `EXE002` shebang-on-test-files and pre-existing type-adjacent findings)
+- **Audit chain**: `verify-chain` reports `chain_intact: true`, 0 breaks
+- **Git**: `main`, HEAD `31d3b7c`, pushed to `origin/main`. Working tree has ongoing daily-pipeline data drift (normal; ledgers/odds/availability snapshots are tracked in this repo by design)
 - **CI**: `.github/workflows/ci.yml` — ruff + pytest on push/PR
-- **Dashboard**: Live at `127.0.0.1:8765`, launchd-managed, token-based auth on orders
-- **Daily pipeline**: Running through 2026-08-02, logs in `data/logs/`
+- **Dashboard**: Live at `127.0.0.1:8765`, launchd-managed, per-session token-based auth on orders. `_pick_quote` (order-readiness) now correctly resolves spread/total, not just moneyline (F-53, 2026-08-04) — previously every real MLB spread/total order was unconditionally refused
+- **Daily pipeline**: Running through 2026-08-04, real `--log` runs verified end-to-end today, logs in `data/logs/`. New capture step (`cli.py::_capture_mlb_starter_snapshots`) keeps `data/mlb_statsapi/game_snapshots.jsonl` current — was previously a one-time static dump with no live-update path
 - **Console entry point**: `.venv/bin/model-prediction` works
 - **BBO capture**: Active across 8 sports (`data/odds/`)
+- **Known, unresolved, non-code issue**: The Odds API key appears genuinely invalid — all 12 configured soccer leagues on that provider return `401 Unauthorized` (verified live 2026-08-04). Soccer's ESPN-sourced leagues are unaffected. Needs a real key rotation, not a code fix.
+- **Repo hygiene flag**: `data/mlb_statsapi/game_snapshots.jsonl` (71MB) and `data/events.jsonl` (60MB) both exceed GitHub's 50MB recommended file size (warned, not yet blocked, on push 2026-08-04). Will hit the hard 100MB cap eventually given both grow daily; Git LFS would be the fix, not yet done.
 
 ## Release verdict
 
-**Not release-ready.** The real-money execution surface should not be used until
-P0 defects are repaired:
+**The 6 originally-identified P0 real-money-execution defects are resolved or confirmed non-issues** (verified 2026-08-03/04, full evidence in `MASTER.md`'s P0 section and Fixed Bugs log):
 
-1. Execution tickets are not bound to the exact qualified ledger row
-2. Ledger mutation and audit append are not atomic
-3. Artifact qualification and quote `timestamp_valid` are not enforced at the
-   classification/pricing step
-4. `config/model.yaml` references `market-residual-v1.json` which doesn't exist
-5. `mlb-spread-baseline-v1.json` is used for both spread AND total research
-6. Two artifact hashes are mismatched (`nba-spread-baseline-v1.json`,
-   `nfl-spread-baseline-v1.json`)
+1. Execution-ticket binding — resolved 2026-08-03, extended to spread/total/btts (F-49), and the dashboard-side gap that made that fix unreachable from the real order flow is also now fixed (F-53, 2026-08-04)
+2. Ledger/audit atomicity — confirmed the original claim was backwards (audit is appended *before* the ledger write); true cross-file atomicity across separate files still doesn't exist as a lower-severity, real architectural gap
+3. Artifact qualification / quote `timestamp_valid` enforcement — resolved as a deliberate operator decision (qualification no longer gates classification) plus re-verified `timestamp_valid` handling is correct everywhere it applies
+4. `market-residual-v1.json` — resolved 2026-08-03 (F-50), real artifact trained, wired as diagnostic-only
+5. MLB spread artifact reused for totals — resolved 2026-08-03 (F-51), both now point at their own real, live Measured Edge artifacts
+6. Two "mismatched" artifact hashes — confirmed never a real bug, an artifact of the verification script's own wrong JSON convention
+
+**That does not mean real-money execution should be turned on.** Separate from the 6 original defects:
+
+- MLB v8 (the active moneyline artifact) is honestly `qualified: false` — real, positive signal (58.5% holdout hit rate, well above the 50% coin-flip line) but does not clear this project's own 60% promotion bar, on top of a validation-set Brier regression vs. the feature set it replaced. It is live via the same operator-override mechanism v7 used, not because it passed cleanly.
+- MLB totals has a known, unfixed systematic bias (over-picks "over"; P1-17).
+- Esports Elo has a known, unfixed thin/stale-data overconfidence gap producing the largest edges in the system.
+- The general cross-file ledger/audit atomicity gap (item 2 above) is real, if lower-severity than originally described.
 
 Do not infer executable profitability from artifact hit rates, synthetic
 `-110` units, shadow-ledger P&L, or a dashboard qualification badge.
 
-## Bugs found and fixed since last verification (2026-07-28 → 2026-08-02)
+## Bugs found and fixed since last verification (2026-08-02 → 2026-08-04)
 
-1. **Unit sizing dead parameter** — `model_uncertainty` accepted at 6 call sites but never read; fixed 2026-07-31
-2. **NPB destructive overwrite** — historical data overwritten on each forecast run
-3. **CLV scanning only Main** — Flat/Research/Gated never got closing prices
-4. **Weather park-factor key collision** — A's/River Cats silently zeroed weather
-5. **MLB rehab-assignment marker missing** — 291 real transactions skipped in availability feature
-6. **MLB same-day transaction ambiguity** — strict `<` not `<=` for PIT safety
-7. **Roster snapshots captured but never read** — dead-weight capture in availability pipeline
-8. **Dashboard token-based auth** — real-money order endpoint now requires per-session token (was unauthenticated)
-9. **SELL-path P&L formula** — BUY and SELL now use single canonical settlement function
+See `MASTER.md`'s Fixed Bugs log (F-47 through F-56) for full evidence on each. Highlights: dual-ledger duplicate-row gap for soccer/tennis re-runs (F-47); two active model coefficients (`bullpen_weakness_gap`, `defensive_trend_gap`, then `starter_era_gap`) silently missing from the audit ledger despite scoring correctly — the same recurring bug class, three times (F-48, F-55); dashboard order-readiness moneyline-only gate blocking every real MLB spread/total order (F-53); MLB v8 promotion with a real starter-identity feature and its own live infrastructure (F-54); a redaction fix that crashed instead of redacting, breaking soccer score collection (F-56).
 
 ## Safe command forms
 
@@ -96,21 +99,12 @@ Commands with `--write-artifacts`, `--log`, settlement, ledger cleanup, ban
 mutation, dashboard POST routes, `daily`, `execute`, or `sell-position` change
 state. They require separate authorization appropriate to the risk.
 
-## Repair order
+## Repair order (remaining, real, lower-severity than the original P0 list)
 
-1. Hard-block real-money execution until tickets are bound to the exact ledger
-   row and all economics are recomputed server-side.
-2. Make ledger mutation and audit append recoverable as one transaction; add
-   failure-injection and retry tests.
-3. Enforce artifact qualification, quote `timestamp_valid`, and fail-closed
-   availability semantics at the classification step.
-4. Fix the two mismatched artifact hashes and the `market-residual-v1.json`
-   config reference without overwriting rollback artifacts.
-5. Point MLB total research at a total artifact, not the spread artifact.
-6. Make exposure-check-plus-append transactional and enforce one writer across
-   all ledgers.
-7. Fix secret redaction, timestamp age, discovery pagination, and economic-CI
-   semantics.
-8. Replace `pkill -f` dashboard startup with PID-file approach.
-9. Split `cli.py` and `dashboard_server.py` into packages; add `tests/test_cli.py`.
-10. Migrate ledger storage to SQLite for ACID guarantees.
+1. Give cross-file ledger-mutation-plus-audit-append real transactional recovery (retry/failure-injection tests) — the original "silent data loss" framing was wrong, but true atomicity still doesn't exist.
+2. Re-fit MLB totals' elasticities against real totals outcomes specifically (P1-17) — needs its own fitting pass, not a mechanical patch.
+3. Add confidence discount / inactivity decay to the esports `NeutralElo` model.
+4. Rotate The Odds API key.
+5. Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.
+6. Split `cli.py` and `dashboard_server.py` into packages (both remain large, growing files).
+7. Migrate ledger storage to SQLite for ACID guarantees (long-standing item, unchanged).
