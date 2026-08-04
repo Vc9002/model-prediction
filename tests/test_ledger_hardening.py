@@ -393,6 +393,16 @@ def test_ledger_write_crash_leaves_a_recoverable_audit_event_not_a_silent_gap(
     # events are real and legitimately distinct, not a duplicate.
     assert row["pick_id"] != crash_events[0]["subject_id"]
 
+    # "Detectable" (the docstring above and ledger.py's own comment) is only
+    # a real property if the operator-facing tool that's supposed to catch
+    # this actually does -- confirm _verify_chain flags the orphaned event,
+    # not just that a human diffing raw audit/ledger data by hand could.
+    from model_prediction.cli import _verify_chain
+
+    result = _verify_chain(ledger.audit.path, ledger)
+    assert result["reconciled"] is False
+    assert result["created_but_absent_without_removal_event"] == 1
+
 
 def test_excel_ledger_has_office_table_filter_and_frozen_header(tmp_path) -> None:
     path = tmp_path / "picks.xlsx"

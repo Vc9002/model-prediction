@@ -101,7 +101,7 @@ state. They require separate authorization appropriate to the risk.
 
 ## Repair order (remaining, real, lower-severity than the original P0 list)
 
-1. Give cross-file ledger-mutation-plus-audit-append real transactional recovery (retry/failure-injection tests) — the original "silent data loss" framing was wrong, but true atomicity still doesn't exist.
+1. ~~Give cross-file ledger-mutation-plus-audit-append real transactional recovery (retry/failure-injection tests)~~ — turned out to already exist (`tests/test_ledger_hardening.py::test_ledger_write_crash_leaves_a_recoverable_audit_event_not_a_silent_gap`, `test_audit_append_happens_while_the_ledger_lock_is_still_held`), this doc's own claim was stale; verified 2026-08-04 and extended to also confirm `_verify_chain` itself (not just raw data inspection) detects the orphaned-audit-event case. True cross-file atomicity across separate files (ledger + audit as one physical transaction) still doesn't exist — that's a real, distinct, lower-severity architectural gap from "no recovery tests," which is now closed.
 2. Build a real absolute-run-environment signal for MLB totals (P1-17/F-62's own next step: `totals_specific_market_residual` or `branched_absolute_run_intensity_head`, per `config/model.yaml`'s `problem_cohorts.totals`) — a relative-elasticity refit was tried 2026-08-04 and honestly did not help.
 3. ~~Add confidence discount / inactivity decay to the esports `NeutralElo` model.~~ Done 2026-08-04, see F-63.
 4. Rotate The Odds API key.
