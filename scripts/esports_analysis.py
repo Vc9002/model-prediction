@@ -14,8 +14,14 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parent.parent
 DATA = PROJECT / "data/esports"
 MODELS = PROJECT / "config/models"
-PICKS_FLAT = PROJECT / "data/flat_picks.xlsx"
-PICKS_MAIN = PROJECT / "data/picks.xlsx"
+# Esports never reaches Main and (since 2026-08-03) no longer reaches Flat --
+# Research/Gated Research are its only ledgers, one file per title.
+def _research_ledger(title: str) -> Path:
+    return PROJECT / f"data/research/{title.lower()}.xlsx"
+
+
+def _gated_ledger(title: str) -> Path:
+    return PROJECT / f"data/gated_research/{title.lower()}.xlsx"
 
 # ── team name mapping ──────────────────────────────────────────────
 TEAM_CACHE: dict[str, dict] = {}
@@ -156,7 +162,7 @@ def backtest(title: str) -> None:
     platt_intercept = cfg.get("platt_intercept")
     platt_slope = cfg.get("platt_slope")
 
-    for fname, label in [(PICKS_FLAT, "FLAT"), (PICKS_MAIN, "MAIN")]:
+    for fname, label in [(_research_ledger(title), "RESEARCH"), (_gated_ledger(title), "GATED")]:
         if not fname.exists(): continue
         df = pd.read_excel(fname, sheet_name="Picks")
         picks = df[(df["league"].str.upper() == title.upper()) & (df["pnl_units"].notna())]

@@ -1621,8 +1621,8 @@ async function renderFlat(force){
   renderFlatTable();
 }
 const PERFORMANCE_VIEWS={
-  main:{label:"Qualified Ledger",source:"picks.xlsx",policy:"Only ledger-qualified calls.",api:"/api/performance"},
-  flat:{label:"Flat Ledger",source:"flat_picks.xlsx",policy:"All recorded game calls; no edge gate.",api:"/api/flat-performance"},
+  main:{label:"Qualified Ledger",source:"per-sport main workbooks",policy:"Only ledger-qualified calls.",api:"/api/performance"},
+  flat:{label:"Flat Ledger",source:"per-sport flat workbooks",policy:"All recorded game calls; no edge gate.",api:"/api/flat-performance"},
   research:{label:"Research Ledger",source:"per-sport research workbooks",policy:"Model calls recorded without the qualification gate.",api:"/api/research-performance"},
   gated:{label:"Gated Research Ledger",source:"per-sport gated research workbooks",policy:"Only research calls that cleared their configured gate.",api:"/api/gated-research-performance"}
 };

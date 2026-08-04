@@ -65,7 +65,7 @@ def main() -> None:
     parser.add_argument(
         "--totals-artifact", default=str(PROJECT_ROOT / "config/models/measured-edge-totals-v2.json")
     )
-    parser.add_argument("--flat-ledger", default=str(PROJECT_ROOT / "data/flat_picks.xlsx"))
+    parser.add_argument("--flat-ledger", default=str(PROJECT_ROOT / "data/flat/mlb.xlsx"))
     args = parser.parse_args()
 
     calibrate = _load_calibrate_module()

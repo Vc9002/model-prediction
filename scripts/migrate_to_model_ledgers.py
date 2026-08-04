@@ -9,8 +9,8 @@ row got routed to, which this migration collapses away: every real-world
 decision lands in exactly one row, in its model's own ledger, regardless of
 which old destination(s) it happened to be logged to.
 
-Read-only against the source ledgers -- nothing in data/picks.xlsx,
-data/flat_picks.xlsx, data/research/*.xlsx, or data/gated_research/*.xlsx is
+Read-only against the source ledgers -- nothing in data/main/*.xlsx,
+data/flat/*.xlsx, data/research/*.xlsx, or data/gated_research/*.xlsx is
 modified or deleted. Output only ever goes to data/model_ledgers/*.xlsx,
 which this script owns exclusively; safe to re-run (existing prediction_ids
 are skipped, not duplicated -- see --dry-run to preview without writing).
@@ -70,7 +70,11 @@ MODEL_ID_BY_LEAGUE_AND_MARKET: dict[tuple[str, str], str] = {
 
 
 def _source_ledger_paths() -> list[Path]:
-    paths = [DATA / "picks.xlsx", DATA / "flat_picks.xlsx"]
+    # Main/Flat were single shared files (data/picks.xlsx, data/flat_picks.xlsx)
+    # until the 2026-08-03 per-sport split (see main_ledgers.py); this now
+    # reads their replacements, data/main/<sport>.xlsx and data/flat/<sport>.xlsx.
+    paths = sorted((DATA / "main").glob("*.xlsx"))
+    paths.extend(sorted((DATA / "flat").glob("*.xlsx")))
     paths.extend(sorted((DATA / "research").glob("*.xlsx")))
     paths.extend(sorted((DATA / "gated_research").glob("*.xlsx")))
     return [path for path in paths if path.exists()]

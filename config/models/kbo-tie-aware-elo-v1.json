@@ -1,6 +1,19 @@
 {
-  "artifact_hash": "4c999a9214e7fea627095d76bde7dec7f45bc3d485c8094da8216c35f8ef522e",
+  "artifact_hash": "9e56194db0cb4052f62e925a99fed9f8225904734f86e31ce825ba388de80f0a",
+  "confidence_threshold": 0.12388935616968044,
   "decay_rate": 0.001,
+  "games_played": {
+    "DOOSAN": 1528,
+    "HANWHA": 1525,
+    "KIA": 1525,
+    "KIWOOM": 1082,
+    "KT": 1524,
+    "LG": 1527,
+    "LOTTE": 1525,
+    "NC": 1520,
+    "SAMSUNG": 1525,
+    "SSG": 825
+  },
   "games_sha256": "c2f1fd60e1ce3671100286546a85a913d4f015f06160fc216ee979cbfd011fe8",
   "home_advantage": 20.0,
   "initial_rating": 1500.0,
@@ -23,7 +36,7 @@
     "SSG": 1452.253154
   },
   "schema_version": "international-baseball-tie-aware-elo-v2",
-  "source_manifest_sha256": "d09402b1f0879080cb03ff9d8c66ac4adef42d3143ce3dc7c1a2283f0118879c",
+  "source_manifest_sha256": "03e4e583646d23c8bb30b5c4dddc89f9f4f2160382f2524fabbbba03e5c9109c",
   "target": "expected moneyline settlement where a tie pays 0.50",
   "tie_method": "elo_gap",
   "tie_probability": 0.024245,

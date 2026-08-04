@@ -4,7 +4,7 @@
 # Uninstall:  launchctl unload ~/Library/LaunchAgents/com.vc.model-dashboard.plist
 set -euo pipefail
 
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST="$HOME/Library/LaunchAgents/com.vc.model-dashboard.plist"
 PYTHON="$(command -v python3)"
 mkdir -p "$PROJECT_DIR/dashboard" "$HOME/Library/LaunchAgents"

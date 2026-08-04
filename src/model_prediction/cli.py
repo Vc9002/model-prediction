@@ -104,7 +104,7 @@ from .international_baseball import (
 )
 from .learned_forward import build_learned_moneyline_slate, match_executable_quote
 from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError
-from .main_ledgers import MultiSportPickLedger
+from .main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from .mlb_baseline_refresh import refresh_if_due
 from .models import MODEL_SPECS
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
@@ -115,7 +115,7 @@ from .research_ledgers import (
     research_ledger,
 )
 from .soccer_forward import build_soccer_total_slate
-from .tennis_forward import build_tennis_slate
+from .tennis_forward import TENNIS_TOURS, build_tennis_slate
 from .total_score import validate_all_total_score_models
 from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
@@ -1703,8 +1703,13 @@ def _forecast_soccer_sport(
 
     flat_ledger: every priced contract, no edge/confidence gate -- same
     "log everything" semantics flat mode uses for the learned sports.
-    main_ledger: mirrors gated_ledger's existing "only when genuinely
-    eligible" append. Soccer's config was set to status: shadow_qualified
+    main_ledger: appended only when genuinely eligible (same
+    evaluate_gated_research_eligibility check gated_ledger would use). As of
+    the 2026-08-03 Main+Flat-only operator directive, no real caller passes
+    gated_ledger/research_ledger for soccer anymore (RESEARCH_LEDGER_SPORTS
+    no longer includes "soccer") -- those two parameters stay for tests /
+    API symmetry with the other _forecast_*_sport functions but are
+    production-dead here. Soccer's config was set to status: shadow_qualified
     via an explicit manual qualification_override (operator directive,
     2026-08-02) rather than a genuine walk-forward/locked-holdout pass --
     see config/model.yaml's SOCCER.qualification_override_reason for the
@@ -1895,9 +1900,11 @@ def _forecast_tennis_sport(
     """Price the surface-blended Elo model against WTA and ATP moneyline
     markets -- see tennis_forward.py for why ITF can never be matched here.
 
-    main_ledger: mirrors gated_ledger's "only when genuinely eligible"
-    append, same as _forecast_soccer_sport. TENNIS's config was set to
-    status: shadow_qualified via an explicit manual qualification_override
+    main_ledger: appended only when genuinely eligible, same as
+    _forecast_soccer_sport -- and like soccer, no real caller passes
+    gated_ledger/research_ledger here either (Main+Flat-only directive,
+    2026-08-03); those params are test-only at this point. TENNIS's config
+    was set to status: shadow_qualified via an explicit manual qualification_override
     (operator directive, 2026-08-03) rather than a genuine walk-forward/
     locked-holdout pass -- see config/model.yaml's TENNIS.
     qualification_override_reason. Real Main-ledger rows now get produced
@@ -2457,49 +2464,59 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
 
 
 def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | None:
-    """Match a ledger row to a completed WTA singles match by player name.
+    """Match a ledger row to a completed WTA or ATP singles match by player name.
 
     ESPN's tennis scoreboard nests matches under `groupings` with
     `athlete`-shaped competitors (see
     `data_sources.espn.completed_tennis_singles_matches`) rather than the
     flat `competitions`/`team` shape `_find_espn_result` assumes, so tennis
-    needs its own matcher. Only WTA is checked -- tennis is only ever
-    forecast (and therefore only ever needs settling) against WTA (see
-    tennis_forward.py).
+    needs its own matcher. Checks both tours (tennis_forward.TENNIS_TOURS) --
+    this used to check WTA only, back when tennis was WTA-only. ATP was added
+    to forecasting on 2026-08-03 but this settlement matcher wasn't updated
+    alongside it. Combined tournaments (most ATP 500/1000s, all four majors)
+    happen to return both tours' matches from either endpoint (see
+    espn.completed_tennis_singles_matches's docstring), which is why this
+    wasn't caught immediately -- but a genuinely ATP-only (non-combined)
+    event never appears under the WTA endpoint at all, so any pick on one
+    could never settle. Found 2026-08-04 while investigating a stuck-open
+    ATP pick; that specific pick turned out to be a real tournament
+    reschedule (unrelated), but the underlying WTA-only gap was real.
     """
     away_names = {row["away_team"].casefold(), row["original_away_team"].casefold()}
     home_names = {row["home_team"].casefold(), row["original_home_team"].casefold()}
-    try:
-        scoreboard = espn.scoreboard("WTA", game_day)
-    except Exception:
-        logger.warning(
-            "ESPN WTA scoreboard fetch failed for %s; tennis settlement skipping", game_day, exc_info=True
-        )
-        return None
-    for event in scoreboard.get("events", []):
-        for grouping in event.get("groupings", []):
-            for competition in grouping.get("competitions", []):
-                slug = str(competition.get("type", {}).get("slug", ""))
-                if "singles" not in slug:
-                    continue
-                competitors = competition.get("competitors", [])
-                if len(competitors) != 2:
-                    continue
-                by_side = {item.get("homeAway"): item for item in competitors}
-                away, home = by_side.get("away"), by_side.get("home")
-                if not away or not home:
-                    continue
-                away_name = str((away.get("athlete") or {}).get("displayName", ""))
-                home_name = str((home.get("athlete") or {}).get("displayName", ""))
-                if away_name.casefold() not in away_names or home_name.casefold() not in home_names:
-                    continue
-                status = competition.get("status", {}).get("type", {})
-                completed = bool(status.get("completed"))
-                record = {"completed": completed, "status_name": str(status.get("name", ""))}
-                if completed:
-                    record["away_score"] = 1 if away.get("winner") else 0
-                    record["home_score"] = 1 if home.get("winner") else 0
-                return record
+    for tour in TENNIS_TOURS:
+        try:
+            scoreboard = espn.scoreboard(tour, game_day)
+        except Exception:
+            logger.warning(
+                "ESPN %s scoreboard fetch failed for %s; tennis settlement skipping this tour",
+                tour, game_day, exc_info=True,
+            )
+            continue
+        for event in scoreboard.get("events", []):
+            for grouping in event.get("groupings", []):
+                for competition in grouping.get("competitions", []):
+                    slug = str(competition.get("type", {}).get("slug", ""))
+                    if "singles" not in slug:
+                        continue
+                    competitors = competition.get("competitors", [])
+                    if len(competitors) != 2:
+                        continue
+                    by_side = {item.get("homeAway"): item for item in competitors}
+                    away, home = by_side.get("away"), by_side.get("home")
+                    if not away or not home:
+                        continue
+                    away_name = str((away.get("athlete") or {}).get("displayName", ""))
+                    home_name = str((home.get("athlete") or {}).get("displayName", ""))
+                    if away_name.casefold() not in away_names or home_name.casefold() not in home_names:
+                        continue
+                    status = competition.get("status", {}).get("type", {})
+                    completed = bool(status.get("completed"))
+                    record = {"completed": completed, "status_name": str(status.get("name", ""))}
+                    if completed:
+                        record["away_score"] = 1 if away.get("winner") else 0
+                        record["home_score"] = 1 if home.get("winner") else 0
+                    return record
     return None
 
 
@@ -2603,13 +2620,25 @@ def _find_soccer_result(
     return None
 
 
-def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> list[str]:
+def _clear_today_open(
+    ledger, date_str: str, by_event_date: bool = False, leagues: set[str] | None = None
+) -> list[str]:
     """Remove open picks for a date before re-forecasting, via the audited path.
 
     When by_event_date is True, also removes open picks whose event_start_utc
     matches date_str — used for flat ledger to prevent duplicate forecast runs.
     All removals go through ``PickLedger.remove_open_rows`` so they hold the
     ledger lock and append ``pick_removed`` audit events.
+
+    leagues: when given (casefolded league names), only rows in those leagues
+    are considered for removal. ``ledger`` here is frequently a
+    MultiSportPickLedger spanning every sport that shares one Main/Flat file
+    pair -- without this filter, re-forecasting a single sport (e.g.
+    `forecast --sport tennis --log`) clears every OTHER sport's still-open
+    today rows too, since they all live in the same underlying ledger, and
+    only the requested sport gets regenerated afterward. Found 2026-08-03
+    when a single-sport flat-forecast run silently wiped that day's real
+    open MLB/WNBA/tennis Main picks.
 
     Only removes picks for games that HAVEN'T STARTED YET. Re-running the
     pipeline intraday is meant to refresh not-yet-started candidates with
@@ -2631,6 +2660,8 @@ def _clear_today_open(ledger, date_str: str, by_event_date: bool = False) -> lis
     to_remove = []
     for row in ledger.rows():
         if row.get("status") != "open":
+            continue
+        if leagues is not None and str(row.get("league", "")).casefold() not in leagues:
             continue
         created = str(row.get("created_at_utc", "") or "")
         event = str(row.get("event_start_utc", "") or "")
@@ -2916,7 +2947,7 @@ def main(argv: list[str] | None = None) -> None:
             replace_today = getattr(args, "replace_today", False) or args.command == "flat-forecast"
             is_flat = args.command == "flat-forecast"
             sports = (
-                [*FLAT_LEDGER_SPORTS, "soccer"]
+                [*FLAT_LEDGER_SPORTS, "soccer", "tennis"]
                 if is_flat and getattr(args, "all", False)
                 else (
                     list(SPORTS) + list(ESPORTS_TITLES)
@@ -2928,11 +2959,21 @@ def main(argv: list[str] | None = None) -> None:
             # main/flat ledgers form a pair -- soccer, matching how its research/
             # gated ledgers already pair -- can log to both from either command.
             flat_ledger = MultiSportPickLedger(data_root, flat=True)
+            # Scopes clearing to only the sport(s) this invocation is about to
+            # regenerate -- flat_ledger/ledger both span every Main-ledger
+            # sport (mlb/wnba/soccer/tennis), so an unscoped clear on a
+            # single-sport run (e.g. `flat-forecast --sport tennis --log`)
+            # would silently wipe every OTHER sport's still-open today rows
+            # too, with nothing in this run to regenerate them. See
+            # _clear_today_open's docstring for the 2026-08-03 incident.
+            main_ledger_sport_scope = {s.casefold() for s in sports} & set(MAIN_LEDGER_SPORTS)
             if is_flat:
                 if replace_today and log:
-                    _clear_today_open(flat_ledger, args.date, by_event_date=True)
+                    _clear_today_open(
+                        flat_ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope
+                    )
             elif replace_today and log:
-                _clear_today_open(ledger, args.date, by_event_date=True)
+                _clear_today_open(ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
             data_directory = Path(ledger_path(config)).parent
             if replace_today and log and not is_flat:
                 selected_research_sports = (
@@ -2956,24 +2997,20 @@ def main(argv: list[str] | None = None) -> None:
                         by_event_date=True,
                     )
             elif replace_today and log and is_flat and "soccer" in {s.casefold() for s in sports}:
-                # Soccer's research/gated/main ledgers all get written
-                # together with flat regardless of which command ran (see
-                # _forecast_soccer_sport's docstring: main+flat and
-                # research+gated are each a pair) -- clearing only
-                # flat_ledger above (the is_flat branch) while leaving
-                # these three untouched means a second same-day
-                # flat-forecast run duplicates every soccer row in them,
-                # since only flat gets deduped via the clear. Every other
-                # flat-forecast sport only ever writes flat_ledger, so this
-                # stays soccer-specific rather than blanket-applied to
-                # every RESEARCH_LEDGER_SPORTS entry.
-                _clear_today_open(
-                    research_ledger(data_directory, "soccer"), args.date, by_event_date=True
-                )
-                _clear_today_open(
-                    research_ledger(data_directory, "soccer", gated=True), args.date, by_event_date=True
-                )
-                _clear_today_open(ledger, args.date, by_event_date=True)
+                # Soccer's main ledger gets written together with flat
+                # regardless of which command ran (constructed unconditionally
+                # above) -- clearing only flat_ledger in the is_flat branch
+                # while leaving main untouched means a second same-day
+                # flat-forecast run duplicates every soccer row there. Every
+                # other flat-forecast sport only ever writes flat_ledger, so
+                # this stays soccer-specific rather than blanket-applied.
+                # NOTE: soccer's research/gated ledgers stopped being written
+                # to entirely as of the 2026-08-03 Main+Flat-only directive
+                # (RESEARCH_LEDGER_SPORTS no longer includes "soccer") -- this
+                # used to also clear those two files, but research_ledger()
+                # now raises ValueError for a sport outside RESEARCH_LEDGER_SPORTS,
+                # so clearing them here would crash rather than no-op. Removed.
+                _clear_today_open(ledger, args.date, by_event_date=True, leagues={"soccer"})
             results = {}
             for sport in sports:
                 if sport == "esports":

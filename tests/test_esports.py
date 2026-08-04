@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from model_prediction.data_sources.polymarket_us import POLYMARKET_SPORT_LEAGUES
+from model_prediction.domain import eastern_today
 from model_prediction.esports import (
     Bo3EsportsClient,
     NeutralElo,
@@ -137,6 +138,12 @@ def test_refresh_recent_matches_merges_instead_of_overwriting(tmp_path) -> None:
     }
     (directory / "teams.json").write_text(json.dumps(old_teams), encoding="utf-8")
 
+    # Relative to "today" (matches refresh_recent_matches's own eastern_today()
+    # lookback window) rather than a hardcoded date -- a fixed date drifts out
+    # of the 14-day window as real time passes and starts failing for reasons
+    # unrelated to the code under test. Found 2026-08-04 when a long session
+    # crossed exactly this boundary.
+    recent_match_date = eastern_today() - timedelta(days=3)
     new_match_row = {
         "id": 2,
         "team1_id": 10,
@@ -145,8 +152,8 @@ def test_refresh_recent_matches_merges_instead_of_overwriting(tmp_path) -> None:
         "team1_score": 0,
         "team2_score": 2,
         "status": "finished",
-        "start_date": "2026-07-20T12:00:00.000+00:00",
-        "end_date": "2026-07-20T14:00:00.000+00:00",
+        "start_date": f"{recent_match_date.isoformat()}T12:00:00.000+00:00",
+        "end_date": f"{recent_match_date.isoformat()}T14:00:00.000+00:00",
         "bo_type": 3,
         "discipline_id": 3,
         "game_version": None,
