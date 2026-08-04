@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import calendar
 import json
+import logging
 import math
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from sklearn.linear_model import LogisticRegression
+
+logger = logging.getLogger(__name__)
 
 from .calibration import calibration_metrics
 from .config import PROJECT_ROOT
@@ -250,8 +253,20 @@ def build_walk_forward_rows(
                             game.start,
                         )
                         probable_available = True
-                    except ValueError:
-                        pass
+                    except ValueError as error:
+                        # DD-3 (deep debug audit, 2026-08-04): point_in_time_
+                        # pitcher_era_gap's only failure mode is a real,
+                        # well-scoped "no archived point-in-time-safe
+                        # observation exists for this game" signal
+                        # (NO_CALL_STARTERS_NO_PIT_ARCHIVE) -- expected and
+                        # common across a large historical backtest, so
+                        # debug (not warning) to avoid log spam; still gives
+                        # real observability into per-game coverage gaps
+                        # that a bare `pass` never surfaced at all.
+                        logger.debug(
+                            "validation: no point-in-time starter ERA gap for %s: %s",
+                            game.event_id, error,
+                        )
 
                 # Historical weather from Open-Meteo DB
                 weather = _lookup_weather(game.home_team, game.start.astimezone(EASTERN).date().isoformat())
@@ -528,7 +543,14 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
                             spread_snapshots += 1
                         elif mt == "total":
                             total_snapshots += 1
-            except OSError:
+            except OSError as error:
+                # DD-3 (deep debug audit, 2026-08-04): this used to be a
+                # bare `continue` -- a genuine I/O failure mid-read (not
+                # "file doesn't exist", already excluded by the caller's own
+                # exists()/glob() check) silently truncated this file's
+                # count with no way to tell it apart from a file that
+                # legitimately had nothing left to contribute.
+                logger.warning("multi_market_readiness: failed reading %s: %s", snap_path, error)
                 continue
 
     # ── Stage 3: legacy flat-file backfill ────────────────────────────────
@@ -575,7 +597,9 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
                                     f5_total += 1
                             elif "-yrfi" in slug or "-nrfi" in slug:
                                 yrfi_nrfi += 1
-                except OSError:
+                except OSError as error:
+                    # DD-3: see Stage 2's matching comment above.
+                    logger.warning("multi_market_readiness: failed reading %s: %s", snap_path, error)
                     continue
 
         fg_spread_status, fg_total_status = _readiness_for_market(
@@ -760,8 +784,14 @@ def _add_legacy_backfill(
                         spread_count += 1
                     elif mt == "total":
                         total_count += 1
-        except OSError:
-            pass
+        except OSError as error:
+            # DD-3 (deep debug audit, 2026-08-04): this used to be a bare
+            # `pass` -- a genuine I/O failure mid-read (the file's own
+            # exists() check above already ruled out "doesn't exist")
+            # silently left spread_count/total_count at whatever partial
+            # value they'd reached, indistinguishable from a legacy file
+            # that legitimately had nothing more relevant in it.
+            logger.warning("_add_legacy_backfill: failed reading %s: %s", legacy_pm_path, error)
 
     # ── Legacy market odds file (MLB-specific dict format) ─────────────
     legacy_mo_path = data_root / "market_odds_snapshots.jsonl"
@@ -778,8 +808,9 @@ def _add_legacy_backfill(
                         spread_count += 1
                     if isinstance(markets.get("total"), dict):
                         total_count += 1
-        except OSError:
-            pass
+        except OSError as error:
+            # DD-3: see the legacy Polymarket file's matching comment above.
+            logger.warning("_add_legacy_backfill: failed reading %s: %s", legacy_mo_path, error)
 
     return spread_count, total_count
 
