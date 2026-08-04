@@ -8954,7 +8954,7 @@
   },
   "bo3:1:23972": {
     "acronym": null,
-    "name": "XClan",
+    "name": "XCLAN",
     "slug": "xclan",
     "source_team_id": 23972,
     "team_id": "bo3:1:23972"
@@ -9567,6 +9567,13 @@
     "slug": "nordic-partners-gaming",
     "source_team_id": 25002,
     "team_id": "bo3:1:25002"
+  },
+  "bo3:1:25014": {
+    "acronym": null,
+    "name": "Finishers",
+    "slug": "finishers",
+    "source_team_id": 25014,
+    "team_id": "bo3:1:25014"
   },
   "bo3:1:25026": {
     "acronym": null,

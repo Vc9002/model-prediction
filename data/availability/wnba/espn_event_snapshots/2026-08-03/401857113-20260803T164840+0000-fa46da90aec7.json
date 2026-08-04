@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3142010",
+      "current_status": "Out",
+      "player_name": "Azura Stevens",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-08-02T21:54:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-02T21:51:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "3065570",
+      "current_status": "Out",
+      "player_name": "Kelsey Plum",
+      "raw_status": "Out",
+      "reason": "Lower Leg",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-08-02T22:12:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "887",
+      "current_status": "Questionable",
+      "player_name": "Sami Whitcomb",
+      "raw_status": "Day-To-Day",
+      "reason": "Knee",
+      "return_date": "2026-08-03",
+      "status_at_utc": "2026-08-02T22:10:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "event_id": "401857113",
+  "observed_at_utc": "2026-08-03T16:48:40.496575+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "fa46da90aec7e139540e24e8f5513e212057404aae8bd93db9a9547b0c5d0793",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

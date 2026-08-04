@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4398577",
+      "current_status": "Out",
+      "player_name": "Miela Sowah",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-04",
+      "status_at_utc": "2026-08-02T23:50:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "4790263",
+      "current_status": "Out",
+      "player_name": "Iliana Rupert",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-07T15:18:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "5364343",
+      "current_status": "Out",
+      "player_name": "Ornella Bankole",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-04",
+      "status_at_utc": "2026-08-02T23:50:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "3904576",
+      "current_status": "Out",
+      "player_name": "Marina Mabrey",
+      "raw_status": "Out",
+      "reason": "Neck",
+      "return_date": "2026-08-04",
+      "status_at_utc": "2026-08-02T19:08:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "4684384",
+      "current_status": "Out",
+      "player_name": "Aneesah Morrow",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-08-04",
+      "status_at_utc": "2026-08-01T23:59:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "2988756",
+      "current_status": "Out",
+      "player_name": "Brittney Sykes",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-26T18:40:00+00:00",
+      "team": "Toronto Tempo"
+    }
+  ],
+  "event_id": "401857110",
+  "observed_at_utc": "2026-08-03T02:35:04.449548+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "ae4519de0abd196a14267a2a985d2efb1083e6864b2ea07d4b7a672c9abea33f",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

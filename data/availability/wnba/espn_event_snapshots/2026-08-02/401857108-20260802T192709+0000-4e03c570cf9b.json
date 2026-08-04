@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5108051",
+      "current_status": "Out",
+      "player_name": "Jordan Harrison",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-02T18:49:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4703794",
+      "current_status": "Out",
+      "player_name": "Sarah Ashlee Barker",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-24T15:18:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4433795",
+      "current_status": "Out",
+      "player_name": "Sania Feagin",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-09T23:15:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "5105752",
+      "current_status": "Out",
+      "player_name": "Alissa Pili",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-08-02T18:52:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4565515",
+      "current_status": "Out",
+      "player_name": "Tonie Morgan",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-08-02T18:50:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "5274110",
+      "current_status": "Out",
+      "player_name": "Monique Akoa Makani",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-08-02T06:33:00+00:00",
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "event_id": "401857108",
+  "observed_at_utc": "2026-08-02T19:27:09.720535+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "4e03c570cf9b0d86e4647c12ea1d7b10a9e34d6011f31945405ad33f781adf38",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

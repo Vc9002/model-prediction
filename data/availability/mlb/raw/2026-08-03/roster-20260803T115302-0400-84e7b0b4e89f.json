@@ -1,0 +1,5068 @@
+{
+  "entries": [
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 640462,
+      "player_name": "A.J. Puk",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680728,
+      "player_name": "Adrian Del Castillo",
+      "position_type": "Hitter",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694851,
+      "player_name": "Andrew Hoffmann",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 685314,
+      "player_name": "Andrew Saalfrank",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 686796,
+      "player_name": "Blake Walston",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694297,
+      "player_name": "Brandon Pfaadt",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 805299,
+      "player_name": "Brandyn Garcia",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 669203,
+      "player_name": "Corbin Burnes",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682998,
+      "player_name": "Corbin Carroll",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 691441,
+      "player_name": "Cristian Mena",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 686753,
+      "player_name": "Drey Jameson",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691009,
+      "player_name": "Dylan Ray",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 593958,
+      "player_name": "Eduardo Rodriguez",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 672515,
+      "player_name": "Gabriel Moreno",
+      "position_type": "Catcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 672695,
+      "player_name": "Geraldo Perdomo",
+      "position_type": "Infielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 672629,
+      "player_name": "Gerardo Carrillo",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 545121,
+      "player_name": "Ildemaro Vargas",
+      "position_type": "Infielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 543510,
+      "player_name": "James McCann",
+      "position_type": "Catcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 642528,
+      "player_name": "Jonathan Loáisiga",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 691783,
+      "player_name": "Jordan Lawlar",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 678489,
+      "player_name": "Jorge Barrosa",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 703615,
+      "player_name": "Jose Cabrera",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 699912,
+      "player_name": "Jose Fernandez",
+      "position_type": "Hitter",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 686228,
+      "player_name": "Juan Burgos",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666661,
+      "player_name": "Juan Morillo",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 679885,
+      "player_name": "Justin Martinez",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669704,
+      "player_name": "Kade Strowd",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 606466,
+      "player_name": "Ketel Marte",
+      "position_type": "Infielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656464,
+      "player_name": "Kevin Ginkel",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 684442,
+      "player_name": "Kohl Drake",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 666971,
+      "player_name": "Lourdes Gurriel Jr.",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694410,
+      "player_name": "LuJames Groover",
+      "position_type": "Infielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 596146,
+      "player_name": "Max Kepler",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 518876,
+      "player_name": "Merrill Kelly",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 647336,
+      "player_name": "Michael Soroka",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683352,
+      "player_name": "Mitch Bratt",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 571448,
+      "player_name": "Nolan Arenado",
+      "position_type": "Infielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 623149,
+      "player_name": "Paul Sewald",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691769,
+      "player_name": "Philip Abner",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 657044,
+      "player_name": "Ryan Thompson",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 814439,
+      "player_name": "Ryan Waldschmidt",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 669194,
+      "player_name": "Ryne Nelson",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664199,
+      "player_name": "Taylor Clarke",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694374,
+      "player_name": "Tim Tawa",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 694371,
+      "player_name": "Tommy Troy",
+      "position_type": "Outfielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682988,
+      "player_name": "Tyler Locklear",
+      "position_type": "Infielder",
+      "team_id": 109
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 668678,
+      "player_name": "Zac Gallen",
+      "position_type": "Pitcher",
+      "team_id": 109
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650644,
+      "player_name": "Aaron Civale",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 608324,
+      "player_name": "Alex Bregman",
+      "position_type": "Infielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681520,
+      "player_name": "Antoine Kelly",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 676962,
+      "player_name": "Ben Brown",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 690990,
+      "player_name": "Cade Horton",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 573204,
+      "player_name": "Caleb Thielbar",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 608348,
+      "player_name": "Carson Kelly",
+      "position_type": "Catcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 607067,
+      "player_name": "Colin Rea",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 694037,
+      "player_name": "Daniel Palencia",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 621020,
+      "player_name": "Dansby Swanson",
+      "position_type": "Infielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656849,
+      "player_name": "David Peterson",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 665795,
+      "player_name": "Edward Cabrera",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 681799,
+      "player_name": "Ethan Roberts",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 668970,
+      "player_name": "Gavin Hollowell",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 571948,
+      "player_name": "Hoby Milner",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 640451,
+      "player_name": "Hunter Harvey",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664023,
+      "player_name": "Ian Happ",
+      "position_type": "Outfielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 657097,
+      "player_name": "Jacob Webb",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663765,
+      "player_name": "Jake Woodford",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701649,
+      "player_name": "James Triantos",
+      "position_type": "Infielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665871,
+      "player_name": "Javier Assad",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681151,
+      "player_name": "Jayden Murray",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 696136,
+      "player_name": "Jordan Wicks",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681909,
+      "player_name": "Justin Dean",
+      "position_type": "Outfielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 657006,
+      "player_name": "Justin Steele",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 682634,
+      "player_name": "Kevin Alcántara",
+      "position_type": "Hitter",
+      "team_id": 112
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 592332,
+      "player_name": "Kevin Gausman",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681432,
+      "player_name": "Luke Little",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 807713,
+      "player_name": "Matt Shaw",
+      "position_type": "Outfielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 571510,
+      "player_name": "Matthew Boyd",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683737,
+      "player_name": "Michael Busch",
+      "position_type": "Infielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 624424,
+      "player_name": "Michael Conforto",
+      "position_type": "Hitter",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665804,
+      "player_name": "Miguel Amaya",
+      "position_type": "Catcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694208,
+      "player_name": "Moisés Ballesteros",
+      "position_type": "Hitter",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663538,
+      "player_name": "Nico Hoerner",
+      "position_type": "Infielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 699393,
+      "player_name": "Pedro Ramírez",
+      "position_type": "Infielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691718,
+      "player_name": "Pete Crow-Armstrong",
+      "position_type": "Outfielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 664208,
+      "player_name": "Phil Maton",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 687863,
+      "player_name": "Porter Hodge",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 702303,
+      "player_name": "Riley Martin",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669020,
+      "player_name": "Ryan Rolison",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 673548,
+      "player_name": "Seiya Suzuki",
+      "position_type": "Outfielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 571946,
+      "player_name": "Shelby Miller",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 684007,
+      "player_name": "Shota Imanaga",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663423,
+      "player_name": "Trent Thornton",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 592122,
+      "player_name": "Tyler Austin",
+      "position_type": "Infielder",
+      "team_id": 112
+    },
+    {
+      "current_status": "Active",
+      "player_id": 621053,
+      "player_name": "Tyler Ferguson",
+      "position_type": "Pitcher",
+      "team_id": 112
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691182,
+      "player_name": "Adael Amador",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 622608,
+      "player_name": "Antonio Senzatela",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 680604,
+      "player_name": "Blas Castaño",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 690924,
+      "player_name": "Braxton Fulford",
+      "position_type": "Hitter",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 657514,
+      "player_name": "Brennan Bernardino",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 686668,
+      "player_name": "Brenton Doyle",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664954,
+      "player_name": "Brett Sullivan",
+      "position_type": "Catcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 677060,
+      "player_name": "Chad Stevens",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 801403,
+      "player_name": "Chase Dollander",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694249,
+      "player_name": "Cole Carrigg",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666397,
+      "player_name": "Edouard Julien",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 682769,
+      "player_name": "Eiberson Castellano",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 678662,
+      "player_name": "Ezequiel Tovar",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687312,
+      "player_name": "Gabriel Hughes",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 696100,
+      "player_name": "Hunter Goodman",
+      "position_type": "Catcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 677955,
+      "player_name": "Jaden Hill",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664983,
+      "player_name": "Jake McCarthy",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 676105,
+      "player_name": "Jeff Criswell",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 623474,
+      "player_name": "Jimmy Herget",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 687597,
+      "player_name": "Jordan Beck",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 605447,
+      "player_name": "Jordan Romano",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 500779,
+      "player_name": "Jose Quintana",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 675848,
+      "player_name": "Juan Mejia",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 592178,
+      "player_name": "Kris Bryant",
+      "position_type": "Hitter",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 607536,
+      "player_name": "Kyle Freeland",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691720,
+      "player_name": "Kyle Karros",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 685326,
+      "player_name": "McCade Brown",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 547179,
+      "player_name": "Michael Lorenzen",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666160,
+      "player_name": "Mickey Moniak",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 693308,
+      "player_name": "Nick Frasso",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 701487,
+      "player_name": "Pierson Ohl",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663372,
+      "player_name": "Ryan Feltner",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 690022,
+      "player_name": "Ryan Ritter",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 807743,
+      "player_name": "Sean Sullivan",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694514,
+      "player_name": "Sterlin Thompson",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681198,
+      "player_name": "TJ Rumfield",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669298,
+      "player_name": "TJ Shook",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 685299,
+      "player_name": "Tanner Gordon",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 608372,
+      "player_name": "Tomoyuki Sugano",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687859,
+      "player_name": "Troy Johnston",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 671289,
+      "player_name": "Tyler Freeman",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680767,
+      "player_name": "Victor Vodnik",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 700327,
+      "player_name": "Welinton Herrera",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650489,
+      "player_name": "Willi Castro",
+      "position_type": "Infielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691728,
+      "player_name": "Zac Veen",
+      "position_type": "Outfielder",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 688642,
+      "player_name": "Zach Agnos",
+      "position_type": "Pitcher",
+      "team_id": 115
+    },
+    {
+      "current_status": "Active",
+      "player_id": 805123,
+      "player_name": "AJ Blubaugh",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 695001,
+      "player_name": "Alimber Santa",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656986,
+      "player_name": "Bennett Sousa",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 687888,
+      "player_name": "Brandon Walter",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 694728,
+      "player_name": "Brice Matthews",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650556,
+      "player_name": "Bryan Abreu",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687911,
+      "player_name": "Bryan King",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701358,
+      "player_name": "Cam Smith",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 621043,
+      "player_name": "Carlos Correa",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 543877,
+      "player_name": "Christian Vázquez",
+      "position_type": "Catcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 572233,
+      "player_name": "Christian Walker",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 805672,
+      "player_name": "Collin Price",
+      "position_type": "Catcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664299,
+      "player_name": "Cristian Javier",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 660853,
+      "player_name": "Enyel De Los Santos",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669713,
+      "player_name": "Hayden Wesneski",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 686613,
+      "player_name": "Hunter Brown",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670623,
+      "player_name": "Isaac Paredes",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676694,
+      "player_name": "Jake Meyers",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669920,
+      "player_name": "Jason Alexander",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665161,
+      "player_name": "Jeremy Peña",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694388,
+      "player_name": "Joey Loperfido",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 514888,
+      "player_name": "Jose Altuve",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 623352,
+      "player_name": "Josh Hader",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 678906,
+      "player_name": "Kai-Wei Teng",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664774,
+      "player_name": "LaMonte Wade Jr.",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 701121,
+      "player_name": "Logan VanWey",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 828599,
+      "player_name": "Lucas Spence",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 699044,
+      "player_name": "Miguel Ullola",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 681347,
+      "player_name": "Mike Burrows",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669397,
+      "player_name": "Nick Allen",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663567,
+      "player_name": "Peter Lambert",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669384,
+      "player_name": "Raynel Delgado",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669854,
+      "player_name": "Ronel Blanco",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694376,
+      "player_name": "Shay Whitcomb",
+      "position_type": "Infielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 681293,
+      "player_name": "Spencer Arrighetti",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 595345,
+      "player_name": "Steven Okert",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 837227,
+      "player_name": "Tatsuya Imai",
+      "position_type": "Pitcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666211,
+      "player_name": "Taylor Trammell",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 673237,
+      "player_name": "Yainer Diaz",
+      "position_type": "Catcher",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670541,
+      "player_name": "Yordan Alvarez",
+      "position_type": "Hitter",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 805904,
+      "player_name": "Zach Cole",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701305,
+      "player_name": "Zach Dezenzo",
+      "position_type": "Outfielder",
+      "team_id": 117
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 677950,
+      "player_name": "Alek Thomas",
+      "position_type": "Outfielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669743,
+      "player_name": "Alex Call",
+      "position_type": "Outfielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 690976,
+      "player_name": "Alex Freeland",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681911,
+      "player_name": "Alex Vesia",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681624,
+      "player_name": "Andy Pages",
+      "position_type": "Outfielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 676508,
+      "player_name": "Ben Casparius",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 605483,
+      "player_name": "Blake Snell",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 595014,
+      "player_name": "Blake Treinen",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 676272,
+      "player_name": "Bobby Miller",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 592779,
+      "player_name": "Brock Stewart",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 660813,
+      "player_name": "Brusdar Graterol",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 679922,
+      "player_name": "Carlos Duran",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687221,
+      "player_name": "Dalton Rushing",
+      "position_type": "Catcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683618,
+      "player_name": "Edgardo Henriquez",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 621242,
+      "player_name": "Edwin Díaz",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 672613,
+      "player_name": "Eliezer Alfonzo",
+      "position_type": "Catcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 686218,
+      "player_name": "Emmet Sheehan",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 571771,
+      "player_name": "Enrique Hernández",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 641778,
+      "player_name": "Eric Lauer",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 623465,
+      "player_name": "Evan Phillips",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 518692,
+      "player_name": "Freddie Freeman",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 694813,
+      "player_name": "Gavin Stone",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 808975,
+      "player_name": "Hyeseong Kim",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676263,
+      "player_name": "Jack Dreyer",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 664776,
+      "player_name": "Jake Cousins",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680736,
+      "player_name": "Justin Wrobleski",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669165,
+      "player_name": "Kyle Hurt",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663656,
+      "player_name": "Kyle Tucker",
+      "position_type": "Outfielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 689017,
+      "player_name": "Landon Knack",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 571970,
+      "player_name": "Max Muncy",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 500743,
+      "player_name": "Miguel Rojas",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 605141,
+      "player_name": "Mookie Betts",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 801434,
+      "player_name": "Paul Gervase",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 808963,
+      "player_name": "Roki Sasaki",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691947,
+      "player_name": "Ronan Kopp",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669899,
+      "player_name": "Ryan Ward",
+      "position_type": "Outfielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 678020,
+      "player_name": "Seth Halvorsen",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 660271,
+      "player_name": "Shohei Ohtani",
+      "position_type": "Two-Way Player",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656945,
+      "player_name": "Tanner Scott",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 669373,
+      "player_name": "Tarik Skubal",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 606192,
+      "player_name": "Teoscar Hernández",
+      "position_type": "Outfielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669242,
+      "player_name": "Tommy Edman",
+      "position_type": "Infielder",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 607192,
+      "player_name": "Tyler Glasnow",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 694361,
+      "player_name": "Will Klein",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 669257,
+      "player_name": "Will Smith",
+      "position_type": "Catcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670090,
+      "player_name": "Wyatt Mills",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Active",
+      "player_id": 808967,
+      "player_name": "Yoshinobu Yamamoto",
+      "position_type": "Pitcher",
+      "team_id": 119
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694673,
+      "player_name": "Abimelec Ortiz",
+      "position_type": "Infielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665953,
+      "player_name": "Andrés Chaparro",
+      "position_type": "Infielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 674841,
+      "player_name": "Andrew Alvarez",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 695418,
+      "player_name": "Brad Lord",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691781,
+      "player_name": "Brady House",
+      "position_type": "Infielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682928,
+      "player_name": "CJ Abrams",
+      "position_type": "Infielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676917,
+      "player_name": "Cade Cavalli",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687223,
+      "player_name": "Carson Palmquist",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681047,
+      "player_name": "Christian Franklin",
+      "position_type": "Outfielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 690925,
+      "player_name": "Clayton Beeter",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669371,
+      "player_name": "Cole Henry",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 813349,
+      "player_name": "Connelly Early",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 687792,
+      "player_name": "DJ Herz",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 695734,
+      "player_name": "Daylen Lile",
+      "position_type": "Outfielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 686452,
+      "player_name": "Drew Millas",
+      "position_type": "Catcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 686611,
+      "player_name": "Dylan Crews",
+      "position_type": "Outfielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 678868,
+      "player_name": "Eddy Yean",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656492,
+      "player_name": "Foster Griffin",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681402,
+      "player_name": "Gus Varland",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 695670,
+      "player_name": "Harry Ford",
+      "position_type": "Catcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 696285,
+      "player_name": "Jacob Young",
+      "position_type": "Outfielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 656234,
+      "player_name": "Jake Bird",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663623,
+      "player_name": "Jake Irvin",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 695578,
+      "player_name": "James Wood",
+      "position_type": "Outfielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 686894,
+      "player_name": "Joey Wiemer",
+      "position_type": "Outfielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 678391,
+      "player_name": "Jorbit Vivas",
+      "position_type": "Infielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 677588,
+      "player_name": "José Tena",
+      "position_type": "Hitter",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 680686,
+      "player_name": "Josiah Gray",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 660688,
+      "player_name": "Keibert Ruiz",
+      "position_type": "Catcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 686610,
+      "player_name": "Ken Waldichuk",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 693312,
+      "player_name": "Kyle Nicolas",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691384,
+      "player_name": "Luis Perales",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668820,
+      "player_name": "Max Kranick",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 571945,
+      "player_name": "Miles Mikolas",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 680730,
+      "player_name": "Mitchell Parker",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683083,
+      "player_name": "Nasim Nuñez",
+      "position_type": "Infielder",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687377,
+      "player_name": "Orlando Ribalta",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 676571,
+      "player_name": "PJ Poulin",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 687606,
+      "player_name": "Paxton Schultz",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 663992,
+      "player_name": "Richard Lovelady",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683000,
+      "player_name": "Riley Cornelio",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676680,
+      "player_name": "Tom Cosgrove",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592866,
+      "player_name": "Trevor Williams",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 672442,
+      "player_name": "Yovanny Cruz",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Active",
+      "player_id": 641793,
+      "player_name": "Zack Littell",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 687849,
+      "player_name": "Zak Kent",
+      "position_type": "Pitcher",
+      "team_id": 120
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 699008,
+      "player_name": "Antwone Kelly",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 695257,
+      "player_name": "Billy Cook",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 684049,
+      "player_name": "Brandan Bidois",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 685126,
+      "player_name": "Brandon Eisert",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664040,
+      "player_name": "Brandon Lowe",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 677952,
+      "player_name": "Braxton Ashcraft",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668804,
+      "player_name": "Bryan Reynolds",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 696149,
+      "player_name": "Bubba Chandler",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666808,
+      "player_name": "Camilo Doval",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669387,
+      "player_name": "Carmen Mlodzinski",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 606965,
+      "player_name": "Chris Devenski",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682848,
+      "player_name": "Endy Rodríguez",
+      "position_type": "Catcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 699013,
+      "player_name": "Esmerlyn Valdez",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 681895,
+      "player_name": "Evan Sisk",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 642397,
+      "player_name": "Gregory Soto",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680779,
+      "player_name": "Henry Davis",
+      "position_type": "Catcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 682995,
+      "player_name": "Hunter Barco",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676702,
+      "player_name": "Hunter Stratton",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676755,
+      "player_name": "Isaac Mattson",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 687394,
+      "player_name": "Jack Brannigan",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694378,
+      "player_name": "Jacob Gonzalez",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663968,
+      "player_name": "Jake Mangum",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683003,
+      "player_name": "Jared Jones",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669707,
+      "player_name": "Jared Triolo",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691373,
+      "player_name": "Jhostynxon Garcia",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 671286,
+      "player_name": "Johnathan Rodríguez",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694753,
+      "player_name": "Khristian Curtis",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 804606,
+      "player_name": "Konnor Griffin",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 542303,
+      "player_name": "Marcell Ozuna",
+      "position_type": "Hitter",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682254,
+      "player_name": "Mason Montgomery",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656605,
+      "player_name": "Mitch Keller",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 693304,
+      "player_name": "Nick Gonzales",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694377,
+      "player_name": "Nick Yorke",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668716,
+      "player_name": "Noah Murdock",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 665833,
+      "player_name": "Oneil Cruz",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694973,
+      "player_name": "Paul Skenes",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 804668,
+      "player_name": "Rafael Flores Jr.",
+      "position_type": "Catcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676760,
+      "player_name": "Ron Marinaccio",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 656811,
+      "player_name": "Ryan O'Hearn",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687462,
+      "player_name": "Spencer Horwitz",
+      "position_type": "Infielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 802419,
+      "player_name": "Thomas Harrington",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 682997,
+      "player_name": "Tyler Callihan",
+      "position_type": "Outfielder",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 696062,
+      "player_name": "Wilber Dotel",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670990,
+      "player_name": "Yohan Ramírez",
+      "position_type": "Pitcher",
+      "team_id": 134
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670970,
+      "player_name": "Adrian Morejon",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 689690,
+      "player_name": "Alek Jacob",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 675448,
+      "player_name": "Blake Hunt",
+      "position_type": "Catcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 699134,
+      "player_name": "Bradgley Rodriguez",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 663773,
+      "player_name": "Bryan Hoeing",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 688158,
+      "player_name": "David Morgan",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665487,
+      "player_name": "Fernando Tatis Jr.",
+      "position_type": "Outfielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666023,
+      "player_name": "Freddy Fermin",
+      "position_type": "Catcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 678184,
+      "player_name": "Garrett Hawkins",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 657757,
+      "player_name": "Gavin Sheets",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 608566,
+      "player_name": "Germán Márquez",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656288,
+      "player_name": "Griffin Canning",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676664,
+      "player_name": "JP Sears",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701538,
+      "player_name": "Jackson Merrill",
+      "position_type": "Outfielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 630105,
+      "player_name": "Jake Cronenworth",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687749,
+      "player_name": "Jase Bowen",
+      "position_type": "Outfielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 592094,
+      "player_name": "Jason Adam",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669093,
+      "player_name": "Jeremiah Estrada",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 666745,
+      "player_name": "Jhony Brito",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 605397,
+      "player_name": "Joe Musgrove",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 606996,
+      "player_name": "Kyle Hart",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 608337,
+      "player_name": "Lucas Giolito",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669134,
+      "player_name": "Luis Campusano",
+      "position_type": "Catcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650859,
+      "player_name": "Luis Rengifo",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592518,
+      "player_name": "Manny Machado",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669200,
+      "player_name": "Mason McCoy",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 695243,
+      "player_name": "Mason Miller",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650633,
+      "player_name": "Michael King",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 609280,
+      "player_name": "Miguel Andujar",
+      "position_type": "Hitter",
+      "team_id": 135
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 700280,
+      "player_name": "Miguel Mendez",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 601713,
+      "player_name": "Nick Pivetta",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 657656,
+      "player_name": "Ramón Laureano",
+      "position_type": "Outfielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681190,
+      "player_name": "Randy Vásquez",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 660710,
+      "player_name": "Rodolfo Durán",
+      "position_type": "Catcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 669392,
+      "player_name": "Samad Taylor",
+      "position_type": "Outfielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 823550,
+      "player_name": "Sung-Mun Song",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664034,
+      "player_name": "Ty France",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 621111,
+      "player_name": "Walker Buehler",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 593974,
+      "player_name": "Wandy Peralta",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 695238,
+      "player_name": "Will Wagner",
+      "position_type": "Hitter",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 593428,
+      "player_name": "Xander Bogaerts",
+      "position_type": "Infielder",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 673513,
+      "player_name": "Yuki Matsui",
+      "position_type": "Pitcher",
+      "team_id": 135
+    },
+    {
+      "current_status": "Active",
+      "player_id": 605288,
+      "player_name": "Adrian Houser",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 683627,
+      "player_name": "Anthony Molina",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694918,
+      "player_name": "Blade Tidwell",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 805811,
+      "player_name": "Bryce Eldridge",
+      "position_type": "Hitter",
+      "team_id": 137
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 671083,
+      "player_name": "Buddy Kennedy",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668873,
+      "player_name": "Caleb Kilian",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 693313,
+      "player_name": "Carson Seymour",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687931,
+      "player_name": "Carson Whisenhunt",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 669477,
+      "player_name": "Casey Schmitt",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683766,
+      "player_name": "Christian Koss",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691740,
+      "player_name": "Daniel Susac",
+      "position_type": "Catcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701852,
+      "player_name": "Drew Cavanaugh",
+      "position_type": "Catcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687551,
+      "player_name": "Drew Gilbert",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681916,
+      "player_name": "Dylan Smith",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669062,
+      "player_name": "Erik Miller",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687529,
+      "player_name": "Grant McCray",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 664056,
+      "player_name": "Harrison Bader",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 806185,
+      "player_name": "Hayden Birdsong",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 671218,
+      "player_name": "Heliot Ramos",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664141,
+      "player_name": "JT Brubaker",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 671345,
+      "player_name": "Jason Foley",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 683679,
+      "player_name": "Jesus Rodriguez",
+      "position_type": "Catcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 666711,
+      "player_name": "Joel Peguero",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 813841,
+      "player_name": "Jonah Cox",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 676130,
+      "player_name": "José Buttó",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 808982,
+      "player_name": "Jung Hoo Lee",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676775,
+      "player_name": "Keaton Winn",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694738,
+      "player_name": "Landen Roupp",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 657277,
+      "player_name": "Logan Webb",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650333,
+      "player_name": "Luis Arraez",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 656305,
+      "player_name": "Matt Chapman",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 657424,
+      "player_name": "Matt Gage",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 801501,
+      "player_name": "Nate Furman",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 678545,
+      "player_name": "Osleivis Basabe",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 646240,
+      "player_name": "Rafael Devers",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 678495,
+      "player_name": "Randy Rodríguez",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 665665,
+      "player_name": "Reiver Sanmartin",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592662,
+      "player_name": "Robbie Ray",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 592858,
+      "player_name": "Rowan Wick",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676254,
+      "player_name": "Ryan Walker",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656529,
+      "player_name": "Sam Hentges",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 702352,
+      "player_name": "Spencer Bivens",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 686790,
+      "player_name": "Trevor McDonald",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 663941,
+      "player_name": "Tristan Beck",
+      "position_type": "Pitcher",
+      "team_id": 137
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 682674,
+      "player_name": "Victor Bericoto",
+      "position_type": "Outfielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 642715,
+      "player_name": "Willy Adames",
+      "position_type": "Infielder",
+      "team_id": 137
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676475,
+      "player_name": "Alec Burleson",
+      "position_type": "Infielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669467,
+      "player_name": "Andre Pallante",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691458,
+      "player_name": "Blaze Jordan",
+      "position_type": "Infielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663494,
+      "player_name": "Bryan Torres",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 802408,
+      "player_name": "Brycen Mautz",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 693409,
+      "player_name": "César Prieto",
+      "position_type": "Infielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 687309,
+      "player_name": "Cooper Hjerpe",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669160,
+      "player_name": "Dustin May",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666277,
+      "player_name": "George Soriano",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 700669,
+      "player_name": "Gordon Graceffo",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 690928,
+      "player_name": "Hunter Dobbins",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 671056,
+      "player_name": "Iván Herrera",
+      "position_type": "Hitter",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 802139,
+      "player_name": "JJ Wetherholt",
+      "position_type": "Infielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 699625,
+      "player_name": "Jimmy Crooks",
+      "position_type": "Catcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 668941,
+      "player_name": "JoJo Romero",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691023,
+      "player_name": "Jordan Walker",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665877,
+      "player_name": "José Fermín",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 695491,
+      "player_name": "Joshua Báez",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 677865,
+      "player_name": "Justin Bruihl",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681517,
+      "player_name": "Kyle Leahy",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663457,
+      "player_name": "Lars Nootbaar",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 699024,
+      "player_name": "Leo Bernal",
+      "position_type": "Catcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 703725,
+      "player_name": "Luis Gastelum",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691026,
+      "player_name": "Masyn Winn",
+      "position_type": "Infielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694335,
+      "player_name": "Matt Svanson",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669461,
+      "player_name": "Matthew Liberatore",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 691008,
+      "player_name": "Max Rajcic",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 700241,
+      "player_name": "Michael McGreevy",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701675,
+      "player_name": "Nathan Church",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676369,
+      "player_name": "Nelson Velázquez",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669357,
+      "player_name": "Nolan Gorman",
+      "position_type": "Infielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 686780,
+      "player_name": "Pedro Pagés",
+      "position_type": "Catcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 657265,
+      "player_name": "Peter Strzelecki",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687273,
+      "player_name": "Quinn Mathews",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 602104,
+      "player_name": "Ramón Urías",
+      "position_type": "Infielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 690916,
+      "player_name": "Richard Fitts",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676617,
+      "player_name": "Riley O'Brien",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681676,
+      "player_name": "Ryan Fernandez",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592773,
+      "player_name": "Ryne Stanek",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694358,
+      "player_name": "Tekoah Roby",
+      "position_type": "Pitcher",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 695336,
+      "player_name": "Thomas Saggese",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 687363,
+      "player_name": "Victor Scott II",
+      "position_type": "Outfielder",
+      "team_id": 138
+    },
+    {
+      "current_status": "Active",
+      "player_id": 702047,
+      "player_name": "Alex Cook",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 810938,
+      "player_name": "Ben Williamson",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 641329,
+      "player_name": "Bryan Baker",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592155,
+      "player_name": "Cam Booser",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 700246,
+      "player_name": "Carson Williams",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668984,
+      "player_name": "Casey Legumina",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656775,
+      "player_name": "Cedric Mullins",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 802415,
+      "player_name": "Chandler Simpson",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 686678,
+      "player_name": "Chase Solesky",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 688297,
+      "player_name": "Chris Roycroft",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 642121,
+      "player_name": "Cole Sulser",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 518886,
+      "player_name": "Craig Kimbrel",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656876,
+      "player_name": "Drew Rasmussen",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 670955,
+      "player_name": "Edwin Uceta",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 642547,
+      "player_name": "Freddy Peralta",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664076,
+      "player_name": "Garrett Cleavinger",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 666158,
+      "player_name": "Gavin Lux",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 643377,
+      "player_name": "Griffin Jax",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 685801,
+      "player_name": "Hunter Bigge",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676439,
+      "player_name": "Hunter Feduccia",
+      "position_type": "Catcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 693855,
+      "player_name": "Ian Seymour",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 689200,
+      "player_name": "Jacob Melton",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 699130,
+      "player_name": "Jadher Areinamo",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 641584,
+      "player_name": "Jake Fraley",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669947,
+      "player_name": "Jesse Scholtens",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 671212,
+      "player_name": "Joe Boyle",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666018,
+      "player_name": "Jonathan Aranda",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 669169,
+      "player_name": "Jonathan Heasley",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676356,
+      "player_name": "Jonny DeLuca",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691406,
+      "player_name": "Junior Caminero",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687330,
+      "player_name": "Kevin Kelly",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 655889,
+      "player_name": "Manuel Rodríguez",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669438,
+      "player_name": "Mason Englert",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 675627,
+      "player_name": "Michael Grove",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663743,
+      "player_name": "Nick Fortes",
+      "position_type": "Catcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 607259,
+      "player_name": "Nick Martinez",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 686554,
+      "player_name": "Oliver Dunn",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680700,
+      "player_name": "Richie Palacios",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 686752,
+      "player_name": "Ryan Pepiot",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668723,
+      "player_name": "Ryan Vilade",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 663556,
+      "player_name": "Shane McClanahan",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 571927,
+      "player_name": "Steven Matz",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 621051,
+      "player_name": "Steven Wilson",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670764,
+      "player_name": "Taylor Walls",
+      "position_type": "Infielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694680,
+      "player_name": "Trevor Martin",
+      "position_type": "Pitcher",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683748,
+      "player_name": "Victor Mesa Jr.",
+      "position_type": "Outfielder",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650490,
+      "player_name": "Yandy Díaz",
+      "position_type": "Hitter",
+      "team_id": 139
+    },
+    {
+      "current_status": "Active",
+      "player_id": 696030,
+      "player_name": "Alejandro Osuna",
+      "position_type": "Outfielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 642851,
+      "player_name": "Austin Wynns",
+      "position_type": "Catcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687239,
+      "player_name": "Ben Peoples",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 607043,
+      "player_name": "Brandon Nimmo",
+      "position_type": "Outfielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 615698,
+      "player_name": "Cal Quantrill",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 695508,
+      "player_name": "Cam Cauley",
+      "position_type": "Outfielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 691945,
+      "player_name": "Carter Baumler",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681217,
+      "player_name": "Chase Silseth",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 455119,
+      "player_name": "Chris Martin",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 674003,
+      "player_name": "Cody Bradford",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 683227,
+      "player_name": "Cody Freeman",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668390,
+      "player_name": "Cole Winn",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 608369,
+      "player_name": "Corey Seager",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 643376,
+      "player_name": "Danny Jansen",
+      "position_type": "Catcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 699314,
+      "player_name": "David Davalillo",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 553869,
+      "player_name": "Elias Díaz",
+      "position_type": "Catcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 693713,
+      "player_name": "Emiliano Teodo",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694497,
+      "player_name": "Evan Carter",
+      "position_type": "Outfielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 677649,
+      "player_name": "Ezequiel Duran",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 686560,
+      "player_name": "Gavin Collyer",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 683004,
+      "player_name": "Jack Leiter",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656641,
+      "player_name": "Jacob Latz",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 594798,
+      "player_name": "Jacob deGrom",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669394,
+      "player_name": "Jake Burger",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 596001,
+      "player_name": "Jakob Junis",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 656222,
+      "player_name": "Jalen Beeks",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592626,
+      "player_name": "Joc Pederson",
+      "position_type": "Hitter",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 656756,
+      "player_name": "Jordan Montgomery",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 692030,
+      "player_name": "Jose Corniell",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 673962,
+      "player_name": "Josh Jung",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669701,
+      "player_name": "Josh Smith",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 679822,
+      "player_name": "Justin Foscue",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 677958,
+      "player_name": "Kumar Rocker",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 543309,
+      "player_name": "Kyle Higashioka",
+      "position_type": "Catcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 699214,
+      "player_name": "Leandro Lopez",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681351,
+      "player_name": "Logan O'Hoppe",
+      "position_type": "Catcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681168,
+      "player_name": "Luis Curvelo",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669022,
+      "player_name": "MacKenzie Gore",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 680737,
+      "player_name": "Michael Helman",
+      "position_type": "Outfielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 543135,
+      "player_name": "Nathan Eovaldi",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670032,
+      "player_name": "Nicky Lopez",
+      "position_type": "Infielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663884,
+      "player_name": "Nolan Kingham",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682608,
+      "player_name": "Peyton Gray",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 695239,
+      "player_name": "Robby Ahlstrom",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 676395,
+      "player_name": "Robert Garcia",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 641302,
+      "player_name": "Tyler Alexander",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 692437,
+      "player_name": "Winston Santos",
+      "position_type": "Pitcher",
+      "team_id": 140
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694671,
+      "player_name": "Wyatt Langford",
+      "position_type": "Outfielder",
+      "team_id": 140
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 671936,
+      "player_name": "Adam Macko",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 680718,
+      "player_name": "Addison Barger",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 672386,
+      "player_name": "Alejandro Kirk",
+      "position_type": "Catcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665926,
+      "player_name": "Andrés Giménez",
+      "position_type": "Infielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 623993,
+      "player_name": "Anthony Santander",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 670102,
+      "player_name": "Bowden Francis",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 678218,
+      "player_name": "Brandon Valenzuela",
+      "position_type": "Catcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680755,
+      "player_name": "Braydon Fisher",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663893,
+      "player_name": "Brendon Little",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 669310,
+      "player_name": "CJ Van Eyk",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 689149,
+      "player_name": "Chad Dallas",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 807727,
+      "player_name": "Charles McAdoo",
+      "position_type": "Infielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 695445,
+      "player_name": "Chase Lee",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 664074,
+      "player_name": "Cody Ponce",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 662139,
+      "player_name": "Daulton Varsho",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676914,
+      "player_name": "Davis Schneider",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656302,
+      "player_name": "Dylan Cease",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676391,
+      "player_name": "Ernie Clement",
+      "position_type": "Infielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 543807,
+      "player_name": "George Springer",
+      "position_type": "Hitter",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 814005,
+      "player_name": "Jake Bloss",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 592791,
+      "player_name": "Jameson Taillon",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656546,
+      "player_name": "Jeff Hoffman",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 660821,
+      "player_name": "Jesús Sánchez",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 573009,
+      "player_name": "Joe Mantiply",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 682729,
+      "player_name": "Jonatan Clase",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 621244,
+      "player_name": "José Berríos",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 667755,
+      "player_name": "José Soriano",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 672960,
+      "player_name": "Kazuma Okamoto",
+      "position_type": "Infielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 681751,
+      "player_name": "Lazaro Estrada",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 672820,
+      "player_name": "Lenyn Sosa",
+      "position_type": "Infielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 686973,
+      "player_name": "Louis Varland",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 649966,
+      "player_name": "Luis Urías",
+      "position_type": "Infielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 689254,
+      "player_name": "Mason Fluharty",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 453286,
+      "player_name": "Max Scherzer",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664702,
+      "player_name": "Myles Straw",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664770,
+      "player_name": "Nathan Lukes",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 571578,
+      "player_name": "Patrick Corbin",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694357,
+      "player_name": "Ricky Tiedemann",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 657675,
+      "player_name": "Rudy Martin Jr.",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 815873,
+      "player_name": "Sean Keys",
+      "position_type": "Hitter",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669456,
+      "player_name": "Shane Bieber",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 693686,
+      "player_name": "Spencer Miles",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 702056,
+      "player_name": "Trey Yesavage",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 643511,
+      "player_name": "Tyler Rogers",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665489,
+      "player_name": "Vladimir Guerrero Jr.",
+      "position_type": "Infielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 680862,
+      "player_name": "Willie MacIver",
+      "position_type": "Catcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 554340,
+      "player_name": "Yimi García",
+      "position_type": "Pitcher",
+      "team_id": 141
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 682818,
+      "player_name": "Yohendrick Piñango",
+      "position_type": "Outfielder",
+      "team_id": 141
+    },
+    {
+      "current_status": "Active",
+      "player_id": 605400,
+      "player_name": "Aaron Nola",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 666969,
+      "player_name": "Adolis García",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 660604,
+      "player_name": "Alan Rangel",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 664761,
+      "player_name": "Alec Bohm",
+      "position_type": "Infielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 686934,
+      "player_name": "Alex McFarlane",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691725,
+      "player_name": "Andrew Painter",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 641745,
+      "player_name": "Brad Keller",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669016,
+      "player_name": "Brandon Marsh",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 662144,
+      "player_name": "Brian Keller",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650559,
+      "player_name": "Bryan De La Cruz",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 547180,
+      "player_name": "Bryce Harper",
+      "position_type": "Infielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681082,
+      "player_name": "Bryson Stott",
+      "position_type": "Infielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663767,
+      "player_name": "Chase Shugart",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 686551,
+      "player_name": "Christian Cairo",
+      "position_type": "Infielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 650911,
+      "player_name": "Cristopher Sánchez",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656537,
+      "player_name": "Derek Hill",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 624641,
+      "player_name": "Edmundo Sosa",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694025,
+      "player_name": "Felix Reyes",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687282,
+      "player_name": "Gabriel Rincones Jr.",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 596117,
+      "player_name": "Garrett Stubbs",
+      "position_type": "Catcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 680880,
+      "player_name": "Grant Holman",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592663,
+      "player_name": "J.T. Realmuto",
+      "position_type": "Catcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666200,
+      "player_name": "Jesús Luzardo",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 661395,
+      "player_name": "Jhoan Duran",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 679032,
+      "player_name": "Johan Rojas",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680742,
+      "player_name": "Jonathan Bowlan",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 621237,
+      "player_name": "José Alvarado",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 702222,
+      "player_name": "Justin Crawford",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 670224,
+      "player_name": "Kameron Misner",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 679775,
+      "player_name": "Kyle Backhus",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656941,
+      "player_name": "Kyle Schwarber",
+      "position_type": "Hitter",
+      "team_id": 143
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 642152,
+      "player_name": "Lou Trivino III",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676661,
+      "player_name": "Max Lazar",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691330,
+      "player_name": "Moisés Chace",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676510,
+      "player_name": "Nolan Hoffman",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 689147,
+      "player_name": "Orion Kerkering",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 805249,
+      "player_name": "Otto Kemp",
+      "position_type": "Outfielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 668721,
+      "player_name": "Payton Henry",
+      "position_type": "Catcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 665561,
+      "player_name": "Rafael Marchán",
+      "position_type": "Catcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 686751,
+      "player_name": "Seth Johnson",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 621383,
+      "player_name": "Tanner Banks",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 641835,
+      "player_name": "Tim Mayza",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 607208,
+      "player_name": "Trea Turner",
+      "position_type": "Infielder",
+      "team_id": 143
+    },
+    {
+      "current_status": "Active",
+      "player_id": 554430,
+      "player_name": "Zack Wheeler",
+      "position_type": "Pitcher",
+      "team_id": 143
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 592450,
+      "player_name": "Aaron Judge",
+      "position_type": "Outfielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 645305,
+      "player_name": "Ali Sánchez",
+      "position_type": "Catcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 642708,
+      "player_name": "Amed Rosario",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683409,
+      "player_name": "Angel Chivilli",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683011,
+      "player_name": "Anthony Volpe",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669224,
+      "player_name": "Austin Wells",
+      "position_type": "Catcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 700250,
+      "player_name": "Ben Rice",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 690440,
+      "player_name": "Bradley Hanner",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694341,
+      "player_name": "Brendan Beck",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687396,
+      "player_name": "Brent Headrick",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 693645,
+      "player_name": "Cam Schlittler",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 607074,
+      "player_name": "Carlos Rodón",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 694633,
+      "player_name": "Chase Hampton",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 657376,
+      "player_name": "Clarke Schmidt",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 641355,
+      "player_name": "Cody Bellinger",
+      "position_type": "Outfielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 670280,
+      "player_name": "David Bednar",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 695684,
+      "player_name": "Elmer Rodríguez",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 518585,
+      "player_name": "Fernando Cruz",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 543037,
+      "player_name": "Gerrit Cole",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 519317,
+      "player_name": "Giancarlo Stanton",
+      "position_type": "Hitter",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 641555,
+      "player_name": "J.C. Escarra",
+      "position_type": "Catcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 691176,
+      "player_name": "Jasson Domínguez",
+      "position_type": "Outfielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 665862,
+      "player_name": "Jazz Chisholm Jr.",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676609,
+      "player_name": "José Caballero",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 665645,
+      "player_name": "Kervin Castro",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Not Yet Reported",
+      "player_id": 671277,
+      "player_name": "Luis García Jr.",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 661563,
+      "player_name": "Luis Gil",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 608331,
+      "player_name": "Max Fried",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 680474,
+      "player_name": "Max Schuemann",
+      "position_type": "Outfielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 665828,
+      "player_name": "Oswaldo Cabrera",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 621112,
+      "player_name": "Paul Blackburn",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 502671,
+      "player_name": "Paul Goldschmidt",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 641857,
+      "player_name": "Ryan McMahon",
+      "position_type": "Infielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 677960,
+      "player_name": "Ryan Weathers",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 642232,
+      "player_name": "Ryan Yarbrough",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682987,
+      "player_name": "Spencer Jones",
+      "position_type": "Outfielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 657612,
+      "player_name": "Tim Hill",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663757,
+      "player_name": "Trent Grisham",
+      "position_type": "Outfielder",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701542,
+      "player_name": "Will Warren",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 660787,
+      "player_name": "Yerry De los Santos",
+      "position_type": "Pitcher",
+      "team_id": 147
+    },
+    {
+      "current_status": "Active",
+      "player_id": 676879,
+      "player_name": "Aaron Ashby",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 682842,
+      "player_name": "Abner Uribe",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 668731,
+      "player_name": "Akil Baddoo",
+      "position_type": "Outfielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 683734,
+      "player_name": "Andrew Vaughn",
+      "position_type": "Infielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 672582,
+      "player_name": "Angel Zerpa",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 666310,
+      "player_name": "Bo Naylor",
+      "position_type": "Catcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 663604,
+      "player_name": "Brandon Lockridge",
+      "position_type": "Outfielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687075,
+      "player_name": "Brandon Sproat",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 605540,
+      "player_name": "Brandon Woodruff",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 702153,
+      "player_name": "Brian Fitzpatrick",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668930,
+      "player_name": "Brice Turang",
+      "position_type": "Infielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669060,
+      "player_name": "Bryse Wilson",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 692230,
+      "player_name": "Carlos Rodriguez",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694477,
+      "player_name": "Chad Patrick",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 592885,
+      "player_name": "Christian Yelich",
+      "position_type": "Hitter",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676051,
+      "player_name": "Codi Heuer",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 689441,
+      "player_name": "Coleman Crow",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 676467,
+      "player_name": "Colton Gordon",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 806198,
+      "player_name": "Cooper Pratt",
+      "position_type": "Infielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669084,
+      "player_name": "DL Hall",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 666152,
+      "player_name": "David Hamilton",
+      "position_type": "Infielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 680723,
+      "player_name": "Drew Rom",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 669003,
+      "player_name": "Garrett Mitchell",
+      "position_type": "Outfielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 668831,
+      "player_name": "Garrett Stallings",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 596142,
+      "player_name": "Gary Sánchez",
+      "position_type": "Catcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 681982,
+      "player_name": "Grant Anderson",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694192,
+      "player_name": "Jackson Chourio",
+      "position_type": "Outfielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 694819,
+      "player_name": "Jacob Misiorowski",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 641343,
+      "player_name": "Jake Bauers",
+      "position_type": "Infielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 657649,
+      "player_name": "Jared Koenig",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 691620,
+      "player_name": "Jeferson Quero",
+      "position_type": "Catcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 669270,
+      "player_name": "Joel Kuhnel",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 687401,
+      "player_name": "Joey Ortiz",
+      "position_type": "Infielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 15-Day",
+      "player_id": 690986,
+      "player_name": "Kyle Harrison",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 701656,
+      "player_name": "Logan Henderson",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 800325,
+      "player_name": "Luis Lara",
+      "position_type": "Outfielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 682990,
+      "player_name": "Quinn Priester",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 60-Day",
+      "player_id": 642239,
+      "player_name": "Rob Zastryzny",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 688107,
+      "player_name": "Robert Gasser",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Injured 10-Day",
+      "player_id": 686217,
+      "player_name": "Sal Frelick",
+      "position_type": "Outfielder",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 675660,
+      "player_name": "Shane Drohan",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 656730,
+      "player_name": "Trevor Megill",
+      "position_type": "Pitcher",
+      "team_id": 158
+    },
+    {
+      "current_status": "Reassigned to Minors",
+      "player_id": 672012,
+      "player_name": "Tyler Black",
+      "position_type": "Hitter",
+      "team_id": 158
+    },
+    {
+      "current_status": "Active",
+      "player_id": 661388,
+      "player_name": "William Contreras",
+      "position_type": "Catcher",
+      "team_id": 158
+    }
+  ],
+  "observed_at_utc": "2026-08-03T15:53:02.232814+00:00",
+  "report_at_utc": "2026-08-03T15:53:02.232814+00:00",
+  "schema_version": "1",
+  "source": "mlb_statsapi_roster_40man",
+  "source_url_template": "https://statsapi.mlb.com/api/v1/teams/{team_id}/roster",
+  "sport": "mlb",
+  "team_ids": [
+    109,
+    112,
+    115,
+    117,
+    119,
+    120,
+    134,
+    135,
+    137,
+    138,
+    139,
+    140,
+    141,
+    143,
+    147,
+    158
+  ]
+}

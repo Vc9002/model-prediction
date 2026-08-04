@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-28T21:27:00+00:00",
+      "team": "Atlanta Dream"
+    },
+    {
+      "athlete_id": "2529458",
+      "current_status": "Out",
+      "player_name": "Cheyenne Parker-Tyus",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-02T21:05:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4565501",
+      "current_status": "Out",
+      "player_name": "Janiah Barker",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-15T23:46:00+00:00",
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "event_id": "401857111",
+  "observed_at_utc": "2026-08-03T04:11:31.726188+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "d6c74478e7fd5389456fa31870ec91871e55220cadd9b8632e326936d716dca0",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}
