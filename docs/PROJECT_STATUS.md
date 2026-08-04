@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-04, single `main` branch, HEAD past `31d3b7c` (F-58 through F-62 committed after). **694 tests pass, 0 fail.**
+**Last verified**: 2026-08-04, single `main` branch, HEAD past `31d3b7c` (F-58 through F-63 committed after). **699 tests pass, 0 fail.**
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -27,8 +27,8 @@ specifically, and remains unchanged by wiring work.
 | WNBA moneyline | `wnba-elo-trend-lr-v4` | shadow_qualified | 67.48% | `qualified=true` |
 | NFL moneyline | `nfl-elo-trend-lr-v4` | shadow_qualified | 71.26% | `qualified=true` (offseason) |
 | Soccer | `soccer-poisson-dc-v1` | shadow_qualified (operator override) | 62.5% locked-holdout | No walk-forward artifact exists; override not genuine promotion |
-| LOL | `lol-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled. **Known gap**: no confidence discount or inactivity decay for stale/thin-data teams — produces the largest, least-trustworthy edges in the system (25-38%), not fixed |
-| CS2 | `cs2-tiered-elo-v5` | shadow_qualified (override) | — | Same known gap as LOL |
+| LOL | `lol-tiered-elo-v6` | shadow_qualified (override) | — | v6 Platt-scaled. **Fixed 2026-08-04 (F-63)**: added inactivity decay + thin-data confidence discount — real ~33% reduction in mean predicted edge for thin-data matchups on held-out data, at a disclosed locked-test accuracy cost (70.6%→69.2%) |
+| CS2 | `cs2-tiered-elo-v6` | shadow_qualified (override) | — | Same v6 fix as LOL (F-63); this title's locked-test accuracy improved slightly (65.8%→66.0%) |
 | Dota 2 | `dota2-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled |
 | Valorant | `valorant-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled |
 | Rainbow Six | `rainbow_six-tiered-elo-v5` | research | — | v5 Platt-scaled |
@@ -75,7 +75,7 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 
 - MLB v8 (the active moneyline artifact) is honestly `qualified: false` — real, positive signal (58.5% holdout hit rate, well above the 50% coin-flip line) but does not clear this project's own 60% promotion bar, on top of a validation-set Brier regression vs. the feature set it replaced. It is live via the same operator-override mechanism v7 used, not because it passed cleanly.
 - MLB totals still has a known, unfixed accuracy gap — a real elasticity refit was attempted and promoted 2026-08-04 but honestly did not improve it (P1-17/F-62); needs an absolute-run-environment-specific model change, not another elasticity refit.
-- Esports Elo has a known, unfixed thin/stale-data overconfidence gap producing the largest edges in the system.
+- Esports Elo's thin/stale-data overconfidence gap has a real fix now (F-63, 2026-08-04): inactivity decay + thin-data shrink reduced mean predicted edge on genuinely thin-data matchups by ~30-35% across all 5 titles on real held-out data, at a modest, disclosed locked-test accuracy cost in 4 of 5 titles.
 - The general cross-file ledger/audit atomicity gap (item 2 above) is real, if lower-severity than originally described.
 
 Do not infer executable profitability from artifact hit rates, synthetic
@@ -83,7 +83,7 @@ Do not infer executable profitability from artifact hit rates, synthetic
 
 ## Bugs found and fixed since last verification (2026-08-02 → 2026-08-04)
 
-See `MASTER.md`'s Fixed Bugs log (F-47 through F-62) for full evidence on each. Highlights: dual-ledger duplicate-row gap for soccer/tennis re-runs (F-47); two active model coefficients (`bullpen_weakness_gap`, `defensive_trend_gap`, then `starter_era_gap`) silently missing from the audit ledger despite scoring correctly — the same recurring bug class, three times (F-48, F-55); dashboard order-readiness moneyline-only gate blocking every real MLB spread/total order (F-53); MLB v8 promotion with a real starter-identity feature and its own live infrastructure (F-54); a redaction fix that crashed instead of redacting, breaking soccer score collection (F-56); registry-free team-ban support completely non-functional in two independent ways (F-58); a WNBA availability fail-closed fix silently defeated by a pre-existing exception wrapper written for a different purpose (F-59); an unbounded pagination loop hardened with a page cap (F-60); MLB totals elasticity refit promoted with an honest (partially negative) result, plus a real bug in the calibration script that would have broken it (F-62).
+See `MASTER.md`'s Fixed Bugs log (F-47 through F-63) for full evidence on each. Highlights: dual-ledger duplicate-row gap for soccer/tennis re-runs (F-47); two active model coefficients (`bullpen_weakness_gap`, `defensive_trend_gap`, then `starter_era_gap`) silently missing from the audit ledger despite scoring correctly — the same recurring bug class, three times (F-48, F-55); dashboard order-readiness moneyline-only gate blocking every real MLB spread/total order (F-53); MLB v8 promotion with a real starter-identity feature and its own live infrastructure (F-54); a redaction fix that crashed instead of redacting, breaking soccer score collection (F-56); registry-free team-ban support completely non-functional in two independent ways (F-58); a WNBA availability fail-closed fix silently defeated by a pre-existing exception wrapper written for a different purpose (F-59); an unbounded pagination loop hardened with a page cap (F-60); MLB totals elasticity refit promoted with an honest (partially negative) result, plus a real bug in the calibration script that would have broken it (F-62); esports inactivity decay + thin-data confidence discount promoted for all 5 titles, real ~30-35% edge reduction on thin-data matchups verified against held-out data (F-63).
 
 ## Safe command forms
 
@@ -103,7 +103,7 @@ state. They require separate authorization appropriate to the risk.
 
 1. Give cross-file ledger-mutation-plus-audit-append real transactional recovery (retry/failure-injection tests) — the original "silent data loss" framing was wrong, but true atomicity still doesn't exist.
 2. Build a real absolute-run-environment signal for MLB totals (P1-17/F-62's own next step: `totals_specific_market_residual` or `branched_absolute_run_intensity_head`, per `config/model.yaml`'s `problem_cohorts.totals`) — a relative-elasticity refit was tried 2026-08-04 and honestly did not help.
-3. Add confidence discount / inactivity decay to the esports `NeutralElo` model.
+3. ~~Add confidence discount / inactivity decay to the esports `NeutralElo` model.~~ Done 2026-08-04, see F-63.
 4. Rotate The Odds API key.
 5. Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.
 6. Split `cli.py` and `dashboard_server.py` into packages (both remain large, growing files).

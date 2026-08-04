@@ -35,6 +35,70 @@ def test_neutral_elo_has_no_team_order_advantage() -> None:
     assert round(book.probability("a", "b") + book.probability("b", "a"), 12) == 1.0
 
 
+def test_raw_probability_never_applies_decay_or_shrink() -> None:
+    """raw_probability() is the basis for rating updates and must stay pure
+    Elo dynamics regardless of last_match_utc/games_played -- decay/shrink
+    are prediction-time-only adjustments applied by probability(), never
+    fed back into how ratings actually move."""
+    book = NeutralElo(
+        k=20, ratings={"a": 1600, "b": 1400},
+        last_match_utc={"a": "2020-01-01T00:00:00Z", "b": "2026-08-04T00:00:00Z"},
+        games_played={"a": 1, "b": 500},
+    )
+    from model_prediction.features.elo_ratings import expected_win_probability
+
+    assert book.raw_probability("a", "b") == expected_win_probability(1600, 1400)
+
+
+def test_thin_data_matchup_is_shrunk_toward_half() -> None:
+    """A brand-new team (0 recorded games) makes the whole matchup's
+    prediction unreliable regardless of the rating gap -- real bug this
+    guards against not existing: pre-v6, a fresh 1500-default team facing an
+    established 1900-rated team produced a confident, unshrunk edge."""
+    from model_prediction.features.elo_ratings import expected_win_probability
+
+    book = NeutralElo(k=20, ratings={"veteran": 1900, "rookie": 1500})
+    book.games_played = {"veteran": 200}  # rookie has no entry -> 0 games
+    shrunk = book.probability("veteran", "rookie")
+    unshrunk = expected_win_probability(1900, 1500)
+    assert abs(shrunk - 0.5) < abs(unshrunk - 0.5) * 0.6  # meaningfully closer to a coin flip
+
+
+def test_established_matchup_is_not_shrunk() -> None:
+    book = NeutralElo(k=20, ratings={"a": 1900, "b": 1500})
+    book.games_played = {"a": 200, "b": 50}
+    from model_prediction.features.elo_ratings import expected_win_probability
+
+    assert book.probability("a", "b") == pytest.approx(expected_win_probability(1900, 1500))
+
+
+def test_inactive_team_rating_decays_toward_neutral_at_prediction_time() -> None:
+    """A team that hasn't played in a long time relative to the prediction's
+    reference_date should be treated as less certain (rating pulled toward
+    1500), even though their point-estimate rating and games_played stay
+    exactly as last observed."""
+    book = NeutralElo(k=20, ratings={"stale": 1900, "active": 1500})
+    book.games_played = {"stale": 200, "active": 200}
+    book.last_match_utc = {"stale": "2020-01-01T00:00:00Z", "active": "2026-08-04T00:00:00Z"}
+    reference_date = datetime(2026, 8, 4, tzinfo=UTC)
+    decayed = book.probability("stale", "active", reference_date)
+    fresh = book.probability("stale", "active", datetime(2020, 1, 1, tzinfo=UTC))
+    assert decayed < fresh  # long-inactive favorite's edge shrinks, doesn't grow
+    assert 0.5 < decayed < fresh
+
+
+def test_no_reference_date_disables_decay_matching_pre_v6_behavior() -> None:
+    """Omitting reference_date (the pre-v6 call signature) must still skip
+    inactivity decay entirely -- existing callers that haven't been updated
+    to pass one keep their old behavior, not a silent new one."""
+    book = NeutralElo(k=20, ratings={"stale": 1900, "active": 1500})
+    book.games_played = {"stale": 200, "active": 200}
+    book.last_match_utc = {"stale": "2020-01-01T00:00:00Z", "active": "2026-08-04T00:00:00Z"}
+    from model_prediction.features.elo_ratings import expected_win_probability
+
+    assert book.probability("stale", "active") == pytest.approx(expected_win_probability(1900, 1500))
+
+
 def test_metrics_units_at_minus_110_matches_flat_stake_diagnostic() -> None:
     # 3 correct, 1 wrong at threshold 0 (all rows selected) -> 3*(10/11) - 1
     rows = [
@@ -239,7 +303,7 @@ def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_p
     assert result["chronological_split"]["locked_test"]["n"] == 120
     assert result["promotion_eligible"] is False
     assert result["units"] == 0
-    artifact = json.loads((tmp_path / "artifacts/lol-tiered-elo-v5.json").read_text())
+    artifact = json.loads((tmp_path / "artifacts/lol-tiered-elo-v6.json").read_text())
     assert artifact["qualified_for_betting"] is False
     assert artifact["model_state"] == "research"
     assert artifact["artifact_hash"] == result["artifact_hash"]
@@ -258,10 +322,10 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
             }
         )
     )
-    (artifacts / "lol-tiered-elo-v5.json").write_text(
+    (artifacts / "lol-tiered-elo-v6.json").write_text(
         json.dumps(
             {
-                "model_version": "lol-tiered-elo-v5",
+                "model_version": "lol-tiered-elo-v6",
                 "trained_through_utc": "2026-07-18T00:00:00Z",
                 "artifact_hash": "hash",
                 "k": 20,

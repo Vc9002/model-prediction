@@ -13,7 +13,7 @@ import logging
 import math
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -78,7 +78,14 @@ TITLE_SPECS: dict[str, dict[str, Any]] = {
 # v4 lineage (2026-07-24): Platt-scaled Elo, manual alias overrides, improved
 # fuzzy matching, confidence gate in cli. Recency/tier scaffolding present but
 # disabled (set HALF_LIFE_DAYS=0 / weights=1.0 to enable).
-ESPORTS_MODEL_LINEAGE = "v5"
+# v6 lineage (2026-08-04): inactivity decay + thin-data confidence discount
+# at PREDICTION time -- addresses the known gap (docs/PROJECT_STATUS.md,
+# MASTER.md) that a stale or thin-history team's point-estimate rating was
+# used with full confidence, producing the largest, least-trustworthy edges
+# in the system (25-38%). Distinct from the existing recency K-boost above,
+# which only affects how fast a rating UPDATES during training, not how
+# confidently a STALE rating is used at prediction time.
+ESPORTS_MODEL_LINEAGE = "v6"
 # Widened 2026-07-31 (was capped at 96.0): SPORT_K_OVERRIDE previously pinned
 # 4 of 5 titles to exactly the grid's own maximum, a classic sign the search
 # was truncated rather than the true optimum landing there.
@@ -100,6 +107,25 @@ RECENCY_MAX_BOOST: float = 1.3
 TOURNAMENT_TIER_WEIGHT: dict[str, float] = {
     "s": 1.15, "a": 1.05, "b": 1.0, "c": 0.95, "d": 0.90,
 }
+# Inactivity decay (v6, 2026-08-04): a team's rating is pulled toward the
+# neutral 1500 prior the longer it's been since their last recorded match,
+# relative to the prediction's own reference date -- a roster/meta-drift
+# uncertainty adjustment, not a training-time update-speed one (that's what
+# RECENCY_HALF_LIFE_DAYS/RECENCY_MAX_BOOST above already do). Hand-set
+# defaults matching this module's existing precedent for RECENCY_* (not
+# grid-searched); half-life chosen shorter than RECENCY's 90 days because a
+# genuinely inactive team's true current strength is far less certain than
+# a merely-old-but-still-active one's.
+INACTIVITY_HALF_LIFE_DAYS: float = 45.0
+INACTIVITY_MAX_PULL: float = 0.6
+# Thin-data confidence discount (v6, 2026-08-04): a team with few recorded
+# matches has a high-variance rating point estimate -- shrink the predicted
+# probability toward 0.5 proportional to how far the LESS-established side
+# of the matchup is below a "reliable" sample size. Full discount at zero
+# games (matches the existing 1500 neutral-rating default for a genuinely
+# unseen team), zero discount at/above MINIMUM_RELIABLE_GAMES.
+MINIMUM_RELIABLE_GAMES: int = 10
+THIN_DATA_MAX_SHRINK: float = 0.5
 
 
 def _parse_date(value: str) -> date:
@@ -485,17 +511,78 @@ class NeutralElo:
     ratings: dict[str, float]
     platt_intercept: float | None = None
     platt_slope: float | None = None
+    # v6 (2026-08-04): per-team prediction-time metadata for inactivity
+    # decay / thin-data confidence discount. Populated by update(); absent
+    # for a team means "never played" (decay is a no-op, thin-data shrink
+    # is maximal, matching the existing 1500 neutral-rating default).
+    last_match_utc: dict[str, str] = field(default_factory=dict)
+    games_played: dict[str, int] = field(default_factory=dict)
 
     def raw_probability(self, team1_id: str, team2_id: str) -> float:
-        """Unshrunk Elo expectation — the correct basis for rating updates."""
+        """Unshrunk Elo expectation — the correct basis for rating updates.
+
+        Deliberately never applies inactivity decay or thin-data shrinkage
+        (see probability() for those) -- rating updates must stay driven by
+        true Elo dynamics against the actual point rating, not a
+        prediction-time confidence adjustment.
+        """
         rating1 = self.ratings.get(team1_id, 1500.0)
         rating2 = self.ratings.get(team2_id, 1500.0)
         return expected_win_probability(rating1, rating2)
 
-    def probability(self, team1_id: str, team2_id: str) -> float:
-        """Platt-calibrated prediction. Falls back to raw Elo if no calibrator."""
-        raw = self.raw_probability(team1_id, team2_id)
-        return _apply_platt(raw, self.platt_intercept, self.platt_slope)
+    def _decayed_rating(self, team_id: str, reference_date: datetime | None) -> float:
+        """Pull team_id's rating toward the neutral 1500 prior the longer
+        it's been since their last recorded match relative to
+        reference_date -- roster/meta drift makes an old rating less
+        trustworthy the staler it gets. A no-op with no reference_date, no
+        recorded last match (team has never played), or decay disabled."""
+        rating = self.ratings.get(team_id, 1500.0)
+        if reference_date is None or INACTIVITY_HALF_LIFE_DAYS <= 0:
+            return rating
+        last_seen = self.last_match_utc.get(team_id)
+        if not last_seen:
+            return rating
+        try:
+            last_dt = datetime.fromisoformat(str(last_seen).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return rating
+        ref_dt = reference_date
+        if last_dt.tzinfo is None and ref_dt.tzinfo is not None:
+            last_dt = last_dt.replace(tzinfo=ref_dt.tzinfo)
+        elif last_dt.tzinfo is not None and ref_dt.tzinfo is None:
+            ref_dt = ref_dt.replace(tzinfo=last_dt.tzinfo)
+        age_days = max(0.0, (ref_dt - last_dt).total_seconds() / 86400)
+        pull = INACTIVITY_MAX_PULL * (1.0 - 2 ** (-age_days / INACTIVITY_HALF_LIFE_DAYS))
+        return rating + (1500.0 - rating) * pull
+
+    def _thin_data_shrink(self, team1_id: str, team2_id: str) -> float:
+        """How far to shrink the prediction toward 0.5, driven by whichever
+        side of the matchup has the FEWER recorded games -- one unreliable
+        rating is enough to make the whole matchup's prediction unreliable.
+        Full shrink at zero games, none at/above MINIMUM_RELIABLE_GAMES."""
+        if MINIMUM_RELIABLE_GAMES <= 0:
+            return 0.0
+        least_established = min(
+            self.games_played.get(team1_id, 0), self.games_played.get(team2_id, 0)
+        )
+        return THIN_DATA_MAX_SHRINK * max(0.0, 1.0 - least_established / MINIMUM_RELIABLE_GAMES)
+
+    def probability(
+        self, team1_id: str, team2_id: str, reference_date: datetime | None = None
+    ) -> float:
+        """Platt-calibrated prediction, with inactivity decay and thin-data
+        shrinkage applied on top -- both prediction-time-only adjustments,
+        never fed back into raw_probability()/update()'s rating dynamics.
+        Falls back to plain Platt-calibrated Elo if reference_date is
+        omitted (decay disabled) -- unchanged behavior for any caller not
+        yet passing one.
+        """
+        rating1 = self._decayed_rating(team1_id, reference_date)
+        rating2 = self._decayed_rating(team2_id, reference_date)
+        raw = expected_win_probability(rating1, rating2)
+        calibrated = _apply_platt(raw, self.platt_intercept, self.platt_slope)
+        shrink = self._thin_data_shrink(team1_id, team2_id)
+        return calibrated * (1.0 - shrink) + 0.5 * shrink
 
     def update(self, row: dict[str, Any]) -> None:
         # Update against the RAW expectation so ratings reflect true Elo
@@ -529,6 +616,12 @@ class NeutralElo:
         self.ratings[row["team1_id"]] = self.ratings.get(row["team1_id"], 1500.0) + delta
         self.ratings[row["team2_id"]] = self.ratings.get(row["team2_id"], 1500.0) - delta
 
+        if start:
+            self.last_match_utc[row["team1_id"]] = str(start)
+            self.last_match_utc[row["team2_id"]] = str(start)
+        self.games_played[row["team1_id"]] = self.games_played.get(row["team1_id"], 0) + 1
+        self.games_played[row["team2_id"]] = self.games_played.get(row["team2_id"], 0) + 1
+
 
 def _load_matches(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
@@ -540,7 +633,20 @@ def _load_matches(path: Path) -> list[dict[str, Any]]:
 def _predict(book: NeutralElo, rows: Iterable[dict[str, Any]], update: bool = True) -> list[dict[str, Any]]:
     output = []
     for row in rows:
-        probability = book.probability(row["team1_id"], row["team2_id"])
+        # Each row's own start_utc is the correct "as of" reference date for
+        # inactivity decay/thin-data shrink at this point in the walk-forward
+        # sequence -- this makes training/validation exercise exactly the
+        # same prediction-time logic forecast_esports_slate uses live
+        # (reference_date=observed_now there), not a version of probability()
+        # that skips it.
+        reference_date = None
+        start = row.get("start_utc")
+        if start:
+            try:
+                reference_date = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                reference_date = None
+        probability = book.probability(row["team1_id"], row["team2_id"], reference_date)
         outcome = 1 if row["winner_id"] == row["team1_id"] else 0
         output.append({"probability": probability, "outcome": outcome})
         if update:
@@ -729,6 +835,10 @@ def validate_esports_baseline(
         "training_observations": len(rows),
         "trained_through_utc": rows[-1]["start_utc"],
         "ratings": {team: round(rating, 6) for team, rating in sorted(all_book.ratings.items())},
+        # v6 (2026-08-04): per-team prediction-time metadata for inactivity
+        # decay / thin-data confidence discount (NeutralElo.probability()).
+        "last_match_utc": dict(sorted(all_book.last_match_utc.items())),
+        "games_played": dict(sorted(all_book.games_played.items())),
         "source_manifest_sha256": _sha256(manifest_path),
         "matches_sha256": source_manifest["matches_sha256"],
         "qualified_for_betting": False,
@@ -828,8 +938,8 @@ def _fuzzy_match_team(
     key = _identity_key(description)
     matched: set[str] = set()
     for team_id, team in teams.items():
-        for field in ("name", "slug", "acronym"):
-            alias = str(team.get(field, ""))
+        for attribute in ("name", "slug", "acronym"):
+            alias = str(team.get(attribute, ""))
             if not alias:
                 continue
             alias_key = _identity_key(alias)
@@ -892,8 +1002,11 @@ def forecast_esports_slate(
     ratings = {key: float(value) for key, value in artifact["ratings"].items()}
     platt_intercept = artifact.get("platt_intercept")
     platt_slope = artifact.get("platt_slope")
+    last_match_utc = {key: str(value) for key, value in (artifact.get("last_match_utc") or {}).items()}
+    games_played = {key: int(value) for key, value in (artifact.get("games_played") or {}).items()}
     book = NeutralElo(k=float(artifact["k"]), ratings=ratings,
-                      platt_intercept=platt_intercept, platt_slope=platt_slope)
+                      platt_intercept=platt_intercept, platt_slope=platt_slope,
+                      last_match_utc=last_match_utc, games_played=games_played)
     trained_through = parse_utc(str(artifact["trained_through_utc"]))
     observed_now = utc_now()
     manual_aliases = _load_manual_aliases(data_root).get(title, {})
@@ -965,7 +1078,7 @@ def forecast_esports_slate(
             source_teams_trained = source_teams_resolved and all(
                 team_id in ratings for team_id in team_ids
             )
-            probability1 = book.probability(team_ids[0], team_ids[1])
+            probability1 = book.probability(team_ids[0], team_ids[1], observed_now)
             probabilities_by_name = {
                 _identity_key(descriptions[0]): probability1,
                 _identity_key(descriptions[1]): 1 - probability1,
