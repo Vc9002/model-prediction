@@ -105,6 +105,7 @@ def _compute_features(
         except ValueError as error:
             features["starter_era_gap"] = 0.0
             unavailable.append(str(error).split(":", 1)[0].strip() or "starter_era_gap_unavailable")
+            logger.warning("starter_era_gap unavailable for %s: %s", event_id, error)
     if "starter_fip_gap" in wanted:
         # F-68 (2026-08-05): FIP pipeline — same point-in-time contract as ERA
         # but uses FIP instead. Locked-holdout shows +1pp hit rate, -39% ECE,
