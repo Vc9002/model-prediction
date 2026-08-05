@@ -127,7 +127,7 @@ class TennisModel:
             p_one = self.match_probability(
                 overall, by_surface, match.player_one, match.player_two, match.surface
             )
-            uncertainty = 0.05
+            uncertainty = 0.05  # source of truth: config.TENNIS_MODEL_UNCERTAINTY
             predictions.append(
                 GamePrediction(
                     event_id=match.event_id,
