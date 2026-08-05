@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4790263",
+      "current_status": "Out",
+      "player_name": "Iliana Rupert",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-07T15:18:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "2988756",
+      "current_status": "Out",
+      "player_name": "Brittney Sykes",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-26T18:40:00+00:00",
+      "team": "Toronto Tempo"
+    }
+  ],
+  "event_id": "401857114",
+  "observed_at_utc": "2026-08-05T01:07:09.655486+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "cedb68dc79eca08c4141dbbe01c6fbc427747b835d6574ee812b2b3ce7b5855c",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

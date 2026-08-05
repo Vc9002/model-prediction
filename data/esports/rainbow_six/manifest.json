@@ -3,22 +3,22 @@
     "from": "2020-01-01",
     "to": "2026-07-27"
   },
-  "extracted_at_utc": "2026-08-04T14:26:32.795762Z",
+  "extracted_at_utc": "2026-08-05T04:38:01.940319Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
     "Team IDs do not encode point-in-time rosters or substitutions."
   ],
-  "match_count": 2971,
-  "matches_sha256": "3c1b6c0ec042ce044617fda667894285d07268544a481056bd7c681b37d170d4",
+  "match_count": 2977,
+  "matches_sha256": "4b65ecbc732cffcaacec445ebd1d7ca136c778a9cea6e06adccae3ba905da60b",
   "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
   "request_pages": {
     "matches": 2,
     "teams": 8
   },
   "requested_window": {
-    "from": "2026-07-21",
-    "to": "2026-08-04"
+    "from": "2026-07-22",
+    "to": "2026-08-05"
   },
   "requires_api_key": false,
   "requires_signup": false,
@@ -27,8 +27,8 @@
   "source_attribution_url": "https://bo3.gg/",
   "source_base_url": "https://api.bo3.gg/api/v1",
   "source_terms_url": "https://bo3.gg/wiki/use-of-services",
-  "team_count": 281,
-  "teams_sha256": "fe69bc7ab999cdaf8a6243f8bb11ef8ae72aac27fe3af2e0a81a50a544ca89d5",
+  "team_count": 282,
+  "teams_sha256": "8c596e2dda5fe7eab503eeebb382ab356bd77fa88ab1b4783f067978e09ca344",
   "title": "rainbow_six",
   "title_name": "Rainbow Six Siege"
 }

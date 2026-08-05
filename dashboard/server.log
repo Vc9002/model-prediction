@@ -20,3 +20,11 @@
 2026-08-04T05:19:12 job finished: daily-1785820752 :: failed in 0.1s
 2026-08-04T05:20:19 job started: refresh_prices-1785820819 :: --contract npb@2026-08-04=aec-npb-cdh-tys-2026-08-04 --contract npb@2026-08-04=aec-npb-hci-ygo-2026-08-04 --contract npb@2026-08-04=aec-npb-clm-ssl-2026-08-04 --contract npb@2026-08-04=aec-npb-fsh-nhf-2026-08-04
 2026-08-04T05:20:56 job finished: refresh_prices-1785820819 :: ok in 37.6s
+2026-08-04T14:59:23 job started: daily-1785855563 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-08-04T15:06:23 job finished: daily-1785855563 :: ok in 420.5s
+2026-08-04T16:48:27 job started: daily-1785862107 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-08-04T16:56:11 job finished: daily-1785862107 :: ok in 463.2s
+2026-08-05T04:32:58 job started: daily-1785904378 :: bash /Users/vincentc9002/model prediction/scripts/run_daily.sh
+2026-08-05T04:40:28 job finished: daily-1785904378 :: ok in 449.7s
+2026-08-05T04:52:57 job started: run_tests-1785905577 :: /Users/vincentc9002/model prediction/.venv/bin/python -m pytest tests/ -q --no-header
+2026-08-05T04:53:14 job finished: run_tests-1785905577 :: ok in 17.4s

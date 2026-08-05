@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "3b345499bd6bad9bcf65367a07fe0c668fb5817d4f016a0a865c01d9212fdeb8",
+  "artifact_hash": "6a5c79541b0e50cb9f7318270e63d5ccc65cbd7bc53a019748ff772d49de5075",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -10,7 +10,7 @@
         -0.0190272663,
         0.1519919276
       ],
-      "confidence_threshold": 0.61966524,
+      "confidence_threshold": 0.58733546,
       "feature_names": [
         "elo_probability",
         "trend_gap",
@@ -26,25 +26,28 @@
   "method": "logistic_regression",
   "model_version": "mlb-elo-trend-lr-v8",
   "qualification": {
-    "brier_score": 0.246354,
-    "called_rate": 0.106398,
-    "calls": 148,
+    "brier_score": 0.242891,
+    "called_rate": 0.253055,
+    "calls": 352,
     "failures": [
-      "validation Brier regressed vs incumbent v7 feature set (0.24702 vs 0.24655) even though locked-holdout metrics clear the bar (0.6081 hit rate, 148 calls) -- disqualified under docs/AGENTS.md's promotion rule (a validation regression is not overridable by a good holdout number, since doing so is exactly 'peeking at holdout'). See qualification.validation_regression_note and training.promotion_rationale for the real numbers and the operator-directed override reasoning."
+      "validation Brier regressed vs incumbent v7 feature set (0.24702 vs 0.24655) -- disqualified under docs/AGENTS.md's promotion rule regardless of holdout performance.",
+      "at the operator-lowered threshold (0.587335, target_hit_rate=0.60), locked-holdout hit rate (0.5852) no longer clears the 60% bar either -- an intentional tradeoff for real Main-ledger coverage, not an oversight. See qualification.threshold_target_note."
     ],
     "framework": "locked_complete_date_60_20_20",
-    "hit_rate": 0.608108,
-    "hits": 90,
+    "hit_rate": 0.585227,
+    "hits": 206,
     "locked_holdout": true,
     "market_type": "moneyline",
-    "meets_primary_holdout_metrics": true,
+    "meets_primary_holdout_metrics": false,
     "minimum_calls": 50,
     "minimum_hit_rate": 0.6,
     "qualification_eligible": true,
     "qualified": false,
     "sample_size": 1391,
+    "threshold_target_hit_rate": 0.6,
+    "threshold_target_note": "Operator-directed threshold lowering, 2026-08-04: the original target_hit_rate=0.65 threshold (0.619665) was too selective in practice -- 0/13 real games cleared it on 2026-08-04, so zero real MLB moneyline picks reached Main despite 13 real candidates existing, even though Flat still logged them all. Re-learned at target_hit_rate=0.60 (validation.py's own existing DIAGNOSTIC_THRESHOLD_TARGET_HIT_RATE constant, not an arbitrary choice) -- roughly doubles validation selectivity (12.9% -> 25.2%) and holdout volume (148 -> 352 calls) while holdout hit rate stays real and positive (58.5%, +41.3u/-110, up from +23.8u at the old threshold due to volume). This does NOT additionally clear the 60% qualification bar on its own -- qualified stays false for the same reason as before (validation Brier regression) plus now also a genuine holdout-hit-rate shortfall at this looser threshold; both are listed honestly in failures below.",
     "training_data_note": "starter_era_gap depends on data/mlb_statsapi/game_snapshots.jsonl, kept current as of this artifact's build by cli.py's daily _capture_mlb_starter_snapshots step (added 2026-08-04, same day as this artifact) -- verify that capture is still running before trusting this feature live.",
-    "units_at_minus_110": 23.818182,
+    "units_at_minus_110": 41.272727,
     "validation_brier_score": 0.24702,
     "validation_brier_score_vs_incumbent": 0.00047,
     "validation_regression_note": "Validation Brier is WORSE than v7's incumbent feature set (0.24702 vs v7's 0.24655) while locked-holdout is better (0.24635 vs v7's 0.24763). This is the exact 'peek at holdout' pattern docs/AGENTS.md's promotion rule exists to catch -- promoted anyway by explicit operator directive 2026-08-04, not because it cleared this project's own automatic promotion bar. See training.promotion_rationale."
@@ -63,7 +66,7 @@
       "start": "2026-04-11"
     },
     "market_inputs_used": false,
-    "promotion_rationale": "Operator-directed promotion, 2026-08-04. Real walk-forward ablation (build_walk_forward_rows + chronological_split, matching v7's own methodology, self-consistency-verified by reproducing v7's exact stored holdout numbers before this comparison) replaced pitcher_era_gap (team-level rolling runs-allowed) with starter_era_gap (real per-starter rolling ERA from mlb_statsapi boxscore history, features/starter_history.py) -- the 'different functional form' docs/MODEL_IMPROVEMENTS.md's 'Rank-1 tested honestly' section flagged as worth trying after the additive form (adding starter_era_gap alongside pitcher_era_gap) showed the same validation/holdout disagreement tested 2026-08-02. Coefficient sign is correct (worse starter ERA -> lower home win probability) in both the additive and replacement forms. Real numbers: locked-holdout hit_rate 0.6081 (148 calls, 90 hits) vs v7's +0.6242-threshold 0.6194. Not a clean automatic pass -- see qualification.validation_regression_note.",
+    "promotion_rationale": "Operator-directed promotion, 2026-08-04. Real walk-forward ablation (build_walk_forward_rows + chronological_split, matching v7's own methodology, self-consistency-verified by reproducing v7's exact stored holdout numbers before this comparison) replaced pitcher_era_gap (team-level rolling runs-allowed) with starter_era_gap (real per-starter rolling ERA from mlb_statsapi boxscore history, features/starter_history.py) -- the 'different functional form' docs/MODEL_IMPROVEMENTS.md's 'Rank-1 tested honestly' section flagged as worth trying after the additive form (adding starter_era_gap alongside pitcher_era_gap) showed the same validation/holdout disagreement tested 2026-08-02. Coefficient sign is correct (worse starter ERA -> lower home win probability) in both the additive and replacement forms. Real numbers: locked-holdout hit_rate 0.6081 (148 calls, 90 hits) vs v7's +0.6242-threshold 0.6194. Not a clean automatic pass -- see qualification.validation_regression_note. CORRECTION 2026-08-04 (later): confidence_threshold lowered from 0.61966524 (target_hit_rate=0.65) to 0.58733546 (target_hit_rate=0.60) by explicit operator directive after the 0.65 threshold produced zero real Main-ledger calls on its first live day (0/13 games cleared it). See qualification.threshold_target_note for the full real numbers.",
     "threshold_selection": {
       "end": "2026-04-10",
       "observations": 1082,

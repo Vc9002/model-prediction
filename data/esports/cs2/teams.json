@@ -9568,6 +9568,13 @@
     "source_team_id": 25002,
     "team_id": "bo3:1:25002"
   },
+  "bo3:1:25011": {
+    "acronym": null,
+    "name": "MEIA NOITE",
+    "slug": "meia-noite",
+    "source_team_id": 25011,
+    "team_id": "bo3:1:25011"
+  },
   "bo3:1:25014": {
     "acronym": null,
     "name": "Finishers",
