@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-04, single `main` branch, HEAD past `31d3b7c` (F-58 through F-63 committed after). **699 tests pass, 0 fail.**
+**Last verified**: 2026-08-05 (documentation overhaul — comprehensive AI-ready README + AI Rebuild Guide), single `main` branch, HEAD past `31d3b7c` (F-58 through F-63 committed after). **699 tests pass, 0 fail.**
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
