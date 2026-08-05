@@ -74,20 +74,22 @@ class TestRawStore:
     def test_write_and_read(self):
         with tempfile.TemporaryDirectory() as td:
             store = RawStore(td)
-            h = store.write("espn", "2026-08-01", "test1", {"a": 1})
-            assert len(h) == 64  # SHA-256 hex
-            data = store.read("espn", "2026-08-01", "test1")
+            ref = store.write("espn", "2026-08-01", "test1", {"a": 1})
+            assert len(ref.snapshot_hash) == 64  # SHA-256 hex
+            assert store.verify_hash(ref)  # verify stored hash
+            data = store.read(ref)
             assert data["a"] == 1
 
     def test_immutability(self):
         with tempfile.TemporaryDirectory() as td:
             store = RawStore(td)
-            store.write("espn", "2026-08-01", "test1", {"a": 1})
-            h1 = store.read_hash("espn", "2026-08-01", "test1")
-            # Write same data again — should produce same hash
-            store.write("espn", "2026-08-01", "test1", {"a": 1})
-            h2 = store.read_hash("espn", "2026-08-01", "test1")
-            assert h1 == h2, "Same payload should produce same hash"
+            ref1 = store.write("espn", "2026-08-01", "test1", {"a": 1})
+            # Write same data again — same hash, idempotent
+            ref2 = store.write("espn", "2026-08-01", "test1", {"a": 1})
+            assert ref1.snapshot_hash == ref2.snapshot_hash, "Same payload should produce same hash"
+            # Different payload — different hash
+            ref3 = store.write("espn", "2026-08-01", "test1", {"a": 2})
+            assert ref1.snapshot_hash != ref3.snapshot_hash, "Different payload should produce different hash"
 
 
 class TestNormalizedStore:
