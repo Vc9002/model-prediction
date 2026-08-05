@@ -1,0 +1,229 @@
+{
+  "audit_date": "2026-08-05",
+  "git_sha": "09bc24e67cebe8dd766ba9b5d52847e0b1fe18bf",
+  "branch": "rebuild/clean-slate-v1",
+  "python_version": "3.14.5",
+  "project_root": "/Users/vincentc9002/model prediction",
+  "test_count": 699,
+  "test_status": "all_pass",
+  "ruff_findings": 118,
+  "package_version": "0.6.0",
+  "files": {
+    "source_modules": 77,
+    "test_files": 75,
+    "model_artifacts": 60,
+    "scripts": 11,
+    "docs": 17
+  },
+  "source_line_counts": {
+    "cli.py": 4411,
+    "dashboard_server.py": 4782,
+    "validation.py": 2428,
+    "ledger.py": 1485,
+    "international_baseball.py": 1186,
+    "esports.py": 1156,
+    "backtester.py": 797,
+    "learned_forward.py": 694,
+    "models/mlb.py": 647,
+    "model_ledger.py": 586,
+    "soccer_forward.py": 563,
+    "ingest.py": 404,
+    "eligibility.py": 319,
+    "tennis_forward.py": 314,
+    "domain.py": 314,
+    "models/learned_market.py": 266,
+    "calibration.py": 258,
+    "main_ledgers.py": 235,
+    "models/soccer.py": 213,
+    "forward.py": 211,
+    "config.py": 209,
+    "models/registry.py": 202,
+    "models/market_residual.py": 158,
+    "source_policy.py": 149,
+    "units.py": 134,
+    "lifecycle.py": 131,
+    "models/base.py": 117,
+    "audit.py": 98,
+    "pricing.py": 79,
+    "research_ledgers.py": 61
+  },
+  "total_source_lines": "~22,000",
+  "dependencies": {
+    "core": {
+      "numpy": "2.5.1",
+      "pandas": "2.3.3",
+      "scipy": "1.18.0",
+      "scikit-learn": "1.9.0",
+      "pydantic": "2.13.4",
+      "httpx": "0.28.1",
+      "joblib": "1.5.3",
+      "openpyxl": "3.1.5",
+      "cryptography": "46.0.7",
+      "PyYAML": "6.0.3",
+      "pypdf": "5.9.0"
+    },
+    "dev": {
+      "pytest": "8.4.2",
+      "ruff": "0.16.0",
+      "mypy": "1.20.2",
+      "pandas-stubs": "3.0.3.260530",
+      "numpy-typing-compat": "20260602.2.5"
+    },
+    "missing_from_plan": [
+      "xgboost",
+      "pybaseball",
+      "polars",
+      "pyarrow",
+      "duckdb",
+      "pandera",
+      "statsmodels",
+      "optuna",
+      "scipy-stubs",
+      "types-PyYAML",
+      "types-openpyxl"
+    ]
+  },
+  "sports_in_scope": [
+    "MLB",
+    "NBA",
+    "WNBA",
+    "NFL",
+    "Soccer",
+    "Tennis",
+    "LOL",
+    "CS2",
+    "Dota2",
+    "Valorant",
+    "Rainbow Six",
+    "KBO",
+    "NPB"
+  ],
+  "active_models": {
+    "mlb_moneyline": {
+      "artifact": "mlb-elo-trend-lr-v8",
+      "method": "logistic_regression",
+      "features": ["elo_probability", "trend_gap", "defensive_trend_gap", "starter_era_gap", "bullpen_weakness_gap", "park_factor", "player_availability"],
+      "status": "shadow_qualified_override",
+      "qualified": false,
+      "ledger": ["main", "flat"]
+    },
+    "mlb_spread": {
+      "artifact": "measured-edge-margin-v3",
+      "method": "gamma_poisson_monte_carlo",
+      "status": "active_research",
+      "ledger": ["main", "flat"]
+    },
+    "mlb_totals": {
+      "artifact": "measured-edge-totals-v3",
+      "method": "gamma_poisson_monte_carlo",
+      "status": "active_research",
+      "diagnostic_correlation": 0.041,
+      "ledger": ["main", "flat"]
+    },
+    "nba_moneyline": {
+      "artifact": "nba-elo-trend-lr-v4",
+      "method": "logistic_regression",
+      "features": ["elo_probability", "trend_gap", "defensive_trend_gap"],
+      "calibration_slope": 1.79,
+      "status": "shadow_qualified",
+      "qualified": true,
+      "ledger": ["flat"]
+    },
+    "wnba_moneyline": {
+      "artifact": "wnba-elo-trend-lr-v4",
+      "method": "logistic_regression",
+      "features": ["elo_probability", "trend_gap", "defensive_trend_gap"],
+      "status": "shadow_qualified",
+      "qualified": true,
+      "ledger": ["main", "flat"]
+    },
+    "nfl_moneyline": {
+      "artifact": "nfl-elo-trend-lr-v4",
+      "method": "logistic_regression",
+      "features": ["elo_probability", "trend_gap"],
+      "locked_evaluation_games": 122,
+      "ece": 0.10,
+      "status": "shadow_qualified",
+      "qualified": true,
+      "ledger": ["flat"]
+    },
+    "soccer": {
+      "artifact": "soccer-poisson-dc-v1",
+      "method": "poisson_dixon_coles",
+      "features": ["ewma_attack", "ewma_defense", "home_boost_1.15", "dc_rho_-0.10"],
+      "hardcoded_params": ["HOME_GOAL_BOOST=1.15", "DC_RHO=-0.10", "BTTS_CALIBRATION_INTERCEPT=0.1393", "BTTS_CALIBRATION_SLOPE=0.4205"],
+      "status": "research",
+      "ledger": ["main", "flat"]
+    },
+    "tennis": {
+      "artifact": "tennis-surface-elo-v1",
+      "method": "surface_blended_elo",
+      "hardcoded_params": ["K=32", "surface_blend_60_40", "uncertainty=0.05"],
+      "features": ["overall_elo", "surface_elo"],
+      "status": "research",
+      "ledger": ["main", "flat"]
+    },
+    "esports": {
+      "method": "platt_scaled_neutral_elo_v5",
+      "features": ["organization_elo"],
+      "status": "research",
+      "ledger": ["research", "gated_research"]
+    },
+    "kbo_npb": {
+      "artifact": "tie-aware-elo-v2",
+      "method": "tie_aware_elo",
+      "features": ["home_elo", "elo_gap_tie_heuristic"],
+      "status": "research",
+      "ledger": ["research", "gated_research"]
+    }
+  },
+  "hardcoded_thresholds_found": [
+    {"location": "config.py", "name": "UNIT_MIN_EDGE", "value": 0.02},
+    {"location": "config.py", "name": "UNIT_INCREMENT", "value": 0.25},
+    {"location": "config.py", "name": "TENNIS_MODEL_UNCERTAINTY", "value": 0.05},
+    {"location": "config.py", "name": "ESPORTS_MIN_OBSERVATIONS", "value": 50},
+    {"location": "config.py", "name": "ESPORTS_MIN_ACCURACY", "value": 0.60},
+    {"location": "models/soccer.py", "name": "HOME_GOAL_BOOST", "value": 1.15},
+    {"location": "models/soccer.py", "name": "DC_RHO", "value": -0.10},
+    {"location": "models/soccer.py", "name": "BTTS_CALIBRATION_INTERCEPT", "value": 0.1393},
+    {"location": "models/soccer.py", "name": "BTTS_CALIBRATION_SLOPE", "value": 0.4205},
+    {"location": "models/tennis.py", "name": "ELO_K", "value": 32},
+    {"location": "validation.py", "name": "PRIMARY_THRESHOLD_TARGET_HIT_RATE", "value": 0.65},
+    {"location": "validation.py", "name": "MINIMUM_CALLS", "value": 50},
+    {"location": "lifecycle.py", "name": "QUALIFICATION_MINIMUM_HIT_RATE", "value": 0.60},
+    {"location": "lifecycle.py", "name": "QUALIFICATION_MINIMUM_CALLS", "value": 50},
+    {"location": "models/market_residual.py", "name": "MINIMUM_SAMPLE", "value": 100},
+    {"location": "models/market_residual.py", "name": "ROLLING_WINDOW_DAYS", "value": 90},
+    {"location": "eligibility.py", "name": "maximum_age_hours", "value": 12}
+  ],
+  "dead_code_candidates": [
+    "roadmap_challenger.py",
+    "verification_checklist.py",
+    "experiment_design.py",
+    "feature_contract.py",
+    "production_feature_ablation.py",
+    "total_score.py",
+    "economic_gate.py",
+    "research_cleanup.py",
+    "point_in_time.py",
+    "mlb_baseline_refresh.py",
+    "wnba_availability_evaluation.py",
+    "data_sources/kalshi.py"
+  ],
+  "key_findings": [
+    "All moneyline models for MLB/NBA/WNBA/NFL share one logistic regression pipeline with only 2-3 features",
+    "MLB v8 is qualified=false but operator-overridden to production",
+    "NBA calibration slope 1.79 indicates severe probability-shape error",
+    "Soccer uses 4 hardcoded global constants rather than learned parameters",
+    "Tennis uses fixed K=32 Elo with no serve/return features in forecast",
+    "cli.py (4,411 lines) has near-zero dedicated test coverage",
+    "dashboard_server.py (4,782 lines) is monolithic with inline HTML",
+    "12 likely-orphaned modules totaling ~1,800 lines",
+    "17 hardcoded thresholds found across 7 files",
+    "Economic evaluation uses synthetic -110 pricing, not executable quotes",
+    "Audit chain validates integrity but does not cross-check ledger contents",
+    "Excel is the primary database format; no ACID guarantees",
+    "No ensemble or out-of-fold calibration exists",
+    "scipy-stubs, types-PyYAML, types-openpyxl listed as dev deps but not installed"
+  ]
+}
