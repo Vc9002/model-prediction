@@ -86,3 +86,64 @@ anywhere in `rebuild/`; no single end-to-end shadow command exists.
 `pyproject.toml`/lockfile/CI Python-version consistency check, then Checkpoint
 4/5 (MLB data + features) is the highest-value next step toward tonight's
 goal, since storage (Checkpoint 2) is already largely built.
+
+## Checkpoint 1 — Environment (2026-08-06)
+
+**Found real inconsistencies, not just theoretical ones:**
+
+1. `.github/workflows/ci.yml` pinned Python 3.12, while `pyproject.toml`
+   (`requires-python = ">=3.14,<3.15"`), `[tool.mypy] python_version`, and
+   `[tool.ruff] target-version = "py314"` all declare 3.14. CI was never
+   actually testing the runtime the project claims to require. Fixed: CI now
+   uses 3.14, installs via `pip install -e ".[dev]"` (previously only
+   `pip install -e . pytest ruff`, silently skipping `mypy` and the
+   `scipy-stubs`/`pandas-stubs`/etc. dev-only deps), and added a `mypy` step
+   (`continue-on-error: true` — 112 pre-existing errors as of Checkpoint 0,
+   not gating CI on paying that down, but now visible in every run instead of
+   invisible).
+2. `README.md` line ~740 said "Python 3.11+" while line 6 already claimed
+   "Python 3.14" for the same repo. Fixed to match the pinned 3.14
+   requirement.
+3. **Real, currently-broken dependency, not a hypothetical fresh-clone
+   issue**: built a genuinely fresh venv (`python3 -m venv`, outside any
+   cached dev environment) and ran `pip install -e ".[dev]"` against the
+   committed `pyproject.toml`. `import xgboost` failed with a `dlopen` error
+   — `libomp.dylib` (OpenMP runtime) was never installed via Homebrew on this
+   machine. Confirmed the **existing primary dev `.venv` has the identical
+   failure** (`.venv/bin/python -c "import xgboost"` also raised the same
+   `dlopen` error before the fix) — this wasn't masked by dev-machine state,
+   it was silently broken there too, since nothing in the current test suite
+   happens to import xgboost yet. Fixed by `brew install libomp`; verified
+   `import xgboost` succeeds afterward (`xgboost 3.4.0`) in both venvs.
+   Documented as a required macOS prerequisite in README (pip alone cannot
+   install this — it's a system library XGBoost's wheel dynamically loads at
+   runtime).
+4. `requirements.lock` (75 packages) checked against every `pyproject.toml`
+   dependency (`duckdb`, `pandera`, `polars`, `pyarrow`, `pybaseball`,
+   `statsmodels`, `xgboost`, etc.) — all present and pinned. `pip check` in
+   the primary venv reports no broken requirements.
+
+**Fresh-install proof**: fresh venv install of `pip install -e ".[dev]"`
+completed, `import model_prediction.rebuild` succeeded, all declared
+dependencies imported (after the `libomp` fix), and
+`PYTHONPATH=src:. python -m pytest tests/ -q` on that fresh venv: **755
+passed, 1 skipped** — identical to the primary dev venv. Temp venv discarded
+after verification (not committed; it was scratch, not repo state).
+
+**Not done in this checkpoint**: did not attempt to verify CI actually passes
+on GitHub's `ubuntu-latest` runner (no `gh` CLI auth available in this
+session) — Linux's OpenMP situation differs from macOS's `libomp.dylib`
+quirk and is unverified; flagging as an open item rather than assuming it's
+fine.
+
+**Files changed**: `.github/workflows/ci.yml`, `README.md`. No source code
+changed — Checkpoint 1 is environment/tooling only.
+
+**Current checkpoint**: 1 (complete).
+
+**Next executable command**: Checkpoint 4/5 (MLB data + features) — normalize
+the already-collected `pybaseball` raw data, actually run the weather and
+Polymarket collectors (Polymarket credential validity in `.env` still
+unverified), and replace `scripts/pipeline_mlb_e2e.py`'s placeholder rolling-
+score features with real starter/lineup/bullpen/park features per
+`CLAUDE.md`'s MLB feature-store spec.

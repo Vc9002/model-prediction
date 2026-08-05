@@ -737,8 +737,13 @@ forecast and settlement regardless of invocation method.
 ## Setup from Scratch
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.14 (pinned — see `pyproject.toml` `requires-python`)
 - macOS or Linux (uses `fcntl` for file locking)
+- On macOS: `brew install libomp` — required for `xgboost` to import at all
+  (its bundled `libxgboost.dylib` dynamically loads OpenMP at runtime; without
+  this, `import xgboost` fails with a `dlopen` error even though `pip install`
+  succeeds silently). Verified 2026-08-06: this was missing on the primary
+  dev machine too, not just fresh clones.
 
 ### Step-by-Step
 
