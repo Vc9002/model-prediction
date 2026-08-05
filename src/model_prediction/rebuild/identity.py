@@ -92,6 +92,24 @@ class IdentityRegistry:
     def __init__(self, metadata: Any) -> None:  # MetadataDB
         self.metadata = metadata
         self._cache: dict[str, CanonicalIdentity] = {}
+        # Load existing entities from SQLite on init
+        try:
+            rows = self.metadata.conn.execute(
+                "SELECT entity_id, entity_type, canonical_name, sport, effective_from_utc, effective_to_utc, attributes_json FROM entities"
+            ).fetchall()
+            for row in rows:
+                eid = row["entity_id"]
+                self._cache[eid] = CanonicalIdentity(
+                    entity_id=eid,
+                    entity_type=row["entity_type"],
+                    canonical_name=row["canonical_name"],
+                    sport=row["sport"],
+                    effective_from_utc=row["effective_from_utc"],
+                    effective_to_utc=row["effective_to_utc"],
+                    attributes=json_loads_safe(row["attributes_json"]),
+                )
+        except Exception:
+            pass  # metadata may not have entities table yet
 
     # ── registration ──────────────────────────────────────────────────
 

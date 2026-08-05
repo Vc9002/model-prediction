@@ -132,11 +132,21 @@ def evaluate_predictive_qualification(
     calibration_intercept: float = 0.0,
     pit_violations: int = 0,
     train_serve_parity: float = 1.0,
+    baseline_log_loss: float | None = None,
+    baseline_brier: float | None = None,
     min_events: int = 50,
+    min_dates: int = 10,
     max_ece: float = 0.10,
+    max_brier: float = 0.30,
     max_pit: int = 0,
+    max_parity_ratio: float = 1.5,
 ) -> PredictiveQualification:
-    """Evaluate predictive qualification from out-of-fold metrics."""
+    """Evaluate predictive qualification from out-of-fold metrics.
+
+    Enforces: minimum events and dates, ECE ceiling, Brier ceiling,
+    PIT violation count, calibration slope proximity, train/serve parity,
+    and improvement over baseline (if provided).
+    """
     from .validation import log_loss, brier_score, ece
 
     failures: list[str] = []
@@ -146,12 +156,22 @@ def evaluate_predictive_qualification(
 
     if n_events < min_events:
         failures.append(f"events {n_events} < {min_events}")
+    if n_dates < min_dates:
+        failures.append(f"dates {n_dates} < {min_dates}")
     if ec > max_ece:
         failures.append(f"ECE {ec:.4f} > {max_ece}")
+    if br > max_brier:
+        failures.append(f"Brier {br:.4f} > {max_brier}")
     if pit_violations > max_pit:
         failures.append(f"PIT violations {pit_violations} > {max_pit}")
     if abs(calibration_slope - 1.0) > 0.3:
         failures.append(f"calibration slope {calibration_slope:.3f} far from 1.0")
+    if train_serve_parity > max_parity_ratio:
+        failures.append(f"train/serve parity {train_serve_parity:.3f} > {max_parity_ratio}")
+    if baseline_log_loss is not None and ll > baseline_log_loss:
+        failures.append(f"log loss {ll:.4f} not better than baseline {baseline_log_loss:.4f}")
+    if baseline_brier is not None and br > baseline_brier:
+        failures.append(f"Brier {br:.4f} not better than baseline {baseline_brier:.4f}")
 
     n_calls = len(y_true)
     return PredictiveQualification(

@@ -105,14 +105,31 @@ def validate_horizon_separation(
     mid_event_ids = {p.get("event_id") for p in mid_predictions}
     late_event_ids = {p.get("event_id") for p in late_predictions}
 
-    # Early should not have features that only appear in late
-    # (enforced structurally, but check statistically)
-    if early_predictions and mid_predictions:
-        early_avg = sum(p.get("home_win_prob", 0.5) for p in early_predictions) / len(early_predictions) if early_predictions else 0.5
-        mid_avg = sum(p.get("home_win_prob", 0.5) for p in mid_predictions) / len(mid_predictions) if mid_predictions else 0.5
-        if abs(early_avg - mid_avg) > 0.15:
+    # Check that predictions have timestamp metadata and that
+    # late-only features don't appear in early/mid predictions
+    late_only_features = {"confirmed_batting_order", "wind_vector", "final_lineups",
+                          "inactive_list", "game_time_weather", "withdrawal_risk"}
+
+    for p in early_predictions:
+        features = set(p.get("features_used", []))
+        leaked = features & late_only_features
+        if leaked:
             violations.append(
-                f"Early avg prob {early_avg:.3f} vs mid {mid_avg:.3f} — potential information leakage"
+                f"Early prediction {p.get('event_id', '?')} contains late-only features: {leaked}"
+            )
+        observed = p.get("observed_at_utc", "")
+        event_start = p.get("event_start_utc", "")
+        if observed and event_start and observed > event_start:
+            violations.append(
+                f"Early prediction {p.get('event_id', '?')} observed {observed} after event start {event_start}"
+            )
+
+    for p in mid_predictions:
+        features = set(p.get("features_used", []))
+        leaked = features & late_only_features
+        if leaked:
+            violations.append(
+                f"Mid prediction {p.get('event_id', '?')} contains late-only features: {leaked}"
             )
 
     return {
