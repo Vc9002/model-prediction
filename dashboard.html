@@ -1224,7 +1224,7 @@ const etDate=value=>{const p=etParts(value);return p?`${p.year}-${p.month}-${p.d
 const gameTimeET=value=>{const p=etParts(value);return p?`${p.month}/${p.day} ${p.hour}:${p.minute} ${p.dayPeriod}`:"—";};
 const todayET=()=>etDate(new Date());
 const shortDate=value=>{const s=String(value||"");return s.length>=16?`${s.slice(5,10).replace("-","/")} ${s.slice(11,16)}`:s;};
-function ageInfo(value,staleMinutes=5){
+function ageInfo(value,staleMinutes=15){
   const timestamp=Date.parse(value||"");
   if(!Number.isFinite(timestamp))return {label:"age unavailable",minutes:null,stale:true};
   const minutes=Math.max(0,(Date.now()-timestamp)/60000);
@@ -1241,7 +1241,7 @@ function timeToStart(value){
   if(minutes<1440)return `starts in ${Math.floor(minutes/60)}h ${minutes%60}m`;
   return `starts in ${Math.floor(minutes/1440)}d`;
 }
-function quoteStateBadge(value,staleMinutes=5){
+function quoteStateBadge(value,staleMinutes=15){
   const age=ageInfo(value,staleMinutes);
   if(age.minutes==null)return '<span class="state-badge bad" aria-label="Quote timestamp unavailable">! no timestamp</span>';
   return `<span class="state-badge ${age.stale?"warn":"ok"}" aria-label="Quote ${age.stale?"stale":"current"}; ${age.label}">${age.stale?"! stale":"✓ current"} · ${age.label}</span>`;
