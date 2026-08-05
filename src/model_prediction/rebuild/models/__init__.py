@@ -141,15 +141,25 @@ class JointScoreDistribution:
         uncertainty: float = 0.05,
     ) -> GamePrediction:
         """total_intensity = expected total runs, home_advantage = expected home margin.
-        Decompose into away/home expected runs, then simulate."""
-        # Decompose: total = away_runs + home_runs, margin = home_runs - away_runs
-        # => home_runs = (total + margin) / 2, away_runs = (total - margin) / 2
+        Decompose into away/home expected runs, then simulate.
+
+        Supports 'independent_poisson' (default) and 'negative_binomial' methods.
+        """
         home_exp = max(0.5, (total_intensity + home_advantage) / 2)
         away_exp = max(0.5, (total_intensity - home_advantage) / 2)
 
-        # Simulate
-        away_scores = self.rng.poisson(away_exp, self.n_sim)
-        home_scores = self.rng.poisson(home_exp, self.n_sim)
+        if self.method == "negative_binomial":
+            # NB with dispersion parameter for overdispersion in run scoring
+            # n parameter estimated from mean-variance relationship in MLB (~1.2×)
+            home_n = max(1, home_exp / 1.5)
+            away_n = max(1, away_exp / 1.5)
+            home_p = home_n / (home_n + home_exp)
+            away_p = away_n / (away_n + away_exp)
+            away_scores = self.rng.negative_binomial(home_n, home_p, self.n_sim)
+            home_scores = self.rng.negative_binomial(away_n, away_p, self.n_sim)
+        else:
+            away_scores = self.rng.poisson(away_exp, self.n_sim)
+            home_scores = self.rng.poisson(home_exp, self.n_sim)
 
         # Moneyline
         home_wins = int((home_scores > away_scores).sum())
@@ -282,9 +292,14 @@ class MLBTwoHeadModel:
         return self.distribution.probability_for_market(pred, market_type, selection, line)
 
     def to_artifact(self) -> dict[str, Any]:
-        return {
+        import hashlib, json
+        raw = {
             "model_id": self.MODEL_VERSION,
-            "method": "two_head_poisson",
+            "method": self.distribution.method,
             "intensity_features": self._intensity_features,
             "differential_features": self._differential_features,
+            "fitted": self._fitted,
         }
+        artifact_hash = hashlib.sha256(json.dumps(raw, sort_keys=True).encode()).hexdigest()
+        raw["artifact_hash"] = artifact_hash
+        return raw

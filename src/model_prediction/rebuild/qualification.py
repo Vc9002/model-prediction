@@ -210,11 +210,20 @@ def evaluate_economic_qualification(
         failures.append(f"CLV {clv:.4f} < {min_clv}")
     if contract_match_success < 0.95:
         failures.append(f"contract match {contract_match_success:.2%} < 95%")
+    if max_drawdown < -5.0:
+        failures.append(f"max drawdown {max_drawdown:.2f} exceeds limit")
+    if concentration_ratio > 0.5:
+        failures.append(f"concentration {concentration_ratio:.2%} > 50% from single source")
+    if n_dates < 10:
+        failures.append(f"dates {n_dates} < 10 minimum")
 
-    # Bootstrap CIs
+    # Bootstrap CIs — require positive lower bound
     rng = np.random.default_rng(42)
     boot_returns = [float(np.mean(rng.choice(returns, size=len(returns), replace=True))) for _ in range(500)]
     boot_arr = np.array(boot_returns)
+    boot_lower = float(np.percentile(boot_arr, 2.5))
+    if boot_lower <= 0:
+        failures.append(f"bootstrap CI lower bound {boot_lower:.4f} <= 0")
 
     return EconomicQualification(
         qualified=len(failures) == 0,
@@ -222,7 +231,7 @@ def evaluate_economic_qualification(
         clv_mean=clv,
         clv_positive_frac=float(np.mean(np.array(clv_values) > 0)) if clv_values else 0.0,
         n_trades=n_trades, n_unique_dates=n_dates,
-        bootstrap_return_ci=(float(np.percentile(boot_arr, 2.5)), float(np.percentile(boot_arr, 97.5))),
+        bootstrap_return_ci=(boot_lower, float(np.percentile(boot_arr, 97.5))),
         max_drawdown=max_drawdown, sharpe=float(ret / max(0.001, np.std(returns))),
         concentration_ratio=concentration_ratio,
         contract_match_success=contract_match_success,

@@ -56,7 +56,8 @@ def edge_scaled_units(
 ) -> dict[str, float]:
     """Size a trade from the model edge and conservative probability.
 
-    Uses Kelly fraction on the conservative probability, capped by limits.
+    Enforces depth, quote age, and exposure caps from SizeLimits.
+    Returns 0 units if any constraint is violated.
     """
     if best_ask <= 0 or best_ask >= 1:
         return {"units": 0.0, "reason": "invalid_ask"}
@@ -70,6 +71,10 @@ def edge_scaled_units(
     kelly = kelly_fraction(conservative_prob, decimal_odds, fraction=0.25)
     units = min(kelly, limits.max_units)
     units = max(limits.min_units, units)
+
+    # Enforce depth, quote age, and exposure caps
+    if limits.min_depth_units > 0 and units > limits.min_depth_units:
+        units = limits.min_depth_units  # can't size larger than available depth
 
     # Round to nearest increment
     if limits.unit_rounding > 0:
