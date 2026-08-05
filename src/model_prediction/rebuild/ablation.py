@@ -103,9 +103,9 @@ class FeatureAblationRunner:
         self,
         data: pl.DataFrame,
         target_col: str,
-        date_col: str = "game_date",
         train_fn: Callable,
         predict_fn: Callable,
+        date_col: str = "game_date",
         all_features: list[str] | None = None,
     ) -> list[AblationResult]:
         """Remove each group one at a time from all features, measure impact."""
