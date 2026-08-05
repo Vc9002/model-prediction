@@ -126,18 +126,18 @@ class BasketballModel:
         away_ortg = self.away_offense.predict(away_off_features.reshape(1, -1))[0]
         home_def = self.home_defense.predict(home_def_features.reshape(1, -1))[0]
 
-        # Net rating per 100 possessions
-        home_net = (home_ortg - home_def) / 100
-        away_net = (away_ortg - away_def) / 100
-
-        home_pts = max(60, pace * (home_ortg / 100))
-        away_pts = max(60, pace * (away_ortg / 100))
+        # Use both offense and defense ratings to compute expected points
+        # home_ortg vs away_def determines home scoring; away_ortg vs home_def determines away scoring
+        home_pps = (home_ortg + away_def) / 200  # average of home offense and opponent defense
+        away_pps = (away_ortg + home_def) / 200  # average of away offense and opponent defense
+        home_pts = max(60, pace * home_pps)
+        away_pts = max(60, pace * away_pps)
         total = home_pts + away_pts
 
-        # Normal approximation for win probability
+        # Normal approximation for win probability using CDF
         margin = home_pts - away_pts
-        std = 12.0  # typical NBA game std dev
-        home_win_prob = float(1.0 - np.exp(-((margin + 0.5) / std) ** 2 / 2)) if margin > 0 else float(np.exp(-((margin - 0.5) / std) ** 2 / 2)) if margin < 0 else 0.5
+        std = 12.0
+        home_win_prob = float(0.5 * (1.0 + np.tanh(margin / (std * np.sqrt(2)))))
 
         return BasketballPrediction(
             event_id=event_id, home_pts=float(home_pts), away_pts=float(away_pts),

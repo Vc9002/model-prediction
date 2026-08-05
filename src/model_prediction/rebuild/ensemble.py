@@ -118,8 +118,17 @@ class Ensemble:
         if self.method == "equal_weight":
             weights = np.ones(len(names)) / len(names)
         elif self.method == "inverse_log_loss":
-            weights_arr = np.array(inverse_log_loss_weights(matrices, y_true))
-            weights = weights_arr / weights_arr.sum()
+            # Compute weights from individual log-losses, not the combined prediction
+            arr = np.array(matrices)
+            eps = 1e-6
+            losses = np.zeros(len(names))
+            for i in range(len(names)):
+                probs = np.clip(arr[i], eps, 1 - eps)
+                losses[i] = -np.mean(
+                    np.array(y_true) * np.log(probs) + (1 - np.array(y_true)) * np.log(1 - probs)
+                )
+            weights = 1.0 / (losses + eps)
+            weights = weights / weights.sum()
         elif self.method == "logistic_stacking":
             _, weights = logistic_stacking(matrices, y_true)
         else:
@@ -130,9 +139,19 @@ class Ensemble:
         return self
 
     def predict(self, probs: dict[str, float]) -> float:
-        """Predict one probability from model-level probabilities."""
+        """Predict one probability from model-level probabilities.
+
+        For logistic_stacking, applies weights in logit space (matches training).
+        For other methods, linear combination in probability space.
+        """
         if not self._fitted:
             return np.mean(list(probs.values())) if probs else 0.5
+        if self.method == "logistic_stacking" and len(probs) > 1:
+            logits = [_logit(probs[n]) for n in self.weights if n in probs]
+            w = [self.weights[n] for n in self.weights if n in probs]
+            if logits:
+                return float(_sigmoid(np.dot(w, logits)))
+            return 0.5
         total = 0.0
         for name, p in probs.items():
             total += self.weights.get(name, 0.0) * p

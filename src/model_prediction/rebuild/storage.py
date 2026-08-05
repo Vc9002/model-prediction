@@ -91,11 +91,24 @@ class RawStore:
         return self.path(source, date_str, record_id).exists()
 
     def write(self, source: str, date_str: str, record_id: str, payload: Any) -> str:
-        """Write an immutable raw snapshot. Returns the SHA-256 hash."""
+        """Write an immutable raw snapshot. Returns the SHA-256 hash.
+
+        If the file already exists and its hash differs from the new payload,
+        raises ValueError — raw storage is genuinely immutable.
+        """
         p = self.path(source, date_str, record_id)
         p.parent.mkdir(parents=True, exist_ok=True)
         raw_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
         snapshot_hash = sha256_hex(raw_bytes)
+        if p.exists():
+            with gzip.open(p, "rb") as f:
+                existing_raw = f.read()
+            existing_hash = sha256_hex(existing_raw)
+            if existing_hash != snapshot_hash:
+                raise ValueError(
+                    f"RawStore immutability violation: {p} exists with hash {existing_hash[:16]}..., "
+                    f"cannot overwrite with hash {snapshot_hash[:16]}..."
+                )
         with gzip.open(p, "wb") as f:
             f.write(raw_bytes)
         return snapshot_hash

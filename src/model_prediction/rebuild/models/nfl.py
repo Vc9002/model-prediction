@@ -48,14 +48,15 @@ class NFLModel:
         )
         self.home_epa_model = Ridge(alpha=1.0)
         self.away_epa_model = Ridge(alpha=1.0)
-        self.scaler = StandardScaler()
+        self.drives_scaler = StandardScaler()
+        self.epa_scaler = StandardScaler()
         self._fitted = False
         self.rng = np.random.default_rng(seed)
 
     def fit(self, data: dict[str, np.ndarray]) -> NFLModel:
-        self.drives_model.fit(self.scaler.fit_transform(data["drives_X"]), data["drives_y"])
-        self.home_epa_model.fit(self.scaler.fit_transform(data["home_epa_X"]), data["home_epa_y"])
-        self.away_epa_model.fit(self.scaler.fit_transform(data["away_epa_X"]), data["away_epa_y"])
+        self.drives_model.fit(self.drives_scaler.fit_transform(data["drives_X"]), data["drives_y"])
+        self.home_epa_model.fit(self.epa_scaler.fit_transform(data["home_epa_X"]), data["home_epa_y"])
+        self.away_epa_model.fit(self.epa_scaler.fit_transform(data["away_epa_X"]), data["away_epa_y"])
         self._fitted = True
         return self
 
@@ -68,34 +69,47 @@ class NFLModel:
         if not self._fitted:
             raise RuntimeError("NFL model not fitted")
 
-        Xd = self.scaler.transform(drives_features.reshape(1, -1))
+        Xd = self.drives_scaler.transform(drives_features.reshape(1, -1))
         drives = max(15, self.drives_model.predict(Xd)[0])
 
-        Xh = self.scaler.transform(home_epa_features.reshape(1, -1))
-        Xa = self.scaler.transform(away_epa_features.reshape(1, -1))
+        Xh = self.epa_scaler.transform(home_epa_features.reshape(1, -1))
+        Xa = self.epa_scaler.transform(away_epa_features.reshape(1, -1))
         home_epa = self.home_epa_model.predict(Xh)[0]
         away_epa = self.away_epa_model.predict(Xa)[0]
 
-        # Adjust outcome probabilities by EPA differential
         epa_diff = home_epa - away_epa
-        td_shift = np.tanh(epa_diff * 2) * 0.05  # bounded shift
-        home_score = 0.0
-        away_score = 0.0
+        td_shift = np.tanh(epa_diff * 2) * 0.05
 
-        for outcome, base_p in self.OUTCOME_PROB.items():
-            points = self.OUTCOME_POINTS[outcome]
-            # Simulate drives for each team
-            home_success = self.rng.binomial(1, min(0.95, base_p + td_shift), int(drives))
-            away_success = self.rng.binomial(1, min(0.95, base_p - td_shift), int(drives))
-            home_score += home_success.sum() * points
-            away_score += away_success.sum() * points
+        # Simulate multiple games, derive win prob from distribution
+        n_sim = 1000
+        home_scores = np.zeros(n_sim)
+        away_scores = np.zeros(n_sim)
+        n_drives = int(drives)
 
-        home_score = float(max(0, home_score))
-        away_score = float(max(0, away_score))
-        spread = home_score - away_score
-        home_win_prob = float(1.0 / (1.0 + np.exp(-spread / 7.0)))
+        for i in range(n_sim):
+            # Each drive is one multinomial outcome (not independent binomials)
+            # Adjust category probabilities by EPA differential
+            probs = np.array([self.OUTCOME_PROB[o] for o in self.DRIVE_OUTCOMES])
+            probs[2] += td_shift  # touchdown
+            probs[1] += td_shift * 0.5  # field goal
+            probs[0] -= td_shift * 1.5  # reduce no_score to keep sum ~1
+            probs = np.clip(probs, 0.01, 0.95)
+            probs /= probs.sum()
+
+            for _team in range(2):
+                outcomes = self.rng.choice(len(self.DRIVE_OUTCOMES), size=n_drives, p=probs)
+                pts = sum(self.OUTCOME_POINTS[self.DRIVE_OUTCOMES[o]] for o in outcomes)
+                if _team == 0:
+                    home_scores[i] = pts
+                else:
+                    away_scores[i] = pts
+
+        home_win_prob = float((home_scores > away_scores).mean() + 0.5 * (home_scores == away_scores).mean())
+        home_score = float(home_scores.mean())
+        away_score = float(away_scores.mean())
 
         return NFLPrediction(
             event_id=event_id, home_score=home_score, away_score=away_score,
-            home_win_prob=home_win_prob, total=home_score + away_score, spread=spread,
+            home_win_prob=home_win_prob, total=home_score + away_score,
+            spread=home_score - away_score,
         )

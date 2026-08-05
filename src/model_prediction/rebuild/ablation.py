@@ -192,25 +192,49 @@ class FeatureAblationRunner:
         self, data: pl.DataFrame, target_col: str, features: list[str],
         train_fn: Callable, predict_fn: Callable,
     ) -> dict[str, float]:
-        """Train with given features, predict, return metrics."""
+        """Train on chronological first half, evaluate on second half.
+
+        Uses a simple train/test split to avoid training-set leakage.
+        """
         if not features:
             y_true = data[target_col].to_list()
             y_prob = [0.5] * len(y_true)
             return {"log_loss": log_loss(y_true, y_prob), "brier": brier_score(y_true, y_prob),
                     "ece": ece(y_true, y_prob)}
 
-        try:
-            X = data.select([f for f in features if f in data.columns]).to_numpy()
-            y = data[target_col].to_numpy()
-            model = train_fn(X, y)
-            probs = predict_fn(model, X)
-            return {"log_loss": log_loss(y.tolist(), probs), "brier": brier_score(y.tolist(), probs),
-                    "ece": ece(y.tolist(), probs)}
-        except Exception:
+        available_features = [f for f in features if f in data.columns]
+        if not available_features:
             y_true = data[target_col].to_list()
             return {"log_loss": log_loss(y_true, [0.5]*len(y_true)),
                     "brier": brier_score(y_true, [0.5]*len(y_true)),
                     "ece": ece(y_true, [0.5]*len(y_true))}
+
+        n = data.height
+        split = n * 2 // 3
+        train_df = data[:split]
+        test_df = data[split:]
+
+        if train_df.height < 10 or test_df.height < 5:
+            y_true = data[target_col].to_list()
+            return {"log_loss": log_loss(y_true, [0.5]*len(y_true)),
+                    "brier": brier_score(y_true, [0.5]*len(y_true)),
+                    "ece": ece(y_true, [0.5]*len(y_true))}
+
+        try:
+            X_train = train_df.select(available_features).to_numpy()
+            y_train = train_df[target_col].to_numpy()
+            X_test = test_df.select(available_features).to_numpy()
+            y_test = test_df[target_col].to_numpy()
+            model = train_fn(X_train, y_train)
+            probs = predict_fn(model, X_test)
+            return {"log_loss": log_loss(y_test.tolist(), probs),
+                    "brier": brier_score(y_test.tolist(), probs),
+                    "ece": ece(y_test.tolist(), probs)}
+        except Exception:
+            y_test = test_df[target_col].to_list()
+            return {"log_loss": log_loss(y_test, [0.5]*len(y_test)),
+                    "brier": brier_score(y_test, [0.5]*len(y_test)),
+                    "ece": ece(y_test, [0.5]*len(y_test))}
 
     @staticmethod
     def _coverage(data: pl.DataFrame, features: list[str]) -> float:

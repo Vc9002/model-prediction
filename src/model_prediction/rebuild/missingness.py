@@ -196,5 +196,7 @@ def empirical_bayes_shrink(
     shrunk = []
     for v, s in zip(values, std_errors, strict=True):
         weight = prior_var / (prior_var + s ** 2) if prior_var > 0 else 0.0
-        shrunk.append(float(weight * grand_mean + (1 - weight) * v))
+        # weight = trust in the observation (high weight = precise, keep value)
+        # (1 - weight) = trust in the prior (grand mean)
+        shrunk.append(float(weight * v + (1 - weight) * grand_mean))
     return prior_var, shrunk

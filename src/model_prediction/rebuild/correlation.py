@@ -79,25 +79,20 @@ class CorrelationTracker:
 
     def add_trade(
         self, event_id: str, team: str, sport: str, market_type: str,
-        units: float, model_version: str = "", weather_region: str = "",
+        units: float, model_version: str = "", date_str: str = "",
     ) -> None:
         self.trades.append({
             "event_id": event_id, "team": team, "sport": sport,
             "market_type": market_type, "units": units,
-            "model_version": model_version, "weather_region": weather_region,
+            "model_version": model_version, "date": date_str,
         })
-        # Group by event
+        # Group by event only — this is the primary correlation dimension
         self._group(event_id, "same_event", units)
 
-        # Group by team
-        self._group(f"team:{team}", f"same_team_{market_type}", units)
-
-        # Group by model family
-        if model_version:
-            self._group(f"model:{model_version}", "model_family", units)
-
-        # Group by sport-day bucket (populated elsewhere)
-        self._group(f"sport:{sport}", "same_league_same_day", units)
+        # Detect ML+spread on same team/event
+        existing = [t for t in self.trades if t["event_id"] == event_id and t["team"] == team]
+        if len(existing) > 1:
+            self._group(f"{event_id}:{team}:ml_spread", "same_team_moneyline_spread", units)
 
     def _group(self, key: str, reason: str, units: float) -> None:
         if key not in self.groups:

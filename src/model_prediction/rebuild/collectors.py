@@ -123,10 +123,12 @@ class MLBCollector:
                 record_id = f"statcast_{game_date}"
                 if payload is not None and len(payload) > 0:
                     data = payload.to_dict(orient="records") if hasattr(payload, "to_dict") else payload
-                    self.raw.write(source, game_date, record_id, {"rows": len(data), "columns": list(data[0].keys()) if data else []})
+                    # Store the actual pitch-level data, not just a row count
+                    snapshot_hash = self.raw.write(source, game_date, record_id, data)
                     self.meta.update_source_health(source, "active")
                     results["collected"].append("statcast")
                     results["statcast_rows"] = len(data)
+                    results["statcast_hash"] = snapshot_hash
             except Exception as e:
                 self.meta.update_source_health(source, "degraded", str(e)[:200])
 

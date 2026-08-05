@@ -119,7 +119,8 @@ def executable_edge(
     """
     raw_edge = model_prob - best_ask
     cost_adjusted = conservative_prob - best_ask - spread * 0.5 - fee_rate
-    ev = conservative_prob * (1.0 / best_ask) - (1 - conservative_prob)
+    # For a binary contract bought at price best_ask, expected profit = p - c
+    ev = conservative_prob - best_ask - fee_rate
     return {
         "raw_edge": float(raw_edge),
         "cost_adjusted_edge": float(cost_adjusted),
