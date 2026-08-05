@@ -3,7 +3,7 @@
 Shadow-first multi-sport prediction, research, ledger, and local dashboard
 system with Polymarket US market-data integration.
 
-**Last updated**: 2026-08-05 | **699 tests pass, 0 fail** | **Python 3.11+**
+**Last updated**: 2026-08-05 | **748 tests pass, 0 fail** (699 legacy + 49 rebuild) | **Python 3.14**
 
 > **This document is the AI-ready master reference.** It contains every fact
 > needed to understand, rebuild, or improve this project. Supporting detail
@@ -44,7 +44,8 @@ defects — see [Known Issues](#known-issues--technical-debt).
 |---|---|
 | Tests | **699 pass, 0 fail** (75 test files) |
 | Ruff | ~118 findings (79 EXE002 shebang, baseline ~117) |
-| Git | Single `main` branch |
+| Git | `main` (legacy) + `rebuild/clean-slate-v1` (new platform) |
+| Rebuild tests | **49 pass, 0 fail** |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
 | Python | 3.11+, managed via `.venv` |
 | Release status | **Blocked** — P0 defects in execution-binding, ledger/audit transactions |
@@ -1002,6 +1003,51 @@ If you're an AI agent rebuilding or improving this project, read these docs
 - **Don't invent contracts**: no spread/total/F5/YRFI without exact historical lines
 - **Shadow calls are not orders**: never log or execute during model validation
 - **Market isolation**: market prices never enter outcome models
+
+---
+
+## Rebuild Platform (branch: `rebuild/clean-slate-v1`)
+
+A clean-slate rebuild of the data platform and model architecture. The legacy
+system is frozen as a benchmark; the rebuild is a separate, independently
+testable system.
+
+### Architecture (18 modules, 49 tests)
+
+| Layer | Modules | What |
+|---|---|---|
+| **Medallion Storage** | `storage.py` | RawStore (immutable gzip JSONL), NormalizedStore (Parquet + DuckDB), FeatureStore (PIT snapshots), MarketStore (timestamped BBOs). 11 provenance columns. |
+| **Metadata** | `metadata.py` | SQLite DB — 14 sources, 51 source-sport mappings, hash-chained audit trail |
+| **Identity** | `identity.py` | CanonicalIdentity with effective dates, Jaccard fuzzy matching (fails closed <90%) |
+| **Collectors** | `collectors.py` | MLB (ESPN + pybaseball + Open-Meteo + Polymarket) + NBA/NFL/soccer/tennis/esports stubs |
+| **Validation** | `validation.py` | Nested chronological CV, expanding/rolling folds, date-cluster bootstrap, log loss/Brier/ECE |
+| **Models** | `models/` | MLB two-head (intensity + differential), NBA possessions×efficiency, NFL drive-based, soccer dynamic Dixon-Coles, tennis serve/return Elo, esports per-title, KBO/NPB tie-aware |
+| **Calibration** | `calibration.py` | Platt, isotonic, temperature scaling — all on OOF data |
+| **Ensemble** | `ensemble.py` | Equal-weight, inverse-log-loss, nonnegative logistic stacking |
+| **Market Residual** | `market_residual.py` | LR on market-side features, cost-adjusted executable edge |
+| **Economics** | `economic.py` | Kelly sizing, Exposure tracker, portfolio eval with bootstrap CIs, 8 health states |
+| **Horizons** | `horizons.py` | Early/mid/late feature schemas per sport, horizon separation validation |
+| **Missingness** | `missingness.py` | FeatureRecord with availability/source/age/reason, beta-binomial shrinkage, empirical Bayes |
+| **XGBoost/Stress** | `xgboost_stress.py` | Conservative XGBoost challenger, 13 stress scenarios with pass/fail verdicts |
+| **Tests** | `tests/test_rebuild.py` | 49 tests — leakage, identity, calibration, ensemble, stress, monitoring, horizons |
+
+### Quick Start (Rebuild)
+
+```bash
+git checkout rebuild/clean-slate-v1
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/test_rebuild.py -q
+# 49 passed
+
+# MLB collector end-to-end
+env PYTHONPATH=src:. .venv/bin/python -c "
+from model_prediction.rebuild import MLBCollector, MetadataDB
+meta = MetadataDB('data/rebuild/metadata.db')
+c = MLBCollector('data/rebuild', meta)
+print(c.collect_espn_scoreboard('2026-08-05'))
+"
+```
+
+See [`docs/REBUILD_PLAN.md`](docs/REBUILD_PLAN.md) for the full 3-part rebuild specification.
 
 ---
 
