@@ -140,8 +140,9 @@ class MLBCollector:
                 record_id = f"schedule_{game_date}"
                 if payload is not None and len(payload) > 0:
                     data = payload.to_dict(orient="records") if hasattr(payload, "to_dict") else payload
-                    self.raw.write(source, game_date, record_id, {"rows": len(data)})
+                    self.raw.write(source, game_date, record_id, data)
                     results["collected"].append("schedule")
+                    results["schedule_rows"] = len(data)
             except Exception:
                 pass
 

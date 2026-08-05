@@ -91,7 +91,8 @@ class FeatureAblationRunner:
     """Run isolated and cumulative feature ablations via chronological validation.
 
     Isolated: remove one group at a time, measure degradation.
-    Cumulative: start with most important group, add groups incrementally, measure improvement.
+    Cumulative: start with most important group, add groups incrementally.
+    Uses expanding chronological folds grouped by complete event dates.
     """
 
     def __init__(self, groups: list[FeatureGroup]) -> None:
@@ -102,6 +103,7 @@ class FeatureAblationRunner:
         self,
         data: pl.DataFrame,
         target_col: str,
+        date_col: str = "game_date",
         train_fn: Callable,
         predict_fn: Callable,
         all_features: list[str] | None = None,
@@ -209,6 +211,9 @@ class FeatureAblationRunner:
                     "brier": brier_score(y_true, [0.5]*len(y_true)),
                     "ece": ece(y_true, [0.5]*len(y_true))}
 
+        # Chronological split: sort by date, train on first 2/3 of dates
+        if date_col in data.columns:
+            data = data.sort(date_col)
         n = data.height
         split = n * 2 // 3
         train_df = data[:split]

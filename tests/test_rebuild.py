@@ -276,7 +276,7 @@ class TestStress:
             {"pnl": -0.1, "team": "B", "month": "2026-08", "edge": -0.01},
         ]
         results = run_stress_tests(trades, base_pnl=1.5)
-        assert len(results) == 6
+        assert len(results) == 13
         summary = stress_test_summary(results)
         assert "overall_verdict" in summary
 
