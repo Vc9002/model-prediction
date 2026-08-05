@@ -7,6 +7,7 @@ Raw responses are immutable. Normalized tables carry full provenance columns.
 from __future__ import annotations
 
 import time
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -129,7 +130,7 @@ class MLBCollector:
                     results["collected"].append("statcast")
                     results["statcast_rows"] = len(data)
                     results["statcast_hash"] = snapshot_hash
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
                 self.meta.update_source_health(source, "degraded", str(e)[:200])
 
         # Schedule
@@ -143,8 +144,8 @@ class MLBCollector:
                     self.raw.write(source, game_date, record_id, data)
                     results["collected"].append("schedule")
                     results["schedule_rows"] = len(data)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
+                self.meta.update_source_health(source, "degraded", str(e)[:200])
 
         results["status"] = "ok" if results["collected"] else "no_data"
         self.meta.audit_event("collect_pybaseball", results)
@@ -190,7 +191,7 @@ class MLBCollector:
             snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
             self.meta.update_source_health(source, "active")
             return {"status": "ok", "venue_id": venue_id, "hash": snapshot_hash}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
             self.meta.update_source_health(source, "degraded", str(e)[:200])
             return {"status": "error", "venue_id": venue_id, "error": str(e)[:200]}
 
@@ -212,8 +213,9 @@ class MLBCollector:
 
         try:
             client = PolymarketUSClient()
-            mlb_events = client.slate("MLB", game_date)
+            mlb_events = client.slate("MLB", date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
+            skipped_events = 0
             for event in mlb_events:
                 try:
                     event_id = str(event.get("id", ""))
@@ -239,7 +241,9 @@ class MLBCollector:
                             "ask_size": market.get("askSize"),
                             "spread": market.get("spread"),
                         })
-                except Exception:
+                except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
+                    skipped_events += 1
+                    self.meta.update_source_health(source, "active", f"skipped malformed event: {str(e)[:150]}")
                     continue
 
             if books:
@@ -248,12 +252,15 @@ class MLBCollector:
                 df = pl.DataFrame(books)
                 self.markets.write_books("mlb", game_date, df)
                 self.meta.update_source_health(source, "active")
-                self.meta.audit_event("collect_polymarket_books", {"date": game_date, "books": len(books)})
-                return {"status": "ok", "date": game_date, "books": len(books)}
+                self.meta.audit_event(
+                    "collect_polymarket_books",
+                    {"date": game_date, "books": len(books), "skipped_events": skipped_events},
+                )
+                return {"status": "ok", "date": game_date, "books": len(books), "skipped_events": skipped_events}
 
             return {"status": "no_mlb_markets", "date": game_date}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
             self.meta.update_source_health(source, "degraded", str(e)[:200])
             return {"status": "error", "date": game_date, "error": str(e)[:200]}
 
@@ -294,7 +301,7 @@ class MLBCollector:
             df = pl.read_parquet(str(path))
             venue_df = df.filter(
                 pl.col("event_start_utc").str.contains(game_date)
-            ).select(["venue_id", "venue"]).unique()
+            ).select(["venue"]).unique()
             # Default coordinates for known ballparks
             KNOWN_PARKS: dict[str, tuple[float, float]] = {
                 "Yankee Stadium": (40.8296, -73.9262),
@@ -334,7 +341,12 @@ class MLBCollector:
                 coords = KNOWN_PARKS.get(name, (0.0, 0.0))
                 venues.append({"id": name, "lat": coords[0], "lon": coords[1]})
             return venues
-        except Exception:
+        except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
+            # This except previously masked a real bug (a KeyError from
+            # selecting a nonexistent `venue_id` column) as a silent `[]` —
+            # see outputs/rebuild/takeover_status.md Checkpoint 4. Surface
+            # failures through source health instead of swallowing them.
+            self.meta.update_source_health("open_meteo", "degraded", f"_venues_for_date failed: {str(e)[:150]}")
             return []
 
 
@@ -430,7 +442,7 @@ class NBACollector:
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
             client = PolymarketUSClient()
-            events = client.slate(sport.upper(), game_date)
+            events = client.slate(sport.upper(), date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
             for event in events:
                 for market in event.get("markets", []):
@@ -447,7 +459,7 @@ class NBACollector:
                 self.markets.write_books(sport, game_date, pl.DataFrame(books))
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
             return {"status": "error", "error": str(e)[:200]}
 
     # ── Orchestrate ──────────────────────────────────────────────────────
@@ -529,7 +541,7 @@ class NFLCollector:
             try:
                 from model_prediction.data_sources.polymarket_us import PolymarketUSClient
                 client = PolymarketUSClient()
-                events = client.slate("NFL", game_date)
+                events = client.slate("NFL", date.fromisoformat(game_date))
                 books: list[dict[str, Any]] = []
                 for event in events:
                     for market in event.get("markets", []):
@@ -542,7 +554,7 @@ class NFLCollector:
                     self.markets.write_books(sport, game_date, pl.DataFrame(books))
                     return {"status": "ok", "books": len(books)}
                 return {"status": "no_markets"}
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
                 return {"status": "error", "error": str(e)[:200]}
 
         def collect_date(self, game_date: str) -> dict[str, Any]:
@@ -614,7 +626,7 @@ class SoccerCollector:
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
             client = PolymarketUSClient()
-            events = client.slate(league, game_date)
+            events = client.slate(league, date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
             for event in events:
                 for market in event.get("markets", []):
@@ -627,7 +639,7 @@ class SoccerCollector:
                 self.markets.write_books(sport, game_date, pl.DataFrame(books))
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
             return {"status": "error", "error": str(e)[:200]}
 
     def _throttle(self) -> None:
@@ -701,7 +713,7 @@ class TennisCollector:
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
             client = PolymarketUSClient()
-            events = client.slate(league, game_date)
+            events = client.slate(league, date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
             for event in events:
                 for market in event.get("markets", []):
@@ -714,7 +726,7 @@ class TennisCollector:
                 self.markets.write_books(sport, game_date, pl.DataFrame(books))
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
             return {"status": "error", "error": str(e)[:200]}
 
     def _throttle(self) -> None:

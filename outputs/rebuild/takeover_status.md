@@ -147,3 +147,95 @@ Polymarket collectors (Polymarket credential validity in `.env` still
 unverified), and replace `scripts/pipeline_mlb_e2e.py`'s placeholder rolling-
 score features with real starter/lineup/bullpen/park features per
 `CLAUDE.md`'s MLB feature-store spec.
+
+## Checkpoint 4 — MLB data (in progress, 2026-08-06)
+
+**Polymarket credentials**: verified all four
+(`POLYMARKET_KEY_ID`/`SECRET_KEY`/`PRIVATE_KEY`/`WALLET_ADDRESS`) are
+populated in `.env` (values not printed). Not a blocker.
+
+**Real bug found and fixed — silent, systemic, affects every sport, not just
+MLB**: `PolymarketUSClient.slate(league, game_date)` compares
+`parsed_datetime.astimezone(tz).date() != game_date`. Every one of the five
+collector classes (`MLBCollector`, `NBACollector`, `NFLCollector`,
+`SoccerCollector`, `TennisCollector`) called `.slate()` with `game_date` as a
+raw `str`, not a `date` object. A `date` object is never `==` a `str` in
+Python, so this comparison is unconditionally `False` for every event, every
+time — Polymarket market collection has silently returned zero markets for
+every sport on this branch since it was written, with no exception raised
+(the code has a broad `except Exception: continue` around each event, plus
+the caller treats an empty list as the unremarkable `no_markets` case).
+Verified before/after: before the fix,
+`collector.collect_polymarket_books('2026-08-06')` returned
+`{"status": "no_mlb_markets", ...}`; after adding `from datetime import date`
+and wrapping every `.slate()` call site with `date.fromisoformat(game_date)`
+(5 call sites: `collectors.py:216,434,533,618,705`), the identical call
+returned `{"status": "ok", "date": "2026-08-06", "books": 132}` — 132 real
+order-book rows written to `data/rebuild/markets/mlb/2026-08-06.parquet` and
+a raw snapshot to `data/rebuild/raw/polymarket_us/2026-08-06/`.
+
+**Second real bug found and fixed**: `_venues_for_date()` selected a
+`venue_id` column from the normalized MLB scoreboard table that doesn't
+exist in that table's schema (only `venue` does — confirmed via
+`df.columns`). The resulting `ColumnNotFoundError` was silently swallowed by
+a bare `except Exception: return []`, so weather collection has always
+received zero venues for every date — `data/rebuild/raw/` had no
+`open_meteo` directory at all before this fix, for any date, ever. Fixed by
+removing the nonexistent column from the `.select()`. After the fix,
+`_venues_for_date('2026-08-06')` correctly returns 2 real venues (Chase
+Field, T-Mobile Park) matched against the hardcoded 30-ballpark coordinate
+table in `collectors.py`.
+
+**Real, unresolved issue — flagged, not patched blindly**:
+`collect_weather_forecast()`'s docstring says it should capture "the forecast
+*as it was* at a specific run time, not the realized weather" (i.e. a
+point-in-time forecast archive, for the same point-in-time-correctness
+invariant this whole rebuild is built around), but it calls
+`archive-api.open-meteo.com/v1/archive` — Open-Meteo's ERA5 **reanalysis**
+endpoint, which serves realized historical weather, not historical forecast
+runs, and has several days of processing lag. Called for today
+(2026-08-06), both real venue requests returned `400 Bad Request`. The
+function's own stated intent needs Open-Meteo's separate "Historical Forecast
+API" (previous-runs), not the Archive API — this is a real endpoint-choice
+bug, not a transient failure, but fixing it means picking the right
+replacement API and verifying its point-in-time semantics match the
+provenance contract, which I'm not doing speculatively. **Weather data
+collection remains non-functional** pending that fix.
+
+**Also observed, not yet fixed**: normalized MLB scoreboard rows appear
+duplicated on repeated collection (5 identical `Kauffman Stadium` rows at the
+same `event_start_utc` in one query) — the medallion "normalized collection
+must not duplicate rows" invariant (`CLAUDE.md` Part 1 §4) isn't actually
+enforced yet in `NormalizedStore`'s write path for this table. Real
+Checkpoint 2 gap, tracked here rather than fixed inline to avoid scope creep
+mid-Checkpoint-4.
+
+**Not yet done**: `pybaseball` raw-to-normalized pipeline (raw data for 10
+days already on disk, never parsed into a usable table); real MLB feature
+engineering (starter/lineup/bullpen/park) is still the placeholder rolling-
+score version in `scripts/pipeline_mlb_e2e.py`.
+
+**Files changed**: `src/model_prediction/rebuild/collectors.py` (both bug
+fixes). No test file yet covers either regression — needed before calling
+Checkpoint 4 complete, per `CLAUDE.md`'s "each corrected bug must include a
+regression test that fails against the pre-fix implementation."
+
+**Current checkpoint**: 4 (in progress — market collection now real and
+verified; weather collection blocked on a real endpoint-choice bug; pybaseball
+normalization and real feature engineering not started).
+
+**Pre-commit hook note**: the first commit attempt for this checkpoint was
+silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
+`.py` files, `set -e`) — `collectors.py` had 12 pre-existing ruff findings
+(`BLE001` blind-except, `S110`/`S112` swallowed-exception-with-no-logging)
+unrelated to this session's edits but in the same file. Fixed properly rather
+than bypassing the hook: the two truly-silent swallows (pybaseball schedule
+fetch, and the `_venues_for_date` catch-all that had already masked the real
+`venue_id` bug above) now log through `meta.update_source_health` instead of
+swallowing silently; the Polymarket per-event parse loop now counts and
+reports `skipped_events` instead of silently discarding malformed events; the
+remaining 10 sites are legitimate broad-catch-with-reporting patterns for
+external-API resilience (error already captured and returned/logged, not
+narrowable to a specific exception type without guessing at pybaseball/httpx
+internals) — annotated with a justified `# noqa: BLE001` each. `ruff check
+src/model_prediction/rebuild/collectors.py` now passes clean.
