@@ -74,6 +74,7 @@ from .domain import (
     MarketType,
     ModelOrigin,
     ModelState,
+    NoCallReason,
     PickRequest,
     RecordType,
     eastern_today,
@@ -96,6 +97,7 @@ from .esports import (
 from .features.base import FeatureStore
 from .forward import build_mlb_slate
 from .ingest import Ingestor
+from .pricing import implied_probability
 from .international_baseball import (
     LEAGUE_SPECS as INTERNATIONAL_BASEBALL_LEAGUE_SPECS,
 )
@@ -790,10 +792,34 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
                 unit_policy(config),
                 now=observed_at,
             )
+            # Value gate (operator directive, 2026-08-05):
+            # The projected winner must also be undervalued by the market.
+            # Measured-edge path: use shrunk probability minus uncertainty
+            # as the conservative estimate, check against implied odds price.
+            if eligibility.decision == "CALL":
+                model_uncertainty = candidate.uncertainty or 0.05
+                conservative_probability = max(
+                    0.01, candidate.shrunk_probability - model_uncertainty
+                )
+                market_price = implied_probability(candidate.american_odds)
+                fees = float(config.get("bankroll", {}).get("fees", 0.0))
+                slippage = float(
+                    config.get("bankroll", {}).get("expected_slippage", 0.01)
+                )
+                min_edge = float(config.get("bankroll", {}).get("min_edge", 0.02))
+                cost_adjusted_edge = (
+                    conservative_probability - market_price - fees - slippage
+                )
+                if cost_adjusted_edge < min_edge:
+                    eligibility = replace(
+                        eligibility,
+                        record_type=RecordType.RESEARCH_OBSERVATION,
+                        decision="NO_CALL",
+                        reason_code=NoCallReason.WINNER_OVERVALUED.value,
+                        units=0,
+                    )
             # Main holds only genuine qualified calls (see the same filter
             # in _forecast_learned_sport) -- this path's model_state is
-            # hardcoded to RESEARCH, so it can never produce one anyway,
-            # but a NO_CALL row here would still be pure noise in main.
             if eligibility.decision != "CALL":
                 continue
             try:
@@ -1341,6 +1367,39 @@ def _forecast_learned_sport(
                             reason_code="NO_CALL_BELOW_LEARNED_CONFIDENCE",
                             units=0,
                         )
+                    # Value gate (operator directive, 2026-08-05):
+                    # The projected winner must also be undervalued by the
+                    # market. Being likely to win is necessary but not
+                    # sufficient — the executable price must clear costs
+                    # after accounting for fees and expected slippage.
+                    if eligibility.decision == "CALL" and quote is not None:
+                        model_uncertainty = candidate.feature_basis.get(
+                            "model_uncertainty", 0.05
+                        )
+                        conservative_probability = max(
+                            0.01, candidate.model_probability - model_uncertainty
+                        )
+                        fees = float(
+                            config.get("bankroll", {}).get("fees", 0.0)
+                        )
+                        slippage = float(
+                            config.get("bankroll", {}).get("expected_slippage", 0.01)
+                        )
+                        min_edge = float(model_config.get("min_edge", 0.02))
+                        cost_adjusted_edge = (
+                            conservative_probability
+                            - quote["executable_ask"]
+                            - fees
+                            - slippage
+                        )
+                        if cost_adjusted_edge < min_edge:
+                            eligibility = replace(
+                                eligibility,
+                                record_type=RecordType.RESEARCH_OBSERVATION,
+                                decision="NO_CALL",
+                                reason_code=NoCallReason.WINNER_OVERVALUED.value,
+                                units=0,
+                            )
                     # What's still NO_CALL here is always a hard trust-
                     # boundary reason or the confidence gate just above.
                     genuinely_eligible = eligibility.decision == "CALL"

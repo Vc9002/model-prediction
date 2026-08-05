@@ -138,17 +138,17 @@ def test_stale_missing_uncertainty_low_edge_and_exposure_become_research(registr
     )
     assert stale.reason_code == "NO_CALL_STALE_DATA"
     assert missing.reason_code == "QUALIFIED"  # uncertainty defaults to 0.05 — pick qualifies
-    # Low edge and exposure caps no longer gate CALL vs NO_CALL at all
-    # (operator directive, 2026-07-26): once a candidate clears the
-    # trust-boundary checks (model state, staleness, provenance), it's a
-    # real qualified call regardless of edge or today's exposure so far.
-    assert low.reason_code == "QUALIFIED"
+    # Value gate (operator directive, 2026-08-05): a 0.54 model probability
+    # against a -110 market (~0.524) with default 0.05 uncertainty gives
+    # conservative 0.49 which is below market → NO_CALL_WINNER_OVERVALUED.
+    # The old 2026-07-26 directive ("edge never gates") is superseded.
+    # Exposure caps are still not a gate (capped below still qualifies).
+    assert low.reason_code == "NO_CALL_WINNER_OVERVALUED"
     assert capped.reason_code == "QUALIFIED"
-    assert low.units > 0
+    assert low.units == 0  # value gate → zero units
     assert capped.units > 0
     # Stale data still can't be *trusted* as a real call, but it still gets a
     # real paper size for research tracking (operator directive, 2026-07-31).
     assert stale.units > 0
-    assert low.units > 0
     assert capped.units > 0
     assert missing.units > 0  # qualified call gets positive units

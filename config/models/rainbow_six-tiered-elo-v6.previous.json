@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "c5ec7539c19af4566d83e9a60999b8bc65c9813e575c65b29d620e2e49895f98",
+  "artifact_hash": "3911bce9b22d82ef85c1d36bc8b559f6d5da017605834be588eb3180d7bb313e",
   "confidence_threshold": 0.0,
   "games_played": {
     "bo3:7:19211": 3,
@@ -863,7 +863,7 @@
     "bo3:7:24958": 1531.124493
   },
   "schema_version": "esports-neutral-elo-v2",
-  "source_manifest_sha256": "a4cf7143afc0f9bacb67382ac92c404641b76e9ce3992c544f93a714c4a0e12a",
+  "source_manifest_sha256": "f4255d4d03374c9fcc78cbbd5efbe9e3c8af365de7a74740362b89f87e149dbd",
   "target": "best-of match/series winner",
   "title": "rainbow_six",
   "trained_through_utc": "2026-08-04T19:00:00Z",

@@ -1,0 +1,27 @@
+{
+  "model_id": "mlb-two-head-v1",
+  "method": "independent_poisson",
+  "intensity_features": [
+    "home_rolling_runs_scored",
+    "away_rolling_runs_scored",
+    "home_rolling_runs_allowed",
+    "away_rolling_runs_allowed",
+    "home_avg_total",
+    "away_avg_total"
+  ],
+  "differential_features": [
+    "home_rolling_run_diff",
+    "away_rolling_run_diff",
+    "home_win_pct",
+    "away_win_pct"
+  ],
+  "fitted": true,
+  "artifact_hash": "d81391d31e967cde4b861abd9fd260328cacb65bdce88fedfa5f68f25dc24ea0",
+  "log_loss": 0.713845197865458,
+  "brier_score": 0.26012417046052627,
+  "ece": 0.2073355263157895,
+  "accuracy": 0.5,
+  "train_games": 150,
+  "test_games": 38,
+  "total_completed": 188
+}

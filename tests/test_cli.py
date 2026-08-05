@@ -78,7 +78,7 @@ def _international_config(*, min_edge: float) -> dict:
             "maximum_data_age_hours": 12,
             "maximum_unreviewed_market_disagreement": 0.10,
         },
-        "bankroll": {},
+        "bankroll": {"expected_slippage": 0.0},
     }
 
 
@@ -102,7 +102,7 @@ def _international_forecast() -> dict:
                     },
                     {
                         "team": "Doosan",
-                        "model_fair_settlement_value": 0.60,
+                        "model_fair_settlement_value": 0.63,
                         "executable_ask": 0.55,
                         "tie_probability": 0.04,
                     },
@@ -130,8 +130,9 @@ def _esports_forecast() -> dict:
                 "market_slug": "valid",
                 "gated_research_eligible": True,
                 "sides": [
-                    {"team": "Team A", "model_probability": 0.60, "executable_ask": 0.55},
-                    {"team": "Team B", "model_probability": 0.40, "executable_ask": 0.45},
+                    # model 0.65, conservative 0.60, ask 0.55 → edge 0.05 clears default 0.02 min + 0.01 slippage
+                    {"team": "Team A", "model_probability": 0.65, "executable_ask": 0.55},
+                    {"team": "Team B", "model_probability": 0.35, "executable_ask": 0.45},
                 ],
             },
             {
@@ -167,7 +168,7 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
     config = {
         "models": {
             "LOL": {
-                "min_edge": 0.02,
+                "min_edge": 0.0,
                 "research_confidence_gate": 0.0,
                 "status": "shadow_qualified",
             }
@@ -176,7 +177,7 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
             "maximum_data_age_hours": 12,
             "maximum_unreviewed_market_disagreement": 0.10,
         },
-        "bankroll": {},
+        "bankroll": {"expected_slippage": 0.0},
     }
 
     logged = cli._log_esports_forecast(
@@ -191,7 +192,10 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
     assert len(gated.appended) == 1
     assert gated.appended[0][0].event_id == "valid"
     by_event = {request.event_id: eligibility for request, eligibility in research.appended}
-    assert by_event["negative-edge"].reason_code == "NO_CALL_LOW_EDGE"
+    # Value gate (2026-08-05): negative-edge now gets WINNER_OVERVALUED
+    # instead of the old LOW_EDGE — the conservative probability (0.55)
+    # is below the executable ask (0.62).
+    assert by_event["negative-edge"].reason_code == "NO_CALL_WINNER_OVERVALUED"
     assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
 
 
@@ -207,7 +211,7 @@ def test_esports_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypa
     config = {
         "models": {
             "LOL": {
-                "min_edge": 0.02,
+                "min_edge": 0.0,
                 "research_confidence_gate": 0.0,
                 "status": "shadow_qualified",
             }
@@ -216,7 +220,7 @@ def test_esports_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypa
             "maximum_data_age_hours": 12,
             "maximum_unreviewed_market_disagreement": 0.10,
         },
-        "bankroll": {},
+        "bankroll": {"expected_slippage": 0.0},
     }
     forecast = _esports_forecast()
 
@@ -1165,15 +1169,13 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executa
     assert eligibility.units == 0
 
 
-def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp_path) -> None:
-    """Operator directive (2026-07-30): a candidate whose model probability
-    is below the executable ask by more than the configured min_edge used
-    to be silently skipped (`continue`) before ever reaching the ledger.
-    It must now still be logged -- edge_scaled_units sizing is driven by
-    the model's own confidence distance from 50/50, not this vs-market
-    number, so nothing about the position size changes; only the row's
-    visibility does. The gap is still recorded in edge_blocked as an
-    informational note, not an exclusion."""
+def test_below_min_edge_vs_market_blocked_by_value_gate(monkeypatch, tmp_path) -> None:
+    """Two-gate strategy (2026-08-05): the projected winner must be
+    undervalued by the market. When the cost-adjusted edge (conservative
+    probability minus executable ask minus fees minus slippage) is below
+    the configured min_edge, the pick is blocked — it was previously logged
+    anyway under the 2026-07-30 directive, but the value gate now correctly
+    suppresses it with NO_CALL_WINNER_OVERVALUED."""
     observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
     candidate = LearnedForwardCandidate(
         event_id="mlb-2",
@@ -1204,8 +1206,9 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
         cli,
         "match_executable_quote",
         lambda *args, **kwargs: {
-            # model_probability (0.55) - executable_ask (0.65) = -0.10, well
-            # below the configured min_edge of 0.05.
+            # model_probability (0.55) - executable_ask (0.65) = -0.10;
+            # conservative (0.55 - 0.05) = 0.50 - 0.65 - 0.00 - 0.01 = -0.16,
+            # well below the configured min_edge of 0.05.
             "executable_ask": 0.65,
             "market_slug": "mlb-2",
             "observed_at_utc": "2026-07-26T11:00:00Z",
@@ -1249,6 +1252,7 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
             "maximum_unreviewed_market_disagreement": 0.10,
             "ledger_path": str(tmp_path / "picks.xlsx"),
         },
+        # Default bankroll costs: fees=0.0, slippage=0.01 (two-gate strategy)
         "bankroll": {},
     }
 
@@ -1256,11 +1260,13 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
         "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
     )
 
-    assert result["logged"] == 1  # not skipped, despite failing min_edge
-    assert len(result["edge_blocked"]) == 1  # still noted, just not exclusionary
-    assert "logged anyway" in result["edge_blocked"][0]["reason"]
-    request, _eligibility = ledger.appended[0]
-    assert request.event_id == "mlb-2"
+    # Value gate: the projected winner (home, 55%) is overpriced at 65¢ ask —
+    # conservative probability (50%) minus ask (65%) minus fees (0%) minus
+    # slippage (1%) = -16ppt, below the 5ppt min_edge → NO_CALL.
+    assert result["logged"] == 0  # blocked by value gate
+    # The old edge_blocked path recorded "logged anyway" notes — those are
+    # now redundant since the value gate handles the exclusion directly.
+    assert result["logged"] == 0
 
 
 def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(
@@ -1282,8 +1288,8 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(
         home_team="New York Yankees",
         market_type="moneyline",
         selection="home",
-        model_probability=0.60,
-        home_probability=0.60,
+        model_probability=0.65,
+        home_probability=0.65,
         confidence_threshold=0.50,
         call=True,
         action="QUALIFIED_SHADOW_CALL",
@@ -1291,7 +1297,7 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(
         model_version="nba-test",
         model_artifact_hash="artifact-hash",
         model_qualified=True,
-        feature_basis={"elo_probability": 0.60, "trend_gap": 0.0},
+        feature_basis={"elo_probability": 0.65, "trend_gap": 0.0},
         feature_snapshot_hash="feature-hash-nba-1",
     )
     monkeypatch.setattr(cli, "utc_now", lambda: observed)
@@ -1506,7 +1512,7 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
             "MLB": {
                 "production_artifact": str(tmp_path / "artifact.json"),
                 "status": "shadow_qualified",
-                "min_edge": 0.02,
+                "min_edge": 0.0,
             },
             "market_residual": {"artifact": str(residual_path)},
         },
@@ -1515,7 +1521,7 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
             "maximum_unreviewed_market_disagreement": 0.10,
             "ledger_path": str(tmp_path / "picks.xlsx"),
         },
-        "bankroll": {},
+        "bankroll": {"expected_slippage": 0.0},
     }
 
     result = cli._forecast_learned_sport(
@@ -1539,8 +1545,8 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
         home_team="New York Yankees",
         market_type="moneyline",
         selection="home",
-        model_probability=0.60,
-        home_probability=0.60,
+        model_probability=0.65,
+        home_probability=0.65,
         confidence_threshold=0.55,
         call=True,
         action="QUALIFIED_SHADOW_CALL",
@@ -1548,7 +1554,7 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
         model_version="mlb-test",
         model_artifact_hash="artifact-hash",
         model_qualified=True,
-        feature_basis={"elo_probability": 0.60, "trend_gap": 0.1},
+        feature_basis={"elo_probability": 0.65, "trend_gap": 0.1},
         feature_snapshot_hash="feature-hash-4",
     )
     monkeypatch.setattr(cli, "utc_now", lambda: observed)
@@ -1585,7 +1591,7 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
             "MLB": {
                 "production_artifact": str(tmp_path / "artifact.json"),
                 "status": "shadow_qualified",
-                "min_edge": 0.02,
+                "min_edge": 0.0,
             },
             "market_residual": {"artifact": str(tmp_path / "does-not-exist.json")},
         },
@@ -1594,7 +1600,7 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
             "maximum_unreviewed_market_disagreement": 0.10,
             "ledger_path": str(tmp_path / "picks.xlsx"),
         },
-        "bankroll": {},
+        "bankroll": {"expected_slippage": 0.0},
     }
 
     result = cli._forecast_learned_sport(
@@ -1705,6 +1711,9 @@ def test_international_forecast_logs_low_edge_to_research_but_not_gated(
     assert result["logged"] == 1
     assert len(research.appended) == 1
     assert research.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    # The value gate at policy.min_edge (0.02) passes for this contract
+    # (cost_adjusted_edge = 0.03), but the gated research edge check at
+    # minimum_edge=0.10 catches it — executable_edge (0.08) < 0.10.
     assert research.appended[0][1].reason_code == "NO_CALL_LOW_EDGE"
     assert gated.appended == []
 

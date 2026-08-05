@@ -142,6 +142,13 @@ def _paired_event_candidates(
             totals_output.run_estimate,
         ),
     )
+    # Two-gate strategy (operator directive, 2026-08-05):
+    # Determine the projected game winner from the moneyline model once,
+    # then constrain every team-sided market (spread) to that same team.
+    predicted_winner = (
+        "home" if margin_output.moneyline.second_win_probability >= 0.5 else "away"
+    )
+
     output = []
     for market_type, distribution, sides, model, estimate in definitions:
         prices = odds_snapshot.markets[market_type.value]
@@ -159,7 +166,15 @@ def _paired_event_candidates(
         calibrated_on_both = {
             side: model.calibrate_selected_side(probabilities[side]) for side in sides
         }
-        selection = max(sides, key=lambda side: calibrated_on_both[side])
+        if market_type is MarketType.SPREAD:
+            # Cross-market winner alignment: the spread pick must be for
+            # the projected game winner, not whichever side happens to
+            # have the higher cover probability in isolation. A team
+            # selected by the winner gate must carry through to every
+            # team-sided market.
+            selection = predicted_winner
+        else:
+            selection = max(sides, key=lambda side: calibrated_on_both[side])
         raw_probability = probabilities[selection]
         calibrated_probability = calibrated_on_both[selection]
         no_vig = dict(

@@ -34,6 +34,8 @@ def evaluate_eligibility(
     now: datetime | None = None,
     maximum_age_hours: float = 12,
     maximum_unreviewed_disagreement: float = 0.10,
+    fees: float = 0.0,
+    expected_slippage: float = 0.01,
 ) -> EligibilityResult:
     # exposure and maximum_unreviewed_disagreement are accepted but unused --
     # kept for call-site/API stability since disagreement/exposure no longer
@@ -80,17 +82,14 @@ def evaluate_eligibility(
         or request.code_revision in {"", "unknown"}
     ):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
-    # Market/model disagreement, exposure caps, and thin post-uncertainty edge
-    # are no longer NO_CALL gates (operator directive, 2026-07-26): once a
-    # candidate clears model-state/staleness/provenance -- the checks above,
-    # which represent "can this decision be trusted at all" -- it becomes a
-    # real qualified call regardless of how far the model disagrees with the
-    # market, today's exposure so far, or how thin the edge is after the
-    # uncertainty haircut. _call_result below always sizes via the proven
-    # edge-scaled method rather than the exposure-aware Kelly engine, since
-    # that engine's only remaining job (deciding CALL vs NO_CALL on edge/
-    # exposure) no longer applies.
-    return _call_result(request, away, home, policy)
+    # Two-gate strategy (operator directive, 2026-08-05):
+    # The projected winner must be undervalued by the market -- being likely
+    # to win is necessary but not sufficient. _call_result below now enforces
+    # the value gate: conservative probability must clear executable ask
+    # after fees and slippage. The old 2026-07-26 directive ("edge is never
+    # a gate") is superseded.
+    return _call_result(request, away, home, policy,
+                        fees=fees, expected_slippage=expected_slippage)
 
 
 def evaluate_esports_eligibility(
@@ -149,8 +148,9 @@ def evaluate_esports_eligibility(
         or request.code_revision in {"", "unknown"}
     ):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
-    # See evaluate_eligibility's matching comment: disagreement/exposure/edge
-    # no longer gate CALL vs NO_CALL (operator directive, 2026-07-26).
+    # Two-gate strategy (operator directive, 2026-08-05):
+    # Same value gate as evaluate_eligibility — the projected winner must
+    # clear the executable ask after costs.
     return _call_result(request, away, home, policy)
 
 
@@ -245,23 +245,58 @@ def _call_result(
     away: CanonicalTeam,
     home: CanonicalTeam,
     policy: UnitPolicy,
+    *,
+    fees: float = 0.0,
+    expected_slippage: float = 0.01,
 ) -> EligibilityResult:
-    """Build a QUALIFIED_SHADOW_CALL once every trust-boundary gate has
-    passed. Sizes via the proven edge-scaled method (edge_scaled_units,
-    "+34.1U vs +13.3U flat" walk-forward) rather than the exposure-aware
-    Kelly engine in recommend_units -- that engine's is_call decision isn't
-    consulted here at all, so its exposure-capped/edge-gated units would
-    otherwise silently reintroduce the very gates this function skips.
+    """Build a QUALIFIED_SHADOW_CALL only when the value gate clears.
+
+    Two-gate strategy (operator directive, 2026-08-05):
+    - Winner gate (upstream): the model has already selected the side with
+      the higher calibrated win probability.
+    - Value gate (here): the projected winner must be undervalued by the
+      market. cost_adjusted_edge = conservative_prob - market_ask - fees
+      - expected_slippage must clear policy.min_edge.
+
+    Failure → NO_CALL_WINNER_OVERVALUED, zero units, research observation.
     """
     uncertainty = request.model_uncertainty or 0.05
-    edge = request.model_probability - implied_probability(request.american_odds)
+    # Edge vs the executable ask (what the market actually charges).
+    executable_ask_prob = implied_probability(request.american_odds)
+    edge = request.model_probability - executable_ask_prob
+    # Conservative probability: model estimate minus uncertainty haircut.
+    conservative_prob = request.model_probability - uncertainty
+    # Cost-adjusted edge: must clear the ask AFTER fees and slippage.
+    # This is the spec formula:
+    #   cost_adjusted_edge = conservative_prob - executable_ask - fees - slippage
+    cost_adjusted_edge = conservative_prob - executable_ask_prob - fees - expected_slippage
+    # no-vig estimate (for diagnostic / reporting only, never for gating).
     market_no_vig = (
         request.decision_no_vig_probability
         if request.decision_no_vig_probability is not None
-        else implied_probability(request.american_odds)
+        else executable_ask_prob
     )
-    adjusted_edge = (request.model_probability - uncertainty) - market_no_vig
+    adjusted_edge = conservative_prob - market_no_vig
     confidence = max(0, min(100, round(50 + 500 * adjusted_edge - 100 * uncertainty)))
+
+    # Value gate: being likely to win is necessary, not sufficient.
+    # The projected winner's executable ask must leave enough edge after
+    # fees and slippage. Never use no-vig midpoint for this check — the
+    # market charges the ask, and the value gate must be conservative.
+    # Equivalent to rebuild/conservative.py's ConservativeProbability.clears_ask().
+    if cost_adjusted_edge < policy.min_edge:
+        return EligibilityResult(
+            RecordType.RESEARCH_OBSERVATION,
+            "NO_CALL",
+            NoCallReason.WINNER_OVERVALUED.value,
+            0,
+            confidence,
+            edge,
+            adjusted_edge,
+            away,
+            home,
+        )
+
     units = edge_scaled_units(request.model_probability, uncertainty, request.american_odds, policy)
     return EligibilityResult(
         RecordType.QUALIFIED_SHADOW_CALL,

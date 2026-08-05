@@ -43,6 +43,11 @@ bankroll:
   reference_units: 5
   kelly_fraction: 0.5
   min_edge: 0.02
+  # Two-gate strategy costs (per the user's 2026-08-05 directive):
+  # cost_adjusted_edge = conservative_prob - executable_ask - fees - expected_slippage
+  # A bet is only placed when cost_adjusted_edge >= min_edge.
+  fees: 0.0
+  expected_slippage: 0.01
   # Range widened 2026-07-31 (operator directive) from 0.5-2.0 to 1.0-2.0:
   # 1U is now the floor for the LEAST confident logged pick, 2U the ceiling
   # for the most confident -- paired with the same-day fix making

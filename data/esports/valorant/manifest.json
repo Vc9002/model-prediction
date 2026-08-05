@@ -3,18 +3,18 @@
     "from": "2020-01-01",
     "to": "2026-07-27"
   },
-  "extracted_at_utc": "2026-08-05T04:37:51.861309Z",
+  "extracted_at_utc": "2026-08-05T13:55:51.982767Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
     "Team IDs do not encode point-in-time rosters or substitutions."
   ],
-  "match_count": 14645,
-  "matches_sha256": "7a57465ecaff8c9924810eec60c7292f667fc77d4e661e6083dec593e4867b40",
+  "match_count": 14647,
+  "matches_sha256": "433d413c26a55851c49012e4a3aed2b45973347a2fa56545694ac70b6a10768a",
   "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
   "request_pages": {
     "matches": 3,
-    "teams": 43
+    "teams": 1
   },
   "requested_window": {
     "from": "2026-07-22",
@@ -27,8 +27,8 @@
   "source_attribution_url": "https://bo3.gg/",
   "source_base_url": "https://api.bo3.gg/api/v1",
   "source_terms_url": "https://bo3.gg/wiki/use-of-services",
-  "team_count": 1811,
-  "teams_sha256": "a0bc001720054b93cbbeb05823df8c67e71a72500c67c319e59c3bddfc4341e9",
+  "team_count": 1812,
+  "teams_sha256": "84b778e26fa7d5d9925769014e28717306f76ed1a9e7009a7517e5613e41dce0",
   "title": "valorant",
   "title_name": "VALORANT"
 }

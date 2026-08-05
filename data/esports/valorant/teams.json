@@ -5151,6 +5151,13 @@
     "source_team_id": 24921,
     "team_id": "bo3:2:24921"
   },
+  "bo3:2:25012": {
+    "acronym": "AT",
+    "name": "A Team",
+    "slug": "a-team-vlr",
+    "source_team_id": 25012,
+    "team_id": "bo3:2:25012"
+  },
   "bo3:2:6328": {
     "acronym": "NOVO",
     "name": "NOVO Esports",

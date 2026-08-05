@@ -9353,7 +9353,7 @@
   },
   "bo3:1:24681": {
     "acronym": null,
-    "name": "maybe",
+    "name": "MAYBE",
     "slug": "maybe-ukr",
     "source_team_id": 24681,
     "team_id": "bo3:1:24681"
@@ -9546,6 +9546,13 @@
     "slug": "teletubisie",
     "source_team_id": 24977,
     "team_id": "bo3:1:24977"
+  },
+  "bo3:1:24978": {
+    "acronym": "DE.P",
+    "name": "Dynamo Eclot Phoenix",
+    "slug": "dynamo-eclot-phoenix",
+    "source_team_id": 24978,
+    "team_id": "bo3:1:24978"
   },
   "bo3:1:2498": {
     "acronym": "SAGA",

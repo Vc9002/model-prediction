@@ -1,229 +1,248 @@
 {
   "audit_date": "2026-08-05",
-  "git_sha": "09bc24e67cebe8dd766ba9b5d52847e0b1fe18bf",
   "branch": "rebuild/clean-slate-v1",
-  "python_version": "3.14.5",
-  "project_root": "/Users/vincentc9002/model prediction",
-  "test_count": 699,
-  "test_status": "all_pass",
-  "ruff_findings": 118,
-  "package_version": "0.6.0",
-  "files": {
-    "source_modules": 77,
-    "test_files": 75,
-    "model_artifacts": 60,
-    "scripts": 11,
-    "docs": 17
-  },
-  "source_line_counts": {
-    "cli.py": 4411,
-    "dashboard_server.py": 4782,
-    "validation.py": 2428,
-    "ledger.py": 1485,
-    "international_baseball.py": 1186,
-    "esports.py": 1156,
-    "backtester.py": 797,
-    "learned_forward.py": 694,
-    "models/mlb.py": 647,
-    "model_ledger.py": 586,
-    "soccer_forward.py": 563,
-    "ingest.py": 404,
-    "eligibility.py": 319,
-    "tennis_forward.py": 314,
-    "domain.py": 314,
-    "models/learned_market.py": 266,
-    "calibration.py": 258,
-    "main_ledgers.py": 235,
-    "models/soccer.py": 213,
-    "forward.py": 211,
-    "config.py": 209,
-    "models/registry.py": 202,
-    "models/market_residual.py": 158,
-    "source_policy.py": 149,
-    "units.py": 134,
-    "lifecycle.py": 131,
-    "models/base.py": 117,
-    "audit.py": 98,
-    "pricing.py": 79,
-    "research_ledgers.py": 61
-  },
-  "total_source_lines": "~22,000",
-  "dependencies": {
-    "core": {
-      "numpy": "2.5.1",
-      "pandas": "2.3.3",
-      "scipy": "1.18.0",
-      "scikit-learn": "1.9.0",
-      "pydantic": "2.13.4",
-      "httpx": "0.28.1",
-      "joblib": "1.5.3",
-      "openpyxl": "3.1.5",
-      "cryptography": "46.0.7",
-      "PyYAML": "6.0.3",
-      "pypdf": "5.9.0"
-    },
-    "dev": {
-      "pytest": "8.4.2",
-      "ruff": "0.16.0",
-      "mypy": "1.20.2",
-      "pandas-stubs": "3.0.3.260530",
-      "numpy-typing-compat": "20260602.2.5"
-    },
-    "missing_from_plan": [
-      "xgboost",
-      "pybaseball",
-      "polars",
-      "pyarrow",
-      "duckdb",
-      "pandera",
-      "statsmodels",
-      "optuna",
-      "scipy-stubs",
-      "types-PyYAML",
-      "types-openpyxl"
+  "git_sha": "bea7e8c",
+  "production_sports": ["mlb", "wnba"],
+  "learned_production_sports": [
+    "mlb", "nba", "wnba", "nfl", "soccer",
+    "lol", "cs2", "dota2", "valorant", "rainbow_six"
+  ],
+  "all_sports": ["mlb", "nba", "wnba", "nfl", "soccer", "tennis"],
+  "research_sports": ["kbo", "npb"],
+
+  "daily_pipeline": {
+    "stages": [
+      {"step": 1, "name": "mlb_baseline_refresh", "what": "Refresh park factors and league run rates (self-throttled to weekly)", "status": "active"},
+      {"step": 2, "name": "polymarket_slate_capture", "what": "Capture Polymarket US slate and BBO snapshots for all sports", "status": "active"},
+      {"step": 3, "name": "wnba_availability_capture", "what": "Capture WNBA injury reports per event from ESPN", "status": "active"},
+      {"step": 4, "name": "wnba_priors_build", "what": "Build player availability priors for WNBA", "status": "active"},
+      {"step": 5, "name": "soccer_score_collection", "what": "Collect recent soccer scores (3-day window)", "status": "active"},
+      {"step": 6, "name": "mlb_probables_capture", "what": "Capture probable starting pitcher snapshots", "status": "active"},
+      {"step": 7, "name": "mlb_availability_capture", "what": "Capture MLB roster/transaction data (shadow feature)", "status": "active"},
+      {"step": 8, "name": "esports_ratings_refresh", "what": "Incremental esports Elo rating refresh", "status": "active"},
+      {"step": 9, "name": "forecast_production", "what": "Forecast + log learned models for production sports", "status": "active"},
+      {"step": 10, "name": "forecast_learned", "what": "Forecast + log learned models for all learned sports", "status": "active"},
+      {"step": 11, "name": "esports_forecast", "what": "Forecast esports slate", "status": "active"},
+      {"step": 12, "name": "international_forecast", "what": "Forecast KBO/NPB slate", "status": "active"},
+      {"step": 13, "name": "soccer_forecast", "what": "Forecast soccer slate", "status": "active"},
+      {"step": 14, "name": "tennis_forecast", "what": "Forecast tennis slate", "status": "active"},
+      {"step": 15, "name": "settle_all", "what": "Settle all unsettled picks against ESPN results", "status": "active"},
+      {"step": 16, "name": "summary", "what": "Print daily summary", "status": "active"}
     ]
   },
-  "sports_in_scope": [
-    "MLB",
-    "NBA",
-    "WNBA",
-    "NFL",
-    "Soccer",
-    "Tennis",
-    "LOL",
-    "CS2",
-    "Dota2",
-    "Valorant",
-    "Rainbow Six",
-    "KBO",
-    "NPB"
-  ],
+
   "active_models": {
-    "mlb_moneyline": {
-      "artifact": "mlb-elo-trend-lr-v8",
-      "method": "logistic_regression",
-      "features": ["elo_probability", "trend_gap", "defensive_trend_gap", "starter_era_gap", "bullpen_weakness_gap", "park_factor", "player_availability"],
-      "status": "shadow_qualified_override",
-      "qualified": false,
-      "ledger": ["main", "flat"]
-    },
-    "mlb_spread": {
-      "artifact": "measured-edge-margin-v3",
-      "method": "gamma_poisson_monte_carlo",
-      "status": "active_research",
-      "ledger": ["main", "flat"]
-    },
-    "mlb_totals": {
-      "artifact": "measured-edge-totals-v3",
-      "method": "gamma_poisson_monte_carlo",
-      "status": "active_research",
-      "diagnostic_correlation": 0.041,
-      "ledger": ["main", "flat"]
-    },
-    "nba_moneyline": {
-      "artifact": "nba-elo-trend-lr-v4",
-      "method": "logistic_regression",
-      "features": ["elo_probability", "trend_gap", "defensive_trend_gap"],
-      "calibration_slope": 1.79,
-      "status": "shadow_qualified",
-      "qualified": true,
-      "ledger": ["flat"]
-    },
-    "wnba_moneyline": {
-      "artifact": "wnba-elo-trend-lr-v4",
-      "method": "logistic_regression",
-      "features": ["elo_probability", "trend_gap", "defensive_trend_gap"],
-      "status": "shadow_qualified",
-      "qualified": true,
-      "ledger": ["main", "flat"]
-    },
-    "nfl_moneyline": {
-      "artifact": "nfl-elo-trend-lr-v4",
-      "method": "logistic_regression",
-      "features": ["elo_probability", "trend_gap"],
-      "locked_evaluation_games": 122,
-      "ece": 0.10,
-      "status": "shadow_qualified",
-      "qualified": true,
-      "ledger": ["flat"]
-    },
-    "soccer": {
-      "artifact": "soccer-poisson-dc-v1",
-      "method": "poisson_dixon_coles",
-      "features": ["ewma_attack", "ewma_defense", "home_boost_1.15", "dc_rho_-0.10"],
-      "hardcoded_params": ["HOME_GOAL_BOOST=1.15", "DC_RHO=-0.10", "BTTS_CALIBRATION_INTERCEPT=0.1393", "BTTS_CALIBRATION_SLOPE=0.4205"],
-      "status": "research",
-      "ledger": ["main", "flat"]
-    },
-    "tennis": {
-      "artifact": "tennis-surface-elo-v1",
-      "method": "surface_blended_elo",
-      "hardcoded_params": ["K=32", "surface_blend_60_40", "uncertainty=0.05"],
-      "features": ["overall_elo", "surface_elo"],
-      "status": "research",
-      "ledger": ["main", "flat"]
-    },
-    "esports": {
-      "method": "platt_scaled_neutral_elo_v5",
-      "features": ["organization_elo"],
-      "status": "research",
-      "ledger": ["research", "gated_research"]
-    },
-    "kbo_npb": {
-      "artifact": "tie-aware-elo-v2",
-      "method": "tie_aware_elo",
-      "features": ["home_elo", "elo_gap_tie_heuristic"],
-      "status": "research",
-      "ledger": ["research", "gated_research"]
+    "mlb": [
+      {
+        "name": "mlb-moneyline-elo-trend-lr",
+        "type": "learned_logistic_regression",
+        "features": ["elo_probability", "trend_gap", "defensive_trend_gap", "park_factor", "weather_factor", "starter_era_gap", "bullpen_weakness_gap", "pitcher_era_gap", "probable_starter_era_gap", "mlb_player_availability"],
+        "artifact": "config/models/mlb-elo-trend-lr-v8.json",
+        "qualified": false,
+        "note": "v8 artifact explicitly qualified:false after validation-Brier regression"
+      },
+      {
+        "name": "measured-edge-margin-v3",
+        "type": "gamma_poisson_margin",
+        "features": ["relative_offense", "starter_quality", "bullpen_quality", "park_factor", "weather_factor"],
+        "artifact": "config/models/measured-edge-margin-v3.json",
+        "qualified": false
+      },
+      {
+        "name": "measured-edge-totals-v3",
+        "type": "gamma_poisson_totals",
+        "features": ["relative_offense", "starter_quality", "bullpen_quality", "park_factor", "weather_factor"],
+        "artifact": "config/models/measured-edge-totals-v3.json",
+        "qualified": false,
+        "note": "Latest totals diagnostic: 0.041 correlation, 52.9% hit rate"
+      }
+    ],
+    "nba": [
+      {
+        "name": "nba-moneyline-elo-trend-lr",
+        "type": "learned_logistic_regression",
+        "features": ["elo_probability", "trend_gap", "defensive_trend_gap"],
+        "artifact": "config/models/nba-v4-learned.json",
+        "qualified": false,
+        "note": "Calibration slope ~1.79 — substantial probability-shape error"
+      }
+    ],
+    "wnba": [
+      {
+        "name": "wnba-moneyline-elo-trend-lr",
+        "type": "learned_logistic_regression",
+        "features": ["elo_probability", "trend_gap", "defensive_trend_gap", "availability_points_gap"],
+        "artifact": "config/models/wnba-v4-learned.json",
+        "qualified": false,
+        "note": "Threshold ~0.50013 — effectively calls the complete slate"
+      }
+    ],
+    "nfl": [
+      {
+        "name": "nfl-moneyline-elo-trend-lr",
+        "type": "learned_logistic_regression",
+        "features": ["elo_probability", "trend_gap"],
+        "artifact": "config/models/nfl-v1-learned.json",
+        "qualified": false,
+        "note": "122 games in locked evaluation, ECE ~0.10"
+      }
+    ],
+    "soccer": [
+      {
+        "name": "soccer-poisson-dc",
+        "type": "poisson_dixon_coles",
+        "features": ["ewma_goals_for", "ewma_goals_against", "home_multiplier_1.15", "dixon_coles_rho_-0.10"],
+        "artifact": "config/models/soccer-poisson-dc-v1.json",
+        "qualified": false
+      }
+    ],
+    "tennis": [
+      {
+        "name": "tennis-surface-elo",
+        "type": "elo_blend",
+        "features": ["surface_elo", "overall_elo", "fixed_60_40_blend"],
+        "artifact": "config/models/tennis-surface-elo-v1.json",
+        "qualified": false,
+        "note": "Fixed K=32, fixed 60/40 surface/overall blend, no serve/return input"
+      }
+    ],
+    "esports": [
+      {
+        "name": "lol-tiered-elo-v6",
+        "type": "neutral_elo_platt",
+        "features": ["elo_rating"],
+        "artifact": "config/models/lol-tiered-elo-v6.json",
+        "qualified": false
+      },
+      {
+        "name": "cs2-tiered-elo-v6",
+        "type": "neutral_elo_platt",
+        "features": ["elo_rating"],
+        "artifact": "config/models/cs2-tiered-elo-v6.json",
+        "qualified": false
+      },
+      {
+        "name": "dota2-tiered-elo-v6",
+        "type": "neutral_elo_platt",
+        "features": ["elo_rating"],
+        "artifact": "config/models/dota2-tiered-elo-v6.json",
+        "qualified": false
+      },
+      {
+        "name": "valorant-tiered-elo-v6",
+        "type": "neutral_elo_platt",
+        "features": ["elo_rating"],
+        "artifact": "config/models/valorant-tiered-elo-v6.json",
+        "qualified": false
+      },
+      {
+        "name": "rainbow_six-tiered-elo-v6",
+        "type": "neutral_elo_platt",
+        "features": ["elo_rating"],
+        "artifact": "config/models/rainbow_six-tiered-elo-v6.json",
+        "qualified": false
+      }
+    ],
+    "international_baseball": [
+      {
+        "name": "kbo-tie-aware-elo-v1",
+        "type": "tie_aware_elo",
+        "features": ["home_elo", "elo_gap_tie_heuristic"],
+        "artifact": "config/models/kbo-tie-aware-elo-v1.json",
+        "qualified": false,
+        "note": "No pitcher, lineup, bullpen, park, or run model"
+      },
+      {
+        "name": "npb-tie-aware-elo-v1",
+        "type": "tie_aware_elo",
+        "features": ["home_elo", "elo_gap_tie_heuristic"],
+        "artifact": "config/models/npb-tie-aware-elo-v1.json",
+        "qualified": false
+      }
+    ]
+  },
+
+  "rebuild_challenger_models": {
+    "mlb": {
+      "name": "mlb-two-head-v1",
+      "type": "run_intensity_plus_differential",
+      "features": ["home_rolling_runs_scored", "away_rolling_runs_scored", "home_rolling_runs_allowed", "away_rolling_runs_allowed", "home_avg_total", "away_avg_total", "home_rolling_run_diff", "away_rolling_run_diff", "home_win_pct", "away_win_pct"],
+      "status": "RESEARCH_ONLY",
+      "trained_games": 150,
+      "test_games": 38,
+      "brier": 0.2601,
+      "ece": 0.2073,
+      "log_loss": 0.7138,
+      "note": "Baseline only — rolling averages from scoreboard. Full Statcast/weather/lineup/pitcher features require collectors to be completed."
     }
   },
-  "hardcoded_thresholds_found": [
-    {"location": "config.py", "name": "UNIT_MIN_EDGE", "value": 0.02},
-    {"location": "config.py", "name": "UNIT_INCREMENT", "value": 0.25},
-    {"location": "config.py", "name": "TENNIS_MODEL_UNCERTAINTY", "value": 0.05},
-    {"location": "config.py", "name": "ESPORTS_MIN_OBSERVATIONS", "value": 50},
-    {"location": "config.py", "name": "ESPORTS_MIN_ACCURACY", "value": 0.60},
-    {"location": "models/soccer.py", "name": "HOME_GOAL_BOOST", "value": 1.15},
-    {"location": "models/soccer.py", "name": "DC_RHO", "value": -0.10},
-    {"location": "models/soccer.py", "name": "BTTS_CALIBRATION_INTERCEPT", "value": 0.1393},
-    {"location": "models/soccer.py", "name": "BTTS_CALIBRATION_SLOPE", "value": 0.4205},
-    {"location": "models/tennis.py", "name": "ELO_K", "value": 32},
-    {"location": "validation.py", "name": "PRIMARY_THRESHOLD_TARGET_HIT_RATE", "value": 0.65},
-    {"location": "validation.py", "name": "MINIMUM_CALLS", "value": 50},
-    {"location": "lifecycle.py", "name": "QUALIFICATION_MINIMUM_HIT_RATE", "value": 0.60},
-    {"location": "lifecycle.py", "name": "QUALIFICATION_MINIMUM_CALLS", "value": 50},
-    {"location": "models/market_residual.py", "name": "MINIMUM_SAMPLE", "value": 100},
-    {"location": "models/market_residual.py", "name": "ROLLING_WINDOW_DAYS", "value": 90},
-    {"location": "eligibility.py", "name": "maximum_age_hours", "value": 12}
-  ],
-  "dead_code_candidates": [
-    "roadmap_challenger.py",
-    "verification_checklist.py",
-    "experiment_design.py",
-    "feature_contract.py",
-    "production_feature_ablation.py",
-    "total_score.py",
-    "economic_gate.py",
-    "research_cleanup.py",
-    "point_in_time.py",
-    "mlb_baseline_refresh.py",
-    "wnba_availability_evaluation.py",
-    "data_sources/kalshi.py"
-  ],
-  "key_findings": [
-    "All moneyline models for MLB/NBA/WNBA/NFL share one logistic regression pipeline with only 2-3 features",
-    "MLB v8 is qualified=false but operator-overridden to production",
-    "NBA calibration slope 1.79 indicates severe probability-shape error",
-    "Soccer uses 4 hardcoded global constants rather than learned parameters",
-    "Tennis uses fixed K=32 Elo with no serve/return features in forecast",
-    "cli.py (4,411 lines) has near-zero dedicated test coverage",
-    "dashboard_server.py (4,782 lines) is monolithic with inline HTML",
-    "12 likely-orphaned modules totaling ~1,800 lines",
-    "17 hardcoded thresholds found across 7 files",
-    "Economic evaluation uses synthetic -110 pricing, not executable quotes",
-    "Audit chain validates integrity but does not cross-check ledger contents",
-    "Excel is the primary database format; no ACID guarantees",
-    "No ensemble or out-of-fold calibration exists",
-    "scipy-stubs, types-PyYAML, types-openpyxl listed as dev deps but not installed"
-  ]
+
+  "data_sources": {
+    "market": {
+      "primary": "polymarket_us",
+      "base_url": "https://gateway.polymarket.us",
+      "pricing": "executable_ask",
+      "status": "active"
+    },
+    "odds_fallback": {
+      "provider": "the_odds_api",
+      "status": "active_but_degrading"
+    },
+    "sport_data": {
+      "provider": "espn_public",
+      "mlb_deep": "mlb_statsapi",
+      "soccer_enrichment": "football_data",
+      "tennis_historical": "sackmann_csv",
+      "optional_upgrade": "sportsdataio"
+    },
+    "esports": {
+      "provider": "bo3_public",
+      "status": "research_replaceable",
+      "titles": ["lol", "cs2"]
+    },
+    "rebuild_collectors": {
+      "mlb": {"status": "partial", "sources": ["espn", "pybaseball", "open-meteo", "polymarket"]},
+      "nba": {"status": "stub", "sources": ["polymarket_only"]},
+      "wnba": {"status": "stub", "sources": ["polymarket_only"]},
+      "nfl": {"status": "stub", "sources": []},
+      "soccer": {"status": "stub", "sources": []},
+      "tennis": {"status": "stub", "sources": []},
+      "esports": {"status": "stub", "sources": []},
+      "kbo_npb": {"status": "stub", "sources": []}
+    }
+  },
+
+  "two_gate_system": {
+    "status": "implemented",
+    "date": "2026-08-05",
+    "winner_gate": {
+      "location": "learned_forward.py:511, forward.py:148-149",
+      "rule": "selection = side with higher calibrated model probability"
+    },
+    "value_gate": {
+      "primary": "eligibility.py:_call_result():279",
+      "secondary": "units.py:edge_scaled_units():85-86",
+      "tertiary": "cli.py:_forecast_learned_sport:1395, cli.py:_forecast_mlb:813",
+      "formula": "cost_adjusted_edge = (model_prob - uncertainty) - market_ask - fees - expected_slippage",
+      "threshold": "policy.min_edge (default 0.02)",
+      "failure": "NO_CALL_WINNER_OVERVALUED, 0 units"
+    },
+    "config": {
+      "fees": 0.0,
+      "expected_slippage": 0.01,
+      "min_edge": 0.02
+    }
+  },
+
+  "key_gaps_vs_rebuild_spec": {
+    "collectors": "Only MLB collector is partially complete. NBA/WNBA/NFL/soccer/tennis/esports collectors are stubs.",
+    "features": "Rebuild features limited to rolling scoreboard averages. Full Statcast/weather/lineup/pitcher feature stores not built.",
+    "models": "Rebuild MLB model is baseline-only. No XGBoost challenger trained. No NBA/WNBA/NFL/soccer/tennis/esports rebuild models.",
+    "calibration": "No out-of-fold calibrator fitted. Current calibration uses in-sample data.",
+    "validation": "MLB rebuild uses simple chronological split, not nested folds. No untouched holdout.",
+    "economic": "No executable order-book walks. No CLV tracking. No paper-trading validation.",
+    "dependencies": "pyproject.toml now includes all currently-used deps. pandera/statsmodels/optuna not yet needed.",
+    "tests": "755 tests pass. Strategy invariants covered. No direct sport-model mathematical tests for rebuild models.",
+    "integration": "Branch is 29 commits behind main. Rebuild pipeline not integrated with daily workflow."
+  }
 }

@@ -53,8 +53,13 @@ def edge_scaled_units(
     american_odds: int,
     policy: UnitPolicy = UnitPolicy(),
 ) -> float:
-    """Scale units by uncertainty-adjusted model edge: 0.5U base + 10× edge
-    above 50/50.
+    """Scale units by uncertainty-adjusted model edge, with a hard value gate.
+
+    Two-gate strategy (operator directive, 2026-08-05): a bet must not be
+    sized unless the model's conservative probability clears the market's
+    implied price. If the conservative estimate is at or below the market
+    price, this returns zero regardless of policy floors — being likely to
+    win is necessary but not sufficient.
 
     The +34.1U vs +13.3U flat MLB walk-forward result (2026-07-17) validated
     the "scale by distance from 50/50" shape of this formula, using a
@@ -74,6 +79,12 @@ def edge_scaled_units(
     Higher (uncertainty-adjusted) edge = more units. Lower edge = fewer
     units. Caps at policy.max_pick_units, floors at policy.min_pick_units.
     """
+    # Value gate: conservative probability must clear the market price.
+    market_prob = implied_probability(american_odds)
+    conservative_prob = model_probability - max(0.0, model_uncertainty)
+    if conservative_prob <= market_prob:
+        return 0.0
+
     adjusted_edge = max(0.0, abs(model_probability - 0.5) - max(0.0, model_uncertainty))
     raw = policy.min_pick_units + adjusted_edge * (policy.max_pick_units - policy.min_pick_units) / 0.15
     units = max(policy.min_pick_units, min(policy.max_pick_units, raw))

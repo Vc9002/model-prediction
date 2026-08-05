@@ -3,7 +3,7 @@
     "from": "2020-01-01",
     "to": "2026-07-27"
   },
-  "extracted_at_utc": "2026-08-05T04:38:01.940319Z",
+  "extracted_at_utc": "2026-08-05T13:55:58.592193Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",

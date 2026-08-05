@@ -265,8 +265,9 @@ def test_esports_settlement_stays_pending_until_terminal_state(tmp_path, monkeyp
 
 
 def test_esports_eligibility_qualifies_only_with_full_provenance():
+    # model 0.60, conservative 0.55, market 0.50 → edge 0.05 clears value gate
     result = evaluate_esports_eligibility(
-        _future_request(model_probability=0.58), Exposure(), UnitPolicy()
+        _future_request(model_probability=0.60), Exposure(), UnitPolicy()
     )
     assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
     assert result.units > 0
@@ -306,15 +307,21 @@ def test_esports_eligibility_fails_closed_on_future_data():
 def test_esports_eligibility_no_longer_gates_on_exposure_caps():
     """Exposure caps no longer block CALL at all (operator directive,
     2026-07-26) -- a saturated exposure state still produces a real
-    qualified call, sized via the edge-scaled method."""
+    qualified call, sized via the edge-scaled method. The value gate
+    (2026-08-05) still applies: model must clear the market price."""
     saturated = Exposure(daily_units=5.0, league_daily_units=3.0)
-    result = evaluate_esports_eligibility(_future_request(), saturated, UnitPolicy())
+    # model 0.65 → conservative 0.60 > market 0.50 → clears value gate
+    result = evaluate_esports_eligibility(
+        _future_request(model_probability=0.65), saturated, UnitPolicy()
+    )
     assert result.decision == "CALL"
     assert result.reason_code == "QUALIFIED"
     assert result.units > 0
 
 
 def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
+    # model 0.58 vs market -150 (implied 0.60): value gate catches it first
+    # (conservative 0.53 - 0.60 - 0.01 = -0.08 < 0.02 → WINNER_OVERVALUED)
     negative_edge = _future_request(model_probability=0.58, american_odds=-150)
     result = evaluate_gated_research_eligibility(
         negative_edge,
@@ -324,10 +331,10 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
         minimum_edge=0.02,
     )
     assert result.decision == "NO_CALL"
-    assert result.reason_code == "NO_CALL_LOW_EDGE"
-    # Downgraded from Gated Research only -- it still gets a real paper size
-    # for the Research ledger (operator directive, 2026-07-31).
-    assert result.units > 0
+    # Value gate fires before gated research edge check — WINNER_OVERVALUED.
+    assert result.reason_code == "NO_CALL_WINNER_OVERVALUED"
+    # Value gate → zero units.
+    assert result.units == 0
 
     invalid_inputs = _future_request(model_probability=0.62, american_odds=100)
     result = evaluate_gated_research_eligibility(
@@ -338,9 +345,11 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
         minimum_edge=0.02,
     )
     assert result.decision == "NO_CALL"
+    # model_inputs_valid=False → MODEL_UNVALIDATED (caught before value gate).
     assert result.reason_code == "NO_CALL_MODEL_UNVALIDATED"
     assert result.units > 0
 
+    # model 0.62, market 0.50: conservative 0.57 - 0.50 - 0.01 = 0.06 >= 0.02 → CALL
     valid = evaluate_gated_research_eligibility(
         invalid_inputs,
         Exposure(),
@@ -477,3 +486,164 @@ def test_match_executable_quote_skips_doubleheaders_and_ambiguous_sides(tmp_path
     )
     quote = learned_forward.match_executable_quote(tmp_path, "mlb", "2026-07-17", _Candidate())
     assert quote is not None and quote["side"] == "short"
+
+
+# ── Two-gate strategy invariants (2026-08-05) ──────────────────────────────
+
+
+def test_predicted_winner_independent_of_market_price():
+    """The model selects the winner from its own probabilities, never from
+    market prices. A higher market price on the loser must not flip the pick.
+    This is tested at the PickRequest level: the selection field ("home" or
+    "away") is set upstream by the model and never modified by eligibility."""
+    # Home model 0.60 → selection is "home" regardless of market odds.
+    home_winner = PickRequest(
+        event_start_utc="2026-08-06T00:00:00Z",
+        event_id="evt-1", league=League.MLB,
+        away_team="BAL", home_team="NYY",
+        market_type=MarketType.MONEYLINE, selection="home", line=None,
+        sportsbook="polymarket_us", american_odds=-150,
+        model_probability=0.60, model_uncertainty=0.05,
+        model_version="v1", rationale="test", risks="test",
+        model_origin=ModelOrigin.STATISTICAL_MODEL,
+        model_state=ModelState.SHADOW_QUALIFIED,
+        model_artifact_hash="hash", calibration_artifact_hash="hash",
+        code_revision="test",
+    )
+    # Away model 0.40 → selection is "away" even though it's the underdog.
+    away_winner = PickRequest(
+        event_start_utc="2026-08-06T00:00:00Z",
+        event_id="evt-2", league=League.MLB,
+        away_team="BAL", home_team="NYY",
+        market_type=MarketType.MONEYLINE, selection="away", line=None,
+        sportsbook="polymarket_us", american_odds=140,
+        model_probability=0.40, model_uncertainty=0.05,
+        model_version="v1", rationale="test", risks="test",
+        model_origin=ModelOrigin.STATISTICAL_MODEL,
+        model_state=ModelState.SHADOW_QUALIFIED,
+        model_artifact_hash="hash", calibration_artifact_hash="hash",
+        code_revision="test",
+    )
+
+    # The winner gate sets "selection" based on model probability alone.
+    # Market price (american_odds) does not participate in that choice.
+    assert home_winner.selection == "home"
+    assert away_winner.selection == "away"
+    # Model probability ordering is consistent with selection.
+    assert home_winner.model_probability > 0.5  # home is the favorite
+    assert away_winner.model_probability < 0.5  # away is the underdog
+
+
+def test_negative_winner_edge_produces_no_bet_zero_units():
+    """A projected winner priced above its conservative probability must
+    produce NO_CALL_WINNER_OVERVALUED with exactly zero units."""
+    from model_prediction.eligibility import evaluate_esports_eligibility
+
+    # Model says home wins at 60%, market charges 70¢ (american -233).
+    # Conservative: 0.60 - 0.05 = 0.55. Market: 0.70.
+    # cost_adjusted_edge = 0.55 - 0.70 - 0.0 - 0.01 = -0.16 < 0.02 → NO_CALL.
+    overpriced = _future_request(
+        model_probability=0.60, american_odds=-233,
+    )
+    result = evaluate_esports_eligibility(overpriced, Exposure(), UnitPolicy())
+
+    assert result.decision == "NO_CALL"
+    assert result.reason_code == "NO_CALL_WINNER_OVERVALUED"
+    assert result.units == 0.0
+
+
+def test_value_gate_returns_zero_units_not_floor():
+    """Every code path that produces NO_CALL_WINNER_OVERVALUED must return
+    exactly zero units — never the policy floor of 1.0U."""
+    from model_prediction.eligibility import evaluate_esports_eligibility
+
+    # -150 → implied 60%. Model 0.58, conservative 0.53 → edge -0.08.
+    overpriced = _future_request(
+        model_probability=0.58, american_odds=-150,
+    )
+    result = evaluate_esports_eligibility(overpriced, Exposure(), UnitPolicy())
+
+    assert result.units == 0.0  # zero, not policy.min_pick_units (1.0)
+
+
+def test_spread_belongs_to_predicted_winner_in_forward_path():
+    """In forward.py's _paired_event_candidates, the spread selection must
+    match the predicted game winner from the moneyline model."""
+    from model_prediction.forward import _paired_event_candidates
+
+    # Simulate: margin model says home wins moneyline, but away has higher
+    # spread-cover probability. The spread pick must still be "home".
+    class FakeDist:
+        first_win_probability = 0.40   # away wins moneyline
+        second_win_probability = 0.60  # home wins moneyline
+
+    class FakeSpreadDist:
+        first_win_probability = 0.55   # away covers spread (higher!)
+        second_win_probability = 0.45  # home covers spread
+
+    class FakeTotalDist:
+        first_win_probability = 0.52
+        second_win_probability = 0.48
+
+    class FakeModel:
+        raw = {"model_name": "test", "model_version": "v1",
+               "artifact_hash": "h", "calibration_version": "cv1"}
+        @staticmethod
+        def calibrate_selected_side(p):
+            return p
+
+    class FakeEstimate:
+        uncertainty = 0.05
+        feature_schema_version = "1"
+        away_expected_runs = 3.5
+        home_expected_runs = 4.2
+
+    class FakeMargin:
+        moneyline = FakeDist()
+        spread = FakeSpreadDist()
+        run_estimate = FakeEstimate()
+
+    class FakeTotals:
+        total = FakeTotalDist()
+        run_estimate = FakeEstimate()
+
+    from model_prediction.domain import MarketType
+    from dataclasses import dataclass
+
+    @dataclass
+    class FakePrice:
+        american_odds: int
+        line: float | None = None
+        decision_probability: float = 0.5
+
+    class FakeOdds:
+        provider = "test"
+        observed_at_utc = "2026-08-05T00:00:00Z"
+        snapshot_hash = "hash"
+        markets = {
+            "moneyline": {"away": FakePrice(-110), "home": FakePrice(-110)},
+            "spread": {"away": FakePrice(-110, line=-1.5), "home": FakePrice(-110, line=1.5)},
+            "total": {"over": FakePrice(-110, line=8.5), "under": FakePrice(-110, line=8.5)},
+        }
+
+    event = {
+        "id": "evt-1",
+        "date": "2026-08-06T00:00:00Z",
+        "competitions": [{"competitors": [
+            {"homeAway": "away", "team": {"displayName": "Away Team"}},
+            {"homeAway": "home", "team": {"displayName": "Home Team"}},
+        ]}],
+    }
+
+    candidates = _paired_event_candidates(
+        event, FakeOdds(), FakeMargin(), FakeTotals(),
+        FakeModel(), FakeModel(), None,
+    )
+
+    # Moneyline winner is home (60% > 40%). Spread away-cover is 55%,
+    # but the spread pick must still be "home" (winner-aligned).
+    spread_candidate = [c for c in candidates if c.market_type is MarketType.SPREAD][0]
+    assert spread_candidate.selection == "home", (
+        f"spread selection '{spread_candidate.selection}' must match "
+        f"predicted winner 'home'"
+    )

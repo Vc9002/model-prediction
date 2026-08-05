@@ -65,13 +65,17 @@ def test_edge_scaled_units_shrinks_as_uncertainty_rises_for_the_same_probability
     assert low_uncertainty > mid_uncertainty > high_uncertainty
 
 
-def test_edge_scaled_units_floors_at_min_pick_units_never_goes_negative() -> None:
-    # Uncertainty larger than the raw edge must floor at min_pick_units
-    # (never zero, never negative) -- edge_scaled_units only decides SIZE,
-    # not whether this is a real call at all.
+def test_edge_scaled_units_returns_zero_when_model_below_market() -> None:
+    # Value gate (2026-08-05): when the conservative probability is at or
+    # below the market's implied price, edge_scaled_units returns zero
+    # regardless of policy floors — being likely to win is not sufficient.
     policy = UnitPolicy()
-    assert edge_scaled_units(0.55, 0.40, -110, policy) == policy.min_pick_units
-    assert edge_scaled_units(0.55, 5.0, -110, policy) == policy.min_pick_units
+    # model 0.55, uncertainty 0.10 → conservative 0.45; market -110 → 0.524.
+    # 0.45 <= 0.524 → zero units (model below market after uncertainty).
+    assert edge_scaled_units(0.55, 0.10, -110, policy) == 0.0
+    # model 0.50, any uncertainty → conservative ≤ 0.50; market -110 → 0.524.
+    assert edge_scaled_units(0.50, 0.0, -110, policy) == 0.0
+    assert edge_scaled_units(0.50, 0.2, -110, policy) == 0.0
 
 
 def test_edge_scaled_units_ignores_uncertainty_sign() -> None:
@@ -83,10 +87,15 @@ def test_edge_scaled_units_ignores_uncertainty_sign() -> None:
     assert edge_scaled_units(0.65, -0.10, -110, policy) == edge_scaled_units(0.65, 0.0, -110, policy)
 
 
-def test_zero_edge_still_sizes_at_the_floor_regardless_of_uncertainty() -> None:
+def test_edge_scaled_units_sizes_normally_when_model_above_market() -> None:
+    # When the conservative probability clears the market price, sizing
+    # proceeds normally — distance from 50/50 minus uncertainty.
     policy = UnitPolicy()
-    assert edge_scaled_units(0.5, 0.0, -110, policy) == policy.min_pick_units
-    assert edge_scaled_units(0.5, 0.2, -110, policy) == policy.min_pick_units
+    # model 0.65, uncertainty 0.05 → conservative 0.60; market +150 → 0.40.
+    # conservative (0.60) > market (0.40) → normal sizing applies.
+    units = edge_scaled_units(0.65, 0.05, 150, policy)
+    assert units >= policy.min_pick_units
+    assert units <= policy.max_pick_units
 
 
 def test_unit_range_is_one_to_two() -> None:
