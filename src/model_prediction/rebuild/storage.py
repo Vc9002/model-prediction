@@ -90,11 +90,13 @@ class RawStore:
     def exists(self, source: str, date_str: str, record_id: str) -> bool:
         return self.path(source, date_str, record_id).exists()
 
-    def write(self, source: str, date_str: str, record_id: str, payload: Any) -> str:
+    def write(self, source: str, date_str: str, record_id: str, payload: Any, *,
+              allow_refresh: bool = False) -> str:
         """Write an immutable raw snapshot. Returns the SHA-256 hash.
 
-        If the file already exists and its hash differs from the new payload,
-        raises ValueError — raw storage is genuinely immutable.
+        If the file already exists and allow_refresh is False, raises ValueError
+        for differing payloads. Set allow_refresh=True for live data (scoreboards,
+        market prices) that legitimately changes within the same date.
         """
         p = self.path(source, date_str, record_id)
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -104,10 +106,11 @@ class RawStore:
             with gzip.open(p, "rb") as f:
                 existing_raw = f.read()
             existing_hash = sha256_hex(existing_raw)
-            if existing_hash != snapshot_hash:
+            if existing_hash != snapshot_hash and not allow_refresh:
                 raise ValueError(
                     f"RawStore immutability violation: {p} exists with hash {existing_hash[:16]}..., "
-                    f"cannot overwrite with hash {snapshot_hash[:16]}..."
+                    f"cannot overwrite with hash {snapshot_hash[:16]}... "
+                    f"Use allow_refresh=True for live data."
                 )
         with gzip.open(p, "wb") as f:
             f.write(raw_bytes)

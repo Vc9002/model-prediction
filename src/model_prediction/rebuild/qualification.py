@@ -98,23 +98,27 @@ class ModelQualification:
     economic: EconomicQualification | None = None
 
     def determine_status(self) -> str:
-        """Determine the model status from predictive + economic evidence."""
+        """Determine the model status from predictive + economic evidence.
+
+        Economic qualification NEVER overrides failed predictive.
+        Probability integrity comes first.
+        """
         if self.predictive is None and self.economic is None:
             return "RESEARCH_ONLY"
 
         pred_ok = self.predictive is not None and self.predictive.qualified
         econ_ok = self.economic is not None and self.economic.qualified
 
-        if not pred_ok and not econ_ok:
+        # Failed predictive = rejected regardless of economic
+        if not pred_ok:
             return "REJECTED"
-        if pred_ok and not econ_ok:
+        # Predictive passed, check economic
+        if not econ_ok:
             if self.economic is not None and self.economic.n_trades < 50:
                 return "ECONOMIC_SAMPLE_INSUFFICIENT"
             return "PREDICTIVELY_QUALIFIED"
-        if econ_ok and (self.economic is not None and self.economic.cost_adjusted_return > 0):
-            return "ECONOMICALLY_QUALIFIED_FOR_SHADOW"
-
-        return "PREDICTIVELY_QUALIFIED"
+        # Both passed: economically qualified for shadow
+        return "ECONOMICALLY_QUALIFIED_FOR_SHADOW"
 
     def to_dict(self) -> dict[str, Any]:
         return {

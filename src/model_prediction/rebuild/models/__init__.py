@@ -155,8 +155,8 @@ class JointScoreDistribution:
             away_n = max(1, away_exp / 1.5)
             home_p = home_n / (home_n + home_exp)
             away_p = away_n / (away_n + away_exp)
-            away_scores = self.rng.negative_binomial(home_n, home_p, self.n_sim)
-            home_scores = self.rng.negative_binomial(away_n, away_p, self.n_sim)
+            away_scores = self.rng.negative_binomial(away_n, away_p, self.n_sim)
+            home_scores = self.rng.negative_binomial(home_n, home_p, self.n_sim)
         else:
             away_scores = self.rng.poisson(away_exp, self.n_sim)
             home_scores = self.rng.poisson(home_exp, self.n_sim)

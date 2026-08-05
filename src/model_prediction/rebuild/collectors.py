@@ -60,7 +60,7 @@ class MLBCollector:
 
         client = ESPNMLBClient()
         payload = client.scoreboard(game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload)
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload, allow_refresh=True)
         self.meta.update_source_health(source, "active")
 
         events = payload.get("events", [])
@@ -212,8 +212,7 @@ class MLBCollector:
 
         try:
             client = PolymarketUSClient()
-            events_by_league = client.events_for_date(game_date)
-            mlb_events = events_by_league.get("MLB", [])
+            mlb_events = client.slate("MLB", game_date)
             books: list[dict[str, Any]] = []
             for event in mlb_events:
                 try:
