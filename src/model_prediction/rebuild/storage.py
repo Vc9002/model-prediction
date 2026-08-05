@@ -77,54 +77,86 @@ def provenance_row(
 # ── Raw storage ─────────────────────────────────────────────────────────────
 
 
+class RawSnapshotRef:
+    """Immutable reference to a stored raw snapshot."""
+
+    def __init__(self, source: str, source_record_id: str,
+                 observed_at_utc: str, snapshot_hash: str, path: Path) -> None:
+        self.source = source
+        self.source_record_id = source_record_id
+        self.observed_at_utc = observed_at_utc
+        self.snapshot_hash = snapshot_hash
+        self.path = path
+
+    def __repr__(self) -> str:
+        return (f"RawSnapshotRef(source={self.source}, record={self.source_record_id}, "
+                f"hash={self.snapshot_hash[:16]}...)")
+
+
 class RawStore:
-    """Immutable compressed provider responses under data/rebuild/raw/{source}/."""
+    """Immutable content-addressed raw storage.
+
+    Every distinct response receives a unique path incorporating its hash.
+    Identical payloads are idempotent — same hash returns existing file.
+    No overwrite semantics. No allow_refresh option. A refreshed response
+    is a new snapshot with a new hash.
+    """
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
 
-    def path(self, source: str, date_str: str, record_id: str) -> Path:
-        """data/rebuild/raw/{source}/{date}/{record_id}.json.gz"""
-        return self.root / source / date_str / f"{record_id}.json.gz"
-
-    def exists(self, source: str, date_str: str, record_id: str) -> bool:
-        return self.path(source, date_str, record_id).exists()
+    def _content_path(self, source: str, date_str: str,
+                      record_id: str, payload_hash: str) -> Path:
+        """data/rebuild/raw/{source}/{date}/{record_id}/{hash}.json.gz"""
+        return self.root / source / date_str / record_id / f"{payload_hash}.json.gz"
 
     def write(self, source: str, date_str: str, record_id: str, payload: Any, *,
-              allow_refresh: bool = False) -> str:
-        """Write an immutable raw snapshot. Returns the SHA-256 hash.
+              observed_at: str | None = None) -> RawSnapshotRef:
+        """Write an immutable content-addressed raw snapshot.
 
-        If the file already exists and allow_refresh is False, raises ValueError
-        for differing payloads. Set allow_refresh=True for live data (scoreboards,
-        market prices) that legitimately changes within the same date.
+        Returns a RawSnapshotRef. If the exact same payload already exists
+        (by hash), returns the existing ref without rewriting. Different
+        payloads always produce different files — no overwrites.
         """
-        p = self.path(source, date_str, record_id)
-        p.parent.mkdir(parents=True, exist_ok=True)
+        observed = observed_at or utc_now().isoformat()
         raw_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
         snapshot_hash = sha256_hex(raw_bytes)
-        if p.exists():
-            with gzip.open(p, "rb") as f:
-                existing_raw = f.read()
-            existing_hash = sha256_hex(existing_raw)
-            if existing_hash != snapshot_hash and not allow_refresh:
-                raise ValueError(
-                    f"RawStore immutability violation: {p} exists with hash {existing_hash[:16]}..., "
-                    f"cannot overwrite with hash {snapshot_hash[:16]}... "
-                    f"Use allow_refresh=True for live data."
-                )
-        with gzip.open(p, "wb") as f:
-            f.write(raw_bytes)
-        return snapshot_hash
+        p = self._content_path(source, date_str, record_id, snapshot_hash)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if not p.exists():
+            with gzip.open(p, "wb") as f:
+                f.write(raw_bytes)
+        return RawSnapshotRef(
+            source=source,
+            source_record_id=record_id,
+            observed_at_utc=observed,
+            snapshot_hash=snapshot_hash,
+            path=p,
+        )
 
-    def read(self, source: str, date_str: str, record_id: str) -> Any:
-        p = self.path(source, date_str, record_id)
-        with gzip.open(p, "rb") as f:
+    def read(self, ref: RawSnapshotRef) -> Any:
+        with gzip.open(ref.path, "rb") as f:
             return json.loads(f.read().decode("utf-8"))
 
-    def read_hash(self, source: str, date_str: str, record_id: str) -> str:
-        p = self.path(source, date_str, record_id)
-        with gzip.open(p, "rb") as f:
-            return sha256_hex(f.read())
+    def verify_hash(self, ref: RawSnapshotRef) -> bool:
+        """Verify the stored file matches the recorded hash."""
+        with gzip.open(ref.path, "rb") as f:
+            return sha256_hex(f.read()) == ref.snapshot_hash
+
+    def list_snapshots(self, source: str, date_str: str,
+                       record_id: str) -> list[RawSnapshotRef]:
+        """List all snapshots for a given source/date/record."""
+        parent = self.root / source / date_str / record_id
+        if not parent.exists():
+            return []
+        refs = []
+        for f in sorted(parent.glob("*.json.gz")):
+            h = f.stem
+            refs.append(RawSnapshotRef(
+                source=source, source_record_id=record_id,
+                observed_at_utc="", snapshot_hash=h, path=f,
+            ))
+        return refs
 
 
 # ── Normalized storage ──────────────────────────────────────────────────────

@@ -60,7 +60,7 @@ class MLBCollector:
 
         client = ESPNMLBClient()
         payload = client.scoreboard(game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload, allow_refresh=True)
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
         self.meta.update_source_health(source, "active")
 
         events = payload.get("events", [])
@@ -124,7 +124,7 @@ class MLBCollector:
                 if payload is not None and len(payload) > 0:
                     data = payload.to_dict(orient="records") if hasattr(payload, "to_dict") else payload
                     # Store the actual pitch-level data, not just a row count
-                    snapshot_hash = self.raw.write(source, game_date, record_id, data)
+                    snapshot_hash = self.raw.write(source, game_date, record_id, data).snapshot_hash
                     self.meta.update_source_health(source, "active")
                     results["collected"].append("statcast")
                     results["statcast_rows"] = len(data)
@@ -187,7 +187,7 @@ class MLBCollector:
             resp = httpx.get(url, params=params, timeout=30)
             resp.raise_for_status()
             payload = resp.json()
-            snapshot_hash = self.raw.write(source, game_date, record_id, payload)
+            snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
             self.meta.update_source_health(source, "active")
             return {"status": "ok", "venue_id": venue_id, "hash": snapshot_hash}
         except Exception as e:
@@ -380,7 +380,7 @@ class NBACollector:
 
         client = ESPNClient()
         payload = client.scoreboard(league, game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload, allow_refresh=True)
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
         self.meta.update_source_health(source, "active")
 
         events = payload.get("events", [])
@@ -495,7 +495,7 @@ class NFLCollector:
                 return {"status": "no_espn_client", "date": game_date}
             client = ESPNClient()
             payload = client.scoreboard("NFL", game_date)
-            snapshot_hash = self.raw.write(source, game_date, record_id, payload, allow_refresh=True)
+            snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
             self.meta.update_source_health(source, "active")
             events = payload.get("events", [])
             games = []
@@ -583,7 +583,7 @@ class SoccerCollector:
             return {"status": "no_espn_client", "date": game_date, "sport": sport}
         client = ESPNClient()
         payload = client.scoreboard(league, game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload, allow_refresh=True)
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
         self.meta.update_source_health(source, "active")
         events = payload.get("events", [])
         games = []
@@ -670,7 +670,7 @@ class TennisCollector:
             return {"status": "no_espn_client", "date": game_date, "sport": sport}
         client = ESPNClient()
         payload = client.scoreboard(league, game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload, allow_refresh=True)
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
         self.meta.update_source_health(source, "active")
         events = payload.get("events", [])
         games = []
