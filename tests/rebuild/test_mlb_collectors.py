@@ -10,7 +10,6 @@ from datetime import date
 from unittest.mock import patch
 
 import polars as pl
-import pytest
 
 from model_prediction.rebuild import MetadataDB, NormalizedStore
 from model_prediction.rebuild.collectors import MLBCollector
@@ -84,3 +83,56 @@ class TestVenuesForDate:
             "normalized table has the real (venue-only) schema"
         )
         assert venues[0]["id"] == "T-Mobile Park"
+
+
+class FakeWeatherResponse:
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict:
+        return {"hourly": {}}
+
+
+class TestWeatherForecastEndpoint:
+    """collect_weather_forecast() called Open-Meteo's Archive API
+    (archive-api.open-meteo.com) — ERA5 *reanalysis* of realized weather, not
+    a forecast, and it 400s for any date without several days of processing
+    lag (verified live: both real venue requests for today's date returned
+    400). Beyond the 400s, using realized weather as a "forecast" feature
+    would be a genuine train-serving mismatch against a live pipeline that
+    only ever has a forecast at inference time. Regression: today-or-future
+    dates must hit the live Forecast API; past dates fall back to the
+    Historical Forecast API (a disclosed approximation, not the broken
+    Archive/reanalysis endpoint).
+    """
+
+    def test_future_date_uses_live_forecast_api(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+        captured = {}
+
+        def fake_get(url, params=None, timeout=None):
+            captured["url"] = url
+            return FakeWeatherResponse()
+
+        with patch("httpx.get", side_effect=fake_get):
+            result = collector.collect_weather_forecast("2099-01-01", 40.0, -75.0, "test_venue")
+
+        assert captured["url"] == "https://api.open-meteo.com/v1/forecast"
+        assert result["endpoint"] == "live_forecast"
+
+    def test_past_date_uses_historical_forecast_api_not_archive(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+        captured = {}
+
+        def fake_get(url, params=None, timeout=None):
+            captured["url"] = url
+            return FakeWeatherResponse()
+
+        with patch("httpx.get", side_effect=fake_get):
+            result = collector.collect_weather_forecast("2000-01-01", 40.0, -75.0, "test_venue")
+
+        assert captured["url"] == "https://historical-forecast-api.open-meteo.com/v1/forecast"
+        assert "archive-api" not in captured["url"]
+        assert result["endpoint"] == "historical_forecast_stitched"

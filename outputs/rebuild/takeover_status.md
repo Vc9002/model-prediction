@@ -216,13 +216,58 @@ engineering (starter/lineup/bullpen/park) is still the placeholder rolling-
 score version in `scripts/pipeline_mlb_e2e.py`.
 
 **Files changed**: `src/model_prediction/rebuild/collectors.py` (both bug
-fixes). No test file yet covers either regression — needed before calling
-Checkpoint 4 complete, per `CLAUDE.md`'s "each corrected bug must include a
-regression test that fails against the pre-fix implementation."
+fixes). Regression tests added in `tests/rebuild/test_mlb_collectors.py`
+(confirmed failing against pre-fix code via `git stash`, per `CLAUDE.md`'s
+"each corrected bug must include a regression test" requirement).
 
-**Current checkpoint**: 4 (in progress — market collection now real and
-verified; weather collection blocked on a real endpoint-choice bug; pybaseball
-normalization and real feature engineering not started).
+### Checkpoint 4 continued — weather endpoint fix and a third real bug
+
+**Weather endpoint bug, fixed**: `collect_weather_forecast()`'s docstring
+claimed it captures "the forecast *as it was* at a specific run time," but it
+called `archive-api.open-meteo.com/v1/archive` — Open-Meteo's ERA5
+*reanalysis* endpoint (realized weather, not a forecast), which 400s for any
+date without several days of processing lag (confirmed: today's two real
+venue requests both 400'd). Verified via `WebFetch` against Open-Meteo's own
+docs before changing anything (didn't want to guess at a replacement
+endpoint): the correct fix is endpoint selection by date — today-or-future
+dates now hit the live Forecast API (`api.open-meteo.com/v1/forecast`; what's
+captured right now genuinely *is* the forecast as of now, no leak), past
+dates fall back to the Historical Forecast API
+(`historical-forecast-api.open-meteo.com/v1/forecast`, which Open-Meteo
+documents as a stitched continuous series of past model runs — a disclosed
+approximation, not a single exact run, but a real forecast product, not
+reanalysis). Verified live for both branches: future date → real weather data
+for Chase Field and T-Mobile Park; a January 2000 date → real historical
+data, confirmed `archive-api` was not the endpoint hit. Regression tests
+added (mocked `httpx.get`, asserting the URL chosen per date).
+
+**Third real bug, more consequential than the first two**: while testing
+`collect_pybaseball` against a real recent date, it silently returned
+`{"status": "no_data"}` despite pybaseball's `statcast()` call genuinely
+succeeding — checked `sources.last_error` in `metadata.db` and found `Object
+of type Timestamp is not JSON serializable`. `RawStore.write()`'s
+`json.dumps()` had no `default=` handler, so it raised `TypeError` on
+`pandas.Timestamp` columns (which every pybaseball DataFrame has) — caught by
+the collector's broad except-and-report-degraded handler, discarding real,
+successfully-fetched Statcast data every time, for every date, silently.
+This is **not MLB-specific** — `RawStore` is shared by every collector, so
+any future NBA/NFL/soccer/esports collector handing it pandas/numpy-typed
+data would hit the identical failure. Fixed with a duck-typed
+`_json_default()` in `storage.py` (handles anything with `.isoformat()` —
+datetime/date/Timestamp — or `.item()` — numpy scalars — without adding a
+hard pandas/numpy import to the storage layer). Verified live:
+`collect_pybaseball('2026-08-04', statcast=True)` went from `{"status":
+"no_data"}` to **4,167 real Statcast pitch-level rows**, hash-verified and
+written to `data/rebuild/raw/pybaseball/2026-08-04/`. Regression tests added
+in `tests/rebuild/test_storage_immutability.py`, including a test that
+genuinely-unserializable objects still raise (the fix must not become a new
+silent-swallow).
+
+**Current checkpoint**: 4 (in progress — market and weather collection now
+real and verified for both time directions; the JSON-serialization bug fix
+unblocks pybaseball for every future collector, not just MLB; pybaseball
+raw-to-normalized parsing and real feature engineering are the two remaining
+items before Checkpoint 5).
 
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged

@@ -29,6 +29,25 @@ def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _json_default(obj: Any) -> Any:
+    """Canonical fallback for json.dumps.
+
+    Collectors regularly hand RawStore.write() pandas/numpy-typed payloads
+    (pybaseball's statcast() returns pandas.Timestamp columns, for example).
+    The stdlib json encoder raises TypeError on those, and that TypeError was
+    previously swallowed by a collector's broad except-and-report-degraded
+    handler, silently discarding real, successfully-fetched data (see
+    outputs/rebuild/takeover_status.md Checkpoint 4). Duck-typed rather than
+    importing pandas/numpy here, so RawStore stays usable by any collector's
+    payload shape without adding a hard dependency.
+    """
+    if hasattr(obj, "isoformat"):  # datetime, date, pandas.Timestamp
+        return obj.isoformat()
+    if hasattr(obj, "item"):  # numpy scalar: int64, float64, bool_, etc.
+        return obj.item()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 # ── Standard provenance columns for every observation ───────────────────────
 
 PROVENANCE_COLUMNS: list[str] = [
@@ -119,7 +138,9 @@ class RawStore:
         payloads always produce different files — no overwrites.
         """
         observed = observed_at or utc_now().isoformat()
-        raw_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        raw_bytes = json.dumps(
+            payload, sort_keys=True, ensure_ascii=False, default=_json_default
+        ).encode("utf-8")
         snapshot_hash = sha256_hex(raw_bytes)
         p = self._content_path(source, date_str, record_id, snapshot_hash)
         p.parent.mkdir(parents=True, exist_ok=True)

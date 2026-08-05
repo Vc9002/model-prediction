@@ -156,11 +156,25 @@ class MLBCollector:
     def collect_weather_forecast(
         self, game_date: str, latitude: float, longitude: float, venue_id: str,
     ) -> dict[str, Any]:
-        """Fetch archived weather forecast for a venue on a game date.
+        """Fetch weather for a venue on a game date, with correct point-in-time semantics.
 
-        Uses Open-Meteo's archive API for individual model runs — this returns
-        the forecast *as it was* at a specific run time, not the realized weather
-        (which would be a retrospective leak).
+        For today-or-future game_date, hits Open-Meteo's live Forecast API —
+        whatever is captured right now genuinely *is* the forecast as of now
+        (observed_at_utc = utc_now()), so there is no leak. For a past
+        game_date (backfill), the *live* forecast for that date no longer
+        exists, so this instead calls the Historical Forecast API, which
+        Open-Meteo documents as a stitched continuous series of past model
+        runs — a real, disclosed approximation of "the forecast at the time,"
+        not a single exact run, but far closer to train-serving parity than
+        realized/reanalysis weather would be.
+
+        Previously this called the Archive API (`archive-api.open-meteo.com`),
+        which is ERA5 *reanalysis* — realized weather, not a forecast, and
+        returns 400 for any date without several days of processing lag. That
+        was a real bug (see outputs/rebuild/takeover_status.md Checkpoint 4),
+        not just today's date failing to resolve: a model trained on realized
+        weather but served with only a live forecast at inference time would
+        have a genuine train-serving mismatch, independent of the 400s.
 
         Args:
             game_date: ISO date string
@@ -172,7 +186,12 @@ class MLBCollector:
         self._throttle()
 
         import httpx
-        url = "https://archive-api.open-meteo.com/v1/archive"
+        is_future_or_today = date.fromisoformat(game_date) >= utc_now().date()
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            if is_future_or_today
+            else "https://historical-forecast-api.open-meteo.com/v1/forecast"
+        )
         params = {
             "latitude": latitude,
             "longitude": longitude,
@@ -190,7 +209,12 @@ class MLBCollector:
             payload = resp.json()
             snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
             self.meta.update_source_health(source, "active")
-            return {"status": "ok", "venue_id": venue_id, "hash": snapshot_hash}
+            return {
+                "status": "ok",
+                "venue_id": venue_id,
+                "hash": snapshot_hash,
+                "endpoint": "live_forecast" if is_future_or_today else "historical_forecast_stitched",
+            }
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
             self.meta.update_source_health(source, "degraded", str(e)[:200])
             return {"status": "error", "venue_id": venue_id, "error": str(e)[:200]}
