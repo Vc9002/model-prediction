@@ -1,0 +1,27 @@
+{
+  "registry_version": "1",
+  "created_utc": "2026-08-05",
+  "branch": "rebuild/clean-slate-v1",
+  "description": "Registry of consumed final tests. Once a test is consumed (evaluated against), it is marked as consumed and never reused. A new prospective test must be created.",
+  "consumed_tests": [],
+  "active_tests": {
+    "mlb_moneyline": {"test_start": null, "test_end": null, "consumed": false,
+      "note": "Not yet trained — no test consumed"},
+    "mlb_spread": {"test_start": null, "test_end": null, "consumed": false},
+    "mlb_totals": {"test_start": null, "test_end": null, "consumed": false},
+    "nba_moneyline": {"test_start": null, "test_end": null, "consumed": false},
+    "wnba_moneyline": {"test_start": null, "test_end": null, "consumed": false},
+    "nfl_moneyline": {"test_start": null, "test_end": null, "consumed": false},
+    "soccer": {"test_start": null, "test_end": null, "consumed": false},
+    "tennis": {"test_start": null, "test_end": null, "consumed": false},
+    "esports": {"test_start": null, "test_end": null, "consumed": false},
+    "kbo_npb": {"test_start": null, "test_end": null, "consumed": false}
+  },
+  "policy": {
+    "test_must_be_chronologically_last": true,
+    "test_must_be_untouched_before_evaluation": true,
+    "consumed_test_never_reused": true,
+    "new_prospective_test_required_after_consumption": true,
+    "features_hyperparams_ensemble_calibrator_must_be_frozen_before_test": true
+  }
+}

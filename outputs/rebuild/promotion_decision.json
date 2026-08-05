@@ -1,0 +1,7 @@
+{
+  "decision_date": "2026-08-05",
+  "summary": "Architecture complete, no models trained on real data yet",
+  "promotions": [],
+  "current_status": {"all_models": "RESEARCH_ONLY"},
+  "next_steps": ["Run MLB collector backfill", "Build features", "Train models", "Paper trade"]
+}
