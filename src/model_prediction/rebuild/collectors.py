@@ -372,7 +372,7 @@ class NBACollector:
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
             client = PolymarketUSClient()
-            events = client.events_for_date(game_date).get(sport.upper(), [])
+            events = client.slate(sport.upper(), game_date)
             books: list[dict[str, Any]] = []
             for event in events:
                 for market in event.get("markets", []):
