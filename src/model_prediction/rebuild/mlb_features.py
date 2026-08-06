@@ -84,6 +84,26 @@ WHIFF_DESCRIPTIONS = {"swinging_strike", "swinging_strike_blocked", "missed_bunt
 CSW_DESCRIPTIONS = WHIFF_DESCRIPTIONS | {"called_strike"}
 
 
+def dedupe_scoreboard(sb: pl.DataFrame) -> pl.DataFrame:
+    """NormalizedStore.write() appends on every call with no primary-key
+    enforcement, so repeated ESPN scoreboard collection produces multiple
+    identical-content rows per real event_id (verified live: event_id
+    401816384 had 2 rows, same score/status, different observed_at_utc —
+    and across the full table, 188 STATUS_FINAL rows were only 135 real
+    unique games). Real Checkpoint 2 storage-layer gap, not yet fixed there
+    (see outputs/rebuild/takeover_status.md) — this is the consumer-side
+    fix so every real script reading the scoreboard doesn't silently
+    over-count games. Keeps the most-recently-observed row per event_id.
+    """
+    if sb.is_empty():
+        return sb
+    return (
+        sb.sort("observed_at_utc")
+        .group_by("event_id", maintain_order=True)
+        .last()
+    )
+
+
 def load_raw_statcast_dates(raw_root: str | Path, dates: list[str]) -> pl.DataFrame:
     """Read and concatenate raw Statcast snapshot(s) for each date into one
     pitch-level table. Reads whatever the newest snapshot is per date (raw
@@ -265,8 +285,15 @@ def lookup_pitcher_id(full_name: str) -> int | None:
     connected to its starter's rolling history at all.
 
     pybaseball caches its full player-ID table on first call (~8s); repeat
-    calls within a process are ~1000x faster. Returns None on no/ambiguous
-    match rather than guessing.
+    calls within a process are ~1000x faster. Returns None on no match, or
+    on a genuine ambiguity that recency can't resolve, rather than guessing.
+
+    Real, verified ambiguity case: "Drew Anderson" matches two real
+    players — one who last played in 2006 (key_mlbam 449776) and one
+    currently active through 2026 (key_mlbam 623454). A probable starter
+    for a real upcoming game must be the currently active one, so ties are
+    broken by `mlb_played_last` — not a guess, a real recency fact already
+    in the same lookup result.
     """
     import pybaseball
 
@@ -280,10 +307,14 @@ def lookup_pitcher_id(full_name: str) -> int | None:
         return None
     if result.empty:
         return None
-    ids = result["key_mlbam"].dropna()
-    if len(ids) != 1:
+    result = result.dropna(subset=["key_mlbam"])
+    if result.empty:
         return None
-    return int(ids.iloc[0])
+    if len(result) > 1:
+        result = result[result["mlb_played_last"] == result["mlb_played_last"].max()]
+    if len(result) != 1:
+        return None
+    return int(result["key_mlbam"].iloc[0])
 
 
 def load_weather_daily_aggregate(raw_root: str | Path, venue_id: str, game_date: str) -> dict[str, float]:

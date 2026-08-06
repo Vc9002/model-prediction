@@ -33,6 +33,7 @@ from model_prediction.rebuild.mlb_features import (
     ESPN_TO_STATCAST_ABBREV,
     build_game_feature_row,
     build_live_game_feature_row,
+    dedupe_scoreboard,
     identify_starters,
     load_raw_statcast_dates,
     normalize_statcast_pitches,
@@ -120,7 +121,7 @@ def main() -> None:
     args = parser.parse_args()
     target_date = args.date
 
-    sb = pl.read_parquet("data/rebuild/normalized/mlb/scoreboard.parquet")
+    sb = dedupe_scoreboard(pl.read_parquet("data/rebuild/normalized/mlb/scoreboard.parquet"))
     tonight = sb.filter(
         (pl.col("event_start_utc").str.slice(0, 10) == target_date)
         & (pl.col("status") == "STATUS_SCHEDULED")

@@ -637,6 +637,70 @@ specific bugs) is the one thing most worth remembering about this branch's
 prior state: things reporting success were not a reliable signal that they
 were actually right.
 
+## Session resumed (2026-08-06/07) — items 1 and (unplanned) 9 from the priority list
+
+**Priority 1 — starter-name resolution, fixed and verified.** Root cause:
+a real, genuine ambiguity, not a lookup failure — pybaseball's register has
+two real "Drew Anderson"s (one last played 2006, one active through 2026).
+`lookup_pitcher_id`'s ambiguity check correctly refused to guess between
+them and returned `None`, which was the safe behavior but meant a real,
+resolvable starter never got real features. Fixed by breaking ties on
+`mlb_played_last` (a real recency fact already in the same lookup result,
+not a guess — a probable starter for a real upcoming game must be the
+currently-active player). Verified: `lookup_pitcher_id("Drew Anderson")`
+now returns `623454` (the active one), not `None`. 4 new tests in
+`TestLookupPitcherId`, including one confirming a *true* tie (two different
+real players both still active) still correctly fails closed rather than
+guessing.
+
+**Bug #9 (unplanned, found while re-verifying the fix above)**: re-ran the
+shadow script expecting more real decisions and instead got the same 2
+games each printed 5 times. Investigated rather than shrugging it off —
+`NormalizedStore.write()` appends unconditionally on every call, so
+repeated ESPN scoreboard collection (the live daily job collects
+continuously) produces exact-duplicate-content rows per real event_id.
+Quantified: **188 STATUS_FINAL rows were only 135 real unique games** —
+meaning Checkpoint 6's original training run was silently trained on
+duplicated, non-independent rows of the same games, not 173 independent
+matched games as reported. Fixed with a consumer-side `dedupe_scoreboard()`
+(keeps the most-recently-observed row per `event_id`) wired into both
+`train_mlb_rebuild_real_features.py` and `mlb_shadow_run.py`. The deeper,
+correct fix — real primary-key enforcement in `NormalizedStore.write()`
+itself — is still a disclosed, unfixed Checkpoint 2 gap; this is the
+targeted fix for what actually consumes the data today.
+
+**Retrained on the corrected, deduplicated data — result got *more*
+concerning, not less, and is reported exactly as such**: 126 real unique
+matched games (down from the duplicate-inflated 173). Fold-validation Brier
+(0.246–0.266) still lands in a plausible range. But the held-out test
+(n=25, down from 34) now shows accuracy=0.320 (worse than before's 0.353),
+and the quality-filtered version (n=22) shows accuracy=0.227 — worse still.
+With a smaller, more genuinely independent sample, standard error is larger
+(~10% on n=25), so this remains most parsimoniously explained as
+small-sample noise rather than a new bug — but it no longer supports even a
+weak "probably fine" read. **This model's real predictive quality is more
+unresolved after this fix, not less** — worth flagging clearly rather than
+either hiding it or over-interpreting a 22-25-game sample. Re-ran the
+Checkpoint 9 shadow script on the corrected data: now correctly shows
+exactly 2 real unique scheduled games (not 10 duplicates), both evaluated
+completely, both honestly `NO_BET` (176 real markets each, no edge cleared
+against real Polymarket pricing).
+
+**Updated priority list for next session**:
+1. The held-out result is now the most important open question — before
+   trusting this feature set at all, get a real answer on whether ~0.32
+   accuracy on 25 games is noise or a real problem. The only way to actually
+   resolve this is more real backfill days (see old priority #4) — a
+   larger n directly shrinks the standard error this conclusion currently
+   hinges on.
+2. Fix `NormalizedStore.write()`'s real primary-key enforcement (the
+   underlying cause of the duplication bug just fixed at the consumer
+   level) — a real Checkpoint 2 gap that could resurface in any other
+   table/sport that reads scoreboard-shaped data the same naive way.
+3. Real `conservative_probability` (bootstrap/model-disagreement), replacing
+   the flat 3% haircut placeholder in `mlb_shadow_run.py`.
+4. SQLite shadow ledger + persistence/idempotency.
+
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
 `.py` files, `set -e`) — `collectors.py` had 12 pre-existing ruff findings

@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from model_prediction.rebuild.calibration import PlattCalibrator
 from model_prediction.rebuild.mlb_features import (
     build_game_feature_row,
+    dedupe_scoreboard,
     identify_starters,
     load_raw_statcast_dates,
     normalize_statcast_pitches,
@@ -54,9 +55,9 @@ def main() -> None:
         print(f"ERROR: {sb_path} not found. Run the MLB collector first.")
         sys.exit(1)
 
-    sb = pl.read_parquet(sb_path)
+    sb = dedupe_scoreboard(pl.read_parquet(sb_path))
     completed = sb.filter(pl.col("status") == "STATUS_FINAL").sort("event_start_utc")
-    print(f"1. Scoreboard: {sb.height} total rows, {completed.height} completed games")
+    print(f"1. Scoreboard: {sb.height} total rows (deduped), {completed.height} completed games")
 
     backfill_dates = sorted({row["event_start_utc"][:10] for row in completed.iter_rows(named=True)})
     raw = load_raw_statcast_dates("data/rebuild", backfill_dates)

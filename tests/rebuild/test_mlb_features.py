@@ -6,11 +6,16 @@ outputs/rebuild/takeover_status.md Checkpoint 5.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import pandas as pd
 import polars as pl
 
 from model_prediction.rebuild.mlb_features import (
     bullpen_rolling_features,
+    dedupe_scoreboard,
     identify_starters,
+    lookup_pitcher_id,
     normalize_statcast_pitches,
     park_factor,
     pitcher_rolling_features,
@@ -121,3 +126,90 @@ class TestParkFactor:
 
     def test_unknown_park_defaults_to_neutral_not_a_guess(self):
         assert park_factor("Some Random Independent-League Field") == 100.0
+
+
+class TestLookupPitcherId:
+    """Real, verified case from a live shadow run (see
+    outputs/rebuild/takeover_status.md Checkpoint 9): pybaseball's register
+    has two real "Drew Anderson"s — one who last played in 2006, one active
+    through 2026. The initial implementation treated any multi-row match as
+    unresolvable ambiguity and returned None, which correctly avoided
+    guessing wrong but meant a real, resolvable probable starter never got
+    real features. Fixed to break ties by mlb_played_last (a real recency
+    fact already in the same lookup result, not a guess) since a probable
+    starter for a real upcoming game must be the currently active player.
+    """
+
+    def test_ambiguous_name_resolved_by_recency(self):
+        fake_result = pd.DataFrame({
+            "name_first": ["drew", "drew"], "name_last": ["anderson", "anderson"],
+            "key_mlbam": [449776, 623454],
+            "mlb_played_first": [2006.0, 2017.0], "mlb_played_last": [2006.0, 2026.0],
+        })
+        with patch("pybaseball.playerid_lookup", return_value=fake_result):
+            assert lookup_pitcher_id("Drew Anderson") == 623454
+
+    def test_unambiguous_name_still_works(self):
+        fake_result = pd.DataFrame({
+            "name_first": ["bryan"], "name_last": ["woo"], "key_mlbam": [693433],
+            "mlb_played_first": [2023.0], "mlb_played_last": [2026.0],
+        })
+        with patch("pybaseball.playerid_lookup", return_value=fake_result):
+            assert lookup_pitcher_id("Bryan Woo") == 693433
+
+    def test_no_match_returns_none_not_a_guess(self):
+        with patch("pybaseball.playerid_lookup", return_value=pd.DataFrame()):
+            assert lookup_pitcher_id("Nobody Real") is None
+
+    def test_true_tie_in_recency_returns_none(self):
+        # Two different real players who both last played the same year --
+        # recency can't break this tie, so it must still fail closed.
+        fake_result = pd.DataFrame({
+            "name_first": ["j", "j"], "name_last": ["smith", "smith"],
+            "key_mlbam": [111, 222],
+            "mlb_played_first": [2020.0, 2021.0], "mlb_played_last": [2026.0, 2026.0],
+        })
+        with patch("pybaseball.playerid_lookup", return_value=fake_result):
+            assert lookup_pitcher_id("J Smith") is None
+
+
+class TestDedupeScoreboard:
+    """Real bug found running the Checkpoint 9 shadow script: 188 real
+    STATUS_FINAL scoreboard rows were only 135 real unique games —
+    NormalizedStore.write() appends on every call with no primary-key
+    enforcement, so repeated collection duplicates identical-content rows.
+    This silently inflated Checkpoint 6's training sample with
+    non-independent duplicate rows of the same game. Regression: same
+    event_id, different observed_at_utc, must collapse to one row.
+    """
+
+    def test_duplicate_event_id_collapses_to_one_row(self):
+        df = pl.DataFrame({
+            "event_id": ["401816384", "401816384", "401816385"],
+            "observed_at_utc": [
+                "2026-08-05T10:33:04+00:00", "2026-08-05T10:42:34+00:00", "2026-08-05T10:33:04+00:00",
+            ],
+            "home_score": [3, 3, 5],
+            "status": ["STATUS_FINAL", "STATUS_FINAL", "STATUS_FINAL"],
+        })
+
+        deduped = dedupe_scoreboard(df)
+
+        assert deduped.height == 2
+        assert sorted(deduped["event_id"].to_list()) == ["401816384", "401816385"]
+
+    def test_keeps_the_most_recently_observed_row(self):
+        df = pl.DataFrame({
+            "event_id": ["1", "1"],
+            "observed_at_utc": ["2026-08-05T10:00:00+00:00", "2026-08-05T12:00:00+00:00"],
+            "home_score": [0, 5],  # later observation has the real final score
+        })
+
+        deduped = dedupe_scoreboard(df)
+
+        assert deduped.height == 1
+        assert deduped["home_score"][0] == 5
+
+    def test_empty_input_returns_empty(self):
+        df = pl.DataFrame({"event_id": [], "observed_at_utc": []})
+        assert dedupe_scoreboard(df).is_empty()
