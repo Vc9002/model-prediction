@@ -407,9 +407,54 @@ and differential head's ElasticNet (Part 2's full OOF-ensemble spec, not
 attempted this checkpoint — the two-head architecture the incumbent rebuild
 already had was reused as-is, only its input features changed).
 
-**Current checkpoint**: 6 (real features wired into real chronological
-training and evaluation; result is honestly inconclusive on this small a
-sample, not a pass or fail either way).
+**Current checkpoint**: 6 complete.
+
+## Checkpoint 7 — Decision engine (2026-08-06)
+
+**Built** `src/model_prediction/rebuild/decision.py` — the winner-first
+value-betting decision engine, implementing CLAUDE.md's exact
+`SportsForecast`/`MarketEvaluation`/`BetDecision` interface. Reuses the
+existing `edge_scaled_units` (Kelly sizing, exposure caps) from
+`economic.py` rather than reimplementing sizing — this checkpoint is about
+*which side is ever evaluated in the first place*, not sizing math.
+
+Enforced invariants:
+- `decide_team_market()` (moneyline/spread): rejects any candidate whose
+  `team_or_side != forecast.predicted_winner` **before** any edge math
+  runs — an attractively-priced opponent is never evaluated as an
+  alternative, not filtered out after computing its edge.
+- `decide_total()`: `forecast.frozen_totals_side(line)` determines
+  OVER/UNDER from the sports-only distribution alone; a market candidate for
+  the other side is rejected the same way, before its price is inspected.
+- Quote freshness (`max_quote_age_seconds`) and depth
+  (`min_depth_units`) both fail closed, checked before edge computation.
+- `NO_BET` decisions always carry `units=0.0` — enforced by construction
+  (`_no_bet()` hardcodes it), not by a downstream check that could be
+  skipped.
+- `evaluate_game()` returns a decision for every candidate market, including
+  every `NO_BET`, so nothing is silently dropped from the audit trail.
+
+**Tests**: `tests/rebuild/test_winner_first_decision.py`, 15 tests, one for
+each item in CLAUDE.md's own "Critical decision tests" list verbatim —
+including the two adversarial ones that matter most: a 40%-probability
+opponent priced at 20¢ (a much larger raw apparent edge than the 60%
+predicted winner's own edge) is still never selected, and a stale/thin
+quote fails closed regardless of its price. 3 of the 15 initially failed
+for a real, orthogonal reason — quarter-Kelly sizing on a realistic
+single-digit edge rounds to zero at `edge_scaled_units`'s own default
+0.25-unit rounding granularity (that function's tested behavior, not a bug);
+fixed by using `unit_rounding=0.0` in those specific tests, since they test
+BET-vs-NO_BET routing, not sizing-policy granularity.
+
+**Not yet done**: wiring `decision.py` into a real end-to-end run against
+tonight's actual MLB slate + real Polymarket books (Checkpoint 8/9) — this
+checkpoint built and tested the decision logic in isolation with synthetic
+`SportsForecast`/`MarketEvaluation` fixtures, not yet against the real
+model + real market data from Checkpoints 5/6 and the Checkpoint 4 Polymarket
+collector.
+
+**Current checkpoint**: 7 (decision engine built and tested against every
+CLAUDE.md-specified critical case; not yet wired end-to-end).
 
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
