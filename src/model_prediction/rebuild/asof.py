@@ -7,7 +7,6 @@ Every join enforces: observation.observed_at_utc <= decision.decision_time_utc.
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
 
 import polars as pl
 
@@ -41,27 +40,43 @@ def point_in_time_join(
         return decisions
 
     # Rename observation columns to avoid clashes, prefix with "obs_"
+    obs_time_renamed = f"obs_{observation_time_col}"
     obs_renamed = observations.rename({
         col: f"obs_{col}" for col in observations.columns
         if col not in entity_keys
     })
 
-    # Build the join condition: match entity keys + PIT constraint
-    join_on = entity_keys.copy()
+    # join_asof requires both frames sorted by their respective `on` column
+    # (within each `by` group). entity_keys go in `by` (exact match, like a
+    # regular join's `on`) — they are not the asof column. Real bug fixed
+    # here (see outputs/rebuild/takeover_status.md): the previous version
+    # passed entity_keys as `on=`, which join_asof treats as the *asof*
+    # column, not an exact-match key, while also passing left_on/right_on —
+    # an invalid combination. It also sorted by the observation time
+    # column's pre-rename name after already renaming it, which raised
+    # ColumnNotFoundError on every real call — this function has never
+    # successfully run once, and had zero test coverage. It's also dead
+    # code: nothing in this repo actually calls it (verified via grep) —
+    # every real feature builder in mlb_features.py implements its own
+    # point-in-time filtering directly instead.
+    decisions_sorted = decisions.sort(decision_time_col)
+    obs_sorted = obs_renamed.sort(obs_time_renamed)
 
-    # Perform an asof join: for each decision, find the newest observation
-    # whose timestamp is <= the decision timestamp
-    result = decisions.join_asof(
-        obs_renamed.sort(observation_time_col),
-        on=join_on,
+    result = decisions_sorted.join_asof(
+        obs_sorted,
         left_on=decision_time_col,
-        right_on=f"obs_{observation_time_col}",
-        strategy="nearest",
+        right_on=obs_time_renamed,
+        by=entity_keys,
+        strategy="backward",
+        # Both frames are already sorted immediately above; polars can't
+        # verify sortedness within `by` groups itself and would otherwise
+        # warn on every call.
+        check_sortedness=False,
     )
 
     # Hard invariant: no observation timestamp after decision time
     if result.height > 0:
-        obs_time = result.get_column(f"obs_{observation_time_col}")
+        obs_time = result.get_column(obs_time_renamed)
         dec_time = result.get_column(decision_time_col)
         violations = (obs_time > dec_time).sum()
         if violations and violations > 0:
@@ -72,7 +87,7 @@ def point_in_time_join(
 
     # Max age filter
     if max_age is not None and result.height > 0:
-        obs_time = result.get_column(f"obs_{observation_time_col}")
+        obs_time = result.get_column(obs_time_renamed)
         dec_time = result.get_column(decision_time_col)
         age = dec_time - obs_time
         mask = age <= max_age
