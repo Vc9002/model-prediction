@@ -58,6 +58,24 @@ MLB_PARK_FACTORS: dict[str, int] = {
 }
 DEFAULT_PARK_FACTOR = 100
 
+# ESPN scoreboard uses full team display names ("Baltimore Orioles");
+# Statcast uses 2-3 letter club abbreviations ("BAL"). Needed to join a
+# scoreboard game (which has the real home/away score labels) to its
+# Statcast pitches (which have the real starter/bullpen signal) — there's no
+# shared game ID between the two sources.
+ESPN_TO_STATCAST_ABBREV: dict[str, str] = {
+    "Arizona Diamondbacks": "AZ", "Atlanta Braves": "ATL", "Athletics": "ATH",
+    "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC",
+    "Chicago White Sox": "CWS", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE",
+    "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU",
+    "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD",
+    "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN",
+    "New York Mets": "NYM", "New York Yankees": "NYY", "Philadelphia Phillies": "PHI",
+    "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF",
+    "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
+    "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
+}
+
 SWING_DESCRIPTIONS = {
     "foul", "foul_tip", "hit_into_play", "swinging_strike",
     "swinging_strike_blocked", "missed_bunt", "foul_bunt",
@@ -264,4 +282,85 @@ def load_weather_daily_aggregate(raw_root: str | Path, venue_id: str, game_date:
         "temp_f_mean": temp_f_mean,
         "wind_mph_mean": wind_mph_mean,
         "precip_mm_total": float(sum(precip_mm)) if precip_mm else 0.0,
+    }
+
+
+def find_statcast_game_pk(
+    pitches: pl.DataFrame, game_date: str, home_abbrev: str, away_abbrev: str,
+) -> int | None:
+    """Join an ESPN scoreboard game to its Statcast game_pk via
+    (date, home team, away team) — there is no shared game ID between the
+    two sources. Not doubleheader-safe: if two games between the same teams
+    on the same date exist, this returns the first match by game_pk, which
+    is a known, disclosed limitation (see CLAUDE.md Part 1 section 7's
+    doubleheader identity requirement — not yet built)."""
+    match = pitches.filter(
+        (pl.col("game_date_str") == game_date)
+        & (pl.col("home_team") == home_abbrev)
+        & (pl.col("away_team") == away_abbrev)
+    )
+    if match.is_empty():
+        return None
+    return int(match["game_pk"].sort()[0])
+
+
+def build_game_feature_row(
+    espn_game: dict,
+    pitches: pl.DataFrame,
+    starters: pl.DataFrame,
+    raw_root: str | Path,
+) -> dict[str, float] | None:
+    """Real feature row for one completed ESPN-scoreboard game: starter and
+    bullpen rolling features for both teams (point-in-time-safe — computed
+    strictly before this game's date), park factor, and weather. Returns
+    None when the game can't be matched to a Statcast game_pk (e.g. a date
+    with no real Statcast collection) rather than filling in fabricated
+    features for an unmatched game.
+    """
+    game_date = espn_game["event_start_utc"][:10]
+    home_name, away_name = espn_game["home_team"], espn_game["away_team"]
+    home_abbrev = ESPN_TO_STATCAST_ABBREV.get(home_name)
+    away_abbrev = ESPN_TO_STATCAST_ABBREV.get(away_name)
+    if home_abbrev is None or away_abbrev is None:
+        return None
+
+    game_pk = find_statcast_game_pk(pitches, game_date, home_abbrev, away_abbrev)
+    if game_pk is None:
+        return None
+
+    game_starters = starters.filter(pl.col("game_pk") == game_pk)
+    home_starter_row = game_starters.filter(pl.col("pitching_team") == home_abbrev)
+    away_starter_row = game_starters.filter(pl.col("pitching_team") == away_abbrev)
+    if home_starter_row.is_empty() or away_starter_row.is_empty():
+        return None
+    home_starter_id = int(home_starter_row["pitcher"][0])
+    away_starter_id = int(away_starter_row["pitcher"][0])
+
+    home_p = pitcher_rolling_features(pitches, home_starter_id, game_date)
+    away_p = pitcher_rolling_features(pitches, away_starter_id, game_date)
+    home_bp = bullpen_rolling_features(pitches, home_abbrev, game_date, starters)
+    away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
+    park = park_factor(espn_game.get("venue", ""))
+    weather = load_weather_daily_aggregate(raw_root, espn_game.get("venue", ""), game_date)
+
+    home_score, away_score = espn_game["home_score"], espn_game["away_score"]
+    return {
+        "event_id": espn_game["event_id"],
+        "game_date": game_date,
+        "event_start_utc": espn_game["event_start_utc"],
+        "home_team": home_name, "away_team": away_name,
+        "total_runs": float(home_score + away_score),
+        "home_margin": float(home_score - away_score),
+        "home_score": float(home_score), "away_score": float(away_score),
+        # Starter features (prefixed by side)
+        **{f"home_sp_{k}": v for k, v in home_p.items()},
+        **{f"away_sp_{k}": v for k, v in away_p.items()},
+        # Bullpen features
+        **{f"home_bp_{k}": v for k, v in home_bp.items()},
+        **{f"away_bp_{k}": v for k, v in away_bp.items()},
+        # Park and weather (shared, not per-side)
+        "park_factor": park,
+        "weather_availability": weather["availability"],
+        "temp_f_mean": weather["temp_f_mean"],
+        "wind_mph_mean": weather["wind_mph_mean"],
     }

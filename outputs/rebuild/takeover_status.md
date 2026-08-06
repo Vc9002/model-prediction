@@ -342,8 +342,74 @@ aggregate, and expanding the coarse park-factor table beyond ~29 parks with
 public data (all 30 MLB parks are listed; this is about factor *quality*,
 not *coverage*).
 
-**Current checkpoint**: 5 (feature functions built, tested, and verified
-against real data; not yet wired into model training).
+**Current checkpoint**: 5 complete.
+
+## Checkpoint 6 — MLB modeling (2026-08-06)
+
+**Built** `scripts/train_mlb_rebuild_real_features.py`, replacing
+`scripts/train_mlb_rebuild.py`'s rolling-team-score baseline (its own
+docstring already flagged this as the intended next step: "the full
+Statcast/weather/lineup/pitcher feature set requires the corresponding
+collectors to be completed first" — that's now done, Checkpoint 5). Joins
+real Statcast games to the ESPN scoreboard via team-name→abbreviation
+mapping + (date, home, away) matching (no shared game ID between the two
+sources) — **173 of 188 real completed games matched**, 15 unmatched and
+correctly excluded rather than fabricated. Real chronological expanding
+folds (`expanding_folds`, no random split), fit on `MLBTwoHeadModel`
+(existing intensity/differential two-head architecture, unmodified — this
+checkpoint only changed what features feed it), Platt-calibrated on a
+held-out tail.
+
+**Real bug caught immediately by running against actual data**:
+`expanding_folds()` returned **0 folds** on the first run. Root cause: it
+dedupes on its `dates` argument (`sorted(set(dates))`); I'd passed the
+calendar-day `game_date`, which only has ~10 unique values across 173 games
+in this real 10-day backfill window — too coarse for `val_size`/`test_size`
+sized in days. Fixed by passing the full `event_start_utc` timestamp instead
+(near-per-game granularity while preserving correct chronological order),
+matching what the original `pipeline_mlb_e2e.py` already did for the
+identical reason.
+
+**Real, honestly-reported result, not spun**: 3 fold-validation Brier scores
+(0.268, 0.252, 0.247) land in a plausible range close to the ~0.25
+coin-flip-adjacent baseline mentioned elsewhere in this project's docs. The
+34-game held-out test, however, shows accuracy=0.353 — worse than a coin
+flip. Investigated rather than either hiding it or reporting it uncritically:
+first hypothesis was the real, verified cold-start missingness mismatch
+(mean starter-`availability` is 0.478 in train vs 0.912 in test — a
+genuine artifact of a short 10-day backfill window, not a modeling
+choice); added a quality-filtered comparison (both starters have real prior
+history, n=28) — brier 0.3139, accuracy 0.357, barely different from the
+unfiltered number. That rules out cold-start missingness as the primary
+explanation. Most likely real explanation: 34 (or 28 filtered) games is a
+small enough sample that a "true" 50% model's binomial standard error is
+~8.6% — 35% accuracy is about 1.7 SE below 50%, unusual but not
+extraordinary. **Conclusion: this feature set's real quality is
+inconclusive on this small a backfill window.** Did not tune
+hyperparameters or features against this held-out set to make the number
+look better — CLAUDE.md explicitly treats a "consumed holdout" that's then
+tuned against as a real violation, not a shortcut.
+
+**Artifacts**: `config/models/challengers/mlb-two-head-real-features-v1.json`
+(new challenger artifact — the incumbent `config/models/mlb-elo-trend-lr-v8`
+and this branch's own earlier placeholder-feature challenger are both left
+untouched, per CLAUDE.md's "do not overwrite" rule), full fold/quality/
+cold-start-composition metrics also in
+`outputs/rebuild/mlb_training_results_real_features.json`.
+
+**Not yet done**: NBA/NFL/soccer/tennis/esports/KBO/NPB modeling
+(out of scope until MLB clears its own gate per CLAUDE.md's explicit
+sequencing — "Ignore NBA/WNBA/NFL/soccer/esports until MLB works"); a
+real backfill spanning weeks rather than 10 days, which is what would
+actually resolve the inconclusive held-out result above; XGBoost/HistGBM
+challengers beyond the existing intensity head's HistGradientBoostingRegressor
+and differential head's ElasticNet (Part 2's full OOF-ensemble spec, not
+attempted this checkpoint — the two-head architecture the incumbent rebuild
+already had was reused as-is, only its input features changed).
+
+**Current checkpoint**: 6 (real features wired into real chronological
+training and evaluation; result is honestly inconclusive on this small a
+sample, not a pass or fail either way).
 
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
