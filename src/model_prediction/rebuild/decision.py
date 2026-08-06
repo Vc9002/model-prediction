@@ -149,7 +149,7 @@ def decide_team_market(
     )
     units = sizing.get("units", 0.0)
     if units <= 0:
-        return _no_bet(forecast, candidate.market_type, sizing.get("reason", ZERO_SIZED), cost_adjusted_edge)
+        return _no_bet(forecast, candidate.market_type, str(sizing.get("reason", ZERO_SIZED)), cost_adjusted_edge)
 
     return BetDecision(
         event_id=forecast.event_id, action="BET", predicted_winner=forecast.predicted_winner,
@@ -196,7 +196,7 @@ def decide_total(
     )
     units = sizing.get("units", 0.0)
     if units <= 0:
-        return _no_bet(forecast, "total", sizing.get("reason", ZERO_SIZED), cost_adjusted_edge)
+        return _no_bet(forecast, "total", str(sizing.get("reason", ZERO_SIZED)), cost_adjusted_edge)
 
     return BetDecision(
         event_id=forecast.event_id, action="BET", predicted_winner=forecast.predicted_winner,
