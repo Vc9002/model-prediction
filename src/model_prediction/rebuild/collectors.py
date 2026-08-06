@@ -61,7 +61,7 @@ class MLBCollector:
 
         client = ESPNMLBClient()
         payload = client.scoreboard(game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
         self.meta.update_source_health(source, "active")
 
         events = payload.get("events", [])
@@ -448,7 +448,7 @@ class NBACollector:
 
         client = ESPNClient()
         payload = client.scoreboard(league, game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
         self.meta.update_source_health(source, "active")
 
         events = payload.get("events", [])
@@ -577,7 +577,7 @@ class NFLCollector:
                 return {"status": "no_espn_client", "date": game_date}
             client = ESPNClient()
             payload = client.scoreboard("NFL", game_date)
-            snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
+            snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
             self.meta.update_source_health(source, "active")
             events = payload.get("events", [])
             games = []
@@ -679,7 +679,7 @@ class SoccerCollector:
             return {"status": "no_espn_client", "date": game_date, "sport": sport}
         client = ESPNClient()
         payload = client.scoreboard(league, game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
         self.meta.update_source_health(source, "active")
         events = payload.get("events", [])
         games = []
@@ -780,7 +780,7 @@ class TennisCollector:
             return {"status": "no_espn_client", "date": game_date, "sport": sport}
         client = ESPNClient()
         payload = client.scoreboard(league, game_date)
-        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash.snapshot_hash
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
         self.meta.update_source_health(source, "active")
         events = payload.get("events", [])
         games = []

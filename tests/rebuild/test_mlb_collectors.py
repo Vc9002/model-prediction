@@ -196,3 +196,44 @@ class TestPolymarketRealDataShape:
         home_row = df.filter(pl.col("team_or_side") == "home")
         assert home_row["team"][0] == "Baltimore Orioles"
         assert home_row["executable_price"][0] == 0.61
+
+
+class FakeESPNClient:
+    def scoreboard(self, game_date):
+        return {"events": [{
+            "id": "401816384", "date": "2026-07-20T22:35Z",
+            "competitions": [{
+                "status": {"type": {"name": "STATUS_FINAL"}},
+                "venue": {"fullName": "Oriole Park at Camden Yards"},
+                "competitors": [
+                    {"homeAway": "home", "team": {"displayName": "Baltimore Orioles"}, "score": "3"},
+                    {"homeAway": "away", "team": {"displayName": "Los Angeles Angels"}, "score": "1"},
+                ],
+            }],
+        }]}
+
+
+class TestESPNScoreboardSnapshotHash:
+    """Real bug found live while backfilling more history for the
+    Foundation Completion pass: every collect_espn_scoreboard (MLB, NBA,
+    NFL, Soccer, Tennis) did
+    `self.raw.write(...).snapshot_hash.snapshot_hash` — RawStore.write()
+    returns a RawSnapshotRef whose `.snapshot_hash` field is already the
+    hash string, so the second `.snapshot_hash` access raised
+    AttributeError on `str`. This crashed every real call — confirmed live
+    calling collect_espn_scoreboard('2026-07-15') before the fix. Nothing
+    upstream of the direct call site caught it.
+    """
+
+    def test_collect_espn_scoreboard_does_not_raise(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClient(),
+        ):
+            result = collector.collect_espn_scoreboard("2026-07-20")
+
+        assert result["status"] == "ok"
+        assert result["games"] == 1
