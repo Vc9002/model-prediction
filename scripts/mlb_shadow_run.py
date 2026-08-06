@@ -23,11 +23,7 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from model_prediction.rebuild.decision import (
-    MarketEvaluation,
-    SportsForecast,
-    evaluate_game,
-)
+from model_prediction.rebuild.decision import SportsForecast, evaluate_game
 from model_prediction.rebuild.economic import SizeLimits
 from model_prediction.rebuild.mlb_features import (
     ESPN_TO_STATCAST_ABBREV,
@@ -37,6 +33,12 @@ from model_prediction.rebuild.mlb_features import (
     identify_starters,
     load_raw_statcast_dates,
     normalize_statcast_pitches,
+)
+from model_prediction.rebuild.mlb_market_matching import (
+    exclude_first_five_innings,
+    real_market_candidates,
+    real_total_lines,
+    resolve_polymarket_event_id,
 )
 from model_prediction.rebuild.models import MLBTwoHeadModel
 
@@ -66,7 +68,10 @@ def train_through(features: pl.DataFrame, cutoff_date: str) -> MLBTwoHeadModel:
     return model, train.height
 
 
-def build_forecast(model: MLBTwoHeadModel, row: dict, uncertainty_haircut: float = 0.03) -> SportsForecast:
+def build_forecast(
+    model: MLBTwoHeadModel, row: dict, total_lines: list[float] | None = None,
+    uncertainty_haircut: float = 0.03,
+) -> SportsForecast:
     pred = model.predict_row(row["event_id"], row)
     predicted_winner = "home" if pred.home_win_prob >= pred.away_win_prob else "away"
     calibrated = {"home": pred.home_win_prob, "away": pred.away_win_prob}
@@ -79,6 +84,18 @@ def build_forecast(model: MLBTwoHeadModel, row: dict, uncertainty_haircut: float
         for side, p in calibrated.items()
     }
     upper = {side: min(1.0, p + uncertainty_haircut) for side, p in calibrated.items()}
+
+    # Real per-line OVER/UNDER probability from the same joint score
+    # distribution the moneyline came from — computed here, before any
+    # market total price is ever inspected, so the frozen side is genuinely
+    # sports-only. Previously this was never populated at all, so every
+    # total market silently produced NO_BET/no_forecast_for_line regardless
+    # of price (see outputs/rebuild/takeover_status.md Checkpoint 9).
+    totals_probabilities: dict[float, dict[str, float]] = {}
+    for line in total_lines or []:
+        over_p = model.distribution.probability_for_market(pred, "total", "over", line)
+        totals_probabilities[line] = {"over": over_p, "under": 1.0 - over_p}
+
     return SportsForecast(
         event_id=row["event_id"], predicted_winner=predicted_winner,
         raw_probabilities=calibrated, calibrated_probabilities=calibrated,
@@ -86,33 +103,8 @@ def build_forecast(model: MLBTwoHeadModel, row: dict, uncertainty_haircut: float
         expected_home_score=pred.home_expected_runs, expected_away_score=pred.away_expected_runs,
         model_artifact_hash=model.to_artifact().get("artifact_hash", ""),
         calibration_artifact_hash="uncalibrated_haircut_v1",
+        totals_probabilities=totals_probabilities,
     )
-
-
-def real_market_candidates(
-    market_rows: pl.DataFrame, home_abbrev: str, away_abbrev: str,
-) -> list[MarketEvaluation]:
-    """Real MarketEvaluation objects from the collected Polymarket rows for
-    this game's two teams. available_depth is a disclosed None (see
-    Checkpoint 8) -- SizeLimits(min_depth_units=0.0) must be used until a
-    real depth source exists, or every real candidate fails the depth gate."""
-    game_rows = market_rows.filter(pl.col("team").is_in([home_abbrev, away_abbrev]))
-    total_rows = market_rows.filter(pl.col("market_type") == "total")
-    candidates = []
-    for r in game_rows.iter_rows(named=True):
-        side = "home" if r["team"] == home_abbrev else "away"
-        candidates.append(MarketEvaluation(
-            market_id=r["market_id"], market_type=r["market_type"], team_or_side=side,
-            line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=0.0, available_depth=999.0,
-        ))
-    for r in total_rows.iter_rows(named=True):
-        candidates.append(MarketEvaluation(
-            market_id=r["market_id"], market_type="total", team_or_side=r["team_or_side"],
-            line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=0.0, available_depth=999.0,
-        ))
-    return candidates
 
 
 def main() -> None:
@@ -152,8 +144,16 @@ def main() -> None:
 
     market_path = Path(f"data/rebuild/markets/mlb/{target_date}.parquet")
     if market_path.exists():
-        market_rows = pl.read_parquet(market_path)
-        print(f"5. {market_rows.height} real Polymarket rows loaded for {target_date}")
+        raw_market_rows = pl.read_parquet(market_path)
+        # This model only predicts full-game outcomes, so first-5-innings
+        # markets are dropped upstream of every consumer below, rather than
+        # risk one call site filtering it and another forgetting to (see
+        # mlb_market_matching.py's module docstring for the real bug this
+        # fixes).
+        market_rows = exclude_first_five_innings(raw_market_rows)
+        f5_count = raw_market_rows.height - market_rows.height
+        print(f"5. {market_rows.height} real full-game Polymarket rows loaded for {target_date} "
+              f"({f5_count} first-5-innings rows excluded — no full-game model to compare them against)")
     else:
         market_rows = pl.DataFrame()
         print(f"5. No Polymarket data collected for {target_date}")
@@ -203,8 +203,14 @@ def main() -> None:
             })
             continue
 
-        forecast = build_forecast(model, row)
-        candidates = real_market_candidates(market_rows, home_abbrev, away_abbrev) if not market_rows.is_empty() else []
+        if market_rows.is_empty():
+            total_lines, candidates = [], []
+        else:
+            resolved_event_id = resolve_polymarket_event_id(market_rows, g["home_team"], g["away_team"])
+            total_lines = real_total_lines(market_rows, resolved_event_id) if resolved_event_id else []
+            candidates = real_market_candidates(market_rows, g["home_team"], g["away_team"])
+
+        forecast = build_forecast(model, row, total_lines)
         decisions = evaluate_game(forecast, candidates, limits)
         bet_decisions = [d for d in decisions if d.action == "BET"]
 

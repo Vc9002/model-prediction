@@ -257,6 +257,7 @@ class MLBCollector:
                     for market in event.get("markets", []):
                         market_id = str(market.get("market_id", ""))
                         market_type = market.get("market_type", "")
+                        market_slug = market.get("market_slug", "")
                         line = market.get("line")
                         for side in market.get("sides", []):
                             books.append({
@@ -271,6 +272,18 @@ class MLBCollector:
                                 "event_id": event_id,
                                 "market_id": market_id,
                                 "market_type": market_type,
+                                # market_slug carries the only reliable signal for
+                                # period ("-f5-" = first 5 innings vs full game) --
+                                # a real, distinct market can share the exact same
+                                # market_type/line as a full-game market (e.g. two
+                                # different real "total > 6.5" markets, one full
+                                # game at 65c, one F5 at 25c, confirmed live). A
+                                # caller comparing a full-game model probability
+                                # against an F5 price is comparing incompatible
+                                # bets -- see outputs/rebuild/takeover_status.md
+                                # Checkpoint 9.
+                                "market_slug": market_slug,
+                                "is_first_five_innings": "-f5-" in market_slug,
                                 "team_or_side": side.get("selection", ""),
                                 "team": side.get("team"),
                                 "line": side.get("line", line),

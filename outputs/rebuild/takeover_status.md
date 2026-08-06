@@ -701,6 +701,84 @@ against real Polymarket pricing).
    the flat 3% haircut placeholder in `mlb_shadow_run.py`.
 4. SQLite shadow ledger + persistence/idempotency.
 
+## External review received, verified, and acted on (2026-08-06/07)
+
+An external review of commit `ffac1dc` correctly flagged several real gaps:
+totals never populated (`SportsForecast.totals_probabilities` was always
+empty), totals market matching not isolated by event, fabricated
+`quote_age_seconds=0.0`/`available_depth=999.0`, the flat calibration
+haircut, and the model's real (pre-fix) held-out numbers. One factual
+inaccuracy in that review: it cited Brier 0.3302/accuracy 35.3% as "the
+latest real-feature evaluation" — those were the pre-deduplication-fix
+numbers from an earlier commit; the actual current numbers (post-dedup,
+`7c1d0a4`) are brier 0.3133/accuracy 0.320 (quality-filtered 0.3007/0.227),
+already reported above as *more* concerning, not less.
+
+**Investigated and fixed the two real, actionable findings**:
+
+1. **Totals market isolation, fixed**: `real_market_candidates()`'s total
+   filter (`market_rows.filter(pl.col("market_type") == "total")`) had no
+   event filter at all — every total market from the whole date's
+   collection was attached to every game (confirmed live: 176 candidates
+   for a single game, exactly matching the day's total total-market count).
+2. **`totals_probabilities` never populated, fixed**: `build_forecast()`
+   built moneyline probabilities but never called
+   `model.distribution.probability_for_market(pred, "total", ...)` for any
+   real line, so `frozen_totals_side()` always returned `None` and every
+   total market produced `NO_BET`/`no_forecast_for_line` regardless of
+   price.
+
+**A third, more severe bug surfaced while verifying fix #1's re-run —
+found independently, not in the external review**: after fixing event
+isolation, decisions started firing `BET` with **24–56% "edges"** on every
+total line, always OVER, edge size *increasing* with the line — the
+opposite of what a sane check should show. Traced it rather than trusting
+the number: `real_market_candidates`/`resolve_polymarket_event_id` were
+comparing Statcast-style team abbreviations ("SEA") against Polymarket's
+`team` field, which is the real full display name ("Seattle Mariners") —
+every comparison silently matched zero rows. This meant **moneyline/spread
+markets had never been evaluated against a real game in any prior run,
+full stop** — every "176 markets evaluated" figure reported earlier was
+entirely the unfiltered-totals leak (bug #1), with real team-based
+matching contributing nothing. Fixed by switching to full team names.
+
+Re-running after that fix exposed a **fourth, independent bug**, still
+producing absurd edges: fetched the live Polymarket market list directly
+and found Polymarket lists genuinely **separate full-game and
+first-5-innings markets that can share the exact same `market_type`/`line`**
+(confirmed live: two distinct real "total > 6.5" markets for the same game
+— full game priced at 65¢, first-5-innings at 25¢). This model only
+predicts full-game outcomes; comparing its probability against an F5 price
+isn't a pricing edge, it's a market-identity error that looks like one.
+Fixed by capturing `market_slug` in the collector (the only reliable
+disambiguator — `-f5-` in the slug; the `question` text doesn't reliably
+say "first 5 innings" for totals) and excluding F5 rows in
+`collectors.py`'s `collect_polymarket_books`, upstream of every consumer.
+
+**Refactored** the three market-matching functions plus the new F5 filter
+out of `scripts/mlb_shadow_run.py` into a new, tested module
+`src/model_prediction/rebuild/mlb_market_matching.py` — these are
+safety-relevant enough to deserve real regression tests (7 added in
+`tests/rebuild/test_mlb_market_matching.py`), not just live-only
+verification in a script.
+
+**Final, verified-sane result** after all four fixes: 176 real full-game
+rows (154 F5 rows correctly excluded), 16 real candidate markets per game
+(down from the bogus 176), realistic edges (1–16%, not 24–56%), both real
+games correctly `NO_BET` (small edges rounded to zero at quarter-Kelly's
+0.25-unit granularity — `zero_sized`, not `no_edge_after_costs`).
+
+**Still real, still disclosed, not fixed this pass**: `quote_age_seconds`
+and `available_depth` remain fabricated (`0.0`/`999.0`) — the underlying
+Polymarket source genuinely doesn't expose real depth (Checkpoint 8's
+disclosed gap), and no timestamp-of-observation is threaded through yet
+either. Both must be fixed before any real-money consideration, not just
+disclosed forever. Flat 3% calibration haircut also still unfixed (item 3
+above). NBA/NFL/soccer/tennis collectors likely have the identical F5-style
+and team-name-matching gaps if/when they're ever wired into a shadow
+script — untouched and unverified, correctly out of scope until MLB
+clears its own gate.
+
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
 `.py` files, `set -e`) — `collectors.py` had 12 pre-existing ruff findings
