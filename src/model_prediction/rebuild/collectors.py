@@ -242,29 +242,48 @@ class MLBCollector:
             skipped_events = 0
             for event in mlb_events:
                 try:
-                    event_id = str(event.get("id", ""))
-                    markets = event.get("markets", [])
-                    for market in markets:
-                        books.append({
-                            **provenance_row(
-                                source=source,
-                                source_record_id=f"{event_id}_{market.get('id', '')}",
-                                source_version="polymarket_us_v1",
-                                observed_at_utc=utc_now().isoformat(),
-                                effective_at_utc=utc_now().isoformat(),
-                                event_start_utc=event.get("startDate", ""),
-                            ),
-                            "event_id": event_id,
-                            "market_id": market.get("id", ""),
-                            "market_type": market.get("type", ""),
-                            "side": market.get("side", ""),
-                            "line": market.get("line"),
-                            "best_bid": market.get("bestBid"),
-                            "best_ask": market.get("bestAsk"),
-                            "bid_size": market.get("bidSize"),
-                            "ask_size": market.get("askSize"),
-                            "spread": market.get("spread"),
-                        })
+                    # _normalize_event's real output shape (polymarket_us.py):
+                    # event["event_id"] (not "id"), event["markets"][i]
+                    # ["market_id"]/["market_type"] (not "id"/"type"), and
+                    # per-side executable prices live in market["sides"] (a
+                    # 2-entry list with "price_probability"/"selection"/
+                    # "team"), not flat market["bestBid"]/["bestAsk"] fields
+                    # that don't exist on this object at all. Every one of
+                    # those wrong keys previously resolved to None/"" for
+                    # every row -- silently, no exception, "status": "ok"
+                    # with 132 books that were really 132 empty shells (see
+                    # outputs/rebuild/takeover_status.md Checkpoint 8).
+                    event_id = str(event.get("event_id", ""))
+                    for market in event.get("markets", []):
+                        market_id = str(market.get("market_id", ""))
+                        market_type = market.get("market_type", "")
+                        line = market.get("line")
+                        for side in market.get("sides", []):
+                            books.append({
+                                **provenance_row(
+                                    source=source,
+                                    source_record_id=f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                    source_version="polymarket_us_v1",
+                                    observed_at_utc=utc_now().isoformat(),
+                                    effective_at_utc=utc_now().isoformat(),
+                                    event_start_utc=event.get("event_start_utc", ""),
+                                ),
+                                "event_id": event_id,
+                                "market_id": market_id,
+                                "market_type": market_type,
+                                "team_or_side": side.get("selection", ""),
+                                "team": side.get("team"),
+                                "line": side.get("line", line),
+                                "executable_price": side.get("price_probability"),
+                                "decimal_odds": side.get("decimal_odds"),
+                                "american_odds": side.get("american_odds"),
+                                # PolymarketUSClient's _normalize_event doesn't
+                                # expose order-book depth/size, only an
+                                # indicative side price -- real, disclosed gap,
+                                # not fabricated. A caller must not treat this
+                                # as a depth-checked executable quote.
+                                "available_depth": None,
+                            })
                 except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
                     skipped_events += 1
                     self.meta.update_source_health(source, "active", f"skipped malformed event: {str(e)[:150]}")
@@ -469,16 +488,30 @@ class NBACollector:
             events = client.slate(sport.upper(), date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
             for event in events:
+                # Real _normalize_event shape (polymarket_us.py): event_id/
+                # market_id/market_type keys, per-side prices in a "sides"
+                # list — not the flat id/type/bestBid/bestAsk keys used
+                # below previously, which don't exist on this object and
+                # silently resolved to "" / None for every row (see
+                # outputs/rebuild/takeover_status.md Checkpoint 8; same bug
+                # as MLBCollector.collect_polymarket_books, fixed there first).
+                event_id = str(event.get("event_id", ""))
                 for market in event.get("markets", []):
-                    books.append({
-                        **provenance_row(source, f"{event.get('id','')}_{market.get('id','')}",
-                                          "polymarket_us_v1", utc_now().isoformat(),
-                                          utc_now().isoformat(), event.get("startDate","")),
-                        "event_id": str(event.get("id", "")),
-                        "market_type": market.get("type", ""), "side": market.get("side", ""),
-                        "line": market.get("line"), "best_bid": market.get("bestBid"),
-                        "best_ask": market.get("bestAsk"),
-                    })
+                    market_id = str(market.get("market_id", ""))
+                    market_type = market.get("market_type", "")
+                    line = market.get("line")
+                    for side in market.get("sides", []):
+                        books.append({
+                            **provenance_row(source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                              "polymarket_us_v1", utc_now().isoformat(),
+                                              utc_now().isoformat(), event.get("event_start_utc", "")),
+                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
+                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "line": side.get("line", line),
+                            "executable_price": side.get("price_probability"),
+                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
+                            "available_depth": None,
+                        })
             if books:
                 self.markets.write_books(sport, game_date, pl.DataFrame(books))
                 return {"status": "ok", "books": len(books)}
@@ -568,12 +601,26 @@ class NFLCollector:
                 events = client.slate("NFL", date.fromisoformat(game_date))
                 books: list[dict[str, Any]] = []
                 for event in events:
+                    # See Checkpoint 8 in outputs/rebuild/takeover_status.md:
+                    # real _normalize_event keys are event_id/market_id/
+                    # market_type, with per-side prices in "sides" - the
+                    # previous id/type/bestBid/bestAsk keys don't exist here.
+                    event_id = str(event.get("event_id", ""))
                     for market in event.get("markets", []):
-                        books.append({**provenance_row(source, f"{event.get("id","")}_{market.get("id","")}",
-                            "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(), event.get("startDate","")),
-                            "event_id": str(event.get("id", "")), "market_type": market.get("type", ""),
-                            "side": market.get("side", ""), "line": market.get("line"),
-                            "best_bid": market.get("bestBid"), "best_ask": market.get("bestAsk")})
+                        market_id = str(market.get("market_id", ""))
+                        market_type = market.get("market_type", "")
+                        line = market.get("line")
+                        for side in market.get("sides", []):
+                            books.append({**provenance_row(
+                                source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
+                                event.get("event_start_utc", "")),
+                                "event_id": event_id, "market_id": market_id, "market_type": market_type,
+                                "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                                "line": side.get("line", line),
+                                "executable_price": side.get("price_probability"),
+                                "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
+                                "available_depth": None})
                 if books:
                     self.markets.write_books(sport, game_date, pl.DataFrame(books))
                     return {"status": "ok", "books": len(books)}
@@ -653,12 +700,26 @@ class SoccerCollector:
             events = client.slate(league, date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
             for event in events:
+                # See Checkpoint 8 in outputs/rebuild/takeover_status.md:
+                # real _normalize_event keys are event_id/market_id/
+                # market_type, with per-side prices in "sides" - the
+                # previous id/type/bestBid/bestAsk keys don't exist here.
+                event_id = str(event.get("event_id", ""))
                 for market in event.get("markets", []):
-                    books.append({**provenance_row(source, f"{event.get("id","")}_{market.get("id","")}",
-                        "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(), event.get("startDate","")),
-                        "event_id": str(event.get("id", "")), "market_type": market.get("type", ""),
-                        "side": market.get("side", ""), "line": market.get("line"),
-                        "best_bid": market.get("bestBid"), "best_ask": market.get("bestAsk")})
+                    market_id = str(market.get("market_id", ""))
+                    market_type = market.get("market_type", "")
+                    line = market.get("line")
+                    for side in market.get("sides", []):
+                        books.append({**provenance_row(
+                            source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                            "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
+                            event.get("event_start_utc", "")),
+                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
+                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "line": side.get("line", line),
+                            "executable_price": side.get("price_probability"),
+                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
+                            "available_depth": None})
             if books:
                 self.markets.write_books(sport, game_date, pl.DataFrame(books))
                 return {"status": "ok", "books": len(books)}
@@ -740,12 +801,26 @@ class TennisCollector:
             events = client.slate(league, date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
             for event in events:
+                # See Checkpoint 8 in outputs/rebuild/takeover_status.md:
+                # real _normalize_event keys are event_id/market_id/
+                # market_type, with per-side prices in "sides" - the
+                # previous id/type/bestBid/bestAsk keys don't exist here.
+                event_id = str(event.get("event_id", ""))
                 for market in event.get("markets", []):
-                    books.append({**provenance_row(source, f"{event.get("id","")}_{market.get("id","")}",
-                        "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(), event.get("startDate","")),
-                        "event_id": str(event.get("id", "")), "market_type": market.get("type", ""),
-                        "side": market.get("side", ""), "line": market.get("line"),
-                        "best_bid": market.get("bestBid"), "best_ask": market.get("bestAsk")})
+                    market_id = str(market.get("market_id", ""))
+                    market_type = market.get("market_type", "")
+                    line = market.get("line")
+                    for side in market.get("sides", []):
+                        books.append({**provenance_row(
+                            source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                            "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
+                            event.get("event_start_utc", "")),
+                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
+                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "line": side.get("line", line),
+                            "executable_price": side.get("price_probability"),
+                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
+                            "available_depth": None})
             if books:
                 self.markets.write_books(sport, game_date, pl.DataFrame(books))
                 return {"status": "ok", "books": len(books)}

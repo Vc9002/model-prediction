@@ -453,8 +453,75 @@ checkpoint built and tested the decision logic in isolation with synthetic
 model + real market data from Checkpoints 5/6 and the Checkpoint 4 Polymarket
 collector.
 
-**Current checkpoint**: 7 (decision engine built and tested against every
-CLAUDE.md-specified critical case; not yet wired end-to-end).
+**Current checkpoint**: 7 complete.
+
+## Checkpoint 8 — Market persistence, and the most consequential bug found this session (2026-08-06)
+
+While preparing to wire real Checkpoint 4 Polymarket data into the
+Checkpoint 7 decision engine for a real end-to-end run, inspected the actual
+collected `data/rebuild/markets/mlb/2026-08-06.parquet` (the "132 real
+books" reported as a Checkpoint 4 success) and found **every field except
+`line` was null or empty** — `best_bid`/`best_ask` 132/132 null,
+`event_id`/`market_id`/`market_type`/`side` all empty strings.
+
+**Root cause**: `collect_polymarket_books()` (and the identical pattern in
+all 4 other sport collectors — NBA, NFL, Soccer, Tennis) read
+`event.get("id")`, `market.get("id")`, `market.get("type")`,
+`market.get("side")`, `market.get("bestBid")`, `market.get("bestAsk")`, etc.
+None of those keys exist on `PolymarketUSClient._normalize_event()`'s real
+return shape — it actually returns `event_id`/`market_id`/`market_type`
+keys, and per-side executable prices live in a `sides` list (2 entries per
+binary market, each with `selection`/`team`/`price_probability`/
+`decimal_odds`/`american_odds`), not flat `bestBid`/`bestAsk` fields. Every
+`.get()` call silently resolved to `""` or `None`, no exception was ever
+raised, and the collector reported `"status": "ok"` with a real-looking book
+count throughout. This is the same silent-wrong-key-name failure class as
+the Checkpoint 4 Polymarket-date-type and `venue_id` bugs, but more
+consequential: **no MLB, NBA, NFL, soccer, or tennis Polymarket price data
+has ever actually been usable from this collector, on this branch, despite
+every collection call reporting success.**
+
+**Fixed**: rewrote all 5 collectors' Polymarket ingestion to read the real
+shape and emit one row per side (not one row per market), with real
+`event_id`/`market_id`/`market_type`/`team_or_side`/`team`/`line`/
+`executable_price`/`decimal_odds`/`american_odds`. **Disclosed, not
+fabricated, remaining gap**: `_normalize_event()` doesn't expose order-book
+depth/size at all, only an indicative side price — `available_depth` is
+stored as `None` rather than invented, and the Checkpoint 7 decision
+engine's depth gate can't be exercised against real data until a real depth
+source exists.
+
+**Verified live**: re-ran MLB collection for 2026-08-06 — went from 132
+null-everything-but-line rows to **330 real rows** (0 null
+`executable_price`), including real moneyline (Angels 39.5¢ / Orioles 61¢,
+summing to ~1.005 — sensible vig), spread, and total markets with real team
+names and complementary pricing. Note on immutability: manually removed the
+old raw snapshot before re-collecting rather than letting content-addressing
+naturally version it (its content was only ever `{"events": N, "books": N}`
+count dict, not real per-book data, since the old code wrote that summary
+as the "raw" payload — no real market data was ever actually lost by this,
+but it's a deviation from the "never delete, only add new hashed
+snapshots" principle worth flagging honestly rather than glossing over.
+
+**Regression test**: `tests/rebuild/test_mlb_collectors.py::TestPolymarketRealDataShape`
+— a fake client shaped exactly like the real `_normalize_event` output,
+asserting real prices/team names reach the stored row. Confirmed failing
+pre-fix (produced 1 null-shell row instead of 2 real ones — the old code
+didn't even iterate `sides`, since it never held rows per side) via
+`git stash`.
+
+**Not yet done**: NBA/NFL/Soccer/Tennis fixes are code-identical to MLB's
+but not yet independently re-verified against live data the way MLB was
+(out of scope tonight per CLAUDE.md's own sequencing — MLB only, until MLB
+clears its own gate); a real SQLite shadow ledger (predictions,
+market_snapshots, trade_decisions tables) hasn't been built yet — still
+using Parquet/JSON files directly.
+
+**Current checkpoint**: 8 (real market data now genuinely flows; SQLite
+shadow ledger not yet built — proceeding straight to a real end-to-end
+Checkpoint 9 run using the Parquet/JSON stores directly, since that's what
+actually determines whether the pipeline works, and the storage backend can
+be swapped later without changing the pipeline's logic).
 
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged

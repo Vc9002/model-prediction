@@ -136,3 +136,63 @@ class TestWeatherForecastEndpoint:
         assert captured["url"] == "https://historical-forecast-api.open-meteo.com/v1/forecast"
         assert "archive-api" not in captured["url"]
         assert result["endpoint"] == "historical_forecast_stitched"
+
+
+class FakePolymarketClientWithRealShape:
+    """Returns data shaped like PolymarketUSClient._normalize_event's real
+    output (event_id/market_id/market_type keys, per-side prices in a
+    "sides" list) — not the event["id"]/market["bestBid"] shape the
+    collector used to assume, which doesn't exist on the real object at all
+    and silently produced 132 "successful" books that were empty shells
+    (null price, empty event_id/market_id) every field except line."""
+
+    def slate(self, league, game_date):
+        return [{
+            "event_id": "70535",
+            "event_start_utc": "2026-08-06T23:00:00+00:00",
+            "markets": [{
+                "market_id": "350520",
+                "market_type": "moneyline",
+                "line": None,
+                "sides": [
+                    {"side_id": "1", "selection": "away", "team": "Los Angeles Angels",
+                     "line": None, "price_probability": 0.395, "decimal_odds": 2.53, "american_odds": 153},
+                    {"side_id": "2", "selection": "home", "team": "Baltimore Orioles",
+                     "line": None, "price_probability": 0.61, "decimal_odds": 1.64, "american_odds": -156},
+                ],
+            }],
+        }]
+
+
+class TestPolymarketRealDataShape:
+    """collect_polymarket_books() read event.get("id")/market.get("id")/
+    market.get("type")/market.get("bestBid")/market.get("bestAsk") — none of
+    which exist on PolymarketUSClient._normalize_event's real return shape
+    (event_id/market_id/market_type, with per-side prices under "sides").
+    Every field except "line" silently resolved to "" or None for every
+    real book collected, with no exception and status: "ok". Regression:
+    real per-side prices and identifiers must actually reach the stored row.
+    """
+
+    def test_real_shaped_market_produces_real_prices_not_nulls(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.polymarket_us.PolymarketUSClient",
+            return_value=FakePolymarketClientWithRealShape(),
+        ):
+            result = collector.collect_polymarket_books("2026-08-06")
+
+        assert result["status"] == "ok"
+        assert result["books"] == 2
+        df = pl.read_parquet(collector.markets.path("mlb", "2026-08-06"))
+        assert df["executable_price"].null_count() == 0, (
+            "executable_price must be populated from side['price_probability'], "
+            "not silently null from a nonexistent market['bestAsk'] key"
+        )
+        assert set(df["event_id"].to_list()) == {"70535"}
+        assert set(df["team_or_side"].to_list()) == {"home", "away"}
+        home_row = df.filter(pl.col("team_or_side") == "home")
+        assert home_row["team"][0] == "Baltimore Orioles"
+        assert home_row["executable_price"][0] == 0.61
