@@ -779,6 +779,66 @@ and team-name-matching gaps if/when they're ever wired into a shadow
 script — untouched and unverified, correctly out of scope until MLB
 clears its own gate.
 
+## Second external review round, verified and acted on (2026-08-07)
+
+A second review of `b9d9de9` correctly verified all four prior fixes
+(totals isolation, totals probabilities, full team names, F5 exclusion)
+against real code and the real shadow report, and correctly identified that
+the accuracy/Brier numbers were already the current (post-dedup) ones, not
+stale — no factual correction needed this round.
+
+**One new, real, more severe bug found and fixed**: `decide_team_market()`
+priced *every* team-market candidate — moneyline **and spread** — using
+`forecast.probability_lower[forecast.predicted_winner]`, the predicted
+winner's moneyline win probability. For a spread, that's the wrong number:
+covering a specific line (e.g. -2.5) is a materially different, usually
+lower, probability than simply winning. Verified in the actual committed
+shadow report before fixing anything: a real spread market showed a
+fabricated **+23.5% edge**, computed from a ~51% moneyline probability
+against a market price that had nothing to do with a 51%-to-win team's
+probability of covering that specific spread.
+
+**Fixed**: added `SportsForecast.spread_probabilities:
+dict[float, dict[str, float]]`, populated the same way as
+`totals_probabilities` (computed via
+`model.distribution.probability_for_market(pred, "spread", side, line)`
+before market inspection) — except spreads need a `(line, side)` pair, not
+just a line, since a real market's home side and away side carry different
+signed lines for the same conceptual market (e.g. home -1.5, away +1.5) —
+added `real_spread_line_side_pairs()` to `mlb_market_matching.py` to supply
+exactly those real pairs. `decide_team_market()` now fails closed with
+`NO_FORECAST_FOR_LINE` for a spread with no real forecast for that exact
+line, rather than silently falling back to the moneyline number. Added the
+exact regression test case the review specified (70% moneyline winner, 40%
+real cover probability, 45¢ ask → `NO_BET`, negative edge, 0 units) plus 3
+more. Re-ran the real pipeline: spread edges went from a nonsensical +23.5%
+to a realistic -8.4% to +6.4% range, both real games still correctly
+`NO_BET`.
+
+**Second, smaller fix from this round**: the review also correctly flagged
+that every `NO_BET` decision discarded which exact market/side/line/ask had
+been evaluated (`selected_market=None` by design) — a report couldn't
+distinguish "evaluated the away spread at 45¢ and rejected it" from having
+evaluated nothing. Added `BetDecision.evaluated_market` (populated on every
+decision, `BET` or `NO_BET`; `selected_market` keeps its
+CLAUDE.md-specified "what was actually bet" meaning). Wired into the
+shadow script's report JSON — every decision row now shows a real
+`market_id`/`team_or_side`/`line`/`executable_ask`, not `null`.
+
+**Caught and fixed a self-inflicted bug while making this change**: a
+sloppy regex used to bulk-update 11 `_no_bet()` call sites incorrectly
+matched into a nested `sizing.get(...)` call on two of them, inserting an
+invalid keyword argument into a dict `.get()` call — syntactically valid
+Python (parsed fine) but would have raised `TypeError` the first time
+either code path actually executed. Caught by reading the diff before
+running anything, not by a test failure — worth noting since it's exactly
+the kind of "looks done, silently wrong" mistake this whole session has
+been about finding in *other* code.
+
+**804 tests pass** (up from 799), all real bugs found this round verified
+against actual code and real data before being treated as confirmed, per
+this session's standing practice.
+
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
 `.py` files, `set -e`) — `collectors.py` had 12 pre-existing ruff findings

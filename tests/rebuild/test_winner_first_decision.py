@@ -34,7 +34,7 @@ from model_prediction.rebuild.economic import SizeLimits
 
 def _forecast(
     predicted_winner="home", home_prob=0.60, away_prob=0.40, lower_margin=0.05,
-    totals_probabilities=None,
+    totals_probabilities=None, spread_probabilities=None,
 ):
     return SportsForecast(
         event_id="game-1",
@@ -46,6 +46,7 @@ def _forecast(
         expected_home_score=4.5, expected_away_score=4.0,
         model_artifact_hash="abc123", calibration_artifact_hash="def456",
         totals_probabilities=totals_probabilities or {},
+        spread_probabilities=spread_probabilities or {},
     )
 
 
@@ -117,7 +118,12 @@ class TestOpponentNeverSubstituted:
 
 class TestWinnerAlignedSpreadMayQualify:
     def test_spread_for_predicted_winner_can_be_bet(self):
-        forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
+        # Real spread cover probability (0.55), not the moneyline win
+        # probability (0.60) — this is the fixed, correct behavior.
+        forecast = _forecast(
+            predicted_winner="home", home_prob=0.60, lower_margin=0.03,
+            spread_probabilities={-1.5: {"home": 0.55, "away": 0.45}},
+        )
         spread_market = _market(
             team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
         )
@@ -133,6 +139,42 @@ class TestWinnerAlignedSpreadMayQualify:
         decision = decide_team_market(forecast, opposing_spread)
         assert decision.action == "NO_BET"
         assert decision.reason_code == NOT_ALIGNED_WITH_PREDICTED_WINNER
+
+    def test_spread_edge_uses_cover_probability_not_moneyline_probability(self):
+        """Real, confirmed bug (see outputs/rebuild/takeover_status.md
+        Checkpoint 9): a real spread market produced a fabricated +23.5%
+        edge because the moneyline win probability (70%) was used to price
+        a spread whose real cover probability was much lower (40%).
+        Exact case from the review that caught this: winner moneyline 70%,
+        winner -2.5 cover probability 40%, spread ask 45c -> must be
+        NO_BET with a negative edge, not a positive one derived from 70%.
+        """
+        forecast = _forecast(
+            predicted_winner="home", home_prob=0.70, lower_margin=0.0,
+            spread_probabilities={-2.5: {"home": 0.40, "away": 0.60}},
+        )
+        spread_market = _market(
+            team_or_side="home", ask=0.45, depth_price=0.45, market_type="spread", line=-2.5,
+        )
+
+        decision = decide_team_market(forecast, spread_market)
+
+        assert decision.action == "NO_BET"
+        assert decision.units == 0.0
+        assert decision.cost_adjusted_edge is not None
+        assert decision.cost_adjusted_edge < 0, (
+            f"edge should be 0.40 - 0.45 = -0.05, not derived from the 70% moneyline "
+            f"probability (which would wrongly give +0.25); got {decision.cost_adjusted_edge}"
+        )
+
+    def test_spread_with_no_real_forecast_for_that_line_fails_closed(self):
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, spread_probabilities={})
+        spread_market = _market(
+            team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
+        )
+        decision = decide_team_market(forecast, spread_market)
+        assert decision.action == "NO_BET"
+        assert decision.units == 0.0
 
 
 class TestStaleQuoteFailsClosed:
@@ -204,3 +246,42 @@ class TestEveryCandidateGetsADecision:
         decisions = evaluate_game(forecast, candidates)
         assert len(decisions) == 2
         assert all(d.action == "NO_BET" for d in decisions)
+
+
+class TestRejectedMarketIdentityIsPreserved:
+    """Real audit-trail gap fixed: NO_BET always set selected_market=None,
+    so a report couldn't show *which* market/side/line/ask was actually
+    rejected — only that something was, with every field showing null.
+    evaluated_market preserves the exact candidate regardless of outcome.
+    """
+
+    def test_no_bet_still_records_which_market_was_evaluated(self):
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
+        market = _market(team_or_side="home", ask=0.70, depth_price=0.70, market_type="moneyline")
+
+        decision = decide_team_market(forecast, market)
+
+        assert decision.action == "NO_BET"
+        assert decision.selected_market is None
+        assert decision.evaluated_market is market
+
+    def test_bet_records_the_same_market_in_both_fields(self):
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
+        market = _market(team_or_side="home", ask=0.52, depth_price=0.52, market_type="moneyline")
+
+        decision = decide_team_market(forecast, market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0))
+
+        assert decision.action == "BET"
+        assert decision.evaluated_market is market
+        assert decision.selected_market is market
+
+    def test_wrong_side_rejection_still_records_the_rejected_candidate(self):
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, away_prob=0.40)
+        away_market = _market(team_or_side="away", ask=0.20, depth_price=0.20)
+
+        decision = decide_team_market(forecast, away_market)
+
+        assert decision.action == "NO_BET"
+        assert decision.evaluated_market is away_market
+        assert decision.evaluated_market.team_or_side == "away"
+        assert decision.evaluated_market.executable_ask == 0.20

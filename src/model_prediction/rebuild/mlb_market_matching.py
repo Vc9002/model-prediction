@@ -62,6 +62,24 @@ def real_total_lines(market_rows: pl.DataFrame, event_id: str) -> list[float]:
     return sorted({line for line in rows["line"].to_list() if line is not None})
 
 
+def real_spread_line_side_pairs(market_rows: pl.DataFrame, event_id: str) -> list[tuple[float, str]]:
+    """Real (line, side) pairs Polymarket actually quotes for this event's
+    spread markets. Each side of a real spread market carries its own
+    signed line — a home favorite's side is quoted at e.g. -1.5 while the
+    away side of that same market is quoted at +1.5, not a single shared
+    line like totals' over/under. `probability_for_market(pred, "spread",
+    side, line)` needs that side's own signed line to compute the right
+    cover probability, so callers must compute one probability per real
+    (line, side) pair, not one per distinct line value."""
+    rows = market_rows.filter((pl.col("event_id") == event_id) & (pl.col("market_type") == "spread"))
+    pairs = {
+        (r["line"], r["team_or_side"])
+        for r in rows.select(["line", "team_or_side"]).iter_rows(named=True)
+        if r["line"] is not None and r["team_or_side"] in ("home", "away")
+    }
+    return sorted(pairs)
+
+
 def real_market_candidates(
     market_rows: pl.DataFrame, home_name: str, away_name: str,
 ) -> list[MarketEvaluation]:

@@ -45,6 +45,14 @@ class SportsForecast:
     # {line: {"over": prob, "under": prob}} — the sports-only distribution's
     # own view per exact line, independent of any specific market's price.
     totals_probabilities: dict[float, dict[str, float]] = field(default_factory=dict)
+    # {line: {"home": cover_prob, "away": cover_prob}} — real, verified bug
+    # (see outputs/rebuild/takeover_status.md Checkpoint 9): without this,
+    # decide_team_market() had no way to price a spread except by reusing
+    # the moneyline win probability, which is not the probability of
+    # covering a specific line (e.g. a 60%-to-win favorite covering -2.5 is
+    # a materially different, usually lower, probability) — that produced
+    # real, confirmed 20%+ fabricated "edges" on real spread markets.
+    spread_probabilities: dict[float, dict[str, float]] = field(default_factory=dict)
 
     def frozen_totals_side(self, line: float) -> Literal["over", "under"] | None:
         """The more probable side for this exact line, decided from the
@@ -79,6 +87,15 @@ class BetDecision:
     units: float
     reason_code: str
     cost_adjusted_edge: float | None = None
+    # The exact candidate this decision was made about, whether or not it
+    # was selected. Real audit-trail gap fixed here: NO_BET always set
+    # selected_market=None, so a rejected market's exact market_id/side/
+    # line/ask was silently discarded — a report couldn't show *what* was
+    # rejected, only that something was. `selected_market` keeps its
+    # CLAUDE.md-specified "what was bet, if anything" meaning (None on
+    # NO_BET); `evaluated_market` is the audit trail's own record of what
+    # was actually looked at, populated on every decision, not just BETs.
+    evaluated_market: MarketEvaluation | None = None
 
 
 # Reason codes are deliberately explicit and stable — a dashboard/audit
@@ -106,12 +123,13 @@ def _quote_gate_reason(candidate: MarketEvaluation, limits: SizeLimits) -> str |
 
 
 def _no_bet(
-    forecast: SportsForecast, market_type: str, reason: str, edge: float | None = None,
+    forecast: SportsForecast, market_type: str, reason: str,
+    edge: float | None = None, evaluated: MarketEvaluation | None = None,
 ) -> BetDecision:
     return BetDecision(
         event_id=forecast.event_id, action="NO_BET", predicted_winner=forecast.predicted_winner,
         market_type=market_type, selected_market=None, units=0.0, reason_code=reason,
-        cost_adjusted_edge=edge,
+        cost_adjusted_edge=edge, evaluated_market=evaluated,
     )
 
 
@@ -125,36 +143,59 @@ def decide_team_market(
     """Moneyline or spread decision. `candidate.team_or_side` must equal
     `forecast.predicted_winner` — market price never influences which side
     that is, and an opponent priced attractively is never evaluated as an
-    alternative recommendation, no matter how large its apparent edge."""
+    alternative recommendation, no matter how large its apparent edge.
+
+    Real, confirmed bug fixed here: a spread candidate was previously
+    priced using the predicted winner's *moneyline* win probability, not
+    its probability of covering that specific line — a materially
+    different (usually lower) number. Verified live: a real spread market
+    produced a fabricated +23.5% "edge" this way. Spread candidates now
+    require `forecast.spread_probabilities[line][predicted_winner]`
+    (populated by the caller before market inspection, same as
+    `totals_probabilities`) and fail closed with `NO_FORECAST_FOR_LINE`
+    when that line has no real spread forecast, rather than falling back
+    to the moneyline number."""
     limits = limits if limits is not None else SizeLimits()
     if candidate.market_type not in ("moneyline", "spread"):
         raise ValueError(f"decide_team_market got market_type={candidate.market_type!r}")
     if candidate.team_or_side != forecast.predicted_winner:
-        return _no_bet(forecast, candidate.market_type, NOT_ALIGNED_WITH_PREDICTED_WINNER)
+        return _no_bet(forecast, candidate.market_type, NOT_ALIGNED_WITH_PREDICTED_WINNER, evaluated=candidate)
 
     gate_reason = _quote_gate_reason(candidate, limits)
     if gate_reason is not None:
-        return _no_bet(forecast, candidate.market_type, gate_reason)
+        return _no_bet(forecast, candidate.market_type, gate_reason, evaluated=candidate)
 
-    conservative_prob = forecast.probability_lower[forecast.predicted_winner]
+    if candidate.market_type == "spread":
+        line_probs = forecast.spread_probabilities.get(candidate.line) if candidate.line is not None else None
+        if line_probs is None or forecast.predicted_winner not in line_probs:
+            return _no_bet(forecast, candidate.market_type, NO_FORECAST_FOR_LINE, evaluated=candidate)
+        conservative_prob = line_probs[forecast.predicted_winner]
+        model_prob = conservative_prob
+    else:
+        conservative_prob = forecast.probability_lower[forecast.predicted_winner]
+        model_prob = forecast.calibrated_probabilities[forecast.predicted_winner]
+
     cost_adjusted_edge = conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
     if cost_adjusted_edge <= 0:
-        return _no_bet(forecast, candidate.market_type, NO_EDGE_AFTER_COSTS, cost_adjusted_edge)
+        return _no_bet(forecast, candidate.market_type, NO_EDGE_AFTER_COSTS, cost_adjusted_edge, evaluated=candidate)
 
     sizing = edge_scaled_units(
-        model_prob=forecast.calibrated_probabilities[forecast.predicted_winner],
+        model_prob=model_prob,
         conservative_prob=conservative_prob,
         best_ask=candidate.executable_ask,
         limits=limits,
     )
     units = sizing.get("units", 0.0)
     if units <= 0:
-        return _no_bet(forecast, candidate.market_type, str(sizing.get("reason", ZERO_SIZED)), cost_adjusted_edge)
+        return _no_bet(
+            forecast, candidate.market_type, str(sizing.get("reason", ZERO_SIZED)),
+            cost_adjusted_edge, evaluated=candidate,
+        )
 
     return BetDecision(
         event_id=forecast.event_id, action="BET", predicted_winner=forecast.predicted_winner,
         market_type=candidate.market_type, selected_market=candidate, units=units,
-        reason_code=QUALIFIED, cost_adjusted_edge=cost_adjusted_edge,
+        reason_code=QUALIFIED, cost_adjusted_edge=cost_adjusted_edge, evaluated_market=candidate,
     )
 
 
@@ -173,22 +214,22 @@ def decide_total(
     if candidate.market_type != "total":
         raise ValueError(f"decide_total got market_type={candidate.market_type!r}")
     if candidate.line is None:
-        return _no_bet(forecast, "total", NO_FORECAST_FOR_LINE)
+        return _no_bet(forecast, "total", NO_FORECAST_FOR_LINE, evaluated=candidate)
 
     frozen_side = forecast.frozen_totals_side(candidate.line)
     if frozen_side is None:
-        return _no_bet(forecast, "total", NO_FORECAST_FOR_LINE)
+        return _no_bet(forecast, "total", NO_FORECAST_FOR_LINE, evaluated=candidate)
     if candidate.team_or_side != frozen_side:
-        return _no_bet(forecast, "total", NOT_ALIGNED_WITH_FROZEN_TOTALS_SIDE)
+        return _no_bet(forecast, "total", NOT_ALIGNED_WITH_FROZEN_TOTALS_SIDE, evaluated=candidate)
 
     gate_reason = _quote_gate_reason(candidate, limits)
     if gate_reason is not None:
-        return _no_bet(forecast, "total", gate_reason)
+        return _no_bet(forecast, "total", gate_reason, evaluated=candidate)
 
     conservative_prob = forecast.totals_probabilities[candidate.line][frozen_side]
     cost_adjusted_edge = conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
     if cost_adjusted_edge <= 0:
-        return _no_bet(forecast, "total", NO_EDGE_AFTER_COSTS, cost_adjusted_edge)
+        return _no_bet(forecast, "total", NO_EDGE_AFTER_COSTS, cost_adjusted_edge, evaluated=candidate)
 
     sizing = edge_scaled_units(
         model_prob=conservative_prob, conservative_prob=conservative_prob,
@@ -196,12 +237,15 @@ def decide_total(
     )
     units = sizing.get("units", 0.0)
     if units <= 0:
-        return _no_bet(forecast, "total", str(sizing.get("reason", ZERO_SIZED)), cost_adjusted_edge)
+        return _no_bet(
+            forecast, "total", str(sizing.get("reason", ZERO_SIZED)),
+            cost_adjusted_edge, evaluated=candidate,
+        )
 
     return BetDecision(
         event_id=forecast.event_id, action="BET", predicted_winner=forecast.predicted_winner,
         market_type="total", selected_market=candidate, units=units,
-        reason_code=QUALIFIED, cost_adjusted_edge=cost_adjusted_edge,
+        reason_code=QUALIFIED, cost_adjusted_edge=cost_adjusted_edge, evaluated_market=candidate,
     )
 
 

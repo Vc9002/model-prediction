@@ -37,6 +37,7 @@ from model_prediction.rebuild.mlb_features import (
 from model_prediction.rebuild.mlb_market_matching import (
     exclude_first_five_innings,
     real_market_candidates,
+    real_spread_line_side_pairs,
     real_total_lines,
     resolve_polymarket_event_id,
 )
@@ -69,7 +70,9 @@ def train_through(features: pl.DataFrame, cutoff_date: str) -> MLBTwoHeadModel:
 
 
 def build_forecast(
-    model: MLBTwoHeadModel, row: dict, total_lines: list[float] | None = None,
+    model: MLBTwoHeadModel, row: dict,
+    total_lines: list[float] | None = None,
+    spread_line_side_pairs: list[tuple[float, str]] | None = None,
     uncertainty_haircut: float = 0.03,
 ) -> SportsForecast:
     pred = model.predict_row(row["event_id"], row)
@@ -96,6 +99,18 @@ def build_forecast(
         over_p = model.distribution.probability_for_market(pred, "total", "over", line)
         totals_probabilities[line] = {"over": over_p, "under": 1.0 - over_p}
 
+    # Real per-(line, side) cover probability. Confirmed bug fixed here: a
+    # spread was previously priced using the moneyline win probability, not
+    # a real cover probability — verified live to fabricate a +23.5% edge
+    # on a real spread market. Each side keeps its own signed line (a home
+    # favorite's line and the away side's line on the same real market are
+    # not the same number), computed here, before any market spread price
+    # is inspected.
+    spread_probabilities: dict[float, dict[str, float]] = {}
+    for line, side in spread_line_side_pairs or []:
+        cover_p = model.distribution.probability_for_market(pred, "spread", side, line)
+        spread_probabilities.setdefault(line, {})[side] = cover_p
+
     return SportsForecast(
         event_id=row["event_id"], predicted_winner=predicted_winner,
         raw_probabilities=calibrated, calibrated_probabilities=calibrated,
@@ -104,6 +119,7 @@ def build_forecast(
         model_artifact_hash=model.to_artifact().get("artifact_hash", ""),
         calibration_artifact_hash="uncalibrated_haircut_v1",
         totals_probabilities=totals_probabilities,
+        spread_probabilities=spread_probabilities,
     )
 
 
@@ -204,13 +220,14 @@ def main() -> None:
             continue
 
         if market_rows.is_empty():
-            total_lines, candidates = [], []
+            total_lines, spread_pairs, candidates = [], [], []
         else:
             resolved_event_id = resolve_polymarket_event_id(market_rows, g["home_team"], g["away_team"])
             total_lines = real_total_lines(market_rows, resolved_event_id) if resolved_event_id else []
+            spread_pairs = real_spread_line_side_pairs(market_rows, resolved_event_id) if resolved_event_id else []
             candidates = real_market_candidates(market_rows, g["home_team"], g["away_team"])
 
-        forecast = build_forecast(model, row, total_lines)
+        forecast = build_forecast(model, row, total_lines, spread_pairs)
         decisions = evaluate_game(forecast, candidates, limits)
         bet_decisions = [d for d in decisions if d.action == "BET"]
 
@@ -222,10 +239,19 @@ def main() -> None:
             "expected_home_score": forecast.expected_home_score,
             "expected_away_score": forecast.expected_away_score,
             "candidate_markets_evaluated": len(candidates),
+            # evaluated_market (not selected_market) is used here so a
+            # NO_BET row still shows the exact market/side/line/ask that
+            # was rejected -- previously every NO_BET showed null for all
+            # of these (selected_market is always None on NO_BET by
+            # design), so the report couldn't distinguish "evaluated the
+            # away spread at 45c and rejected it" from having evaluated
+            # nothing at all. Real audit-trail gap, fixed in decision.py.
             "decisions": [
                 {"market_type": d.market_type, "action": d.action, "units": d.units, "reason": d.reason_code,
-                 "team_or_side": d.selected_market.team_or_side if d.selected_market else None,
-                 "line": d.selected_market.line if d.selected_market else None,
+                 "market_id": d.evaluated_market.market_id if d.evaluated_market else None,
+                 "team_or_side": d.evaluated_market.team_or_side if d.evaluated_market else None,
+                 "line": d.evaluated_market.line if d.evaluated_market else None,
+                 "executable_ask": d.evaluated_market.executable_ask if d.evaluated_market else None,
                  "cost_adjusted_edge": d.cost_adjusted_edge}
                 for d in decisions
             ],

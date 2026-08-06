@@ -18,36 +18,44 @@
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
-          "reason": "no_edge_after_costs",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": -0.265
+          "reason": "zero_sized",
+          "market_id": "350566",
+          "team_or_side": "away",
+          "line": 2.5,
+          "executable_ask": 0.745,
+          "cost_adjusted_edge": 0.05630000000000002
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "350566",
+          "team_or_side": "home",
+          "line": -2.5,
+          "executable_ask": 0.26,
           "cost_adjusted_edge": null
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
-          "reason": "no_edge_after_costs",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": -0.16000000000000003
+          "reason": "zero_sized",
+          "market_id": "350565",
+          "team_or_side": "away",
+          "line": 1.5,
+          "executable_ask": 0.64,
+          "cost_adjusted_edge": 0.06430000000000002
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "350565",
+          "team_or_side": "home",
+          "line": -1.5,
+          "executable_ask": 0.365,
           "cost_adjusted_edge": null
         },
         {
@@ -55,8 +63,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "zero_sized",
-          "team_or_side": null,
+          "market_id": "350562",
+          "team_or_side": "away",
           "line": null,
+          "executable_ask": 0.46,
           "cost_adjusted_edge": 0.019999999999999962
         },
         {
@@ -64,44 +74,54 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
+          "market_id": "350562",
+          "team_or_side": "home",
           "line": null,
+          "executable_ask": 0.545,
           "cost_adjusted_edge": null
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
-          "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": 0.13999999999999996
+          "reason": "no_edge_after_costs",
+          "market_id": "350564",
+          "team_or_side": "away",
+          "line": -1.5,
+          "executable_ask": 0.34,
+          "cost_adjusted_edge": -0.028400000000000036
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "350564",
+          "team_or_side": "home",
+          "line": 1.5,
+          "executable_ask": 0.665,
           "cost_adjusted_edge": null
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
-          "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": 0.235
+          "reason": "no_edge_after_costs",
+          "market_id": "350563",
+          "team_or_side": "away",
+          "line": -2.5,
+          "executable_ask": 0.245,
+          "cost_adjusted_edge": -0.044300000000000006
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "350563",
+          "team_or_side": "home",
+          "line": 2.5,
+          "executable_ask": 0.76,
           "cost_adjusted_edge": null
         },
         {
@@ -109,8 +129,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368589",
+          "team_or_side": "over",
+          "line": 6.5,
+          "executable_ask": 0.65,
           "cost_adjusted_edge": 0.15789999999999993
         },
         {
@@ -118,8 +140,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_frozen_totals_side",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368589",
+          "team_or_side": "under",
+          "line": 6.5,
+          "executable_ask": 0.355,
           "cost_adjusted_edge": null
         },
         {
@@ -127,8 +151,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368590",
+          "team_or_side": "over",
+          "line": 7.5,
+          "executable_ask": 0.535,
           "cost_adjusted_edge": 0.15259999999999996
         },
         {
@@ -136,8 +162,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_frozen_totals_side",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368590",
+          "team_or_side": "under",
+          "line": 7.5,
+          "executable_ask": 0.47,
           "cost_adjusted_edge": null
         },
         {
@@ -145,8 +173,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368591",
+          "team_or_side": "over",
+          "line": 8.5,
+          "executable_ask": 0.445,
           "cost_adjusted_edge": 0.11059999999999998
         },
         {
@@ -154,8 +184,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_frozen_totals_side",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368591",
+          "team_or_side": "under",
+          "line": 8.5,
+          "executable_ask": 0.56,
           "cost_adjusted_edge": null
         }
       ],
@@ -166,8 +198,8 @@
       "home_team": "Arizona Diamondbacks",
       "away_team": "San Diego Padres",
       "predicted_winner": "away",
-      "home_win_prob": 0.49525,
-      "away_win_prob": 0.50475,
+      "home_win_prob": 0.4854,
+      "away_win_prob": 0.5146,
       "expected_home_score": 4.50926444721986,
       "expected_away_score": 4.610715298538762,
       "candidate_markets_evaluated": 16,
@@ -176,36 +208,44 @@
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
-          "reason": "no_edge_after_costs",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": -0.28025
+          "reason": "zero_sized",
+          "market_id": "350535",
+          "team_or_side": "away",
+          "line": 2.5,
+          "executable_ask": 0.755,
+          "cost_adjusted_edge": 0.055499999999999994
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "350535",
+          "team_or_side": "home",
+          "line": -2.5,
+          "executable_ask": 0.25,
           "cost_adjusted_edge": null
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
-          "reason": "no_edge_after_costs",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": -0.19025000000000003
+          "reason": "zero_sized",
+          "market_id": "350534",
+          "team_or_side": "away",
+          "line": 1.5,
+          "executable_ask": 0.665,
+          "cost_adjusted_edge": 0.03739999999999999
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "350534",
+          "team_or_side": "home",
+          "line": -1.5,
+          "executable_ask": 0.34,
           "cost_adjusted_edge": null
         },
         {
@@ -213,53 +253,65 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "no_edge_after_costs",
-          "team_or_side": null,
+          "market_id": "350531",
+          "team_or_side": "away",
           "line": null,
-          "cost_adjusted_edge": -0.03025
+          "executable_ask": 0.505,
+          "cost_adjusted_edge": -0.020400000000000085
         },
         {
           "market_type": "moneyline",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
+          "market_id": "350531",
+          "team_or_side": "home",
           "line": null,
+          "executable_ask": 0.5,
           "cost_adjusted_edge": null
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
-          "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": 0.08975
-        },
-        {
-          "market_type": "spread",
-          "action": "NO_BET",
-          "units": 0.0,
-          "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": null
-        },
-        {
-          "market_type": "spread",
-          "action": "NO_BET",
-          "units": 0.0,
-          "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": 0.18975000000000003
+          "reason": "no_edge_after_costs",
+          "market_id": "350533",
+          "team_or_side": "away",
+          "line": -1.5,
+          "executable_ask": 0.385,
+          "cost_adjusted_edge": -0.0726
         },
         {
           "market_type": "spread",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_predicted_winner",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "350533",
+          "team_or_side": "home",
+          "line": 1.5,
+          "executable_ask": 0.62,
+          "cost_adjusted_edge": null
+        },
+        {
+          "market_type": "spread",
+          "action": "NO_BET",
+          "units": 0.0,
+          "reason": "no_edge_after_costs",
+          "market_id": "350532",
+          "team_or_side": "away",
+          "line": -2.5,
+          "executable_ask": 0.285,
+          "cost_adjusted_edge": -0.08439999999999998
+        },
+        {
+          "market_type": "spread",
+          "action": "NO_BET",
+          "units": 0.0,
+          "reason": "not_aligned_with_predicted_winner",
+          "market_id": "350532",
+          "team_or_side": "home",
+          "line": 2.5,
+          "executable_ask": 0.72,
           "cost_adjusted_edge": null
         },
         {
@@ -267,17 +319,21 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": 0.012899999999999912
+          "market_id": "368625",
+          "team_or_side": "over",
+          "line": 8.5,
+          "executable_ask": 0.555,
+          "cost_adjusted_edge": 0.007699999999999929
         },
         {
           "market_type": "total",
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_frozen_totals_side",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368625",
+          "team_or_side": "under",
+          "line": 8.5,
+          "executable_ask": 0.45,
           "cost_adjusted_edge": null
         },
         {
@@ -285,26 +341,10 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "not_aligned_with_frozen_totals_side",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": null
-        },
-        {
-          "market_type": "total",
-          "action": "NO_BET",
-          "units": 0.0,
-          "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": 0.013599999999999945
-        },
-        {
-          "market_type": "total",
-          "action": "NO_BET",
-          "units": 0.0,
-          "reason": "not_aligned_with_frozen_totals_side",
-          "team_or_side": null,
-          "line": null,
+          "market_id": "368626",
+          "team_or_side": "over",
+          "line": 9.5,
+          "executable_ask": 0.45,
           "cost_adjusted_edge": null
         },
         {
@@ -312,9 +352,33 @@
           "action": "NO_BET",
           "units": 0.0,
           "reason": "zero_sized",
-          "team_or_side": null,
-          "line": null,
-          "cost_adjusted_edge": 0.05630000000000002
+          "market_id": "368626",
+          "team_or_side": "under",
+          "line": 9.5,
+          "executable_ask": 0.555,
+          "cost_adjusted_edge": 0.019199999999999995
+        },
+        {
+          "market_type": "total",
+          "action": "NO_BET",
+          "units": 0.0,
+          "reason": "not_aligned_with_frozen_totals_side",
+          "market_id": "368627",
+          "team_or_side": "over",
+          "line": 10.5,
+          "executable_ask": 0.375,
+          "cost_adjusted_edge": null
+        },
+        {
+          "market_type": "total",
+          "action": "NO_BET",
+          "units": 0.0,
+          "reason": "zero_sized",
+          "market_id": "368627",
+          "team_or_side": "under",
+          "line": 10.5,
+          "executable_ask": 0.63,
+          "cost_adjusted_edge": 0.05740000000000001
         }
       ],
       "bets": 0
