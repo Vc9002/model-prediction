@@ -839,6 +839,37 @@ been about finding in *other* code.
 against actual code and real data before being treated as confirmed, per
 this session's standing practice.
 
+## Calibration/testing split fixed (2026-08-07)
+
+The second review's remaining "calibration remains invalid" point was
+checked and was real: `train_mlb_rebuild_real_features.py` fit the Platt
+calibrator on `test_final` and then evaluated the calibrated model on that
+same `test_final` — the calibrator is specifically optimized to improve
+log loss/Brier on whatever data it's fit on, so evaluating it there biases
+the reported "held-out" metrics favorably, and it isn't a genuinely
+untouched final test as CLAUDE.md's Part 2 §14 requires.
+
+**Fixed**: three-way split — `train_final` (fits the model),
+`calib_final` (fits the Platt calibrator only), `test_final` (genuinely
+untouched by both, used once for the single final evaluation). With
+n=126: train=84, calibration=21, test=21.
+
+**Real result after the fix, reported honestly**: held-out accuracy=0.381
+(n=21, up from the prior split's 0.320 on n=25), quality-filtered
+accuracy=0.444 (n=18, up from 0.227), Brier 0.2832 quality-filtered
+(closer to the ~0.25 baseline than before). This moved back toward
+"plausibly fine" rather than "concerning" — but with n=18–21, standard
+error is ~11%, so this remains squarely in small-sample-noise territory,
+not promotion evidence either way. The methodology fix changed the split
+boundaries (hence different specific games in each bucket), which is
+expected and correct, not itself informative about model quality.
+
+804 tests pass (unchanged — this was a script-only fix, no new test
+surface). Priority list unchanged: (1) more real backfill days is still
+the only way to get a real answer on model quality, (2)
+`NormalizedStore.write()` primary-key enforcement, (3) real
+`conservative_probability`, (4) SQLite shadow ledger.
+
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
 `.py` files, `set -e`) — `collectors.py` had 12 pre-existing ruff findings

@@ -122,21 +122,38 @@ def main() -> None:
 
     print(f"5. Validation complete: {len(fold_metrics)} folds evaluated")
 
-    # ── Final model: fit on all but a held-out tail, calibrate on that tail ──
-    test_size = max(10, n // 5)
-    train_final = features[: n - test_size]
+    # ── Final model: train / calibration / untouched final test ──────────────
+    # Real bug fixed here (see outputs/rebuild/takeover_status.md Checkpoint
+    # 9): this used to fit the Platt calibrator on test_final and then
+    # evaluate the calibrated model on that same test_final — the calibrator
+    # is specifically optimized to improve log loss/Brier on whatever data
+    # it's fit on, so evaluating it there biases the "held-out" metrics
+    # favorably. A genuinely untouched final test needs its own separate
+    # chunk that neither the model nor the calibrator ever sees before the
+    # single final evaluation below.
+    test_size = max(10, n // 6)
+    calib_size = max(10, n // 6)
+    train_final = features[: n - test_size - calib_size]
+    calib_final = features[n - test_size - calib_size: n - test_size]
     test_final = features[n - test_size:]
+    print(f"5b. Split: train={train_final.height}, calibration={calib_final.height} "
+          f"(fits Platt only), test={test_final.height} (untouched until final evaluation)")
 
     final_model = MLBTwoHeadModel(seed=42)
     final_model.fit(train_final, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+
+    calib_raw_probs, calib_labels = [], []
+    for row in calib_final.iter_rows(named=True):
+        pred = final_model.predict_row(row["event_id"], row)
+        calib_raw_probs.append(pred.home_win_prob)
+        calib_labels.append(1 if row["home_score"] > row["away_score"] else 0)
+    cal = PlattCalibrator().fit(calib_raw_probs, calib_labels)
 
     raw_probs, labels = [], []
     for row in test_final.iter_rows(named=True):
         pred = final_model.predict_row(row["event_id"], row)
         raw_probs.append(pred.home_win_prob)
         labels.append(1 if row["home_score"] > row["away_score"] else 0)
-
-    cal = PlattCalibrator().fit(raw_probs, labels)
     calibrated = [cal.transform(p) for p in raw_probs]
 
     final_metrics = {
@@ -201,6 +218,7 @@ def main() -> None:
         "quality_filtered_metrics": quality_metrics,
         "cold_start_composition": {"train_mean_availability": train_avail, "test_mean_availability": test_avail},
         "train_games": train_final.height,
+        "calibration_games": calib_final.height,
         "test_games": test_final.height,
         "total_completed_games": completed.height,
         "matched_games": features.height,

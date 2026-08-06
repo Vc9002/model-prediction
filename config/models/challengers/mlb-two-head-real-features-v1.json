@@ -55,24 +55,25 @@
     }
   ],
   "final_metrics": {
-    "log_loss": 0.8285239897975548,
-    "brier": 0.3133220839,
-    "ece": 0.27387,
-    "raw_brier": 0.3133220839,
-    "accuracy": 0.32
+    "log_loss": 0.8652224757402099,
+    "brier": 0.3210765738095238,
+    "ece": 0.2638285714285713,
+    "raw_brier": 0.3210765738095238,
+    "accuracy": 0.38095238095238093
   },
   "quality_filtered_metrics": {
-    "n": 22,
-    "brier": 0.30074905125,
-    "log_loss": 0.8013716111672561,
-    "accuracy": 0.22727272727272727
+    "n": 18,
+    "brier": 0.2831679545833333,
+    "log_loss": 0.7644349337118088,
+    "accuracy": 0.4444444444444444
   },
   "cold_start_composition": {
-    "train_mean_availability": 0.29702970297029707,
-    "test_mean_availability": 0.94
+    "train_mean_availability": 0.16666666666666669,
+    "test_mean_availability": 0.9285714285714286
   },
-  "train_games": 101,
-  "test_games": 25,
+  "train_games": 84,
+  "calibration_games": 21,
+  "test_games": 21,
   "total_completed_games": 135,
   "matched_games": 126,
   "unmatched_games": 9
