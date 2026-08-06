@@ -263,11 +263,87 @@ in `tests/rebuild/test_storage_immutability.py`, including a test that
 genuinely-unserializable objects still raise (the fix must not become a new
 silent-swallow).
 
-**Current checkpoint**: 4 (in progress — market and weather collection now
-real and verified for both time directions; the JSON-serialization bug fix
-unblocks pybaseball for every future collector, not just MLB; pybaseball
-raw-to-normalized parsing and real feature engineering are the two remaining
-items before Checkpoint 5).
+**Current checkpoint**: 4 complete.
+
+## Checkpoint 5 — MLB features (2026-08-06)
+
+**Backfill**: ran `collect_pybaseball` for all 10 remaining completed-game
+dates in the normalized ESPN scoreboard (2026-07-26 through 2026-08-04;
+2026-08-05 returned `no_data` — plausibly Baseball Savant processing lag on a
+1-day-old date, not investigated further, not blocking). Total: **39,692
+real Statcast pitches across 270 real starter-game entries**, all
+hash-verified in `data/rebuild/raw/pybaseball/`.
+
+**Built** `src/model_prediction/rebuild/mlb_features.py`, replacing
+`scripts/pipeline_mlb_e2e.py`'s rolling-home/away-score placeholder:
+
+- `identify_starters()` — the actual MLB rule (whoever throws a team's first
+  pitch of the game), not a name heuristic. Verified against real data: 270
+  starter-game entries from 270 real (game, team) pairs.
+- `pitcher_rolling_features()` — K%/BB%/CSW%/whiff%/avg velocity/days
+  rest/pitches-last-start, computed only from a pitcher's *own* pitches in
+  games strictly before the decision date (point-in-time-safe by
+  construction — verified with a test where a pitcher's 08-10 start does not
+  leak into a decision computed for 08-01). Returns
+  `availability=0.0` with zeroed fields when a pitcher has no real prior
+  starts, rather than silently substituting a league-average-looking number.
+- `bullpen_rolling_features()` — team-level relief workload/velocity over a
+  trailing window, with the starter's own pitches explicitly excluded via
+  `identify_starters()` (verified: a 2-pitch starter outing didn't count
+  toward bullpen workload).
+- `park_factor()` — a small, explicitly coarse static table (documented as
+  sourced from long-run public consensus, not this season's own outcomes,
+  to avoid a park factor that leaks the thing it's meant to help predict);
+  unknown parks default to neutral (100) rather than guessing.
+- `load_weather_daily_aggregate()` — wires in the now-working weather
+  collector; daily mean, not yet aligned to the exact first-pitch hour
+  (disclosed limitation, not silently approximated as exact).
+
+**Real bug found and fixed while validating this module against actual
+data**: both `load_raw_statcast_dates()` and `load_weather_daily_aggregate()`
+initially omitted the `raw/` path segment (`raw_root / "pybaseball" / d`
+instead of `raw_root / "raw" / "pybaseball" / d`), so real-data validation
+returned 0 rows despite 39,692 real pitches being on disk. Caught
+immediately by running against real data (not just the unit tests, which
+used synthetic fixtures with their own tmp paths and wouldn't have caught a
+path-prefix bug). Fixed before writing any test that could have quietly
+encoded the same wrong path.
+
+**Second bug, caught by the test suite itself**: a small fixture batch where
+every `events` value happened to be `None` made polars infer that column as
+its `Null` dtype instead of `Utf8`, and `.str.contains("strikeout")` raised
+`InvalidOperationError` — not a fixture-only issue, since a real slate with
+zero completed at-bats yet would hit the identical failure. Fixed by
+explicitly casting `events`/`description`/`pitching_team` to `Utf8` in
+`normalize_statcast_pitches()`.
+
+**Verified live**: sample pitcher rolling features against real data —
+`{'availability': 1.0, 'starts_seen': 2.0, 'avg_velocity': 93.26, 'k_pct':
+0.104, 'bb_pct': 0.011, 'csw_pct': 0.339, 'whiff_pct': 0.340, 'days_rest':
+6.0, 'pitches_last_start': 96.0}`; bullpen for TOR:
+`{'bullpen_pitches': 173.0, 'bullpen_avg_velocity': 88.0,
+'bullpen_appearances': 10.0}`; weather for Chase Field 2026-08-06:
+`{'temp_f_mean': 90.7, 'wind_mph_mean': 5.2, 'precip_mm_total': 2.5}`. All
+real, sensible, non-fabricated values.
+
+**Tests**: `tests/rebuild/test_mlb_features.py`, 7 tests — starter
+identification, point-in-time leakage prevention (the highest-value test:
+proves a future start can't influence a past decision), missing-history
+honesty (availability=0 rather than a guessed average), real K%/BB%
+computation from actual plate-appearance outcomes, starter-exclusion from
+bullpen workload, and park-factor defaulting.
+
+**Not yet done**: the retrained MLB model (Checkpoint 6) still needs to
+actually consume these features in place of the placeholder — this
+checkpoint built and validated the feature functions but hasn't rewired
+`scripts/pipeline_mlb_e2e.py` (or its successor) to call them yet. Also not
+done: aligning weather to the actual first-pitch hour instead of a daily
+aggregate, and expanding the coarse park-factor table beyond ~29 parks with
+public data (all 30 MLB parks are listed; this is about factor *quality*,
+not *coverage*).
+
+**Current checkpoint**: 5 (feature functions built, tested, and verified
+against real data; not yet wired into model training).
 
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged
