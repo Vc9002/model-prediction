@@ -517,11 +517,125 @@ clears its own gate); a real SQLite shadow ledger (predictions,
 market_snapshots, trade_decisions tables) hasn't been built yet — still
 using Parquet/JSON files directly.
 
-**Current checkpoint**: 8 (real market data now genuinely flows; SQLite
-shadow ledger not yet built — proceeding straight to a real end-to-end
-Checkpoint 9 run using the Parquet/JSON stores directly, since that's what
-actually determines whether the pipeline works, and the storage backend can
-be swapped later without changing the pipeline's logic).
+**Current checkpoint**: 8 complete.
+
+## Checkpoint 9 — Real end-to-end run, and session wrap-up (2026-08-06)
+
+**Session ended here at the operator's request** (had to leave the house) —
+this is a genuine mid-work stopping point, not a completed Checkpoint 9.
+Everything below is accurate as of the last real run.
+
+### What actually works, verified live, right now
+
+Built `scripts/mlb_shadow_run.py` — the real one-command pipeline: load
+tonight's real scheduled games → retrain the model walk-forward on all real
+history strictly before tonight → load real Polymarket books → run every
+game through the Checkpoint 7 winner-first decision engine → write a full
+report, including every `NO_BET`. **No real order adapter is imported or
+called anywhere in this script.**
+
+Hit one more real, important gap immediately on the first run:
+`build_game_feature_row` (Checkpoints 5/6) identifies a game's starters by
+matching *its own* Statcast pitch data — which doesn't exist yet for a
+**scheduled** game, since it hasn't been played. That function is correct
+for historical/backtesting use (Checkpoints 5/6 — validated), but cannot
+serve a live prediction. Fixed by adding `build_live_game_feature_row()` +
+`lookup_pitcher_id()` (`src/model_prediction/rebuild/mlb_features.py`):
+reads the incumbent system's own real, already-collected probable-starter
+feed (`data/point_in_time/mlb_probable_starters.jsonl` — real ESPN
+probables data, used here only as an input source per CLAUDE.md's "the
+existing project is a benchmark and data source," not as a shortcut around
+building real features), then resolves each probable starter's name to a
+real Statcast pitcher ID via `pybaseball.playerid_lookup` (verified live:
+"Bryan Woo" → MLBAM ID 693433) so the same real rolling-feature functions
+from Checkpoint 5 can be reused unmodified.
+
+**Real result of the actual run** (`outputs/rebuild/mlb_shadow_run_2026-08-06.json`):
+10 real scheduled MLB games for tonight. 8/10 skipped —
+`starter_name_not_resolved_to_real_statcast_id` (the probables feed and
+pybaseball's name lookup didn't connect for those starters; not
+investigated further before the session ended — likely a name-format
+mismatch, e.g. suffixes/nicknames, not a systemic failure, but genuinely
+unverified). **2/10 games produced real, complete decisions**: San Diego
+Padres @ Arizona Diamondbacks — model predicted away (Padres) to win at
+~53%, evaluated 176 real candidate markets (moneyline/spread/total, both
+sides, multiple lines), correctly returned `NO_BET` on all of them (no
+edge cleared after real Polymarket pricing). That's the winner-first engine
+running against real model output and real market prices end-to-end,
+exactly once, successfully — genuinely produced 0 bets, which is an honest
+result given this model's Checkpoint 6 evaluation was itself inconclusive,
+not a broken pipeline.
+
+**Also real, not yet fixed**: `build_forecast()`'s conservative/lower-bound
+probability is a flat 3% haircut off calibrated probability, not the real
+bootstrap/model-disagreement-based `conservative_probability` CLAUDE.md
+specifies. Simple and disclosed, not silently treated as equivalent to the
+real thing.
+
+### Full, honest checkpoint status at session end
+
+- **Checkpoint 0-8**: complete, as detailed above, each with real
+  verification evidence and regression tests.
+- **Checkpoint 9**: partial. The one-command pipeline exists and ran
+  successfully end-to-end for 2/10 real games tonight. Not done: the
+  8/10 starter-name-resolution failures are unexplained; no idempotency
+  check (rerunning the same date) was performed; no operator-facing summary
+  beyond the JSON report exists yet.
+- **Checkpoint 10 (evidence/reports)**: not started — `outputs/rebuild/`
+  has real per-checkpoint evidence embedded in this file and in
+  `mlb_training_results_real_features.json`/`mlb_shadow_run_2026-08-06.json`,
+  but the polished `predictive_report.md`/`economic_report.md`/
+  `model_cards/` deliverables CLAUDE.md's Part 3 §16 asks for don't exist.
+- **SQLite shadow ledger** (Checkpoint 8's own spec item): not built —
+  still using Parquet/JSON files directly. Real gap, not deferred silently.
+- **NBA/WNBA/NFL/soccer/esports/KBO/NPB**: untouched, correctly, per
+  CLAUDE.md's own sequencing ("ignore until MLB works").
+
+### Recommended next steps, in priority order
+
+1. Debug the 8/10 starter-name-resolution failures — likely the highest-
+   leverage single fix, since it directly gates how many of tonight's real
+   games can get a real decision at all.
+2. Build the real `conservative_probability` (bootstrap/model-disagreement),
+   replacing the flat 3% haircut placeholder.
+3. Build the SQLite shadow ledger and wire persistence + idempotency
+   (rerunning the same date must not double-count).
+4. Only after 1-3: expand backfill window from 10 days to several weeks —
+   this is what would actually resolve Checkpoint 6's inconclusive
+   held-out result, more than any further feature engineering would.
+
+### Real bugs found and fixed this session (full list)
+
+1. CI silently tested Python 3.12 against a 3.14-only project; also skipped
+   dev deps and mypy entirely (Checkpoint 1).
+2. `xgboost` couldn't import on this machine at all — missing `libomp`,
+   affecting the existing dev `.venv` too, not just fresh clones
+   (Checkpoint 1).
+3. Polymarket collection silently returned empty for every sport, forever —
+   a `date` object compared against a raw `str` is always `False`
+   (Checkpoint 4).
+4. `_venues_for_date` selected a nonexistent `venue_id` column, silently
+   swallowed by a bare `except`, zeroing weather collection for every date
+   (Checkpoint 4).
+5. `collect_weather_forecast` called Open-Meteo's reanalysis API instead of
+   a forecast API — wrong data product, not just a transient failure
+   (Checkpoint 4).
+6. `RawStore.write()`'s `json.dumps` had no `default=` handler, silently
+   discarding every real pybaseball payload (`pandas.Timestamp` isn't
+   JSON-serializable) — shared infrastructure, not MLB-specific
+   (Checkpoint 4).
+7. `expanding_folds()` returned 0 folds because calendar-day granularity
+   was too coarse for a 10-day real backfill window (Checkpoint 6).
+8. Polymarket collectors (all 5 sports) read key names that don't exist on
+   the real API response shape — every field except `line` was silently
+   null/empty despite `"status": "ok"` (Checkpoint 8) — the most
+   consequential bug found this session.
+
+All 8 were silent — no exception, no error surfaced to a caller not
+specifically inspecting source-health internals. That pattern (not the
+specific bugs) is the one thing most worth remembering about this branch's
+prior state: things reporting success were not a reliable signal that they
+were actually right.
 
 **Pre-commit hook note**: the first commit attempt for this checkpoint was
 silently rejected by `.git/hooks/pre-commit` (runs `ruff check` on staged

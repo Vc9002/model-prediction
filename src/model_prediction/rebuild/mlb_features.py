@@ -255,6 +255,37 @@ def park_factor(venue: str) -> float:
     return float(MLB_PARK_FACTORS.get(venue, DEFAULT_PARK_FACTOR))
 
 
+def lookup_pitcher_id(full_name: str) -> int | None:
+    """Real name -> Statcast pitcher ID (MLBAM) crosswalk via pybaseball's
+    own player register. Needed because probable-starter feeds (e.g. ESPN's
+    scoreboard probables) identify pitchers by name, while Statcast pitch
+    data — the only source real rolling features can come from — identifies
+    them only by numeric ID. Without this, a scheduled game (which has no
+    Statcast pitches of its own yet, since it hasn't been played) cannot be
+    connected to its starter's rolling history at all.
+
+    pybaseball caches its full player-ID table on first call (~8s); repeat
+    calls within a process are ~1000x faster. Returns None on no/ambiguous
+    match rather than guessing.
+    """
+    import pybaseball
+
+    parts = full_name.strip().split(" ")
+    if len(parts) < 2:
+        return None
+    first, last = parts[0], " ".join(parts[1:])
+    try:
+        result = pybaseball.playerid_lookup(last, first)
+    except Exception:  # noqa: BLE001 -- external lookup/network; treated as no-match, not fatal
+        return None
+    if result.empty:
+        return None
+    ids = result["key_mlbam"].dropna()
+    if len(ids) != 1:
+        return None
+    return int(ids.iloc[0])
+
+
 def load_weather_daily_aggregate(raw_root: str | Path, venue_id: str, game_date: str) -> dict[str, float]:
     """Coarse daily mean/max from the venue's Open-Meteo snapshot for the
     date — not aligned to the exact first-pitch hour yet (see
@@ -359,6 +390,63 @@ def build_game_feature_row(
         **{f"home_bp_{k}": v for k, v in home_bp.items()},
         **{f"away_bp_{k}": v for k, v in away_bp.items()},
         # Park and weather (shared, not per-side)
+        "park_factor": park,
+        "weather_availability": weather["availability"],
+        "temp_f_mean": weather["temp_f_mean"],
+        "wind_mph_mean": weather["wind_mph_mean"],
+    }
+
+
+def build_live_game_feature_row(
+    espn_game: dict,
+    home_starter_name: str,
+    away_starter_name: str,
+    pitches: pl.DataFrame,
+    starters: pl.DataFrame,
+    raw_root: str | Path,
+) -> dict | None:
+    """Feature row for a real *scheduled* (not yet played) game, using
+    probable-starter names (e.g. from ESPN's scoreboard probables feed)
+    instead of build_game_feature_row's Statcast-game_pk matching — a
+    scheduled game has no Statcast pitches of its own yet, since it hasn't
+    been played, so there is no game_pk to match against. Starter rolling
+    features come from lookup_pitcher_id() + the starter's real prior
+    starts; bullpen/park/weather don't depend on this game having already
+    happened, so they're identical to build_game_feature_row's.
+
+    Returns None when either starter name can't be resolved to a real
+    Statcast ID, rather than silently guessing or falling back to a
+    league-average-looking feature row.
+    """
+    game_date = espn_game["event_start_utc"][:10]
+    home_name, away_name = espn_game["home_team"], espn_game["away_team"]
+    home_abbrev = ESPN_TO_STATCAST_ABBREV.get(home_name)
+    away_abbrev = ESPN_TO_STATCAST_ABBREV.get(away_name)
+    if home_abbrev is None or away_abbrev is None:
+        return None
+
+    home_starter_id = lookup_pitcher_id(home_starter_name)
+    away_starter_id = lookup_pitcher_id(away_starter_name)
+    if home_starter_id is None or away_starter_id is None:
+        return None
+
+    home_p = pitcher_rolling_features(pitches, home_starter_id, game_date)
+    away_p = pitcher_rolling_features(pitches, away_starter_id, game_date)
+    home_bp = bullpen_rolling_features(pitches, home_abbrev, game_date, starters)
+    away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
+    park = park_factor(espn_game.get("venue", ""))
+    weather = load_weather_daily_aggregate(raw_root, espn_game.get("venue", ""), game_date)
+
+    return {
+        "event_id": espn_game["event_id"],
+        "game_date": game_date,
+        "event_start_utc": espn_game["event_start_utc"],
+        "home_team": home_name, "away_team": away_name,
+        "home_starter_name": home_starter_name, "away_starter_name": away_starter_name,
+        **{f"home_sp_{k}": v for k, v in home_p.items()},
+        **{f"away_sp_{k}": v for k, v in away_p.items()},
+        **{f"home_bp_{k}": v for k, v in home_bp.items()},
+        **{f"away_bp_{k}": v for k, v in away_bp.items()},
         "park_factor": park,
         "weather_availability": weather["availability"],
         "temp_f_mean": weather["temp_f_mean"],
