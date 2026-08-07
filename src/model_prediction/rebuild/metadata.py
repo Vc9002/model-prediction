@@ -160,25 +160,33 @@ class MetadataDB:
         )
         self.conn.commit()
 
-    def update_source_health(self, source_id: str, status: str, error: str | None = None) -> None:
-        # Real bug fixed here: this was UPDATE-only, and register_source()
-        # (the only way to INSERT a row) had zero real callers anywhere in
-        # this codebase (verified via grep) -- every collector calls this
-        # on every real collection (dozens of real call sites in
-        # collectors.py) against a `sources` row that never existed, so
-        # source-health tracking has never actually recorded anything,
-        # ever, for any real source. Also blocked real identity-mapping
-        # work: entity_mappings.source_id has a real, enforced foreign key
-        # (PRAGMA foreign_keys=ON) against sources(source_id), so
-        # IdentityRegistry.map() would fail closed for a source that was
-        # never registered. INSERT OR IGNORE ensures the row exists (with
-        # a reasonable default tier a caller can refine later via
-        # register_source()) before every real health update.
+    def ensure_source_exists(self, source_id: str) -> None:
+        """Guarantee a `sources` row exists for `source_id`, without
+        touching status. Real gap fixed here: register_source() (the only
+        way to INSERT a row) had zero real callers anywhere in this
+        codebase (verified via grep), but entity_mappings.source_id
+        carries a real, enforced foreign key against sources(source_id)
+        (PRAGMA foreign_keys=ON) -- so any real mapping (IdentityRegistry.
+        map()) or health update against an unregistered source would
+        fail closed with a real sqlite3.IntegrityError. Separated from
+        update_source_health() so calling this never has the side effect
+        of silently flipping a source's real, currently-tracked status
+        (e.g. `degraded`) back to a default `active`.
+        """
         self.conn.execute(
             """INSERT OR IGNORE INTO sources(source_id, name, tier, status)
                VALUES(?, ?, 'keyless_api', 'active')""",
             (source_id, source_id),
         )
+        self.conn.commit()
+
+    def update_source_health(self, source_id: str, status: str, error: str | None = None) -> None:
+        # See ensure_source_exists() -- every collector calls this on every
+        # real collection (dozens of real call sites in collectors.py)
+        # against a `sources` row that, before this fix, never existed, so
+        # source-health tracking never actually recorded anything for any
+        # real source.
+        self.ensure_source_exists(source_id)
         now = utc_now()
         if status == "active":
             self.conn.execute(

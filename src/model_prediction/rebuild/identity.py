@@ -157,6 +157,16 @@ class IdentityRegistry:
         return identity
 
     def map(self, entity_id: str, source_id: str, source_entity_id: str, confidence: float = 1.0) -> SourceMapping:
+        # entity_mappings.source_id carries a real, enforced foreign key
+        # against sources(source_id) (PRAGMA foreign_keys=ON). Real
+        # collectors always call meta.update_source_health() before doing
+        # any work, so this is a no-op in practice for them -- but
+        # IdentityRegistry shouldn't depend on caller convention to avoid a
+        # real sqlite3.IntegrityError (see test_metadata.py's
+        # TestIdentityRegistryRealSourceMapping). Uses ensure_source_exists,
+        # not update_source_health, so mapping an entity never has the
+        # side effect of silently resetting a source's real tracked status.
+        self.metadata.ensure_source_exists(source_id)
         mapping = SourceMapping(entity_id, source_id, source_entity_id, confidence)
         self.metadata.map_entity(entity_id, source_id, source_entity_id, confidence)
         return mapping
@@ -206,6 +216,57 @@ class IdentityRegistry:
         if best_score < min_confidence:
             return None, best_score
         return best, best_score
+
+
+def resolve_or_register_team(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    source_team_id: str,
+    team_name: str,
+    effective_from_utc: str,
+    min_confidence: float = 0.90,
+) -> CanonicalIdentity:
+    """The one real entry point collection code should use to get a team's
+    canonical identity, instead of ad-hoc name matching per collector.
+
+    Real gap this closes: `IdentityRegistry` (fuzzy matching, effective-dated
+    mappings, fail-closed low-confidence rejection) existed with zero real
+    callers anywhere in this codebase -- every real team-matching path
+    (mlb_features.ESPN_TO_STATCAST_ABBREV, mlb_market_matching's full-name
+    comparison) used its own bespoke, source-specific logic instead. This
+    doesn't replace those yet (a real, separate migration for each
+    consumer), but is the first real, tested, live-callable path to a
+    canonical team identity from real collector data.
+
+    Resolution order, most-specific first:
+    1. Already mapped from this exact (source_id, source_team_id) -- the
+       common case on every rerun after the first.
+    2. A same-sport team whose canonical_name fuzzy-matches `team_name`
+       above `min_confidence` -- maps this new source id to that existing
+       entity (e.g. a second source observing the same real team) rather
+       than minting a duplicate. Ambiguous/low-confidence matches fail
+       closed into (3), not a guess.
+    3. No confident match -- registers a brand-new canonical identity and
+       maps this source id to it.
+    """
+    existing = registry.resolve(source_id, source_team_id)
+    if existing is not None:
+        return existing
+
+    proposed, _confidence = registry.propose_match(
+        entity_type="team", sport=sport, name=team_name,
+        source_id=source_id, min_confidence=min_confidence,
+    )
+    if proposed is not None:
+        registry.map(proposed.entity_id, source_id, source_team_id)
+        return proposed
+
+    return registry.register(
+        entity_type="team", canonical_name=team_name, sport=sport,
+        effective_from_utc=effective_from_utc,
+        source_id=source_id, source_entity_id=source_team_id,
+    )
 
 
 def json_loads_safe(value: str | None) -> dict[str, Any]:
