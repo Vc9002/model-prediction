@@ -183,6 +183,7 @@ def decide_team_market(
         if line_probs is None or forecast.predicted_winner not in line_probs:
             return _no_bet(forecast, candidate.market_type, NO_FORECAST_FOR_LINE, evaluated=candidate)
         model_prob = line_probs[forecast.predicted_winner]
+        assert candidate.line is not None  # narrowed: line_probs above is None whenever candidate.line is None
         lower_line_probs = forecast.spread_probabilities_lower.get(candidate.line, {})
         conservative_prob = lower_line_probs.get(forecast.predicted_winner, model_prob)
     else:
