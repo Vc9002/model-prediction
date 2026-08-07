@@ -21,9 +21,12 @@ outputs/rebuild/takeover_status.md Checkpoint 9 for full evidence):
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import polars as pl
 
 from .decision import MarketEvaluation
+from .storage import utc_now
 
 
 def exclude_first_five_innings(market_rows: pl.DataFrame) -> pl.DataFrame:
@@ -80,6 +83,28 @@ def real_spread_line_side_pairs(market_rows: pl.DataFrame, event_id: str) -> lis
     return sorted(pairs)
 
 
+def real_quote_age_seconds(observed_at_utc: str | None, *, now: datetime | None = None) -> float:
+    """Real elapsed time since a quote was actually observed — every market
+    row already carries a real `observed_at_utc` (see provenance_row in
+    storage.py), so this was never blocked on a missing data source the way
+    depth is. The previous hardcoded `quote_age_seconds=0.0` silently
+    claimed every quote was captured at the exact instant of evaluation,
+    which was never true and made the staleness gate in decision.py's
+    `_quote_gate_reason()` unable to ever fire for a real reason. Returns a
+    large sentinel (so the staleness gate fails closed) rather than 0.0 for
+    a missing/unparseable timestamp — a quote with unknown age must not be
+    treated as fresh.
+    """
+    if not observed_at_utc:
+        return float("inf")
+    try:
+        observed = datetime.fromisoformat(observed_at_utc)
+    except ValueError:
+        return float("inf")
+    reference = now or utc_now()
+    return max(0.0, (reference - observed).total_seconds())
+
+
 def real_market_candidates(
     market_rows: pl.DataFrame, home_name: str, away_name: str,
 ) -> list[MarketEvaluation]:
@@ -88,8 +113,11 @@ def real_market_candidates(
     via full team names first and filters every market type to just that
     event (fixes bugs #1 and #2 above; the caller must already have
     excluded F5 rows via exclude_first_five_innings() to avoid bug #3).
-    available_depth is a disclosed None (Checkpoint 8's real gap — the
-    underlying API doesn't expose order-book depth) —
+
+    quote_age_seconds is now real (see real_quote_age_seconds() above).
+    available_depth is still a disclosed None (Checkpoint 8's real gap —
+    the underlying API doesn't expose order-book depth, unlike age, which
+    was always computable from data already collected) —
     SizeLimits(min_depth_units=0.0) must be used until a real depth source
     exists, or every real candidate fails the depth gate."""
     event_id = resolve_polymarket_event_id(market_rows, home_name, away_name)
@@ -104,12 +132,12 @@ def real_market_candidates(
         candidates.append(MarketEvaluation(
             market_id=r["market_id"], market_type=r["market_type"], team_or_side=side,
             line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=0.0, available_depth=999.0,
+            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=999.0,
         ))
     for r in total_rows.iter_rows(named=True):
         candidates.append(MarketEvaluation(
             market_id=r["market_id"], market_type="total", team_or_side=r["team_or_side"],
             line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=0.0, available_depth=999.0,
+            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=999.0,
         ))
     return candidates

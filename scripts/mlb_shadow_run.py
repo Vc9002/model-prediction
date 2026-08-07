@@ -23,8 +23,10 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from model_prediction.rebuild.collectors import MLBCollector
 from model_prediction.rebuild.decision import SportsForecast, evaluate_game
 from model_prediction.rebuild.economic import SizeLimits
+from model_prediction.rebuild.metadata import MetadataDB
 from model_prediction.rebuild.mlb_features import (
     ESPN_TO_STATCAST_ABBREV,
     build_game_feature_row,
@@ -157,6 +159,20 @@ def main() -> None:
 
     model, train_n = train_through(features, target_date)
     print(f"4. Model retrained on {train_n} real games (walk-forward, strictly before {target_date})")
+
+    # Real bug this fixes: fixing quote_age_seconds to be real (see
+    # mlb_market_matching.py) immediately exposed that this script never
+    # actually re-collected market data itself — it just read whatever
+    # parquet happened to already be on disk, which could be hours stale by
+    # the time a decision was made, silently defeating the freshness gate
+    # that fabricated 0.0 had been masking. A real one-command shadow run
+    # must collect its own fresh quotes, not assume someone else already
+    # did recently enough.
+    meta = MetadataDB("data/rebuild/metadata.db")
+    collector = MLBCollector("data/rebuild", meta)
+    collect_result = collector.collect_polymarket_books(target_date)
+    print(f"4b. Live Polymarket collection: {collect_result.get('status')} "
+          f"({collect_result.get('books', 0)} books)")
 
     market_path = Path(f"data/rebuild/markets/mlb/{target_date}.parquet")
     if market_path.exists():

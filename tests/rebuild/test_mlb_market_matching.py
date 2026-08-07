@@ -8,10 +8,12 @@ full live evidence.
 from __future__ import annotations
 
 import polars as pl
+import pytest
 
 from model_prediction.rebuild.mlb_market_matching import (
     exclude_first_five_innings,
     real_market_candidates,
+    real_quote_age_seconds,
     real_total_lines,
     resolve_polymarket_event_id,
 )
@@ -107,3 +109,35 @@ class TestRealMarketCandidates:
             _row("70543", "moneyline", "home", None, 0.5, team="Some Other Team"),
         ])
         assert real_market_candidates(df, "Seattle Mariners", "Detroit Tigers") == []
+
+
+class TestRealQuoteAgeSeconds:
+    """Real bug fixed: quote_age_seconds was hardcoded to 0.0 for every
+    candidate even though every market row already carries a real
+    observed_at_utc timestamp (see storage.py's provenance_row) — age was
+    never actually blocked on a missing data source the way depth is.
+    Fixing this immediately exposed that mlb_shadow_run.py never
+    re-collected fresh market data itself, silently relying on however
+    stale whatever was already on disk happened to be — see
+    outputs/rebuild/takeover_status.md.
+    """
+
+    def test_computes_real_elapsed_time(self):
+        from datetime import timedelta
+
+        from model_prediction.rebuild.storage import utc_now
+
+        now = utc_now()
+        observed = (now - timedelta(seconds=45)).isoformat()
+
+        age = real_quote_age_seconds(observed, now=now)
+
+        assert age == pytest.approx(45.0, abs=0.01)
+
+    def test_missing_timestamp_fails_closed_not_fresh(self):
+        assert real_quote_age_seconds(None) == float("inf"), (
+            "an unknown-age quote must not be treated as instantly fresh"
+        )
+
+    def test_unparseable_timestamp_fails_closed_not_fresh(self):
+        assert real_quote_age_seconds("not-a-real-timestamp") == float("inf")
