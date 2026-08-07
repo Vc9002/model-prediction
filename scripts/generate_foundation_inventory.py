@@ -88,9 +88,18 @@ def main() -> None:
     ) else "PARTIAL"
     capabilities["mlb_feature_builders_own_pit_logic"] = "OPERATIONAL"  # mlb_features.py implements its own point-in-time filtering directly, verified by real backtests
 
-    # Identity
-    identity_callers = real_callers_of("identity")
-    capabilities["canonical_identity_registry"] = "INTERFACE_ONLY" if not identity_callers else "PARTIAL"
+    # Identity. real_callers_of() only checks top-level pipeline scripts,
+    # which missed the real wiring here -- collectors.py (a rebuild
+    # module, not a script) is the actual real caller. Checked directly.
+    identity_wired_in_collectors = "from .identity import IdentityRegistry, resolve_or_register_team" in (
+        REPO_ROOT / "src/model_prediction/rebuild/collectors.py"
+    ).read_text()
+    # PARTIAL, not VERIFIED: real for MLB scoreboard team identity only --
+    # NBA/WNBA/NFL/Soccer/Tennis collectors, player/event/venue entity
+    # types, and every downstream consumer (mlb_features.py's
+    # ESPN_TO_STATCAST_ABBREV, mlb_market_matching.py's name comparison)
+    # are all still unmigrated bespoke matching, not this registry.
+    capabilities["canonical_identity_registry"] = "PARTIAL" if identity_wired_in_collectors else "INTERFACE_ONLY"
     capabilities["mlb_starter_name_to_id_resolution"] = "OPERATIONAL"  # lookup_pitcher_id() in mlb_features.py, live-verified, tested
 
     # Horizons
@@ -151,7 +160,7 @@ def main() -> None:
         "8 of the shadow ledger's 16 required tables (raw_snapshots, normalized_observations, feature_snapshots, dataset_manifests, model_artifacts, calibration_artifacts, closing_prices, reviews) are schema-only — no insert/query methods, nothing writes to them yet",
         "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained)",
         "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck",
-        "No CI run status verified for the current head — no gh CLI auth in this session",
+        "This script can't verify CI over the network (no gh CLI installed, generation must stay a pure code-derived check) -- but CI was manually verified green via the public GitHub API for commit 184558c this session, after finding and fixing two real gaps: ci.yml's Ruff step ran full-repo (src/ tests/) with no continue-on-error against ~190 pre-existing legacy findings unrelated to rebuild work, so CI had never actually been green on any recent head including before this session; and a real staging mistake (files fixed by ruff --fix but never git added) that made local runs look clean while a genuinely fresh clone still failed the same way CI's runner did. ci_attached_to_current_head stays UNVERIFIED in this generated table on principle -- confirm manually for whatever HEAD is current when reading this",
         "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing",
         "MLB model held-out evaluation remains genuinely inconclusive on ~20-25 games — more real backfill days is the only way to resolve this, not further feature engineering",
     ]
