@@ -13,6 +13,7 @@ from typing import Any
 
 import polars as pl
 
+from .identity import IdentityRegistry, resolve_or_register_team
 from .storage import MarketStore, NormalizedStore, RawStore, provenance_row, utc_now
 
 DEFAULT_RATE_LIMIT = 0.6  # seconds between calls
@@ -38,6 +39,7 @@ class MLBCollector:
         self.raw = RawStore(self.root / "raw")
         self.norm = NormalizedStore(self.root / "normalized")
         self.markets = MarketStore(self.root / "markets")
+        self.identity = IdentityRegistry(meta)
         self._last_call = 0.0
 
     def _throttle(self) -> None:
@@ -76,19 +78,49 @@ class MLBCollector:
                     away = c
                 else:
                     home = c
+            away_team_obj = away.get("team", {}) or {}
+            home_team_obj = home.get("team", {}) or {}
+            observed_at = utc_now().isoformat()
+
+            # Real canonical identity, resolved from ESPN's own stable
+            # numeric team ID (team["id"]) -- FOUNDATION_COMPLETION.md
+            # Phase 4. Additive: home_team/away_team display-name columns
+            # are unchanged so existing consumers (mlb_features.py's
+            # ESPN_TO_STATCAST_ABBREV, mlb_market_matching.py's name
+            # comparison) keep working exactly as before; this is the
+            # first real collector wiring for IdentityRegistry, not a
+            # replacement for those yet.
+            away_canonical_id = home_canonical_id = None
+            if away_team_obj.get("id") and away_team_obj.get("displayName"):
+                away_canonical_id = resolve_or_register_team(
+                    self.identity, sport="mlb", source_id=source,
+                    source_team_id=str(away_team_obj["id"]),
+                    team_name=away_team_obj["displayName"],
+                    effective_from_utc=observed_at,
+                ).entity_id
+            if home_team_obj.get("id") and home_team_obj.get("displayName"):
+                home_canonical_id = resolve_or_register_team(
+                    self.identity, sport="mlb", source_id=source,
+                    source_team_id=str(home_team_obj["id"]),
+                    team_name=home_team_obj["displayName"],
+                    effective_from_utc=observed_at,
+                ).entity_id
+
             games.append({
                 **provenance_row(
                     source=source,
                     source_record_id=str(event.get("id", "")),
                     source_version="espn_public_v1",
-                    observed_at_utc=utc_now().isoformat(),
+                    observed_at_utc=observed_at,
                     effective_at_utc=event.get("date", ""),
                     event_start_utc=event.get("date", ""),
                     raw_snapshot_hash=snapshot_hash,
                 ),
                 "event_id": str(event.get("id", "")),
-                "away_team": (away.get("team", {}) or {}).get("displayName", ""),
-                "home_team": (home.get("team", {}) or {}).get("displayName", ""),
+                "away_team": away_team_obj.get("displayName", ""),
+                "home_team": home_team_obj.get("displayName", ""),
+                "away_team_canonical_id": away_canonical_id,
+                "home_team_canonical_id": home_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),

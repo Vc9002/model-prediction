@@ -237,3 +237,67 @@ class TestESPNScoreboardSnapshotHash:
 
         assert result["status"] == "ok"
         assert result["games"] == 1
+
+
+class FakeESPNClientWithTeamIds:
+    """Real ESPN payloads always carry a stable numeric team.id alongside
+    displayName (verified against real collected data under
+    data/rebuild/raw/espn_public/) — this fixture matches that real shape,
+    unlike FakeESPNClient above which predates identity wiring."""
+
+    def scoreboard(self, game_date):
+        return {"events": [{
+            "id": "401816384", "date": "2026-07-20T22:35Z",
+            "competitions": [{
+                "status": {"type": {"name": "STATUS_FINAL"}},
+                "venue": {"fullName": "Oriole Park at Camden Yards"},
+                "competitors": [
+                    {"homeAway": "home", "team": {"id": "1", "displayName": "Baltimore Orioles"}, "score": "3"},
+                    {"homeAway": "away", "team": {"id": "3", "displayName": "Los Angeles Angels"}, "score": "1"},
+                ],
+            }],
+        }]}
+
+
+class TestScoreboardCanonicalIdentity:
+    """FOUNDATION_COMPLETION.md Phase 4: collect_espn_scoreboard now
+    resolves each team through IdentityRegistry using ESPN's real stable
+    team.id, not just the display-name columns it already wrote."""
+
+    def test_scoreboard_rows_carry_real_canonical_team_ids(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClientWithTeamIds(),
+        ):
+            collector.collect_espn_scoreboard("2026-07-20")
+
+        df = collector.norm.read("mlb", "scoreboard")
+        row = df.row(0, named=True)
+        assert row["home_team_canonical_id"] is not None
+        assert row["away_team_canonical_id"] is not None
+        assert row["home_team_canonical_id"] != row["away_team_canonical_id"]
+
+        # And the identity is real and independently resolvable, not just
+        # a value that happens to be non-null.
+        resolved = collector.identity.resolve("espn_public", "1")
+        assert resolved is not None
+        assert resolved.canonical_name == "Baltimore Orioles"
+
+    def test_rerunning_collection_reuses_the_same_canonical_id(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClientWithTeamIds(),
+        ):
+            collector.collect_espn_scoreboard("2026-07-20")
+            first_id = collector.identity.resolve("espn_public", "1").entity_id
+
+            collector.collect_espn_scoreboard("2026-07-20")
+            second_id = collector.identity.resolve("espn_public", "1").entity_id
+
+        assert first_id == second_id, "rerunning collection must not mint a duplicate canonical identity"
