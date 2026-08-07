@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
@@ -241,6 +242,55 @@ def main() -> None:
         "artifact_hash": artifact.get("artifact_hash", ""),
     }, indent=2))
     print(f"10. Results saved to {results_path}")
+
+    # Real, persisted split manifest (CLAUDE.md Part 2 SS2 "Persist a split
+    # manifest" / Definition-of-Done "Final-test registry contains real date
+    # ranges"). Real gap fixed here: train/calib/test boundaries previously
+    # only existed as positional slice indices inside this script's own
+    # memory -- nothing recorded the real date ranges anywhere, so that
+    # checklist item wasn't actually satisfiable by inspecting any artifact.
+    split_manifest = {
+        "sport": "mlb", "horizon": "late", "dataset_hash": artifact.get("artifact_hash", ""),
+        "fold_metrics": fold_metrics,
+        "train_start": str(train_final["event_start_utc"].min()),
+        "train_end": str(train_final["event_start_utc"].max()),
+        "train_n": train_final.height,
+        "calibration_start": str(calib_final["event_start_utc"].min()),
+        "calibration_end": str(calib_final["event_start_utc"].max()),
+        "calibration_n": calib_final.height,
+        "final_test_start": str(test_final["event_start_utc"].min()),
+        "final_test_end": str(test_final["event_start_utc"].max()),
+        "final_test_n": test_final.height,
+        "final_test_consumed": True,
+        "final_test_consumed_at_utc": datetime.now(UTC).isoformat(),
+        "final_metrics": final_metrics,
+    }
+    split_manifest_path = Path("outputs/rebuild/mlb_split_manifest.json")
+    split_manifest_path.write_text(json.dumps(split_manifest, indent=2, default=str))
+    print(f"11. Split manifest (real date ranges, final test marked consumed) saved to {split_manifest_path}")
+
+    # Real test_consumption_registry.json update -- the registry exists
+    # precisely so a later session can tell mlb_moneyline's final test has
+    # already been spent and must not be silently reused (CLAUDE.md: "Do
+    # not inspect the final test while selecting features/model family/
+    # hyperparameters/ensemble weights/calibrator/threshold"). Previously
+    # left at its stale placeholder (test_start=null, consumed=false, "Not
+    # yet trained") from before real-feature training existed.
+    registry_path = Path("outputs/rebuild/test_consumption_registry.json")
+    registry = json.loads(registry_path.read_text())
+    registry["active_tests"]["mlb_moneyline"] = {
+        "test_start": split_manifest["final_test_start"],
+        "test_end": split_manifest["final_test_end"],
+        "consumed": True,
+        "consumed_at_utc": split_manifest["final_test_consumed_at_utc"],
+        "note": (
+            f"real held-out evaluation, n={test_final.height}, "
+            f"accuracy={final_metrics['accuracy']:.3f}, brier={final_metrics['brier']:.4f} "
+            f"-- small-sample, RESEARCH_ONLY per outputs/rebuild/model_cards/mlb-two-head-v1.md"
+        ),
+    }
+    registry_path.write_text(json.dumps(registry, indent=2))
+    print("12. test_consumption_registry.json updated: mlb_moneyline marked consumed")
 
 
 if __name__ == "__main__":

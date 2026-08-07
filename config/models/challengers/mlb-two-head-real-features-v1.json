@@ -74,7 +74,7 @@
   "train_games": 84,
   "calibration_games": 21,
   "test_games": 21,
-  "total_completed_games": 135,
+  "total_completed_games": 150,
   "matched_games": 126,
-  "unmatched_games": 9
+  "unmatched_games": 24
 }

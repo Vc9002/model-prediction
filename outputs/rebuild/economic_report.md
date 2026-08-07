@@ -1,11 +1,35 @@
 # Economic Report — Rebuild Platform
 
-**Generated**: 2026-08-05 | **Branch**: rebuild/clean-slate-v1
+**Generated**: 2026-08-07 | **Branch**: rebuild/clean-slate-v1 @ `e03688f`
 
-## Status
+## Status — MLB (real, live-verified)
 
-Economic evaluation architecture is complete. No paper trading has been run —
-the collector backfill has not yet executed. This documents the architecture.
+The one-command MLB shadow pipeline (`scripts/mlb_shadow_run.py`) has run
+live against real scheduled games and real Polymarket order data multiple
+times, most recently 2026-08-06 (2 real games, 176 real full-game
+Polymarket rows, 32 real candidate market evaluations, all persisted to
+`data/rebuild/shadow.db`). **Result: 0 BET every time, for two independent
+reasons, one structural and permanent:**
+
+1. **Structural, not a sample-size problem**: `real_market_candidates()`
+   sets `depth_available=False` on every real candidate (fixed 2026-08-07
+   — previously fabricated `available_depth=999.0`), because the
+   Polymarket source this system reads exposes no order-book depth.
+   `decision.py`'s depth gate fails closed on that unconditionally. **No
+   market can economically qualify — at any edge, any price — until a
+   genuine depth-providing data source is integrated.** This is a missing
+   capability, not a threshold to tune.
+2. In the specific 2026-08-06 run, most real candidates additionally
+   failed `STALE_QUOTE`/alignment gates before ever reaching the depth
+   check, because that run's market data was from an earlier collection
+   rather than a fresh live pull.
+
+**Economic status: REJECTED** (structural depth gap), not
+`ECONOMIC_SAMPLE_INSUFFICIENT` — a larger sample of paper trades cannot
+fix a missing data source. The architecture below (sizing, correlation,
+stress tests, qualification gates) is real, implemented, and tested, but
+has never been exercised end-to-end against a real accepted trade, because
+no real trade has ever cleared the depth gate to size and execute.
 
 ## Executable Edge Calculation
 
@@ -59,12 +83,20 @@ All must pass for shadow qualification:
 
 ## Conservative Probability
 
-Lower-bound estimate from 5 uncertainty sources:
-- Model bootstrap uncertainty (variance across folds)
-- Calibration uncertainty (residual from Platt/isotonic fit)
-- Player/lineup uncertainty (available from missingness module)
-- Data quality uncertainty (observation age, conflicting sources)
-- Model disagreement (std across ensemble members, scaled by 1/√n)
+Design target: lower-bound estimate from 5 uncertainty sources (bootstrap,
+calibration, lineup, data quality, model disagreement). **Real current
+state (MLB)**: only bootstrap uncertainty is implemented —
+`BootstrapMLBEnsemble`, 20 independent resample-fit replicates, applied
+uniformly to moneyline/spread/total, replacing a flat 3% haircut
+(2026-08-07). Real bounds are wide given only 126 training games (e.g. a
+0.49 point estimate → real [0.27, 0.67] bound) — correctly conservative
+given genuine data scarcity, and the honest reason almost every market
+fails the edge gate even before the depth gate is reached. The other 4
+sources remain unimplemented; `model_disagreement` specifically requires
+multiple independently-trained model families, which don't exist yet
+(see predictive report).
 
 A trade proceeds in paper simulation only when conservative_prob clears:
-executable ask + fees + slippage + 2% safety margin.
+executable ask + fees + slippage + 2% safety margin — and, as of
+2026-08-07, only when `depth_available=True`, which is never true for a
+real MLB candidate today (see Status above).
