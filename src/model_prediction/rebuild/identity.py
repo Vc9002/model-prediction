@@ -365,6 +365,30 @@ def resolve_polymarket_team_id(
     return matches[0].entity_id
 
 
+def resolve_mlbam_player_id(
+    registry: IdentityRegistry, sport: str, player_name: str, mlbam_id: int, effective_from_utc: str,
+) -> str:
+    """Register/resolve a canonical player identity for a real MLBAM
+    (Statcast/pybaseball) pitcher ID -- see mlb_features.lookup_pitcher_id(),
+    which already resolves a real probable-starter name to this real,
+    stable, globally-unique numeric ID via pybaseball's own player
+    register. Unlike ESPN team ids (only unique within one sport's own
+    numbering -- see resolve_espn_scoreboard_team_ids()'s docstring for
+    the real cross-sport collision that caused), MLBAM ids carry no such
+    collision risk, so this is a straightforward register-or-reuse keyed
+    directly on the MLBAM id, not a fuzzy name match."""
+    source_id = "statcast_mlbam"
+    source_entity_id = str(mlbam_id)
+    existing = registry.resolve(source_id, source_entity_id)
+    if existing is not None:
+        return existing.entity_id
+    return registry.register(
+        entity_type="player", canonical_name=player_name, sport=sport,
+        effective_from_utc=effective_from_utc,
+        source_id=source_id, source_entity_id=source_entity_id,
+    ).entity_id
+
+
 def json_loads_safe(value: str | None) -> dict[str, Any]:
     import json
     if value is None:

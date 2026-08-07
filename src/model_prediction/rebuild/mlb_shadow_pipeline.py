@@ -278,6 +278,15 @@ def predict_stage(
         records = [json.loads(line) for line in probables_path.read_text().splitlines() if line.strip()]
         probables_by_event = point_in_time_probable_starters(state.decision_times, records)
 
+    # Real canonical player identity for probable starters (identity.
+    # resolve_mlbam_player_id) -- constructed once per predict_stage call,
+    # not per game, matching every real collector's own
+    # one-registry-per-run pattern.
+    from .identity import IdentityRegistry
+    from .metadata import MetadataDB
+
+    identity_registry = IdentityRegistry(MetadataDB(f"{data_root}/metadata.db"))
+
     n_predicted = 0
     for g in state.tonight.iter_rows(named=True):
         event_id = g["event_id"]
@@ -294,6 +303,7 @@ def predict_stage(
 
         row = build_live_game_feature_row(
             g, probable["home_starter"], probable["away_starter"], state.pitches, state.starters, data_root,
+            identity_registry,
         )
         if row is None:
             state.skipped[event_id] = "starter_name_not_resolved_to_real_statcast_id"

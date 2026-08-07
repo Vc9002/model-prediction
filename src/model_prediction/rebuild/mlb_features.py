@@ -14,10 +14,12 @@ import gzip
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 
 from .asof import point_in_time_join
+from .storage import utc_now
 
 # Coarse, static single-season park factors (100 = neutral run environment).
 # Sourced from long-run public park-factor consensus (not derived from this
@@ -492,6 +494,7 @@ def build_live_game_feature_row(
     pitches: pl.DataFrame,
     starters: pl.DataFrame,
     raw_root: str | Path,
+    identity_registry: Any | None = None,
 ) -> dict | None:
     """Feature row for a real *scheduled* (not yet played) game, using
     probable-starter names (e.g. from ESPN's scoreboard probables feed)
@@ -505,6 +508,12 @@ def build_live_game_feature_row(
     Returns None when either starter name can't be resolved to a real
     Statcast ID, rather than silently guessing or falling back to a
     league-average-looking feature row.
+
+    identity_registry is optional (canonical player identity is additive
+    lineage, not required for the feature row itself to be correct) --
+    when given a real IdentityRegistry, both starters' real MLBAM ids are
+    registered/resolved as canonical player entities via
+    identity.resolve_mlbam_player_id().
     """
     game_date = espn_game["event_start_utc"][:10]
     home_name, away_name = espn_game["home_team"], espn_game["away_team"]
@@ -517,6 +526,13 @@ def build_live_game_feature_row(
     away_starter_id = lookup_pitcher_id(away_starter_name)
     if home_starter_id is None or away_starter_id is None:
         return None
+
+    if identity_registry is not None:
+        from .identity import resolve_mlbam_player_id
+
+        observed_at = utc_now().isoformat()
+        resolve_mlbam_player_id(identity_registry, "mlb", home_starter_name, home_starter_id, observed_at)
+        resolve_mlbam_player_id(identity_registry, "mlb", away_starter_name, away_starter_id, observed_at)
 
     home_p = pitcher_rolling_features(pitches, home_starter_id, game_date)
     away_p = pitcher_rolling_features(pitches, away_starter_id, game_date)

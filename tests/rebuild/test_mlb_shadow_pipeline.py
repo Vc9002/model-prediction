@@ -158,3 +158,61 @@ class TestModelArtifactLineage:
         ledger.close()
         assert row is not None
         assert row["run_id"] == run_id
+
+
+class TestPlayerIdentityLineage:
+    """Real gap closed: probable starters were resolved to a real MLBAM id
+    (lookup_pitcher_id) but that id was only ever used inline for Statcast
+    feature lookups, never registered as a canonical player entity --
+    identity.resolve_mlbam_player_id() (added this session) had no real
+    caller wiring it into the actual pipeline, mirroring the
+    TestModelArtifactLineage gap fixed earlier."""
+
+    def test_predict_stage_registers_real_canonical_player_identity_for_probable_starters(self, tmp_path):
+        from model_prediction.rebuild.identity import IdentityRegistry
+        from model_prediction.rebuild.metadata import MetadataDB
+
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        for i in range(30):
+            _write_scoreboard(tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00",
+                               "A", "B", "STATUS_FINAL")
+        state = pipeline.load_state(str(tmp_path), "2026-08-06")
+        assert state is not None
+
+        registries_seen = []
+
+        def fake_build_live_row(espn_game, home_name, away_name, pitches, starters, data_root, identity_registry=None):
+            registries_seen.append(identity_registry)
+            if identity_registry is not None:
+                from model_prediction.rebuild.identity import resolve_mlbam_player_id
+                resolve_mlbam_player_id(identity_registry, "mlb", home_name, 665742, "2026-08-06T21:10:00+00:00")
+                resolve_mlbam_player_id(identity_registry, "mlb", away_name, 592450, "2026-08-06T21:10:00+00:00")
+            return {"event_id": "401"}
+
+        with patch(
+            "model_prediction.rebuild.mlb_features.build_game_feature_row",
+            return_value={"game_date": "2026-07-01", "event_id": "hist"},
+        ), patch(
+            "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
+            return_value=(MagicMock(), MagicMock(), 30),
+        ), patch(
+            "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
+            return_value={"401": {"home_starter": "Juan Soto", "away_starter": "Aaron Judge"}},
+        ), patch(
+            "model_prediction.rebuild.mlb_shadow_pipeline.build_live_game_feature_row",
+            side_effect=fake_build_live_row,
+        ):
+            pipeline.predict_stage(state, str(tmp_path))
+
+        assert len(registries_seen) == 1
+        assert isinstance(registries_seen[0], IdentityRegistry)
+
+        # And the real registration is independently resolvable via a
+        # fresh registry against the same real metadata.db, not just an
+        # in-memory artifact of this one call.
+        fresh_registry = IdentityRegistry(MetadataDB(f"{tmp_path}/metadata.db"))
+        resolved = fresh_registry.resolve("statcast_mlbam", "665742")
+        assert resolved is not None
+        assert resolved.canonical_name == "Juan Soto"
+        assert resolved.entity_type == "player"
+        assert resolved.sport == "mlb"
