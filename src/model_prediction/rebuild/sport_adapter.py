@@ -374,6 +374,33 @@ class _EsportsStubAdapter(_NotImplementedStagesMixin):
         return StageResult("collect", STAGE_NOT_IMPLEMENTED, result)
 
 
+class _ResearchOnlyAdapter(_NotImplementedStagesMixin):
+    """Explicit decision, not a wiring gap: KBO/NPB have no real collector
+    or data source client anywhere in this codebase (checked -- the only
+    KBO/NPB reference in the whole rebuild tree is Polymarket's own market
+    league-code mapping in data_sources/polymarket_us.py, a real betting
+    market existing for a sport this platform still has zero real
+    schedule/roster/results source for). CLAUDE.md is explicit: "When
+    reliable inputs are unavailable, restrict the model rather than
+    inventing MLB-equivalent features" -- building a KBO/NPB Elo baseline
+    on top of nothing (no real completed-game backfill possible) would be
+    exactly the fabricated coverage that instruction forbids, not a
+    genuine basic pipeline. Registered here (rather than left to
+    build_adapter()'s ValueError) so the shared CLI can route to kbo/npb
+    and get one clear, structured, honest research_only status through
+    every real stage instead of a bare exception."""
+
+    def __init__(self, sport: str) -> None:
+        self.sport = sport
+
+    def collect(self, date: str, run_id: str | None = None) -> StageResult:
+        return StageResult("collect", STAGE_NOT_IMPLEMENTED, {
+            "reason": f"{self.sport} has no real collector or data source client in this codebase -- "
+                      f"explicitly research_only, not a wiring gap (see CLAUDE.md's KBO/NPB section)",
+            "qualification_status": "RESEARCH_ONLY",
+        })
+
+
 def build_adapter(sport: str, data_root: str = "data/rebuild") -> SportAdapter:
     """The one real registry every sport plugs into."""
     if sport == "mlb":
@@ -394,12 +421,10 @@ def build_adapter(sport: str, data_root: str = "data/rebuild") -> SportAdapter:
         return _BasicEloAdapter(sport, data_root, tennis_collector, tennis_collector.collect_date)
     if sport == "esports":
         return _EsportsStubAdapter(data_root, meta)
+    if sport in ("kbo", "npb"):
+        return _ResearchOnlyAdapter(sport)
 
-    raise ValueError(
-        f"no adapter registered for sport={sport!r} -- "
-        f"kbo/npb correctly have no real collector or data source client "
-        f"anywhere in this codebase yet"
-    )
+    raise ValueError(f"no adapter registered for sport={sport!r}")
 
 
-SUPPORTED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis", "esports")
+SUPPORTED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis", "esports", "kbo", "npb")

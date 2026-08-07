@@ -23,7 +23,7 @@ class TestBuildAdapter:
 
     def test_unsupported_sport_fails_closed_not_a_guess(self, tmp_path):
         with pytest.raises(ValueError, match="no adapter registered"):
-            build_adapter("kbo", str(tmp_path))
+            build_adapter("cricket", str(tmp_path))
 
     def test_esports_collect_calls_the_real_stub_and_reports_it_honestly(self, tmp_path):
         # EsportsCollector.collect_date() is a real, honest stub (returns
@@ -35,6 +35,22 @@ class TestBuildAdapter:
         result = adapter.collect("2026-08-06")
         assert result.status == STAGE_NOT_IMPLEMENTED
         assert result.detail.get("status") == "stub"
+
+    def test_kbo_and_npb_are_explicitly_research_only_not_a_wiring_gap(self, tmp_path):
+        # Explicit decision (CLAUDE.md: "restrict the model rather than
+        # inventing MLB-equivalent features" when reliable inputs don't
+        # exist) -- kbo/npb have no real collector anywhere in this
+        # codebase, so every stage honestly reports NOT_IMPLEMENTED with a
+        # clear research_only reason rather than raising or, worse,
+        # fabricating a working pipeline on top of nothing.
+        for sport in ("kbo", "npb"):
+            adapter = build_adapter(sport, str(tmp_path))
+            assert adapter.sport == sport
+            collect_result = adapter.collect("2026-08-06")
+            assert collect_result.status == STAGE_NOT_IMPLEMENTED
+            assert collect_result.detail["qualification_status"] == "RESEARCH_ONLY"
+            assert adapter.predict("2026-08-06", "late").status == STAGE_NOT_IMPLEMENTED
+            assert adapter.build_features("2026-08-06", "late").status == STAGE_NOT_IMPLEMENTED
 
 
 class TestHonestNotImplementedStages:
