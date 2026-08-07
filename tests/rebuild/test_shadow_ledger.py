@@ -629,3 +629,160 @@ class TestRealDecisionModuleIntegration:
         assert stored_decision["action"] == "BET"
         assert stored_decision["units"] == 0.5
         assert stored_decision["evaluated_market_evaluation_id"] == eval_id
+
+
+class TestRawSnapshots:
+    def test_record_and_dedupe_on_snapshot_hash(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_raw_snapshot(
+            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
+            observed_at_utc="2026-08-06T10:00:00Z", snapshot_hash="abc123",
+        )
+        id2, created2 = ledger.record_raw_snapshot(
+            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
+            observed_at_utc="2026-08-06T11:00:00Z", snapshot_hash="abc123",
+        )
+        assert created1 and not created2
+        assert id1 == id2
+
+    def test_different_hash_creates_a_new_row(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, _ = ledger.record_raw_snapshot(
+            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
+            observed_at_utc="2026-08-06T10:00:00Z", snapshot_hash="hash1", event_id="401",
+        )
+        id2, created2 = ledger.record_raw_snapshot(
+            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
+            observed_at_utc="2026-08-06T22:00:00Z", snapshot_hash="hash2", event_id="401",
+        )
+        assert created2
+        assert id1 != id2
+        assert len(ledger.raw_snapshots_for_event("mlb", "401")) == 2
+
+
+class TestNormalizedObservations:
+    def test_record_and_dedupe_on_identical_content(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_normalized_observation(
+            run_id=run_id, sport="mlb", table_name="scoreboard",
+            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            payload={"status": "STATUS_SCHEDULED"},
+        )
+        id2, created2 = ledger.record_normalized_observation(
+            run_id=run_id, sport="mlb", table_name="scoreboard",
+            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            payload={"status": "STATUS_SCHEDULED"},
+        )
+        assert created1 and not created2
+        assert id1 == id2
+
+    def test_a_real_state_change_at_the_same_key_creates_a_new_row(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, _ = ledger.record_normalized_observation(
+            run_id=run_id, sport="mlb", table_name="scoreboard",
+            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            payload={"status": "STATUS_SCHEDULED"},
+        )
+        id2, created2 = ledger.record_normalized_observation(
+            run_id=run_id, sport="mlb", table_name="scoreboard",
+            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            payload={"status": "STATUS_FINAL"},
+        )
+        assert created2
+        assert id1 != id2
+
+
+class TestFeatureSnapshotsLedger:
+    def test_record_and_dedupe_on_dataset_hash(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_feature_snapshot(
+            run_id=run_id, sport="mlb", horizon="late", dataset_hash="hash1", row_count=5,
+        )
+        id2, created2 = ledger.record_feature_snapshot(
+            run_id=run_id, sport="mlb", horizon="late", dataset_hash="hash1", row_count=5,
+        )
+        assert created1 and not created2
+        assert id1 == id2
+        assert len(ledger.feature_snapshots_for_horizon("mlb", "late")) == 1
+
+
+class TestDatasetManifestsLedger:
+    def test_record_and_dedupe_on_dataset_hash(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_dataset_manifest(
+            run_id=run_id, sport="mlb", dataset_hash="hash1",
+            final_test_start="2026-08-02", final_test_end="2026-08-04", final_test_consumed=True,
+        )
+        id2, created2 = ledger.record_dataset_manifest(
+            run_id=run_id, sport="mlb", dataset_hash="hash1",
+        )
+        assert created1 and not created2
+        assert id1 == id2
+
+
+class TestModelArtifactsLedger:
+    def test_record_and_dedupe_on_artifact_hash(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_model_artifact(
+            run_id=run_id, sport="mlb", model_name="mlb-two-head-v1", model_version="1",
+            artifact_hash="hash1",
+        )
+        id2, created2 = ledger.record_model_artifact(
+            run_id=run_id, sport="mlb", model_name="mlb-two-head-v1", model_version="1",
+            artifact_hash="hash1",
+        )
+        assert created1 and not created2
+        assert id1 == id2
+        assert ledger.get_model_artifact_by_hash("mlb", "hash1")["model_name"] == "mlb-two-head-v1"
+
+
+class TestCalibrationArtifactsLedger:
+    def test_record_and_dedupe_bound_to_model_hash(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_calibration_artifact(
+            run_id=run_id, sport="mlb", model_artifact_hash="model1", calibration_hash="calib1",
+            method="bootstrap_uncertainty",
+        )
+        id2, created2 = ledger.record_calibration_artifact(
+            run_id=run_id, sport="mlb", model_artifact_hash="model1", calibration_hash="calib1",
+        )
+        assert created1 and not created2
+        assert id1 == id2
+
+
+class TestClosingPricesLedger:
+    def test_record_and_dedupe_on_identical_price(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+        )
+        id2, created2 = ledger.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+        )
+        assert created1 and not created2
+        assert id1 == id2
+
+    def test_conflicting_closing_price_at_the_same_key_fails_closed(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        ledger.record_closing_price(run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55)
+        with pytest.raises(ValueError, match="conflicting closing_price"):
+            ledger.record_closing_price(run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.60)
+
+
+class TestReviewsLedger:
+    def test_record_and_query_by_subject(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        review_id = ledger.record_review(
+            run_id=run_id, subject_table="trade_decisions", subject_id=1,
+            verdict="approved", reviewer="operator", notes="looks right",
+        )
+        reviews = ledger.reviews_for_subject("trade_decisions", 1)
+        assert len(reviews) == 1
+        assert reviews[0]["id"] == review_id
+        assert reviews[0]["verdict"] == "approved"
+
+    def test_multiple_reviews_of_the_same_subject_all_persist(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        ledger.record_review(run_id=run_id, subject_table="trade_decisions", subject_id=1, verdict="approved")
+        ledger.record_review(run_id=run_id, subject_table="trade_decisions", subject_id=1, verdict="flagged")
+        assert len(ledger.reviews_for_subject("trade_decisions", 1)) == 2
