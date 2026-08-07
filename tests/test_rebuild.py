@@ -47,7 +47,7 @@ from model_prediction.rebuild.economic import (
     evaluate_portfolio, EconomicResult, MonitorState, HEALTH_STATES,
 )
 from model_prediction.rebuild.market_residual import (
-    executable_edge, is_tradeable,
+    executable_edge, is_tradeable, MarketResidualModel, MarketResidualFeatures,
 )
 from model_prediction.rebuild.models.kbo_npb import KBONPBModel
 from model_prediction.rebuild.models.esports import EsportsModel, game_to_series_prob
@@ -557,6 +557,89 @@ class TestMarketResidual:
     def test_not_tradeable_no_edge(self):
         result = executable_edge(0.48, 0.47, 0.52)
         assert not is_tradeable(result)
+
+
+class TestMarketResidualModel:
+    """Real first unit coverage for MarketResidualModel/MarketResidualFeatures
+    -- executable_edge()/is_tradeable() (the pure functions above) already
+    had tests, but the class itself had zero coverage anywhere (grep-
+    verified; tests/test_market_residual.py tests a different, legacy
+    MarketResidualModel in model_prediction.models.market_residual, not
+    this rebuild one)."""
+
+    def _synthetic_rows(self, n=200, seed=0):
+        import random
+        rng = random.Random(seed)
+        features, labels = [], []
+        for _ in range(n):
+            # Genuine disagreement (large |logit_model - logit_market|,
+            # fresh quote, real depth) predicts a positive outcome; a
+            # stale/thin/small-disagreement quote predicts a negative one
+            # -- a real, learnable signal, not noise.
+            disagreement = rng.uniform(-2.0, 2.0)
+            quote_age = rng.uniform(0, 600)
+            depth = rng.uniform(0, 5000)
+            genuine_score = disagreement - quote_age / 300 + depth / 5000
+            label = 1 if genuine_score + rng.uniform(-0.3, 0.3) > 0 else 0
+            features.append(MarketResidualFeatures(
+                logit_model=disagreement, logit_market=0.0, spread=rng.uniform(0, 0.05),
+                depth_ask=depth, quote_age_seconds=quote_age, time_to_start_hours=rng.uniform(0.5, 48),
+                model_uncertainty=rng.uniform(0.01, 0.1),
+            ))
+            labels.append(label)
+        return features, labels
+
+    def test_fit_and_predict_produce_valid_probabilities(self):
+        features, labels = self._synthetic_rows()
+        model = MarketResidualModel().fit(features, labels)
+        for f in features[:10]:
+            prob = model.predict_genuine_edge_prob(f)
+            assert 0.0 <= prob <= 1.0
+
+    def test_learns_the_real_synthetic_signal(self):
+        features, labels = self._synthetic_rows(n=400)
+        train_f, train_y = features[:300], labels[:300]
+        test_f, test_y = features[300:], labels[300:]
+        model = MarketResidualModel().fit(train_f, train_y)
+
+        preds = [model.predict_genuine_edge_prob(f) >= 0.5 for f in test_f]
+        accuracy = sum(p == bool(y) for p, y in zip(preds, test_y)) / len(test_y)
+        assert accuracy > 0.6, "model should learn better than a coin flip on a real separable signal"
+
+    def test_unfitted_model_returns_honest_fallback_not_a_crash(self):
+        model = MarketResidualModel()
+        f = MarketResidualFeatures(
+            logit_model=0.5, logit_market=0.0, spread=0.01, depth_ask=100,
+            quote_age_seconds=5, time_to_start_hours=2, model_uncertainty=0.05,
+        )
+        assert model.predict_genuine_edge_prob(f) == 0.5
+
+    def test_should_trade_respects_the_threshold(self):
+        features, labels = self._synthetic_rows()
+        model = MarketResidualModel().fit(features, labels)
+        strong_edge = MarketResidualFeatures(
+            logit_model=2.0, logit_market=0.0, spread=0.0, depth_ask=5000,
+            quote_age_seconds=0, time_to_start_hours=24, model_uncertainty=0.01,
+        )
+        weak_edge = MarketResidualFeatures(
+            logit_model=-2.0, logit_market=0.0, spread=0.05, depth_ask=0,
+            quote_age_seconds=600, time_to_start_hours=1, model_uncertainty=0.1,
+        )
+        strong_trade, strong_prob = model.should_trade(strong_edge, threshold=0.6)
+        weak_trade, weak_prob = model.should_trade(weak_edge, threshold=0.6)
+        assert strong_prob > weak_prob
+        assert strong_trade or not weak_trade  # strong case should trade at least as readily
+
+    def test_never_touches_sports_probability(self):
+        # Real architectural invariant (module docstring: "Never rewrites
+        # the independent sports probability. Market isolation is
+        # absolute.") -- MarketResidualFeatures only carries market-side
+        # and disagreement-derived inputs, never a raw sports-model
+        # probability field the residual model could silently overwrite.
+        import dataclasses
+        field_names = {f.name for f in dataclasses.fields(MarketResidualFeatures)}
+        assert "calibrated_probability" not in field_names
+        assert "sports_probability" not in field_names
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
