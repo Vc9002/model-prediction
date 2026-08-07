@@ -29,6 +29,7 @@ import polars as pl
 
 from .decision import SportsForecast, evaluate_game
 from .economic import SizeLimits
+from .identity import resolve_or_link_polymarket_event_id
 from .mlb_features import (
     ESPN_TO_STATCAST_ABBREV,
     build_live_game_feature_row,
@@ -200,6 +201,7 @@ class MLBRunState:
     candidates_by_event: dict[str, list] = field(default_factory=dict)
     total_lines_by_event: dict[str, list[float]] = field(default_factory=dict)
     spread_pairs_by_event: dict[str, list[tuple[float, str]]] = field(default_factory=dict)
+    event_canonical_id_by_event: dict[str, str | None] = field(default_factory=dict)  # linked Polymarket <-> ESPN canonical event
     skipped: dict[str, str] = field(default_factory=dict)  # event_id -> real skip reason
 
 
@@ -371,6 +373,18 @@ def match_markets_stage(
         resolved_event_id = resolve_polymarket_event_id(
             state.market_rows, g["home_team"], g["away_team"],
             home_canonical_id=home_canonical_id, away_canonical_id=away_canonical_id,
+        )
+        # Real event-identity linking (Task 1 follow-up): ties Polymarket's
+        # own event_id to the same canonical event ESPN scoreboard
+        # collection already registered, closing the gap flagged in
+        # identity.py's resolve_or_link_polymarket_event_id() docstring --
+        # the two id-spaces previously had nothing tying them together.
+        # Fails closed to None (not an error) on any ambiguity or missing
+        # canonical team ids, matching every other resolver here.
+        state.event_canonical_id_by_event[event_id] = resolve_or_link_polymarket_event_id(
+            collector.identity, "mlb", resolved_event_id,
+            home_canonical_id, away_canonical_id, state.target_date,
+            known_canonical_event_id=g.get("event_canonical_id"),
         )
         state.total_lines_by_event[event_id] = (
             real_total_lines(state.market_rows, resolved_event_id) if resolved_event_id else []

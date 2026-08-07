@@ -487,6 +487,56 @@ def resolve_polymarket_team_id(
     return matches[0].entity_id
 
 
+def resolve_or_link_polymarket_event_id(
+    registry: IdentityRegistry,
+    sport: str,
+    polymarket_event_id: str | None,
+    home_canonical_id: str | None,
+    away_canonical_id: str | None,
+    game_date: str,
+    known_canonical_event_id: str | None = None,
+) -> str | None:
+    """Link Polymarket's own event_id (already resolved per-game by
+    mlb_market_matching.resolve_polymarket_event_id(), which matches by
+    team name/canonical-id equality but has no IdentityRegistry access
+    itself) to the same canonical event ESPN scoreboard collection already
+    registered via resolve_espn_scoreboard_event_id(). Closes the real gap
+    identity.py's own module docstring flagged: Polymarket's and ESPN's
+    event ids live in two completely separate id-spaces with nothing
+    tying them together until now.
+
+    `known_canonical_event_id` should be passed whenever the caller is
+    already iterating one specific game (e.g. scoreboard row) and already
+    has that row's own real `event_canonical_id` (written by
+    resolve_espn_scoreboard_event_id() at collection time) -- linking
+    directly to it is strictly more precise than re-deriving via
+    resolve_event_by_team_pair() below, which must fail closed on a
+    doubleheader (two real candidates, genuinely ambiguous from team-pair
+    + date alone) even though the caller, in this per-game context,
+    already knows unambiguously which of the two real games it means.
+    Falls back to resolve_event_by_team_pair() only when the caller
+    doesn't already have that answer.
+
+    Checks for an existing mapping first (idempotent across reruns, same
+    shape as every other resolve_* helper here). Returns None (never
+    guesses, never registers a new event purely from market-side data)
+    when there's no Polymarket event id, no resolved canonical team ids,
+    or no unambiguous match."""
+    if not polymarket_event_id or not home_canonical_id or not away_canonical_id:
+        return None
+    namespaced_source_id = f"polymarket_us:{sport}"
+    existing = registry.resolve(namespaced_source_id, polymarket_event_id)
+    if existing is not None:
+        return existing.entity_id
+    canonical_event_id = known_canonical_event_id or resolve_event_by_team_pair(
+        registry, sport, home_canonical_id, away_canonical_id, game_date,
+    )
+    if canonical_event_id is None:
+        return None
+    registry.map(canonical_event_id, namespaced_source_id, polymarket_event_id)
+    return canonical_event_id
+
+
 def resolve_mlbam_player_id(
     registry: IdentityRegistry, sport: str, player_name: str, mlbam_id: int, effective_from_utc: str,
 ) -> str:
