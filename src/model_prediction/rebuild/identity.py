@@ -269,6 +269,36 @@ def resolve_or_register_team(
     )
 
 
+def resolve_espn_scoreboard_team_ids(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    home_team_obj: dict[str, Any],
+    away_team_obj: dict[str, Any],
+    observed_at: str,
+) -> tuple[str | None, str | None]:
+    """The one real helper every ESPN-scoreboard-shaped collector should
+    call for canonical team identity -- shared here so MLB/NBA/WNBA/NFL/
+    Soccer/Tennis don't each reimplement the same "resolve if id+name
+    present, else None" guard around resolve_or_register_team(). Returns
+    (home_canonical_id, away_canonical_id); either is None if that side's
+    real ESPN team object is missing id or displayName (never guessed)."""
+    home_id = away_id = None
+    if home_team_obj.get("id") and home_team_obj.get("displayName"):
+        home_id = resolve_or_register_team(
+            registry, sport=sport, source_id=source_id,
+            source_team_id=str(home_team_obj["id"]), team_name=home_team_obj["displayName"],
+            effective_from_utc=observed_at,
+        ).entity_id
+    if away_team_obj.get("id") and away_team_obj.get("displayName"):
+        away_id = resolve_or_register_team(
+            registry, sport=sport, source_id=source_id,
+            source_team_id=str(away_team_obj["id"]), team_name=away_team_obj["displayName"],
+            effective_from_utc=observed_at,
+        ).entity_id
+    return home_id, away_id
+
+
 def json_loads_safe(value: str | None) -> dict[str, Any]:
     import json
     if value is None:

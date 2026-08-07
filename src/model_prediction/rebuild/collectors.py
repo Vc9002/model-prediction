@@ -13,11 +13,27 @@ from typing import Any
 
 import polars as pl
 
-from .identity import IdentityRegistry, resolve_or_register_team
+from .identity import IdentityRegistry, resolve_espn_scoreboard_team_ids
 from .schemas import MARKET_SNAPSHOT_CONTRACT, SCOREBOARD_CONTRACT
 from .storage import MarketStore, NormalizedStore, RawStore, provenance_row, utc_now
 
 DEFAULT_RATE_LIMIT = 0.6  # seconds between calls
+
+
+def _competitor_identity_obj(competitor: dict[str, Any]) -> dict[str, Any]:
+    """Normalize an ESPN competitor entry to {"id", "displayName"}
+    regardless of whether it's team-shaped (competitor["team"]) or
+    athlete-shaped (individual-sport competitor["athlete"], with the
+    ESPN person ID on the competitor itself rather than inside
+    "athlete") -- so resolve_espn_scoreboard_team_ids() can treat both
+    the same way."""
+    team = competitor.get("team")
+    if team:
+        return {"id": team.get("id"), "displayName": team.get("displayName", "")}
+    athlete = competitor.get("athlete")
+    if athlete:
+        return {"id": competitor.get("id"), "displayName": athlete.get("displayName", "")}
+    return {"id": None, "displayName": ""}
 
 
 class MLBCollector:
@@ -88,24 +104,10 @@ class MLBCollector:
             # Phase 4. Additive: home_team/away_team display-name columns
             # are unchanged so existing consumers (mlb_features.py's
             # ESPN_TO_STATCAST_ABBREV, mlb_market_matching.py's name
-            # comparison) keep working exactly as before; this is the
-            # first real collector wiring for IdentityRegistry, not a
-            # replacement for those yet.
-            away_canonical_id = home_canonical_id = None
-            if away_team_obj.get("id") and away_team_obj.get("displayName"):
-                away_canonical_id = resolve_or_register_team(
-                    self.identity, sport="mlb", source_id=source,
-                    source_team_id=str(away_team_obj["id"]),
-                    team_name=away_team_obj["displayName"],
-                    effective_from_utc=observed_at,
-                ).entity_id
-            if home_team_obj.get("id") and home_team_obj.get("displayName"):
-                home_canonical_id = resolve_or_register_team(
-                    self.identity, sport="mlb", source_id=source,
-                    source_team_id=str(home_team_obj["id"]),
-                    team_name=home_team_obj["displayName"],
-                    effective_from_utc=observed_at,
-                ).entity_id
+            # comparison) keep working exactly as before.
+            home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
+                self.identity, "mlb", source, home_team_obj, away_team_obj, observed_at,
+            )
 
             games.append({
                 **provenance_row(
@@ -457,6 +459,7 @@ class NBACollector:
         self.raw = RawStore(self.root / "raw")
         self.norm = NormalizedStore(self.root / "normalized")
         self.markets = MarketStore(self.root / "markets")
+        self.identity = IdentityRegistry(meta)
         self._last_call = 0.0
 
     def _throttle(self) -> None:
@@ -496,19 +499,27 @@ class NBACollector:
                     away = c
                 else:
                     home = c
+            home_team_obj = (home.get("team", {}) or {})
+            away_team_obj = (away.get("team", {}) or {})
+            observed_at = utc_now().isoformat()
+            home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
+                self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+            )
             games.append({
                 **provenance_row(
                     source=source,
                     source_record_id=str(event.get("id", "")),
                     source_version="espn_public_v1",
-                    observed_at_utc=utc_now().isoformat(),
+                    observed_at_utc=observed_at,
                     effective_at_utc=event.get("date", ""),
                     event_start_utc=event.get("date", ""),
                     raw_snapshot_hash=snapshot_hash,
                 ),
                 "event_id": str(event.get("id", "")),
-                "away_team": (away.get("team", {}) or {}).get("displayName", ""),
-                "home_team": (home.get("team", {}) or {}).get("displayName", ""),
+                "away_team": away_team_obj.get("displayName", ""),
+                "home_team": home_team_obj.get("displayName", ""),
+                "away_team_canonical_id": away_canonical_id,
+                "home_team_canonical_id": home_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
@@ -591,6 +602,7 @@ class NFLCollector:
         self.raw = RawStore(self.root / "raw")
         self.norm = NormalizedStore(self.root / "normalized")
         self.markets = MarketStore(self.root / "markets")
+        self.identity = IdentityRegistry(meta)
         self._last_call = 0.0
 
     def _throttle(self) -> None:
@@ -620,13 +632,21 @@ class NFLCollector:
             for c in competitors:
                 if c.get("homeAway") == "away": away = c
                 else: home = c
+            home_team_obj = (home.get("team", {}) or {})
+            away_team_obj = (away.get("team", {}) or {})
+            observed_at = utc_now().isoformat()
+            home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
+                self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+            )
             games.append({
                 **provenance_row(source, str(event.get("id", "")), "espn_public_v1",
-                                  utc_now().isoformat(), event.get("date", ""), event.get("date", ""),
+                                  observed_at, event.get("date", ""), event.get("date", ""),
                                   raw_snapshot_hash=snapshot_hash),
                 "event_id": str(event.get("id", "")),
-                "away_team": (away.get("team", {}) or {}).get("displayName", ""),
-                "home_team": (home.get("team", {}) or {}).get("displayName", ""),
+                "away_team": away_team_obj.get("displayName", ""),
+                "home_team": home_team_obj.get("displayName", ""),
+                "away_team_canonical_id": away_canonical_id,
+                "home_team_canonical_id": home_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
@@ -693,6 +713,7 @@ class SoccerCollector:
         self.raw = RawStore(self.root / "raw")
         self.norm = NormalizedStore(self.root / "normalized")
         self.markets = MarketStore(self.root / "markets")
+        self.identity = IdentityRegistry(meta)
         self._last_call = 0.0
 
     def _collect_date(self, game_date: str, sport: str, league: str) -> dict[str, Any]:
@@ -722,12 +743,20 @@ class SoccerCollector:
             for c in competitors:
                 if c.get("homeAway") == "away": away = c
                 else: home = c
+            home_team_obj = (home.get("team", {}) or {})
+            away_team_obj = (away.get("team", {}) or {})
+            observed_at = utc_now().isoformat()
+            home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
+                self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+            )
             games.append({**provenance_row(source, str(event.get("id", "")), "espn_public_v1",
-                utc_now().isoformat(), event.get("date", ""), event.get("date", ""),
+                observed_at, event.get("date", ""), event.get("date", ""),
                 raw_snapshot_hash=snapshot_hash),
                 "event_id": str(event.get("id", "")),
-                "away_team": (away.get("team", {}) or {}).get("displayName", ""),
-                "home_team": (home.get("team", {}) or {}).get("displayName", ""),
+                "away_team": away_team_obj.get("displayName", ""),
+                "home_team": home_team_obj.get("displayName", ""),
+                "away_team_canonical_id": away_canonical_id,
+                "home_team_canonical_id": home_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
@@ -806,6 +835,7 @@ class TennisCollector:
         self.raw = RawStore(self.root / "raw")
         self.norm = NormalizedStore(self.root / "normalized")
         self.markets = MarketStore(self.root / "markets")
+        self.identity = IdentityRegistry(meta)
         self._last_call = 0.0
 
     def _collect_date(self, game_date: str, sport: str, league: str) -> dict[str, Any]:
@@ -829,22 +859,44 @@ class TennisCollector:
         events = payload.get("events", [])
         games = []
         for event in events:
-            comp = (event.get("competitions", [{}]) or [{}])[0]
-            competitors = comp.get("competitors", [])
-            away = home = {}
-            for c in competitors:
-                if c.get("homeAway") == "away": away = c
-                else: home = c
-            games.append({**provenance_row(source, str(event.get("id", "")), "espn_public_v1",
-                utc_now().isoformat(), event.get("date", ""), event.get("date", ""),
-                raw_snapshot_hash=snapshot_hash),
-                "event_id": str(event.get("id", "")),
-                "away_team": (away.get("team", {}) or {}).get("displayName", ""),
-                "home_team": (home.get("team", {}) or {}).get("displayName", ""),
-                "away_score": int(away.get("score", 0) or 0),
-                "home_score": int(home.get("score", 0) or 0),
-                "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
+            # Real gap fixed here: ESPN tennis events are tournaments, not
+            # single matches. Real matches live under groupings[].competitions[]
+            # (e.g. "Men's Singles"), not the top-level event.competitions used
+            # by team sports -- that top-level key is absent/empty for real
+            # tennis events, which silently produced one garbage all-empty row
+            # per tournament (competitors=[]) instead of one real row per
+            # match. Falls back to top-level competitions for any payload
+            # shape without groupings (defensive, not currently observed live).
+            groupings = event.get("groupings")
+            competitions = (
+                [c for g in groupings for c in (g.get("competitions", []) or [])]
+                if groupings else (event.get("competitions", []) or [])
+            )
+            for comp in competitions:
+                competitors = comp.get("competitors", [])
+                away = home = {}
+                for c in competitors:
+                    if c.get("homeAway") == "away": away = c
+                    else: home = c
+                home_team_obj = _competitor_identity_obj(home)
+                away_team_obj = _competitor_identity_obj(away)
+                observed_at = utc_now().isoformat()
+                home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
+                    self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+                )
+                comp_id = str(comp.get("id", "")) or str(event.get("id", ""))
+                games.append({**provenance_row(source, comp_id, "espn_public_v1",
+                    observed_at, comp.get("date", event.get("date", "")), comp.get("date", event.get("date", "")),
+                    raw_snapshot_hash=snapshot_hash),
+                    "event_id": comp_id,
+                    "away_team": away_team_obj.get("displayName", ""),
+                    "home_team": home_team_obj.get("displayName", ""),
+                    "away_team_canonical_id": away_canonical_id,
+                    "home_team_canonical_id": home_canonical_id,
+                    "away_score": int(away.get("score", 0) or 0),
+                    "home_score": int(home.get("score", 0) or 0),
+                    "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
+                    "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
         if games:
             self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
