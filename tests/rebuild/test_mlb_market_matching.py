@@ -112,6 +112,24 @@ class TestRealMarketCandidates:
         ])
         assert real_market_candidates(df, "Seattle Mariners", "Detroit Tigers") == []
 
+    def test_real_candidates_honestly_mark_depth_unavailable_not_fabricated(self):
+        # Real bug fixed: this previously set available_depth=999.0, a
+        # fabricated value that trivially cleared decision.py's depth gate
+        # on every candidate (CLAUDE.md Part 3 SS2 explicitly forbids this —
+        # "do not fabricate depth ... fail economic qualification"). The
+        # underlying Polymarket source has no real depth endpoint, so every
+        # real candidate must say so honestly via depth_available=False.
+        df = pl.DataFrame([
+            _row("70543", "moneyline", "home", None, 0.545, team="Seattle Mariners"),
+            _row("70543", "total", "over", 6.5, 0.65),
+        ])
+
+        candidates = real_market_candidates(df, "Seattle Mariners", "Detroit Tigers")
+
+        assert len(candidates) == 2
+        assert all(c.depth_available is False for c in candidates)
+        assert all(c.available_depth == 0.0 for c in candidates)
+
 
 class TestRealQuoteAgeSeconds:
     """Real bug fixed: quote_age_seconds was hardcoded to 0.0 for every

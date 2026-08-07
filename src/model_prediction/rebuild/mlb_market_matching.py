@@ -117,11 +117,20 @@ def real_market_candidates(
     excluded F5 rows via exclude_first_five_innings() to avoid bug #3).
 
     quote_age_seconds is now real (see real_quote_age_seconds() above).
-    available_depth is still a disclosed None (Checkpoint 8's real gap —
-    the underlying API doesn't expose order-book depth, unlike age, which
-    was always computable from data already collected) —
-    SizeLimits(min_depth_units=0.0) must be used until a real depth source
-    exists, or every real candidate fails the depth gate."""
+    available_depth is honestly unavailable (Checkpoint 8 / reviewer-flagged
+    gap: the underlying Polymarket source doesn't expose order-book depth,
+    unlike age, which was always computable from data already collected).
+    Real bug fixed here: this previously set available_depth=999.0, a
+    fabricated value that trivially cleared decision.py's default
+    min_depth_units=1.0 gate on every single candidate — the INSUFFICIENT_
+    DEPTH reason code existed but could never actually fire. Per CLAUDE.md
+    Part 3 §2 ("mark depth_available=false; do not fabricate depth; ...
+    fail economic qualification"), every real candidate now sets
+    depth_available=False, which makes decide_team_market()/decide_total()
+    correctly return NO_BET/INSUFFICIENT_DEPTH for every real market until
+    a genuine depth-providing source is integrated — that is the honest,
+    correct behavior given real data scarcity, not a bug to work around
+    with SizeLimits(min_depth_units=0.0)."""
     event_id = resolve_polymarket_event_id(market_rows, home_name, away_name)
     if event_id is None:
         return []
@@ -134,13 +143,15 @@ def real_market_candidates(
         candidates.append(MarketEvaluation(
             market_id=r["market_id"], market_type=r["market_type"], team_or_side=side,
             line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=999.0,
+            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=0.0,
+            depth_available=False,
         ))
     for r in total_rows.iter_rows(named=True):
         candidates.append(MarketEvaluation(
             market_id=r["market_id"], market_type="total", team_or_side=r["team_or_side"],
             line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=999.0,
+            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=0.0,
+            depth_available=False,
         ))
     return candidates
 

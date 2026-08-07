@@ -265,7 +265,15 @@ def main() -> None:
             probables_by_event[rec["event_id"]] = rec
     print(f"5b. {len(probables_by_event)} real probable-starter records loaded")
 
-    limits = SizeLimits(min_depth_units=0.0)  # real depth data doesn't exist yet (Checkpoint 8)
+    # Real depth data doesn't exist yet (Checkpoint 8). This previously set
+    # min_depth_units=0.0 to work around that -- which is exactly the
+    # fabrication CLAUDE.md Part 3 SS2 forbids ("do not describe the price
+    # as depth-checked executable; fail economic qualification"). Every real
+    # candidate now sets depth_available=False (mlb_market_matching.py), so
+    # decide_team_market()/decide_total() correctly return NO_BET/
+    # INSUFFICIENT_DEPTH regardless of min_depth_units until a real
+    # depth-providing source is integrated -- default limits, no workaround.
+    limits = SizeLimits()
     report = []
     n_predictions_recorded = 0
     n_decisions_recorded = 0

@@ -88,6 +88,13 @@ class MarketEvaluation:
     depth_adjusted_price: float
     quote_age_seconds: float
     available_depth: float
+    # CLAUDE.md Part 3 §2: "If the current Polymarket interface does not
+    # provide depth: mark depth_available=false; do not fabricate depth."
+    # Defaults True so existing callers/tests that construct a candidate
+    # with a real, known depth value (or don't care about the depth gate)
+    # are unaffected; the real MLB market-matching path sets this False
+    # explicitly since the underlying source has no depth endpoint.
+    depth_available: bool = True
 
 
 @dataclass(frozen=True)
@@ -130,7 +137,7 @@ def _quote_gate_reason(candidate: MarketEvaluation, limits: SizeLimits) -> str |
     how attractive its price looks."""
     if candidate.quote_age_seconds > limits.max_quote_age_seconds:
         return STALE_QUOTE
-    if candidate.available_depth < limits.min_depth_units:
+    if not candidate.depth_available or candidate.available_depth < limits.min_depth_units:
         return INSUFFICIENT_DEPTH
     return None
 

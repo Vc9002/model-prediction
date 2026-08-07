@@ -269,6 +269,23 @@ class TestInsufficientDepthFailsClosed:
         assert decision.action == "NO_BET"
         assert decision.reason_code == INSUFFICIENT_DEPTH
 
+    def test_depth_available_false_fails_closed_even_with_zero_minimum(self):
+        # Real bug fixed: mlb_shadow_run.py previously worked around missing
+        # real depth data with SizeLimits(min_depth_units=0.0), which is
+        # exactly the fabrication CLAUDE.md Part 3 SS2 forbids — a market
+        # with genuinely unknown depth must fail closed regardless of how
+        # low the configured minimum is, not slip through because the floor
+        # happens to be zero.
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
+        unknown_depth_market = MarketEvaluation(
+            market_id="mkt-1", market_type="moneyline", team_or_side="home", line=None,
+            executable_ask=0.52, depth_adjusted_price=0.52, quote_age_seconds=5.0,
+            available_depth=0.0, depth_available=False,
+        )
+        decision = decide_team_market(forecast, unknown_depth_market, limits=SizeLimits(min_depth_units=0.0))
+        assert decision.action == "NO_BET"
+        assert decision.reason_code == INSUFFICIENT_DEPTH
+
 
 class TestContractMismatchFailsClosed:
     def test_mismatched_side_fails_closed_via_evaluate_game(self):
