@@ -259,3 +259,86 @@ class TestModelSaveLoadRoundTrip:
             except RuntimeError:
                 raised = True
             assert raised, "saving an unfitted model must fail loudly, not silently write a broken bundle"
+
+
+def _training_data_with_an_always_missing_column(n: int = 40, seed: int = 0) -> pl.DataFrame:
+    """Same shape as _synthetic_training_data(), except f2/g2 are 100% NaN
+    -- the exact real scenario Task 5's live verification hit: a feature
+    (weather, in the real data) that is currently unavailable for every
+    single real historical game."""
+    rng = np.random.default_rng(seed)
+    f1 = rng.uniform(3, 6, n)
+    g1 = rng.uniform(-2, 2, n)
+    total_runs = f1 + rng.normal(0, 0.5, n)
+    home_margin = g1 + rng.normal(0, 0.5, n)
+    return pl.DataFrame({
+        "f1": f1, "f2": [float("nan")] * n, "g1": g1, "g2": [float("nan")] * n,
+        "total_runs": total_runs, "home_margin": home_margin,
+    })
+
+
+class TestAlwaysMissingColumnNeutralization:
+    """Task 5 (explicit missingness): real bug caught by live verification
+    against the actual current backfilled dataset, not a hypothetical --
+    weather (temp_f_first_pitch) is 100% NaN for every real historical
+    game right now (Task 3's PIT-safe weather fix leaves the 3 pre-fix
+    legacy snapshots unusable). StandardScaler.fit_transform() on an
+    all-NaN column silently produced all-NaN mean/variance, and
+    HistGradientBoostingRegressor's binning step then raised a real
+    ValueError trying to find split thresholds among zero real distinct
+    values. Separately, SimpleImputer(strategy="mean") drops an all-NaN
+    column from its output entirely (confirmed live), which would have
+    silently shifted every later column out of alignment with the
+    model's own stored feature-name list."""
+
+    def test_fit_does_not_crash_when_an_intensity_feature_is_always_missing(self):
+        data = _training_data_with_an_always_missing_column()
+        model = MLBTwoHeadModel(seed=1)
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+        assert model._fitted
+
+    def test_predict_row_does_not_crash_with_an_always_missing_feature(self):
+        data = _training_data_with_an_always_missing_column()
+        model = MLBTwoHeadModel(seed=1)
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+
+        row = data.row(0, named=True)
+        pred = model.predict_row("event1", row)
+
+        assert pred.total_mean == pred.total_mean  # not NaN (self-equality check)
+        assert 0.0 <= pred.home_win_prob <= 1.0
+
+    def test_differential_head_imputer_does_not_silently_drop_the_column(self):
+        # Real bug: SimpleImputer(strategy="mean") drops an all-NaN
+        # column from its *output* entirely rather than erroring --
+        # confirmed live. If RunDifferentialHead didn't neutralize first,
+        # a 2-feature fit would silently become a 1-feature fit, with
+        # g1's values landing in the position g2 was supposed to occupy.
+        from model_prediction.rebuild.models import RunDifferentialHead
+
+        data = _training_data_with_an_always_missing_column()
+        X = data.select(["g1", "g2"]).to_numpy()
+        y = data["home_margin"].to_numpy()
+
+        head = RunDifferentialHead().fit(X, y, ["g1", "g2"])
+
+        assert head._always_missing_mask.tolist() == [False, True]
+        # predict() must accept the original 2-column shape, not a
+        # silently-narrowed 1-column one.
+        pred = head.predict(X[:1])
+        assert pred.shape == (1,)
+
+    def test_reload_predicts_identically_with_an_always_missing_feature(self):
+        data = _training_data_with_an_always_missing_column()
+        model = MLBTwoHeadModel(seed=1)
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+        row = data.row(0, named=True)
+        pred_before = model.predict_row("event1", row)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save(tmp)
+            loaded = MLBTwoHeadModel.load(tmp)
+        pred_after = loaded.predict_row("event1", row)
+
+        assert pred_before.home_win_prob == pred_after.home_win_prob
+        assert pred_before.total_mean == pred_after.total_mean

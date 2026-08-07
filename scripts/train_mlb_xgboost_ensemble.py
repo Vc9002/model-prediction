@@ -33,26 +33,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from model_prediction.rebuild.ensemble import Ensemble
 from model_prediction.rebuild.horizon_builder import build_mlb_historical_horizon_dataset
-from model_prediction.rebuild.mlb_features import dedupe_scoreboard
+from model_prediction.rebuild.mlb_features import (
+    MLB_DIFFERENTIAL_FEATURES,
+    MLB_INTENSITY_FEATURES,
+    dedupe_scoreboard,
+)
 from model_prediction.rebuild.models import MLBTwoHeadModel
 from model_prediction.rebuild.validation import brier_score, ece, expanding_folds, log_loss
 from model_prediction.rebuild.xgboost_stress import XGBoostChallenger
 
 HORIZON = "late"
 
-INTENSITY_FEATURES = [
-    "home_sp_avg_velocity", "away_sp_avg_velocity",
-    "home_sp_csw_pct", "away_sp_csw_pct",
-    "home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
-    "park_factor", "temp_f_first_pitch",
-]
-DIFFERENTIAL_FEATURES = [
-    "home_sp_k_pct", "away_sp_k_pct",
-    "home_sp_bb_pct", "away_sp_bb_pct",
-    "home_sp_days_rest", "away_sp_days_rest",
-    "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity",
-]
-XGB_FEATURES = INTENSITY_FEATURES + DIFFERENTIAL_FEATURES
+# Task 5: the one shared feature-list definition (mlb_features.py), also
+# used by train_mlb_rebuild_real_features.py and mlb_shadow_pipeline.py --
+# not redefined here. Deduplicated (not a plain concatenation) since both
+# lists now share the real `*_availability` indicator columns.
+INTENSITY_FEATURES = MLB_INTENSITY_FEATURES
+DIFFERENTIAL_FEATURES = MLB_DIFFERENTIAL_FEATURES
+XGB_FEATURES = list(dict.fromkeys(INTENSITY_FEATURES + DIFFERENTIAL_FEATURES))
 
 
 def _home_win_labels(df: pl.DataFrame) -> list[int]:

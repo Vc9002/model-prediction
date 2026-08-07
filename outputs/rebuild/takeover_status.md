@@ -1669,3 +1669,118 @@ alongside zeroed values when there's no real prior history, but XGBoost
 still receives that zero as an ordinary numeric value (not a native
 missing/NaN), and linear-model consumers have no paired
 imputed-value-plus-indicator convention yet.
+
+### Task 5 — explicit MLB feature missingness, encoded
+
+**Real rule applied throughout**: a count/sample-size is genuinely 0 when
+zero real observations exist (a true statement regardless of *why* the
+sample is empty) -- `starts_seen`, every `_n` clean-rate field,
+`bullpen_pitches`, `bullpen_appearances`, and `availability` itself all
+stay real zeros. A rate/average/single-observation *value* computed from
+zero real observations is mathematically undefined, not "a real value
+that happens to be zero" -- `avg_velocity`, `k_pct`/`bb_pct`/`csw_pct`/
+`whiff_pct`, `days_rest`, `pitches_last_start`, `bullpen_avg_velocity`,
+and all four weather fields now return real `NaN` in that case, not an
+apparently-measured `0.0`. **One principled exception**: the beta-
+binomial-shrunk clean-rate fields (`first_inning_clean_rate`/
+`scoreless_inning_rate`/`clean_appearance_rate`) are already well-defined
+at zero real observations -- the posterior mean collapses to the pure
+league prior (0.5) -- so a real bug was fixed in the same pass: the two
+early-return branches in `pitcher_clean_rate_features()` previously
+bypassed the shrinkage estimator entirely and hardcoded a literal `0.0`,
+inconsistent with the function's own design. Now routed through the
+identical `pitcher_clean_rate_shrink()` call every other case uses.
+
+**A second real bug found in the same pass**: several inline `else 0.0`
+fallbacks inside `pitcher_rolling_features()`'s "has some real history"
+branch (`k_pct`/`bb_pct`/`csw_pct`/`whiff_pct` when their real
+denominator is 0) were computing 0/0 and silently calling it a measured
+zero rate. Fixed to `NaN` -- mathematically undefined, not ambiguous.
+
+**Modeling side — a real, live-verified crash and a real, live-verified
+silent-corruption bug, both found by actually fitting on the current
+real dataset, not assumed from reading code**:
+
+1. `RunDifferentialHead` (ElasticNet, the differential-margin head) has
+   no native NaN support (confirmed live: raises `ValueError` on any
+   missing value), unlike `RunIntensityHead`'s
+   `HistGradientBoostingRegressor`. Fixed with a real
+   `SimpleImputer(strategy="mean")`, fit only on training data (never
+   prediction-time data) and persisted through `save()`/`load()`. The
+   paired "missingness indicator" half of CLAUDE.md's "imputed value +
+   missingness indicator must be paired" requirement is the real, named
+   `*_availability` columns now included directly in the shared feature
+   lists (below) -- not an anonymous auto-generated indicator column.
+
+2. **Real crash, found by fitting `MLBTwoHeadModel` on the actual current
+   backfilled dataset**: weather (`temp_f_first_pitch`) is genuinely
+   `NaN` for **every one of the 161 real matched games right now** (Task
+   3's fix correctly rejects the 3 pre-fix legacy weather snapshots as
+   PIT-unknown). `StandardScaler.fit_transform()` on a wholly-`NaN`
+   column silently produced `NaN` mean/variance, and
+   `HistGradientBoostingRegressor`'s binning step then raised a real
+   `ValueError: window shape cannot be larger than input array shape`
+   trying to find split thresholds among zero real distinct values.
+   Separately confirmed live: `SimpleImputer(strategy="mean")` *drops* an
+   all-`NaN` column from its output entirely rather than erroring, which
+   would have silently shifted every later feature out of alignment with
+   the model's own stored feature-name list. Fixed with
+   `_neutralize_always_missing_columns()`: any feature column that is
+   100% `NaN` across the current fit's training data is replaced with a
+   real neutral `0.0` constant (a feature never once observed carries no
+   learnable signal either way), applied identically at predict time via
+   a persisted per-head `_always_missing_mask` (now part of
+   `save()`/`load()`'s bundle). Live-verified: `MLBTwoHeadModel.fit()`,
+   `.predict_row()`, `.save()`/`.load()` round-trip (identical
+   predictions after reload), and `BootstrapMLBEnsemble.fit()` all now
+   succeed on the real current dataset, including predicting a row with a
+   genuinely unresolved starter.
+
+**Shared feature-list consolidation**: `MLB_INTENSITY_FEATURES`/
+`MLB_DIFFERENTIAL_FEATURES` (`mlb_features.py`) are now the one canonical
+definition -- previously each of `train_mlb_rebuild_real_features.py`,
+`train_mlb_xgboost_ensemble.py`, and `mlb_shadow_pipeline.py`
+independently hardcoded its own copy, with no guarantee they'd stay
+identical (`mlb_shadow_pipeline.py`'s copy is the one that actually
+retrains the live-serving artifact, so a silent divergence there would
+have been a real train-serving mismatch). Both lists now include the
+real `*_availability` indicators paired with every feature that can be
+`NaN`. `train_mlb_xgboost_ensemble.py`'s `XGB_FEATURES` deduplicates the
+union (`train_mlb_feature_ablation.py`'s `FEATURE_GROUPS_MLB` is left
+unchanged -- XGBoost already gets native `NaN` handling there regardless
+of an explicit indicator; adding availability fields per-group is a
+disclosed, deliberate scope boundary, not an oversight).
+
+**A real, latent bug this pass also surfaced and fixed**:
+`normalize_statcast_pitches()`'s empty-input path (fixed in Task 4)
+covers a `pl.DataFrame()` with zero rows; a genuinely `.is_empty()` input
+was the only case exercised there. No further gap found in this pass.
+
+**Train-serving parity, proven not assumed**: new
+`TestTrainServingMissingnessParity` builds the identical no-history
+inputs through both `build_game_feature_row()` (historical) and
+`build_live_game_feature_row()` (live) and asserts every shared field
+(`home_sp_*`, `away_sp_*`, `*_clean_*`, `*_bp_*`, weather, park factor)
+encodes identically, `NaN`-for-`NaN` -- both already delegate to the same
+underlying functions, so this proves the invariant rather than assuming
+it holds.
+
+**1134 tests pass** (up from 1129), 1 skipped. `ruff check` clean.
+
+**Real evidence regenerated**: re-ran the real (registry-safe)
+`train_mlb_feature_ablation.py` against the actual backfilled data with
+the new NaN-aware features flowing all the way through
+`XGBoostChallenger` (native NaN handling, confirmed no crash) --
+`outputs/rebuild/mlb_feature_ablation.json` updated with the current real
+numbers (bullpen still the strongest isolated group,
+`delta_log_loss=+0.051`; directionally similar to before, small
+per-group movement from the clean-rate prior-mean fix and inline 0/0->NaN
+fix changing exactly which rows contribute non-degenerate signal).
+
+**Next phase**: Tasks 1-5 (the correctness/parity "stop condition" per
+this phase's own instructions) are now complete. The next real step is
+Task 6 -- expanding the historical MLB backfill -- but see the
+structural constraint recorded in the handoff summary: genuinely
+point-in-time-safe probable-starter data can only exist for dates this
+collector was actually running, which bounds how far backfill can
+honestly extend without fabricating history.

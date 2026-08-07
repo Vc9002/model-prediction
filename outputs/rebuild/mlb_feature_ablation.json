@@ -5,64 +5,64 @@
   "results": [
     {
       "group": "starter_pitching",
-      "delta_log_loss": 0.0025400773001519328,
-      "delta_brier": 0.001308583822222209,
+      "delta_log_loss": 0.0006038605993911039,
+      "delta_brier": 0.000513702321615267,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "bullpen",
-      "delta_log_loss": 0.048780191165648135,
-      "delta_brier": 0.027327151501383984,
+      "delta_log_loss": 0.05058222183475669,
+      "delta_brier": 0.027617712612045542,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "clean_rates",
-      "delta_log_loss": -0.0037315858221523834,
-      "delta_brier": -0.0011654084650171703,
+      "delta_log_loss": -0.001699552238319857,
+      "delta_brier": -0.00031438544243933553,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "park_weather",
-      "delta_log_loss": -0.003014357849836169,
-      "delta_brier": -0.0011209997035474262,
+      "delta_log_loss": -0.0030473952219934874,
+      "delta_brier": -0.0011353039194566539,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "cumulative_bullpen",
-      "delta_log_loss": -0.04139012572251599,
-      "delta_brier": -0.022809706192438273,
+      "delta_log_loss": -0.046140785305083254,
+      "delta_brier": -0.024414741207745533,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "cumulative_starter_pitching",
-      "delta_log_loss": -0.04171959863751029,
-      "delta_brier": -0.023181227493659556,
-      "coverage_impact": 0.0,
-      "fold_stability": 0.0,
-      "verdict": "PASS"
-    },
-    {
-      "group": "cumulative_park_weather",
-      "delta_log_loss": -0.04227227472117889,
-      "delta_brier": -0.02396446603752847,
+      "delta_log_loss": -0.04215863591129132,
+      "delta_brier": -0.02297737288138188,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "cumulative_clean_rates",
-      "delta_log_loss": -0.041521500171389225,
-      "delta_brier": -0.023777133296492142,
+      "delta_log_loss": -0.041395744653605404,
+      "delta_brier": -0.022958145337980407,
+      "coverage_impact": 0.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "cumulative_park_weather",
+      "delta_log_loss": -0.04058925929598789,
+      "delta_brier": -0.0227105647515769,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"

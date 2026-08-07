@@ -22,6 +22,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import ElasticNet
 from sklearn.preprocessing import StandardScaler
 
@@ -30,6 +31,37 @@ def _sigmoid(x: float) -> float:
     if x >= 0:
         return 1.0 / (1.0 + math.exp(-x))
     return math.exp(x) / (1.0 + math.exp(x))
+
+
+def _neutralize_always_missing_columns(X: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Replace every value in a column flagged True in `mask` with a
+    neutral 0.0 constant.
+
+    Real bug caught by live verification against the actual current
+    backfilled dataset (see outputs/rebuild/takeover_status.md Task 5),
+    not a hypothetical: weather is currently unavailable for every real
+    historical game (Task 3's fix), so temp_f_first_pitch is 100% NaN
+    across the whole real training set. StandardScaler.fit_transform()
+    on an all-NaN column silently produces an all-NaN mean/variance, and
+    HistGradientBoostingRegressor's binning step then raised
+    `ValueError: window shape cannot be larger than input array shape`
+    trying to find split thresholds among zero real distinct values.
+    Separately, SimpleImputer(strategy="mean") *drops* an all-NaN column
+    from its output entirely (confirmed live) rather than erroring --
+    which would have silently shifted every later column's position out
+    of alignment with the model's own stored feature-name list.
+
+    A feature never once observed in the training window carries no real
+    signal for that fit either way (0.0 vs. dropped vs. left NaN all mean
+    "the model learned nothing from this column") -- 0.0 is simply the
+    choice that keeps the feature matrix's shape and column identity
+    stable for both heads, matching what every other real observed value
+    is scaled/imputed relative to."""
+    if not mask.any():
+        return X
+    X = X.copy()
+    X[:, mask] = 0.0
+    return X
 
 
 # ── Run-Intensity Head (predicts total scoring environment) ──────────────────
@@ -44,9 +76,13 @@ class RunIntensityHead:
         self.scaler = StandardScaler()
         self.alpha = alpha
         self._feature_names: list[str] = []
+        self._always_missing_mask: np.ndarray | None = None
 
     def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None) -> RunIntensityHead:
         self._feature_names = feature_names or [f"f{i}" for i in range(X.shape[1])]
+        X = np.asarray(X, dtype=float)
+        self._always_missing_mask = np.all(np.isnan(X), axis=0)
+        X = _neutralize_always_missing_columns(X, self._always_missing_mask)
         X_scaled = self.scaler.fit_transform(X)
         self.model = HistGradientBoostingRegressor(
             max_iter=200, max_depth=4, learning_rate=0.05,
@@ -60,6 +96,9 @@ class RunIntensityHead:
     def predict(self, X: np.ndarray) -> np.ndarray:
         if self.model is None:
             raise RuntimeError("RunIntensityHead not fitted")
+        X = np.asarray(X, dtype=float)
+        if self._always_missing_mask is not None:
+            X = _neutralize_always_missing_columns(X, self._always_missing_mask)
         return self.model.predict(self.scaler.transform(X))
 
 
@@ -68,23 +107,52 @@ class RunIntensityHead:
 
 class RunDifferentialHead:
     """Predicts home run advantage from lineup, starter, bullpen differentials,
-    defense, handedness matchup, and home field."""
+    defense, handedness matchup, and home field.
+
+    Real gap fixed here (see outputs/rebuild/takeover_status.md Task 5):
+    ElasticNet has no native NaN support (confirmed live: raises
+    ValueError on any missing value) unlike RunIntensityHead's
+    HistGradientBoostingRegressor, which handles NaN natively. Since
+    mlb_features.py's rolling/weather feature builders now return NaN
+    (not an apparently-real 0.0) for a continuous statistic with no real
+    prior history, this head needs its own real imputation step, not a
+    shared assumption that "whatever RunIntensityHead does is fine here
+    too." Uses a mean imputer fit only on training data (never
+    prediction-time data, which would be leakage-prone and inconsistent
+    across calls) -- the paired "missingness indicator" half of CLAUDE.md's
+    "imputed value + missingness indicator must be paired" requirement is
+    the real, named `*_availability` columns already present in the row
+    and included directly in DIFFERENTIAL_FEATURES by every real caller,
+    not an anonymous auto-generated indicator column."""
 
     def __init__(self, alpha: float = 0.1) -> None:
         self.model = ElasticNet(alpha=alpha, l1_ratio=0.5, max_iter=5000, random_state=42)
+        self.imputer = SimpleImputer(strategy="mean")
         self.scaler = StandardScaler()
         self._feature_names: list[str] = []
+        self._always_missing_mask: np.ndarray | None = None
 
     def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None) -> RunDifferentialHead:
         self._feature_names = feature_names or [f"f{i}" for i in range(X.shape[1])]
-        X_scaled = self.scaler.fit_transform(X)
+        X = np.asarray(X, dtype=float)
+        # SimpleImputer(strategy="mean") silently *drops* an all-NaN
+        # column from its output rather than erroring (confirmed live) --
+        # neutralizing first keeps every column present and the feature
+        # matrix's width/order aligned with self._feature_names.
+        self._always_missing_mask = np.all(np.isnan(X), axis=0)
+        X = _neutralize_always_missing_columns(X, self._always_missing_mask)
+        X_imputed = self.imputer.fit_transform(X)
+        X_scaled = self.scaler.fit_transform(X_imputed)
         self.model.fit(X_scaled, y)
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         if self.model is None:
             raise RuntimeError("RunDifferentialHead not fitted")
-        return self.model.predict(self.scaler.transform(X))
+        X = np.asarray(X, dtype=float)
+        if self._always_missing_mask is not None:
+            X = _neutralize_always_missing_columns(X, self._always_missing_mask)
+        return self.model.predict(self.scaler.transform(self.imputer.transform(X)))
 
 
 # ── Joint Score Distribution ─────────────────────────────────────────────────
@@ -351,8 +419,8 @@ class MLBTwoHeadModel:
     def predict_row(self, event_id: str, row: dict[str, float]) -> GamePrediction:
         if not self._fitted:
             raise RuntimeError("Model not fitted")
-        X_intensity = np.array([[row.get(f, 0.0) for f in self._intensity_features]])
-        X_diff = np.array([[row.get(f, 0.0) for f in self._differential_features]])
+        X_intensity = np.array([[row.get(f, float("nan")) for f in self._intensity_features]])
+        X_diff = np.array([[row.get(f, float("nan")) for f in self._differential_features]])
         total = float(self.intensity_head.predict(X_intensity)[0])
         margin = float(self.differential_head.predict(X_diff)[0])
         return self.distribution.predict_game(event_id, max(1.0, total), margin)
@@ -396,9 +464,12 @@ class MLBTwoHeadModel:
             "intensity_model": self.intensity_head.model,
             "intensity_scaler": self.intensity_head.scaler,
             "intensity_feature_names": self.intensity_head._feature_names,
+            "intensity_always_missing_mask": self.intensity_head._always_missing_mask,
             "differential_model": self.differential_head.model,
             "differential_scaler": self.differential_head.scaler,
+            "differential_imputer": self.differential_head.imputer,
             "differential_feature_names": self.differential_head._feature_names,
+            "differential_always_missing_mask": self.differential_head._always_missing_mask,
             "distribution_method": self.distribution.method,
             "distribution_n_sim": self.distribution.n_sim,
             "distribution_seed": self.distribution.seed,
@@ -421,9 +492,12 @@ class MLBTwoHeadModel:
         model.intensity_head.model = bundle["intensity_model"]
         model.intensity_head.scaler = bundle["intensity_scaler"]
         model.intensity_head._feature_names = bundle["intensity_feature_names"]
+        model.intensity_head._always_missing_mask = bundle.get("intensity_always_missing_mask")
         model.differential_head.model = bundle["differential_model"]
         model.differential_head.scaler = bundle["differential_scaler"]
+        model.differential_head.imputer = bundle["differential_imputer"]
         model.differential_head._feature_names = bundle["differential_feature_names"]
+        model.differential_head._always_missing_mask = bundle.get("differential_always_missing_mask")
         # Real bug caught before this was ever committed: setting .method/
         # .n_sim on the default-constructed distribution left .rng seeded
         # from cls()'s default seed=42, silently ignoring whatever seed the
@@ -513,8 +587,8 @@ class BootstrapMLBEnsemble:
             raise RuntimeError("BootstrapMLBEnsemble not fitted")
         probs = []
         for ih, dh in self._replicates:
-            x_int = np.array([[row.get(f, 0.0) for f in self._intensity_features]])
-            x_diff = np.array([[row.get(f, 0.0) for f in self._differential_features]])
+            x_int = np.array([[row.get(f, float("nan")) for f in self._intensity_features]])
+            x_diff = np.array([[row.get(f, float("nan")) for f in self._differential_features]])
             total = max(1.0, float(ih.predict(x_int)[0]))
             margin = float(dh.predict(x_diff)[0])
             pred = distribution.predict_game(str(row.get("event_id", "bootstrap")), total, margin)

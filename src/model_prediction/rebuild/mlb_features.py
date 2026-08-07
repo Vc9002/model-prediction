@@ -233,6 +233,41 @@ def identify_starters(pitches: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+_NAN = float("nan")
+
+# Task 5 (explicit missingness): a count/sample-size is genuinely 0 when
+# zero real observations exist -- that's a true, non-ambiguous statement
+# regardless of *why* the sample is empty. A rate, average, or single
+# most-recent-observation value computed *from* zero real observations is
+# mathematically undefined, not "a real value that happens to be zero" --
+# CLAUDE.md's own "0 must not mean both actual measured zero and unknown."
+# These module-level "no real history" defaults are the single source of
+# truth both pitcher_rolling_features()/pitcher_clean_rate_features() and
+# build_game_feature_row()'s "starter identity itself unknown" fallback
+# (Task 1) share, so the two can never silently drift apart.
+_NO_STARTER_ROLLING = {
+    "availability": 0.0, "starts_seen": 0.0, "avg_velocity": _NAN,
+    "k_pct": _NAN, "bb_pct": _NAN, "csw_pct": _NAN, "whiff_pct": _NAN,
+    "days_rest": _NAN, "pitches_last_start": _NAN,
+}
+# Clean-rate fields are the one exception to the NaN rule above: their
+# beta-binomial shrinkage estimator (missingness.pitcher_clean_rate_shrink)
+# is already well-defined at zero real observations -- posterior_mean
+# collapses to the pure league prior (alpha=beta=5 -> 0.5), a real,
+# principled answer, not a fabricated measurement. pitcher_clean_rate_features()
+# computes this identically via its own _no_history() helper; hardcoded
+# here as the same deterministic constant (player_id/stat_name never
+# affect beta_binomial_shrink()'s math, only its returned labels) so this
+# module-level default never needs a live call to compute.
+_CLEAN_RATE_PRIOR_MEAN = 5.0 / (5.0 + 5.0)
+_NO_STARTER_CLEAN = {
+    "availability": 0.0,
+    "first_inning_clean_rate": _CLEAN_RATE_PRIOR_MEAN, "first_inning_clean_n": 0.0,
+    "scoreless_inning_rate": _CLEAN_RATE_PRIOR_MEAN, "scoreless_inning_n": 0.0,
+    "clean_appearance_rate": _CLEAN_RATE_PRIOR_MEAN, "clean_appearance_n": 0.0,
+}
+
+
 def pitcher_rolling_features(
     pitches: pl.DataFrame, pitcher_id: int, before_game_date: str, lookback_starts: int = 3,
 ) -> dict[str, float]:
@@ -242,16 +277,23 @@ def pitcher_rolling_features(
     there isn't enough real history yet — never silently substitutes a
     league-average guess as if it were observed data (the caller is
     responsible for treating availability=0.0 as missingness, not signal).
+
+    Real fields (avg_velocity, k_pct, bb_pct, csw_pct, whiff_pct,
+    days_rest, pitches_last_start) are NaN, not 0.0, when unavailable --
+    0.0 is itself a plausible real value for several of these (a clean
+    strikeout-free outing really can have k_pct=0.0), so a literal zero
+    would be indistinguishable from real data. XGBoost and
+    HistGradientBoostingRegressor both treat NaN as a native missing
+    value; linear-model consumers must impute it explicitly (see
+    RunDifferentialHead in models/__init__.py) paired with the real
+    `availability` indicator, not silently receive an apparently-measured
+    zero.
     """
     prior = pitches.filter(
         (pl.col("pitcher") == pitcher_id) & (pl.col("game_date_str") < before_game_date)
     )
     if prior.is_empty():
-        return {
-            "availability": 0.0, "starts_seen": 0.0, "avg_velocity": 0.0,
-            "k_pct": 0.0, "bb_pct": 0.0, "csw_pct": 0.0, "whiff_pct": 0.0,
-            "days_rest": 0.0, "pitches_last_start": 0.0,
-        }
+        return dict(_NO_STARTER_ROLLING)
 
     recent_game_dates = (
         prior.select("game_date_str").unique().sort("game_date_str", descending=True)
@@ -271,23 +313,30 @@ def pitcher_rolling_features(
 
     last_game_date = recent_game_dates[0] if recent_game_dates else None
     pitches_last_start = (
-        recent.filter(pl.col("game_date_str") == last_game_date).height if last_game_date else 0
+        recent.filter(pl.col("game_date_str") == last_game_date).height if last_game_date else None
     )
     days_rest_vals = recent.filter(
         (pl.col("game_date_str") == last_game_date) & pl.col("pitcher_days_since_prev_game").is_not_null()
     )["pitcher_days_since_prev_game"]
-    days_rest = float(days_rest_vals[0]) if days_rest_vals.len() > 0 else 0.0
+    days_rest = float(days_rest_vals[0]) if days_rest_vals.len() > 0 else _NAN
+
+    avg_velocity_raw = recent["release_speed"].mean()
 
     return {
         "availability": 1.0,
         "starts_seen": float(len(recent_game_dates)),
-        "avg_velocity": float(recent["release_speed"].mean() or 0.0),
-        "k_pct": (strikeouts / batters_faced) if batters_faced else 0.0,
-        "bb_pct": (walks / batters_faced) if batters_faced else 0.0,
-        "csw_pct": (csw / total_pitches) if total_pitches else 0.0,
-        "whiff_pct": (whiffs / swings) if swings else 0.0,
+        # Real, disclosed 0/0-vs-real-zero distinction (Task 5): a
+        # denominator of 0 (no real swings/batters-faced/pitches in this
+        # small a real sample) makes the rate mathematically undefined,
+        # not a real observed zero -- `else 0.0` would have silently
+        # claimed a measured 0% rate from zero real observations.
+        "avg_velocity": float(avg_velocity_raw) if avg_velocity_raw is not None else _NAN,
+        "k_pct": (strikeouts / batters_faced) if batters_faced else _NAN,
+        "bb_pct": (walks / batters_faced) if batters_faced else _NAN,
+        "csw_pct": (csw / total_pitches) if total_pitches else _NAN,
+        "whiff_pct": (whiffs / swings) if swings else _NAN,
         "days_rest": days_rest,
-        "pitches_last_start": float(pitches_last_start),
+        "pitches_last_start": float(pitches_last_start) if pitches_last_start is not None else _NAN,
     }
 
 
@@ -331,16 +380,32 @@ def pitcher_clean_rate_features(
     Returns availability=0.0 with neutral defaults when there's no real
     prior start (or the source data predates bat_score/post_bat_score
     being collected) -- never substitutes a league-average guess."""
+    from .missingness import pitcher_clean_rate_shrink
+
+    # Task 5 fix: the beta-binomial shrinkage estimator is already
+    # well-defined at zero real observations (posterior_mean collapses to
+    # the league prior, e.g. 0.5 at alpha=beta=5) -- a real, principled
+    # answer, not a fabricated measurement. The two early-return branches
+    # below previously hardcoded a literal 0.0 instead, which both
+    # bypassed the function's own shrinkage design AND (per CLAUDE.md's
+    # "0 must not mean both real measured zero and unknown") looked
+    # indistinguishable from a genuinely observed 0% clean rate. Routing
+    # zero real observations through the identical shrink() call every
+    # other case already uses keeps the estimate honest and consistent.
+    def _no_history() -> dict[str, float]:
+        zero = pitcher_clean_rate_shrink(str(pitcher_id), "clean_appearance", 0.0, 0.0)
+        return {
+            "availability": 0.0,
+            "first_inning_clean_rate": zero.posterior_mean, "first_inning_clean_n": 0.0,
+            "scoreless_inning_rate": zero.posterior_mean, "scoreless_inning_n": 0.0,
+            "clean_appearance_rate": zero.posterior_mean, "clean_appearance_n": 0.0,
+        }
+
     prior = pitches.filter(
         (pl.col("pitcher") == pitcher_id) & (pl.col("game_date_str") < before_game_date)
     )
     if prior.is_empty() or "bat_score" not in prior.columns or "post_bat_score" not in prior.columns:
-        return {
-            "availability": 0.0,
-            "first_inning_clean_rate": 0.0, "first_inning_clean_n": 0.0,
-            "scoreless_inning_rate": 0.0, "scoreless_inning_n": 0.0,
-            "clean_appearance_rate": 0.0, "clean_appearance_n": 0.0,
-        }
+        return _no_history()
 
     prior = prior.filter(
         pl.col("bat_score").is_not_null() & pl.col("post_bat_score").is_not_null()
@@ -348,12 +413,7 @@ def pitcher_clean_rate_features(
         (pl.col("post_bat_score") - pl.col("bat_score")).alias("runs_this_pitch")
     )
     if prior.is_empty():
-        return {
-            "availability": 0.0,
-            "first_inning_clean_rate": 0.0, "first_inning_clean_n": 0.0,
-            "scoreless_inning_rate": 0.0, "scoreless_inning_n": 0.0,
-            "clean_appearance_rate": 0.0, "clean_appearance_n": 0.0,
-        }
+        return _no_history()
 
     # Clean appearance: per real start (game_pk), total runs allowed.
     per_start = prior.group_by("game_pk").agg(pl.col("runs_this_pitch").sum().alias("runs_allowed"))
@@ -377,8 +437,6 @@ def pitcher_clean_rate_features(
     )
     scoreless_innings = float(per_game_inning.filter(pl.col("runs_allowed") == 0).height)
     total_innings = float(per_game_inning.height)
-
-    from .missingness import pitcher_clean_rate_shrink
 
     first_inning_shrunk = pitcher_clean_rate_shrink(
         str(pitcher_id), "first_inning_clean", first_inning_clean, first_inning_n,
@@ -409,6 +467,14 @@ def bullpen_rolling_features(
     the same real first-pitch rule, not a name heuristic)."""
     from datetime import date, timedelta
 
+    # Task 5: bullpen_pitches/bullpen_appearances are real counts -- 0.0 is
+    # a true, unambiguous statement even when the whole window has zero
+    # real coverage. bullpen_avg_velocity is a measured average and is
+    # mathematically undefined at zero real pitches, so it's NaN rather
+    # than an apparently-real 0 mph (see pitcher_rolling_features' own
+    # avg_velocity for the identical reasoning).
+    no_bullpen = {"availability": 0.0, "bullpen_pitches": 0.0, "bullpen_avg_velocity": _NAN, "bullpen_appearances": 0.0}
+
     cutoff = (date.fromisoformat(before_game_date) - timedelta(days=lookback_days)).isoformat()
     team_pitches = pitches.filter(
         (pl.col("pitching_team") == team)
@@ -416,20 +482,21 @@ def bullpen_rolling_features(
         & (pl.col("game_date_str") < before_game_date)
     )
     if team_pitches.is_empty():
-        return {"availability": 0.0, "bullpen_pitches": 0.0, "bullpen_avg_velocity": 0.0, "bullpen_appearances": 0.0}
+        return dict(no_bullpen)
 
     team_starters = set(
         starters.filter(pl.col("pitching_team") == team)["pitcher"].to_list()
     )
     relief = team_pitches.filter(~pl.col("pitcher").is_in(list(team_starters)) if team_starters else pl.lit(True))
     if relief.is_empty():
-        return {"availability": 0.0, "bullpen_pitches": 0.0, "bullpen_avg_velocity": 0.0, "bullpen_appearances": 0.0}
+        return dict(no_bullpen)
 
     appearances = relief.select(["game_pk", "pitcher"]).unique().height
+    avg_velocity_raw = relief["release_speed"].mean()
     return {
         "availability": 1.0,
         "bullpen_pitches": float(relief.height),
-        "bullpen_avg_velocity": float(relief["release_speed"].mean() or 0.0),
+        "bullpen_avg_velocity": float(avg_velocity_raw) if avg_velocity_raw is not None else _NAN,
         "bullpen_appearances": float(appearances),
     }
 
@@ -534,10 +601,16 @@ def point_in_time_probable_starters(
     return result
 
 
+# Task 5: every field here is a real measured/observed value (or the age
+# of one) -- there is no real count/sample-size field to keep as a
+# meaningful 0. 0.0 previously stood in for "no forecast" in every one of
+# these, indistinguishable from a real, plausible 0 (0mph wind, 0mm rain,
+# and -- worst of all -- forecast_age_hours=0.0 looked exactly like "just
+# observed," the opposite of "never observed").
 _NO_WEATHER = {
-    "availability": 0.0, "temp_f_first_pitch": 0.0, "wind_mph_first_pitch": 0.0,
-    "wind_direction_deg_first_pitch": 0.0, "precip_mm_first_pitch": 0.0,
-    "forecast_age_hours": 0.0,
+    "availability": 0.0, "temp_f_first_pitch": _NAN, "wind_mph_first_pitch": _NAN,
+    "wind_direction_deg_first_pitch": _NAN, "precip_mm_first_pitch": _NAN,
+    "forecast_age_hours": _NAN,
 }
 
 
@@ -729,19 +802,6 @@ def resolve_statcast_game_pk(
     return best_game_pk
 
 
-_NO_STARTER_ROLLING = {
-    "availability": 0.0, "starts_seen": 0.0, "avg_velocity": 0.0,
-    "k_pct": 0.0, "bb_pct": 0.0, "csw_pct": 0.0, "whiff_pct": 0.0,
-    "days_rest": 0.0, "pitches_last_start": 0.0,
-}
-_NO_STARTER_CLEAN = {
-    "availability": 0.0,
-    "first_inning_clean_rate": 0.0, "first_inning_clean_n": 0.0,
-    "scoreless_inning_rate": 0.0, "scoreless_inning_n": 0.0,
-    "clean_appearance_rate": 0.0, "clean_appearance_n": 0.0,
-}
-
-
 def resolve_horizon_starter_names(
     espn_game: dict, horizon: str, probable_records: list[dict],
 ) -> tuple[str | None, str | None, str | None]:
@@ -774,6 +834,44 @@ def resolve_horizon_starter_names(
     if names is None:
         return None, None, "no_valid_probable_at_horizon"
     return names["home_starter"], names["away_starter"], None
+
+
+# Task 5 (explicit missingness): the one shared, canonical feature-list
+# definition for MLBTwoHeadModel's two heads -- previously each of
+# train_mlb_rebuild_real_features.py, train_mlb_xgboost_ensemble.py, and
+# mlb_shadow_pipeline.py independently hardcoded its own copy of these
+# two lists, with no guarantee they'd stay identical (exactly the kind of
+# drift Task 4 eliminated for the dataset-building loop itself, just one
+# layer up, for *which* columns of that dataset each model consumes).
+# mlb_shadow_pipeline.py's copy matters most: it's the one that actually
+# retrains the live-serving artifact, so a silent difference there would
+# be a real train-serving mismatch, not just a research-script
+# inconsistency.
+#
+# Includes the real `*_availability` indicators paired with every
+# feature that can now be NaN (see pitcher_rolling_features(),
+# bullpen_rolling_features(), load_weather_at_decision_time() above) --
+# CLAUDE.md's "imputed value + missingness indicator must be paired"
+# requirement for RunDifferentialHead's ElasticNet (models/__init__.py),
+# and useful signal even for RunIntensityHead's HistGradientBoostingRegressor,
+# which handles the NaN natively but still benefits from an explicit flag.
+MLB_INTENSITY_FEATURES = [
+    "home_sp_avg_velocity", "away_sp_avg_velocity",
+    "home_sp_csw_pct", "away_sp_csw_pct",
+    "home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
+    "park_factor", "temp_f_first_pitch",
+    "home_sp_availability", "away_sp_availability",
+    "home_bp_availability", "away_bp_availability",
+    "weather_availability",
+]
+MLB_DIFFERENTIAL_FEATURES = [
+    "home_sp_k_pct", "away_sp_k_pct",
+    "home_sp_bb_pct", "away_sp_bb_pct",
+    "home_sp_days_rest", "away_sp_days_rest",
+    "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity",
+    "home_sp_availability", "away_sp_availability",
+    "home_bp_availability", "away_bp_availability",
+]
 
 
 def build_game_feature_row(

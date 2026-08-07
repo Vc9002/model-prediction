@@ -31,6 +31,8 @@ from .economic import SizeLimits
 from .identity import resolve_or_link_polymarket_event_id
 from .mlb_features import (
     ESPN_TO_STATCAST_ABBREV,
+    MLB_DIFFERENTIAL_FEATURES,
+    MLB_INTENSITY_FEATURES,
     build_live_game_feature_row,
     dedupe_scoreboard,
     identify_starters,
@@ -51,18 +53,12 @@ from .models import BootstrapMLBEnsemble, MLBTwoHeadModel
 HORIZON_LATE = "late"
 DECISION_POLICY_VERSION = "winner_first_v1"
 
-INTENSITY_FEATURES = [
-    "home_sp_avg_velocity", "away_sp_avg_velocity",
-    "home_sp_csw_pct", "away_sp_csw_pct",
-    "home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
-    "park_factor", "temp_f_first_pitch",
-]
-DIFFERENTIAL_FEATURES = [
-    "home_sp_k_pct", "away_sp_k_pct",
-    "home_sp_bb_pct", "away_sp_bb_pct",
-    "home_sp_days_rest", "away_sp_days_rest",
-    "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity",
-]
+# Task 5: the one shared feature-list definition (mlb_features.py), also
+# used by the two real-feature training scripts -- this is the live
+# artifact-producing path, so a silent difference here would be a real
+# train-serving mismatch, not just research-script inconsistency.
+INTENSITY_FEATURES = MLB_INTENSITY_FEATURES
+DIFFERENTIAL_FEATURES = MLB_DIFFERENTIAL_FEATURES
 
 
 def train_through(features: pl.DataFrame, cutoff_date: str) -> tuple[MLBTwoHeadModel, BootstrapMLBEnsemble, int]:

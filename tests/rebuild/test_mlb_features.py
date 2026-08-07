@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import gzip
 import json
-from datetime import datetime
+import math
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,6 +19,7 @@ import pytest
 
 from model_prediction.rebuild.mlb_features import (
     build_game_feature_row,
+    build_live_game_feature_row,
     bullpen_rolling_features,
     dedupe_scoreboard,
     identify_starters,
@@ -95,9 +97,14 @@ class TestPitcherRollingFeaturesPointInTime:
         feats = pitcher_rolling_features(pitches, 999, before_game_date="2026-08-01")
 
         assert feats["availability"] == 0.0
-        assert feats["avg_velocity"] == 0.0, (
-            "a pitcher with zero prior starts must report availability=0, not a silently "
-            "substituted league-average-looking number"
+        # Task 5: avg_velocity is a measured average, mathematically
+        # undefined at zero real observations -- NaN, not an
+        # apparently-real 0 mph (0.0 would be indistinguishable from a
+        # genuinely observed value and is not itself a plausible real
+        # pitch velocity anyway).
+        assert math.isnan(feats["avg_velocity"]), (
+            "a pitcher with zero prior starts must report availability=0 and NaN, not a "
+            "silently substituted league-average-looking number"
         )
 
     def test_k_pct_and_bb_pct_computed_from_real_plate_appearance_outcomes(self):
@@ -128,7 +135,13 @@ class TestPitcherCleanRateFeatures:
         pitches = normalize_statcast_pitches(pl.DataFrame([_pitch_row(1, "2026-08-05", 100, 1, 1)]))
         feats = pitcher_clean_rate_features(pitches, 999, before_game_date="2026-08-01")
         assert feats["availability"] == 0.0
-        assert feats["clean_appearance_rate"] == 0.0
+        # Task 5: unlike the other rate fields, clean-rate estimates are
+        # beta-binomial shrunk and remain well-defined at zero real
+        # observations -- the posterior mean collapses to the pure league
+        # prior (alpha=beta=5 -> 0.5), a real Bayesian answer, not a
+        # fabricated raw-rate zero.
+        assert feats["clean_appearance_rate"] == 0.5
+        assert feats["clean_appearance_n"] == 0.0
         assert feats["clean_appearance_n"] == 0.0
 
     def test_future_starts_never_leak_into_a_past_decision(self):
@@ -519,7 +532,7 @@ class TestBuildGameFeatureRowStarterParity:
         assert row["starters_known"] == 0.0
         assert row["starter_missing_reason"] == "no_valid_probable_at_horizon"
         assert row["home_sp_availability"] == 0.0
-        assert row["home_sp_avg_velocity"] == 0.0
+        assert math.isnan(row["home_sp_avg_velocity"])
 
     def test_name_that_cannot_be_resolved_to_a_statcast_id_also_zeroes_not_falls_back(self):
         game = _espn_game()
@@ -534,7 +547,7 @@ class TestBuildGameFeatureRowStarterParity:
         assert row is not None
         assert row["starters_known"] == 0.0
         assert row["starter_missing_reason"] == "starter_name_not_resolved_to_statcast_id"
-        assert row["home_sp_avg_velocity"] == 0.0
+        assert math.isnan(row["home_sp_avg_velocity"])
 
 
 def _statsapi_game(game_pk: int, game_date_utc: str, home: str, away: str) -> dict:
@@ -699,7 +712,7 @@ class TestLoadWeatherAtDecisionTime:
         )
 
         assert result["availability"] == 0.0
-        assert result["temp_f_first_pitch"] == 0.0
+        assert math.isnan(result["temp_f_first_pitch"])
 
     def test_selects_the_hour_closest_to_first_pitch_not_a_daily_mean(self, tmp_path):
         # Real regression for the "daily mean dilutes the signal" bug:
@@ -763,3 +776,59 @@ class TestLoadWeatherAtDecisionTime:
 
         # observed at 10:00Z, decision at 21:10Z -> 11h10m old
         assert result["forecast_age_hours"] == pytest.approx(11.1666, abs=0.01)
+
+
+class TestTrainServingMissingnessParity:
+    """Explicit train-serving parity check (Task 5's closing requirement):
+    historical (build_game_feature_row) and live (build_live_game_feature_row)
+    feature rows must encode missingness identically -- same NaN pattern,
+    same availability flags -- for the identical real inputs. Both
+    functions delegate to the same underlying pitcher_rolling_features()/
+    pitcher_clean_rate_features()/bullpen_rolling_features()/
+    load_weather_at_decision_time() calls, so this should hold by
+    construction; this test proves it rather than assuming it."""
+
+    SHARED_PREFIXES = ("home_sp_", "away_sp_", "home_sp_clean_", "away_sp_clean_", "home_bp_", "away_bp_")
+    SHARED_EXACT = ("park_factor", "weather_availability", "temp_f_first_pitch",
+                     "wind_mph_first_pitch", "wind_direction_deg_first_pitch",
+                     "precip_mm_first_pitch", "weather_forecast_age_hours")
+
+    def _same_value(self, a, b) -> bool:
+        if isinstance(a, float) and isinstance(b, float) and math.isnan(a) and math.isnan(b):
+            return True
+        return a == b
+
+    def test_identical_missingness_for_a_starter_with_no_prior_history(self):
+        game = _espn_game()
+        # Pitcher A/B both real, resolvable names, but neither has any
+        # real prior Statcast pitches before this game's date -- every
+        # continuous stat must come back NaN in both paths identically.
+        this_game = [
+            _pitch_row(100, "2026-08-06", pitcher=1, at_bat_number=1, pitch_number=1,
+                       home_team="SEA", away_team="DET"),
+        ]
+        pitches = normalize_statcast_pitches(pl.DataFrame(this_game))
+        starters = identify_starters(pitches)
+
+        records = [_pit_probable("401", "2026-08-06T16:00:00+00:00", "Pitcher A", "Pitcher B")]
+
+        with patch(
+            "model_prediction.rebuild.mlb_features.lookup_pitcher_id",
+            side_effect=lambda name: {"Pitcher A": 1, "Pitcher B": 2}.get(name),
+        ):
+            historical_row = build_game_feature_row(game, pitches, starters, "data/rebuild", "late", records)
+            decision_time = datetime.fromisoformat(game["event_start_utc"]) - timedelta(hours=1)
+            live_row = build_live_game_feature_row(
+                game, "Pitcher A", "Pitcher B", pitches, starters, "data/rebuild",
+                decision_time_utc=decision_time,
+            )
+
+        assert historical_row is not None
+        assert live_row is not None
+
+        for key, value in live_row.items():
+            if key.startswith(self.SHARED_PREFIXES) or key in self.SHARED_EXACT:
+                assert key in historical_row, f"{key} present in live row but not historical row"
+                assert self._same_value(historical_row[key], value), (
+                    f"{key} differs between historical ({historical_row[key]}) and live ({value})"
+                )
