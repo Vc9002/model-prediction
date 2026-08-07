@@ -196,7 +196,14 @@ def match_markets_stage(
         if state.market_rows.is_empty():
             state.candidates_by_event[event_id] = []
             continue
-        candidates = real_market_candidates(state.market_rows, g["home_team"], g["away_team"])
+        # Canonical team IDs (from ESPN scoreboard collection's real
+        # identity wiring) are preferred over name matching when available
+        # -- real_market_candidates() falls back to word-boundary name
+        # matching honestly when they aren't.
+        candidates = real_market_candidates(
+            state.market_rows, g["home_team"], g["away_team"],
+            home_canonical_id=g.get("home_team_canonical_id"), away_canonical_id=g.get("away_team_canonical_id"),
+        )
         state.candidates_by_event[event_id] = [c for c in candidates if c.market_type == "moneyline"]
         n_matched += 1
 

@@ -13,7 +13,7 @@ from typing import Any
 
 import polars as pl
 
-from .identity import IdentityRegistry, resolve_espn_scoreboard_team_ids
+from .identity import IdentityRegistry, resolve_espn_scoreboard_team_ids, resolve_polymarket_team_id
 from .schemas import MARKET_SNAPSHOT_CONTRACT, SCOREBOARD_CONTRACT
 from .storage import MarketStore, NormalizedStore, RawStore, provenance_row, utc_now
 
@@ -321,6 +321,7 @@ class MLBCollector:
                                 "is_first_five_innings": "-f5-" in market_slug,
                                 "team_or_side": side.get("selection", ""),
                                 "team": side.get("team"),
+                                "team_canonical_id": resolve_polymarket_team_id(self.identity, "mlb", side.get("team")),
                                 "line": side.get("line", line),
                                 "executable_price": side.get("price_probability"),
                                 "decimal_odds": side.get("decimal_odds"),
@@ -564,6 +565,7 @@ class NBACollector:
                                               utc_now().isoformat(), event.get("event_start_utc", "")),
                             "event_id": event_id, "market_id": market_id, "market_type": market_type,
                             "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
                             "line": side.get("line", line),
                             "executable_price": side.get("price_probability"),
                             "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
@@ -682,6 +684,7 @@ class NFLCollector:
                             event.get("event_start_utc", "")),
                             "event_id": event_id, "market_id": market_id, "market_type": market_type,
                             "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
                             "line": side.get("line", line),
                             "executable_price": side.get("price_probability"),
                             "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
@@ -790,6 +793,7 @@ class SoccerCollector:
                             event.get("event_start_utc", "")),
                             "event_id": event_id, "market_id": market_id, "market_type": market_type,
                             "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
                             "line": side.get("line", line),
                             "executable_price": side.get("price_probability"),
                             "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
@@ -926,6 +930,7 @@ class TennisCollector:
                             event.get("event_start_utc", "")),
                             "event_id": event_id, "market_id": market_id, "market_type": market_type,
                             "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
                             "line": side.get("line", line),
                             "executable_price": side.get("price_probability"),
                             "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),

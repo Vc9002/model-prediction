@@ -143,5 +143,10 @@ MARKET_SNAPSHOT_CONTRACT = TableContract(
         ColumnSpec("executable_price", float, nullable=True),
         ColumnSpec("observed_at_utc", str, nullable=False),
         ColumnSpec("source", str, nullable=False),
+        # Resolved via identity.resolve_polymarket_team_id() -- null for
+        # total-market rows (no team) and for a real market-side team name
+        # the identity registry can't confidently match to an already-
+        # registered canonical team (fails closed, not fabricated).
+        ColumnSpec("team_canonical_id", str, nullable=True),
     ],
 )

@@ -247,14 +247,33 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
     not an advanced model" foundation build these 5 sports were missing.
     See basic_sport_pipeline.py's module docstring for the real,
     disclosed scope limits (moneyline only, no bootstrap ensemble, no
-    derived feature store) versus MLB's pipeline. Inherits collect() from
-    _CollectionOnlyAdapter unchanged -- collection itself was already real."""
+    derived feature store) versus MLB's pipeline."""
 
-    def __init__(self, sport: str, data_root: str, collector: Any, collect_fn: Callable[[str], dict]) -> None:
+    def __init__(self, sport: str, data_root: str, collector: Any, collect_fn: Callable[[str], dict[str, Any]]) -> None:
         super().__init__(sport, collector)
         self.data_root = data_root
         self.collect_fn = collect_fn
         self._state: Any = None  # basic_sport_pipeline.BasicRunState, held across predict/match_markets/decide
+
+    def collect(self, date: str, run_id: str | None = None) -> StageResult:
+        # Real bug found live (2026-08-07): _CollectionOnlyAdapter.collect()
+        # calls self.collector.collect_date(date) with no sport argument,
+        # which is correct for the single-sport collectors (NFL/Soccer/
+        # Tennis) but silently defaulted to sport="nba" for WNBA --
+        # NBACollector.collect_date()'s own default -- so the CLI's
+        # collect stage was collecting real NBA data (correctly NO_DATA,
+        # off-season) while claiming to serve WNBA. predict/match_markets/
+        # decide never surfaced this because they read the already
+        # correctly-collected wnba scoreboard/market parquet directly, not
+        # through this stage. Uses self.collect_fn (the same
+        # sport-parameterized closure match_markets_stage() calls) instead
+        # of the raw collector, so both stages are guaranteed consistent.
+        try:
+            result = self.collect_fn(date)
+        except Exception as e:  # noqa: BLE001 -- reported as a real, visible per-stage error, not swallowed
+            return StageResult("collect", STAGE_ERROR, {"error": str(e)[:300]})
+        status_map = {"ok": STAGE_SUCCESS, "no_games": STAGE_NO_DATA, "partial": STAGE_SUCCESS}
+        return StageResult("collect", status_map.get(str(result.get("status", "")), STAGE_ERROR), result)
 
     def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         # Real, not fabricated, but genuinely basic: the "feature snapshot"

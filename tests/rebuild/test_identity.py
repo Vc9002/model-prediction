@@ -15,6 +15,7 @@ from model_prediction.rebuild.identity import (
     IdentityRegistry,
     jaccard_similarity,
     normalize_name,
+    resolve_espn_scoreboard_team_ids,
     resolve_or_register_team,
 )
 from model_prediction.rebuild.metadata import MetadataDB
@@ -181,3 +182,40 @@ class TestResolveOrRegisterTeam:
             team_name="Detroit Tigers", effective_from_utc="2026-01-01",
         )
         assert mariners.entity_id != tigers.entity_id
+
+
+class TestResolveEspnScoreboardTeamIdsCrossSportCollision:
+    """Real, serious bug found live (2026-08-07): ESPN's team `id` is only
+    unique *within* one sport's own numbering -- WNBA team id "20" and MLB
+    team id "20" are two completely unrelated real teams. Confirmed live:
+    WNBA's "Atlanta Dream" (ESPN team id 20) was silently resolved to
+    MLB's "Washington Nationals" (also ESPN team id 20) because both
+    collectors passed the same bare source_id="espn_public" into
+    resolve_or_register_team(), and entity_mappings' (source_id,
+    source_entity_id) key has no sport dimension. Fixed by namespacing
+    source_id with sport inside resolve_espn_scoreboard_team_ids() itself."""
+
+    def test_same_espn_team_id_in_two_sports_resolves_to_two_different_teams(self, tmp_path):
+        registry = _registry(tmp_path)
+        mlb_home, mlb_away = resolve_espn_scoreboard_team_ids(
+            registry, "mlb", "espn_public",
+            {"id": "20", "displayName": "Washington Nationals"},
+            {"id": "15", "displayName": "Atlanta Braves"},
+            "2026-08-07T00:00:00+00:00",
+        )
+        wnba_home, wnba_away = resolve_espn_scoreboard_team_ids(
+            registry, "wnba", "espn_public",
+            {"id": "20", "displayName": "Atlanta Dream"},
+            {"id": "15", "displayName": "Washington Mystics"},
+            "2026-08-07T00:00:00+00:00",
+        )
+        # The real bug: before the fix, wnba_home (ESPN id "20") would
+        # resolve to the already-registered MLB entity for ESPN id "20"
+        # (Washington Nationals) instead of a genuinely new WNBA team.
+        assert wnba_home != mlb_home
+        assert wnba_away != mlb_away
+        assert registry.resolve("espn_public:mlb", "20").canonical_name == "Washington Nationals"
+        assert registry.resolve("espn_public:wnba", "20").canonical_name == "Atlanta Dream"
+        # And the old, unnamespaced source_id is genuinely unused now --
+        # nothing was ever registered directly under bare "espn_public".
+        assert registry.resolve("espn_public", "20") is None

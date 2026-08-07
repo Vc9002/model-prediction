@@ -282,21 +282,87 @@ def resolve_espn_scoreboard_team_ids(
     Soccer/Tennis don't each reimplement the same "resolve if id+name
     present, else None" guard around resolve_or_register_team(). Returns
     (home_canonical_id, away_canonical_id); either is None if that side's
-    real ESPN team object is missing id or displayName (never guessed)."""
+    real ESPN team object is missing id or displayName (never guessed).
+
+    Real, serious bug found and fixed live (2026-08-07): ESPN's team `id`
+    is only unique *within* one sport's own numbering -- e.g. WNBA team id
+    "20" and MLB team id "20" are two completely unrelated real teams
+    (confirmed live: WNBA's "Atlanta Dream" was silently resolved to MLB's
+    "Washington Nationals" because both collectors passed the same bare
+    source_id="espn_public" into resolve_or_register_team(), whose first
+    lookup step -- registry.resolve(source_id, source_team_id) -- has no
+    sport dimension in entity_mappings' (source_id, source_entity_id) key).
+    Namespacing source_id by sport here (not at every call site) scopes
+    every ESPN team-id lookup to its own sport's numbering, matching
+    reality: `source_id` was never really one shared ID space, ESPN's own
+    per-sport numbering already wasn't."""
+    namespaced_source_id = f"{source_id}:{sport}"
     home_id = away_id = None
     if home_team_obj.get("id") and home_team_obj.get("displayName"):
         home_id = resolve_or_register_team(
-            registry, sport=sport, source_id=source_id,
+            registry, sport=sport, source_id=namespaced_source_id,
             source_team_id=str(home_team_obj["id"]), team_name=home_team_obj["displayName"],
             effective_from_utc=observed_at,
         ).entity_id
     if away_team_obj.get("id") and away_team_obj.get("displayName"):
         away_id = resolve_or_register_team(
-            registry, sport=sport, source_id=source_id,
+            registry, sport=sport, source_id=namespaced_source_id,
             source_team_id=str(away_team_obj["id"]), team_name=away_team_obj["displayName"],
             effective_from_utc=observed_at,
         ).entity_id
     return home_id, away_id
+
+
+def word_boundary_name_match(a: str, b: str) -> bool:
+    """True when a and b identify the same real-world team name despite one
+    being a shorter form of the other (e.g. Polymarket's "Washington" vs
+    ESPN's "Washington Mystics") -- word-boundary prefix match only, not a
+    naive substring check, which would wrongly match unrelated names that
+    happen to share leading letters (e.g. "SEA" inside "Seattle
+    Mariners" -- a real bug this exact shape was already fixed for once,
+    see mlb_market_matching.py's module docstring)."""
+    if a == b:
+        return True
+    return a.startswith(b + " ") or b.startswith(a + " ")
+
+
+def resolve_polymarket_team_id(
+    registry: IdentityRegistry, sport: str, team_name: str | None,
+) -> str | None:
+    """Resolve a Polymarket-reported team name to the same canonical team
+    entity ESPN scoreboard collection already registered for this sport.
+
+    Polymarket exposes no stable per-team ID of its own (unlike ESPN's
+    numeric team id) -- only a name string, sometimes a short city name
+    ("Washington") rather than ESPN's full display name ("Washington
+    Mystics"). There is no (source_id, source_team_id) pair to look up the
+    way resolve_or_register_team() does for ESPN, so this uses
+    word_boundary_name_match() against already-registered same-sport team
+    entities instead of IdentityRegistry.propose_match()'s Jaccard
+    similarity -- Jaccard token-set similarity scores "Washington" against
+    "Washington Mystics" at 0.5 (1 shared token of 2 total), well under
+    propose_match()'s real 0.90 fail-closed threshold, so it would
+    incorrectly refuse this exact real case.
+
+    Fails closed (returns None) on no match or an ambiguous one (more than
+    one same-sport team's name is a word-boundary match) -- never guesses,
+    never mints a new canonical team purely from a market-side name
+    string, since a genuinely new/misspelled name should surface as
+    unresolved, not silently become a duplicate identity."""
+    if not team_name:
+        return None
+    existing = registry.resolve("polymarket_us", team_name)
+    if existing is not None:
+        return existing.entity_id
+    matches = [
+        ident for ident in registry._cache.values()
+        if ident.entity_type == "team" and ident.sport == sport
+        and word_boundary_name_match(team_name, ident.canonical_name)
+    ]
+    if len(matches) != 1:
+        return None
+    registry.map(matches[0].entity_id, "polymarket_us", team_name)
+    return matches[0].entity_id
 
 
 def json_loads_safe(value: str | None) -> dict[str, Any]:

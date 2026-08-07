@@ -282,7 +282,11 @@ class TestScoreboardCanonicalIdentity:
 
         # And the identity is real and independently resolvable, not just
         # a value that happens to be non-null.
-        resolved = collector.identity.resolve("espn_public", "1")
+        # source_id is sport-namespaced ("espn_public:mlb") to prevent real
+        # cross-sport ESPN team-id collisions (e.g. WNBA team id "20" and
+        # MLB team id "20" are unrelated real teams) -- see
+        # resolve_espn_scoreboard_team_ids()'s docstring for the live bug this fixed.
+        resolved = collector.identity.resolve("espn_public:mlb", "1")
         assert resolved is not None
         assert resolved.canonical_name == "Baltimore Orioles"
 
@@ -295,9 +299,9 @@ class TestScoreboardCanonicalIdentity:
             return_value=FakeESPNClientWithTeamIds(),
         ):
             collector.collect_espn_scoreboard("2026-07-20")
-            first_id = collector.identity.resolve("espn_public", "1").entity_id
+            first_id = collector.identity.resolve("espn_public:mlb", "1").entity_id
 
             collector.collect_espn_scoreboard("2026-07-20")
-            second_id = collector.identity.resolve("espn_public", "1").entity_id
+            second_id = collector.identity.resolve("espn_public:mlb", "1").entity_id
 
         assert first_id == second_id, "rerunning collection must not mint a duplicate canonical identity"

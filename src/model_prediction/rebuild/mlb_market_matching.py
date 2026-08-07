@@ -28,6 +28,7 @@ from datetime import datetime
 import polars as pl
 
 from .decision import MarketEvaluation
+from .identity import word_boundary_name_match as _team_name_matches
 from .storage import sha256_hex, utc_now
 
 
@@ -40,36 +41,60 @@ def exclude_first_five_innings(market_rows: pl.DataFrame) -> pl.DataFrame:
     return market_rows.filter(~pl.col("is_first_five_innings"))
 
 
-def _team_name_matches(market_team: str, real_name: str) -> bool:
-    """True when market_team (Polymarket's own team string) identifies the
-    same real team as real_name (the collector's full ESPN display name).
-
-    Real gap found live wiring the basic NBA/WNBA/NFL/Soccer/Tennis
-    adapters (2026-08-07): Polymarket's `team` field is the real full
-    display name for MLB ("Seattle Mariners") but a short city name for
-    WNBA ("Washington" for "Washington Mystics") — an exact-equality check
-    silently matched zero real WNBA rows even with 216 real market rows
-    already collected (confirmed live: candidate_markets_evaluated stayed
-    0 for every real scheduled game). Word-boundary prefix match only —
-    NOT a naive substring check, which would reintroduce a *different*
-    silent bug this function was already fixed for once (bug #2, module
-    docstring): "SEA" must never match "Seattle Mariners" just because of
-    shared leading letters."""
-    if market_team == real_name:
-        return True
-    return real_name.startswith(market_team + " ") or market_team.startswith(real_name + " ")
+# _team_name_matches (aliased above from identity.word_boundary_name_match)
+# is the real, tested name-based fallback used when a market row has no
+# resolved team_canonical_id. True when market_team (Polymarket's own team
+# string) identifies the same real team as real_name (the collector's full
+# ESPN display name).
+#
+# Real gap found live wiring the basic NBA/WNBA/NFL/Soccer/Tennis adapters
+# (2026-08-07): Polymarket's `team` field is the real full display name
+# for MLB ("Seattle Mariners") but a short city name for WNBA
+# ("Washington" for "Washington Mystics") — an exact-equality check
+# silently matched zero real WNBA rows even with 216 real market rows
+# already collected (confirmed live: candidate_markets_evaluated stayed 0
+# for every real scheduled game). Word-boundary prefix match only — NOT a
+# naive substring check, which would reintroduce a *different* silent bug
+# this function was already fixed for once (bug #2, module docstring):
+# "SEA" must never match "Seattle Mariners" just because of shared leading
+# letters.
 
 
 def resolve_polymarket_event_id(
     market_rows: pl.DataFrame, home_name: str, away_name: str,
+    *, home_canonical_id: str | None = None, away_canonical_id: str | None = None,
 ) -> str | None:
     """Polymarket's own event_id (e.g. "70535") for this specific game,
     found via its moneyline/spread rows that carry real team names — total
     markets don't carry a team, only a line, so they can't be matched this
-    way and must instead be filtered by this resolved event_id. Takes full
-    team names ("Seattle Mariners"), not Statcast-style abbreviations
-    ("SEA") — see bug #2 above. Returns None on no/ambiguous match rather
-    than guessing which event a game belongs to."""
+    way and must instead be filtered by this resolved event_id.
+
+    Canonical-ID matching is primary when both sides' canonical team IDs
+    are supplied and the market rows carry a real `team_canonical_id`
+    (resolved at collection time via identity.resolve_polymarket_team_id())
+    — real ID equality, not name heuristics. Falls back to real,
+    word-boundary name matching (_team_name_matches -- takes full team
+    names like "Seattle Mariners", not Statcast-style abbreviations like
+    "SEA", see bug #2 above) only when canonical IDs aren't available,
+    e.g. an older collected snapshot predating this column, or a market
+    team name the identity registry couldn't confidently resolve. Returns
+    None on no/ambiguous match rather than guessing which event a game
+    belongs to."""
+    if home_canonical_id and away_canonical_id and "team_canonical_id" in market_rows.columns:
+        id_rows = market_rows.filter(pl.col("team_canonical_id").is_in([home_canonical_id, away_canonical_id]))
+        event_ids = id_rows["event_id"].unique().to_list()
+        if len(event_ids) == 1:
+            return event_ids[0]
+        if len(event_ids) > 1:
+            # A genuine ambiguity in ID-space (e.g. a bad historical
+            # mapping) is real signal, not a reason to retry with weaker
+            # name matching -- fail closed here rather than silently
+            # falling through to a name-based guess.
+            return None
+        # len == 0: this collector's rows may simply not have real
+        # resolved canonical IDs yet (team_canonical_id all null) --
+        # correctly falls through to name matching below.
+
     team_rows = market_rows.filter(
         pl.col("team").map_elements(
             lambda t: t is not None and (_team_name_matches(t, home_name) or _team_name_matches(t, away_name)),
@@ -134,6 +159,7 @@ def real_quote_age_seconds(observed_at_utc: str | None, *, now: datetime | None 
 
 def real_market_candidates(
     market_rows: pl.DataFrame, home_name: str, away_name: str,
+    *, home_canonical_id: str | None = None, away_canonical_id: str | None = None,
 ) -> list[MarketEvaluation]:
     """Real MarketEvaluation objects from the collected Polymarket rows for
     this specific game only — resolves the game's real Polymarket event_id
@@ -156,7 +182,10 @@ def real_market_candidates(
     a genuine depth-providing source is integrated — that is the honest,
     correct behavior given real data scarcity, not a bug to work around
     with SizeLimits(min_depth_units=0.0)."""
-    event_id = resolve_polymarket_event_id(market_rows, home_name, away_name)
+    event_id = resolve_polymarket_event_id(
+        market_rows, home_name, away_name,
+        home_canonical_id=home_canonical_id, away_canonical_id=away_canonical_id,
+    )
     if event_id is None:
         return []
     event_rows = market_rows.filter(pl.col("event_id") == event_id)
@@ -173,7 +202,14 @@ def real_market_candidates(
     total_rows = event_rows.filter(pl.col("market_type") == "total")
     candidates = []
     for r in game_rows.iter_rows(named=True):
-        side = "home" if _team_name_matches(r["team"], home_name) else "away"
+        # Canonical-ID side determination when this row carries a real
+        # resolved team_canonical_id (primary, ID-based per the user's
+        # canonical-identity-migration request) -- falls back to
+        # word-boundary name matching only when it doesn't.
+        if home_canonical_id and r.get("team_canonical_id") is not None:
+            side = "home" if r["team_canonical_id"] == home_canonical_id else "away"
+        else:
+            side = "home" if _team_name_matches(r["team"], home_name) else "away"
         candidates.append(MarketEvaluation(
             market_id=r["market_id"], market_type=r["market_type"], team_or_side=side,
             line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],

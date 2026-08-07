@@ -141,6 +141,26 @@ class TestBasicEloAdapter:
     -- proves predict/match_markets/decide are genuinely real (not the
     NOT_IMPLEMENTED mixin) and fail closed the same way MLBAdapter does."""
 
+    def test_wnba_collect_calls_the_real_collector_with_sport_wnba_not_the_nba_default(self, tmp_path):
+        # Real bug found live (2026-08-07): the inherited
+        # _CollectionOnlyAdapter.collect() called
+        # self.collector.collect_date(date) with no sport argument, which
+        # silently defaulted to NBACollector.collect_date()'s own
+        # sport="nba" default -- so the shared CLI's collect stage for
+        # --sport wnba was actually collecting real NBA data (correctly
+        # NO_DATA, off-season) while claiming to serve WNBA.
+        # _BasicEloAdapter.collect() must use the same sport-parameterized
+        # collect_fn match_markets_stage() uses, not the raw collector.
+        calls = []
+        adapter = build_adapter("wnba", str(tmp_path))
+        # Replaces the real network-calling collect_date with a spy so this
+        # stays a fast, deterministic unit test -- live network
+        # verification is done separately (matching the pattern used
+        # elsewhere in this file).
+        adapter.collector.collect_date = lambda d, sport="nba": (calls.append(sport), {"status": "no_games"})[1]
+        adapter.collect("2026-08-06")
+        assert calls == ["wnba"]
+
     def test_nba_predict_on_a_cold_empty_data_root_is_honest_no_data_not_a_crash(self, tmp_path):
         adapter = build_adapter("nba", str(tmp_path))
         result = adapter.predict("2026-08-06", "late")

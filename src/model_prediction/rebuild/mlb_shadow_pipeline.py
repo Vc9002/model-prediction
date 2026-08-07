@@ -352,14 +352,26 @@ def match_markets_stage(
         if state.market_rows.is_empty():
             state.candidates_by_event[event_id] = []
             continue
-        resolved_event_id = resolve_polymarket_event_id(state.market_rows, g["home_team"], g["away_team"])
+        # Canonical team IDs (from ESPN scoreboard collection's real
+        # identity wiring) are preferred over name matching when
+        # available -- resolve_polymarket_event_id()/real_market_candidates()
+        # fall back to word-boundary name matching honestly when they aren't.
+        home_canonical_id = g.get("home_team_canonical_id")
+        away_canonical_id = g.get("away_team_canonical_id")
+        resolved_event_id = resolve_polymarket_event_id(
+            state.market_rows, g["home_team"], g["away_team"],
+            home_canonical_id=home_canonical_id, away_canonical_id=away_canonical_id,
+        )
         state.total_lines_by_event[event_id] = (
             real_total_lines(state.market_rows, resolved_event_id) if resolved_event_id else []
         )
         state.spread_pairs_by_event[event_id] = (
             real_spread_line_side_pairs(state.market_rows, resolved_event_id) if resolved_event_id else []
         )
-        state.candidates_by_event[event_id] = real_market_candidates(state.market_rows, g["home_team"], g["away_team"])
+        state.candidates_by_event[event_id] = real_market_candidates(
+            state.market_rows, g["home_team"], g["away_team"],
+            home_canonical_id=home_canonical_id, away_canonical_id=away_canonical_id,
+        )
         n_matched += 1
 
     return {
