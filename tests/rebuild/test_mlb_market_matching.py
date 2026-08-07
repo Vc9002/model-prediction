@@ -10,9 +10,11 @@ from __future__ import annotations
 import polars as pl
 import pytest
 
+from model_prediction.rebuild.decision import MarketEvaluation
 from model_prediction.rebuild.mlb_market_matching import (
     exclude_first_five_innings,
     real_market_candidates,
+    real_market_snapshot_hash,
     real_quote_age_seconds,
     real_total_lines,
     resolve_polymarket_event_id,
@@ -141,3 +143,41 @@ class TestRealQuoteAgeSeconds:
 
     def test_unparseable_timestamp_fails_closed_not_fresh(self):
         assert real_quote_age_seconds("not-a-real-timestamp") == float("inf")
+
+
+class TestRealMarketSnapshotHash:
+    """Real bug found wiring the shadow ledger into scripts/mlb_shadow_run.py
+    against a live slate: hashing quote_age_seconds (which is `now -
+    observed_at_utc` and increases every second regardless of whether the
+    book moved) meant an immediate rerun against byte-identical market data
+    always produced a different market_snapshot_hash, defeating
+    trade_decisions' idempotency guarantee -- a real rerun with unchanged
+    books produced 32 duplicate rows instead of 0.
+    """
+
+    def test_hash_is_stable_across_different_quote_ages(self):
+        m1 = MarketEvaluation(
+            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
+            executable_ask=0.55, depth_adjusted_price=0.55, quote_age_seconds=5.0, available_depth=999.0,
+        )
+        m2 = MarketEvaluation(
+            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
+            executable_ask=0.55, depth_adjusted_price=0.55, quote_age_seconds=4500.0, available_depth=999.0,
+        )
+        assert real_market_snapshot_hash("70543", [m1]) == real_market_snapshot_hash("70543", [m2]), (
+            "the same real quote observed at two different wall-clock moments "
+            "must hash identically -- only real market content should affect this hash"
+        )
+
+    def test_hash_changes_when_real_content_changes(self):
+        m1 = MarketEvaluation(
+            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
+            executable_ask=0.55, depth_adjusted_price=0.55, quote_age_seconds=5.0, available_depth=999.0,
+        )
+        m2 = MarketEvaluation(
+            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
+            executable_ask=0.60, depth_adjusted_price=0.60, quote_age_seconds=5.0, available_depth=999.0,
+        )
+        assert real_market_snapshot_hash("70543", [m1]) != real_market_snapshot_hash("70543", [m2]), (
+            "a real price move must still produce a different hash"
+        )

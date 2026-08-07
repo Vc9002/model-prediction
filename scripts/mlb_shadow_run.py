@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import polars as pl
@@ -39,11 +40,18 @@ from model_prediction.rebuild.mlb_features import (
 from model_prediction.rebuild.mlb_market_matching import (
     exclude_first_five_innings,
     real_market_candidates,
+    real_market_snapshot_hash,
     real_spread_line_side_pairs,
     real_total_lines,
     resolve_polymarket_event_id,
 )
 from model_prediction.rebuild.models import MLBTwoHeadModel
+from model_prediction.rebuild.shadow_ledger import ShadowLedger
+
+# Only the "late" horizon (CLAUDE.md: start minus 60 minutes) is implemented
+# by this script today -- early/mid horizons are a disclosed future gap.
+HORIZON_LATE = "late"
+DECISION_POLICY_VERSION = "winner_first_v1"
 
 INTENSITY_FEATURES = [
     "home_sp_avg_velocity", "away_sp_avg_velocity",
@@ -131,6 +139,10 @@ def main() -> None:
     args = parser.parse_args()
     target_date = args.date
 
+    ledger = ShadowLedger("data/rebuild/shadow.db")
+    run_id = ledger.record_run("mlb", run_type="shadow", horizon=HORIZON_LATE, params={"date": target_date})
+    print(f"0. Shadow ledger run {run_id} started (data/rebuild/shadow.db)")
+
     sb = dedupe_scoreboard(pl.read_parquet("data/rebuild/normalized/mlb/scoreboard.parquet"))
     tonight = sb.filter(
         (pl.col("event_start_utc").str.slice(0, 10) == target_date)
@@ -209,6 +221,9 @@ def main() -> None:
 
     limits = SizeLimits(min_depth_units=0.0)  # real depth data doesn't exist yet (Checkpoint 8)
     report = []
+    n_predictions_recorded = 0
+    n_decisions_recorded = 0
+    n_decisions_deduped = 0
     for g in tonight.iter_rows(named=True):
         home_abbrev = ESPN_TO_STATCAST_ABBREV.get(g["home_team"])
         away_abbrev = ESPN_TO_STATCAST_ABBREV.get(g["away_team"])
@@ -247,6 +262,66 @@ def main() -> None:
         decisions = evaluate_game(forecast, candidates, limits)
         bet_decisions = [d for d in decisions if d.action == "BET"]
 
+        # decision_time_utc is derived from the event's own start time and
+        # the "late" horizon definition (start minus 60 minutes), not
+        # wall-clock "now" -- this is what makes an identical rerun of this
+        # script against the same slate genuinely idempotent in the ledger
+        # (same event + same horizon always yields the same decision
+        # timestamp), rather than every invocation minting a fresh row.
+        event_start = datetime.fromisoformat(g["event_start_utc"])
+        decision_time_utc = (event_start - timedelta(minutes=60)).isoformat()
+
+        _, pred_created = ledger.record_prediction(
+            run_id=run_id, sport="mlb", event_id=g["event_id"], horizon=HORIZON_LATE,
+            decision_time_utc=decision_time_utc, forecast=forecast,
+        )
+        n_predictions_recorded += 1 if pred_created else 0
+
+        # One market_evaluation row per real candidate this game actually
+        # saw, keyed by (market_id, market_type, team_or_side, line) so each
+        # decision below can look up the ledger row id of the exact
+        # candidate it selected/evaluated without relying on Python object
+        # identity surviving through evaluate_game().
+        market_eval_ids: dict[tuple, int] = {}
+        for c in candidates:
+            eval_row_id = ledger.record_market_evaluation(
+                run_id=run_id, sport="mlb", event_id=g["event_id"],
+                evaluation=c, decision_time_utc=decision_time_utc,
+            )
+            market_eval_ids[(c.market_id, c.market_type, c.team_or_side, c.line)] = eval_row_id
+
+        # A real content hash of exactly the market evidence this decision
+        # was made from -- part of trade_decisions' required idempotency key
+        # (sport, event_id, horizon, decision_time_utc, model_artifact_hash,
+        # market_snapshot_hash, decision_policy_version), so a rerun against
+        # unchanged books is a no-op, and a rerun after the book moves
+        # appends a new, distinguishable decision instead of silently
+        # colliding with the stale one. (quote_age_seconds is deliberately
+        # excluded from this hash -- see real_market_snapshot_hash().)
+        market_snapshot_hash = real_market_snapshot_hash(g["event_id"], candidates)
+
+        for d in decisions:
+            selected_id = market_eval_ids.get(
+                (d.selected_market.market_id, d.selected_market.market_type,
+                 d.selected_market.team_or_side, d.selected_market.line)
+            ) if d.selected_market else None
+            evaluated_id = market_eval_ids.get(
+                (d.evaluated_market.market_id, d.evaluated_market.market_type,
+                 d.evaluated_market.team_or_side, d.evaluated_market.line)
+            ) if d.evaluated_market else None
+            _, decision_created = ledger.record_trade_decision(
+                run_id=run_id, sport="mlb", event_id=g["event_id"], horizon=HORIZON_LATE,
+                decision_time_utc=decision_time_utc,
+                model_artifact_hash=forecast.model_artifact_hash,
+                market_snapshot_hash=market_snapshot_hash,
+                decision_policy_version=DECISION_POLICY_VERSION,
+                decision=d,
+                selected_market_evaluation_id=selected_id,
+                evaluated_market_evaluation_id=evaluated_id,
+            )
+            n_decisions_recorded += 1 if decision_created else 0
+            n_decisions_deduped += 0 if decision_created else 1
+
         report.append({
             "event_id": g["event_id"], "home_team": g["home_team"], "away_team": g["away_team"],
             "predicted_winner": forecast.predicted_winner,
@@ -284,14 +359,24 @@ def main() -> None:
               f"(home {g['home_win_prob']:.1%}/away {g['away_win_prob']:.1%}), "
               f"{g['candidate_markets_evaluated']} markets evaluated, {g['bets']} BET")
 
+    print(f"\n6b. Shadow ledger: {n_predictions_recorded} new predictions, "
+          f"{n_decisions_recorded} new trade decisions, "
+          f"{n_decisions_deduped} trade decisions deduped as idempotent reruns")
+
     out_path = Path("outputs/rebuild") / f"mlb_shadow_run_{target_date}.json"
     out_path.write_text(json.dumps({
         "date": target_date, "model_train_games": train_n,
         "no_real_order_submitted": True,
+        "shadow_ledger_run_id": run_id,
+        "shadow_ledger_db": "data/rebuild/shadow.db",
+        "predictions_recorded": n_predictions_recorded,
+        "trade_decisions_recorded": n_decisions_recorded,
+        "trade_decisions_deduped": n_decisions_deduped,
         "games": report,
     }, indent=2, default=str))
     print(f"\n7. Full report saved to {out_path}")
     print("8. No real order adapter was imported or called by this script.")
+    ledger.close()
 
 
 if __name__ == "__main__":

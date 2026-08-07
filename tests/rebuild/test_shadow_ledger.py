@@ -360,6 +360,75 @@ class TestTradeDecisionIdempotency:
         assert created2 is True
         assert id1 != id2
 
+    def test_multiple_real_markets_for_one_game_all_persist(self, ledger: ShadowLedger):
+        # Real bug found wiring this ledger into scripts/mlb_shadow_run.py
+        # against a live slate: one real game produces one BetDecision per
+        # candidate market (moneyline, each spread line, each total line) --
+        # 16 real decisions for a single game in the live run that exposed
+        # this. All 16 share the exact same sport/event_id/horizon/
+        # decision_time_utc/model_artifact_hash/market_snapshot_hash/
+        # decision_policy_version, because they come from one forecast
+        # evaluated against one market snapshot. Before this fix, the
+        # idempotency key didn't include the evaluated market's own
+        # identity, so only the first decision was ever inserted -- every
+        # other real, distinct decision for that game silently "deduped"
+        # against it and was lost. 32 real decisions from a real 2-game
+        # slate produced only 2 ledger rows.
+        run_id = ledger.record_run("mlb")
+        moneyline_home = _decision(
+            market_type="moneyline",
+            evaluated_market=_evaluation(market_id="ml-1", market_type="moneyline", team_or_side="home", line=None),
+        )
+        spread_home = _decision(
+            market_type="spread",
+            evaluated_market=_evaluation(market_id="sp-1", market_type="spread", team_or_side="home", line=-1.5),
+        )
+        spread_away = _decision(
+            market_type="spread",
+            evaluated_market=_evaluation(market_id="sp-1", market_type="spread", team_or_side="away", line=1.5),
+        )
+        total_over = _decision(
+            market_type="total",
+            evaluated_market=_evaluation(market_id="tot-1", market_type="total", team_or_side="over", line=8.5),
+        )
+
+        ids = [
+            ledger.record_trade_decision(run_id=run_id, decision=d, **self.IDEMPOTENCY_KWARGS)
+            for d in (moneyline_home, spread_home, spread_away, total_over)
+        ]
+
+        assert all(created for _id, created in ids), "every distinct real market decision must be a real new row"
+        assert len({_id for _id, _ in ids}) == 4, "four distinct markets must yield four distinct rows"
+
+        count = ledger.conn.execute(
+            "SELECT COUNT(*) AS n FROM trade_decisions WHERE sport=? AND event_id=?",
+            (self.IDEMPOTENCY_KWARGS["sport"], self.IDEMPOTENCY_KWARGS["event_id"]),
+        ).fetchone()["n"]
+        assert count == 4, f"expected 4 real distinct decisions to persist, found {count}"
+
+    def test_rerunning_the_same_multi_market_game_is_still_idempotent(self, ledger: ShadowLedger):
+        # The fix above must not reopen the door to duplicating a genuine
+        # rerun -- the same two distinct decisions submitted twice must
+        # still collapse to two rows, not four.
+        run_id = ledger.record_run("mlb")
+        moneyline_home = _decision(
+            market_type="moneyline",
+            evaluated_market=_evaluation(market_id="ml-1", market_type="moneyline", team_or_side="home", line=None),
+        )
+        spread_home = _decision(
+            market_type="spread",
+            evaluated_market=_evaluation(market_id="sp-1", market_type="spread", team_or_side="home", line=-1.5),
+        )
+
+        for d in (moneyline_home, spread_home, moneyline_home, spread_home):
+            ledger.record_trade_decision(run_id=run_id, decision=d, **self.IDEMPOTENCY_KWARGS)
+
+        count = ledger.conn.execute(
+            "SELECT COUNT(*) AS n FROM trade_decisions WHERE sport=? AND event_id=?",
+            (self.IDEMPOTENCY_KWARGS["sport"], self.IDEMPOTENCY_KWARGS["event_id"]),
+        ).fetchone()["n"]
+        assert count == 2
+
     def test_explicit_supersedes_id_always_appends_even_with_identical_key(self, ledger: ShadowLedger):
         # A genuine correction to a trade_decision (same inputs, e.g. fixing
         # a bug found in decision persistence itself) must still be able to

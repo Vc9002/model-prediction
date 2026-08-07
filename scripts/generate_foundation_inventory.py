@@ -92,8 +92,8 @@ def main() -> None:
     capabilities["evaluated_market_audit_trail"] = "VERIFIED"
 
     # Execution evidence
-    capabilities["real_quote_depth"] = "NOT_STARTED"  # Polymarket source doesn't expose this; fabricated 999.0 still in mlb_shadow_run.py
-    capabilities["real_quote_age"] = "NOT_STARTED"  # fabricated 0.0 still in mlb_shadow_run.py
+    capabilities["real_quote_depth"] = "NOT_STARTED"  # Polymarket source doesn't expose this; fabricated 999.0 still in mlb_market_matching.py
+    capabilities["real_quote_age"] = "VERIFIED"  # real_quote_age_seconds() computes now-observed_at_utc from real provenance timestamps, fails closed to inf on missing/unparseable data; 3 tests
     capabilities["order_book_walking"] = "NOT_STARTED"
 
     # Model / evaluation
@@ -102,11 +102,12 @@ def main() -> None:
     capabilities["mlb_predictive_qualification"] = "NOT_STARTED"  # honestly RESEARCH_ONLY, inconclusive on this sample size
 
     # Persistence
-    capabilities["sqlite_shadow_ledger"] = "NOT_STARTED"
-    capabilities["rerun_idempotency"] = "NOT_STARTED"
+    shadow_ledger_callers = real_callers_of("shadow_ledger")
+    capabilities["sqlite_shadow_ledger"] = "VERIFIED" if shadow_ledger_callers else "PARTIAL"  # data/rebuild/shadow.db; runs/predictions/market_snapshots/market_evaluations/trade_decisions/paper_orders/settlements/audit_events fully implemented and wired into scripts/mlb_shadow_run.py; raw_snapshots/normalized_observations/feature_snapshots/dataset_manifests/model_artifacts/calibration_artifacts/closing_prices/reviews remain schema-only
+    capabilities["rerun_idempotency"] = "VERIFIED" if shadow_ledger_callers else "NOT_STARTED"  # live-verified: real 2-game slate, first run wrote 2 predictions + 32 trade_decisions, immediate rerun wrote 0 new of either (32 deduped) -- two real bugs found and fixed getting here, see takeover_status.md
 
     # Orchestration
-    capabilities["one_command_mlb_shadow_run"] = "OPERATIONAL"  # scripts/mlb_shadow_run.py, real live runs
+    capabilities["one_command_mlb_shadow_run"] = "OPERATIONAL"  # scripts/mlb_shadow_run.py, real live runs, now with real ledger persistence
     capabilities["multi_sport_shared_cli"] = "NOT_STARTED"
 
     # Other sports
@@ -121,8 +122,8 @@ def main() -> None:
     known_blockers = [
         "NormalizedStore.write() still unconditionally concatenates — no real primary-key idempotency at the storage layer (consumer-side dedupe_scoreboard() is a workaround for MLB only)",
         "point_in_time_join() is now correct and tested but is dead code — the real MLB pipeline uses its own point-in-time filtering in mlb_features.py instead of this shared utility",
-        "Real order-book depth is unavailable from the current Polymarket source — quote_age_seconds/available_depth remain fabricated placeholders in mlb_shadow_run.py",
-        "No SQLite shadow ledger exists — persistence is Parquet/JSON files",
+        "Real order-book depth is unavailable from the current Polymarket source — available_depth remains a fabricated 999.0 placeholder in mlb_market_matching.py (quote_age_seconds itself is real)",
+        "8 of the shadow ledger's 16 required tables (raw_snapshots, normalized_observations, feature_snapshots, dataset_manifests, model_artifacts, calibration_artifacts, closing_prices, reviews) are schema-only — no insert/query methods, nothing writes to them yet",
         "No CI run status verified for the current head — no gh CLI auth in this session",
         "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing",
         "MLB model held-out evaluation remains genuinely inconclusive on ~20-25 games — more real backfill days is the only way to resolve this, not further feature engineering",

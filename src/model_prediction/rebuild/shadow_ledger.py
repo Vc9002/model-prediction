@@ -331,7 +331,10 @@ class ShadowLedger:
                 reason_code TEXT,
                 cost_adjusted_edge REAL,
                 selected_market_evaluation_id INTEGER REFERENCES market_evaluations(id),
-                evaluated_market_evaluation_id INTEGER REFERENCES market_evaluations(id)
+                evaluated_market_evaluation_id INTEGER REFERENCES market_evaluations(id),
+                evaluated_market_id TEXT,
+                evaluated_team_or_side TEXT,
+                evaluated_line REAL
             );
 
             -- The required idempotency key (sport, event_id, horizon,
@@ -339,10 +342,36 @@ class ShadowLedger:
             -- decision_policy_version), scoped to non-superseding rows so a
             -- genuine correction (supersedes_id set) can still append even
             -- if every other field is identical to what it replaces.
+            --
+            -- evaluated_market_id/evaluated_team_or_side/evaluated_line are
+            -- real, required parts of this key -- a single real game
+            -- produces one BetDecision per candidate market (moneyline,
+            -- each spread line, each total line), all sharing the exact
+            -- same sport/event_id/horizon/decision_time_utc/
+            -- model_artifact_hash/market_snapshot_hash/
+            -- decision_policy_version. Without the evaluated market's own
+            -- identity in the key, every decision after the first one for a
+            -- game collided with it and was silently discarded as an
+            -- "idempotent rerun" -- confirmed live: a real 2-game slate
+            -- produced 32 real BetDecision objects (16 markets/game) but
+            -- only 2 ever reached trade_decisions before this fix.
+            -- COALESCE wraps the three nullable identity columns: SQLite
+            -- treats every NULL as distinct from every other NULL for
+            -- UNIQUE-index purposes, so without this a moneyline decision
+            -- (whose evaluated_line is a real, legitimate NULL) would never
+            -- collide with a second identical moneyline decision at the raw
+            -- SQL/UNIQUE-index level -- only the application-level
+            -- check-before-insert (which correctly uses "IS ?") would catch
+            -- it, leaving the "actual guarantee against races" half of the
+            -- contract silently unenforced for exactly the most common
+            -- market_type. -999999.0 is out of the real domain of a spread
+            -- or total line.
             CREATE UNIQUE INDEX IF NOT EXISTS ux_trade_decisions_idempotency
             ON trade_decisions(
                 sport, event_id, horizon, decision_time_utc,
-                model_artifact_hash, market_snapshot_hash, decision_policy_version
+                model_artifact_hash, market_snapshot_hash, decision_policy_version,
+                market_type, COALESCE(evaluated_market_id, ''),
+                COALESCE(evaluated_team_or_side, ''), COALESCE(evaluated_line, -999999.0)
             )
             WHERE supersedes_id IS NULL;
 
@@ -716,9 +745,14 @@ class ShadowLedger:
     ) -> tuple[int, bool]:
         """Insert a BetDecision dataclass instance (or dict shaped like one).
 
-        Idempotency key (per the plan, required):
+        Idempotency key (per the plan, required, plus the evaluated market's
+        own identity -- see the CREATE TABLE comment above for why: a single
+        real game produces one BetDecision per candidate market, and without
+        market identity in the key they collided with each other, not just
+        across reruns):
             (sport, event_id, horizon, decision_time_utc, model_artifact_hash,
-             market_snapshot_hash, decision_policy_version)
+             market_snapshot_hash, decision_policy_version, market_type,
+             evaluated_market_id, evaluated_team_or_side, evaluated_line)
 
         Rerunning the same job with identical inputs and no explicit
         `supersedes_id` returns the existing row (created=False) instead of
@@ -728,11 +762,16 @@ class ShadowLedger:
         real SQLite UNIQUE index as the actual guarantee against races.
         """
         d = _as_dict(decision)
+        evaluated = d.get("evaluated_market") or {}
+        evaluated_market_id = evaluated.get("market_id")
+        evaluated_team_or_side = evaluated.get("team_or_side")
+        evaluated_line = evaluated.get("line")
 
         if supersedes_id is None:
             existing = self._find_trade_decision(
                 sport, event_id, horizon, decision_time_utc,
                 model_artifact_hash, market_snapshot_hash, decision_policy_version,
+                d.get("market_type"), evaluated_market_id, evaluated_team_or_side, evaluated_line,
             )
             if existing is not None:
                 return existing, False
@@ -744,21 +783,24 @@ class ShadowLedger:
                     decision_time_utc, model_artifact_hash, market_snapshot_hash,
                     decision_policy_version, action, predicted_winner, market_type, units,
                     reason_code, cost_adjusted_edge, selected_market_evaluation_id,
-                    evaluated_market_evaluation_id
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    evaluated_market_evaluation_id, evaluated_market_id, evaluated_team_or_side,
+                    evaluated_line
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     utc_now(), run_id, sport, event_id, horizon, schema_version, supersedes_id,
                     decision_time_utc, model_artifact_hash, market_snapshot_hash,
                     decision_policy_version, d["action"], d.get("predicted_winner"),
                     d.get("market_type"), d["units"], d.get("reason_code"),
                     d.get("cost_adjusted_edge"), selected_market_evaluation_id,
-                    evaluated_market_evaluation_id,
+                    evaluated_market_evaluation_id, evaluated_market_id, evaluated_team_or_side,
+                    evaluated_line,
                 ),
             )
         except sqlite3.IntegrityError:
             existing = self._find_trade_decision(
                 sport, event_id, horizon, decision_time_utc,
                 model_artifact_hash, market_snapshot_hash, decision_policy_version,
+                d.get("market_type"), evaluated_market_id, evaluated_team_or_side, evaluated_line,
             )
             if existing is None:
                 raise
@@ -769,14 +811,21 @@ class ShadowLedger:
     def _find_trade_decision(
         self, sport, event_id, horizon, decision_time_utc,
         model_artifact_hash, market_snapshot_hash, decision_policy_version,
+        market_type=None, evaluated_market_id=None, evaluated_team_or_side=None, evaluated_line=None,
     ) -> int | None:
+        # "IS ?" (not "=") for the nullable identity columns -- a moneyline
+        # decision has a real, legitimate NULL evaluated_line, and SQL NULLs
+        # never compare equal to each other with "=".
         row = self.conn.execute(
             """SELECT id FROM trade_decisions
                WHERE sport=? AND event_id=? AND horizon=? AND decision_time_utc=?
                  AND model_artifact_hash=? AND market_snapshot_hash=? AND decision_policy_version=?
+                 AND market_type IS ? AND evaluated_market_id IS ?
+                 AND evaluated_team_or_side IS ? AND evaluated_line IS ?
                  AND supersedes_id IS NULL""",
             (sport, event_id, horizon, decision_time_utc,
-             model_artifact_hash, market_snapshot_hash, decision_policy_version),
+             model_artifact_hash, market_snapshot_hash, decision_policy_version,
+             market_type, evaluated_market_id, evaluated_team_or_side, evaluated_line),
         ).fetchone()
         return int(row["id"]) if row is not None else None
 

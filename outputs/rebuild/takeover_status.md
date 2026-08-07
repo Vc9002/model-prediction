@@ -885,3 +885,86 @@ external-API resilience (error already captured and returned/logged, not
 narrowable to a specific exception type without guessing at pybaseball/httpx
 internals) — annotated with a justified `# noqa: BLE001` each. `ruff check
 src/model_prediction/rebuild/collectors.py` now passes clean.
+
+## Shadow ledger wired into the real pipeline, and two real bugs found live (2026-08-07)
+
+`ShadowLedger` (Phase 12, commit `b8fdd02`) existed but nothing called it —
+`scripts/mlb_shadow_run.py` only ever wrote a one-shot JSON report. Wired it
+in: `record_run` once per invocation; `record_prediction` per game;
+`record_market_evaluation` per real candidate market; `record_trade_decision`
+per `BetDecision` (one per candidate market — moneyline, each real spread
+line, each real total line). `decision_time_utc` is derived from the game's
+own `event_start_utc` minus the "late" horizon's 60 minutes (CLAUDE.md's own
+definition), not wall-clock "now", so an identical rerun against an unchanged
+slate produces the same decision timestamp and is genuinely idempotent
+rather than minting a fresh row every invocation.
+
+**Bug #1 (real, found by running against the live 2026-08-06 slate, not by
+unit tests alone):** `trade_decisions`' idempotency key
+(`sport, event_id, horizon, decision_time_utc, model_artifact_hash,
+market_snapshot_hash, decision_policy_version`) has no field distinguishing
+*which* market a decision is about. A single real game produces one
+`BetDecision` per candidate market — confirmed live, 16 per game — and all
+16 share every field in that key, since they come from one forecast
+evaluated against one market snapshot. Result: only the first decision per
+game was ever inserted; the other 15 silently "deduped" against it as if
+they were reruns. A real 2-game slate produced 32 real decisions but only 2
+ledger rows. Fixed by adding `evaluated_market_id`/`evaluated_team_or_side`/
+`evaluated_line` as real columns (derived from `BetDecision.evaluated_market`,
+which is always populated per the earlier Checkpoint 8/9 fix) and including
+them in the unique index, wrapped in `COALESCE(..., sentinel)` because
+SQLite treats every `NULL` as distinct for `UNIQUE` purposes and a
+moneyline decision has a real, legitimate `NULL` line. Regression tests
+added: `test_multiple_real_markets_for_one_game_all_persist`,
+`test_rerunning_the_same_multi_market_game_is_still_idempotent` — both
+confirmed failing against the pre-fix schema (`git stash`) before the fix,
+passing after.
+
+**Bug #2 (real, found immediately after fixing #1 by rerunning the live
+pipeline a second time to prove idempotency, not by assuming it):** even
+with #1 fixed, an immediate rerun against byte-identical market data
+produced 32 *more* rows instead of 0 deduping. Cause: `market_snapshot_hash`
+was computed by hashing every field of each candidate `MarketEvaluation`,
+including `quote_age_seconds` — which is `now - observed_at_utc` (see
+`real_quote_age_seconds`) and increases every second purely from wall-clock
+time passing, independent of whether the book actually moved. Extracted
+`real_market_snapshot_hash(event_id, candidates)` into
+`mlb_market_matching.py`, excluding `quote_age_seconds` from the hashed
+payload. Regression tests:
+`TestRealMarketSnapshotHash::test_hash_is_stable_across_different_quote_ages`
+(two otherwise-identical candidates, ages 5s vs 4500s, must hash equal) and
+`test_hash_changes_when_real_content_changes` (a real price move must still
+change the hash).
+
+**Verified live, not just via unit tests:** ran
+`PYTHONPATH=src:. .venv/bin/python scripts/mlb_shadow_run.py --date
+2026-08-06` against `data/rebuild/shadow.db` (deleted and regenerated —
+schema changed, this is shadow/research data, not an incumbent production
+ledger) — first run: 2 new predictions, 32 new trade decisions, 0 deduped.
+Immediate rerun: 0 new predictions, 0 new trade decisions, 32 deduped as
+idempotent reruns. `trade_decisions` table stayed at 32 rows after the
+rerun; `predictions` stayed at 2. `market_evaluations` correctly grew (32 →
+64) since it has no idempotency requirement by design (append-only
+observation log, not a decision record).
+
+**859 tests pass, 1 skipped** (860 total, up from 804 — 22 pre-existing
+`test_shadow_ledger.py` tests plus this session's 4 new regression tests,
+plus 2 new `test_mlb_market_matching.py` tests, plus tests added in the
+intervening calibration-split-fix commit). `ruff check`
+clean on every file touched this round (`scripts/mlb_shadow_run.py`,
+`shadow_ledger.py`, `mlb_market_matching.py`, and both touched test files);
+the repository-wide `ruff check src tests` failure count (192) is entirely
+pre-existing legacy-test-file findings (`EXE002` missing shebangs, `SIM`
+style suggestions, etc.) untouched by and unrelated to this session's work.
+
+Priority list, updated: (1) more real backfill days is still the only way
+to get a real answer on model quality — now the single highest-leverage
+open item; (2) real `conservative_probability` (CLAUDE.md's full
+bootstrap/calibration/lineup/missingness uncertainty spec — today's
+`build_forecast` uses a disclosed flat 3% haircut placeholder); (3) wire
+`point_in_time_join()` into an actual call site (fixed and tested, still
+dead code); (4) canonical identity (`IdentityRegistry` exists, not wired
+into collectors/features/market-matching uniformly — Phase 4); (5) formal
+schema registry (Phase 5); (6) shared multi-sport CLI (Phase 13); (7)
+monitoring/governance reports (Phase 14). No sport beyond MLB has started
+per CLAUDE.md's explicit sequencing (MLB must clear its own gate first).

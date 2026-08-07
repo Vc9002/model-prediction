@@ -21,12 +21,14 @@ outputs/rebuild/takeover_status.md Checkpoint 9 for full evidence):
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
 from datetime import datetime
 
 import polars as pl
 
 from .decision import MarketEvaluation
-from .storage import utc_now
+from .storage import sha256_hex, utc_now
 
 
 def exclude_first_five_innings(market_rows: pl.DataFrame) -> pl.DataFrame:
@@ -141,3 +143,24 @@ def real_market_candidates(
             quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=999.0,
         ))
     return candidates
+
+
+def real_market_snapshot_hash(event_id: str, candidates: list[MarketEvaluation]) -> str:
+    """A real content hash of exactly the market evidence a decision was
+    made from, for use as the shadow ledger's trade_decisions idempotency
+    key. Real bug found and fixed here: `quote_age_seconds` is deliberately
+    excluded -- it's `now - observed_at_utc` (see real_quote_age_seconds()
+    above), which increases every single second purely from wall-clock time
+    passing, even when the underlying book hasn't moved at all. Hashing it
+    in meant an immediate rerun against byte-identical market data always
+    produced a different hash, defeating the idempotency guarantee: a real
+    2-game rerun with unchanged books produced 32 duplicate trade_decisions
+    rows instead of 0 before this fix."""
+    payload = {
+        "event_id": event_id,
+        "candidates": [
+            {k: v for k, v in asdict(c).items() if k != "quote_age_seconds"}
+            for c in candidates
+        ],
+    }
+    return sha256_hex(json.dumps(payload, sort_keys=True, default=str).encode("utf-8"))
