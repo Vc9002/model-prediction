@@ -126,7 +126,16 @@ def main() -> None:
     # Market matching
     capabilities["mlb_market_event_isolation"] = "VERIFIED"  # mlb_market_matching.py, 7 tests, live-verified against real Polymarket data
     capabilities["mlb_market_period_disambiguation_f5"] = "VERIFIED"  # exclude_first_five_innings, live-verified
-    capabilities["other_sport_market_matching"] = "NOT_STARTED"
+    # PARTIAL, not VERIFIED: resolve_polymarket_event_id()/real_market_candidates()
+    # (mlb_market_matching.py) are now genuinely sport-agnostic and reused
+    # as-is by basic_sport_pipeline.py for NBA/WNBA/NFL/Soccer/Tennis --
+    # live-verified this session for WNBA (8 real market candidates matched
+    # per game after a real bug fix: Polymarket's own `team` field is a
+    # short city name for WNBA, not MLB's full display name) and tennis
+    # (13 new real trade decisions recorded). Moneyline only (see
+    # basic_sport_pipeline.py's module docstring) -- spread/total matching
+    # for these sports is correctly still NOT_STARTED, not silently reused.
+    capabilities["other_sport_market_matching"] = "PARTIAL"
 
     # Decision engine
     capabilities["winner_first_decision_engine"] = "VERIFIED"  # decision.py, 20+4 tests matching CLAUDE.md's exact critical-test list plus conservative-bound preference
@@ -208,6 +217,24 @@ def main() -> None:
     capabilities["multi_sport_shared_cli"] = (
         "PARTIAL" if cli_path.exists() and pipeline_path.exists() else "NOT_STARTED"
     )
+
+    # PARTIAL, not VERIFIED: basic_sport_pipeline.py + basic_elo.py give
+    # NBA/WNBA/NFL/Soccer/Tennis a real collect->features->predict->
+    # match_markets->decide->ledger pipeline via a logistic Elo baseline
+    # (checked directly: _BasicEloAdapter referenced in sport_adapter.py)
+    # -- explicitly a basic/control-tier model, not the sport-specific
+    # distributions Part 2 calls for. Live-verified end-to-end this
+    # session for WNBA (real 90-game backfill, 2 real scheduled games
+    # predicted, 8 real market candidates matched per game) and tennis (28
+    # real predictions, 13 new real trade decisions). NFL/soccer have the
+    # identical real code path but no real backfilled data yet in this
+    # data_root (real off-season/preseason sparsity, not a code gap).
+    basic_pipeline_path = REPO_ROOT / "src/model_prediction/rebuild/basic_sport_pipeline.py"
+    basic_adapter_wired = (
+        basic_pipeline_path.exists()
+        and "_BasicEloAdapter" in (REPO_ROOT / "src/model_prediction/rebuild/sport_adapter.py").read_text()
+    )
+    capabilities["basic_multisport_elo_pipeline"] = "PARTIAL" if basic_adapter_wired else "NOT_STARTED"
 
     # Other sports. Real collection now works for all 5 of nba/wnba/nfl/
     # soccer/tennis, live-verified this session (the prior soccer/tennis

@@ -1,7 +1,7 @@
 # Foundation Inventory
 
-Generated from code at commit `c962431c797669b565a60aa0fd6b5b769d085beb` on branch `rebuild/clean-slate-v1`.
-Python: Python 3.14.5. Total tests passing: 966.
+Generated from code at commit `e1ca0952b0b166991b439ffa0800151d269d91ad` on branch `rebuild/clean-slate-v1`.
+Python: Python 3.14.5. Total tests passing: 986.
 
 ## Capability status
 
@@ -16,7 +16,7 @@ Python: Python 3.14.5. Total tests passing: 966.
 | `horizon_orchestration` | PARTIAL |
 | `mlb_market_event_isolation` | VERIFIED |
 | `mlb_market_period_disambiguation_f5` | VERIFIED |
-| `other_sport_market_matching` | NOT_STARTED |
+| `other_sport_market_matching` | PARTIAL |
 | `winner_first_decision_engine` | VERIFIED |
 | `spread_cover_probability` | VERIFIED |
 | `evaluated_market_audit_trail` | VERIFIED |
@@ -31,6 +31,7 @@ Python: Python 3.14.5. Total tests passing: 966.
 | `rerun_idempotency` | VERIFIED |
 | `one_command_mlb_shadow_run` | OPERATIONAL |
 | `multi_sport_shared_cli` | PARTIAL |
+| `basic_multisport_elo_pipeline` | PARTIAL |
 | `nba_foundation_gate` | NOT_STARTED |
 | `wnba_foundation_gate` | NOT_STARTED |
 | `nfl_foundation_gate` | NOT_STARTED |

@@ -9,6 +9,7 @@ from model_prediction.rebuild.sport_adapter import (
     STAGE_ERROR,
     STAGE_NO_DATA,
     STAGE_NOT_IMPLEMENTED,
+    STAGE_SUCCESS,
     SUPPORTED_SPORTS,
     build_adapter,
 )
@@ -39,27 +40,28 @@ class TestBuildAdapter:
 class TestHonestNotImplementedStages:
     """The real point of this module: a sport with no real trained model
     must say so honestly through the shared interface, not fabricate a
-    prediction."""
+    prediction. Esports is the one remaining sport with no real
+    predict/match_markets/decide/build_features -- NBA/WNBA/NFL/Soccer/
+    Tennis all gained real basic (Elo) implementations, see
+    TestBasicEloAdapter below."""
 
-    def test_nba_predict_is_honestly_not_implemented(self, tmp_path):
-        adapter = build_adapter("nba", str(tmp_path))
+    def test_esports_predict_is_honestly_not_implemented(self, tmp_path):
+        adapter = build_adapter("esports", str(tmp_path))
         result = adapter.predict("2026-08-06", "late")
         assert result.status == STAGE_NOT_IMPLEMENTED
 
-    def test_nba_match_markets_is_honestly_not_implemented(self, tmp_path):
-        adapter = build_adapter("nba", str(tmp_path))
+    def test_esports_match_markets_is_honestly_not_implemented(self, tmp_path):
+        adapter = build_adapter("esports", str(tmp_path))
         result = adapter.match_markets("2026-08-06", "late")
         assert result.status == STAGE_NOT_IMPLEMENTED
 
-    def test_nba_decide_is_honestly_not_implemented(self, tmp_path):
-        adapter = build_adapter("nba", str(tmp_path))
+    def test_esports_decide_is_honestly_not_implemented(self, tmp_path):
+        adapter = build_adapter("esports", str(tmp_path))
         result = adapter.decide("2026-08-06", "late")
         assert result.status == STAGE_NOT_IMPLEMENTED
 
-    def test_nba_build_features_is_honestly_not_implemented(self, tmp_path):
-        # No real horizon feature builder exists for NBA yet -- must not
-        # silently claim MLB's real one applies.
-        adapter = build_adapter("nba", str(tmp_path))
+    def test_esports_build_features_is_honestly_not_implemented(self, tmp_path):
+        adapter = build_adapter("esports", str(tmp_path))
         result = adapter.build_features("2026-08-06", "late")
         assert result.status == STAGE_NOT_IMPLEMENTED
 
@@ -117,6 +119,95 @@ class TestCollectionOnlyAdapterFailsClosedNotCrashed:
         result = adapter.collect("2026-08-06")
         assert result.status == "ERROR"
         assert "simulated real collector failure" in result.detail["error"]
+
+
+def _write_nba_scoreboard(data_root, event_id: str, event_start_utc: str, home: str, away: str,
+                           status: str, home_score: int = 0, away_score: int = 0) -> None:
+    from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
+
+    norm = NormalizedStore(f"{data_root}/normalized")
+    row = {
+        **provenance_row(source="espn_public", source_record_id=event_id, source_version="v1",
+                          observed_at_utc=utc_now().isoformat(), effective_at_utc=event_start_utc,
+                          event_start_utc=event_start_utc),
+        "event_id": event_id, "home_team": home, "away_team": away,
+        "home_score": home_score, "away_score": away_score, "status": status, "venue": "",
+    }
+    norm.write("nba", "scoreboard", __import__("polars").DataFrame([row]), primary_key=["event_id"])
+
+
+class TestBasicEloAdapter:
+    """Real basic (Elo) foundation pipeline for NBA/WNBA/NFL/Soccer/Tennis
+    -- proves predict/match_markets/decide are genuinely real (not the
+    NOT_IMPLEMENTED mixin) and fail closed the same way MLBAdapter does."""
+
+    def test_nba_predict_on_a_cold_empty_data_root_is_honest_no_data_not_a_crash(self, tmp_path):
+        adapter = build_adapter("nba", str(tmp_path))
+        result = adapter.predict("2026-08-06", "late")
+        assert result.status == STAGE_NO_DATA
+
+    def test_nba_match_markets_without_predict_first_fails_closed(self, tmp_path):
+        adapter = build_adapter("nba", str(tmp_path))
+        result = adapter.match_markets("2026-08-06", "late")
+        assert result.status == STAGE_ERROR
+
+    def test_nba_decide_without_predict_first_fails_closed(self, tmp_path):
+        adapter = build_adapter("nba", str(tmp_path))
+        result = adapter.decide("2026-08-06", "late")
+        assert result.status == STAGE_ERROR
+
+    def test_nba_build_features_is_real_not_the_stub(self, tmp_path):
+        # Confirms build_features is real code (basic_sport_pipeline
+        # reading the real scoreboard), not silently falling back to the
+        # NOT_IMPLEMENTED mixin -- an empty data_root produces a real
+        # NO_DATA, which the mixin cannot produce.
+        adapter = build_adapter("nba", str(tmp_path))
+        result = adapter.build_features("2026-08-06", "late")
+        assert result.status == STAGE_NO_DATA
+
+    def test_predict_freezes_a_real_winner_from_real_historical_results(self, tmp_path):
+        # 12 real completed games where "Alpha" always beats "Beta" --
+        # Elo must learn a real, non-50/50 preference for Alpha, and
+        # predicted_winner must be frozen (moneyline only, no market
+        # inspected yet) before match_markets/decide ever run.
+        for i in range(12):
+            _write_nba_scoreboard(
+                tmp_path, f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90,
+            )
+        _write_nba_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+
+        adapter = build_adapter("nba", str(tmp_path))
+        result = adapter.predict("2026-08-06", "late")
+        assert result.status == STAGE_SUCCESS
+        assert result.detail["games_predicted"] == 1
+        forecast = adapter._state.forecasts["401"]
+        assert forecast.predicted_winner == "home"
+        assert forecast.calibrated_probabilities["home"] > 0.5
+
+    def test_decide_without_a_real_market_still_returns_a_real_no_bet_not_a_crash(self, tmp_path):
+        # collect_fn is injected (not build_adapter()'s real network-calling
+        # closure) so this stays a fast, deterministic unit test -- live
+        # network verification against real Polymarket data is done
+        # separately, matching the pattern used for MLBAdapter.
+        from model_prediction.rebuild.sport_adapter import _BasicEloAdapter
+
+        for i in range(12):
+            _write_nba_scoreboard(
+                tmp_path, f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90,
+            )
+        _write_nba_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+
+        adapter = _BasicEloAdapter("nba", str(tmp_path), collector=None, collect_fn=lambda d: {"status": "no_markets"})
+        adapter.predict("2026-08-06", "late")
+        # No real Polymarket data at all in this cold data_root -- match_markets
+        # must still succeed honestly with zero real candidates, not crash.
+        markets_result = adapter.match_markets("2026-08-06", "late")
+        assert markets_result.status == STAGE_SUCCESS
+        decide_result = adapter.decide("2026-08-06", "late")
+        assert decide_result.status == STAGE_SUCCESS
+        assert decide_result.detail["total_bets"] == 0  # no real market evidence -> no real bet is possible
 
 
 class TestMLBRealCollectAndFeatures:

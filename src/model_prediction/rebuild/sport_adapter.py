@@ -30,9 +30,13 @@ Honest scope, not fabricated:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+import polars as pl
+
+from . import basic_sport_pipeline as basic_pipeline
 from .collectors import (
     EsportsCollector,
     MLBCollector,
@@ -234,6 +238,97 @@ class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
         return StageResult("collect", status_map.get(result.get("status"), STAGE_ERROR), result)
 
 
+class _BasicEloAdapter(_CollectionOnlyAdapter):
+    """Real basic foundation pipeline for NBA/WNBA/NFL/Soccer/Tennis:
+    collect -> build_features -> predict -> match_markets -> decide -> the
+    real shadow ledger, all real code, using a logistic Elo baseline
+    (basic_elo.py/basic_sport_pipeline.py) instead of a sport-specific
+    distribution -- explicitly the "basic prediction, working pipeline,
+    not an advanced model" foundation build these 5 sports were missing.
+    See basic_sport_pipeline.py's module docstring for the real,
+    disclosed scope limits (moneyline only, no bootstrap ensemble, no
+    derived feature store) versus MLB's pipeline. Inherits collect() from
+    _CollectionOnlyAdapter unchanged -- collection itself was already real."""
+
+    def __init__(self, sport: str, data_root: str, collector: Any, collect_fn: Callable[[str], dict]) -> None:
+        super().__init__(sport, collector)
+        self.data_root = data_root
+        self.collect_fn = collect_fn
+        self._state: Any = None  # basic_sport_pipeline.BasicRunState, held across predict/match_markets/decide
+
+    def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        # Real, not fabricated, but genuinely basic: the "feature snapshot"
+        # here is just the real deduped scoreboard itself -- there is no
+        # derived per-team feature store yet for these sports (unlike
+        # MLB's horizon_builder.py). Reports real coverage counts so this
+        # is honest about what it is, not a placeholder pretending to be
+        # horizon_builder's real output.
+        try:
+            sb = basic_pipeline.dedupe_scoreboard(
+                pl.read_parquet(f"{self.data_root}/normalized/{self.sport}/scoreboard.parquet")
+            )
+        except FileNotFoundError:
+            return StageResult("build_features", STAGE_NO_DATA, {"reason": "no scoreboard ever collected"})
+        completed = sb.filter(pl.col("status") == "STATUS_FINAL").height
+        scheduled = sb.filter(pl.col("status") == "STATUS_SCHEDULED").height
+        status = STAGE_SUCCESS if sb.height > 0 else STAGE_NO_DATA
+        return StageResult("build_features", status, {
+            "real_scoreboard_rows": sb.height, "completed_games": completed, "scheduled_games": scheduled,
+        })
+
+    def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        state = basic_pipeline.load_state(self.data_root, self.sport, date)
+        if state is None:
+            return StageResult("predict", STAGE_NO_DATA, {"reason": "no real scheduled games for this date"})
+        self._state = state
+
+        ledger = self._ledger(run_id)
+        try:
+            result = basic_pipeline.predict_stage(state, self.data_root, ledger=ledger, run_id=run_id)
+        finally:
+            if ledger is not None:
+                ledger.close()
+
+        if result["status"] == "insufficient_history":
+            return StageResult("predict", STAGE_NO_DATA, result)
+        status = STAGE_SUCCESS if result["games_predicted"] > 0 else STAGE_NO_DATA
+        return StageResult("predict", status, result)
+
+    def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        if self._state is None or self._state.target_date != date:
+            return StageResult("match_markets", STAGE_ERROR, {
+                "reason": "predict() must run first in the same invocation -- no real forecast state to match markets against",
+            })
+
+        ledger = self._ledger(run_id)
+        try:
+            result = basic_pipeline.match_markets_stage(
+                self._state, self.data_root, self.collect_fn, ledger=ledger, run_id=run_id,
+            )
+        finally:
+            if ledger is not None:
+                ledger.close()
+        return StageResult("match_markets", STAGE_SUCCESS, result)
+
+    def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        if self._state is None or self._state.target_date != date:
+            return StageResult("decide", STAGE_ERROR, {
+                "reason": "predict()/match_markets() must run first in the same invocation -- no real state to decide against",
+            })
+
+        ledger = self._ledger(run_id)
+        try:
+            result = basic_pipeline.decide_stage(self._state, ledger=ledger, run_id=run_id)
+        finally:
+            if ledger is not None:
+                ledger.close()
+        return StageResult("decide", STAGE_SUCCESS, result)
+
+    def _ledger(self, run_id: str | None) -> Any:
+        from .shadow_ledger import ShadowLedger
+        return ShadowLedger(f"{self.data_root}/shadow.db") if run_id else None
+
+
 class _EsportsStubAdapter(_NotImplementedStagesMixin):
     """Esports has a real, honest stub collector (EsportsCollector.
     collect_date() itself returns status="stub" -- "BO3/OpenDota
@@ -267,13 +362,17 @@ def build_adapter(sport: str, data_root: str = "data/rebuild") -> SportAdapter:
 
     meta = MetadataDB(f"{data_root}/metadata.db")
     if sport in ("nba", "wnba"):
-        return _CollectionOnlyAdapter(sport, NBACollector(data_root, meta))
+        nba_collector = NBACollector(data_root, meta)
+        return _BasicEloAdapter(sport, data_root, nba_collector, lambda d: nba_collector.collect_date(d, sport=sport))
     if sport == "nfl":
-        return _CollectionOnlyAdapter(sport, NFLCollector(data_root, meta))
+        nfl_collector = NFLCollector(data_root, meta)
+        return _BasicEloAdapter(sport, data_root, nfl_collector, nfl_collector.collect_date)
     if sport == "soccer":
-        return _CollectionOnlyAdapter(sport, SoccerCollector(data_root, meta))
+        soccer_collector = SoccerCollector(data_root, meta)
+        return _BasicEloAdapter(sport, data_root, soccer_collector, soccer_collector.collect_date)
     if sport == "tennis":
-        return _CollectionOnlyAdapter(sport, TennisCollector(data_root, meta))
+        tennis_collector = TennisCollector(data_root, meta)
+        return _BasicEloAdapter(sport, data_root, tennis_collector, tennis_collector.collect_date)
     if sport == "esports":
         return _EsportsStubAdapter(data_root, meta)
 

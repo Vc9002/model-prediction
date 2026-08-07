@@ -40,6 +40,26 @@ def exclude_first_five_innings(market_rows: pl.DataFrame) -> pl.DataFrame:
     return market_rows.filter(~pl.col("is_first_five_innings"))
 
 
+def _team_name_matches(market_team: str, real_name: str) -> bool:
+    """True when market_team (Polymarket's own team string) identifies the
+    same real team as real_name (the collector's full ESPN display name).
+
+    Real gap found live wiring the basic NBA/WNBA/NFL/Soccer/Tennis
+    adapters (2026-08-07): Polymarket's `team` field is the real full
+    display name for MLB ("Seattle Mariners") but a short city name for
+    WNBA ("Washington" for "Washington Mystics") — an exact-equality check
+    silently matched zero real WNBA rows even with 216 real market rows
+    already collected (confirmed live: candidate_markets_evaluated stayed
+    0 for every real scheduled game). Word-boundary prefix match only —
+    NOT a naive substring check, which would reintroduce a *different*
+    silent bug this function was already fixed for once (bug #2, module
+    docstring): "SEA" must never match "Seattle Mariners" just because of
+    shared leading letters."""
+    if market_team == real_name:
+        return True
+    return real_name.startswith(market_team + " ") or market_team.startswith(real_name + " ")
+
+
 def resolve_polymarket_event_id(
     market_rows: pl.DataFrame, home_name: str, away_name: str,
 ) -> str | None:
@@ -50,7 +70,12 @@ def resolve_polymarket_event_id(
     team names ("Seattle Mariners"), not Statcast-style abbreviations
     ("SEA") — see bug #2 above. Returns None on no/ambiguous match rather
     than guessing which event a game belongs to."""
-    team_rows = market_rows.filter(pl.col("team").is_in([home_name, away_name]))
+    team_rows = market_rows.filter(
+        pl.col("team").map_elements(
+            lambda t: t is not None and (_team_name_matches(t, home_name) or _team_name_matches(t, away_name)),
+            return_dtype=pl.Boolean,
+        )
+    )
     event_ids = team_rows["event_id"].unique().to_list()
     if len(event_ids) != 1:
         return None
@@ -135,11 +160,20 @@ def real_market_candidates(
     if event_id is None:
         return []
     event_rows = market_rows.filter(pl.col("event_id") == event_id)
-    game_rows = event_rows.filter(pl.col("team").is_in([home_name, away_name]))
+    # Real fix, same root cause as resolve_polymarket_event_id()'s: an
+    # exact `.is_in([home_name, away_name])` filter silently dropped every
+    # real row for sports where Polymarket's own `team` field is a short
+    # city name (WNBA: "Washington") rather than the full ESPN display
+    # name ("Washington Mystics"). event_rows is already scoped to this
+    # one real event_id (only two possible real teams), so filtering out
+    # total rows (team is always null for those) is sufficient here --
+    # correctly avoids re-deriving name-matching for a game that's already
+    # uniquely resolved.
+    game_rows = event_rows.filter(pl.col("team").is_not_null())
     total_rows = event_rows.filter(pl.col("market_type") == "total")
     candidates = []
     for r in game_rows.iter_rows(named=True):
-        side = "home" if r["team"] == home_name else "away"
+        side = "home" if _team_name_matches(r["team"], home_name) else "away"
         candidates.append(MarketEvaluation(
             market_id=r["market_id"], market_type=r["market_type"], team_or_side=side,
             line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
