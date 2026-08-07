@@ -32,6 +32,9 @@ REAL_MLB_FEATURE_COLUMNS = {
     "home_sp_bb_pct", "away_sp_bb_pct",
     "home_sp_days_rest", "away_sp_days_rest",
     "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity",
+    "home_sp_clean_first_inning_clean_rate", "away_sp_clean_first_inning_clean_rate",
+    "home_sp_clean_scoreless_inning_rate", "away_sp_clean_scoreless_inning_rate",
+    "home_sp_clean_clean_appearance_rate", "away_sp_clean_clean_appearance_rate",
 }
 
 

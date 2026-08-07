@@ -87,6 +87,14 @@ FEATURE_GROUPS_MLB: list[FeatureGroup] = [
         "Bullpen recent workload and velocity, real Statcast-derived",
     ),
     FeatureGroup(
+        "clean_rates",
+        ["home_sp_clean_first_inning_clean_rate", "away_sp_clean_first_inning_clean_rate",
+         "home_sp_clean_scoreless_inning_rate", "away_sp_clean_scoreless_inning_rate",
+         "home_sp_clean_clean_appearance_rate", "away_sp_clean_clean_appearance_rate"],
+        "Beta-binomial shrunk pitcher clean rates (first-inning/scoreless-inning/"
+        "clean-appearance), real Statcast run-scoring-derived",
+    ),
+    FeatureGroup(
         "park_weather",
         ["park_factor", "temp_f_mean"],
         "Empirical park run factor and archived weather forecast temperature",

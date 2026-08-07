@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import polars as pl
+import pytest
 
 from model_prediction.rebuild.mlb_features import (
     bullpen_rolling_features,
@@ -19,6 +20,7 @@ from model_prediction.rebuild.mlb_features import (
     lookup_pitcher_id,
     normalize_statcast_pitches,
     park_factor,
+    pitcher_clean_rate_features,
     pitcher_rolling_features,
     point_in_time_probable_starters,
 )
@@ -29,17 +31,19 @@ def _pitch_row(
     *, inning_topbot: str = "Top", home_team: str = "HOME", away_team: str = "AWAY",
     description: str = "called_strike", events: str | None = None,
     release_speed: float = 93.0, pitcher_days_since_prev_game: int = 4,
+    inning: int = 1, bat_score: int = 0, post_bat_score: int = 0,
 ) -> dict:
     return {
         "game_pk": game_pk, "game_date": game_date, "pitcher": pitcher,
         "batter": 1, "home_team": home_team, "away_team": away_team,
-        "inning": 1, "inning_topbot": inning_topbot,
+        "inning": inning, "inning_topbot": inning_topbot,
         "at_bat_number": at_bat_number, "pitch_number": pitch_number,
         "pitch_type": "FF", "release_speed": release_speed, "release_spin_rate": 2200,
         "description": description, "events": events, "zone": 5,
         "p_throws": "R", "stand": "R",
         "pitcher_days_since_prev_game": pitcher_days_since_prev_game,
         "n_thruorder_pitcher": 1,
+        "bat_score": bat_score, "post_bat_score": post_bat_score,
     }
 
 
@@ -104,6 +108,86 @@ class TestPitcherRollingFeaturesPointInTime:
 
         assert feats["k_pct"] == 0.5   # 1 strikeout / 2 batters faced
         assert feats["bb_pct"] == 0.5  # 1 walk / 2 batters faced
+
+
+class TestPitcherCleanRateFeatures:
+    """CLAUDE.md Part 1 SS10's "Pitcher clean-rate group" -- real beta-
+    binomial-shrunk rates computed directly from Statcast's real
+    bat_score/post_bat_score run-scoring fields, previously not wired
+    anywhere (pitcher_clean_rate_shrink() in missingness.py had zero real
+    callers, grep-verified)."""
+
+    def test_no_prior_history_reports_unavailable_not_a_guess(self):
+        pitches = normalize_statcast_pitches(pl.DataFrame([_pitch_row(1, "2026-08-05", 100, 1, 1)]))
+        feats = pitcher_clean_rate_features(pitches, 999, before_game_date="2026-08-01")
+        assert feats["availability"] == 0.0
+        assert feats["clean_appearance_rate"] == 0.0
+        assert feats["clean_appearance_n"] == 0.0
+
+    def test_future_starts_never_leak_into_a_past_decision(self):
+        rows = [
+            # Before the decision date: a clean start.
+            _pitch_row(10, "2026-07-20", 100, 1, 1, inning=1, bat_score=0, post_bat_score=0),
+            # After the decision date: pitcher allows a run -- must not
+            # influence a feature computed for before_game_date=2026-08-01.
+            _pitch_row(20, "2026-08-10", 100, 1, 1, inning=1, bat_score=0, post_bat_score=1),
+        ]
+        pitches = normalize_statcast_pitches(pl.DataFrame(rows))
+        feats = pitcher_clean_rate_features(pitches, 100, before_game_date="2026-08-01")
+
+        assert feats["availability"] == 1.0
+        assert feats["clean_appearance_rate"] > 0.5, (
+            "a future start where the pitcher allowed a run leaked into a feature "
+            "computed for an earlier decision date"
+        )
+        assert feats["clean_appearance_n"] == 1.0
+
+    def test_rates_computed_from_real_run_scoring_data(self):
+        rows = [
+            # Start 1 (game_pk=10, 2026-07-20): fully clean -- no runs in
+            # inning 1 or inning 2.
+            _pitch_row(10, "2026-07-20", 100, 1, 1, inning=1, bat_score=0, post_bat_score=0),
+            _pitch_row(10, "2026-07-20", 100, 1, 2, inning=1, bat_score=0, post_bat_score=0),
+            _pitch_row(10, "2026-07-20", 100, 2, 1, inning=2, bat_score=0, post_bat_score=0),
+            _pitch_row(10, "2026-07-20", 100, 2, 2, inning=2, bat_score=0, post_bat_score=0),
+            # Start 2 (game_pk=11, 2026-07-25): clean first inning, but
+            # allows 1 run in inning 2 -- not a clean appearance, and
+            # inning 2 is not a scoreless inning.
+            _pitch_row(11, "2026-07-25", 100, 1, 1, inning=1, bat_score=0, post_bat_score=0),
+            _pitch_row(11, "2026-07-25", 100, 1, 2, inning=1, bat_score=0, post_bat_score=0),
+            _pitch_row(11, "2026-07-25", 100, 2, 1, inning=2, bat_score=0, post_bat_score=1),
+        ]
+        pitches = normalize_statcast_pitches(pl.DataFrame(rows))
+        feats = pitcher_clean_rate_features(pitches, 100, before_game_date="2026-08-01")
+
+        assert feats["availability"] == 1.0
+        # Raw: 2/2 starts had a clean inning 1.
+        assert feats["first_inning_clean_n"] == 2.0
+        # Raw: 3/4 real (game, inning) pairs were scoreless -- (10,1),
+        # (10,2), (11,1) clean; (11,2) is not.
+        assert feats["scoreless_inning_n"] == 4.0
+        # Raw: 1/2 starts were a fully clean appearance -- game_pk=10
+        # clean, game_pk=11 allowed a run in inning 2.
+        assert feats["clean_appearance_n"] == 2.0
+
+        # Beta-binomial posterior means with the real default league prior
+        # (alpha=5.0, beta=5.0) -- hand-computed from the real counts
+        # above, not just "some number between 0 and 1".
+        assert feats["first_inning_clean_rate"] == pytest.approx((5.0 + 2) / (5.0 + 5.0 + 2), abs=1e-9)
+        assert feats["scoreless_inning_rate"] == pytest.approx((5.0 + 3) / (5.0 + 5.0 + 4), abs=1e-9)
+        assert feats["clean_appearance_rate"] == pytest.approx((5.0 + 1) / (5.0 + 5.0 + 2), abs=1e-9)
+
+    def test_data_without_bat_score_reports_unavailable_not_a_crash(self):
+        # normalize_statcast_pitches() only keeps bat_score/post_bat_score
+        # when the source data actually has them -- an older or synthetic
+        # dataset missing them must fail closed to availability=0, not
+        # raise on a missing column.
+        pitches = pl.DataFrame([
+            {"game_pk": 1, "game_date": "2026-07-20", "pitcher": 100, "inning": 1,
+             "inning_topbot": "Top", "home_team": "HOME", "away_team": "AWAY"},
+        ]).with_columns(pl.col("game_date").str.slice(0, 10).alias("game_date_str"))
+        feats = pitcher_clean_rate_features(pitches, 100, before_game_date="2026-08-01")
+        assert feats["availability"] == 0.0
 
 
 class TestBullpenRollingFeatures:

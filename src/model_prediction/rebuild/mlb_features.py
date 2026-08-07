@@ -152,6 +152,13 @@ def normalize_statcast_pitches(pitches: pl.DataFrame) -> pl.DataFrame:
         "pitch_type", "release_speed", "release_spin_rate", "description",
         "events", "zone", "p_throws", "stand",
         "pitcher_days_since_prev_game", "n_thruorder_pitcher",
+        # bat_score/post_bat_score: the batting team's real score
+        # immediately before/after this pitch. Added for
+        # pitcher_clean_rate_features() -- runs allowed by the pitcher on
+        # the mound is exactly the batting (opposing) team's score delta
+        # while that pitcher's pitches are being thrown, real Statcast
+        # data, not derived/estimated.
+        "bat_score", "post_bat_score",
     ]
     present = [c for c in keep if c in pitches.columns]
     df = pitches.select(present)
@@ -240,6 +247,116 @@ def pitcher_rolling_features(
         "whiff_pct": (whiffs / swings) if swings else 0.0,
         "days_rest": days_rest,
         "pitches_last_start": float(pitches_last_start),
+    }
+
+
+def pitcher_clean_rate_features(
+    pitches: pl.DataFrame, pitcher_id: int, before_game_date: str,
+) -> dict[str, float]:
+    """Real beta-binomial-shrunk pitcher clean-rate features (CLAUDE.md Part
+    1 SS10's "Pitcher clean-rate group"), computed strictly from this
+    pitcher's own real prior starts before before_game_date --
+    point-in-time-safe, same convention as pitcher_rolling_features().
+
+    Computes three of CLAUDE.md's five named rates directly from real
+    Statcast run-scoring data (bat_score/post_bat_score per pitch -- the
+    batting team's score immediately before/after each pitch, so
+    post_bat_score - bat_score is the real runs scored on that exact
+    pitch/play; summing it over a pitcher's own pitches gives runs
+    allowed while they were on the mound, without needing official
+    earned/unearned attribution):
+
+      - first_inning_clean_rate: fraction of real prior starts where this
+        pitcher allowed 0 runs during inning 1.
+      - scoreless_inning_rate: fraction of real (game, inning) pairs this
+        pitcher pitched in where they allowed 0 runs.
+      - clean_appearance_rate: fraction of real prior starts where this
+        pitcher allowed 0 runs across the entire outing.
+
+    Each is shrunk via missingness.pitcher_clean_rate_shrink() (real,
+    tested, previously had zero callers anywhere in this codebase --
+    verified via grep) rather than used as a raw, noisy small-sample
+    rate.
+
+    Real, disclosed scope: CLAUDE.md also names rolling_10/rolling_20
+    variants of clean_appearance (fixed-window rates). With this
+    project's real backfill window so far (~10 real days), few if any
+    pitchers have 10+ real prior starts -- a separate rolling-10/20
+    feature would be degenerate (identical to the all-history rate) for
+    nearly every real pitcher right now, so it's deliberately not built
+    as a distinct feature yet; needs more real backfill to be
+    meaningfully different from what's here.
+
+    Returns availability=0.0 with neutral defaults when there's no real
+    prior start (or the source data predates bat_score/post_bat_score
+    being collected) -- never substitutes a league-average guess."""
+    prior = pitches.filter(
+        (pl.col("pitcher") == pitcher_id) & (pl.col("game_date_str") < before_game_date)
+    )
+    if prior.is_empty() or "bat_score" not in prior.columns or "post_bat_score" not in prior.columns:
+        return {
+            "availability": 0.0,
+            "first_inning_clean_rate": 0.0, "first_inning_clean_n": 0.0,
+            "scoreless_inning_rate": 0.0, "scoreless_inning_n": 0.0,
+            "clean_appearance_rate": 0.0, "clean_appearance_n": 0.0,
+        }
+
+    prior = prior.filter(
+        pl.col("bat_score").is_not_null() & pl.col("post_bat_score").is_not_null()
+    ).with_columns(
+        (pl.col("post_bat_score") - pl.col("bat_score")).alias("runs_this_pitch")
+    )
+    if prior.is_empty():
+        return {
+            "availability": 0.0,
+            "first_inning_clean_rate": 0.0, "first_inning_clean_n": 0.0,
+            "scoreless_inning_rate": 0.0, "scoreless_inning_n": 0.0,
+            "clean_appearance_rate": 0.0, "clean_appearance_n": 0.0,
+        }
+
+    # Clean appearance: per real start (game_pk), total runs allowed.
+    per_start = prior.group_by("game_pk").agg(pl.col("runs_this_pitch").sum().alias("runs_allowed"))
+    clean_starts = float(per_start.filter(pl.col("runs_allowed") == 0).height)
+    total_starts = float(per_start.height)
+
+    # First-inning clean: per real start, runs allowed during inning 1.
+    first_inning = prior.filter(pl.col("inning") == 1)
+    if first_inning.is_empty():
+        first_inning_clean, first_inning_n = 0.0, 0.0
+    else:
+        per_start_inning1 = first_inning.group_by("game_pk").agg(
+            pl.col("runs_this_pitch").sum().alias("runs_allowed")
+        )
+        first_inning_clean = float(per_start_inning1.filter(pl.col("runs_allowed") == 0).height)
+        first_inning_n = float(per_start_inning1.height)
+
+    # Scoreless inning: per real (game, inning) pair this pitcher threw in.
+    per_game_inning = prior.group_by(["game_pk", "inning"]).agg(
+        pl.col("runs_this_pitch").sum().alias("runs_allowed")
+    )
+    scoreless_innings = float(per_game_inning.filter(pl.col("runs_allowed") == 0).height)
+    total_innings = float(per_game_inning.height)
+
+    from .missingness import pitcher_clean_rate_shrink
+
+    first_inning_shrunk = pitcher_clean_rate_shrink(
+        str(pitcher_id), "first_inning_clean", first_inning_clean, first_inning_n,
+    )
+    scoreless_shrunk = pitcher_clean_rate_shrink(
+        str(pitcher_id), "scoreless_inning", scoreless_innings, total_innings,
+    )
+    clean_appearance_shrunk = pitcher_clean_rate_shrink(
+        str(pitcher_id), "clean_appearance", clean_starts, total_starts,
+    )
+
+    return {
+        "availability": 1.0,
+        "first_inning_clean_rate": first_inning_shrunk.posterior_mean,
+        "first_inning_clean_n": first_inning_n,
+        "scoreless_inning_rate": scoreless_shrunk.posterior_mean,
+        "scoreless_inning_n": total_innings,
+        "clean_appearance_rate": clean_appearance_shrunk.posterior_mean,
+        "clean_appearance_n": total_starts,
     }
 
 
@@ -459,6 +576,11 @@ def build_game_feature_row(
 
     home_p = pitcher_rolling_features(pitches, home_starter_id, game_date)
     away_p = pitcher_rolling_features(pitches, away_starter_id, game_date)
+    # Distinct "home_sp_clean_" prefix (not "home_sp_") -- both dicts
+    # have their own "availability" key, so sharing home_p's prefix would
+    # silently let one clobber the other in the merged row below.
+    home_clean = pitcher_clean_rate_features(pitches, home_starter_id, game_date)
+    away_clean = pitcher_clean_rate_features(pitches, away_starter_id, game_date)
     home_bp = bullpen_rolling_features(pitches, home_abbrev, game_date, starters)
     away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
     park = park_factor(espn_game.get("venue", ""))
@@ -476,6 +598,8 @@ def build_game_feature_row(
         # Starter features (prefixed by side)
         **{f"home_sp_{k}": v for k, v in home_p.items()},
         **{f"away_sp_{k}": v for k, v in away_p.items()},
+        **{f"home_sp_clean_{k}": v for k, v in home_clean.items()},
+        **{f"away_sp_clean_{k}": v for k, v in away_clean.items()},
         # Bullpen features
         **{f"home_bp_{k}": v for k, v in home_bp.items()},
         **{f"away_bp_{k}": v for k, v in away_bp.items()},
@@ -536,6 +660,11 @@ def build_live_game_feature_row(
 
     home_p = pitcher_rolling_features(pitches, home_starter_id, game_date)
     away_p = pitcher_rolling_features(pitches, away_starter_id, game_date)
+    # Distinct "home_sp_clean_" prefix (not "home_sp_") -- both dicts
+    # have their own "availability" key, so sharing home_p's prefix would
+    # silently let one clobber the other in the merged row below.
+    home_clean = pitcher_clean_rate_features(pitches, home_starter_id, game_date)
+    away_clean = pitcher_clean_rate_features(pitches, away_starter_id, game_date)
     home_bp = bullpen_rolling_features(pitches, home_abbrev, game_date, starters)
     away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
     park = park_factor(espn_game.get("venue", ""))
@@ -549,6 +678,8 @@ def build_live_game_feature_row(
         "home_starter_name": home_starter_name, "away_starter_name": away_starter_name,
         **{f"home_sp_{k}": v for k, v in home_p.items()},
         **{f"away_sp_{k}": v for k, v in away_p.items()},
+        **{f"home_sp_clean_{k}": v for k, v in home_clean.items()},
+        **{f"away_sp_clean_{k}": v for k, v in away_clean.items()},
         **{f"home_bp_{k}": v for k, v in home_bp.items()},
         **{f"away_bp_{k}": v for k, v in away_bp.items()},
         "park_factor": park,

@@ -1,28 +1,36 @@
 {
-  "groups_tested": 6,
+  "groups_tested": 8,
   "rejected_groups": [],
   "warned_groups": [],
   "results": [
     {
       "group": "starter_pitching",
-      "delta_log_loss": -0.0003678082412497119,
-      "delta_brier": -0.00016214217539833875,
+      "delta_log_loss": 0.0026515469703404237,
+      "delta_brier": 0.0013951540673306506,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "bullpen",
-      "delta_log_loss": 0.06693932802913438,
-      "delta_brier": 0.03403193032017421,
+      "delta_log_loss": 0.07087146114461385,
+      "delta_brier": 0.036102263752507385,
+      "coverage_impact": 1.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "clean_rates",
+      "delta_log_loss": 0.0038827775625538408,
+      "delta_brier": 0.0020465394915445134,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "park_weather",
-      "delta_log_loss": -0.002829516087479833,
-      "delta_brier": -0.001421377872309948,
+      "delta_log_loss": 0.0028161572943615765,
+      "delta_brier": 0.0014148065639102425,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
@@ -36,17 +44,25 @@
       "verdict": "PASS"
     },
     {
-      "group": "cumulative_starter_pitching",
-      "delta_log_loss": -0.06587038872172946,
-      "delta_brier": -0.033724409559688834,
+      "group": "cumulative_clean_rates",
+      "delta_log_loss": -0.06457284272027386,
+      "delta_brier": -0.03277632331277433,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "cumulative_park_weather",
-      "delta_log_loss": -0.06400496739735373,
-      "delta_brier": -0.03277387857503303,
+      "delta_log_loss": -0.0645473006022953,
+      "delta_brier": -0.03288954427690885,
+      "coverage_impact": 0.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "cumulative_starter_pitching",
+      "delta_log_loss": -0.0651348684083215,
+      "delta_brier": -0.033221711460083764,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
