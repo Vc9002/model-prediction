@@ -100,15 +100,25 @@ def main() -> None:
     identity_wired_count = collectors_src.count("resolve_espn_scoreboard_team_ids(")
     # VERIFIED, not PARTIAL: real for all 5 real ESPN scoreboard collectors
     # (MLB/NBA/NFL/Soccer/Tennis) as of this check. Still not VERIFIED for
-    # the *whole* identity system, though -- player/event/venue/
-    # market-contract entity types, and every downstream consumer besides
-    # collection itself (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict,
-    # mlb_market_matching.py's raw name comparison) are still unmigrated
-    # bespoke matching. capabilities table only claims what's checked here.
+    # the *whole* identity system, though -- venue/event/market-contract
+    # entity types are still unmigrated (market-contract matching has real
+    # canonical-ID support now, see other_sport_market_matching above, but
+    # falls back to name matching honestly rather than requiring it).
+    # capabilities table only claims what's checked here.
     capabilities["canonical_identity_registry"] = (
         "VERIFIED" if identity_wired_count >= 5 else "PARTIAL" if identity_wired_count > 0 else "INTERFACE_ONLY"
     )
     capabilities["mlb_starter_name_to_id_resolution"] = "OPERATIONAL"  # lookup_pitcher_id() in mlb_features.py, live-verified, tested
+    # Player identity: resolve_mlbam_player_id() (identity.py) wired into
+    # mlb_shadow_pipeline.py's predict_stage() -- live-verified, 12 real
+    # MLB starters registered with genuine MLBAM canonical player ids
+    # against a real slate. MLB only -- NBA/NFL/Soccer/Tennis player
+    # identity is still unmigrated (no equivalent name->stable-id crosswalk
+    # exists for them yet, unlike MLB's pybaseball player register).
+    pipeline_src = (REPO_ROOT / "src/model_prediction/rebuild/mlb_shadow_pipeline.py").read_text()
+    capabilities["mlb_player_canonical_identity"] = (
+        "VERIFIED" if "resolve_mlbam_player_id" in pipeline_src else "NOT_STARTED"
+    )
 
     # Horizons. horizon_builder.py (not horizons.py, which is only
     # declarative metadata) is the real orchestrator -- checked directly
@@ -261,7 +271,7 @@ def main() -> None:
 
     known_blockers = [
         "Real order-book depth still doesn't exist as a data source — real_market_candidates() honestly sets depth_available=False, which makes every real market correctly fail INSUFFICIENT_DEPTH; it doesn't create the missing capability. Order-book walking (walk_asks) is also NOT_STARTED — nothing to walk without a real depth source. External blocker, not internal foundation debt.",
-        "Canonical identity: resolve_espn_scoreboard_team_ids() is real, tested, and now wired into all 5 real ESPN scoreboard collectors (MLB/NBA/NFL/Soccer/Tennis), live-verified against real network data. Still unmigrated: player/event/venue/market-contract entity types, and every non-collection downstream consumer (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict, mlb_market_matching.py's raw name comparison).",
+        "Canonical identity: resolve_espn_scoreboard_team_ids() is real, tested, and wired into all 5 real ESPN scoreboard collectors (MLB/NBA/NFL/Soccer/Tennis), live-verified against real network data -- including a real fix for a cross-sport ESPN team-id collision found live (WNBA/MLB shared numeric ids under one unnamespaced source_id). Market-contract matching now prefers canonical team IDs too (resolve_polymarket_team_id(), team_canonical_id column) with an honest name-matching fallback. MLB player identity is real (resolve_mlbam_player_id(), 12 real starters live-verified). Still unmigrated: NBA/NFL/Soccer/Tennis player identity (no stable name->id crosswalk exists for them the way MLB has pybaseball's player register), venue identity, and event identity.",
         "point_in_time_join() has one real caller (mlb_features.point_in_time_probable_starters, used by both mlb_shadow_run.py and horizon_builder.py) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own day-granularity point-in-time filtering directly -- a genuinely different computational shape, not a drop-in fit for the shared utility as written.",
         "Horizon orchestration (PARTIAL): horizon_builder.py is real, tested, and live-verified for MLB across all 3 horizons (0/12, 2/12, 5/12 real coverage on the 2026-08-06 slate) -- but no other sport has a horizon builder, and MLB's rolling Statcast features are calendar-day granularity regardless of horizon (disclosed in the module's own docstring; the real available granularity given Statcast has no wall-clock pitch timestamp).",
         "Multi-sport shared CLI (PARTIAL): rebuild_shadow_cli.py + sport_adapter.py now run the REAL MLB pipeline end-to-end (predict/match_markets/decide via mlb_shadow_pipeline.py, live-verified byte-identical to scripts/mlb_shadow_run.py and idempotent on rerun). "

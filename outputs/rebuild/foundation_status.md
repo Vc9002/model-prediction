@@ -1,7 +1,7 @@
 # Foundation Inventory
 
-Generated from code at commit `bb6d238e65bd819a30b5155fa91fdea5b9b3bc38` on branch `rebuild/clean-slate-v1`.
-Python: Python 3.14.5. Total tests passing: 989.
+Generated from code at commit `39f3f0c36d54fcd074e538c3d54cb7e833d91b49` on branch `rebuild/clean-slate-v1`.
+Python: Python 3.14.5. Total tests passing: 992.
 
 ## Capability status
 
@@ -13,6 +13,7 @@ Python: Python 3.14.5. Total tests passing: 989.
 | `mlb_feature_builders_own_pit_logic` | OPERATIONAL |
 | `canonical_identity_registry` | VERIFIED |
 | `mlb_starter_name_to_id_resolution` | OPERATIONAL |
+| `mlb_player_canonical_identity` | VERIFIED |
 | `horizon_orchestration` | PARTIAL |
 | `mlb_market_event_isolation` | VERIFIED |
 | `mlb_market_period_disambiguation_f5` | VERIFIED |
@@ -46,7 +47,7 @@ Python: Python 3.14.5. Total tests passing: 989.
 ## Known blockers
 
 - Real order-book depth still doesn't exist as a data source — real_market_candidates() honestly sets depth_available=False, which makes every real market correctly fail INSUFFICIENT_DEPTH; it doesn't create the missing capability. Order-book walking (walk_asks) is also NOT_STARTED — nothing to walk without a real depth source. External blocker, not internal foundation debt.
-- Canonical identity: resolve_espn_scoreboard_team_ids() is real, tested, and now wired into all 5 real ESPN scoreboard collectors (MLB/NBA/NFL/Soccer/Tennis), live-verified against real network data. Still unmigrated: player/event/venue/market-contract entity types, and every non-collection downstream consumer (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict, mlb_market_matching.py's raw name comparison).
+- Canonical identity: resolve_espn_scoreboard_team_ids() is real, tested, and wired into all 5 real ESPN scoreboard collectors (MLB/NBA/NFL/Soccer/Tennis), live-verified against real network data -- including a real fix for a cross-sport ESPN team-id collision found live (WNBA/MLB shared numeric ids under one unnamespaced source_id). Market-contract matching now prefers canonical team IDs too (resolve_polymarket_team_id(), team_canonical_id column) with an honest name-matching fallback. MLB player identity is real (resolve_mlbam_player_id(), 12 real starters live-verified). Still unmigrated: NBA/NFL/Soccer/Tennis player identity (no stable name->id crosswalk exists for them the way MLB has pybaseball's player register), venue identity, and event identity.
 - point_in_time_join() has one real caller (mlb_features.point_in_time_probable_starters, used by both mlb_shadow_run.py and horizon_builder.py) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own day-granularity point-in-time filtering directly -- a genuinely different computational shape, not a drop-in fit for the shared utility as written.
 - Horizon orchestration (PARTIAL): horizon_builder.py is real, tested, and live-verified for MLB across all 3 horizons (0/12, 2/12, 5/12 real coverage on the 2026-08-06 slate) -- but no other sport has a horizon builder, and MLB's rolling Statcast features are calendar-day granularity regardless of horizon (disclosed in the module's own docstring; the real available granularity given Statcast has no wall-clock pitch timestamp).
 - Multi-sport shared CLI (PARTIAL): rebuild_shadow_cli.py + sport_adapter.py now run the REAL MLB pipeline end-to-end (predict/match_markets/decide via mlb_shadow_pipeline.py, live-verified byte-identical to scripts/mlb_shadow_run.py and idempotent on rerun). scripts/mlb_shadow_run.py is now a real thin wrapper (checked directly: no inlined build_forecast()/evaluate_game() loop of its own) around the same stage functions MLBAdapter calls -- the duplicate-orchestration drift risk is closed. Still open: every sport besides MLB is collect-only through this interface (collection itself now genuinely succeeds for all 5 -- the prior soccer/tennis ESPN-league-code and tennis groupings/athlete-shape bugs are fixed); esports is registered wrapping its honest stub collector; KBO/NPB are registered as an explicit research_only decision (no real collector or data source client exists for either); --resume-run-id continues ledger lineage only, not real in-memory stage state across processes.
