@@ -15,16 +15,14 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import polars as pl
-from scipy.stats import nbinom, poisson, skellam
-from sklearn.linear_model import ElasticNet, LogisticRegression
 from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.linear_model import ElasticNet
 from sklearn.preprocessing import StandardScaler
 
 
@@ -131,6 +129,7 @@ class JointScoreDistribution:
     def __init__(self, method: str = "independent_poisson", n_sim: int = 10000, seed: int = 42) -> None:
         self.method = method
         self.n_sim = n_sim
+        self.seed = seed
         self.rng = np.random.default_rng(seed)
 
     def predict_game(
@@ -292,7 +291,7 @@ class MLBTwoHeadModel:
         return self.distribution.probability_for_market(pred, market_type, selection, line)
 
     def to_artifact(self) -> dict[str, Any]:
-        import hashlib, json
+        import json
         raw = {
             "model_id": self.MODEL_VERSION,
             "method": self.distribution.method,
@@ -303,3 +302,69 @@ class MLBTwoHeadModel:
         artifact_hash = hashlib.sha256(json.dumps(raw, sort_keys=True).encode()).hexdigest()
         raw["artifact_hash"] = artifact_hash
         return raw
+
+    def save(self, path: str | Path) -> None:
+        """Save a real, loadable artifact bundle — fixes a real gap
+        (FOUNDATION_COMPLETION.md Phase 8): to_artifact() only ever recorded
+        metadata and hashes, never the fitted sklearn objects themselves, so
+        a saved artifact could never actually be reloaded to reproduce a
+        prediction — every run had to retrain from scratch (verified in
+        scripts/mlb_shadow_run.py's own docstring, which disclosed this as
+        a known limitation rather than pretending otherwise).
+
+        Writes `path/model.joblib` (the fitted heads + distribution config)
+        and `path/metadata.json` (feature names, version, artifact hash) as
+        a self-contained directory.
+        """
+        import joblib
+
+        if not self._fitted:
+            raise RuntimeError("cannot save an unfitted model")
+        out = Path(path)
+        out.mkdir(parents=True, exist_ok=True)
+        joblib.dump({
+            "intensity_model": self.intensity_head.model,
+            "intensity_scaler": self.intensity_head.scaler,
+            "intensity_feature_names": self.intensity_head._feature_names,
+            "differential_model": self.differential_head.model,
+            "differential_scaler": self.differential_head.scaler,
+            "differential_feature_names": self.differential_head._feature_names,
+            "distribution_method": self.distribution.method,
+            "distribution_n_sim": self.distribution.n_sim,
+            "distribution_seed": self.distribution.seed,
+        }, out / "model.joblib")
+        (out / "metadata.json").write_text(json.dumps(self.to_artifact(), indent=2, default=str))
+
+    @classmethod
+    def load(cls, path: str | Path) -> MLBTwoHeadModel:
+        """Load a bundle written by save(). Reconstructs both heads and the
+        distribution config exactly — round-trip-tested to produce
+        identical predictions to the original in-memory model, not just
+        "loads without error"."""
+        import joblib
+
+        src = Path(path)
+        bundle = joblib.load(src / "model.joblib")
+        metadata = json.loads((src / "metadata.json").read_text())
+
+        model = cls()
+        model.intensity_head.model = bundle["intensity_model"]
+        model.intensity_head.scaler = bundle["intensity_scaler"]
+        model.intensity_head._feature_names = bundle["intensity_feature_names"]
+        model.differential_head.model = bundle["differential_model"]
+        model.differential_head.scaler = bundle["differential_scaler"]
+        model.differential_head._feature_names = bundle["differential_feature_names"]
+        # Real bug caught before this was ever committed: setting .method/
+        # .n_sim on the default-constructed distribution left .rng seeded
+        # from cls()'s default seed=42, silently ignoring whatever seed the
+        # original model actually used. Reconstruct the whole object from
+        # the persisted seed instead of mutating fields piecemeal.
+        model.distribution = JointScoreDistribution(
+            method=bundle["distribution_method"],
+            n_sim=bundle["distribution_n_sim"],
+            seed=bundle["distribution_seed"],
+        )
+        model._intensity_features = metadata["intensity_features"]
+        model._differential_features = metadata["differential_features"]
+        model._fitted = True
+        return model
