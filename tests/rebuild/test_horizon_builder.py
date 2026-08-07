@@ -1,0 +1,88 @@
+"""Tests for the real early/mid/late horizon dataset builder
+(horizon_builder.py, FOUNDATION_COMPLETION.md Phase 7).
+"""
+
+from __future__ import annotations
+
+import polars as pl
+import pytest
+
+from model_prediction.rebuild.horizon_builder import build_mlb_horizon_dataset
+from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
+
+
+def _write_scoreboard(data_root, event_id: str, event_start_utc: str, home: str, away: str) -> None:
+    norm = NormalizedStore(f"{data_root}/normalized")
+    row = {
+        **provenance_row(
+            source="espn_public", source_record_id=event_id, source_version="v1",
+            observed_at_utc=utc_now().isoformat(), effective_at_utc=event_start_utc,
+            event_start_utc=event_start_utc,
+        ),
+        "event_id": event_id, "home_team": home, "away_team": away,
+        "home_score": 0, "away_score": 0, "status": "STATUS_SCHEDULED", "venue": "",
+    }
+    norm.write("mlb", "scoreboard", pl.DataFrame([row]), primary_key=["event_id"])
+
+
+class TestInvalidHorizon:
+    def test_unknown_horizon_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="horizon must be one of"):
+            build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "afternoon", [])
+
+
+class TestDecisionTimesDifferByHorizon:
+    """The one thing that's genuinely real and horizon-sensitive today:
+    decision_time_utc itself, and anything joined against a real
+    observation timestamp (probable starters)."""
+
+    def test_early_mid_late_produce_different_real_decision_times(self, tmp_path):
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
+
+        early = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "early", [])
+        mid = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "mid", [])
+        late = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", [])
+
+        assert early.decision_times["401"] != mid.decision_times["401"] != late.decision_times["401"]
+        # early is furthest before start, late is closest
+        assert early.decision_times["401"] < mid.decision_times["401"] < late.decision_times["401"]
+
+
+class TestMissingnessIsHonest:
+    def test_no_probable_starter_data_is_recorded_as_real_missingness_not_silently_dropped(self, tmp_path):
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
+
+        result = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", [])
+
+        assert result.coverage["total_games"] == 1
+        assert result.coverage["rows_built"] == 0
+        assert result.coverage["coverage_fraction"] == 0.0
+        assert result.missingness["missing_reasons"]["no_point_in_time_probable_starters"] == 1
+        assert result.snapshot_hash is None  # nothing to persist
+
+    def test_probable_starter_observed_after_early_cutoff_is_honest_early_missingness(self, tmp_path):
+        # A revision published close to game time is real, valid data for
+        # "late" but must not leak into "early" -- exactly the point-in-time
+        # guarantee point_in_time_probable_starters exists to provide.
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
+        records = [{
+            "event_id": "401", "observed_at_utc": "2026-08-06T21:30:00+00:00",  # ~40min before start
+            "home_starter": "Some Pitcher", "away_starter": "Other Pitcher",
+        }]
+
+        early = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "early", records)
+        late = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", records)
+
+        # early's decision time (T-36h) is long before this observation was
+        # published -- it must not see it.
+        assert early.missingness["missing_reasons"].get("no_point_in_time_probable_starters") == 1
+        # late's decision time (T-60m) is after the observation -- it has a
+        # real probable starter to work with (may still fail later at real
+        # Statcast-ID resolution in this test's empty-data environment, but
+        # NOT for the point-in-time reason).
+        assert "no_point_in_time_probable_starters" not in late.missingness["missing_reasons"]
+
+    def test_no_scheduled_games_is_zero_coverage_not_an_error(self, tmp_path):
+        result = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", [])
+        assert result.coverage["total_games"] == 0
+        assert result.coverage["rows_built"] == 0
