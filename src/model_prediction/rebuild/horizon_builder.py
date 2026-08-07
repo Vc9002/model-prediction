@@ -129,6 +129,7 @@ def build_mlb_horizon_dataset(
         row = build_live_game_feature_row(
             g, probable["home_starter"], probable["away_starter"],
             pitches, starters_table, data_root,
+            decision_time_utc=decision_times[event_id],
         )
         if row is None:
             missing_reasons["starter_name_not_resolved_to_real_statcast_id"] = (

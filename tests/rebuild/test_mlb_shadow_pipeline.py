@@ -181,7 +181,8 @@ class TestPlayerIdentityLineage:
 
         registries_seen = []
 
-        def fake_build_live_row(espn_game, home_name, away_name, pitches, starters, data_root, identity_registry=None):
+        def fake_build_live_row(espn_game, home_name, away_name, pitches, starters, data_root,
+                                 identity_registry=None, decision_time_utc=None):
             registries_seen.append(identity_registry)
             if identity_registry is not None:
                 from model_prediction.rebuild.identity import resolve_mlbam_player_id

@@ -96,7 +96,7 @@ FEATURE_GROUPS_MLB: list[FeatureGroup] = [
     ),
     FeatureGroup(
         "park_weather",
-        ["park_factor", "temp_f_mean"],
+        ["park_factor", "temp_f_first_pitch"],
         "Empirical park run factor and archived weather forecast temperature",
     ),
 ]

@@ -27,7 +27,7 @@ REAL_MLB_FEATURE_COLUMNS = {
     "home_sp_avg_velocity", "away_sp_avg_velocity",
     "home_sp_csw_pct", "away_sp_csw_pct",
     "home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
-    "park_factor", "temp_f_mean",
+    "park_factor", "temp_f_first_pitch",
     "home_sp_k_pct", "away_sp_k_pct",
     "home_sp_bb_pct", "away_sp_bb_pct",
     "home_sp_days_rest", "away_sp_days_rest",

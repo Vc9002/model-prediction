@@ -326,20 +326,50 @@ class MLBCollector:
             "hourly": ["temperature_2m", "relative_humidity_2m", "dew_point_2m",
                         "precipitation", "surface_pressure", "wind_speed_10m",
                         "wind_direction_10m", "weather_code"],
-            "timezone": "America/New_York",
+            # Real bug fixed here (see outputs/rebuild/takeover_status.md
+            # Task 3): this previously requested "America/New_York" for
+            # every venue regardless of its real location, so
+            # hourly.time's local-time labels were wrong for any
+            # non-Eastern venue (verified live: a real Chase Field
+            # response still carried utc_offset_seconds=-14400, Eastern's
+            # offset, not Arizona's real -25200) -- any downstream
+            # first-pitch-hour lookup keyed off those mislabeled local
+            # timestamps would silently pick the wrong hour's weather.
+            # Requesting UTC directly makes hourly.time genuinely
+            # comparable to event_start_utc with no venue-timezone
+            # dependency at all.
+            "timezone": "UTC",
             "models": "best_match",
         }
         try:
             resp = httpx.get(url, params=params, timeout=30)
             resp.raise_for_status()
-            payload = resp.json()
-            snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
+            forecast_data = resp.json()
+            observed_at = utc_now().isoformat()
+            endpoint = "live_forecast" if is_future_or_today else "historical_forecast_stitched"
+            # Real gap fixed here: RawStore.list_snapshots() cannot recover
+            # a snapshot's real observed_at_utc from disk after the fact
+            # (it's only ever known transiently, at write time, to the
+            # caller that passed it in) -- so without embedding it inside
+            # the immutable content itself, no later point-in-time
+            # selection over multiple weather snapshots for the same
+            # venue/date would be possible at all. Wrapping the real
+            # Open-Meteo response in a small self-describing envelope
+            # (not altering the real forecast_data itself) is the minimal
+            # fix; a full RawStore provenance-recovery fix is a separate,
+            # broader storage-layer gap, not this collector's to solve.
+            payload = {
+                "observed_at_utc": observed_at,
+                "endpoint": endpoint,
+                "forecast_data": forecast_data,
+            }
+            snapshot_hash = self.raw.write(source, game_date, record_id, payload, observed_at=observed_at).snapshot_hash
             self.meta.update_source_health(source, "active")
             return {
                 "status": "ok",
                 "venue_id": venue_id,
                 "hash": snapshot_hash,
-                "endpoint": "live_forecast" if is_future_or_today else "historical_forecast_stitched",
+                "endpoint": endpoint,
             }
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
             self.meta.update_source_health(source, "degraded", str(e)[:200])

@@ -55,7 +55,7 @@ INTENSITY_FEATURES = [
     "home_sp_avg_velocity", "away_sp_avg_velocity",
     "home_sp_csw_pct", "away_sp_csw_pct",
     "home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
-    "park_factor", "temp_f_mean",
+    "park_factor", "temp_f_first_pitch",
 ]
 DIFFERENTIAL_FEATURES = [
     "home_sp_k_pct", "away_sp_k_pct",
@@ -318,7 +318,7 @@ def predict_stage(
 
         row = build_live_game_feature_row(
             g, probable["home_starter"], probable["away_starter"], state.pitches, state.starters, data_root,
-            identity_registry,
+            identity_registry, decision_time_utc=state.decision_times[event_id],
         )
         if row is None:
             state.skipped[event_id] = "starter_name_not_resolved_to_real_statcast_id"

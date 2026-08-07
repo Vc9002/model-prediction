@@ -6,7 +6,10 @@ outputs/rebuild/takeover_status.md Checkpoint 5.
 
 from __future__ import annotations
 
+import gzip
+import json
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -18,6 +21,7 @@ from model_prediction.rebuild.mlb_features import (
     bullpen_rolling_features,
     dedupe_scoreboard,
     identify_starters,
+    load_weather_at_decision_time,
     lookup_pitcher_id,
     normalize_statcast_pitches,
     park_factor,
@@ -630,3 +634,132 @@ class TestResolveStatcastGamePk:
         espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
                       "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
         assert resolve_statcast_game_pk(espn_game, []) is None
+
+
+def _write_weather_snapshot(raw_root: Path, venue_id: str, game_date: str, name: str, payload: dict) -> None:
+    record_dir = raw_root / "raw" / "open_meteo" / game_date / f"weather_{venue_id}_{game_date}"
+    record_dir.mkdir(parents=True, exist_ok=True)
+    with gzip.open(record_dir / f"{name}.json.gz", "wb") as f:
+        f.write(json.dumps(payload).encode("utf-8"))
+
+
+def _weather_envelope(observed_at_utc: str, times: list[str], temps_c: list[float],
+                       wind_kmh: list[float], wind_dir: list[float], precip_mm: list[float]) -> dict:
+    return {
+        "observed_at_utc": observed_at_utc,
+        "endpoint": "historical_forecast_stitched",
+        "forecast_data": {
+            "hourly": {
+                "time": times, "temperature_2m": temps_c, "wind_speed_10m": wind_kmh,
+                "wind_direction_10m": wind_dir, "precipitation": precip_mm,
+            },
+        },
+    }
+
+
+class TestLoadWeatherAtDecisionTime:
+    """Task 3 (historical weather point-in-time selection): replaces the
+    previous "latest snapshot on disk, whole-day mean" behavior, which had
+    no point-in-time guarantee at all and diluted the real pregame signal
+    with hours unrelated to the game."""
+
+    def test_selects_the_newest_snapshot_observed_before_decision_time(self, tmp_path):
+        # Two real snapshots: an earlier one (valid for a late decision at
+        # 21:10Z) and a later revision observed *after* that decision time
+        # -- the later one must never be used for this decision.
+        early = _weather_envelope(
+            "2026-08-06T10:00:00+00:00",
+            ["2026-08-06T22:00"], [30.0], [10.0], [180.0], [0.0],
+        )
+        late = _weather_envelope(
+            "2026-08-06T21:30:00+00:00",  # after the late decision time
+            ["2026-08-06T22:00"], [99.0], [99.0], [99.0], [99.0],
+        )
+        _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "a_early", early)
+        _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "b_late", late)
+        decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
+
+        result = load_weather_at_decision_time(
+            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+        )
+
+        assert result["availability"] == 1.0
+        assert result["temp_f_first_pitch"] == pytest.approx(30.0 * 9 / 5 + 32)
+
+    def test_no_snapshot_before_decision_time_is_honestly_unavailable(self, tmp_path):
+        only_late = _weather_envelope(
+            "2026-08-06T21:30:00+00:00",
+            ["2026-08-06T22:00"], [30.0], [10.0], [180.0], [0.0],
+        )
+        _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "only_late", only_late)
+        decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
+
+        result = load_weather_at_decision_time(
+            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+        )
+
+        assert result["availability"] == 0.0
+        assert result["temp_f_first_pitch"] == 0.0
+
+    def test_selects_the_hour_closest_to_first_pitch_not_a_daily_mean(self, tmp_path):
+        # Real regression for the "daily mean dilutes the signal" bug:
+        # three real distinct hourly values; first pitch is at 22:10Z, so
+        # the 22:00Z entry (60.0) must be used, not a mean across all three.
+        snap = _weather_envelope(
+            "2026-08-06T10:00:00+00:00",
+            ["2026-08-06T20:00", "2026-08-06T22:00", "2026-08-07T00:00"],
+            [10.0, 60.0, 90.0],
+            [5.0, 5.0, 5.0],
+            [180.0, 180.0, 180.0],
+            [0.0, 0.0, 0.0],
+        )
+        _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "snap", snap)
+        decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
+
+        result = load_weather_at_decision_time(
+            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+        )
+
+        assert result["temp_f_first_pitch"] == pytest.approx(60.0 * 9 / 5 + 32)
+
+    def test_legacy_unenveloped_snapshot_is_pit_unknown_not_silently_used(self, tmp_path):
+        # A raw Open-Meteo response with no provenance envelope at all
+        # (the shape every snapshot had before this fix) -- its real
+        # observed_at_utc is unknown, so it must never be used, not even
+        # as a last resort.
+        legacy_payload = {
+            "hourly": {
+                "time": ["2026-08-06T22:00"], "temperature_2m": [30.0],
+                "wind_speed_10m": [10.0], "wind_direction_10m": [180.0], "precipitation": [0.0],
+            },
+        }
+        _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "legacy", legacy_payload)
+        decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
+
+        result = load_weather_at_decision_time(
+            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+        )
+
+        assert result["availability"] == 0.0
+
+    def test_no_snapshot_directory_at_all_is_unavailable(self, tmp_path):
+        decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
+        result = load_weather_at_decision_time(
+            tmp_path, "nowhere", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+        )
+        assert result["availability"] == 0.0
+
+    def test_forecast_age_hours_reflects_the_real_gap(self, tmp_path):
+        snap = _weather_envelope(
+            "2026-08-06T10:00:00+00:00",
+            ["2026-08-06T22:00"], [30.0], [10.0], [180.0], [0.0],
+        )
+        _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "snap", snap)
+        decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
+
+        result = load_weather_at_decision_time(
+            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+        )
+
+        # observed at 10:00Z, decision at 21:10Z -> 11h10m old
+        assert result["forecast_age_hours"] == pytest.approx(11.1666, abs=0.01)

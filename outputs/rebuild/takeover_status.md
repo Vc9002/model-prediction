@@ -1480,3 +1480,108 @@ before it).
 (`load_weather_daily_aggregate()` currently takes the latest snapshot in
 a date folder and a daily aggregate, not a decision-time-valid snapshot
 aligned to first-pitch hour).
+
+### Task 3 — historical weather point-in-time selection, fixed
+
+**Real bug confirmed by inspecting actual collected data**:
+`load_weather_daily_aggregate()` took whichever snapshot sorted last on
+disk for a venue/date (no relationship to decision time at all) and
+averaged the *entire day's* hourly values into one number — diluting the
+real pregame signal with hours unrelated to the game and carrying no
+point-in-time guarantee whatsoever (a snapshot collected after a late
+decision time could silently leak in).
+
+**A second, more consequential real bug found while investigating**:
+`collect_weather_forecast()` requested Open-Meteo's `hourly` data with
+`"timezone": "America/New_York"` hardcoded for *every* venue. Verified
+live against a real already-collected Chase Field (Arizona) snapshot:
+`utc_offset_seconds: -14400` — Eastern's real offset, not Arizona's real
+`-25200`. Any first-pitch-hour lookup keyed off those local timestamps
+would silently pick the wrong hour's weather for any non-Eastern venue.
+Fixed by requesting `"timezone": "UTC"` directly (verified live) — no
+venue-timezone lookup needed at all, `hourly.time` is now directly
+comparable to a real `event_start_utc`.
+
+**A third real gap**: `RawStore` has no way to recover a snapshot's real
+`observed_at_utc` from disk after the fact (`list_snapshots()` returns
+`observed_at_utc=""` — it was only ever known transiently to the writer).
+Without a real, embedded observed_at, no genuine "select the newest
+snapshot observed before decision_time" filtering is even possible.
+Fixed by wrapping the real Open-Meteo response in a small self-describing
+envelope before writing (`{"observed_at_utc", "endpoint",
+"forecast_data"}`) rather than writing the bare API response — the
+minimal, in-scope fix; full `RawStore` provenance recovery is a separate,
+broader storage-layer gap, not fixed here.
+
+**Replaced** `load_weather_daily_aggregate()` with
+`load_weather_at_decision_time()` (`mlb_features.py`): considers only
+real snapshots carrying the new provenance envelope (a legacy
+unenveloped snapshot — the shape every one of the 3 real snapshots
+collected before this fix has — has no real recorded `observed_at_utc`
+and is treated as PIT-unknown, never guessed at via file mtime or
+otherwise); selects the newest one with `observed_at_utc <=
+decision_time_utc`; reads the one real hourly entry closest to the
+game's actual first-pitch time, not a daily aggregate. Returns
+`temp_f_first_pitch`, `wind_mph_first_pitch`,
+`wind_direction_deg_first_pitch`, `precip_mm_first_pitch`, and
+`forecast_age_hours` (real, disclosed gap between when the forecast was
+observed and the decision time), plus the existing `availability` flag.
+Renamed from `temp_f_mean`/`wind_mph_mean`/`precip_mm_total` since they
+are no longer means/totals — updated every real reference (both training
+scripts, `mlb_shadow_pipeline.py`, `ablation.py`'s feature groups,
+`test_ablation.py`'s schema guard).
+
+**Disclosed, not silently ignored**: for a historical (backfilled)
+`game_date`, Open-Meteo's own Historical Forecast API is itself a real,
+documented approximation — a stitched series of past model runs, not one
+exact historical run. Even perfect point-in-time-safe *selection* here
+cannot make that number a literal "forecast exactly as it existed at
+decision_time_utc" — that is an external data-source limitation, not
+something this function's selection logic can fix, and is documented as
+such in the function's own docstring rather than silently treated as
+exact.
+
+**A fourth real bug, caught by live verification against the actual
+Open-Meteo API** (not just synthetic test fixtures, which had used an
+unrealistic `+00:00`-suffixed shape): Open-Meteo's `hourly.time` entries
+under `timezone=UTC` are genuinely UTC but returned *naive* (e.g.
+`"2026-08-08T00:00"`, no offset suffix) — comparing that directly against
+an aware `event_start_utc` raised `TypeError` on every real call. Fixed
+by explicitly attaching UTC to a naive parsed hourly timestamp before
+comparing. Caught by actually running the real (fixed) collector end to
+end against the live API, not by unit tests alone — the test fixtures
+were then corrected to use the same real naive shape so this exact
+regression can't resurface silently.
+
+**Live-verified end to end**: ran the real (fixed) `collect_weather_forecast`
+against the live Open-Meteo API for a real venue/date, then
+`load_weather_at_decision_time()` against the real resulting snapshot 2
+hours before a synthetic decision time. Real result: `availability=1.0`,
+`temp_f_first_pitch=109.6` (a realistic real August Phoenix forecast),
+`forecast_age_hours=2.0` (matches the real 2-hour gap). Also confirmed
+honestly: the 3 real legacy (pre-fix) snapshots already on disk
+(`data/rebuild/raw/open_meteo/`) now correctly report
+`availability=0.0` — a real, disclosed consequence of doing this
+correctly (weather is effectively unavailable for every currently-
+collected historical game until new provenance-enveloped collection
+accumulates going forward), not a bug.
+
+**Tests**: `tests/rebuild/test_mlb_features.py::TestLoadWeatherAtDecisionTime`
+(7 tests: PIT snapshot selection, first-pitch-hour alignment vs. a real
+non-uniform 3-hour series, legacy-envelope rejection, no-snapshot/no-
+directory cases, forecast age) plus 2 new
+`tests/rebuild/test_mlb_collectors.py::TestWeatherForecastEndpoint` tests
+(UTC timezone request, real provenance-envelope shape written to
+`RawStore`).
+
+**1122 tests pass** (up from 1114), 1 skipped. `ruff check` clean.
+
+**Next task:** Task 4 — unify the MLB historical horizon dataset builder.
+Three training scripts (`train_mlb_rebuild_real_features.py`,
+`train_mlb_xgboost_ensemble.py`, `train_mlb_feature_ablation.py`) each
+independently rebuild the same feature-row loop; `mlb_shadow_pipeline.py`
+has a fourth, near-identical copy for walk-forward retraining. All four
+now correctly call the fixed `build_game_feature_row()`, but should
+converge on one real, shared `MLBHistoricalHorizonDatasetBuilder` per
+CLAUDE.md's own instruction, rather than four independently-maintained
+loops that could silently drift from each other.

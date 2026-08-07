@@ -137,6 +137,44 @@ class TestWeatherForecastEndpoint:
         assert "archive-api" not in captured["url"]
         assert result["endpoint"] == "historical_forecast_stitched"
 
+    def test_requests_hourly_data_in_utc_not_a_hardcoded_venue_timezone(self, tmp_path):
+        # Real bug fixed here: this used to hardcode "America/New_York" for
+        # every venue, so hourly.time's local-time labels were wrong for
+        # any non-Eastern venue (verified live against a real Chase Field
+        # response). Requesting UTC makes hourly.time directly comparable
+        # to a real event_start_utc with no venue-timezone lookup needed.
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+        captured = {}
+
+        def fake_get(url, params=None, timeout=None):
+            captured["params"] = params
+            return FakeWeatherResponse()
+
+        with patch("httpx.get", side_effect=fake_get):
+            collector.collect_weather_forecast("2026-08-06", 33.4455, -112.0667, "chase_field")
+
+        assert captured["params"]["timezone"] == "UTC"
+
+    def test_raw_payload_wraps_the_real_forecast_with_a_provenance_envelope(self, tmp_path):
+        # Real gap fixed here: RawStore can't recover a snapshot's real
+        # observed_at_utc from disk after the fact, so without embedding
+        # it in the content itself, no later point-in-time selection over
+        # multiple weather snapshots would be possible at all.
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch("httpx.get", return_value=FakeWeatherResponse()):
+            result = collector.collect_weather_forecast("2099-01-01", 40.0, -75.0, "test_venue")
+
+        stored = collector.raw.read(
+            collector.raw.list_snapshots("open_meteo", "2099-01-01", "weather_test_venue_2099-01-01")[0]
+        )
+        assert set(stored.keys()) == {"observed_at_utc", "endpoint", "forecast_data"}
+        assert stored["endpoint"] == "live_forecast"
+        assert stored["forecast_data"] == FakeWeatherResponse().json()
+        assert result["hash"]
+
 
 class FakePolymarketClientWithRealShape:
     """Returns data shaped like PolymarketUSClient._normalize_event's real

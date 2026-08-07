@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import gzip
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -511,33 +511,126 @@ def point_in_time_probable_starters(
     return result
 
 
-def load_weather_daily_aggregate(raw_root: str | Path, venue_id: str, game_date: str) -> dict[str, float]:
-    """Coarse daily mean/max from the venue's Open-Meteo snapshot for the
-    date — not aligned to the exact first-pitch hour yet (see
-    outputs/rebuild/takeover_status.md: real, disclosed limitation, not a
-    silent approximation)."""
+_NO_WEATHER = {
+    "availability": 0.0, "temp_f_first_pitch": 0.0, "wind_mph_first_pitch": 0.0,
+    "wind_direction_deg_first_pitch": 0.0, "precip_mm_first_pitch": 0.0,
+    "forecast_age_hours": 0.0,
+}
+
+
+def load_weather_at_decision_time(
+    raw_root: str | Path,
+    venue_id: str,
+    game_date: str,
+    decision_time_utc: datetime,
+    event_start_utc: str,
+) -> dict[str, float]:
+    """Real, point-in-time-safe weather feature for one game.
+
+    Fix (see outputs/rebuild/takeover_status.md, Task 3): the previous
+    version took whichever snapshot sorted last on disk for the date
+    regardless of when it was actually collected, and averaged the
+    entire day's hourly values into one number -- diluting the real
+    pregame signal with hours that have nothing to do with the game and
+    with no point-in-time guarantee at all (a snapshot collected *after*
+    a late decision time could silently leak into it).
+
+    Fixed by: (1) only considering real snapshots written with the
+    provenance envelope collect_weather_forecast() now embeds
+    ({"observed_at_utc", "endpoint", "forecast_data"}) -- a legacy raw
+    snapshot from before this fix has no real recorded observed_at_utc to
+    check at all, and this must not guess one (e.g. from file mtime) or
+    silently treat "the only snapshot that happens to exist" as
+    point-in-time-valid; (2) selecting the newest such snapshot with
+    observed_at_utc <= decision_time_utc, never a later one; (3) reading
+    the one real hourly entry closest to the game's actual first-pitch
+    time (both now genuinely UTC-labeled -- see collect_weather_forecast's
+    own timezone fix -- so no venue-timezone lookup is needed to compare
+    them), not a full-day aggregate.
+
+    Returns availability=0.0 with every value zeroed, never a postgame
+    actual or a guess, when no snapshot satisfies both conditions. Also
+    reports forecast_age_hours (decision_time_utc minus the selected
+    snapshot's real observed_at_utc) so a very stale-but-technically-valid
+    forecast is honestly distinguishable from a fresh one downstream.
+
+    For a historical (backfilled) game_date, the underlying Open-Meteo
+    Historical Forecast API itself is a disclosed, real approximation --
+    Open-Meteo documents it as a stitched series of past model runs, not
+    a single exact historical run -- so even a perfectly point-in-time-safe
+    *selection* here cannot make that number a literal "forecast run
+    exactly as it existed at decision_time_utc." That is an external data
+    source limitation, not something this function's selection logic can
+    fix; disclosed here rather than silently treated as exact.
+    """
     raw_root = Path(raw_root)
     record_dir = raw_root / "raw" / "open_meteo" / game_date / f"weather_{venue_id}_{game_date}"
     if not record_dir.exists():
-        return {"availability": 0.0, "temp_f_mean": 0.0, "wind_mph_mean": 0.0, "precip_mm_total": 0.0}
+        return dict(_NO_WEATHER)
     snapshots = sorted(record_dir.glob("*.json.gz"))
     if not snapshots:
-        return {"availability": 0.0, "temp_f_mean": 0.0, "wind_mph_mean": 0.0, "precip_mm_total": 0.0}
-    with gzip.open(snapshots[-1]) as f:
-        payload = json.loads(f.read())
-    hourly = payload.get("hourly", {})
-    temp_c = hourly.get("temperature_2m", [])
-    wind_kmh = hourly.get("wind_speed_10m", [])
-    precip_mm = hourly.get("precipitation", [])
-    if not temp_c:
-        return {"availability": 0.0, "temp_f_mean": 0.0, "wind_mph_mean": 0.0, "precip_mm_total": 0.0}
-    temp_f_mean = sum(t * 9 / 5 + 32 for t in temp_c) / len(temp_c)
-    wind_mph_mean = (sum(wind_kmh) / len(wind_kmh)) * 0.621371 if wind_kmh else 0.0
+        return dict(_NO_WEATHER)
+
+    valid: list[tuple[datetime, dict]] = []
+    for snap_path in snapshots:
+        with gzip.open(snap_path) as f:
+            payload = json.loads(f.read())
+        if not isinstance(payload, dict) or "observed_at_utc" not in payload or "forecast_data" not in payload:
+            continue  # legacy/unenveloped snapshot -- real observed_at_utc unknown, not PIT-usable
+        try:
+            observed_at = datetime.fromisoformat(payload["observed_at_utc"])
+        except (TypeError, ValueError):
+            continue
+        if observed_at <= decision_time_utc:
+            valid.append((observed_at, payload))
+
+    if not valid:
+        return dict(_NO_WEATHER)
+    observed_at, payload = max(valid, key=lambda pair: pair[0])
+
+    hourly = payload["forecast_data"].get("hourly", {})
+    times = hourly.get("time", [])
+    if not times:
+        return dict(_NO_WEATHER)
+
+    event_start = datetime.fromisoformat(event_start_utc)
+    if event_start.tzinfo is None:
+        event_start = event_start.replace(tzinfo=UTC)
+
+    def _hourly_time(raw: str) -> datetime:
+        # Real bug caught by live verification against the actual
+        # Open-Meteo API (not just synthetic fixtures): requesting
+        # timezone=UTC (collect_weather_forecast's own fix) makes
+        # hourly.time genuinely UTC, but Open-Meteo still returns those
+        # timestamps *naive* (e.g. "2026-08-08T00:00", no "+00:00"/"Z"
+        # suffix) -- comparing that directly against an aware
+        # event_start_utc raised TypeError every time. Attach UTC
+        # explicitly rather than assume the caller's data is naive too.
+        parsed = datetime.fromisoformat(raw)
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+
+    idx = min(
+        range(len(times)),
+        key=lambda i: abs((_hourly_time(times[i]) - event_start).total_seconds()),
+    )
+
+    def _hour(series_name: str) -> float | None:
+        series = hourly.get(series_name, [])
+        value = series[idx] if idx < len(series) else None
+        return float(value) if value is not None else None
+
+    temp_c = _hour("temperature_2m")
+    wind_kmh = _hour("wind_speed_10m")
+    wind_dir = _hour("wind_direction_10m")
+    precip_mm = _hour("precipitation")
+
     return {
         "availability": 1.0,
-        "temp_f_mean": temp_f_mean,
-        "wind_mph_mean": wind_mph_mean,
-        "precip_mm_total": float(sum(precip_mm)) if precip_mm else 0.0,
+        "temp_f_first_pitch": (temp_c * 9 / 5 + 32) if temp_c is not None else 0.0,
+        "wind_mph_first_pitch": (wind_kmh * 0.621371) if wind_kmh is not None else 0.0,
+        "wind_direction_deg_first_pitch": wind_dir if wind_dir is not None else 0.0,
+        "precip_mm_first_pitch": precip_mm if precip_mm is not None else 0.0,
+        "forecast_age_hours": (decision_time_utc - observed_at).total_seconds() / 3600.0,
     }
 
 
@@ -726,7 +819,12 @@ def build_game_feature_row(
     home_bp = bullpen_rolling_features(pitches, home_abbrev, game_date, starters)
     away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
     park = park_factor(espn_game.get("venue", ""))
-    weather = load_weather_daily_aggregate(raw_root, espn_game.get("venue", ""), game_date)
+    decision_time_utc = datetime.fromisoformat(espn_game["event_start_utc"]) - timedelta(
+        hours=HORIZON_HOURS_BEFORE[horizon]
+    )
+    weather = load_weather_at_decision_time(
+        raw_root, espn_game.get("venue", ""), game_date, decision_time_utc, espn_game["event_start_utc"],
+    )
 
     # Targets attached last, after every feature above is frozen from
     # point-in-time-safe inputs only -- the actual result never influences
@@ -751,8 +849,11 @@ def build_game_feature_row(
         # Park and weather (shared, not per-side)
         "park_factor": park,
         "weather_availability": weather["availability"],
-        "temp_f_mean": weather["temp_f_mean"],
-        "wind_mph_mean": weather["wind_mph_mean"],
+        "temp_f_first_pitch": weather["temp_f_first_pitch"],
+        "wind_mph_first_pitch": weather["wind_mph_first_pitch"],
+        "wind_direction_deg_first_pitch": weather["wind_direction_deg_first_pitch"],
+        "precip_mm_first_pitch": weather["precip_mm_first_pitch"],
+        "weather_forecast_age_hours": weather["forecast_age_hours"],
         "total_runs": float(home_score + away_score),
         "home_margin": float(home_score - away_score),
         "home_score": float(home_score), "away_score": float(away_score),
@@ -767,6 +868,7 @@ def build_live_game_feature_row(
     starters: pl.DataFrame,
     raw_root: str | Path,
     identity_registry: Any | None = None,
+    decision_time_utc: datetime | None = None,
 ) -> dict | None:
     """Feature row for a real *scheduled* (not yet played) game, using
     probable-starter names (e.g. from ESPN's scoreboard probables feed)
@@ -774,7 +876,7 @@ def build_live_game_feature_row(
     scheduled game has no Statcast pitches of its own yet, since it hasn't
     been played, so there is no game_pk to match against. Starter rolling
     features come from lookup_pitcher_id() + the starter's real prior
-    starts; bullpen/park/weather don't depend on this game having already
+    starts; bullpen/park don't depend on this game having already
     happened, so they're identical to build_game_feature_row's.
 
     Returns None when either starter name can't be resolved to a real
@@ -786,7 +888,18 @@ def build_live_game_feature_row(
     when given a real IdentityRegistry, both starters' real MLBAM ids are
     registered/resolved as canonical player entities via
     identity.resolve_mlbam_player_id().
+
+    decision_time_utc should be the real decision time the caller already
+    computed for this horizon (compute_decision_times()/state.decision_times)
+    -- used for point-in-time-safe weather-snapshot selection
+    (load_weather_at_decision_time()). Defaults to this game's own
+    event_start_utc (i.e. "as of right now, at first pitch") when not
+    given, matching this function's existing live-inference callers that
+    predate a threaded-through decision time; a caller with a real
+    horizon-specific decision time should always pass it explicitly.
     """
+    if decision_time_utc is None:
+        decision_time_utc = datetime.fromisoformat(espn_game["event_start_utc"])
     game_date = espn_game["event_start_utc"][:10]
     home_name, away_name = espn_game["home_team"], espn_game["away_team"]
     home_abbrev = ESPN_TO_STATCAST_ABBREV.get(home_name)
@@ -816,7 +929,9 @@ def build_live_game_feature_row(
     home_bp = bullpen_rolling_features(pitches, home_abbrev, game_date, starters)
     away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
     park = park_factor(espn_game.get("venue", ""))
-    weather = load_weather_daily_aggregate(raw_root, espn_game.get("venue", ""), game_date)
+    weather = load_weather_at_decision_time(
+        raw_root, espn_game.get("venue", ""), game_date, decision_time_utc, espn_game["event_start_utc"],
+    )
 
     return {
         "event_id": espn_game["event_id"],
@@ -832,6 +947,9 @@ def build_live_game_feature_row(
         **{f"away_bp_{k}": v for k, v in away_bp.items()},
         "park_factor": park,
         "weather_availability": weather["availability"],
-        "temp_f_mean": weather["temp_f_mean"],
-        "wind_mph_mean": weather["wind_mph_mean"],
+        "temp_f_first_pitch": weather["temp_f_first_pitch"],
+        "wind_mph_first_pitch": weather["wind_mph_first_pitch"],
+        "wind_direction_deg_first_pitch": weather["wind_direction_deg_first_pitch"],
+        "precip_mm_first_pitch": weather["precip_mm_first_pitch"],
+        "weather_forecast_age_hours": weather["forecast_age_hours"],
     }
