@@ -84,3 +84,48 @@ class TestMLBRealCollectAndFeatures:
         adapter = build_adapter("mlb", str(tmp_path))
         result = adapter.build_features("2026-08-06", "late")
         assert result.status != STAGE_NOT_IMPLEMENTED
+
+    def test_build_features_with_a_run_id_records_real_ledger_lineage(self, tmp_path):
+        # Real gap closed: horizon_builder.py wrote to FeatureStore but
+        # that write was never captured in ShadowLedger lineage even
+        # though both real methods independently existed.
+        from unittest.mock import patch
+
+        from model_prediction.rebuild.shadow_ledger import ShadowLedger
+
+        with patch(
+            "model_prediction.rebuild.mlb_features.build_live_game_feature_row",
+            return_value={"event_id": "401", "home_sp_avg_velocity": 93.0},
+        ), patch(
+            "model_prediction.rebuild.horizon_builder.point_in_time_probable_starters",
+            return_value={"401": {"home_starter": "A", "away_starter": "B"}},
+        ):
+            adapter = build_adapter("mlb", str(tmp_path))
+            from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
+            norm = NormalizedStore(f"{tmp_path}/normalized")
+            row = {
+                **provenance_row(source="espn_public", source_record_id="401", source_version="v1",
+                                  observed_at_utc=utc_now().isoformat(),
+                                  effective_at_utc="2026-08-06T22:10:00+00:00",
+                                  event_start_utc="2026-08-06T22:10:00+00:00"),
+                "event_id": "401", "home_team": "Seattle Mariners", "away_team": "Detroit Tigers",
+                "home_score": 0, "away_score": 0, "status": "STATUS_SCHEDULED", "venue": "",
+            }
+            norm.write("mlb", "scoreboard", __import__("polars").DataFrame([row]), primary_key=["event_id"])
+
+            # A real run_id must reference a real runs row (foreign key) --
+            # matches exactly what rebuild_shadow_cli.py's run() does
+            # before calling any adapter stage.
+            setup_ledger = ShadowLedger(f"{tmp_path}/shadow.db")
+            real_run_id = setup_ledger.record_run("mlb", run_type="test")
+            setup_ledger.close()
+
+            result = adapter.build_features("2026-08-06", "late", run_id=real_run_id)
+            assert result.status == "SUCCESS"
+
+        ledger = ShadowLedger(f"{tmp_path}/shadow.db")
+        rows = ledger.feature_snapshots_for_horizon("mlb", "late")
+        ledger.close()
+        assert len(rows) == 1
+        assert rows[0]["run_id"] == real_run_id
+        assert rows[0]["row_count"] == 1

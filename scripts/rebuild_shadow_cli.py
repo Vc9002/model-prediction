@@ -38,7 +38,7 @@ def run(sport: str, date: str, horizon: str, data_root: str, only_stage: str | N
 
     for stage in stages_to_run:
         method = getattr(adapter, stage)
-        result = method(date) if stage == "collect" else method(date, horizon)
+        result = method(date, run_id=run_id) if stage == "collect" else method(date, horizon, run_id=run_id)
         report["stages"][stage] = {"status": result.status, "detail": result.detail}
         # A stage that didn't succeed doesn't invalidate stages that already
         # ran, but there's no real reason to keep running downstream stages

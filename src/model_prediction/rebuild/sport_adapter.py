@@ -54,11 +54,11 @@ class StageResult:
 class SportAdapter(Protocol):
     sport: str
 
-    def collect(self, date: str) -> StageResult: ...
-    def build_features(self, date: str, horizon: str) -> StageResult: ...
-    def predict(self, date: str, horizon: str) -> StageResult: ...
-    def match_markets(self, date: str, horizon: str) -> StageResult: ...
-    def decide(self, date: str, horizon: str) -> StageResult: ...
+    def collect(self, date: str, run_id: str | None = None) -> StageResult: ...
+    def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult: ...
+    def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult: ...
+    def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult: ...
+    def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult: ...
 
 
 class _NotImplementedStagesMixin:
@@ -68,22 +68,22 @@ class _NotImplementedStagesMixin:
 
     sport: str
 
-    def predict(self, date: str, horizon: str) -> StageResult:
+    def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         return StageResult("predict", STAGE_NOT_IMPLEMENTED, {
             "reason": f"no real trained model wired into the shared adapter for {self.sport} yet",
         })
 
-    def match_markets(self, date: str, horizon: str) -> StageResult:
+    def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         return StageResult("match_markets", STAGE_NOT_IMPLEMENTED, {
             "reason": f"no real market-matching logic wired into the shared adapter for {self.sport} yet",
         })
 
-    def decide(self, date: str, horizon: str) -> StageResult:
+    def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         return StageResult("decide", STAGE_NOT_IMPLEMENTED, {
             "reason": f"no real decision logic wired into the shared adapter for {self.sport} yet",
         })
 
-    def build_features(self, date: str, horizon: str) -> StageResult:
+    def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         return StageResult("build_features", STAGE_NOT_IMPLEMENTED, {
             "reason": f"no real horizon feature builder wired into the shared adapter for {self.sport} yet",
         })
@@ -97,7 +97,7 @@ class MLBAdapter(_NotImplementedStagesMixin):
         self.meta = MetadataDB(f"{data_root}/metadata.db")
         self.collector = MLBCollector(data_root, self.meta)
 
-    def collect(self, date: str) -> StageResult:
+    def collect(self, date: str, run_id: str | None = None) -> StageResult:
         result = self.collector.collect_espn_scoreboard(date)
         if result.get("status") == "ok":
             return StageResult("collect", STAGE_SUCCESS, result)
@@ -105,20 +105,33 @@ class MLBAdapter(_NotImplementedStagesMixin):
             return StageResult("collect", STAGE_NO_DATA, result)
         return StageResult("collect", STAGE_ERROR, result)
 
-    def build_features(self, date: str, horizon: str) -> StageResult:
+    def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         # Real, not a placeholder: horizon_builder.py, live-verified
         # against the real 2026-08-06 slate in this same session.
         import json
         from pathlib import Path
 
         from .horizon_builder import build_mlb_horizon_dataset
+        from .shadow_ledger import ShadowLedger
 
         probables_path = Path("data/point_in_time/mlb_probable_starters.jsonl")
         records = (
             [json.loads(line) for line in probables_path.read_text().splitlines() if line.strip()]
             if probables_path.exists() else []
         )
-        result = build_mlb_horizon_dataset(self.data_root, date, horizon, records)
+        # Real lineage wiring: when the shared CLI supplies a run_id, the
+        # resulting feature snapshot is also recorded in the shadow ledger
+        # (record_feature_snapshot) -- previously the horizon builder wrote
+        # to FeatureStore but that write was never captured in ledger
+        # lineage, even though both real methods existed independently.
+        ledger = ShadowLedger(f"{self.data_root}/shadow.db") if run_id else None
+        try:
+            result = build_mlb_horizon_dataset(
+                self.data_root, date, horizon, records, ledger=ledger, run_id=run_id,
+            )
+        finally:
+            if ledger is not None:
+                ledger.close()
         status = STAGE_SUCCESS if result.coverage["rows_built"] > 0 else STAGE_NO_DATA
         return StageResult("build_features", status, {
             "coverage": result.coverage, "missingness": result.missingness,
@@ -136,7 +149,7 @@ class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
         self.sport = sport
         self.collector = collector
 
-    def collect(self, date: str) -> StageResult:
+    def collect(self, date: str, run_id: str | None = None) -> StageResult:
         # Real bug found live wiring this adapter (2026-08-07): Soccer/
         # TennisCollector.collect_date() call the real ESPN client with
         # league="SOCCER"/"TENNIS", neither of which exists in

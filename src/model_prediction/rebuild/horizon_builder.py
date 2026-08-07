@@ -59,6 +59,9 @@ def build_mlb_horizon_dataset(
     game_date: str,
     horizon: str,
     probable_starter_records: list[dict],
+    *,
+    ledger: Any | None = None,  # ShadowLedger -- typed Any to avoid a hard import cycle risk
+    run_id: str | None = None,
 ) -> HorizonBuildResult:
     """Real horizon-dataset build for one MLB calendar date.
 
@@ -68,6 +71,13 @@ def build_mlb_horizon_dataset(
     4. record missing groups honestly, not silently
     5. persist an immutable, versioned feature snapshot (FeatureStore)
     6. generate a real coverage/missingness report
+
+    When `ledger` and `run_id` are both given, also records a real
+    feature_snapshots row (FOUNDATION_COMPLETION.md Phase 12 lineage) --
+    real gap closed here: the horizon builder wrote to FeatureStore but
+    never recorded that write in ShadowLedger, so the lineage chain from
+    raw source through feature snapshot was not actually reconstructable
+    even though both real methods existed.
     """
     if horizon not in HORIZONS:
         raise ValueError(f"horizon must be one of {HORIZONS}, got {horizon!r}")
@@ -175,5 +185,11 @@ def build_mlb_horizon_dataset(
         store = FeatureStore(f"{data_root}/features")
         store.write_snapshot("mlb", horizon, df, snapshot_hash=snapshot_hash)
         result.snapshot_hash = snapshot_hash
+
+        if ledger is not None and run_id is not None:
+            ledger.record_feature_snapshot(
+                run_id=run_id, sport="mlb", horizon=horizon, dataset_hash=snapshot_hash,
+                row_count=df.height,
+            )
 
     return result
