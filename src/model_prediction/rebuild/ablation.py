@@ -56,33 +56,41 @@ class AblationResult:
         }
 
 
+# Real gap fixed here: every feature name below used to be a legacy/
+# aspirational name (elo_probability, starter_era_gap, lineup_xwoba,
+# home_availability_pct, ...) that doesn't exist anywhere in the real
+# rebuild feature schema mlb_features.build_game_feature_row() actually
+# produces (verified via grep -- zero matches for any of the old names in
+# src/model_prediction/rebuild/). Running FeatureAblationRunner against
+# the old groups on real data would silently find zero available_features
+# for every single group and report a vacuous 0.5-coinflip result for
+# all of them -- not an ablation, a false negative dressed up as one.
+# Renamed to the exact columns INTENSITY_FEATURES/DIFFERENTIAL_FEATURES
+# in scripts/train_mlb_rebuild_real_features.py and
+# scripts/train_mlb_xgboost_ensemble.py already train on. Real, current
+# scope is deliberately smaller than CLAUDE.md's long-term feature list
+# (no lineup/player-availability/schedule groups exist yet because those
+# features aren't built by mlb_features.py yet either) -- this reflects
+# what's real today, not what's aspired to.
 FEATURE_GROUPS_MLB: list[FeatureGroup] = [
-    FeatureGroup("elo_ratings", ["elo_probability", "elo_rating_home", "elo_rating_away"],
-                 "Chronological Elo ratings for both teams"),
-    FeatureGroup("trend_momentum", ["trend_gap", "defensive_trend_gap", "consistency_gap"],
-                 "EWMA offensive/defensive momentum and consistency"),
-    FeatureGroup("starter_quality", ["starter_era_gap", "starter_fip_gap", "starter_k_bb_pct",
-                                      "starter_xwoba", "starter_barrel_rate"],
-                 "Starting pitcher quality metrics"),
-    FeatureGroup("bullpen", ["bullpen_weakness_gap", "bullpen_fatigue_gap", "bullpen_availability"],
-                 "Bullpen quality, fatigue, and availability"),
-    FeatureGroup("lineup_quality", ["lineup_xwoba", "lineup_k_pct", "lineup_bb_pct",
-                                     "platoon_split", "missing_regulars"],
-                 "Projected lineup quality with availability adjustments"),
-    FeatureGroup("park_factors", ["park_factor", "park_factor_3yr", "roof_flag"],
-                 "Season-versioned park factors and roof status"),
-    FeatureGroup("weather", ["temperature", "humidity", "wind_vector", "precipitation_prob",
-                              "forecast_age_hours"],
-                 "Archived weather forecast (not realized weather)"),
-    FeatureGroup("schedule", ["rest_disparity", "back_to_back_gap", "games_last_7_gap",
-                               "travel_distance"],
-                 "Schedule load and travel"),
-    FeatureGroup("player_availability", ["home_availability_pct", "away_availability_pct",
-                                          "home_war_missing", "away_war_missing"],
-                 "Player availability from IL/roster reports"),
-    FeatureGroup("clean_rates", ["home_sp_scoreless_inning", "away_sp_scoreless_inning",
-                                  "home_sp_first_inning_clean", "away_sp_first_inning_clean"],
-                 "Beta-binomial shrunk pitcher clean rates"),
+    FeatureGroup(
+        "starter_pitching",
+        ["home_sp_avg_velocity", "away_sp_avg_velocity", "home_sp_csw_pct", "away_sp_csw_pct",
+         "home_sp_k_pct", "away_sp_k_pct", "home_sp_bb_pct", "away_sp_bb_pct",
+         "home_sp_days_rest", "away_sp_days_rest"],
+        "Starting pitcher velocity, CSW%, K%/BB%, and rest, real Statcast-derived",
+    ),
+    FeatureGroup(
+        "bullpen",
+        ["home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
+         "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity"],
+        "Bullpen recent workload and velocity, real Statcast-derived",
+    ),
+    FeatureGroup(
+        "park_weather",
+        ["park_factor", "temp_f_mean"],
+        "Empirical park run factor and archived weather forecast temperature",
+    ),
 ]
 
 
