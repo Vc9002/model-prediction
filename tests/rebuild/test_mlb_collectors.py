@@ -259,6 +259,30 @@ class FakeESPNClientWithTeamIds:
         }]}
 
 
+class FakeESPNClientWithVenueId:
+    """Real ESPN payloads also carry a stable numeric venue.id alongside
+    fullName/address/indoor (verified against real collected data under
+    data/rebuild/raw/espn_public/) -- this fixture matches that real
+    shape for venue-identity tests."""
+
+    def scoreboard(self, game_date):
+        return {"events": [{
+            "id": "401816384", "date": "2026-07-20T22:35Z",
+            "competitions": [{
+                "status": {"type": {"name": "STATUS_FINAL"}},
+                "venue": {
+                    "id": "84", "fullName": "Citizens Bank Park",
+                    "address": {"city": "Philadelphia", "state": "Pennsylvania"},
+                    "indoor": False,
+                },
+                "competitors": [
+                    {"homeAway": "home", "team": {"id": "1", "displayName": "Baltimore Orioles"}, "score": "3"},
+                    {"homeAway": "away", "team": {"id": "3", "displayName": "Los Angeles Angels"}, "score": "1"},
+                ],
+            }],
+        }]}
+
+
 class TestScoreboardCanonicalIdentity:
     """FOUNDATION_COMPLETION.md Phase 4: collect_espn_scoreboard now
     resolves each team through IdentityRegistry using ESPN's real stable
@@ -387,3 +411,41 @@ class TestScoreboardEventIdentity:
             second_id = collector.identity.resolve("espn_public:mlb", "401816384").entity_id
 
         assert first_id == second_id, "rerunning collection must not mint a duplicate canonical event"
+
+    def test_scoreboard_rows_carry_a_real_canonical_venue_id(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClientWithTeamIds(),
+        ):
+            collector.collect_espn_scoreboard("2026-07-20")
+
+        df = collector.norm.read("mlb", "scoreboard")
+        row = df.row(0, named=True)
+        # FakeESPNClientWithTeamIds's payload has a venue name but no real
+        # venue.id -- real venue resolution correctly returns None rather
+        # than fabricating an id from the name string alone (see the
+        # dedicated FakeESPNClientWithVenue test below for the id-present
+        # case).
+        assert row["venue_canonical_id"] is None
+
+    def test_scoreboard_rows_carry_a_real_canonical_venue_id_when_espn_provides_one(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClientWithVenueId(),
+        ):
+            collector.collect_espn_scoreboard("2026-07-20")
+
+        df = collector.norm.read("mlb", "scoreboard")
+        row = df.row(0, named=True)
+        assert row["venue_canonical_id"] is not None
+        resolved = collector.identity.resolve("espn_public:mlb", "84")
+        assert resolved is not None
+        assert resolved.entity_id == row["venue_canonical_id"]
+        assert resolved.entity_type == "venue"
+        assert resolved.canonical_name == "Citizens Bank Park"

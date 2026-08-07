@@ -19,10 +19,12 @@ from model_prediction.rebuild.identity import (
     normalize_name,
     resolve_espn_scoreboard_event_id,
     resolve_espn_scoreboard_team_ids,
+    resolve_espn_scoreboard_venue_id,
     resolve_event_by_team_pair,
     resolve_or_link_polymarket_event_id,
     resolve_or_register_event,
     resolve_or_register_team,
+    resolve_or_register_venue,
 )
 from model_prediction.rebuild.metadata import MetadataDB
 
@@ -486,3 +488,112 @@ class TestResolveOrLinkPolymarketEventId:
         assert resolve_or_link_polymarket_event_id(
             registry, "mlb", None, "mlb:team:home", "mlb:team:away", "2026-07-20",
         ) is None
+
+
+class TestResolveOrRegisterVenue:
+    """Real entry point for canonical venue identity -- same
+    register-or-reuse-or-fuzzy-match shape as resolve_or_register_team(),
+    since more than one source can observe the same physical venue under
+    slightly different name strings."""
+
+    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path):
+        registry = _registry(tmp_path)
+        identity = resolve_or_register_venue(
+            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
+            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
+        )
+        assert identity.entity_type == "venue"
+        assert identity.canonical_name == "Citizens Bank Park"
+
+    def test_repeated_observation_reuses_the_identity(self, tmp_path):
+        registry = _registry(tmp_path)
+        first = resolve_or_register_venue(
+            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
+            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
+        )
+        second = resolve_or_register_venue(
+            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
+            venue_name="Citizens Bank Park", effective_from_utc="2026-06-01",
+        )
+        assert second.entity_id == first.entity_id
+
+    def test_confident_fuzzy_match_reuses_the_identity_across_sources(self, tmp_path):
+        registry = _registry(tmp_path)
+        espn_venue = resolve_or_register_venue(
+            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
+            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
+        )
+        other_source_venue = resolve_or_register_venue(
+            registry, sport="mlb", source_id="some_other_source", source_venue_id="CBP-1",
+            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
+        )
+        assert other_source_venue.entity_id == espn_venue.entity_id
+
+    def test_two_genuinely_different_venues_get_different_identities(self, tmp_path):
+        registry = _registry(tmp_path)
+        park_1 = resolve_or_register_venue(
+            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
+            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
+        )
+        park_2 = resolve_or_register_venue(
+            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="1",
+            venue_name="Oriole Park at Camden Yards", effective_from_utc="2026-01-01",
+        )
+        assert park_1.entity_id != park_2.entity_id
+
+
+class TestResolveEspnScoreboardVenueId:
+    """The real helper every ESPN-scoreboard-shaped collector calls for
+    canonical venue identity. ESPN's real venue object (verified against
+    real collected raw snapshots under data/rebuild/raw/espn_public/) has
+    id/fullName/address.city/address.state/indoor -- no lat/long/
+    timezone/capacity/surface, so those are honestly left unset rather
+    than fabricated."""
+
+    def test_missing_id_returns_none(self, tmp_path):
+        registry = _registry(tmp_path)
+        result = resolve_espn_scoreboard_venue_id(
+            registry, "mlb", "espn_public", {"fullName": "Citizens Bank Park"},
+            "2026-07-20T20:00:00+00:00",
+        )
+        assert result is None
+
+    def test_missing_name_returns_none(self, tmp_path):
+        registry = _registry(tmp_path)
+        result = resolve_espn_scoreboard_venue_id(
+            registry, "mlb", "espn_public", {"id": "84"},
+            "2026-07-20T20:00:00+00:00",
+        )
+        assert result is None
+
+    def test_real_venue_shape_resolves_with_available_real_fields_only(self, tmp_path):
+        registry = _registry(tmp_path)
+        venue_obj = {
+            "id": "84", "fullName": "Citizens Bank Park",
+            "address": {"city": "Philadelphia", "state": "Pennsylvania"},
+            "indoor": False,
+        }
+        venue_id = resolve_espn_scoreboard_venue_id(
+            registry, "mlb", "espn_public", venue_obj, "2026-07-20T20:00:00+00:00",
+        )
+        assert venue_id is not None
+        resolved = registry.resolve("espn_public:mlb", "84")
+        assert resolved is not None
+        assert resolved.canonical_name == "Citizens Bank Park"
+        assert resolved.attributes["city"] == "Philadelphia"
+        assert resolved.attributes["indoor"] is False
+        # Honestly unset, not fabricated -- CLAUDE.md wants these but ESPN's
+        # scoreboard venue object doesn't provide them.
+        assert resolved.attributes["latitude"] is None
+        assert resolved.attributes["capacity"] is None
+
+    def test_rerunning_collection_reuses_the_same_canonical_venue(self, tmp_path):
+        registry = _registry(tmp_path)
+        venue_obj = {"id": "84", "fullName": "Citizens Bank Park"}
+        first = resolve_espn_scoreboard_venue_id(
+            registry, "mlb", "espn_public", venue_obj, "2026-07-20T20:00:00+00:00",
+        )
+        second = resolve_espn_scoreboard_venue_id(
+            registry, "mlb", "espn_public", venue_obj, "2026-07-21T20:00:00+00:00",
+        )
+        assert first == second

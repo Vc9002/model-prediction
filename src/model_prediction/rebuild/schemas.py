@@ -125,6 +125,7 @@ SCOREBOARD_CONTRACT = TableContract(
         ColumnSpec("home_team_canonical_id", str, nullable=True),
         ColumnSpec("away_team_canonical_id", str, nullable=True),
         ColumnSpec("event_canonical_id", str, nullable=True),
+        ColumnSpec("venue_canonical_id", str, nullable=True),
         ColumnSpec("observed_at_utc", str, nullable=False),
         ColumnSpec("event_start_utc", str, nullable=False),
         ColumnSpec("source", str, nullable=False),

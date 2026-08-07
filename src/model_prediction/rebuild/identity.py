@@ -435,6 +435,91 @@ def resolve_event_by_team_pair(
     return matches[0].entity_id
 
 
+def resolve_or_register_venue(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    source_venue_id: str,
+    venue_name: str,
+    effective_from_utc: str,
+    attributes: dict[str, Any] | None = None,
+    min_confidence: float = 0.90,
+) -> CanonicalIdentity:
+    """The one real entry point collection code should use to get a
+    venue's canonical identity -- same register-or-reuse-or-fuzzy-match
+    shape as resolve_or_register_team(), for the same real reason: more
+    than one source can observe the same physical venue under slightly
+    different name strings, and a confident fuzzy match should reuse the
+    existing identity rather than mint a duplicate."""
+    existing = registry.resolve(source_id, source_venue_id)
+    if existing is not None:
+        return existing
+
+    proposed, _confidence = registry.propose_match(
+        entity_type="venue", sport=sport, name=venue_name,
+        source_id=source_id, min_confidence=min_confidence,
+    )
+    if proposed is not None:
+        registry.map(proposed.entity_id, source_id, source_venue_id)
+        return proposed
+
+    return registry.register(
+        entity_type="venue", canonical_name=venue_name, sport=sport,
+        effective_from_utc=effective_from_utc,
+        source_id=source_id, source_entity_id=source_venue_id,
+        attributes=attributes,
+    )
+
+
+def resolve_espn_scoreboard_venue_id(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    venue_obj: dict[str, Any],
+    observed_at: str,
+) -> str | None:
+    """The one real helper every ESPN-scoreboard-shaped collector should
+    call for canonical venue identity -- same shape as
+    resolve_espn_scoreboard_team_ids(), namespacing source_id by sport for
+    the same defensive reason (an ESPN venue-id collision across sports is
+    unverified but untested-safe, same posture as the real team-id
+    collision already found live). Returns None when ESPN's own venue
+    object is missing an id or name (never guessed).
+
+    Honest gap: ESPN's scoreboard venue object exposes real `id`,
+    `fullName`, `address.city`/`address.state`, and `indoor` -- not
+    latitude, longitude, timezone, capacity, or surface. CLAUDE.md's
+    venue schema wants all of those; this registers only what's real and
+    observed, leaving lat/long/timezone/capacity/surface unset in
+    `attributes` rather than fabricating them -- the same
+    never-fabricate-missing-data principle real_market_candidates()
+    already applies to `available_depth`. A future venue-reference source
+    (a static stadium metadata table) would fill those in without
+    changing this function's shape."""
+    venue_id = venue_obj.get("id")
+    venue_name = venue_obj.get("fullName", "")
+    if not venue_id or not venue_name:
+        return None
+    namespaced_source_id = f"{source_id}:{sport}"
+    address = venue_obj.get("address") or {}
+    identity = resolve_or_register_venue(
+        registry, sport=sport, source_id=namespaced_source_id,
+        source_venue_id=str(venue_id), venue_name=venue_name,
+        effective_from_utc=observed_at,
+        attributes={
+            "city": address.get("city"),
+            "state": address.get("state"),
+            "indoor": venue_obj.get("indoor"),
+            "latitude": None,
+            "longitude": None,
+            "timezone": None,
+            "capacity": None,
+            "surface": None,
+        },
+    )
+    return identity.entity_id
+
+
 def word_boundary_name_match(a: str, b: str) -> bool:
     """True when a and b identify the same real-world team name despite one
     being a shorter form of the other (e.g. Polymarket's "Washington" vs

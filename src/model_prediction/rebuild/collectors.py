@@ -17,6 +17,7 @@ from .identity import (
     IdentityRegistry,
     resolve_espn_scoreboard_event_id,
     resolve_espn_scoreboard_team_ids,
+    resolve_espn_scoreboard_venue_id,
     resolve_polymarket_team_id,
 )
 from .schemas import MARKET_SNAPSHOT_CONTRACT, SCOREBOARD_CONTRACT
@@ -113,11 +114,15 @@ class MLBCollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, "mlb", source, home_team_obj, away_team_obj, observed_at,
             )
-            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            venue_obj = comp.get("venue", {}) or {}
+            venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
                 self.identity, "mlb", source, str(event.get("id", "")),
                 home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
                 event.get("date", ""), observed_at, venue_name,
+            )
+            venue_canonical_id = resolve_espn_scoreboard_venue_id(
+                self.identity, "mlb", source, venue_obj, observed_at,
             )
 
             games.append({
@@ -136,6 +141,7 @@ class MLBCollector:
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
                 "event_canonical_id": event_canonical_id,
+                "venue_canonical_id": venue_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
@@ -518,11 +524,15 @@ class NBACollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
             )
-            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            venue_obj = comp.get("venue", {}) or {}
+            venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
                 self.identity, sport, source, str(event.get("id", "")),
                 home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
                 event.get("date", ""), observed_at, venue_name,
+            )
+            venue_canonical_id = resolve_espn_scoreboard_venue_id(
+                self.identity, sport, source, venue_obj, observed_at,
             )
             games.append({
                 **provenance_row(
@@ -540,6 +550,7 @@ class NBACollector:
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
                 "event_canonical_id": event_canonical_id,
+                "venue_canonical_id": venue_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
@@ -659,11 +670,15 @@ class NFLCollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
             )
-            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            venue_obj = comp.get("venue", {}) or {}
+            venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
                 self.identity, sport, source, str(event.get("id", "")),
                 home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
                 event.get("date", ""), observed_at, venue_name,
+            )
+            venue_canonical_id = resolve_espn_scoreboard_venue_id(
+                self.identity, sport, source, venue_obj, observed_at,
             )
             games.append({
                 **provenance_row(source, str(event.get("id", "")), "espn_public_v1",
@@ -675,6 +690,7 @@ class NFLCollector:
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
                 "event_canonical_id": event_canonical_id,
+                "venue_canonical_id": venue_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
@@ -778,11 +794,15 @@ class SoccerCollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
             )
-            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            venue_obj = comp.get("venue", {}) or {}
+            venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
                 self.identity, sport, source, str(event.get("id", "")),
                 home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
                 event.get("date", ""), observed_at, venue_name,
+            )
+            venue_canonical_id = resolve_espn_scoreboard_venue_id(
+                self.identity, sport, source, venue_obj, observed_at,
             )
             games.append({**provenance_row(source, str(event.get("id", "")), "espn_public_v1",
                 observed_at, event.get("date", ""), event.get("date", ""),
@@ -793,6 +813,7 @@ class SoccerCollector:
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
                 "event_canonical_id": event_canonical_id,
+                "venue_canonical_id": venue_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
@@ -923,11 +944,15 @@ class TennisCollector:
                 )
                 comp_id = str(comp.get("id", "")) or str(event.get("id", ""))
                 comp_date = comp.get("date", event.get("date", ""))
-                venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+                venue_obj = comp.get("venue", {}) or {}
+                venue_name = venue_obj.get("fullName", "")
                 event_canonical_id = resolve_espn_scoreboard_event_id(
                     self.identity, sport, source, comp_id,
                     home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
                     comp_date, observed_at, venue_name,
+                )
+                venue_canonical_id = resolve_espn_scoreboard_venue_id(
+                    self.identity, sport, source, venue_obj, observed_at,
                 )
                 games.append({**provenance_row(source, comp_id, "espn_public_v1",
                     observed_at, comp_date, comp_date,
@@ -938,6 +963,7 @@ class TennisCollector:
                     "away_team_canonical_id": away_canonical_id,
                     "home_team_canonical_id": home_canonical_id,
                     "event_canonical_id": event_canonical_id,
+                "venue_canonical_id": venue_canonical_id,
                     "away_score": int(away.get("score", 0) or 0),
                     "home_score": int(home.get("score", 0) or 0),
                     "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
