@@ -9624,12 +9624,96 @@
     "source_team_id": 25053,
     "team_id": "bo3:1:25053"
   },
+  "bo3:1:25054": {
+    "acronym": "ZES",
+    "name": "Zeste",
+    "slug": "zeste",
+    "source_team_id": 25054,
+    "team_id": "bo3:1:25054"
+  },
+  "bo3:1:25055": {
+    "acronym": "DT",
+    "name": "Dark Tigre",
+    "slug": "dark-tigre",
+    "source_team_id": 25055,
+    "team_id": "bo3:1:25055"
+  },
+  "bo3:1:25056": {
+    "acronym": "MGN",
+    "name": "MANGANESE",
+    "slug": "manganese",
+    "source_team_id": 25056,
+    "team_id": "bo3:1:25056"
+  },
+  "bo3:1:25057": {
+    "acronym": "SHU",
+    "name": "Spirit HU",
+    "slug": "spirit-hu",
+    "source_team_id": 25057,
+    "team_id": "bo3:1:25057"
+  },
+  "bo3:1:25058": {
+    "acronym": "VAN",
+    "name": "Vandulken",
+    "slug": "vandulken",
+    "source_team_id": 25058,
+    "team_id": "bo3:1:25058"
+  },
+  "bo3:1:25059": {
+    "acronym": "OW",
+    "name": "Orion Wanderers",
+    "slug": "orion-wanderers",
+    "source_team_id": 25059,
+    "team_id": "bo3:1:25059"
+  },
   "bo3:1:2506": {
     "acronym": null,
     "name": "Rare Atom",
     "slug": "rare-atom",
     "source_team_id": 2506,
     "team_id": "bo3:1:2506"
+  },
+  "bo3:1:25060": {
+    "acronym": "DHA",
+    "name": "Dhala",
+    "slug": "dhala",
+    "source_team_id": 25060,
+    "team_id": "bo3:1:25060"
+  },
+  "bo3:1:25062": {
+    "acronym": "SF",
+    "name": "SadFamous",
+    "slug": "sadfamous",
+    "source_team_id": 25062,
+    "team_id": "bo3:1:25062"
+  },
+  "bo3:1:25063": {
+    "acronym": "REV",
+    "name": "REVENIX",
+    "slug": "revenix",
+    "source_team_id": 25063,
+    "team_id": "bo3:1:25063"
+  },
+  "bo3:1:25064": {
+    "acronym": "LONE",
+    "name": "levelONE",
+    "slug": "levelone",
+    "source_team_id": 25064,
+    "team_id": "bo3:1:25064"
+  },
+  "bo3:1:25065": {
+    "acronym": "VAEL",
+    "name": "Vael",
+    "slug": "vael",
+    "source_team_id": 25065,
+    "team_id": "bo3:1:25065"
+  },
+  "bo3:1:25066": {
+    "acronym": "PC",
+    "name": "Passion Chicha",
+    "slug": "passion-chicha",
+    "source_team_id": 25066,
+    "team_id": "bo3:1:25066"
   },
   "bo3:1:25067": {
     "acronym": "FKO",

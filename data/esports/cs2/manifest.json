@@ -3,14 +3,14 @@
     "from": "2024-01-01",
     "to": "2026-07-19"
   },
-  "extracted_at_utc": "2026-08-07T15:23:12.285022Z",
+  "extracted_at_utc": "2026-08-07T18:30:25.407090Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
     "Team IDs do not encode point-in-time rosters or substitutions."
   ],
-  "match_count": 38562,
-  "matches_sha256": "5861bf59d802c63525c85a3df1441e34ec8ac75f7878b927e8c8015df31b5aaa",
+  "match_count": 38583,
+  "matches_sha256": "a80ef2cf7463fff155d7c19c9ef75662209b7352789dbf6c12eabccae0c94458",
   "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
   "request_pages": {
     "matches": 7,
@@ -27,8 +27,8 @@
   "source_attribution_url": "https://bo3.gg/",
   "source_base_url": "https://api.bo3.gg/api/v1",
   "source_terms_url": "https://bo3.gg/wiki/use-of-services",
-  "team_count": 2054,
-  "teams_sha256": "06f29c51360fa2a2aa35abb44fc2280b3398da096c7690146ec8eef29155ca90",
+  "team_count": 2066,
+  "teams_sha256": "8132034241f8c4c7151bca44d5e35e38f96c7337844b302f0398bf417918b13b",
   "title": "cs2",
   "title_name": "Counter-Strike 2"
 }
