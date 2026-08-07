@@ -91,15 +91,23 @@ def main() -> None:
     # Identity. real_callers_of() only checks top-level pipeline scripts,
     # which missed the real wiring here -- collectors.py (a rebuild
     # module, not a script) is the actual real caller. Checked directly.
-    identity_wired_in_collectors = "from .identity import IdentityRegistry, resolve_or_register_team" in (
-        REPO_ROOT / "src/model_prediction/rebuild/collectors.py"
-    ).read_text()
-    # PARTIAL, not VERIFIED: real for MLB scoreboard team identity only --
-    # NBA/WNBA/NFL/Soccer/Tennis collectors, player/event/venue entity
-    # types, and every downstream consumer (mlb_features.py's
-    # ESPN_TO_STATCAST_ABBREV, mlb_market_matching.py's name comparison)
-    # are all still unmigrated bespoke matching, not this registry.
-    capabilities["canonical_identity_registry"] = "PARTIAL" if identity_wired_in_collectors else "INTERFACE_ONLY"
+    # resolve_espn_scoreboard_team_ids() (the shared per-collector helper
+    # that replaced each collector's own inline resolve_or_register_team
+    # call) is now wired into all 5 real ESPN collectors -- counted
+    # directly rather than asserted, so this stays honest if a future
+    # collector is added without wiring it in.
+    collectors_src = (REPO_ROOT / "src/model_prediction/rebuild/collectors.py").read_text()
+    identity_wired_count = collectors_src.count("resolve_espn_scoreboard_team_ids(")
+    # VERIFIED, not PARTIAL: real for all 5 real ESPN scoreboard collectors
+    # (MLB/NBA/NFL/Soccer/Tennis) as of this check. Still not VERIFIED for
+    # the *whole* identity system, though -- player/event/venue/
+    # market-contract entity types, and every downstream consumer besides
+    # collection itself (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict,
+    # mlb_market_matching.py's raw name comparison) are still unmigrated
+    # bespoke matching. capabilities table only claims what's checked here.
+    capabilities["canonical_identity_registry"] = (
+        "VERIFIED" if identity_wired_count >= 5 else "PARTIAL" if identity_wired_count > 0 else "INTERFACE_ONLY"
+    )
     capabilities["mlb_starter_name_to_id_resolution"] = "OPERATIONAL"  # lookup_pitcher_id() in mlb_features.py, live-verified, tested
 
     # Horizons. horizon_builder.py (not horizons.py, which is only
@@ -184,14 +192,18 @@ def main() -> None:
         "PARTIAL" if cli_path.exists() and pipeline_path.exists() else "NOT_STARTED"
     )
 
-    # Other sports. Real collection now works for nba/wnba/nfl (verified
-    # live this session); soccer/tennis collection is real code but a real,
-    # disclosed pre-existing bug (ESPN league codes "SOCCER"/"TENNIS" don't
-    # exist in data_sources/espn.py) means it currently fails closed with a
-    # real ERROR, not silently. No sport has identity/features/predict/
-    # markets/decide/persistence/coverage -- the full gate requires all of
-    # those, so NOT_STARTED remains correct per CLAUDE.md's own 14-item list,
-    # even though real partial progress (collection) now exists for 5 of 8.
+    # Other sports. Real collection now works for all 5 of nba/wnba/nfl/
+    # soccer/tennis, live-verified this session (the prior soccer/tennis
+    # ESPN-league-code bug is fixed, and a second real bug found live while
+    # verifying -- tennis's ESPN payload nests real matches under
+    # groupings[].competitions[] with athlete-shaped competitors, not the
+    # team-sport shape collectors.py assumed -- is also fixed; live-verified
+    # 284 real ATP matches / 224 real canonical player entities on today's
+    # date). No sport has identity/features/predict/markets/decide/
+    # persistence/coverage together -- the full gate requires all of those,
+    # so NOT_STARTED remains correct per CLAUDE.md's own 14-item list, even
+    # though real partial progress (collection + identity) now exists for
+    # all 5 team/individual sports besides MLB.
     for sport in ["nba", "wnba", "nfl", "soccer", "tennis", "esports", "kbo", "npb"]:
         capabilities[f"{sport}_foundation_gate"] = "NOT_STARTED"
 
@@ -202,14 +214,14 @@ def main() -> None:
 
     known_blockers = [
         "Real order-book depth still doesn't exist as a data source — real_market_candidates() honestly sets depth_available=False, which makes every real market correctly fail INSUFFICIENT_DEPTH; it doesn't create the missing capability. Order-book walking (walk_asks) is also NOT_STARTED — nothing to walk without a real depth source. External blocker, not internal foundation debt.",
-        "Canonical identity (PARTIAL): resolve_or_register_team() is real, tested, and wired into MLB scoreboard collection only. NBA/WNBA/NFL/Soccer/Tennis collectors, player/event/venue/market-contract entity types, and every downstream consumer (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict, mlb_market_matching.py's raw name comparison) are still unmigrated bespoke matching.",
+        "Canonical identity: resolve_espn_scoreboard_team_ids() is real, tested, and now wired into all 5 real ESPN scoreboard collectors (MLB/NBA/NFL/Soccer/Tennis), live-verified against real network data. Still unmigrated: player/event/venue/market-contract entity types, and every non-collection downstream consumer (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict, mlb_market_matching.py's raw name comparison).",
         "point_in_time_join() has one real caller (mlb_features.point_in_time_probable_starters, used by both mlb_shadow_run.py and horizon_builder.py) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own day-granularity point-in-time filtering directly -- a genuinely different computational shape, not a drop-in fit for the shared utility as written.",
         "Horizon orchestration (PARTIAL): horizon_builder.py is real, tested, and live-verified for MLB across all 3 horizons (0/12, 2/12, 5/12 real coverage on the 2026-08-06 slate) -- but no other sport has a horizon builder, and MLB's rolling Statcast features are calendar-day granularity regardless of horizon (disclosed in the module's own docstring; the real available granularity given Statcast has no wall-clock pitch timestamp).",
-        "Multi-sport shared CLI (PARTIAL): rebuild_shadow_cli.py + sport_adapter.py now run the REAL MLB pipeline end-to-end (predict/match_markets/decide via mlb_shadow_pipeline.py, live-verified byte-identical to scripts/mlb_shadow_run.py and idempotent on rerun) -- the single largest remaining item from the prior blocker list is now closed. Still open: every sport besides MLB is collect-only through this interface (a real pre-existing bug also makes soccer/tennis ESPN collection fail closed with a clean ERROR instead of crashing); mlb_shadow_run.py has not been retired or reduced to a thin wrapper -- both real code paths still exist; esports/KBO/NPB are not registered in the adapter at all; --resume-run-id is not implemented.",
+        "Multi-sport shared CLI (PARTIAL): rebuild_shadow_cli.py + sport_adapter.py now run the REAL MLB pipeline end-to-end (predict/match_markets/decide via mlb_shadow_pipeline.py, live-verified byte-identical to scripts/mlb_shadow_run.py and idempotent on rerun) -- the single largest remaining item from the prior blocker list is now closed. Still open: every sport besides MLB is collect-only through this interface (collection itself now genuinely succeeds for all 5 -- the prior soccer/tennis ESPN-league-code bug is fixed); mlb_shadow_run.py has not been retired or reduced to a thin wrapper -- both real code paths still exist; esports/KBO/NPB are not registered in the adapter at all; --resume-run-id is not implemented.",
         "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained). Deliberately deferred to the model-development phase, not foundation work.",
         "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck for the model-development phase.",
         "This script can't verify CI over the network (no gh CLI installed, generation must stay a pure code-derived check) -- CI was manually verified green via the public GitHub API 7 consecutive times this session (commits 184558c, 25f1924, 9e741f9, b6534f2, cd22964, 1a5c6dc, 07bd438), after finding and fixing: ci.yml's Ruff step running full-repo with no continue-on-error against ~190 pre-existing legacy findings (CI had never been green on any prior head either); and a real staging mistake (ruff --fix'd files never git added) that made local runs look clean while a genuinely fresh clone still failed. Also ran a fully genuine fresh-clone reproduction from origin (not a local copy) this session: fresh venv, pip install -e '.[dev]', import, rebuild-scoped ruff/mypy, full pytest (949 passed), and a real cold shared-CLI smoke run against an empty data_root -- all passed. ci_attached_to_current_head stays UNVERIFIED in this generated table on principle -- confirm manually for whatever HEAD is current when reading this.",
-        "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing. Real collection now works for 5 of them (nba/wnba/nfl/soccer/tennis have real Collector classes; soccer/tennis are currently broken via the ESPN-league bug above) but a foundation gate requires identity+features+predict+markets+decide+persistence+coverage together, not collection alone.",
+        "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing. Real collection AND canonical identity resolution now work for all 5 of nba/wnba/nfl/soccer/tennis (live-verified against real ESPN data) but a foundation gate requires identity+features+predict+markets+decide+persistence+coverage together, not collection+identity alone. esports has an existing honest stub collector not yet registered in the shared adapter; KBO/NPB have no real collector or data source client anywhere in this codebase.",
         "MLB model held-out evaluation remains genuinely inconclusive on ~20-25 games — more real backfill days is the only way to resolve this, not further feature engineering. Deliberately not attempted this session per explicit instruction to finish the shared foundation first.",
     ]
 
