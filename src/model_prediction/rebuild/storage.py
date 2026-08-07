@@ -22,6 +22,8 @@ from typing import Any, ClassVar
 import duckdb
 import polars as pl
 
+from .schemas import TableContract, validate_or_raise
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -235,6 +237,7 @@ class NormalizedStore:
         mode: str = "append",
         primary_key: list[str] | None = None,
         conflict_policy: str = "keep_latest",
+        contract: TableContract | None = None,
     ) -> int:
         """Write a DataFrame to a Parquet table. mode='append' or 'overwrite'.
 
@@ -259,7 +262,17 @@ class NormalizedStore:
             — correct for tables whose primary key is meant to be
             genuinely immutable (identical re-collection is still fine and
             silently deduped; a real conflicting value is not).
+
+        When `contract` is given (FOUNDATION_COMPLETION.md Phase 5), the
+        incoming rows are validated against it before anything is written
+        -- schema drift (a missing required column, a null primary key,
+        a wrong dtype) fails closed with a real ValueError instead of
+        silently landing in the table next to rows that don't have the
+        problem.
         """
+        if contract is not None:
+            validate_or_raise(df, contract)
+
         p = self.path(sport, table)
         p.parent.mkdir(parents=True, exist_ok=True)
         if mode == "overwrite" or not p.exists():
@@ -469,6 +482,7 @@ class MarketStore:
         df: pl.DataFrame,
         *,
         primary_key: list[str] | None = None,
+        contract: TableContract | None = None,
     ) -> int:
         """Write market snapshots for one date. Appends if exists.
 
@@ -481,7 +495,14 @@ class MarketStore:
         keep_latest semantics as `NormalizedStore.write()`; pass
         `primary_key=None` explicitly is not supported — pass `[]` to opt
         out entirely if a caller genuinely needs raw concatenation.
+
+        `contract` (FOUNDATION_COMPLETION.md Phase 5), when given, validates
+        the incoming rows before anything is written -- schema drift fails
+        closed with a real ValueError.
         """
+        if contract is not None:
+            validate_or_raise(df, contract)
+
         p = self.path(sport, date_str)
         p.parent.mkdir(parents=True, exist_ok=True)
         if p.exists():

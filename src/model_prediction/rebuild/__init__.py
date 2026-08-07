@@ -40,6 +40,14 @@ from .market_residual import (
 )
 from .metadata import MetadataDB
 from .models import GamePrediction, JointScoreDistribution, MLBTwoHeadModel
+from .schemas import (
+    MARKET_SNAPSHOT_CONTRACT,
+    SCOREBOARD_CONTRACT,
+    ColumnSpec,
+    TableContract,
+    validate_against_contract,
+    validate_or_raise,
+)
 from .storage import (
     PROVENANCE_COLUMNS,
     FeatureStore,
@@ -68,6 +76,9 @@ __all__ = [  # noqa: RUF022 -- grouped by subsystem with comments, not alphabeti
     "MetadataDB",
     # Identity
     "IdentityRegistry", "CanonicalIdentity", "normalize_name",
+    # Schemas
+    "TableContract", "ColumnSpec", "validate_against_contract", "validate_or_raise",
+    "SCOREBOARD_CONTRACT", "MARKET_SNAPSHOT_CONTRACT",
     # Collectors
     "MLBCollector", "NBACollector", "NFLCollector",
     "SoccerCollector", "TennisCollector", "EsportsCollector",

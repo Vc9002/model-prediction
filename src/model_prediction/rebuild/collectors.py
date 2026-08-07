@@ -14,6 +14,7 @@ from typing import Any
 import polars as pl
 
 from .identity import IdentityRegistry, resolve_or_register_team
+from .schemas import MARKET_SNAPSHOT_CONTRACT, SCOREBOARD_CONTRACT
 from .storage import MarketStore, NormalizedStore, RawStore, provenance_row, utc_now
 
 DEFAULT_RATE_LIMIT = 0.6  # seconds between calls
@@ -129,7 +130,7 @@ class MLBCollector:
 
         if games:
             df = pl.DataFrame(games)
-            self.norm.write("mlb", "scoreboard", df, primary_key=["event_id"])
+            self.norm.write("mlb", "scoreboard", df, primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             self.meta.audit_event("collect_espn_scoreboard", {"date": game_date, "games": len(games)})
             return {"status": "ok", "date": game_date, "games": len(games)}
 
@@ -338,7 +339,7 @@ class MLBCollector:
                 payload = {"events": len(mlb_events), "books": len(books)}
                 self.raw.write(source, game_date, record_id, payload)
                 df = pl.DataFrame(books)
-                self.markets.write_books("mlb", game_date, df)
+                self.markets.write_books("mlb", game_date, df, contract=MARKET_SNAPSHOT_CONTRACT)
                 self.meta.update_source_health(source, "active")
                 self.meta.audit_event(
                     "collect_polymarket_books",
@@ -516,7 +517,7 @@ class NBACollector:
 
         if games:
             df = pl.DataFrame(games)
-            self.norm.write(sport, "scoreboard", df, primary_key=["event_id"])
+            self.norm.write(sport, "scoreboard", df, primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             self.meta.audit_event("collect_espn_scoreboard", {"sport": sport, "date": game_date, "games": len(games)})
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
 
@@ -558,7 +559,7 @@ class NBACollector:
                             "available_depth": None,
                         })
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books))
+                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
@@ -632,7 +633,7 @@ class NFLCollector:
                 "venue": (comp.get("venue", {}) or {}).get("fullName", ""),
             })
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"])
+            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
@@ -666,7 +667,7 @@ class NFLCollector:
                             "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
                             "available_depth": None})
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books))
+                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
@@ -732,7 +733,7 @@ class SoccerCollector:
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
                 "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"])
+            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
@@ -765,7 +766,7 @@ class SoccerCollector:
                             "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
                             "available_depth": None})
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books))
+                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
@@ -833,7 +834,7 @@ class TennisCollector:
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
                 "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"])
+            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
@@ -866,7 +867,7 @@ class TennisCollector:
                             "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
                             "available_depth": None})
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books))
+                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
