@@ -36,6 +36,7 @@ from model_prediction.rebuild.mlb_features import (
     identify_starters,
     load_raw_statcast_dates,
     normalize_statcast_pitches,
+    point_in_time_probable_starters,
 )
 from model_prediction.rebuild.mlb_market_matching import (
     exclude_first_five_innings,
@@ -248,6 +249,14 @@ def main() -> None:
         market_rows = pl.DataFrame()
         print(f"5. No Polymarket data collected for {target_date}")
 
+    # Each game's real "late" decision_time_utc (start minus 60 minutes),
+    # computed once here and reused both for the point-in-time probable-
+    # starter join below and for ledger persistence later in this loop.
+    decision_times: dict[str, datetime] = {
+        g["event_id"]: datetime.fromisoformat(g["event_start_utc"]) - timedelta(minutes=60)
+        for g in tonight.iter_rows(named=True)
+    }
+
     # Real probable-starter names, keyed by ESPN event_id — a scheduled game
     # has no Statcast pitches of its own yet (it hasn't been played), so
     # build_game_feature_row's game_pk matching can never find it. This is
@@ -255,15 +264,26 @@ def main() -> None:
     # a real input source per CLAUDE.md ("the existing project [is] a
     # benchmark and data source"), not as a shortcut around building real
     # features.
+    #
+    # Real point-in-time gap fixed here (FOUNDATION_COMPLETION.md Phase 3):
+    # this file carries real revisions over time for the same event_id (152
+    # of 163 real events have more than one record, confirmed live) but was
+    # previously read with `probables_by_event[rec["event_id"]] = rec`,
+    # which keeps whichever record happens to be *last in the file* — not
+    # necessarily the newest observation strictly before this game's real
+    # decision_time_utc. A revision observed after the "late" horizon's
+    # T-60m cutoff could silently leak into a decision that shouldn't have
+    # seen it yet. point_in_time_probable_starters() uses the shared
+    # point_in_time_join() utility (asof.py) — fixed and tested in Phase 3
+    # but dead code with no real caller in this repo until this.
     probables_path = Path("data/point_in_time/mlb_probable_starters.jsonl")
     probables_by_event: dict[str, dict] = {}
-    if probables_path.exists():
-        for line in probables_path.read_text().splitlines():
-            if not line.strip():
-                continue
-            rec = json.loads(line)
-            probables_by_event[rec["event_id"]] = rec
-    print(f"5b. {len(probables_by_event)} real probable-starter records loaded")
+    if probables_path.exists() and decision_times:
+        records = [
+            json.loads(line) for line in probables_path.read_text().splitlines() if line.strip()
+        ]
+        probables_by_event = point_in_time_probable_starters(decision_times, records)
+    print(f"5b. {len(probables_by_event)} real probable-starter records loaded (point-in-time filtered)")
 
     # Real depth data doesn't exist yet (Checkpoint 8). This previously set
     # min_depth_units=0.0 to work around that -- which is exactly the
@@ -322,8 +342,9 @@ def main() -> None:
         # script against the same slate genuinely idempotent in the ledger
         # (same event + same horizon always yields the same decision
         # timestamp), rather than every invocation minting a fresh row.
-        event_start = datetime.fromisoformat(g["event_start_utc"])
-        decision_time_utc = (event_start - timedelta(minutes=60)).isoformat()
+        # Reuses the same value already computed above for the probable-
+        # starter point-in-time join, rather than recomputing it.
+        decision_time_utc = decision_times[g["event_id"]].isoformat()
 
         _, pred_created = ledger.record_prediction(
             run_id=run_id, sport="mlb", event_id=g["event_id"], horizon=HORIZON_LATE,

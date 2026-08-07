@@ -6,6 +6,7 @@ outputs/rebuild/takeover_status.md Checkpoint 5.
 
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import patch
 
 import pandas as pd
@@ -19,6 +20,7 @@ from model_prediction.rebuild.mlb_features import (
     normalize_statcast_pitches,
     park_factor,
     pitcher_rolling_features,
+    point_in_time_probable_starters,
 )
 
 
@@ -213,3 +215,70 @@ class TestDedupeScoreboard:
     def test_empty_input_returns_empty(self):
         df = pl.DataFrame({"event_id": [], "observed_at_utc": []})
         assert dedupe_scoreboard(df).is_empty()
+
+
+def _probable_record(event_id: str, observed_at_utc: str, home_starter: str, away_starter: str) -> dict:
+    return {
+        "event_id": event_id, "observed_at_utc": observed_at_utc,
+        "home_starter": home_starter, "away_starter": away_starter,
+    }
+
+
+class TestPointInTimeProbableStarters:
+    """FOUNDATION_COMPLETION.md Phase 3: wires the shared point_in_time_join()
+    utility into a real caller for the first time. Real gap fixed: a naive
+    `{rec["event_id"]: rec for rec in records}` keeps whichever record
+    happens to be last in the file for an event, not the newest observation
+    strictly before that game's real decision_time_utc."""
+
+    def test_uses_the_newest_observation_strictly_before_decision_time(self):
+        decision_times = {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")}
+        records = [
+            _probable_record("401", "2026-08-05T10:00:00+00:00", "Pitcher A", "Pitcher X"),
+            _probable_record("401", "2026-08-06T18:00:00+00:00", "Pitcher B", "Pitcher Y"),  # real revision
+        ]
+
+        result = point_in_time_probable_starters(decision_times, records)
+
+        assert result["401"] == {"home_starter": "Pitcher B", "away_starter": "Pitcher Y"}
+
+    def test_a_revision_published_after_decision_time_does_not_leak_in(self):
+        # The real bug this closes: "last record in the file" would have
+        # picked this late revision even though it was observed *after* the
+        # late horizon's real decision cutoff.
+        decision_times = {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")}
+        records = [
+            _probable_record("401", "2026-08-05T10:00:00+00:00", "Pitcher A", "Pitcher X"),
+            _probable_record("401", "2026-08-06T23:00:00+00:00", "Pitcher B", "Pitcher Y"),  # after cutoff
+        ]
+
+        result = point_in_time_probable_starters(decision_times, records)
+
+        assert result["401"] == {"home_starter": "Pitcher A", "away_starter": "Pitcher X"}
+
+    def test_event_with_no_qualifying_observation_is_absent_not_guessed(self):
+        decision_times = {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")}
+        records = [
+            _probable_record("401", "2026-08-06T23:00:00+00:00", "Pitcher A", "Pitcher X"),  # only future
+        ]
+
+        result = point_in_time_probable_starters(decision_times, records)
+
+        assert "401" not in result
+
+    def test_only_events_in_decision_times_are_considered(self):
+        decision_times = {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")}
+        records = [
+            _probable_record("401", "2026-08-05T10:00:00+00:00", "Pitcher A", "Pitcher X"),
+            _probable_record("999", "2026-08-05T10:00:00+00:00", "Other Home", "Other Away"),
+        ]
+
+        result = point_in_time_probable_starters(decision_times, records)
+
+        assert set(result.keys()) == {"401"}
+
+    def test_empty_inputs_return_empty(self):
+        assert point_in_time_probable_starters({}, [_probable_record("401", "2026-08-05T10:00:00+00:00", "A", "X")]) == {}
+        assert point_in_time_probable_starters(
+            {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")}, [],
+        ) == {}

@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import gzip
 import json
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
+
+from .asof import point_in_time_join
 
 # Coarse, static single-season park factors (100 = neutral run environment).
 # Sourced from long-run public park-factor consensus (not derived from this
@@ -315,6 +318,60 @@ def lookup_pitcher_id(full_name: str) -> int | None:
     if len(result) != 1:
         return None
     return int(result["key_mlbam"].iloc[0])
+
+
+def point_in_time_probable_starters(
+    decision_times: dict[str, datetime], probable_records: list[dict],
+) -> dict[str, dict[str, str]]:
+    """The real, point-in-time-correct probable starters for each game in
+    `decision_times` ({event_id: decision_time_utc}), selected from
+    `probable_records` (each a dict with real event_id/observed_at_utc/
+    home_starter/away_starter fields, e.g. loaded from
+    data/point_in_time/mlb_probable_starters.jsonl).
+
+    Real gap fixed here (FOUNDATION_COMPLETION.md Phase 3): a naive
+    `{rec["event_id"]: rec for rec in records}` keeps whichever record
+    happens to be *last in the file* for an event, not necessarily the
+    newest observation strictly before that game's real decision_time_utc —
+    152 of 163 real events in the incumbent probables file have more than
+    one record (confirmed live), so a revision observed after the "late"
+    horizon's T-60m cutoff could otherwise silently leak into a decision
+    that shouldn't have seen it yet. Uses the shared point_in_time_join()
+    utility (asof.py) — fixed and tested per Phase 3 but dead code with no
+    real caller in this repo until this.
+
+    Returns {event_id: {"home_starter": ..., "away_starter": ...}} only for
+    events with a real, valid prior observation — an event with no
+    qualifying observation is simply absent, not filled with a guess.
+    """
+    if not decision_times or not probable_records:
+        return {}
+    records = [
+        {
+            "event_id": rec["event_id"],
+            "observed_at_utc": datetime.fromisoformat(rec["observed_at_utc"]),
+            "home_starter": rec["home_starter"],
+            "away_starter": rec["away_starter"],
+        }
+        for rec in probable_records
+        if rec["event_id"] in decision_times
+    ]
+    if not records:
+        return {}
+    observations = pl.DataFrame(records)
+    decisions = pl.DataFrame({
+        "event_id": list(decision_times.keys()),
+        "decision_time_utc": list(decision_times.values()),
+    })
+    joined = point_in_time_join(decisions, observations, entity_keys=["event_id"])
+    result: dict[str, dict[str, str]] = {}
+    for row in joined.iter_rows(named=True):
+        if row.get("obs_home_starter") is not None and row.get("obs_away_starter") is not None:
+            result[row["event_id"]] = {
+                "home_starter": row["obs_home_starter"],
+                "away_starter": row["obs_away_starter"],
+            }
+    return result
 
 
 def load_weather_daily_aggregate(raw_root: str | Path, venue_id: str, game_date: str) -> dict[str, float]:
