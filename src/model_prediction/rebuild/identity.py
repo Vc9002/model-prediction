@@ -622,6 +622,57 @@ def resolve_or_link_polymarket_event_id(
     return canonical_event_id
 
 
+def resolve_or_link_statcast_game_pk(
+    registry: IdentityRegistry,
+    sport: str,
+    game_pk: int | str | None,
+    home_canonical_id: str | None,
+    away_canonical_id: str | None,
+    game_date: str,
+    known_canonical_event_id: str | None = None,
+) -> str | None:
+    """Link Statcast/MLB-StatsAPI's own game_pk (the same real numeric ID
+    space -- Baseball Savant's game_pk *is* MLB StatsAPI's own gamePk,
+    verified live against a real MLB StatsAPI schedule response) to the
+    same canonical event ESPN scoreboard collection already registered
+    via resolve_espn_scoreboard_event_id(). Same shape as
+    resolve_or_link_polymarket_event_id() for the identical real reason:
+    game_pk lives in a separate id-space from ESPN's own event_id with
+    nothing tying them together, and naive (date, home, away) matching is
+    exactly unsafe on a doubleheader -- resolve_event_by_team_pair()
+    correctly fails closed on that case rather than guessing.
+
+    `known_canonical_event_id` should be passed whenever the caller
+    already knows unambiguously which of a doubleheader's two real games
+    this game_pk belongs to (e.g. a real per-game join on scheduled start
+    time -- see mlb_features.resolve_statcast_game_pk(), which disambiguates
+    a doubleheader's two real games by their real start times, hours
+    apart, without needing a shared native ID between ESPN and Statcast at
+    all). Linking directly to it is strictly more precise than
+    resolve_event_by_team_pair()'s date-only fallback, which cannot
+    disambiguate a doubleheader from team pair + date alone and must fail
+    closed there.
+
+    Checks for an existing mapping first (idempotent across reruns).
+    Returns None (never guesses, never registers a new event purely from
+    Statcast-side data) when there's no game_pk, no resolved canonical
+    team ids, or no unambiguous match."""
+    if not game_pk or not home_canonical_id or not away_canonical_id:
+        return None
+    namespaced_source_id = f"mlb_statsapi:{sport}"
+    game_pk_str = str(game_pk)
+    existing = registry.resolve(namespaced_source_id, game_pk_str)
+    if existing is not None:
+        return existing.entity_id
+    canonical_event_id = known_canonical_event_id or resolve_event_by_team_pair(
+        registry, sport, home_canonical_id, away_canonical_id, game_date,
+    )
+    if canonical_event_id is None:
+        return None
+    registry.map(canonical_event_id, namespaced_source_id, game_pk_str)
+    return canonical_event_id
+
+
 def resolve_or_register_player(
     registry: IdentityRegistry,
     sport: str,

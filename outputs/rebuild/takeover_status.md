@@ -1405,3 +1405,78 @@ ablation script / a standalone snippet instead.
 (Task 1 removed that dependency for starter resolution) but remains,
 unused and still doubleheader-unsafe, for this task to replace with a
 persisted canonical-event <-> `game_pk` mapping.
+
+### Task 2 — doubleheader-safe ESPN-Statcast game matching, fixed
+
+Deleted `find_statcast_game_pk()` (the doubleheader-unsafe `(date, home,
+away) -> first game_pk` join — real bug: on a real doubleheader it
+silently picked whichever of the two real games sorted first by
+`game_pk`, with no guarantee that was the right one). It had zero real
+callers left after Task 1 anyway.
+
+**Replaced with `resolve_statcast_game_pk()`** (`mlb_features.py`):
+Statcast's own `game_pk` *is* MLB StatsAPI's real `gamePk` (Baseball
+Savant sources it directly from MLB's own numbering — verified live
+against the actual `https://statsapi.mlb.com/api/v1/schedule` endpoint).
+Matches an ESPN event to the real StatsAPI schedule game sharing both
+real team names on the same calendar date, breaking ties by the closest
+real scheduled start timestamp — a doubleheader's two real games are
+hours apart, so this disambiguates them without needing any shared
+native ID between ESPN and Statcast, and without depending on StatsAPI's
+own `gameNumber`/`doubleHeader` fields (more robust to a source that
+omits them). Fails closed (returns `None`, never guesses) on: no
+team-pair match; a genuine tie in closest start time; or a best match
+more than 3 real hours off (a real postponement/reschedule
+inconsistency, not a doubleheader). Reuses the existing incumbent
+`MLBStatsAPIClient` (`data_sources/mlb_statsapi.py`) as the real data
+source for `statsapi_games` — not reimplemented.
+
+**Persistence**: `resolve_or_link_statcast_game_pk()` (`identity.py`),
+mirroring `resolve_or_link_polymarket_event_id()`'s exact shape — links
+a real `game_pk` to the same canonical event ESPN scoreboard collection
+already registered, namespaced `mlb_statsapi:{sport}`, idempotent across
+reruns, fails closed on a doubleheader when no `known_canonical_event_id`
+is supplied (team-pair+date alone can't disambiguate).
+
+**Live-verified, not just synthetic fixtures**: ran
+`resolve_statcast_game_pk()` against the real captured 2026-07-28 ESPN
+scoreboard (`data/rebuild/normalized/mlb/scoreboard.parquet`) and a real
+live `MLBStatsAPIClient().schedule('2026-07-28', '2026-07-28')` call.
+Real result: the real Cincinnati Reds/Cleveland Guardians doubleheader
+(event_ids `401901849` at 17:40Z and `401816295` at 23:10Z) correctly
+resolved to the two real distinct game_pks `824490` and `824489`
+respectively — matching MLB's own real schedule data exactly. (Also
+observed, honestly: 3 games with `event_start_utc` in the 01:xxZ early
+hours of 2026-07-28 UTC returned `None` against a same-day-only schedule
+query — those are real games whose StatsAPI `officialDate` is the
+*previous* US calendar day; a real caller querying a ±1-day window, the
+same pattern this codebase's other date-boundary-aware collectors
+already use, would resolve them. Not a matching bug, a real
+single-day-query-window limitation of this verification script, not of
+`resolve_statcast_game_pk()` itself.)
+
+**Tests**: `tests/rebuild/test_mlb_features.py::TestResolveStatcastGamePk`
+covers all 5 required scenarios (single game, doubleheader game 1,
+doubleheader game 2, postponed/rescheduled, same teams on consecutive
+dates) plus a genuine-tie case, using real MLB team names and real
+gamePks from the live-verified doubleheader above.
+`tests/rebuild/test_identity.py::TestResolveOrLinkStatcastGamePk` covers
+the persistence layer the same way `TestResolveOrLinkPolymarketEventId`
+does.
+
+**Scope boundary, disclosed not hidden**: neither new function is wired
+into a live collector yet — no collector in `rebuild/collectors.py`
+currently fetches MLB StatsAPI schedule data at all (that would be a new
+raw source, its own real scope item), so there's no live caller to wire
+`resolve_or_link_statcast_game_pk()` into today. Built and tested as
+real, ready infrastructure — the same "build + test the primitive, wire
+it into a live pipeline in a later checkpoint" split this branch has used
+repeatedly (e.g. `resolve_mlbam_player_id`, `resolve_or_link_polymarket_event_id`
+before it).
+
+**1114 tests pass** (up from 1101), 1 skipped. `ruff check` clean.
+
+**Next task:** Task 3 — historical weather point-in-time selection
+(`load_weather_daily_aggregate()` currently takes the latest snapshot in
+a date folder and a daily aggregate, not a decision-time-valid snapshot
+aligned to first-pitch hour).

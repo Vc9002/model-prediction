@@ -541,29 +541,76 @@ def load_weather_daily_aggregate(raw_root: str | Path, venue_id: str, game_date:
     }
 
 
-def find_statcast_game_pk(
-    pitches: pl.DataFrame, game_date: str, home_abbrev: str, away_abbrev: str,
+def resolve_statcast_game_pk(
+    espn_game: dict,
+    statsapi_games: list[dict],
+    *,
+    max_start_time_diff_minutes: float = 180.0,
 ) -> int | None:
-    """Join an ESPN scoreboard game to its Statcast game_pk via
-    (date, home team, away team) — there is no shared game ID between the
-    two sources. Not doubleheader-safe: if two games between the same teams
-    on the same date exist, this returns the first match by game_pk, which
-    is a known, disclosed limitation (see CLAUDE.md Part 1 section 7's
-    doubleheader identity requirement — Task 2 of the next rebuild phase).
-    No longer called by build_game_feature_row() as of the horizon-safe
-    starter fix (Task 1) — that function now resolves starters from the
-    point-in-time probable-starter feed, not from this game's own Statcast
-    game_pk, so it no longer needs this join at all. Left in place,
-    unused, for Task 2 to fix and wire back in for whatever still needs a
-    real game_pk (e.g. a future point-in-time lineup join)."""
-    match = pitches.filter(
-        (pl.col("game_date_str") == game_date)
-        & (pl.col("home_team") == home_abbrev)
-        & (pl.col("away_team") == away_abbrev)
-    )
-    if match.is_empty():
+    """Doubleheader-safe replacement for the previous (date, home, away)
+    -> first-Statcast-game_pk join (real bug: on a real doubleheader that
+    silently picked whichever of the two real games happened to sort
+    first by game_pk, with no guarantee that was the actual game being
+    featurized). Statcast's own game_pk *is* MLB StatsAPI's real gamePk
+    (Baseball Savant sources it directly from MLB's own numbering,
+    verified live against a real MLB StatsAPI schedule response) -- so
+    this matches ESPN's scheduled event to the real StatsAPI schedule
+    game sharing both real team names on the same calendar date, breaking
+    ties by the closest real scheduled start timestamp. A doubleheader's
+    two real games have real start times hours apart (verified live: a
+    real 2026-07-28 CIN/CLE doubleheader was 17:40Z and 23:10Z), so this
+    correctly disambiguates them without needing any shared native ID
+    between ESPN and Statcast at all -- and without needing the
+    doubleHeader/gameNumber fields StatsAPI happens to also carry, which
+    keeps this robust to a source that omits them.
+
+    `statsapi_games` should be the real payload from
+    MLBStatsAPIClient.schedule() (data_sources/mlb_statsapi.py, the
+    existing incumbent StatsAPI adapter, reused here rather than
+    reimplemented) for the relevant date range -- each item a real
+    schedule game dict with gamePk/gameDate/teams.home.team.name/
+    teams.away.team.name.
+
+    Fails closed (returns None), never guesses, when: no candidate shares
+    both real team names on the event's calendar date; more than one
+    candidate is genuinely tied for closest start time (real, if rare --
+    must not be silently broken by list order); or the single best
+    candidate's start time differs from ESPN's own by more than
+    max_start_time_diff_minutes (a real data problem, e.g. an
+    inconsistently-reported postponement/reschedule between sources, not
+    a doubleheader case at all -- three real hours is comfortably wider
+    than any real doubleheader gap but still catches a genuinely wrong
+    date/source mismatch)."""
+    espn_start = datetime.fromisoformat(espn_game["event_start_utc"])
+    home_name, away_name = espn_game["home_team"], espn_game["away_team"]
+    game_date = espn_game["event_start_utc"][:10]
+
+    candidates: list[tuple[float, int]] = []
+    for g in statsapi_games:
+        game_start_raw = g.get("gameDate")
+        game_pk = g.get("gamePk")
+        if not game_start_raw or not game_pk:
+            continue
+        game_start = datetime.fromisoformat(str(game_start_raw))
+        if game_start.strftime("%Y-%m-%d") != game_date:
+            continue
+        teams = g.get("teams") or {}
+        g_home = ((teams.get("home") or {}).get("team") or {}).get("name")
+        g_away = ((teams.get("away") or {}).get("team") or {}).get("name")
+        if g_home != home_name or g_away != away_name:
+            continue
+        diff_minutes = abs((game_start - espn_start).total_seconds()) / 60.0
+        candidates.append((diff_minutes, int(game_pk)))
+
+    if not candidates:
         return None
-    return int(match["game_pk"].sort()[0])
+    candidates.sort(key=lambda c: c[0])
+    best_diff, best_game_pk = candidates[0]
+    if len(candidates) > 1 and candidates[1][0] == best_diff:
+        return None  # genuine tie -- fail closed, never guess by list order
+    if best_diff > max_start_time_diff_minutes:
+        return None
+    return best_game_pk
 
 
 _NO_STARTER_ROLLING = {

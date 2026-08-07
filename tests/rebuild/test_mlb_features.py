@@ -25,6 +25,7 @@ from model_prediction.rebuild.mlb_features import (
     pitcher_rolling_features,
     point_in_time_probable_starters,
     resolve_horizon_starter_names,
+    resolve_statcast_game_pk,
 )
 
 
@@ -530,3 +531,102 @@ class TestBuildGameFeatureRowStarterParity:
         assert row["starters_known"] == 0.0
         assert row["starter_missing_reason"] == "starter_name_not_resolved_to_statcast_id"
         assert row["home_sp_avg_velocity"] == 0.0
+
+
+def _statsapi_game(game_pk: int, game_date_utc: str, home: str, away: str) -> dict:
+    return {
+        "gamePk": game_pk, "gameDate": game_date_utc,
+        "teams": {"home": {"team": {"name": home}}, "away": {"team": {"name": away}}},
+    }
+
+
+class TestResolveStatcastGamePk:
+    """Task 2 (doubleheader-safe ESPN-Statcast game matching): replaces the
+    previous (date, home, away) -> first-game_pk join, which silently
+    picked whichever of a real doubleheader's two games sorted first.
+    Matches by real team names + closest real scheduled start time
+    instead -- a doubleheader's two games are hours apart in real
+    scheduled start time, which disambiguates them without needing any
+    shared native ID between ESPN and Statcast. Fixture shapes mirror a
+    real MLBStatsAPIClient.schedule() response, verified live against the
+    actual API during development (a real 2026-07-28 CIN/CLE doubleheader:
+    gamePks 824490 at 17:40Z and 824489 at 23:10Z)."""
+
+    def test_single_game(self):
+        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
+                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        statsapi_games = [_statsapi_game(822950, "2026-07-26T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians")]
+
+        assert resolve_statcast_game_pk(espn_game, statsapi_games) == 822950
+
+    def test_doubleheader_game_1_resolves_to_the_earlier_real_game(self):
+        espn_game = {"event_id": "g1", "event_start_utc": "2026-07-28T17:40:00+00:00",
+                      "home_team": "Cincinnati Reds", "away_team": "Cleveland Guardians"}
+        statsapi_games = [
+            _statsapi_game(824490, "2026-07-28T17:40:00Z", "Cincinnati Reds", "Cleveland Guardians"),
+            _statsapi_game(824489, "2026-07-28T23:10:00Z", "Cincinnati Reds", "Cleveland Guardians"),
+        ]
+
+        assert resolve_statcast_game_pk(espn_game, statsapi_games) == 824490
+
+    def test_doubleheader_game_2_resolves_to_the_later_real_game(self):
+        espn_game = {"event_id": "g2", "event_start_utc": "2026-07-28T23:05:00+00:00",
+                      "home_team": "Cincinnati Reds", "away_team": "Cleveland Guardians"}
+        statsapi_games = [
+            _statsapi_game(824490, "2026-07-28T17:40:00Z", "Cincinnati Reds", "Cleveland Guardians"),
+            _statsapi_game(824489, "2026-07-28T23:10:00Z", "Cincinnati Reds", "Cleveland Guardians"),
+        ]
+
+        assert resolve_statcast_game_pk(espn_game, statsapi_games) == 824489
+
+    def test_postponed_or_rescheduled_game_fails_closed_not_a_wrong_guess(self):
+        # ESPN reports this game on 2026-07-26, but the real StatsAPI
+        # schedule for that date has no matching team pair at all (e.g.
+        # the real game was postponed to a later date) -- must not guess
+        # at an unrelated real game sharing the same team names elsewhere.
+        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
+                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        statsapi_games = [
+            _statsapi_game(822950, "2026-07-28T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
+        ]
+
+        assert resolve_statcast_game_pk(espn_game, statsapi_games) is None
+
+    def test_same_teams_on_consecutive_dates_resolves_to_the_correct_date(self):
+        # A normal 3-game series (not a doubleheader): the same two teams
+        # play on both 2026-07-26 and 2026-07-27. Must resolve to the real
+        # game on the SAME calendar date as the ESPN event, not the
+        # nearest one by team pair alone.
+        espn_game = {"event_id": "2", "event_start_utc": "2026-07-27T16:15:00+00:00",
+                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        statsapi_games = [
+            _statsapi_game(822950, "2026-07-26T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
+            _statsapi_game(822951, "2026-07-27T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
+        ]
+
+        assert resolve_statcast_game_pk(espn_game, statsapi_games) == 822951
+
+    def test_genuine_tie_in_start_time_fails_closed(self):
+        # A synthetic but real-shaped edge case: two real candidates
+        # equally close in time -- must not be silently broken by list
+        # order.
+        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T18:00:00+00:00",
+                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        statsapi_games = [
+            _statsapi_game(1, "2026-07-26T17:00:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
+            _statsapi_game(2, "2026-07-26T19:00:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
+        ]
+
+        assert resolve_statcast_game_pk(espn_game, statsapi_games) is None
+
+    def test_no_matching_team_pair_returns_none(self):
+        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
+                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        statsapi_games = [_statsapi_game(1, "2026-07-26T16:15:00Z", "Boston Red Sox", "New York Yankees")]
+
+        assert resolve_statcast_game_pk(espn_game, statsapi_games) is None
+
+    def test_empty_statsapi_games_returns_none(self):
+        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
+                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        assert resolve_statcast_game_pk(espn_game, []) is None

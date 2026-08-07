@@ -23,6 +23,7 @@ from model_prediction.rebuild.identity import (
     resolve_espn_scoreboard_venue_id,
     resolve_event_by_team_pair,
     resolve_or_link_polymarket_event_id,
+    resolve_or_link_statcast_game_pk,
     resolve_or_register_event,
     resolve_or_register_player,
     resolve_or_register_team,
@@ -488,6 +489,85 @@ class TestResolveOrLinkPolymarketEventId:
     def test_missing_polymarket_event_id_returns_none(self, tmp_path):
         registry, _ = self._seeded_registry(tmp_path)
         assert resolve_or_link_polymarket_event_id(
+            registry, "mlb", None, "mlb:team:home", "mlb:team:away", "2026-07-20",
+        ) is None
+
+
+class TestResolveOrLinkStatcastGamePk:
+    """Ties Statcast/MLB-StatsAPI's own game_pk to the canonical event ESPN
+    scoreboard collection already registered -- same shape as
+    TestResolveOrLinkPolymarketEventId, since game_pk lives in the
+    identical kind of separate id-space problem Polymarket's event_id
+    does (Task 2 of the model-development phase)."""
+
+    home: ClassVar = {"id": "1", "displayName": "Baltimore Orioles"}
+    away: ClassVar = {"id": "3", "displayName": "Los Angeles Angels"}
+
+    def _seeded_registry(self, tmp_path):
+        registry = _registry(tmp_path)
+        event_id = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816384",
+            self.home, self.away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+        )
+        return registry, event_id
+
+    def test_known_canonical_event_id_links_directly(self, tmp_path):
+        registry, espn_event_id = self._seeded_registry(tmp_path)
+
+        linked = resolve_or_link_statcast_game_pk(
+            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away",
+            "2026-07-20", known_canonical_event_id=espn_event_id,
+        )
+
+        assert linked == espn_event_id
+        assert registry.resolve("mlb_statsapi:mlb", "824490").entity_id == espn_event_id
+
+    def test_rerun_is_idempotent(self, tmp_path):
+        registry, espn_event_id = self._seeded_registry(tmp_path)
+
+        first = resolve_or_link_statcast_game_pk(
+            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away",
+            "2026-07-20", known_canonical_event_id=espn_event_id,
+        )
+        second = resolve_or_link_statcast_game_pk(
+            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away",
+            "2026-07-20", known_canonical_event_id=espn_event_id,
+        )
+        assert first == second == espn_event_id
+
+    def test_falls_back_to_team_pair_lookup_when_canonical_id_not_supplied(self, tmp_path):
+        registry, espn_event_id = self._seeded_registry(tmp_path)
+
+        linked = resolve_or_link_statcast_game_pk(
+            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away", "2026-07-20",
+        )
+        assert linked == espn_event_id
+
+    def test_doubleheader_without_known_id_fails_closed(self, tmp_path):
+        # The real precision case this design exists for: with no
+        # known_canonical_event_id, team-pair+date alone cannot
+        # disambiguate a doubleheader -- must fail closed, not guess.
+        registry = _registry(tmp_path)
+        resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816384",
+            self.home, self.away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T18:05Z", "2026-07-20T17:00:00+00:00",
+        )
+        resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816385",
+            self.home, self.away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T21:30:00+00:00",
+        )
+
+        linked = resolve_or_link_statcast_game_pk(
+            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away", "2026-07-20",
+        )
+        assert linked is None
+
+    def test_missing_game_pk_returns_none(self, tmp_path):
+        registry, _ = self._seeded_registry(tmp_path)
+        assert resolve_or_link_statcast_game_pk(
             registry, "mlb", None, "mlb:team:home", "mlb:team:away", "2026-07-20",
         ) is None
 
