@@ -778,8 +778,20 @@ class SoccerCollector:
             time.sleep(self.rate_limit - elapsed)
         self._last_call = time.monotonic()
 
-    def collect_date(self, game_date: str) -> dict[str, Any]:
-        return self._collect_date(game_date, "soccer", "SOCCER")
+    def collect_date(self, game_date: str, league: str = "EPL") -> dict[str, Any]:
+        # Real bug fixed here (found live wiring the shared sport-adapter
+        # CLI, 2026-08-07): this called ESPNClient.scoreboard() with
+        # league="SOCCER" -- not a real league in data_sources/espn.py's
+        # LEAGUE_PATHS, which only has specific competitions (EPL,
+        # LA_LIGA, MLS, ...). Real collection has never worked for any
+        # soccer league through this collector; every real call raised
+        # ValueError("unsupported ESPN league: SOCCER"). "Soccer" isn't
+        # one real ESPN league -- there's no single umbrella competition
+        # -- so this defaults to a real, well-established one (EPL) rather
+        # than silently guessing at "the" soccer league. Multi-competition
+        # aggregation (CLAUDE.md Part 1's real soccer scope) remains real,
+        # disclosed future work, not claimed here.
+        return self._collect_date(game_date, "soccer", league)
 
 
 # ── Tennis Collector ────────────────────────────────────────────────────────
@@ -879,8 +891,19 @@ class TennisCollector:
             time.sleep(self.rate_limit - elapsed)
         self._last_call = time.monotonic()
 
-    def collect_date(self, game_date: str) -> dict[str, Any]:
-        return self._collect_date(game_date, "tennis", "TENNIS")
+    def collect_date(self, game_date: str, league: str = "ATP") -> dict[str, Any]:
+        # Real bug fixed here (found live wiring the shared sport-adapter
+        # CLI, 2026-08-07): this called ESPNClient.scoreboard() with
+        # league="TENNIS" -- not a real league in data_sources/espn.py's
+        # LEAGUE_PATHS, which has "ATP"/"WTA" specifically, not a generic
+        # "TENNIS" umbrella. Real collection has never worked through this
+        # collector; every real call raised ValueError("unsupported ESPN
+        # league: TENNIS"). Defaults to ATP; a caller wanting WTA passes
+        # league="WTA" explicitly (collect_date() doesn't aggregate both
+        # tours in one call, unlike ESPNClient.tennis_scoreboard() which
+        # already merges them -- using that directly is real, disclosed
+        # future work for this collector, not claimed here).
+        return self._collect_date(game_date, "tennis", league)
 
 
 # ── Esports Collector ───────────────────────────────────────────────────────

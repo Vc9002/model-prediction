@@ -76,17 +76,36 @@ class TestHonestNotImplementedStages:
 
 
 class TestCollectionOnlyAdapterFailsClosedNotCrashed:
-    """Real bug found live: SoccerCollector/TennisCollector call the real
-    ESPN client with league codes ("SOCCER"/"TENNIS") that don't exist in
-    data_sources/espn.py's LEAGUE_PATHS -- a real ValueError on a real
-    call, not a mock. The adapter must report this as an honest per-stage
-    ERROR, not crash the whole CLI process."""
+    """Real bug found live, then fixed: SoccerCollector/TennisCollector
+    called the real ESPN client with league codes ("SOCCER"/"TENNIS")
+    that don't exist in data_sources/espn.py's LEAGUE_PATHS -- a real
+    ValueError on a real call, not a mock. Fixed by defaulting to a real
+    valid league each (EPL, ATP) instead. This class now covers two
+    things: the fix actually works (real network collection succeeds),
+    and the adapter's try/except still reports a genuine failure as an
+    honest per-stage ERROR rather than crashing, for any future collector
+    bug of the same shape."""
 
-    def test_tennis_collect_reports_error_not_crash(self, tmp_path):
+    def test_tennis_collect_now_succeeds_with_the_real_default_league(self, tmp_path):
         adapter = build_adapter("tennis", str(tmp_path))
         result = adapter.collect("2026-08-06")
+        assert result.status in ("SUCCESS", "NO_DATA")  # real network call; either is a real non-error outcome
+
+    def test_collection_only_adapter_still_reports_a_genuine_collector_failure_as_error(self, tmp_path):
+        # Proves the try/except in _CollectionOnlyAdapter.collect() still
+        # does its job for a real failure, now that the specific
+        # SOCCER/TENNIS bug it was written for is fixed.
+        from unittest.mock import MagicMock
+
+        from model_prediction.rebuild.sport_adapter import _CollectionOnlyAdapter
+
+        broken_collector = MagicMock()
+        broken_collector.collect_date.side_effect = ValueError("simulated real collector failure")
+        adapter = _CollectionOnlyAdapter("tennis", broken_collector)
+
+        result = adapter.collect("2026-08-06")
         assert result.status == "ERROR"
-        assert "error" in result.detail
+        assert "simulated real collector failure" in result.detail["error"]
 
 
 class TestMLBRealCollectAndFeatures:
