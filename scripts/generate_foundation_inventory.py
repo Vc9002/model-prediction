@@ -183,8 +183,11 @@ def main() -> None:
     # script for the real 2026-08-06 slate, and idempotent on rerun (64
     # trade_decisions before and after). Still PARTIAL, not VERIFIED:
     # every sport besides MLB is collect-only through this same interface
-    # (predict/match_markets/decide correctly NOT_IMPLEMENTED for them),
-    # and mlb_shadow_run.py itself has not been retired/reduced to a thin
+    # (predict/match_markets/decide correctly NOT_IMPLEMENTED for them);
+    # esports is now registered too but its collector is an honest stub
+    # (collect() correctly reports NOT_IMPLEMENTED, not a fabricated
+    # SUCCESS); KBO/NPB still correctly raise (no collector exists); and
+    # mlb_shadow_run.py itself has not been retired/reduced to a thin
     # wrapper -- both real code paths still exist side by side.
     cli_path = REPO_ROOT / "scripts/rebuild_shadow_cli.py"
     pipeline_path = REPO_ROOT / "src/model_prediction/rebuild/mlb_shadow_pipeline.py"
@@ -221,7 +224,7 @@ def main() -> None:
         "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained). Deliberately deferred to the model-development phase, not foundation work.",
         "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck for the model-development phase.",
         "This script can't verify CI over the network (no gh CLI installed, generation must stay a pure code-derived check) -- CI was manually verified green via the public GitHub API 7 consecutive times this session (commits 184558c, 25f1924, 9e741f9, b6534f2, cd22964, 1a5c6dc, 07bd438), after finding and fixing: ci.yml's Ruff step running full-repo with no continue-on-error against ~190 pre-existing legacy findings (CI had never been green on any prior head either); and a real staging mistake (ruff --fix'd files never git added) that made local runs look clean while a genuinely fresh clone still failed. Also ran a fully genuine fresh-clone reproduction from origin (not a local copy) this session: fresh venv, pip install -e '.[dev]', import, rebuild-scoped ruff/mypy, full pytest (949 passed), and a real cold shared-CLI smoke run against an empty data_root -- all passed. ci_attached_to_current_head stays UNVERIFIED in this generated table on principle -- confirm manually for whatever HEAD is current when reading this.",
-        "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing. Real collection AND canonical identity resolution now work for all 5 of nba/wnba/nfl/soccer/tennis (live-verified against real ESPN data) but a foundation gate requires identity+features+predict+markets+decide+persistence+coverage together, not collection+identity alone. esports has an existing honest stub collector not yet registered in the shared adapter; KBO/NPB have no real collector or data source client anywhere in this codebase.",
+        "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing. Real collection AND canonical identity resolution now work for all 5 of nba/wnba/nfl/soccer/tennis (live-verified against real ESPN data) but a foundation gate requires identity+features+predict+markets+decide+persistence+coverage together, not collection+identity alone. esports is now registered in build_adapter()/SUPPORTED_SPORTS, wrapping its existing honest stub collector (collect() reports NOT_IMPLEMENTED, not a fabricated result) rather than newly building real BO3/OpenDota integration. KBO/NPB still have no real collector or data source client anywhere in this codebase — genuinely new engineering, not yet begun.",
         "MLB model held-out evaluation remains genuinely inconclusive on ~20-25 games — more real backfill days is the only way to resolve this, not further feature engineering. Deliberately not attempted this session per explicit instruction to finish the shared foundation first.",
     ]
 

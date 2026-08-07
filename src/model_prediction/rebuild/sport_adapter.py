@@ -8,7 +8,11 @@ Honest scope, not fabricated:
 
 - `collect()`: real for all 5 sports with a real collector (MLB, NBA/WNBA,
   NFL, Soccer, Tennis) -- reuses the exact same Collector classes
-  scripts/mlb_shadow_run.py and the test suite already exercise.
+  scripts/mlb_shadow_run.py and the test suite already exercise. Esports
+  is registered too, but its collector is an honest stub (no real BO3/
+  OpenDota network integration yet), so collect() reports
+  NOT_IMPLEMENTED rather than SUCCESS. KBO/NPB have no collector at all
+  and correctly raise from build_adapter().
 - `build_features()`: real for MLB only (horizon_builder.py, itself real
   and live-verified). Every other sport correctly reports NOT_IMPLEMENTED
   rather than fabricating a feature row.
@@ -30,6 +34,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from .collectors import (
+    EsportsCollector,
     MLBCollector,
     NBACollector,
     NFLCollector,
@@ -229,6 +234,32 @@ class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
         return StageResult("collect", status_map.get(result.get("status"), STAGE_ERROR), result)
 
 
+class _EsportsStubAdapter(_NotImplementedStagesMixin):
+    """Esports has a real, honest stub collector (EsportsCollector.
+    collect_date() itself returns status="stub" -- "BO3/OpenDota
+    integration pending" -- it does not call any real network source
+    yet). Registered here so the shared CLI can route to esports without
+    a KeyError, while collect() still reports the honest
+    STAGE_NOT_IMPLEMENTED outcome rather than fabricating SUCCESS for a
+    call that did no real collection. This does not create the missing
+    capability -- it makes the existing gap visible through the same
+    interface every other sport uses."""
+
+    sport = "esports"
+
+    def __init__(self, data_root: str, meta: Any) -> None:
+        self.collector = EsportsCollector(data_root, meta)
+
+    def collect(self, date: str, run_id: str | None = None) -> StageResult:
+        # title is a real, required parameter of the per-title esports
+        # collector (e.g. "cs2"/"dota2"/"lol") that this single-sport-per-
+        # call CLI interface has no slot for yet -- passed as an explicit
+        # placeholder so the real stub code path still runs and its own
+        # honest status governs the result below.
+        result = self.collector.collect_date(date, title="unspecified")
+        return StageResult("collect", STAGE_NOT_IMPLEMENTED, result)
+
+
 def build_adapter(sport: str, data_root: str = "data/rebuild") -> SportAdapter:
     """The one real registry every sport plugs into."""
     if sport == "mlb":
@@ -243,11 +274,14 @@ def build_adapter(sport: str, data_root: str = "data/rebuild") -> SportAdapter:
         return _CollectionOnlyAdapter(sport, SoccerCollector(data_root, meta))
     if sport == "tennis":
         return _CollectionOnlyAdapter(sport, TennisCollector(data_root, meta))
+    if sport == "esports":
+        return _EsportsStubAdapter(data_root, meta)
 
     raise ValueError(
         f"no adapter registered for sport={sport!r} -- "
-        f"esports/kbo/npb correctly have no real collector wired here yet"
+        f"kbo/npb correctly have no real collector or data source client "
+        f"anywhere in this codebase yet"
     )
 
 
-SUPPORTED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis")
+SUPPORTED_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis", "esports")

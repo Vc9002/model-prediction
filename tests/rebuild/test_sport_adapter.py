@@ -22,7 +22,18 @@ class TestBuildAdapter:
 
     def test_unsupported_sport_fails_closed_not_a_guess(self, tmp_path):
         with pytest.raises(ValueError, match="no adapter registered"):
-            build_adapter("esports", str(tmp_path))
+            build_adapter("kbo", str(tmp_path))
+
+    def test_esports_collect_calls_the_real_stub_and_reports_it_honestly(self, tmp_path):
+        # EsportsCollector.collect_date() is a real, honest stub (returns
+        # status="stub", does no real network call) -- the adapter must
+        # not fabricate SUCCESS for it. Proves the real stub was actually
+        # called (not skipped) by checking its own real response note
+        # survives into the StageResult.
+        adapter = build_adapter("esports", str(tmp_path))
+        result = adapter.collect("2026-08-06")
+        assert result.status == STAGE_NOT_IMPLEMENTED
+        assert result.detail.get("status") == "stub"
 
 
 class TestHonestNotImplementedStages:
