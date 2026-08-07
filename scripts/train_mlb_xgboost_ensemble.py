@@ -85,15 +85,21 @@ def main() -> None:
         print("Not enough matched games to compare model families meaningfully (need >=30). Stopping honestly.")
         sys.exit(0)
 
-    n = features.height
-    # Same fold shape as train_mlb_rebuild_real_features.py -- real,
-    # already-validated chronological fold definitions, not re-derived
-    # differently here.
-    folds = expanding_folds(
-        features["event_start_utc"].to_list(), n_splits=3,
-        val_size=max(10, n // 6), test_size=max(15, n // 5),
-    )
-    print(f"2. Chronological folds: {len(folds)}")
+    # Task 8 fix: same real date-cluster-safe fold shape as
+    # train_mlb_rebuild_real_features.py -- sized in real distinct
+    # calendar dates, not game count, so no real calendar date's games
+    # can land on opposite sides of a fold boundary. Kept textually
+    # identical to that script's own fold construction (not imported as a
+    # shared helper) since both build folds from the same real feature
+    # table independently and must agree by construction, not by a
+    # runtime dependency between the two scripts.
+    game_dates = features["game_date"].to_list()
+    n_unique_dates = len(set(game_dates))
+    val_size_days = max(1, n_unique_dates // 6)
+    test_size_days = max(1, n_unique_dates // 6)
+    folds = expanding_folds(game_dates, n_splits=3, val_size=val_size_days, test_size=test_size_days, gap=1)
+    print(f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
+          f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)")
 
     two_head_oof: list[float] = []
     xgb_oof: list[float] = []
@@ -101,9 +107,9 @@ def main() -> None:
     per_fold_report = []
 
     for fold in folds:
-        train_df = features.filter(pl.col("event_start_utc") <= fold.train_end)
+        train_df = features.filter(pl.col("game_date") <= fold.train_end)
         val_df = features.filter(
-            (pl.col("event_start_utc") >= fold.val_start) & (pl.col("event_start_utc") <= fold.val_end)
+            (pl.col("game_date") >= fold.val_start) & (pl.col("game_date") <= fold.val_end)
         )
         if train_df.height < 10 or val_df.height < 3:
             continue

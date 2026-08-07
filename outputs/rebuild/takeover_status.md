@@ -1860,3 +1860,71 @@ stacker but not yet a fully unbiased claim about the ensemble's own
 value, per this phase's own distinction). Given the honest
 `xgboost=1.0` collapse just observed, Task 10 is lower-priority now: the
 stacker already isn't being relied on.
+
+### Task 8 — folds and the final split rebuilt on complete event dates
+
+**Real bug confirmed by reading the code**: both real training scripts
+built their chronological folds by passing full `event_start_utc`
+timestamps into `expanding_folds()` -- near-per-game granularity, a
+deliberate prior workaround (calendar-day granularity alone collapsed
+the small real dataset into too few unique buckets and produced 0
+folds). But `expanding_folds()` treats each unique value in its `dates`
+argument as one indivisible partition unit, so per-timestamp granularity
+meant a fold boundary could fall *between* two real games on the
+identical calendar date -- exactly the same-day contamination CLAUDE.md's
+Part 2 SS2 requires folds to prevent. **A second, more consequential
+instance of the identical bug**: `train_mlb_rebuild_real_features.py`'s
+separate final train/calibration/test split sliced the sorted feature
+table by real game *count* (`features[n - test_size:]`), with the same
+same-day-contamination exposure -- and this is the exact split whose
+boundaries get written into `test_consumption_registry.json` as the
+official consumed final test.
+
+**Fixed**: added `date_cluster_split()` (`validation.py`) -- splits real
+calendar dates into (train, calib, test) clusters, never splitting a
+single date's games across buckets; returns dates only, so the caller
+re-joins them against its feature table and every game sharing a
+selected date moves together. Both training scripts now build folds from
+real `game_date` values (not `event_start_utc` timestamps), sized as a
+real fraction of the distinct dates available (not game count), with a
+real 1-day embargo; `train_mlb_rebuild_real_features.py`'s final split
+now uses `date_cluster_split()` instead of positional game-count
+slicing. Fold construction is kept textually identical between the two
+training scripts (not extracted into a shared helper) since each builds
+folds independently from its own copy of the same real feature table and
+must agree by construction.
+
+**Live-verified two ways**: (1) ran the real (registry-safe)
+`train_mlb_xgboost_ensemble.py` end to end -- 3 real folds from 15 real
+distinct dates (`val=2d test=2d gap=1d`), no crash, real predictive
+numbers (XGBoost OOF log loss 0.7469 vs. two-head control's 1.0169,
+ensemble weight now 0.964 xgboost / 0.036 two-head -- a real, slightly
+different picture from the near-per-game-granularity run, since exactly
+which games land in each fold changed). (2) Since
+`train_mlb_rebuild_real_features.py` itself must not be run live (it
+writes to `test_consumption_registry.json`), independently replicated
+its exact new fold/split logic in an isolated, read-only snippet against
+the real dataset and asserted the actual invariant directly: **zero
+calendar-date overlap between train and validation in any of the 3 real
+folds, and zero cross-bucket date overlap in the final
+train(11 dates)/calib(2 dates)/test(2 dates) split** -- not just "the
+code looks right," a real assertion against real data. The replicated
+per-fold log-loss values (0.777/1.440/0.756) matched the standalone
+XGBoost script's own two-head numbers exactly, a real cross-check that
+both scripts' now-identical fold construction actually produces
+identical folds.
+
+**Tests**: `tests/test_rebuild.py::TestDateClusterSplit` (5 tests: no
+cross-bucket date splitting with several real games per date,
+chronologically-last test dates, zero-calibration-size handling, honest
+under-sizing when too few real dates exist, duplicate-date
+deduplication).
+
+**1144 tests pass** (up from 1139), 1 skipped. `ruff check` clean.
+
+**Not done, disclosed**: `outputs/rebuild/mlb_split_manifest.json`
+persistence itself (CLAUDE.md's "persist a split manifest" requirement)
+was already real and working before this fix (`build_split_manifest()`,
+wired into `train_mlb_rebuild_real_features.py`) -- this task fixed the
+*granularity* of what goes into it, not its persistence, which was
+already correct.

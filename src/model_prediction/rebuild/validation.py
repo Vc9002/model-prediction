@@ -112,6 +112,41 @@ def rolling_folds(
     return folds
 
 
+def date_cluster_split(
+    dates: Sequence[str], test_size: int, calib_size: int = 0,
+) -> tuple[list[str], list[str], list[str]]:
+    """Split real calendar dates into (train_dates, calib_dates, test_dates)
+    -- never splits a single date's games across buckets.
+
+    Real bug this closes (see outputs/rebuild/takeover_status.md Task 8):
+    the actual final-test split in train_mlb_rebuild_real_features.py
+    sliced the sorted feature table by a game *count*
+    (`features[n - test_size:]`), not by real calendar date. Two games on
+    the identical calendar date can land on opposite sides of that
+    positional cut -- exactly the "same-day contamination" CLAUDE.md's
+    own Part 2 SS2 names as the reason folds must be grouped by complete
+    event dates: "No game on the same calendar date may be placed in
+    training while another game from that date is in outer validation."
+    This applies the same real invariant to the final train/calibration/
+    test split, not just the cross-validation folds expanding_folds()
+    already handles.
+
+    Returns real dates only -- the caller re-joins them against its own
+    feature table (e.g. `pl.col("game_date").is_in(test_dates)`), so
+    every game sharing a selected date moves together as one indivisible
+    cluster. If there aren't enough real distinct dates for the requested
+    sizes, returns everything as train and empty calib/test lists --
+    honest under-sizing, never a fabricated split."""
+    unique_dates = sorted(set(dates))
+    if len(unique_dates) < test_size + calib_size + 1:
+        return unique_dates, [], []
+    test_dates = unique_dates[-test_size:] if test_size > 0 else []
+    remaining = unique_dates[: len(unique_dates) - test_size]
+    calib_dates = remaining[-calib_size:] if calib_size > 0 else []
+    train_dates = remaining[: len(remaining) - calib_size] if calib_size > 0 else remaining
+    return train_dates, calib_dates, test_dates
+
+
 def build_split_manifest(
     sport: str,
     horizon: str,

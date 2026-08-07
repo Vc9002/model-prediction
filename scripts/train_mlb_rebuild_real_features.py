@@ -36,6 +36,7 @@ from model_prediction.rebuild.models import MLBTwoHeadModel
 from model_prediction.rebuild.validation import (
     brier_score,
     build_split_manifest,
+    date_cluster_split,
     ece,
     expanding_folds,
     log_loss,
@@ -84,24 +85,35 @@ def main() -> None:
         print("Not enough matched games to train meaningfully (need >=30). Stopping honestly, not faking a result.")
         sys.exit(0)
 
-    # expanding_folds() dedupes on its `dates` argument (sorted(set(dates))),
-    # so passing the calendar-day game_date collapses 173 games into only
-    # ~10 unique values here — too coarse for val_size/test_size sized in
-    # days against this small a real dataset (this genuinely produced 0
-    # folds on the first run). Passing the full event_start_utc timestamp
-    # instead keeps chronological order but gives near-per-game granularity,
-    # matching what pipeline_mlb_e2e.py already did for the same reason.
+    # Task 8 fix (see outputs/rebuild/takeover_status.md): this used to pass
+    # the full event_start_utc timestamp (near-per-game granularity)
+    # because passing the calendar-day game_date alone made val_size/
+    # test_size (sized in games, not real days) too coarse and produced 0
+    # folds. That was real, but it means two games on the identical
+    # calendar date could land on opposite sides of a fold boundary --
+    # exactly the same-day contamination CLAUDE.md's Part 2 SS2 requires
+    # folds to prevent ("No game on the same calendar date may be placed
+    # in training while another game from that date is in outer
+    # validation"). Fixed by sizing val_size/test_size in real *date*
+    # units (a fraction of the real distinct dates available), not game
+    # count -- expanding_folds() already treats each unique value in its
+    # `dates` argument as one indivisible cluster; passing real calendar
+    # dates now makes that cluster a real calendar date, not a fold
+    # boundary that can fall between two same-day games.
     features = features.sort("event_start_utc")
-    dates = features["event_start_utc"].to_list()
-    n = features.height
-    folds = expanding_folds(dates, n_splits=3, val_size=max(10, n // 6), test_size=max(15, n // 5))
-    print(f"4. Chronological folds: {len(folds)}")
+    game_dates = features["game_date"].to_list()
+    n_unique_dates = len(set(game_dates))
+    val_size_days = max(1, n_unique_dates // 6)
+    test_size_days = max(1, n_unique_dates // 6)
+    folds = expanding_folds(game_dates, n_splits=3, val_size=val_size_days, test_size=test_size_days, gap=1)
+    print(f"4. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
+          f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)")
 
     fold_metrics = []
     for fold in folds:
-        train_df = features.filter(pl.col("event_start_utc") <= fold.train_end)
+        train_df = features.filter(pl.col("game_date") <= fold.train_end)
         val_df = features.filter(
-            (pl.col("event_start_utc") >= fold.val_start) & (pl.col("event_start_utc") <= fold.val_end)
+            (pl.col("game_date") >= fold.val_start) & (pl.col("game_date") <= fold.val_end)
         )
         if train_df.height < 10 or val_df.height < 3:
             continue
@@ -135,13 +147,24 @@ def main() -> None:
     # favorably. A genuinely untouched final test needs its own separate
     # chunk that neither the model nor the calibrator ever sees before the
     # single final evaluation below.
-    test_size = max(10, n // 6)
-    calib_size = max(10, n // 6)
-    train_final = features[: n - test_size - calib_size]
-    calib_final = features[n - test_size - calib_size: n - test_size]
-    test_final = features[n - test_size:]
-    print(f"5b. Split: train={train_final.height}, calibration={calib_final.height} "
-          f"(fits Platt only), test={test_final.height} (untouched until final evaluation)")
+    #
+    # Task 8 fix: this previously sliced by real game *count*
+    # (`features[n - test_size:]`), the identical same-day-contamination
+    # bug the fold construction above had -- two games sharing the
+    # identical calendar date could land in different buckets.
+    # date_cluster_split() makes every one of a selected date's real
+    # games move together as one indivisible cluster.
+    test_size_dates = max(1, n_unique_dates // 6)
+    calib_size_dates = max(1, n_unique_dates // 6)
+    train_dates, calib_dates, test_dates = date_cluster_split(
+        game_dates, test_size=test_size_dates, calib_size=calib_size_dates,
+    )
+    train_final = features.filter(pl.col("game_date").is_in(train_dates))
+    calib_final = features.filter(pl.col("game_date").is_in(calib_dates))
+    test_final = features.filter(pl.col("game_date").is_in(test_dates))
+    print(f"5b. Split: train={train_final.height} ({len(train_dates)} dates), "
+          f"calibration={calib_final.height} ({len(calib_dates)} dates, fits Platt only), "
+          f"test={test_final.height} ({len(test_dates)} dates, untouched until final evaluation)")
 
     final_model = MLBTwoHeadModel(seed=42)
     final_model.fit(train_final, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)

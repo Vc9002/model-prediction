@@ -24,7 +24,7 @@ from model_prediction.rebuild import (
 from model_prediction.rebuild.validation import (
     expanding_folds, rolling_folds, log_loss, brier_score, ece,
     calibration_curve, date_cluster_bootstrap, team_cluster_bootstrap,
-    build_split_manifest, ChronologicalFold,
+    build_split_manifest, date_cluster_split, ChronologicalFold,
 )
 from model_prediction.rebuild.missingness import (
     FeatureRecord, MissingnessReport, compute_missingness_report,
@@ -322,6 +322,52 @@ class TestBuildSplitManifest:
         assert len(manifest["folds"]) == len(folds)
         for entry in manifest["folds"]:
             assert entry["train_start"] <= entry["train_end"] < entry["validation_start"] <= entry["validation_end"]
+
+
+class TestDateClusterSplit:
+    """Task 8: real fix for a same-day-contamination bug in the actual
+    final-test split (train_mlb_rebuild_real_features.py sliced by game
+    *count*, not real calendar date -- two games on the identical date
+    could land in different buckets)."""
+
+    def test_never_splits_a_single_dates_games_across_buckets(self):
+        # Real shape: several games share each of a handful of real dates.
+        dates = (
+            ["2026-08-01"] * 5 + ["2026-08-02"] * 3 + ["2026-08-03"] * 4
+            + ["2026-08-04"] * 2 + ["2026-08-05"] * 6
+        )
+        train_dates, calib_dates, test_dates = date_cluster_split(dates, test_size=1, calib_size=1)
+
+        assert set(train_dates) & set(calib_dates) == set()
+        assert set(calib_dates) & set(test_dates) == set()
+        assert set(train_dates) & set(test_dates) == set()
+        assert test_dates == ["2026-08-05"]
+        assert calib_dates == ["2026-08-04"]
+        assert train_dates == ["2026-08-01", "2026-08-02", "2026-08-03"]
+
+    def test_test_dates_are_chronologically_last(self):
+        dates = [f"2026-08-{d:02d}" for d in range(1, 11)]
+        _, _, test_dates = date_cluster_split(dates, test_size=3)
+        assert test_dates == ["2026-08-08", "2026-08-09", "2026-08-10"]
+
+    def test_zero_calib_size_produces_no_calibration_dates(self):
+        dates = [f"2026-08-{d:02d}" for d in range(1, 11)]
+        train_dates, calib_dates, _test_dates = date_cluster_split(dates, test_size=2, calib_size=0)
+        assert calib_dates == []
+        assert len(train_dates) == 8
+
+    def test_not_enough_real_dates_returns_everything_as_train_not_a_fabricated_split(self):
+        dates = ["2026-08-01", "2026-08-02"]
+        train_dates, calib_dates, test_dates = date_cluster_split(dates, test_size=5, calib_size=5)
+        assert train_dates == ["2026-08-01", "2026-08-02"]
+        assert calib_dates == []
+        assert test_dates == []
+
+    def test_duplicate_dates_are_deduplicated(self):
+        dates = ["2026-08-01", "2026-08-01", "2026-08-02", "2026-08-02", "2026-08-03"]
+        train_dates, _calib_dates, test_dates = date_cluster_split(dates, test_size=1)
+        assert test_dates == ["2026-08-03"]
+        assert train_dates == ["2026-08-01", "2026-08-02"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
