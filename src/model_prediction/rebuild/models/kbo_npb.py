@@ -7,7 +7,7 @@ League-specific starter/lineup/bullpen score model. Count model calibrated separ
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -48,7 +48,7 @@ class KBONPBModel:
     """
 
     # League constants — empirically estimated, not copied from MLB
-    LEAGUE_PARAMS = {
+    LEAGUE_PARAMS: ClassVar[dict[str, dict[str, float]]] = {
         "kbo": {"runs_per_game": 9.5, "tie_rate": 0.02, "home_advantage": 0.04, "max_innings": 12},
         "npb": {"runs_per_game": 7.5, "tie_rate": 0.03, "home_advantage": 0.03, "max_innings": 12},
     }

@@ -6,7 +6,6 @@ The stacker sees only out-of-fold predictions, never training predictions.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 import numpy as np
 from scipy.optimize import minimize
@@ -38,7 +37,7 @@ def inverse_log_loss_weights(
     """
     arr = np.array(prob_matrices)
     eps = 1e-6
-    n_models, n_samples = arr.shape
+    n_models = arr.shape[0]
     losses = np.zeros(n_models)
     for i in range(n_models):
         probs = np.clip(arr[i], eps, 1 - eps)
@@ -61,7 +60,7 @@ def logistic_stacking(
     Weights are constrained to be nonnegative and sum to 1.
     """
     arr = np.array(prob_matrices)  # (n_models, n_samples)
-    n_models, n_samples = arr.shape
+    n_models = arr.shape[0]
     yt = np.array(y_true)
 
     # Stack on logits
@@ -104,7 +103,6 @@ class Ensemble:
 
     def add_model(self, name: str, oof_probs: Sequence[float]) -> None:
         """Register a model's out-of-fold predictions. Not used during predict."""
-        pass
 
     def fit(
         self, oof_probs: dict[str, Sequence[float]], y_true: Sequence[int],

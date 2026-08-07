@@ -6,15 +6,12 @@ correlation-aware exposure limits, stress testing, and health state monitoring.
 
 from __future__ import annotations
 
-import math
-from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
-
 
 # ── Position Sizing ──────────────────────────────────────────────────────────
 
@@ -52,13 +49,14 @@ def edge_scaled_units(
     model_prob: float,
     conservative_prob: float,
     best_ask: float,
-    limits: SizeLimits = SizeLimits(),
+    limits: SizeLimits | None = None,
 ) -> dict[str, float]:
     """Size a trade from the model edge and conservative probability.
 
     Enforces depth, quote age, and exposure caps from SizeLimits.
     Returns 0 units if any constraint is violated.
     """
+    limits = limits if limits is not None else SizeLimits()
     if best_ask <= 0 or best_ask >= 1:
         return {"units": 0.0, "reason": "invalid_ask"}
 
@@ -107,9 +105,10 @@ class Exposure:
         team: str,
         event_id: str,
         units: float,
-        limits: SizeLimits = SizeLimits(),
+        limits: SizeLimits | None = None,
     ) -> tuple[bool, str]:
         """Check if adding `units` to this position would violate any limit."""
+        limits = limits if limits is not None else SizeLimits()
         if self.daily_total + units > limits.max_daily_total:
             return False, "daily_total"
         if self.sport_daily.get(sport, 0) + units > limits.max_sport_daily:

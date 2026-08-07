@@ -2,7 +2,7 @@
   "date": "2026-08-06",
   "model_train_games": 126,
   "no_real_order_submitted": true,
-  "shadow_ledger_run_id": "mlb_shadow_1f3bb18e7a0c",
+  "shadow_ledger_run_id": "mlb_shadow_43c3a4fbacd3",
   "shadow_ledger_db": "data/rebuild/shadow.db",
   "predictions_recorded": 0,
   "trade_decisions_recorded": 0,

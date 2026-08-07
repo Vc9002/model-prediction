@@ -11,14 +11,13 @@ coverage loss, acts mainly as a missingness proxy, or cannot be reproduced live.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
-import numpy as np
 import polars as pl
 
-from .validation import log_loss, brier_score, ece
+from .validation import brier_score, ece, log_loss
 
 
 @dataclass
@@ -113,7 +112,7 @@ class FeatureAblationRunner:
             all_features = [f for g in self.groups for f in g.features]
 
         # Baseline: all features
-        baseline = self._evaluate(data, target_col, all_features, train_fn, predict_fn)
+        baseline = self._evaluate(data, target_col, all_features, train_fn, predict_fn, date_col)
         self.results = []
 
         for group in self.groups:
@@ -121,7 +120,7 @@ class FeatureAblationRunner:
             if len(ablated_features) == len(all_features):
                 continue  # group features not in data
 
-            ablated = self._evaluate(data, target_col, ablated_features, train_fn, predict_fn)
+            ablated = self._evaluate(data, target_col, ablated_features, train_fn, predict_fn, date_col)
 
             # Coverage impact: how many rows lose all features?
             coverage = self._coverage(data, group.features)
@@ -157,10 +156,11 @@ class FeatureAblationRunner:
         train_fn: Callable,
         predict_fn: Callable,
         top_n: int = 5,
+        date_col: str = "game_date",
     ) -> list[AblationResult]:
         """Add groups one at a time in order of isolated importance, measure cumulative gain."""
         if not self.results:
-            self.run_isolated(data, target_col, train_fn, predict_fn)
+            self.run_isolated(data, target_col, train_fn, predict_fn, date_col)
 
         # Sort by delta (most important first — largest degradation when removed)
         sorted_groups = sorted(self.results, key=lambda r: r.delta_log_loss, reverse=True)[:top_n]
@@ -168,12 +168,12 @@ class FeatureAblationRunner:
         features: list[str] = []
 
         # Baseline: no features
-        baseline = self._evaluate(data, target_col, [], train_fn, predict_fn)
+        baseline = self._evaluate(data, target_col, [], train_fn, predict_fn, date_col)
 
         for ar in sorted_groups:
             group = next(g for g in self.groups if g.name == ar.group)
             features.extend(group.features)
-            result = self._evaluate(data, target_col, features, train_fn, predict_fn)
+            result = self._evaluate(data, target_col, features, train_fn, predict_fn, date_col)
             cumulative.append(AblationResult(
                 group=f"cumulative_{group.name}",
                 baseline_log_loss=baseline["log_loss"],
@@ -192,7 +192,7 @@ class FeatureAblationRunner:
 
     def _evaluate(
         self, data: pl.DataFrame, target_col: str, features: list[str],
-        train_fn: Callable, predict_fn: Callable,
+        train_fn: Callable, predict_fn: Callable, date_col: str = "game_date",
     ) -> dict[str, float]:
         """Train on chronological first half, evaluate on second half.
 
@@ -235,7 +235,7 @@ class FeatureAblationRunner:
             return {"log_loss": log_loss(y_test.tolist(), probs),
                     "brier": brier_score(y_test.tolist(), probs),
                     "ece": ece(y_test.tolist(), probs)}
-        except Exception:
+        except Exception:  # noqa: BLE001 -- train_fn/predict_fn are caller-supplied callables that can raise anything; falls back to a disclosed coin-flip result, not silently swallowed
             y_test = test_df[target_col].to_list()
             return {"log_loss": log_loss(y_test, [0.5]*len(y_test)),
                     "brier": brier_score(y_test, [0.5]*len(y_test)),

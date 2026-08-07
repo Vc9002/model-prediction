@@ -6,13 +6,10 @@ Stored as separately hashed, mutually bound artifacts with base model hash.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Protocol
+from typing import ClassVar, Protocol
 
 import numpy as np
 from sklearn.isotonic import IsotonicRegression
@@ -47,7 +44,7 @@ class Calibrator(Protocol):
 
 class IdentityCalibrator:
     method = "identity"
-    parameters: dict[str, float] = {}
+    parameters: ClassVar[dict[str, float]] = {}
 
     def fit(self, y_prob: Sequence[float], y_true: Sequence[int]) -> IdentityCalibrator:
         return self

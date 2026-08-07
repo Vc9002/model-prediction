@@ -7,6 +7,7 @@ silently authorize one — low-confidence matches fail closed.
 from __future__ import annotations
 
 import re
+import sqlite3
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -92,24 +93,31 @@ class IdentityRegistry:
     def __init__(self, metadata: Any) -> None:  # MetadataDB
         self.metadata = metadata
         self._cache: dict[str, CanonicalIdentity] = {}
-        # Load existing entities from SQLite on init
+        # Load existing entities from SQLite on init. Real gap fixed here:
+        # this used to catch `Exception` and silently `pass`, which would
+        # mask a genuine bug (a real schema mismatch, a corrupted row, a
+        # bad attributes_json blob) exactly as silently as the "table
+        # doesn't exist yet on a fresh MetadataDB" case it was meant for —
+        # the same silent-failure pattern found and fixed repeatedly
+        # elsewhere in this codebase this session. Narrowed to the one
+        # real expected case; anything else now surfaces.
         try:
             rows = self.metadata.conn.execute(
                 "SELECT entity_id, entity_type, canonical_name, sport, effective_from_utc, effective_to_utc, attributes_json FROM entities"
             ).fetchall()
-            for row in rows:
-                eid = row["entity_id"]
-                self._cache[eid] = CanonicalIdentity(
-                    entity_id=eid,
-                    entity_type=row["entity_type"],
-                    canonical_name=row["canonical_name"],
-                    sport=row["sport"],
-                    effective_from_utc=row["effective_from_utc"],
-                    effective_to_utc=row["effective_to_utc"],
-                    attributes=json_loads_safe(row["attributes_json"]),
-                )
-        except Exception:
-            pass  # metadata may not have entities table yet
+        except sqlite3.OperationalError:
+            rows = []  # fresh MetadataDB — entities table not created yet
+        for row in rows:
+            eid = row["entity_id"]
+            self._cache[eid] = CanonicalIdentity(
+                entity_id=eid,
+                entity_type=row["entity_type"],
+                canonical_name=row["canonical_name"],
+                sport=row["sport"],
+                effective_from_utc=row["effective_from_utc"],
+                effective_to_utc=row["effective_to_utc"],
+                attributes=json_loads_safe(row["attributes_json"]),
+            )
 
     # ── registration ──────────────────────────────────────────────────
 

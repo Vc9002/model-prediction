@@ -117,8 +117,6 @@ class DynamicDixonColes:
         low_score = sum(1 for m in matches if m["home_goals"] <= 1 and m["away_goals"] <= 1)
         if low_score > 0:
             obs_00 = sum(1 for m in matches if m["home_goals"] == 0 and m["away_goals"] == 0) / low_score
-            obs_01 = sum(1 for m in matches if m["home_goals"] == 0 and m["away_goals"] == 1) / low_score
-            obs_10 = sum(1 for m in matches if m["home_goals"] == 1 and m["away_goals"] == 0) / low_score
             obs_11 = sum(1 for m in matches if m["home_goals"] == 1 and m["away_goals"] == 1) / low_score
             # rho estimate from 0-0 and 1-1 cell discrepancies
             avg_home_rate = self.home_boost * np.mean([self.attack[m["home"]] * self.defense[m["away"]] for m in matches])

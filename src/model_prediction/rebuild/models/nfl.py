@@ -8,11 +8,11 @@ for robust win probability.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
-from sklearn.linear_model import Ridge
 from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 
 
@@ -38,9 +38,9 @@ class NFLPrediction:
 class NFLModel:
     """NFL model: expected drives → drive outcome distribution → coherent scores."""
 
-    DRIVE_OUTCOMES = ["no_score", "field_goal", "touchdown", "safety"]
-    OUTCOME_POINTS = {"no_score": 0, "field_goal": 3, "touchdown": 7, "safety": 2}
-    BASE_PROBS = {"no_score": 0.65, "field_goal": 0.12, "touchdown": 0.21, "safety": 0.02}
+    DRIVE_OUTCOMES: ClassVar[list[str]] = ["no_score", "field_goal", "touchdown", "safety"]
+    OUTCOME_POINTS: ClassVar[dict[str, int]] = {"no_score": 0, "field_goal": 3, "touchdown": 7, "safety": 2}
+    BASE_PROBS: ClassVar[dict[str, float]] = {"no_score": 0.65, "field_goal": 0.12, "touchdown": 0.21, "safety": 0.02}
     HOME_FIELD_TD_BOOST = 0.01  # small home-field advantage on TD probability
 
     def __init__(self, seed: int = 42) -> None:

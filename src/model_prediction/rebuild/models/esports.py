@@ -9,9 +9,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
-
-import numpy as np
+from typing import Any, ClassVar
 
 
 @dataclass
@@ -82,7 +80,7 @@ class EsportsElo:
 class EsportsModel:
     """Per-title esports model: Elo prior + title-specific features."""
 
-    TITLES = ["lol", "cs2", "dota2", "valorant", "rainbow_six"]
+    TITLES: ClassVar[list[str]] = ["lol", "cs2", "dota2", "valorant", "rainbow_six"]
 
     def __init__(self, title: str) -> None:
         if title not in self.TITLES:
