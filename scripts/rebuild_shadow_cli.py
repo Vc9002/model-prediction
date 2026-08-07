@@ -27,11 +27,23 @@ from model_prediction.rebuild.sport_adapter import SUPPORTED_SPORTS, build_adapt
 STAGES = ("collect", "build_features", "predict", "match_markets", "decide")
 
 
-def run(sport: str, date: str, horizon: str, data_root: str, only_stage: str | None) -> dict:
+def run(
+    sport: str, date: str, horizon: str, data_root: str, only_stage: str | None,
+    resume_run_id: str | None = None,
+) -> dict:
     adapter = build_adapter(sport, data_root)
     ledger = ShadowLedger(f"{data_root}/shadow.db")
+    # record_run() is itself idempotent on an explicit run_id (real,
+    # tested behavior -- see shadow_ledger.py): resuming an existing run
+    # and starting a brand-new one with a caller-chosen ID both just work,
+    # no separate "does this run exist" check needed. This is the real
+    # gap CLAUDE.md's own orchestration spec called out
+    # ("--resume-run-id") -- previously every invocation always minted a
+    # fresh run_id, so a stage-only rerun (e.g. --decision-only after a
+    # --predict-only that already ran) could never continue one real
+    # lineage chain.
     run_id = ledger.record_run(sport, run_type="rebuild-shadow-cli", horizon=horizon,
-                                params={"date": date, "only_stage": only_stage})
+                                params={"date": date, "only_stage": only_stage}, run_id=resume_run_id)
 
     stages_to_run = [only_stage] if only_stage else list(STAGES)
     report: dict = {"run_id": run_id, "sport": sport, "date": date, "horizon": horizon, "stages": {}}
@@ -62,6 +74,14 @@ def main() -> None:
     parser.add_argument("--predict-only", action="store_true")
     parser.add_argument("--markets-only", action="store_true")
     parser.add_argument("--decision-only", action="store_true")
+    parser.add_argument(
+        "--resume-run-id", default=None,
+        help="Reuse this run_id instead of minting a new one (record_run() is idempotent on it). "
+             "Real, disclosed limitation: this continues the same ledger lineage row, not in-memory "
+             "state -- MLB's predict/match_markets/decide need MLBAdapter.state from an earlier stage "
+             "in the SAME process; --decision-only --resume-run-id in a fresh process still correctly "
+             "fails closed with 'predict() must run first', it does not silently skip that requirement.",
+    )
     args = parser.parse_args()
 
     only_stage = None
@@ -76,7 +96,7 @@ def main() -> None:
     elif args.decision_only:
         only_stage = "decide"
 
-    report = run(args.sport, args.date, args.horizon, args.data_root, only_stage)
+    report = run(args.sport, args.date, args.horizon, args.data_root, only_stage, args.resume_run_id)
     print(json.dumps(report, indent=2, default=str))
     print("\nNo real order adapter was imported or called by this script.")
 
