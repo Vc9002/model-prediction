@@ -7,16 +7,15 @@ NBA and WNBA trained independently with WNBA using stronger shrinkage.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from sklearn.linear_model import ElasticNet, Ridge
 from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 
 from . import JointScoreDistribution
-
 
 # ── Possessions model ────────────────────────────────────────────────────────
 

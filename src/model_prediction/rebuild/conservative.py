@@ -13,7 +13,6 @@ Apply frozen threshold once to untouched economic test. Record every trial.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 

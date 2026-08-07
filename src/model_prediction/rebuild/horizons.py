@@ -13,9 +13,7 @@ Horizons:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, UTC
 from typing import Any
-
 
 HORIZONS = ("early", "mid", "late")
 HORIZON_HOURS_BEFORE = {"early": 36, "mid": 6, "late": 0.5}

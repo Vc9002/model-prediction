@@ -6,17 +6,14 @@ One untouched final test per model family. Date-cluster and team-cluster bootstr
 
 from __future__ import annotations
 
-import json
 import math
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, UTC
 from typing import Any
 
 import numpy as np
 import polars as pl
-from sklearn.model_selection import TimeSeriesSplit
 
 # ── Fold definitions ────────────────────────────────────────────────────────
 

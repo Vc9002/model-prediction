@@ -19,7 +19,6 @@ from typing import Any
 
 import numpy as np
 
-
 MODEL_STATUSES = [
     "REJECTED",
     "RESEARCH_ONLY",
@@ -151,7 +150,7 @@ def evaluate_predictive_qualification(
     PIT violation count, calibration slope proximity, train/serve parity,
     and improvement over baseline (if provided).
     """
-    from .validation import log_loss, brier_score, ece
+    from .validation import brier_score, ece, log_loss
 
     failures: list[str] = []
     ll = log_loss(y_true, y_prob)

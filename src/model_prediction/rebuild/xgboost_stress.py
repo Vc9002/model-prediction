@@ -13,12 +13,10 @@ A system that fails under minor realistic degradation remains research-only.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-
 
 # ── XGBoost challenger ───────────────────────────────────────────────────────
 
