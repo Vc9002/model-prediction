@@ -47,7 +47,19 @@ from .mlb_market_matching import (
 )
 
 DECISION_POLICY_VERSION = "winner_first_v1"
-DECISION_MINUTES_BEFORE_START = 60
+# Real gap found and fixed live (2026-08-07): predict()/match_markets()/
+# decide() all received a real `horizon` argument from the shared CLI but
+# silently ignored it -- every call used the same fixed 60-minutes-before-
+# start decision time and hardcoded horizon="basic" in every ledger call,
+# so `--horizon early` and `--horizon late` produced byte-identical
+# results and identical ledger rows. Matches MLB's own real early=36h/
+# mid=6h/late=60m convention (mlb_shadow_pipeline.py's HORIZON_LATE
+# comment) rather than horizons.py's more general declarative spec.
+# Real, disclosed limit this doesn't change: the Elo win probability
+# itself doesn't vary by horizon (no lineup-confirmation-style features
+# exist for these sports yet) -- only decision_time_utc (and therefore
+# which market quotes are fresh enough to evaluate) does.
+HORIZON_MINUTES_BEFORE_START = {"early": 36 * 60, "mid": 6 * 60, "late": 60}
 MIN_HISTORICAL_GAMES = 10
 UNCERTAINTY_HAIRCUT = 0.03
 
@@ -77,6 +89,7 @@ class BasicRunState:
     CLI invocation -- same real shape as MLBRunState (mlb_shadow_pipeline.py)."""
     sport: str
     target_date: str
+    horizon: str
     tonight: pl.DataFrame
     model: EloModel | None = None
     train_n: int = 0
@@ -87,10 +100,13 @@ class BasicRunState:
     skipped: dict[str, str] = field(default_factory=dict)
 
 
-def load_state(data_root: str, sport: str, target_date: str) -> BasicRunState | None:
+def load_state(data_root: str, sport: str, target_date: str, horizon: str = "late") -> BasicRunState | None:
     """Real scheduled-games load. Returns None (honest stop) when no
     scoreboard has ever been collected for this sport/data_root, or there
-    are no real scheduled games on target_date."""
+    are no real scheduled games on target_date. `horizon` fails closed to
+    a KeyError on anything outside HORIZON_MINUTES_BEFORE_START's real
+    early/mid/late keys, rather than silently falling back to a default."""
+    minutes_before_start = HORIZON_MINUTES_BEFORE_START[horizon]
     try:
         sb = pl.read_parquet(f"{data_root}/normalized/{sport}/scoreboard.parquet")
     except FileNotFoundError:
@@ -104,10 +120,12 @@ def load_state(data_root: str, sport: str, target_date: str) -> BasicRunState | 
         return None
 
     decision_times = {
-        g["event_id"]: datetime.fromisoformat(g["event_start_utc"]) - timedelta(minutes=DECISION_MINUTES_BEFORE_START)
+        g["event_id"]: datetime.fromisoformat(g["event_start_utc"]) - timedelta(minutes=minutes_before_start)
         for g in tonight.iter_rows(named=True)
     }
-    return BasicRunState(sport=sport, target_date=target_date, tonight=tonight, decision_times=decision_times)
+    return BasicRunState(
+        sport=sport, target_date=target_date, horizon=horizon, tonight=tonight, decision_times=decision_times,
+    )
 
 
 def predict_stage(state: BasicRunState, data_root: str, *, ledger: Any | None = None, run_id: str | None = None) -> dict:
@@ -133,7 +151,7 @@ def predict_stage(state: BasicRunState, data_root: str, *, ledger: Any | None = 
     if ledger is not None and run_id is not None:
         ledger.record_model_artifact(
             run_id=run_id, sport=state.sport, model_name=f"{state.sport}-elo-v1",
-            model_version="elo-v1", artifact_hash=artifact_hash, horizon="basic",
+            model_version="elo-v1", artifact_hash=artifact_hash, horizon=state.horizon,
             training_end=state.target_date,
         )
 
@@ -244,7 +262,7 @@ def decide_stage(
 
         if ledger is not None and run_id is not None:
             _, pred_created = ledger.record_prediction(
-                run_id=run_id, sport=state.sport, event_id=event_id, horizon="basic",
+                run_id=run_id, sport=state.sport, event_id=event_id, horizon=state.horizon,
                 decision_time_utc=decision_time_utc, forecast=forecast,
             )
             n_predictions_recorded += 1 if pred_created else 0
@@ -268,7 +286,7 @@ def decide_stage(
                      d.evaluated_market.team_or_side, d.evaluated_market.line)
                 ) if d.evaluated_market else None
                 _, decision_created = ledger.record_trade_decision(
-                    run_id=run_id, sport=state.sport, event_id=event_id, horizon="basic",
+                    run_id=run_id, sport=state.sport, event_id=event_id, horizon=state.horizon,
                     decision_time_utc=decision_time_utc,
                     model_artifact_hash=forecast.model_artifact_hash,
                     market_snapshot_hash=market_snapshot_hash,

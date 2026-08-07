@@ -38,6 +38,29 @@ class TestLoadState:
         assert state is not None
         assert state.tonight.height == 1
         assert "1" in state.decision_times
+        assert state.horizon == "late"  # real default
+
+    def test_horizon_changes_the_real_decision_time_not_ignored(self, tmp_path):
+        # Real bug found and fixed live (2026-08-07): predict()/decide()
+        # received a real `horizon` argument from the shared CLI but
+        # silently ignored it -- every call used the same fixed
+        # 60-minutes-before-start decision time regardless of
+        # --horizon early/mid/late.
+        _write_scoreboard(tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        late = pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="late")
+        mid = pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="mid")
+        early = pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="early")
+        assert late.decision_times["1"] != mid.decision_times["1"] != early.decision_times["1"]
+        assert early.decision_times["1"] < mid.decision_times["1"] < late.decision_times["1"]
+
+    def test_invalid_horizon_fails_closed_not_a_silent_default(self, tmp_path):
+        _write_scoreboard(tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        try:
+            pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="not_a_real_horizon")
+            raised = False
+        except KeyError:
+            raised = True
+        assert raised
 
 
 class TestPredictStage:

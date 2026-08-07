@@ -296,7 +296,7 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
         })
 
     def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
-        state = basic_pipeline.load_state(self.data_root, self.sport, date)
+        state = basic_pipeline.load_state(self.data_root, self.sport, date, horizon)
         if state is None:
             return StageResult("predict", STAGE_NO_DATA, {"reason": "no real scheduled games for this date"})
         self._state = state
