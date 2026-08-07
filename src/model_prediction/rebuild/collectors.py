@@ -566,87 +566,86 @@ class NFLCollector:
             time.sleep(self.rate_limit - elapsed)
         self._last_call = time.monotonic()
 
-    def collect_date(self, game_date: str) -> dict[str, Any]:
-        def _collect_espn(self, game_date: str) -> dict[str, Any]:
-            sport = "nfl"; source = "espn_public"
-            record_id = f"nfl_scoreboard_{game_date}"
-            self._throttle()
-            try:
-                from model_prediction.data_sources.espn import ESPNClient
-            except ImportError:
-                return {"status": "no_espn_client", "date": game_date}
-            client = ESPNClient()
-            payload = client.scoreboard("NFL", game_date)
-            snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
-            self.meta.update_source_health(source, "active")
-            events = payload.get("events", [])
-            games = []
+    def _collect_espn(self, game_date: str) -> dict[str, Any]:
+        sport = "nfl"; source = "espn_public"
+        record_id = f"nfl_scoreboard_{game_date}"
+        self._throttle()
+        try:
+            from model_prediction.data_sources.espn import ESPNClient
+        except ImportError:
+            return {"status": "no_espn_client", "date": game_date}
+        client = ESPNClient()
+        payload = client.scoreboard("NFL", game_date)
+        snapshot_hash = self.raw.write(source, game_date, record_id, payload).snapshot_hash
+        self.meta.update_source_health(source, "active")
+        events = payload.get("events", [])
+        games = []
+        for event in events:
+            comp = (event.get("competitions", [{}]) or [{}])[0]
+            competitors = comp.get("competitors", [])
+            away = home = {}
+            for c in competitors:
+                if c.get("homeAway") == "away": away = c
+                else: home = c
+            games.append({
+                **provenance_row(source, str(event.get("id", "")), "espn_public_v1",
+                                  utc_now().isoformat(), event.get("date", ""), event.get("date", ""),
+                                  raw_snapshot_hash=snapshot_hash),
+                "event_id": str(event.get("id", "")),
+                "away_team": (away.get("team", {}) or {}).get("displayName", ""),
+                "home_team": (home.get("team", {}) or {}).get("displayName", ""),
+                "away_score": int(away.get("score", 0) or 0),
+                "home_score": int(home.get("score", 0) or 0),
+                "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
+                "venue": (comp.get("venue", {}) or {}).get("fullName", ""),
+            })
+        if games:
+            self.norm.write(sport, "scoreboard", pl.DataFrame(games))
+            return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
+        return {"status": "no_games", "sport": sport, "date": game_date}
+
+    def _collect_markets(self, game_date: str) -> dict[str, Any]:
+        sport = "nfl"; source = "polymarket_us"
+        self._throttle()
+        try:
+            from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+            client = PolymarketUSClient()
+            events = client.slate("NFL", date.fromisoformat(game_date))
+            books: list[dict[str, Any]] = []
             for event in events:
-                comp = (event.get("competitions", [{}]) or [{}])[0]
-                competitors = comp.get("competitors", [])
-                away = home = {}
-                for c in competitors:
-                    if c.get("homeAway") == "away": away = c
-                    else: home = c
-                games.append({
-                    **provenance_row(source, str(event.get("id", "")), "espn_public_v1",
-                                      utc_now().isoformat(), event.get("date", ""), event.get("date", ""),
-                                      raw_snapshot_hash=snapshot_hash),
-                    "event_id": str(event.get("id", "")),
-                    "away_team": (away.get("team", {}) or {}).get("displayName", ""),
-                    "home_team": (home.get("team", {}) or {}).get("displayName", ""),
-                    "away_score": int(away.get("score", 0) or 0),
-                    "home_score": int(home.get("score", 0) or 0),
-                    "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                    "venue": (comp.get("venue", {}) or {}).get("fullName", ""),
-                })
-            if games:
-                self.norm.write(sport, "scoreboard", pl.DataFrame(games))
-                return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
-            return {"status": "no_games", "sport": sport, "date": game_date}
+                # See Checkpoint 8 in outputs/rebuild/takeover_status.md:
+                # real _normalize_event keys are event_id/market_id/
+                # market_type, with per-side prices in "sides" - the
+                # previous id/type/bestBid/bestAsk keys don't exist here.
+                event_id = str(event.get("event_id", ""))
+                for market in event.get("markets", []):
+                    market_id = str(market.get("market_id", ""))
+                    market_type = market.get("market_type", "")
+                    line = market.get("line")
+                    for side in market.get("sides", []):
+                        books.append({**provenance_row(
+                            source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                            "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
+                            event.get("event_start_utc", "")),
+                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
+                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
+                            "line": side.get("line", line),
+                            "executable_price": side.get("price_probability"),
+                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
+                            "available_depth": None})
+            if books:
+                self.markets.write_books(sport, game_date, pl.DataFrame(books))
+                return {"status": "ok", "books": len(books)}
+            return {"status": "no_markets"}
+        except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
+            return {"status": "error", "error": str(e)[:200]}
 
-        def _collect_markets(self, game_date: str) -> dict[str, Any]:
-            sport = "nfl"; source = "polymarket_us"
-            self._throttle()
-            try:
-                from model_prediction.data_sources.polymarket_us import PolymarketUSClient
-                client = PolymarketUSClient()
-                events = client.slate("NFL", date.fromisoformat(game_date))
-                books: list[dict[str, Any]] = []
-                for event in events:
-                    # See Checkpoint 8 in outputs/rebuild/takeover_status.md:
-                    # real _normalize_event keys are event_id/market_id/
-                    # market_type, with per-side prices in "sides" - the
-                    # previous id/type/bestBid/bestAsk keys don't exist here.
-                    event_id = str(event.get("event_id", ""))
-                    for market in event.get("markets", []):
-                        market_id = str(market.get("market_id", ""))
-                        market_type = market.get("market_type", "")
-                        line = market.get("line")
-                        for side in market.get("sides", []):
-                            books.append({**provenance_row(
-                                source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
-                                "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
-                                event.get("event_start_utc", "")),
-                                "event_id": event_id, "market_id": market_id, "market_type": market_type,
-                                "team_or_side": side.get("selection", ""), "team": side.get("team"),
-                                "line": side.get("line", line),
-                                "executable_price": side.get("price_probability"),
-                                "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
-                                "available_depth": None})
-                if books:
-                    self.markets.write_books(sport, game_date, pl.DataFrame(books))
-                    return {"status": "ok", "books": len(books)}
-                return {"status": "no_markets"}
-            except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
-                return {"status": "error", "error": str(e)[:200]}
-
-        def collect_date(self, game_date: str) -> dict[str, Any]:
-            results: dict[str, Any] = {"date": game_date, "sport": "nfl"}
-            results["espn"] = self._collect_espn(game_date)
-            results["polymarket"] = self._collect_markets(game_date)
-            results["status"] = "ok" if all(r.get("status") in ("ok", "no_games", "no_markets") for r in (results.get("espn", {}), results.get("polymarket", {}))) else "partial"
-            return results
+    def collect_date(self, game_date: str) -> dict[str, Any]:
+        results: dict[str, Any] = {"date": game_date, "sport": "nfl"}
+        results["espn"] = self._collect_espn(game_date)
+        results["polymarket"] = self._collect_markets(game_date)
+        results["status"] = "ok" if all(r.get("status") in ("ok", "no_games", "no_markets") for r in (results.get("espn", {}), results.get("polymarket", {}))) else "partial"
+        return results
 
 
 # ── Soccer Collector ────────────────────────────────────────────────────────
