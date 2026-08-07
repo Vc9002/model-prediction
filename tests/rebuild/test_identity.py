@@ -10,12 +10,17 @@ exercised outside its own file.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from model_prediction.rebuild.identity import (
     CanonicalIdentity,
     IdentityRegistry,
     jaccard_similarity,
     normalize_name,
+    resolve_espn_scoreboard_event_id,
     resolve_espn_scoreboard_team_ids,
+    resolve_event_by_team_pair,
+    resolve_or_register_event,
     resolve_or_register_team,
 )
 from model_prediction.rebuild.metadata import MetadataDB
@@ -219,3 +224,186 @@ class TestResolveEspnScoreboardTeamIdsCrossSportCollision:
         # And the old, unnamespaced source_id is genuinely unused now --
         # nothing was ever registered directly under bare "espn_public".
         assert registry.resolve("espn_public", "20") is None
+
+
+class TestResolveOrRegisterEvent:
+    """The real entry point for canonical event identity -- mirrors
+    resolve_or_register_team()'s register-or-reuse shape, keyed on
+    (source_id, source_event_id) with no fuzzy name matching (two real
+    games can share both team names and date -- a doubleheader -- so
+    guessing from a name string would risk silently merging them)."""
+
+    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path):
+        registry = _registry(tmp_path)
+        identity = resolve_or_register_event(
+            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
+            canonical_name="Los Angeles Angels @ Baltimore Orioles",
+            effective_from_utc="2026-07-20T22:35Z",
+        )
+        assert identity.entity_type == "event"
+        assert identity.sport == "mlb"
+
+    def test_repeated_observation_of_the_same_source_id_reuses_the_identity(self, tmp_path):
+        registry = _registry(tmp_path)
+        first = resolve_or_register_event(
+            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
+            canonical_name="Los Angeles Angels @ Baltimore Orioles",
+            effective_from_utc="2026-07-20T22:35Z",
+        )
+        second = resolve_or_register_event(
+            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
+            canonical_name="Los Angeles Angels @ Baltimore Orioles",
+            effective_from_utc="2026-07-20T22:35Z",
+        )
+        assert second.entity_id == first.entity_id
+
+    def test_two_genuinely_different_events_get_different_identities(self, tmp_path):
+        registry = _registry(tmp_path)
+        first = resolve_or_register_event(
+            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
+            canonical_name="Los Angeles Angels @ Baltimore Orioles",
+            effective_from_utc="2026-07-20T22:35Z",
+        )
+        second = resolve_or_register_event(
+            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816999",
+            canonical_name="Los Angeles Angels @ Baltimore Orioles",
+            effective_from_utc="2026-07-20T22:35Z",
+        )
+        assert first.entity_id != second.entity_id
+
+
+class TestResolveEspnScoreboardEventId:
+    """The real helper every ESPN-scoreboard-shaped collector calls. Named
+    directly in CLAUDE.md's canonical-identity test requirements:
+    doubleheaders and neutral-site games must resolve to correct,
+    non-conflated identities."""
+
+    _home: ClassVar = {"id": "1", "displayName": "Baltimore Orioles"}
+    _away: ClassVar = {"id": "3", "displayName": "Los Angeles Angels"}
+
+    def test_missing_espn_event_id_returns_none(self, tmp_path):
+        registry = _registry(tmp_path)
+        result = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "",
+            self._home, self._away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+        )
+        assert result is None
+
+    def test_doubleheader_two_real_games_same_teams_same_day_get_different_ids(self, tmp_path):
+        # A real doubleheader: the same two teams play twice on the same
+        # calendar date. ESPN assigns each game its own real, distinct
+        # event id -- this must produce two distinct canonical events, not
+        # one collapsed identity.
+        registry = _registry(tmp_path)
+        game_1 = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816384",
+            self._home, self._away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T18:05Z", "2026-07-20T17:00:00+00:00",
+            venue_name="Oriole Park at Camden Yards",
+        )
+        game_2 = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816385",
+            self._home, self._away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T21:30:00+00:00",
+            venue_name="Oriole Park at Camden Yards",
+        )
+        assert game_1 is not None
+        assert game_2 is not None
+        assert game_1 != game_2
+
+    def test_neutral_site_game_resolves_and_records_the_neutral_venue(self, tmp_path):
+        # A neutral-site game's venue belongs to neither team -- resolution
+        # must not depend on venue matching a "home" team's usual park.
+        registry = _registry(tmp_path)
+        event_id = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401900001",
+            self._home, self._away, "mlb:team:home", "mlb:team:away",
+            "2026-06-13T17:05Z", "2026-06-13T16:00:00+00:00",
+            venue_name="London Stadium",
+        )
+        assert event_id is not None
+        resolved = registry.resolve("espn_public:mlb", "401900001")
+        assert resolved is not None
+        assert resolved.attributes["venue"] == "London Stadium"
+
+    def test_rerunning_collection_reuses_the_same_canonical_event(self, tmp_path):
+        registry = _registry(tmp_path)
+        first = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816384",
+            self._home, self._away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+        )
+        second = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816384",
+            self._home, self._away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T21:00:00+00:00",
+        )
+        assert first == second
+
+    def test_same_espn_event_id_in_two_sports_resolves_to_two_different_events(self, tmp_path):
+        # Same defensive namespacing as resolve_espn_scoreboard_team_ids()'s
+        # real cross-sport team-id collision fix -- applied here on
+        # principle since ESPN's per-sport event-id numbering was never
+        # verified collision-free either.
+        registry = _registry(tmp_path)
+        mlb_event = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "500",
+            self._home, self._away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+        )
+        wnba_event = resolve_espn_scoreboard_event_id(
+            registry, "wnba", "espn_public", "500",
+            {"id": "20", "displayName": "Atlanta Dream"}, {"id": "15", "displayName": "Washington Mystics"},
+            "wnba:team:home", "wnba:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+        )
+        assert mlb_event != wnba_event
+
+
+class TestResolveEventByTeamPair:
+    """The fallback a source with no stable native event id of its own
+    (Polymarket) uses to link into an already-registered canonical event.
+    Must fail closed on doubleheaders -- team pair + date alone genuinely
+    cannot disambiguate two real games between the same teams on the same
+    day."""
+
+    def test_finds_the_single_matching_event(self, tmp_path):
+        registry = _registry(tmp_path)
+        event_id = resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816384",
+            {"id": "1", "displayName": "Baltimore Orioles"}, {"id": "3", "displayName": "Los Angeles Angels"},
+            "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+        )
+        found = resolve_event_by_team_pair(
+            registry, "mlb", "mlb:team:home", "mlb:team:away", "2026-07-20",
+        )
+        assert found == event_id
+
+    def test_doubleheader_ambiguity_fails_closed(self, tmp_path):
+        registry = _registry(tmp_path)
+        home, away = {"id": "1", "displayName": "Baltimore Orioles"}, {"id": "3", "displayName": "Los Angeles Angels"}
+        resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816384",
+            home, away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T18:05Z", "2026-07-20T17:00:00+00:00",
+        )
+        resolve_espn_scoreboard_event_id(
+            registry, "mlb", "espn_public", "401816385",
+            home, away, "mlb:team:home", "mlb:team:away",
+            "2026-07-20T22:35Z", "2026-07-20T21:30:00+00:00",
+        )
+        assert resolve_event_by_team_pair(
+            registry, "mlb", "mlb:team:home", "mlb:team:away", "2026-07-20",
+        ) is None
+
+    def test_no_match_returns_none(self, tmp_path):
+        registry = _registry(tmp_path)
+        assert resolve_event_by_team_pair(
+            registry, "mlb", "mlb:team:home", "mlb:team:away", "2026-07-20",
+        ) is None
+
+    def test_missing_canonical_team_id_returns_none(self, tmp_path):
+        registry = _registry(tmp_path)
+        assert resolve_event_by_team_pair(registry, "mlb", None, "mlb:team:away", "2026-07-20") is None

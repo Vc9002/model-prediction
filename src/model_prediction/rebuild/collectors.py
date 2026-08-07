@@ -13,7 +13,12 @@ from typing import Any
 
 import polars as pl
 
-from .identity import IdentityRegistry, resolve_espn_scoreboard_team_ids, resolve_polymarket_team_id
+from .identity import (
+    IdentityRegistry,
+    resolve_espn_scoreboard_event_id,
+    resolve_espn_scoreboard_team_ids,
+    resolve_polymarket_team_id,
+)
 from .schemas import MARKET_SNAPSHOT_CONTRACT, SCOREBOARD_CONTRACT
 from .storage import MarketStore, NormalizedStore, RawStore, provenance_row, utc_now
 
@@ -108,6 +113,12 @@ class MLBCollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, "mlb", source, home_team_obj, away_team_obj, observed_at,
             )
+            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            event_canonical_id = resolve_espn_scoreboard_event_id(
+                self.identity, "mlb", source, str(event.get("id", "")),
+                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
+                event.get("date", ""), observed_at, venue_name,
+            )
 
             games.append({
                 **provenance_row(
@@ -124,10 +135,11 @@ class MLBCollector:
                 "home_team": home_team_obj.get("displayName", ""),
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
+                "event_canonical_id": event_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": (comp.get("venue", {}) or {}).get("fullName", ""),
+                "venue": venue_name,
             })
 
         if games:
@@ -506,6 +518,12 @@ class NBACollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
             )
+            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            event_canonical_id = resolve_espn_scoreboard_event_id(
+                self.identity, sport, source, str(event.get("id", "")),
+                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
+                event.get("date", ""), observed_at, venue_name,
+            )
             games.append({
                 **provenance_row(
                     source=source,
@@ -521,10 +539,11 @@ class NBACollector:
                 "home_team": home_team_obj.get("displayName", ""),
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
+                "event_canonical_id": event_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": (comp.get("venue", {}) or {}).get("fullName", ""),
+                "venue": venue_name,
             })
 
         if games:
@@ -640,6 +659,12 @@ class NFLCollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
             )
+            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            event_canonical_id = resolve_espn_scoreboard_event_id(
+                self.identity, sport, source, str(event.get("id", "")),
+                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
+                event.get("date", ""), observed_at, venue_name,
+            )
             games.append({
                 **provenance_row(source, str(event.get("id", "")), "espn_public_v1",
                                   observed_at, event.get("date", ""), event.get("date", ""),
@@ -649,10 +674,11 @@ class NFLCollector:
                 "home_team": home_team_obj.get("displayName", ""),
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
+                "event_canonical_id": event_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": (comp.get("venue", {}) or {}).get("fullName", ""),
+                "venue": venue_name,
             })
         if games:
             self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
@@ -752,6 +778,12 @@ class SoccerCollector:
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
                 self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
             )
+            venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+            event_canonical_id = resolve_espn_scoreboard_event_id(
+                self.identity, sport, source, str(event.get("id", "")),
+                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
+                event.get("date", ""), observed_at, venue_name,
+            )
             games.append({**provenance_row(source, str(event.get("id", "")), "espn_public_v1",
                 observed_at, event.get("date", ""), event.get("date", ""),
                 raw_snapshot_hash=snapshot_hash),
@@ -760,10 +792,11 @@ class SoccerCollector:
                 "home_team": home_team_obj.get("displayName", ""),
                 "away_team_canonical_id": away_canonical_id,
                 "home_team_canonical_id": home_canonical_id,
+                "event_canonical_id": event_canonical_id,
                 "away_score": int(away.get("score", 0) or 0),
                 "home_score": int(home.get("score", 0) or 0),
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
+                "venue": venue_name,})
         if games:
             self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
@@ -889,18 +922,26 @@ class TennisCollector:
                     self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
                 )
                 comp_id = str(comp.get("id", "")) or str(event.get("id", ""))
+                comp_date = comp.get("date", event.get("date", ""))
+                venue_name = (comp.get("venue", {}) or {}).get("fullName", "")
+                event_canonical_id = resolve_espn_scoreboard_event_id(
+                    self.identity, sport, source, comp_id,
+                    home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
+                    comp_date, observed_at, venue_name,
+                )
                 games.append({**provenance_row(source, comp_id, "espn_public_v1",
-                    observed_at, comp.get("date", event.get("date", "")), comp.get("date", event.get("date", "")),
+                    observed_at, comp_date, comp_date,
                     raw_snapshot_hash=snapshot_hash),
                     "event_id": comp_id,
                     "away_team": away_team_obj.get("displayName", ""),
                     "home_team": home_team_obj.get("displayName", ""),
                     "away_team_canonical_id": away_canonical_id,
                     "home_team_canonical_id": home_canonical_id,
+                    "event_canonical_id": event_canonical_id,
                     "away_score": int(away.get("score", 0) or 0),
                     "home_score": int(home.get("score", 0) or 0),
                     "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                    "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
+                    "venue": venue_name,})
         if games:
             self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}

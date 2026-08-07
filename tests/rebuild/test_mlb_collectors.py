@@ -305,3 +305,85 @@ class TestScoreboardCanonicalIdentity:
             second_id = collector.identity.resolve("espn_public:mlb", "1").entity_id
 
         assert first_id == second_id, "rerunning collection must not mint a duplicate canonical identity"
+
+
+class FakeESPNClientDoubleheader:
+    """Two real games between the same two teams on the same calendar
+    date, each with its own distinct real ESPN event id -- the real shape
+    of a doubleheader."""
+
+    def scoreboard(self, game_date):
+        common = {
+            "competitions": [{
+                "status": {"type": {"name": "STATUS_FINAL"}},
+                "venue": {"fullName": "Oriole Park at Camden Yards"},
+                "competitors": [
+                    {"homeAway": "home", "team": {"id": "1", "displayName": "Baltimore Orioles"}, "score": "3"},
+                    {"homeAway": "away", "team": {"id": "3", "displayName": "Los Angeles Angels"}, "score": "1"},
+                ],
+            }],
+        }
+        return {"events": [
+            {"id": "401816384", "date": "2026-07-20T18:05Z", **common},
+            {"id": "401816385", "date": "2026-07-20T22:35Z", **common},
+        ]}
+
+
+class TestScoreboardEventIdentity:
+    """Task 1 (event identity): collect_espn_scoreboard now resolves each
+    game through IdentityRegistry using ESPN's own real event id, writing
+    a real event_canonical_id column additively alongside the existing
+    team-identity columns."""
+
+    def test_scoreboard_rows_carry_a_real_canonical_event_id(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClientWithTeamIds(),
+        ):
+            collector.collect_espn_scoreboard("2026-07-20")
+
+        df = collector.norm.read("mlb", "scoreboard")
+        row = df.row(0, named=True)
+        assert row["event_canonical_id"] is not None
+        resolved = collector.identity.resolve("espn_public:mlb", "401816384")
+        assert resolved is not None
+        assert resolved.entity_id == row["event_canonical_id"]
+        assert resolved.entity_type == "event"
+
+    def test_doubleheader_games_get_two_distinct_canonical_event_ids(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClientDoubleheader(),
+        ):
+            result = collector.collect_espn_scoreboard("2026-07-20")
+
+        assert result["games"] == 2
+        df = collector.norm.read("mlb", "scoreboard")
+        event_canonical_ids = df["event_canonical_id"].to_list()
+        assert len(event_canonical_ids) == 2
+        assert len(set(event_canonical_ids)) == 2, (
+            "a real doubleheader (same two teams, same day, two real ESPN "
+            "event ids) must not collapse into one canonical event"
+        )
+
+    def test_rerunning_collection_reuses_the_same_canonical_event(self, tmp_path):
+        meta = MetadataDB(tmp_path / "metadata.db")
+        collector = MLBCollector(tmp_path / "data", meta)
+
+        with patch(
+            "model_prediction.data_sources.espn.ESPNMLBClient",
+            return_value=FakeESPNClientWithTeamIds(),
+        ):
+            collector.collect_espn_scoreboard("2026-07-20")
+            first_id = collector.identity.resolve("espn_public:mlb", "401816384").entity_id
+
+            collector.collect_espn_scoreboard("2026-07-20")
+            second_id = collector.identity.resolve("espn_public:mlb", "401816384").entity_id
+
+        assert first_id == second_id, "rerunning collection must not mint a duplicate canonical event"

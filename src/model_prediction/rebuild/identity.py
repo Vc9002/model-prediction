@@ -313,6 +313,128 @@ def resolve_espn_scoreboard_team_ids(
     return home_id, away_id
 
 
+def resolve_or_register_event(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    source_event_id: str,
+    canonical_name: str,
+    effective_from_utc: str,
+    attributes: dict[str, Any] | None = None,
+) -> CanonicalIdentity:
+    """The one real entry point collection code should use to get a game's
+    canonical event identity, instead of treating each source's own raw
+    event_id (ESPN's numeric id, Polymarket's separate numeric id) as if it
+    were shared, stable identity across sources -- it isn't; the two
+    id-spaces don't overlap at all (see resolve_polymarket_event_id() in
+    mlb_market_matching.py, which resolves Polymarket's own event_id per
+    game but never ties it back to ESPN's own event_id or a shared
+    canonical identity).
+
+    Unlike team names, no fuzzy name matching is attempted for events --
+    two different real games can trivially share the same team names and
+    date (a doubleheader), so guessing identity from a name string alone
+    risks silently merging two distinct real games. Every call site must
+    supply a real, source-native, already-unique event id (ESPN's own
+    numeric event id). A source without one of its own must resolve
+    identity a different way -- see resolve_event_by_team_pair() below,
+    which fails closed exactly on the doubleheader case a name/date guess
+    would get wrong. This is a straightforward register-or-reuse keyed on
+    (source_id, source_event_id), the same shape as
+    resolve_mlbam_player_id() for exactly the same reason: no collision
+    risk once source_id is correctly scoped."""
+    existing = registry.resolve(source_id, source_event_id)
+    if existing is not None:
+        return existing
+    return registry.register(
+        entity_type="event", canonical_name=canonical_name, sport=sport,
+        effective_from_utc=effective_from_utc,
+        source_id=source_id, source_entity_id=source_event_id,
+        attributes=attributes,
+    )
+
+
+def resolve_espn_scoreboard_event_id(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    espn_event_id: str,
+    home_team_obj: dict[str, Any],
+    away_team_obj: dict[str, Any],
+    home_canonical_id: str | None,
+    away_canonical_id: str | None,
+    event_start_utc: str,
+    observed_at: str,
+    venue_name: str = "",
+) -> str | None:
+    """The one real helper every ESPN-scoreboard-shaped collector should
+    call for canonical event identity -- mirrors
+    resolve_espn_scoreboard_team_ids()'s shape and namespaces source_id by
+    sport for the same real reason team ids are namespaced there (a
+    cross-sport ESPN id collision was already found live for team ids;
+    event ids get the same defensive treatment rather than assuming
+    they're safe untested). Returns None (never guesses) when ESPN's own
+    event id is missing.
+
+    Stores the resolving team-pair and start time in `attributes` so a
+    source with no stable event id of its own (Polymarket) can later link
+    into this same canonical event via resolve_event_by_team_pair()."""
+    if not espn_event_id:
+        return None
+    namespaced_source_id = f"{source_id}:{sport}"
+    home_name = home_team_obj.get("displayName", "")
+    away_name = away_team_obj.get("displayName", "")
+    canonical_name = f"{away_name} @ {home_name}".strip()
+    identity = resolve_or_register_event(
+        registry, sport=sport, source_id=namespaced_source_id,
+        source_event_id=espn_event_id, canonical_name=canonical_name,
+        effective_from_utc=event_start_utc or observed_at,
+        attributes={
+            "home_team_canonical_id": home_canonical_id,
+            "away_team_canonical_id": away_canonical_id,
+            "event_start_utc": event_start_utc,
+            "venue": venue_name,
+        },
+    )
+    return identity.entity_id
+
+
+def resolve_event_by_team_pair(
+    registry: IdentityRegistry,
+    sport: str,
+    home_canonical_id: str | None,
+    away_canonical_id: str | None,
+    game_date: str,
+) -> str | None:
+    """Find an already-registered canonical event for this exact team pair
+    on this exact calendar date -- the fallback a source with no stable
+    native event id of its own (Polymarket's event_id is real and stable,
+    but lives in a completely separate id-space from ESPN's, so it can't
+    be looked up via resolve_or_register_event() directly) uses to link
+    into an existing canonical event rather than minting a duplicate.
+    Scoped to a date (event_start_utc's leading date component, not an
+    exact timestamp) since start times can differ slightly by source.
+
+    Fails closed (returns None) on zero or on more than one candidate. A
+    doubleheader is exactly the real case where more than one candidate is
+    correct and must not be silently collapsed into one -- a caller
+    without a real per-game disambiguator (e.g. a game number) genuinely
+    cannot tell them apart from team pair + date alone, and must not
+    guess."""
+    if not home_canonical_id or not away_canonical_id:
+        return None
+    matches = [
+        ident for ident in registry._cache.values()
+        if ident.entity_type == "event" and ident.sport == sport
+        and ident.attributes.get("home_team_canonical_id") == home_canonical_id
+        and ident.attributes.get("away_team_canonical_id") == away_canonical_id
+        and str(ident.attributes.get("event_start_utc") or "").startswith(game_date)
+    ]
+    if len(matches) != 1:
+        return None
+    return matches[0].entity_id
+
+
 def word_boundary_name_match(a: str, b: str) -> bool:
     """True when a and b identify the same real-world team name despite one
     being a shorter form of the other (e.g. Polymarket's "Washington" vs
