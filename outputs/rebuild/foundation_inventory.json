@@ -1,9 +1,9 @@
 {
   "branch": "rebuild/clean-slate-v1",
-  "head_sha": "8860325147c4c40852ae31e0912db5a2364e3edc",
+  "head_sha": "45fdeda52f90214aaafcf445ee3c9ce4ef9cdbd4",
   "working_tree_dirty_in_rebuild_paths": true,
   "python_version": "Python 3.14.5",
-  "total_tests_passed": 960,
+  "total_tests_passed": 965,
   "capabilities": {
     "raw_storage_content_addressed": "VERIFIED",
     "normalized_storage_idempotent": "VERIFIED",

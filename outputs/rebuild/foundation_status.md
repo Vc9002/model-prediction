@@ -1,7 +1,7 @@
 # Foundation Inventory
 
-Generated from code at commit `8860325147c4c40852ae31e0912db5a2364e3edc` on branch `rebuild/clean-slate-v1`.
-Python: Python 3.14.5. Total tests passing: 960.
+Generated from code at commit `45fdeda52f90214aaafcf445ee3c9ce4ef9cdbd4` on branch `rebuild/clean-slate-v1`.
+Python: Python 3.14.5. Total tests passing: 965.
 
 ## Capability status
 
