@@ -13,7 +13,8 @@ A system that fails under minor realistic degradation remains research-only.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import itertools
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -81,6 +82,157 @@ class XGBoostChallenger:
         if not self._fitted or self.model is None:
             return np.full(X.shape[0], 0.5)
         return self.predict_proba(X)[:, 1]
+
+
+# ── Nested chronological XGBoost validation ──────────────────────────────────
+#
+# Real bug fixed here (see outputs/rebuild/takeover_status.md Task 9):
+# every real caller of XGBoostChallenger.fit() passed the outer validation
+# fold itself as `eval_set` -- XGBoost's early stopping chose the number of
+# boosting rounds using the exact rows whose held-out performance was then
+# reported as the result. That is the textbook "outer validation labels
+# influence early stopping" leak CLAUDE.md's own stop condition names
+# explicitly. nested_xgboost_fold() is the real fix: split the outer
+# training history itself into an inner train/tune block, select
+# hyperparameters and the early-stopping iteration by inner chronological
+# log loss only, freeze both, then predict the outer validation fold with
+# a model that has never seen it in any form.
+
+# A conservative, bounded, pre-declared grid -- not an open-ended
+# Optuna-style search. 3*3*3*2*2*3*3 = 972 combinations; real, deterministic,
+# reproducible, and (per real live timing on this project's small dataset)
+# fast enough to run in full per fold rather than needing a random subsample.
+XGB_PARAM_GRID: dict[str, list[Any]] = {
+    "max_depth": [2, 3, 4],
+    "learning_rate": [0.01, 0.03, 0.05],
+    "min_child_weight": [5, 10, 20],
+    "subsample": [0.7, 0.85],
+    "colsample_bytree": [0.6, 0.8],
+    "reg_alpha": [0.5, 1, 2],
+    "reg_lambda": [1, 2, 5],
+}
+
+
+def _grid_combinations(grid: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    keys = list(grid.keys())
+    return [dict(zip(keys, values, strict=True)) for values in itertools.product(*grid.values())]
+
+
+@dataclass
+class NestedFoldResult:
+    """Everything CLAUDE.md's Task 9 requires persisted per outer fold:
+    best_params, best_iteration, inner_score, outer_score -- so a real
+    audit can verify the outer score was never used to pick either."""
+    fold_index: int
+    best_params: dict[str, Any]
+    best_iteration: int
+    inner_log_loss: float
+    outer_log_loss: float
+    outer_brier: float
+    outer_probs: list[float] = field(default_factory=list)
+    inner_train_n: int = 0
+    inner_val_n: int = 0
+    outer_train_n: int = 0
+    outer_val_n: int = 0
+
+
+def nested_xgboost_fold(
+    X_outer_train: np.ndarray,
+    y_outer_train: np.ndarray,
+    X_outer_val: np.ndarray,
+    y_outer_val: np.ndarray,
+    fold_index: int,
+    *,
+    inner_val_fraction: float = 0.2,
+    seed: int = 42,
+    param_grid: dict[str, list[Any]] | None = None,
+) -> NestedFoldResult:
+    """One real nested-CV outer fold.
+
+    X_outer_train/y_outer_train must already be in chronological order
+    (matching every other real fold-construction in this codebase, e.g.
+    validation.expanding_folds()) -- the inner split below takes the
+    chronologically last `inner_val_fraction` of it as the inner
+    tuning/early-stop block, never a random split.
+
+    Required sequence (CLAUDE.md):
+        outer training history
+            -> split internally: inner train / inner tuning block
+            -> fit/tune XGBoost, selecting by INNER chronological log loss only
+            -> freeze best params + iteration
+            -> predict outer validation
+
+    The outer validation labels (y_outer_val) are never passed to any
+    XGBoost fit call in this function, only used once at the very end to
+    score the frozen model's predictions -- structurally impossible for
+    them to influence early stopping, hyperparameters, or feature
+    selection, not just disciplined by convention.
+    """
+    from .validation import brier_score, log_loss
+
+    grid = param_grid or XGB_PARAM_GRID
+    n = X_outer_train.shape[0]
+    inner_split = max(1, round(n * (1.0 - inner_val_fraction)))
+    X_inner_train, X_inner_val = X_outer_train[:inner_split], X_outer_train[inner_split:]
+    y_inner_train, y_inner_val = y_outer_train[:inner_split], y_outer_train[inner_split:]
+
+    if len(X_inner_train) < 5 or len(X_inner_val) < 2:
+        raise ValueError(
+            f"fold {fold_index}: outer training history (n={n}) is too small to carve out a "
+            "real inner train/tune split -- refusing to fabricate a result from an "
+            "unreasonably small inner block."
+        )
+
+    import xgboost as xgb
+
+    best_params: dict[str, Any] | None = None
+    best_inner_loss = float("inf")
+    best_iteration = 0
+    for params in _grid_combinations(grid):
+        model = xgb.XGBClassifier(
+            objective="binary:logistic", eval_metric="logloss",
+            n_estimators=500, early_stopping_rounds=25,
+            random_state=seed, n_jobs=2, verbosity=0,
+            **params,
+        )
+        model.fit(X_inner_train, y_inner_train, eval_set=[(X_inner_val, y_inner_val)], verbose=False)
+        inner_probs = model.predict_proba(X_inner_val)[:, 1].tolist()
+        inner_loss = log_loss(y_inner_val.tolist(), inner_probs)
+        if inner_loss < best_inner_loss:
+            best_inner_loss = inner_loss
+            best_params = params
+            # best_iteration is the real number of trees XGBoost's own
+            # early stopping selected on the inner block -- 0-indexed, so
+            # +1 for a real tree count.
+            best_iteration = int(model.best_iteration) + 1
+
+    assert best_params is not None  # grid is never empty in real use
+
+    # Refit on the FULL outer training history (inner train + inner tune
+    # combined) with the frozen params/iteration -- no early stopping this
+    # time, since the iteration count is already decided, and no outer
+    # validation data anywhere in this call.
+    final_model = xgb.XGBClassifier(
+        objective="binary:logistic", eval_metric="logloss",
+        n_estimators=best_iteration, random_state=seed, n_jobs=2, verbosity=0,
+        **best_params,
+    )
+    final_model.fit(X_outer_train, y_outer_train, verbose=False)
+
+    outer_probs = final_model.predict_proba(X_outer_val)[:, 1].tolist()
+    y_outer_val_list = y_outer_val.tolist() if hasattr(y_outer_val, "tolist") else list(y_outer_val)
+
+    return NestedFoldResult(
+        fold_index=fold_index,
+        best_params=best_params,
+        best_iteration=best_iteration,
+        inner_log_loss=best_inner_loss,
+        outer_log_loss=log_loss(y_outer_val_list, outer_probs),
+        outer_brier=brier_score(y_outer_val_list, outer_probs),
+        outer_probs=outer_probs,
+        inner_train_n=len(X_inner_train), inner_val_n=len(X_inner_val),
+        outer_train_n=n, outer_val_n=len(X_outer_val),
+    )
 
 
 # ── Stress tests ─────────────────────────────────────────────────────────────

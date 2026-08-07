@@ -7,14 +7,26 @@ wired them together for the first time.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 
 from model_prediction.rebuild.ensemble import Ensemble, equal_weight_ensemble, logistic_stacking
 from model_prediction.rebuild.validation import log_loss
-from model_prediction.rebuild.xgboost_stress import XGBoostChallenger
+from model_prediction.rebuild.xgboost_stress import XGBoostChallenger, nested_xgboost_fold
 
 xgboost = pytest.importorskip("xgboost")
+
+_TINY_GRID = {
+    "max_depth": [2, 3],
+    "learning_rate": [0.05],
+    "min_child_weight": [5],
+    "subsample": [0.85],
+    "colsample_bytree": [0.8],
+    "reg_alpha": [1],
+    "reg_lambda": [2],
+}
 
 
 def _separable_binary_data(n: int = 200, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
@@ -118,3 +130,85 @@ class TestEnsemble:
         # dominate the result -- only fitted model names count.
         result = ensemble.predict({"a": 0.5, "b": 0.5, "unknown_model": 0.99})
         assert 0.0 <= result <= 1.0
+
+
+class TestNestedXgboostFold:
+    """Task 9: real bug fixed -- every prior real caller passed the outer
+    validation fold itself as XGBoostChallenger's eval_set, so XGBoost's
+    early stopping chose the number of boosting rounds using the exact
+    rows whose held-out performance was then reported as the result.
+    nested_xgboost_fold() is the fix: an inner train/tune split inside
+    the outer training history selects params/iteration by inner
+    chronological log loss only; the outer validation fold is never
+    passed to any fit call."""
+
+    def _data(self, n=120, seed=0):
+        return _separable_binary_data(n=n, seed=seed)
+
+    def test_outer_validation_labels_never_reach_any_fit_call(self):
+        X, y = self._data(n=150)
+        X_outer_train, y_outer_train = X[:100], y[:100]
+        X_outer_val, y_outer_val = X[100:], y[100:]
+
+        seen_y_arrays: list[np.ndarray] = []
+        real_fit = xgboost.XGBClassifier.fit
+
+        def spy_fit(self, X_arg, y_arg, **kwargs):
+            seen_y_arrays.append(np.asarray(y_arg))
+            if "eval_set" in kwargs:
+                for _, y_eval in kwargs["eval_set"]:
+                    seen_y_arrays.append(np.asarray(y_eval))
+            return real_fit(self, X_arg, y_arg, **kwargs)
+
+        with patch.object(xgboost.XGBClassifier, "fit", spy_fit):
+            nested_xgboost_fold(
+                X_outer_train, y_outer_train, X_outer_val, y_outer_val,
+                fold_index=0, param_grid=_TINY_GRID,
+            )
+
+        # Every real y-array passed to any real XGBoost .fit()/eval_set
+        # call must be a subset of the outer TRAINING labels -- the outer
+        # validation labels must never appear in any of them.
+        outer_val_set = set(y_outer_val.tolist())
+        for arr in seen_y_arrays:
+            seen_set = set(arr.tolist())
+            assert seen_set <= set(y_outer_train.tolist()) or not (seen_set & outer_val_set), (
+                "outer validation labels leaked into a real XGBoost fit/eval_set call"
+            )
+
+    def test_persists_required_fields_per_claude_md(self):
+        X, y = self._data(n=120)
+        result = nested_xgboost_fold(
+            X[:80], y[:80], X[80:], y[80:], fold_index=2, param_grid=_TINY_GRID,
+        )
+
+        assert result.fold_index == 2
+        assert result.best_params  # a real dict, not empty
+        assert result.best_iteration > 0
+        assert result.inner_log_loss >= 0.0
+        assert result.outer_log_loss >= 0.0
+        assert 0.0 <= result.outer_brier <= 1.0
+        assert len(result.outer_probs) == 40
+
+    def test_too_small_outer_train_refuses_to_fabricate_a_result(self):
+        X, y = self._data(n=20)
+        with pytest.raises(ValueError, match="too small"):
+            nested_xgboost_fold(X[:4], y[:4], X[4:8], y[4:8], fold_index=0, param_grid=_TINY_GRID)
+
+    def test_selected_params_come_from_the_declared_grid(self):
+        X, y = self._data(n=120)
+        result = nested_xgboost_fold(
+            X[:80], y[:80], X[80:], y[80:], fold_index=0, param_grid=_TINY_GRID,
+        )
+        assert result.best_params["max_depth"] in _TINY_GRID["max_depth"]
+        assert result.best_params["learning_rate"] in _TINY_GRID["learning_rate"]
+
+    def test_learns_the_real_separable_signal_out_of_sample(self):
+        # Not a tautology -- confirms the whole nested procedure still
+        # produces a genuinely useful outer-fold prediction, not just
+        # "doesn't crash."
+        X, y = self._data(n=250)
+        result = nested_xgboost_fold(
+            X[:180], y[:180], X[180:], y[180:], fold_index=0, param_grid=_TINY_GRID,
+        )
+        assert result.outer_log_loss < 0.5

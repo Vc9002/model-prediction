@@ -40,7 +40,7 @@ from model_prediction.rebuild.mlb_features import (
 )
 from model_prediction.rebuild.models import MLBTwoHeadModel
 from model_prediction.rebuild.validation import brier_score, ece, expanding_folds, log_loss
-from model_prediction.rebuild.xgboost_stress import XGBoostChallenger
+from model_prediction.rebuild.xgboost_stress import nested_xgboost_fold
 
 HORIZON = "late"
 
@@ -120,6 +120,16 @@ def main() -> None:
         # model (flat feature vector -> P(home win) directly, no joint
         # score simulation) -- an independent challenger per CLAUDE.md
         # Part 2 SS1, not a reimplementation of the same structure.
+        #
+        # Task 9 fix: nested_xgboost_fold() selects hyperparameters and the
+        # early-stopping iteration by INNER chronological log loss only,
+        # over a bounded declared grid -- the outer validation fold
+        # (X_val/y_val_fold) is never passed to any XGBoost fit call.
+        # Previously this called XGBoostChallenger.fit(..., eval_set=(X_val,
+        # y_val_fold)) directly: the exact rows whose held-out performance
+        # was then reported were also the rows early stopping was tuned
+        # against -- a real leak CLAUDE.md's stop condition names
+        # explicitly.
         X_train = train_df.select(XGB_FEATURES).to_numpy()
         y_train_arr = train_df.select(
             (pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y")
@@ -127,9 +137,8 @@ def main() -> None:
         X_val = val_df.select(XGB_FEATURES).to_numpy()
         y_val_fold = _home_win_labels(val_df)
 
-        xgb_challenger = XGBoostChallenger(seed=42)
-        xgb_challenger.fit(X_train, y_train_arr, feature_names=XGB_FEATURES, eval_set=(X_val, y_val_fold))
-        fold_xgb_probs = xgb_challenger.predict(X_val).tolist()
+        nested_result = nested_xgboost_fold(X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index)
+        fold_xgb_probs = nested_result.outer_probs
 
         two_head_oof.extend(fold_two_head_probs)
         xgb_oof.extend(fold_xgb_probs)
@@ -142,13 +151,21 @@ def main() -> None:
                 "brier": brier_score(y_val_fold, fold_two_head_probs),
             },
             "xgboost": {
-                "log_loss": log_loss(y_val_fold, fold_xgb_probs),
-                "brier": brier_score(y_val_fold, fold_xgb_probs),
+                "log_loss": nested_result.outer_log_loss,
+                "brier": nested_result.outer_brier,
+                # CLAUDE.md Task 9: persisted for every fold so a real
+                # audit can verify the outer score never influenced these.
+                "best_params": nested_result.best_params,
+                "best_iteration": nested_result.best_iteration,
+                "inner_log_loss": nested_result.inner_log_loss,
+                "inner_train_n": nested_result.inner_train_n,
+                "inner_val_n": nested_result.inner_val_n,
             },
         })
         print(f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
               f"two_head_ll={per_fold_report[-1]['two_head']['log_loss']:.3f} "
-              f"xgb_ll={per_fold_report[-1]['xgboost']['log_loss']:.3f}")
+              f"xgb_ll={per_fold_report[-1]['xgboost']['log_loss']:.3f} "
+              f"(inner_ll={nested_result.inner_log_loss:.3f}, best_iter={nested_result.best_iteration})")
 
     if len(y_true) < 10:
         print("Too few real OOF predictions across folds to fit a meaningful ensemble. Stopping honestly.")

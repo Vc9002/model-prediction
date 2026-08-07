@@ -1784,3 +1784,79 @@ structural constraint recorded in the handoff summary: genuinely
 point-in-time-safe probable-starter data can only exist for dates this
 collector was actually running, which bounds how far backfill can
 honestly extend without fabricating history.
+
+### Task 9 — nested chronological XGBoost validation, fixed
+
+**Real bug confirmed by reading the code**: every real caller of
+`XGBoostChallenger.fit()` (`train_mlb_xgboost_ensemble.py`) passed the
+outer validation fold itself as `eval_set` --
+`xgb_challenger.fit(X_train, y_train_arr, eval_set=(X_val, y_val_fold))`
+-- so XGBoost's own early stopping chose the number of boosting rounds
+using the exact rows whose held-out performance was then reported as the
+fold's result. Textbook "outer validation labels influence early
+stopping," named explicitly in this phase's stop condition.
+
+**Fixed** with `nested_xgboost_fold()` (`xgboost_stress.py`): splits the
+outer training history itself (chronologically, matching every other
+real fold construction in this codebase) into an inner train block and
+an inner tuning/early-stop block; searches a real, bounded, pre-declared
+grid (`XGB_PARAM_GRID`, exactly the dimensions this phase specified --
+`max_depth`/`learning_rate`/`min_child_weight`/`subsample`/
+`colsample_bytree`/`reg_alpha`/`reg_lambda`, 972 real combinations, not
+an open-ended Optuna sweep); selects params and the early-stopping
+iteration by **inner** chronological log loss only; freezes both; refits
+on the full outer-training history with no early stopping (the iteration
+count is already decided); predicts the outer validation fold with a
+model that has never seen it, in any form, at any stage. Persists
+`best_params`/`best_iteration`/`inner_log_loss`/`outer_log_loss` per
+fold, as this phase's instructions require.
+
+**Real timing check before committing to the full grid** (not assumed):
+one fold, full 972-combination grid, ~70 real training rows -- 11
+seconds. Fast enough to run the complete declared grid on every real
+fold rather than needing a random subsample.
+
+**Tests**: `tests/rebuild/test_xgboost_challenger_and_ensemble.py::TestNestedXgboostFold`
+-- most notably `test_outer_validation_labels_never_reach_any_fit_call`,
+which patches `xgboost.XGBClassifier.fit` itself to record every real
+y-array passed to any underlying fit/eval_set call across the whole grid
+search and asserts none of them overlap the outer validation labels
+(structural proof, not a convention check) -- plus required-field
+persistence, too-small-history refusal, grid-membership, and an
+out-of-sample signal-recovery test.
+
+**Wired into `train_mlb_xgboost_ensemble.py`**, replacing the leaky
+direct `XGBoostChallenger.fit(..., eval_set=(X_val, ...))` call.
+
+**1139 tests pass** (up from 1134), 1 skipped. `ruff check` clean.
+
+**Real evidence, live-verified, reported honestly**: re-ran the real
+(registry-safe) script against the actual backfilled data with the fixed
+nested CV. Real result -- **the leak's removal changed the picture
+substantially**: XGBoost's real out-of-fold log loss is now `0.7258`
+(vs. the two-head control's `1.4760`) across 103 real OOF predictions,
+3 folds (`train=31/59/85`, `val=34/32/37`). The two-head control's much
+higher log loss than earlier session numbers is not itself caused by
+this fix -- it reflects Tasks 1/3/5's honest missingness (58% of games
+now flagged `starters_known=0`, weather 100% unavailable) feeding a
+control architecture (`HistGradientBoostingRegressor`/`ElasticNet`) that
+evidently handles that much real missingness worse than XGBoost does on
+this small a sample, not a re-introduced leak. Ensemble weights collapse
+to `xgboost=1.0`/`two_head~0.0` -- per this phase's own instruction ("If
+the fitted stacker again becomes two_head=0/xgboost=1, report that the
+ensemble adds no value and use XGBoost as the direct challenger"), that
+is exactly what should be reported here: **the ensemble currently adds
+no value; XGBoost is the stronger direct challenger on this real,
+still-small (n=161) sample.** Still explicitly not a promotion decision
+-- no consumed or new final test was touched.
+
+**What's still open from this phase's stop condition** (tracked, not
+done): Task 8 (persisted date-cluster split manifest -- `expanding_folds`
+already clusters by chronological block but a dedicated persisted
+manifest artifact doesn't yet exist) and Task 10 (cross-fit ensemble
+evaluation -- the logistic stacker above is fit on the same OOF rows its
+weights are then reported against, which is fine for *fitting* the
+stacker but not yet a fully unbiased claim about the ensemble's own
+value, per this phase's own distinction). Given the honest
+`xgboost=1.0` collapse just observed, Task 10 is lower-priority now: the
+stacker already isn't being relied on.
