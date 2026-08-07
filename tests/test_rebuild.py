@@ -91,6 +91,22 @@ class TestRawStore:
             ref3 = store.write("espn", "2026-08-01", "test1", {"a": 2})
             assert ref1.snapshot_hash != ref3.snapshot_hash, "Different payload should produce different hash"
 
+    def test_write_is_atomic_no_leftover_temp_files(self):
+        """Real gap fixed (FOUNDATION_COMPLETION.md Phase 2): write()
+        previously wrote directly to the final content-addressed path — a
+        crash mid-write could leave a truncated file sitting at a
+        hash-named path that looks like a valid immutable snapshot. Now
+        writes to a temp file and os.replace()s into place; verify no temp
+        file is ever left behind and the final file is valid."""
+        with tempfile.TemporaryDirectory() as td:
+            store = RawStore(td)
+            ref = store.write("espn", "2026-08-01", "test1", {"a": 1, "b": [1, 2, 3]})
+            all_files = list(Path(td).rglob("*"))
+            tmp_files = [f for f in all_files if ".tmp" in f.name]
+            assert tmp_files == [], f"leftover temp file(s) after write: {tmp_files}"
+            assert store.verify_hash(ref)
+            assert ref.path.exists()
+
 
 class TestNormalizedStore:
     def test_write_read_parquet(self):

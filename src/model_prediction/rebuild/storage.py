@@ -13,6 +13,8 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -145,8 +147,24 @@ class RawStore:
         p = self._content_path(source, date_str, record_id, snapshot_hash)
         p.parent.mkdir(parents=True, exist_ok=True)
         if not p.exists():
-            with gzip.open(p, "wb") as f:
-                f.write(raw_bytes)
+            # Real gap fixed here (FOUNDATION_COMPLETION.md Phase 2): this
+            # previously wrote directly to the final content-addressed path.
+            # A crash or kill mid-write (a real risk during a long live
+            # collection run) could leave a truncated/corrupted gzip file
+            # sitting at a hash-named path that looks like a valid,
+            # immutable snapshot until someone calls verify_hash() on it.
+            # Write to a temp file in the same directory (same filesystem,
+            # so the rename below is atomic on POSIX) and rename into place
+            # only once the write is complete.
+            tmp = p.with_name(f".{p.name}.{uuid.uuid4().hex[:8]}.tmp")
+            try:
+                with gzip.open(tmp, "wb") as f:
+                    f.write(raw_bytes)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp, p)
+            finally:
+                tmp.unlink(missing_ok=True)
         return RawSnapshotRef(
             source=source,
             source_record_id=record_id,
