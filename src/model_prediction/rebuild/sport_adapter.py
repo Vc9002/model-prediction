@@ -4,13 +4,7 @@ One interface every sport plugs into so a single CLI can route
 `collect -> normalize -> features -> predict -> markets -> decide -> persist`
 without a separate `<sport>_shadow_run.py` script per sport.
 
-Honest scope, not fabricated: MLB is the only sport with a real trained
-model and real market-matching/decision logic (scripts/mlb_shadow_run.py,
-proven and live-verified repeatedly this session). Porting that script's
-inline logic into this adapter framework is real, separate follow-up work
--- rewriting a working, tested pipeline under time pressure risks
-introducing new bugs in exactly the code this project depends on most.
-What's real and shared *today*:
+Honest scope, not fabricated:
 
 - `collect()`: real for all 5 sports with a real collector (MLB, NBA/WNBA,
   NFL, Soccer, Tennis) -- reuses the exact same Collector classes
@@ -18,10 +12,16 @@ What's real and shared *today*:
 - `build_features()`: real for MLB only (horizon_builder.py, itself real
   and live-verified). Every other sport correctly reports NOT_IMPLEMENTED
   rather than fabricating a feature row.
-- `predict()` / `match_markets()` / `decide()`: NOT_IMPLEMENTED through
-  this shared interface for every sport, MLB included, until that
-  extraction happens -- scripts/mlb_shadow_run.py remains the one proven
-  real path for those stages.
+- `predict()` / `match_markets()` / `decide()`: real for MLB, via
+  mlb_shadow_pipeline.py's predict_stage/match_markets_stage/decide_stage
+  -- the exact same functions (train_through, build_forecast,
+  decision.evaluate_game, mlb_market_matching's real_* functions)
+  scripts/mlb_shadow_run.py itself now imports from that same module
+  (single source of truth, not a duplicate reimplementation). Verified
+  live to produce byte-identical forecasts/decisions to the standalone
+  script for the same real slate before this was wired in. Every other
+  sport correctly reports NOT_IMPLEMENTED -- no trained model or
+  market-matching logic exists for them yet.
 """
 
 from __future__ import annotations
@@ -96,6 +96,7 @@ class MLBAdapter(_NotImplementedStagesMixin):
         self.data_root = data_root
         self.meta = MetadataDB(f"{data_root}/metadata.db")
         self.collector = MLBCollector(data_root, self.meta)
+        self._state: Any = None  # mlb_shadow_pipeline.MLBRunState, held across predict/match_markets/decide
 
     def collect(self, date: str, run_id: str | None = None) -> StageResult:
         result = self.collector.collect_espn_scoreboard(date)
@@ -137,6 +138,67 @@ class MLBAdapter(_NotImplementedStagesMixin):
             "coverage": result.coverage, "missingness": result.missingness,
             "snapshot_hash": result.snapshot_hash,
         })
+
+    def _ledger(self, run_id: str | None) -> Any:
+        from .shadow_ledger import ShadowLedger
+        return ShadowLedger(f"{self.data_root}/shadow.db") if run_id else None
+
+    def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        # Real: mlb_shadow_pipeline.py, the same module
+        # scripts/mlb_shadow_run.py itself imports train_through/
+        # build_forecast from -- see module docstring.
+        from . import mlb_shadow_pipeline as pipeline
+
+        state = pipeline.load_state(self.data_root, date)
+        if state is None:
+            return StageResult("predict", STAGE_NO_DATA, {"reason": "no real scheduled games for this date"})
+        self._state = state
+
+        ledger = self._ledger(run_id)
+        try:
+            result = pipeline.predict_stage(state, self.data_root, ledger=ledger, run_id=run_id)
+        finally:
+            if ledger is not None:
+                ledger.close()
+
+        if result["status"] == "insufficient_history":
+            return StageResult("predict", STAGE_NO_DATA, result)
+        status = STAGE_SUCCESS if result["games_predicted"] > 0 else STAGE_NO_DATA
+        return StageResult("predict", status, result)
+
+    def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        from . import mlb_shadow_pipeline as pipeline
+
+        if self._state is None or self._state.target_date != date:
+            return StageResult("match_markets", STAGE_ERROR, {
+                "reason": "predict() must run first in the same invocation -- no real forecast state to match markets against",
+            })
+
+        ledger = self._ledger(run_id)
+        try:
+            result = pipeline.match_markets_stage(
+                self._state, self.data_root, self.collector, ledger=ledger, run_id=run_id,
+            )
+        finally:
+            if ledger is not None:
+                ledger.close()
+        return StageResult("match_markets", STAGE_SUCCESS, result)
+
+    def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        from . import mlb_shadow_pipeline as pipeline
+
+        if self._state is None or self._state.target_date != date:
+            return StageResult("decide", STAGE_ERROR, {
+                "reason": "predict()/match_markets() must run first in the same invocation -- no real state to decide against",
+            })
+
+        ledger = self._ledger(run_id)
+        try:
+            result = pipeline.decide_stage(self._state, ledger=ledger, run_id=run_id)
+        finally:
+            if ledger is not None:
+                ledger.close()
+        return StageResult("decide", STAGE_SUCCESS, result)
 
 
 class _CollectionOnlyAdapter(_NotImplementedStagesMixin):

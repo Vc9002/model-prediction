@@ -6,6 +6,8 @@ from __future__ import annotations
 import pytest
 
 from model_prediction.rebuild.sport_adapter import (
+    STAGE_ERROR,
+    STAGE_NO_DATA,
     STAGE_NOT_IMPLEMENTED,
     SUPPORTED_SPORTS,
     build_adapter,
@@ -50,14 +52,27 @@ class TestHonestNotImplementedStages:
         result = adapter.build_features("2026-08-06", "late")
         assert result.status == STAGE_NOT_IMPLEMENTED
 
-    def test_mlb_predict_market_decide_are_honestly_not_implemented_through_the_shared_adapter(self, tmp_path):
-        # scripts/mlb_shadow_run.py is the one proven real path for these
-        # stages -- the shared adapter must not claim to have them until
-        # that extraction genuinely happens.
+    def test_mlb_predict_on_a_cold_empty_data_root_is_honest_no_data_not_a_crash(self, tmp_path):
+        # MLB predict/match_markets/decide are now real (mlb_shadow_pipeline.py)
+        # -- against a genuinely empty data_root (no scoreboard ever
+        # collected), the honest real result is NO_DATA, not a crash and
+        # not NOT_IMPLEMENTED (that would misrepresent real code as absent).
         adapter = build_adapter("mlb", str(tmp_path))
-        assert adapter.predict("2026-08-06", "late").status == STAGE_NOT_IMPLEMENTED
-        assert adapter.match_markets("2026-08-06", "late").status == STAGE_NOT_IMPLEMENTED
-        assert adapter.decide("2026-08-06", "late").status == STAGE_NOT_IMPLEMENTED
+        result = adapter.predict("2026-08-06", "late")
+        assert result.status == STAGE_NO_DATA
+
+    def test_mlb_match_markets_without_predict_first_fails_closed(self, tmp_path):
+        # match_markets() depends on real forecast state predict() builds --
+        # calling it first (e.g. a bare --markets-only invocation) must fail
+        # closed with a clear reason, not silently operate on nothing.
+        adapter = build_adapter("mlb", str(tmp_path))
+        result = adapter.match_markets("2026-08-06", "late")
+        assert result.status == STAGE_ERROR
+
+    def test_mlb_decide_without_predict_first_fails_closed(self, tmp_path):
+        adapter = build_adapter("mlb", str(tmp_path))
+        result = adapter.decide("2026-08-06", "late")
+        assert result.status == STAGE_ERROR
 
 
 class TestCollectionOnlyAdapterFailsClosedNotCrashed:
