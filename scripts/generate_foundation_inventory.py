@@ -66,10 +66,26 @@ def main() -> None:
 
     # Storage
     capabilities["raw_storage_content_addressed"] = "VERIFIED" if (REPO_ROOT / "data/rebuild/raw").exists() else "NOT_STARTED"
-    capabilities["normalized_storage_idempotent"] = "NOT_STARTED"  # NormalizedStore.write() still unconditional-appends; consumer-side dedupe_scoreboard() exists as a workaround, not a fix
-    # Checked live: asof.py is fixed and tested (10 tests) but real_callers_of("asof")
-    # is empty — no real pipeline script calls it. Fixed infrastructure, not yet wired in.
-    capabilities["point_in_time_join_utility"] = "PARTIAL"
+    # Verified by grep: every real NormalizedStore.write() call site in
+    # collectors.py (MLB/NBA-WNBA/NFL/Soccer/Tennis scoreboard writes, the
+    # only real .norm.write() callers in the repo) now passes
+    # primary_key=["event_id"], and the write path itself is atomic
+    # (temp file + rename). MarketStore.write_books() and
+    # FeatureStore.write_snapshot() got the same atomic/idempotent
+    # treatment. Real caveat: primary_key is opt-in per call, not enforced
+    # by the storage layer itself — a future caller could still omit it.
+    capabilities["normalized_storage_idempotent"] = "VERIFIED"
+    # Real caller found and wired: mlb_features.point_in_time_probable_starters()
+    # (used by scripts/mlb_shadow_run.py) calls point_in_time_join()
+    # directly — verified by grep on mlb_features.py's own source, not
+    # inferred. The rolling-feature lookback windows (pitcher/bullpen) are
+    # a genuinely different shape (aggregate many prior rows, not attach one
+    # latest observation) and still implement their own filtering — VERIFIED
+    # means "has a real caller," not "is the only PIT mechanism in the repo."
+    capabilities["point_in_time_join_utility"] = "VERIFIED" if re.search(
+        r"from \.asof import point_in_time_join",
+        (REPO_ROOT / "src/model_prediction/rebuild/mlb_features.py").read_text(),
+    ) else "PARTIAL"
     capabilities["mlb_feature_builders_own_pit_logic"] = "OPERATIONAL"  # mlb_features.py implements its own point-in-time filtering directly, verified by real backtests
 
     # Identity
@@ -93,7 +109,16 @@ def main() -> None:
     capabilities["conservative_probability_bootstrap_uncertainty"] = "VERIFIED"  # BootstrapMLBEnsemble, real per-row empirical bound applied uniformly to moneyline/spread/total, replaces flat 3% haircut; still missing calibration/lineup/missingness/model-disagreement components of CLAUDE.md's full spec
 
     # Execution evidence
-    capabilities["real_quote_depth"] = "NOT_STARTED"  # Polymarket source doesn't expose this; fabricated 999.0 still in mlb_market_matching.py
+    # Real fix, not a new source: available_depth=999.0 (fabricated) is gone
+    # — real_market_candidates() now sets depth_available=False honestly,
+    # and decision.py's gate fails closed on that regardless of
+    # min_depth_units. NOT_STARTED is still correct here because the
+    # underlying capability (a genuine depth-providing source) still
+    # doesn't exist — this capability is about having real depth data, not
+    # about honestly disclosing its absence (that's covered by the
+    # honest-failure behavior itself, verified by
+    # test_real_candidates_honestly_mark_depth_unavailable_not_fabricated).
+    capabilities["real_quote_depth"] = "NOT_STARTED"
     capabilities["real_quote_age"] = "VERIFIED"  # real_quote_age_seconds() computes now-observed_at_utc from real provenance timestamps, fails closed to inf on missing/unparseable data; 3 tests
     capabilities["order_book_walking"] = "NOT_STARTED"
 
@@ -121,9 +146,8 @@ def main() -> None:
     capabilities["ci_attached_to_current_head"] = "UNVERIFIED"  # no gh CLI auth available in this session — genuinely unknown, not assumed passing
 
     known_blockers = [
-        "NormalizedStore.write() still unconditionally concatenates — no real primary-key idempotency at the storage layer (consumer-side dedupe_scoreboard() is a workaround for MLB only)",
-        "point_in_time_join() is now correct and tested but is dead code — the real MLB pipeline uses its own point-in-time filtering in mlb_features.py instead of this shared utility",
-        "Real order-book depth is unavailable from the current Polymarket source — available_depth remains a fabricated 999.0 placeholder in mlb_market_matching.py (quote_age_seconds itself is real)",
+        "Real order-book depth still doesn't exist as a data source — real_market_candidates() now honestly sets depth_available=False instead of a fabricated 999.0 (fixed), but that only makes every real market correctly fail INSUFFICIENT_DEPTH; it doesn't create the missing capability. Order-book walking (walk_asks) is also NOT_STARTED — nothing to walk without a real depth source.",
+        "point_in_time_join() now has one real caller (mlb_shadow_run.py's probable-starter lookup, via mlb_features.point_in_time_probable_starters) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own point-in-time filtering directly — a different computational shape (aggregate a window of prior rows vs. attach one latest observation), not yet migrated and not obviously a drop-in fit for the shared utility as written",
         "8 of the shadow ledger's 16 required tables (raw_snapshots, normalized_observations, feature_snapshots, dataset_manifests, model_artifacts, calibration_artifacts, closing_prices, reviews) are schema-only — no insert/query methods, nothing writes to them yet",
         "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained)",
         "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck",

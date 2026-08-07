@@ -1023,3 +1023,113 @@ reran `scripts/mlb_shadow_run.py --date 2026-08-06`, confirmed real
 `"uncalibrated_haircut_v1"`), and that the ledger wiring/idempotency fixes
 from the prior checkpoint still hold (2 predictions, 32 trade decisions, 0
 duplicates on rerun).
+
+## Shared-infrastructure session: storage atomicity/idempotency, real depth honesty, PIT wiring (2026-08-07)
+
+Session goal, set by an external review of the prior state: stop doing more
+MLB model-quality work and clear the shared-foundation gaps the review
+identified by re-reading the actual code (not the previously-generated
+status doc, which was stale). Three real fixes landed, each independently
+committed, tested, and live-verified — not a single "do everything" batch.
+
+**1. Storage-wide atomic writes + universal scoreboard idempotency
+(`ea973f3`).** `NormalizedStore.write()`, `MarketStore.write_books()`, and
+`FeatureStore.write_snapshot()` all wrote straight to the final Parquet
+path with no temp-file+rename, unlike `RawStore`. `write_books()` also
+concatenated unconditionally with zero primary-key awareness — a retried
+collection call could write exact-duplicate market rows undetectably.
+`FeatureStore.write_snapshot()` explicitly said "overwrites for that
+horizon," destroying prior versions. Also confirmed only `MLBCollector`
+passed `primary_key=["event_id"]` to `NormalizedStore.write()` —
+NBA/WNBA/NFL/Soccer/Tennis scoreboard writes did not, so the same
+duplicate-row bug fixed for MLB in `a4e03a1` was still live everywhere
+else. Fixed: shared `_atomic_write_parquet()` helper now backs all three
+stores; `MarketStore.write_books()` dedupes on a real key (market_id/
+team_or_side/line/observed_at_utc); `primary_key=["event_id"]` added to the
+4 remaining scoreboard writes; `FeatureStore` now writes immutable
+per-snapshot-hash files plus a `latest.json` version manifest (currently
+unused by any real caller — the interface is now correct for whenever one
+exists). New `tests/rebuild/test_normalized_idempotency.py` — named in
+CLAUDE.md's own required-tests list but never created until now. **878
+tests pass** (up from 870).
+
+**2. Removed fabricated `available_depth=999.0`, fails closed honestly
+(`d516ab3`).** CLAUDE.md Part 3 §2 is explicit: unavailable depth must be
+marked `depth_available=false`, not fabricated, and must fail economic
+qualification. `real_market_candidates()` did the opposite — set
+`available_depth=999.0` on every real candidate, trivially clearing
+`decision.py`'s `min_depth_units=1.0` gate every time; `INSUFFICIENT_DEPTH`
+existed as a reason code but could never actually fire. Worse,
+`mlb_shadow_run.py` had an explicit `SizeLimits(min_depth_units=0.0)`
+"workaround" comment — the same fabrication, just with extra steps. Fixed:
+`MarketEvaluation` gained `depth_available: bool = True`;
+`_quote_gate_reason()` checks `not candidate.depth_available` before the
+numeric comparison, so a market with genuinely unknown depth fails closed
+regardless of how low the configured minimum is (closes the
+`min_depth_units=0.0` loophole specifically, not just the 999.0 one);
+`real_market_candidates()` now sets `available_depth=0.0,
+depth_available=False` honestly; the shadow-run workaround is removed,
+using default `SizeLimits()`. **Verified live**: reran
+`scripts/mlb_shadow_run.py --date 2026-08-06` — outcome unchanged (0 BET,
+same as before; this run's market data was already stale so
+`STALE_QUOTE`/alignment gates fire first for these particular 32
+candidates), but the depth gate itself is now provably real per a new test
+proving a `depth_available=False` candidate is rejected even at
+`min_depth_units=0.0`. **880 tests pass** (up from 878).
+
+**3. Wired `point_in_time_join()` into a real caller, closed a live
+starter-leak gap (`90d5826`).** `point_in_time_join()` was fixed and
+tested (Phase 3) but genuinely dead code — no real feature builder called
+it. The pitcher/bullpen rolling-feature lookback windows in
+`mlb_features.py` aren't a natural fit (they aggregate a window of prior
+rows, not attach one latest observation), but
+`mlb_shadow_run.py`'s probable-starter lookup was exactly that shape, and
+had a real bug: `probables_by_event[rec["event_id"]] = rec` kept whichever
+record was *last in the file* per event, not the newest observation
+strictly before that game's real `decision_time_utc`. **Verified live**:
+152 of 163 real events in
+`data/point_in_time/mlb_probable_starters.jsonl` have more than one
+record (real revisions over time) — a revision observed after the "late"
+horizon's T-60m cutoff could have silently leaked into a decision that
+shouldn't have seen it yet. Didn't happen to bite tonight's real slate
+(reran before/after the fix: identical predictions, 49.0%/51.0% and
+48.5%/51.5%, and the ledger correctly deduped all 32 decisions as
+idempotent), but was a live latent bug, not a hypothetical one. Extracted
+the fix into a real, independently tested function,
+`point_in_time_probable_starters()` in `mlb_features.py` (previously
+inline, untestable script logic), with 5 new tests including one that
+directly proves a post-cutoff revision does not leak in. **885 tests
+pass** (up from 880).
+
+**Foundation inventory regenerated** (`outputs/rebuild/foundation_status.md`,
+`scripts/generate_foundation_inventory.py`) to reflect all three fixes with
+code-derived checks, not manual claims — `normalized_storage_idempotent`
+and `point_in_time_join_utility` both moved from NOT_STARTED/PARTIAL to
+VERIFIED, each backed by a grep-verified real caller or call site, not an
+assertion.
+
+**What this session deliberately did not attempt, and why:** the review's
+full priority list also included canonical identity wiring (Phase 4,
+still INTERFACE_ONLY), a formal schema registry (Phase 5, not started),
+the shared horizon builder (Phase 7, still INTERFACE_ONLY), the 8 remaining
+schema-only shadow-ledger tables, a shared multi-sport CLI (Phase 13, not
+started), and real order-book depth (no data source exists to integrate —
+this is not an engineering task that can be completed by writing code
+alone). Each of the three items actually shipped this session was chosen
+because it was well-scoped, testable, and independently verifiable in one
+sitting without cutting corners on the same rigor (small commits, live
+verification, honest reporting) the rest of this branch has used. The
+remaining items are real, multi-step efforts in their own right — treating
+them as a single afternoon's work risked producing exactly the kind of
+looks-complete-but-isn't work this project's own rules were written to
+prevent.
+
+Priority list, unchanged in substance from the prior entry: (1) more real
+backfill days remains the single highest-leverage open item for MLB
+predictive qualification; (2) canonical identity (Phase 4); (3) formal
+schema registry (Phase 5); (4) the shared horizon builder (Phase 7); (5)
+the 8 schema-only shadow-ledger tables; (6) shared multi-sport CLI (Phase
+13); (7) a genuine order-book-depth source, if one can be found — otherwise
+depth-dependent economic qualification remains permanently blocked, which
+is the honest state, not a gap to paper over. No sport beyond MLB has
+started, per CLAUDE.md's explicit sequencing.

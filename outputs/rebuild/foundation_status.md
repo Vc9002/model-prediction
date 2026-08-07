@@ -1,15 +1,15 @@
 # Foundation Inventory
 
-Generated from code at commit `001228c2b3ab527630f152f4743819127ec6f9b6` on branch `rebuild/clean-slate-v1`.
-Python: Python 3.14.5. Total tests passing: 870.
+Generated from code at commit `90d582678ac5384162bd96672a7ab178bd8eae44` on branch `rebuild/clean-slate-v1`.
+Python: Python 3.14.5. Total tests passing: 885.
 
 ## Capability status
 
 | Capability | Status |
 |---|---|
 | `raw_storage_content_addressed` | VERIFIED |
-| `normalized_storage_idempotent` | NOT_STARTED |
-| `point_in_time_join_utility` | PARTIAL |
+| `normalized_storage_idempotent` | VERIFIED |
+| `point_in_time_join_utility` | VERIFIED |
 | `mlb_feature_builders_own_pit_logic` | OPERATIONAL |
 | `canonical_identity_registry` | INTERFACE_ONLY |
 | `mlb_starter_name_to_id_resolution` | OPERATIONAL |
@@ -44,9 +44,8 @@ Python: Python 3.14.5. Total tests passing: 870.
 
 ## Known blockers
 
-- NormalizedStore.write() still unconditionally concatenates — no real primary-key idempotency at the storage layer (consumer-side dedupe_scoreboard() is a workaround for MLB only)
-- point_in_time_join() is now correct and tested but is dead code — the real MLB pipeline uses its own point-in-time filtering in mlb_features.py instead of this shared utility
-- Real order-book depth is unavailable from the current Polymarket source — available_depth remains a fabricated 999.0 placeholder in mlb_market_matching.py (quote_age_seconds itself is real)
+- Real order-book depth still doesn't exist as a data source — real_market_candidates() now honestly sets depth_available=False instead of a fabricated 999.0 (fixed), but that only makes every real market correctly fail INSUFFICIENT_DEPTH; it doesn't create the missing capability. Order-book walking (walk_asks) is also NOT_STARTED — nothing to walk without a real depth source.
+- point_in_time_join() now has one real caller (mlb_shadow_run.py's probable-starter lookup, via mlb_features.point_in_time_probable_starters) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own point-in-time filtering directly — a different computational shape (aggregate a window of prior rows vs. attach one latest observation), not yet migrated and not obviously a drop-in fit for the shared utility as written
 - 8 of the shadow ledger's 16 required tables (raw_snapshots, normalized_observations, feature_snapshots, dataset_manifests, model_artifacts, calibration_artifacts, closing_prices, reviews) are schema-only — no insert/query methods, nothing writes to them yet
 - conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained)
 - Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck
