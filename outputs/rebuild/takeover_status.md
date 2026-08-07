@@ -1259,3 +1259,149 @@ correctly deferred to the model-development phase (more MLB backfill,
 multi-model-family OOF ensemble). Real order-book depth remains an
 external blocker, not internal foundation debt, per this session's own
 explicit instruction to treat it that way.
+
+## Model-development phase — Checkpoint 0 + Task 1 (2026-08-08)
+
+Foundation frozen (above). This entry starts the next phase: MLB
+train-serving correctness fixes before any large backfill or model-family
+comparison, per this phase's own explicit ordering (correctness before
+scale).
+
+**Checkpoint 0 — preflight, real commands run:**
+
+```bash
+git status --short        # clean
+git branch --show-current # rebuild/clean-slate-v1
+git rev-parse HEAD        # 4f0bea8c78e1085df443c9a5fabcbcd57194c084 (start)
+git log --oneline -20
+python --version           # `python` not on PATH; python3 -> 3.14.5
+PYTHONPATH=src:. .venv/bin/python -m pytest -q
+.venv/bin/ruff check src/model_prediction/rebuild tests/rebuild
+```
+
+**Start-of-phase state:** HEAD `4f0bea8` (a `shadow.db` idempotent-touch
+data commit — the substantive code baseline is `21a2684`, "regenerate
+model_benchmark.md with real MLB Phase 3 results"). Working tree clean.
+1093 passed, 1 skipped (49.71s). `ruff check` on rebuild scope: clean.
+
+**Current benchmark** (`outputs/rebuild/model_benchmark.md`, from
+`21a2684`, unchanged by this entry): XGBoost OOF Brier 0.233 vs. control
+0.255 — real, but the advantage is concentrated in one fold (barely wins
+fold 0, loses fold 1, wins heavily fold 2) on tiny per-fold training sets
+(24/44/63 games). Not yet a basis for choosing XGBoost; needs Task 9's
+real nested chronological validation and a much larger sample before that
+read is trustworthy either way.
+
+**Current data range:** real ESPN scoreboard + Statcast backfill spans
+2026-07-26 through the most recent daily-pipeline collection (2026-08-07
+as of this entry) — about 2 weeks, not the 1-2 full seasons later tasks
+in this phase call for. Real archived point-in-time probable-starter
+observations (`data/point_in_time/mlb_probable_starters.jsonl`) cover the
+identical window (2533 records total, `pit_eligible=True` for the
+genuinely prospective ones, `pit_eligible=False`/
+`retroactive_or_unverifiable_non_pit` for the rest).
+
+**Current matched-game count:** pre-fix (`21a2684`), 126 real unique
+matched games via Statcast `game_pk` join. Post-Task-1-fix, the matching
+criterion itself changed (starters no longer require a Statcast `game_pk`
+match at all — see Task 1 below), so this number isn't directly
+comparable; a real, fresh count is captured below.
+
+**Current consumed final-test range:**
+`outputs/rebuild/test_consumption_registry.json` — `mlb_moneyline`:
+`2026-08-02T20:05Z` through `2026-08-04T23:40Z`, consumed
+`2026-08-07T19:08:55Z`, n=21, accuracy=0.381, brier=0.3211,
+RESEARCH_ONLY. **Never reused for promotion** — see the process note
+below about a mistake that nearly did exactly that.
+
+### Task 1 — historical starter train-serving parity, fixed
+
+**Real bug confirmed by reading the code, not assumed:**
+`build_game_feature_row()` (consumed by all three training scripts plus
+`mlb_shadow_pipeline.py`'s own walk-forward retraining step) called
+`identify_starters(pitches)` on the completed game's **own** Statcast
+pitches — the actual pitcher who threw, determined only after the game
+happened. Live inference (`build_live_game_feature_row()`) already
+resolved starters from the point-in-time probable-starter archive. Same
+feature names (`home_sp_*`), two different real definitions of "starter"
+depending on whether the row came from training or live serving — a
+genuine train-serving mismatch that could let a late starter swap leak
+into a historical decision that shouldn't have seen it yet.
+
+**Fix:** `resolve_horizon_starter_names()` (new,
+`mlb_features.py`) resolves the horizon-aware point-in-time-valid
+probable starter the identical way `build_live_game_feature_row()`
+already did, via `point_in_time_probable_starters()`. Records with
+`pit_eligible=False` are excluded even though the point-in-time join's
+own timestamp filter already makes them structurally unselectable for
+any pre-event decision time (defense in depth, not covering a second
+bug). `build_game_feature_row()` now uses this instead of
+`identify_starters()` for the CURRENT game's own starter identity
+(`identify_starters()` remains legitimately used elsewhere, for
+excluding a *prior, already-completed* game's actual starter from
+bullpen workload — not a leak, since that game is already over by the
+time it's prior history). When no valid point-in-time probable exists
+(or a resolved name can't be matched to a real Statcast pitcher ID), the
+row is kept with starter features zeroed and
+`starters_known=0.0`/`starter_missing_reason` set — never silently
+backfilled with the actual starter.
+
+**Related bug fixed in the same commit:** `HORIZON_HOURS_BEFORE["late"]`
+was `0.5` (30 minutes), contradicting both this phase's own "late: start
+minus 60 minutes" spec and `mlb_shadow_pipeline.py`'s live decision-time
+computation, which had already hardcoded 60 minutes directly rather than
+using the shared constant. Now both agree at `1.0`.
+
+**Real regression tests** (`tests/rebuild/test_mlb_features.py`): a
+starter revision observed after the late horizon's decision time must
+not leak in; a retroactively-scraped record must never be used even if
+its timestamp would otherwise pass; and an end-to-end
+`build_game_feature_row()` case where the real actual starter and the
+real point-in-time probable are different pitchers with distinct
+prior-history signals (velocities 99.0 vs 80.0) — the row must carry the
+probable's signal (99.0), not the actual starter's, even though the
+actual starter really did throw the game's first pitch.
+
+**1101 tests pass** (up from 1093), 1 skipped. `ruff check` clean.
+Pushed as `e3d7b5b` (`fix(rebuild): make MLB historical starter features
+horizon-safe`).
+
+**Real effect on real data, verified — and a process mistake caught and
+corrected:** to confirm the fix does real, non-trivial work (not just
+pass synthetic unit tests), ran
+`scripts/train_mlb_rebuild_real_features.py` once against the real
+backfilled data. Real console output: `161` completed games, `0`
+team-unresolved, `104/161` with a point-in-time-valid probable starter
+for both teams at horizon=late, `57/161` (35%) now honestly flagged
+`starters_known=0` — games where the pre-fix code would have silently
+used the actual (leaky) starter instead. That's real, meaningful
+confirmation the fix changes behavior on real data, not just in fixtures.
+
+**The mistake:** that script also consumes-and-marks the final test on
+every run as a side effect (`test_consumption_registry.json`) — a
+genuine "do not proceed to model tuning if a consumed final test is used
+for feature/model selection" violation risk, and directly against this
+phase's own explicit instruction not to touch the existing consumed
+range or manufacture a new one outside the proper procedure (only after
+Tasks 2-10 freeze the dataset builder, features, tuning, ensemble, and
+calibration). The run silently overwrote the registry with a new
+consumed range (`2026-08-04T22:35Z`-`2026-08-07T01:40Z`, n=26,
+accuracy=0.577, brier=0.2483) and rewrote
+`mlb_split_manifest.json`/`mlb_training_results_real_features.json`/the
+`mlb-two-head-real-features-v1` challenger artifact to match. **Caught
+before any decision was made from that result** and reverted all four
+files (`git checkout --`) back to their committed state — the original
+`2026-08-02T20:05Z`-`2026-08-04T23:40Z` consumption remains the only real
+one. Lesson for the rest of this phase: `train_mlb_rebuild_real_features.py`
+and `train_mlb_xgboost_ensemble.py` both touch the registry on every run
+(grep-confirmed); `train_mlb_feature_ablation.py` does not. Verifying a
+fix's real-data effect from here on should read the printed diagnostics
+from those two scripts without treating their held-out numbers as
+anything but immediately-discarded scratch output, or should use the
+ablation script / a standalone snippet instead.
+
+**Next task:** Task 2 — doubleheader-safe ESPN-Statcast game matching.
+`find_statcast_game_pk()` is no longer called by `build_game_feature_row()`
+(Task 1 removed that dependency for starter resolution) but remains,
+unused and still doubleheader-unsafe, for this task to replace with a
+persisted canonical-event <-> `game_pk` mapping.
