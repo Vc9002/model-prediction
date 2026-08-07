@@ -26,6 +26,24 @@ from model_prediction.rebuild.sport_adapter import SUPPORTED_SPORTS, build_adapt
 
 STAGES = ("collect", "build_features", "predict", "match_markets", "decide")
 
+# Task 5 (true resume system): only these two stages are honestly
+# skippable on resume. Both are disk-backed and idempotent (RawStore/
+# NormalizedStore for collect, FeatureStore for build_features) -- a
+# resumed invocation re-reads their real prior output straight from disk
+# regardless of whether this call actually re-executes them, so skipping
+# a completed one is a genuine time/network-call saving, not a shortcut
+# that changes behavior. predict/match_markets/decide are NOT in this set
+# on purpose: MLBAdapter (sport_adapter.py) holds their real output in
+# `self._state`, populated only by predict() running earlier in THIS
+# process -- a fresh process resuming after a crash has no such state, so
+# skipping any of these three would make match_markets/decide fail closed
+# against a state that was never populated this run, not silently succeed
+# against stale data. They correctly always re-run; real cross-process
+# resume for them requires real fitted-model artifact reload (see
+# mlb_shadow_pipeline.py's train_through() docstring for that disclosed,
+# separate gap), not orchestration logic.
+RESUMABLE_STAGES = frozenset({"collect", "build_features"})
+
 
 def run(
     sport: str, date: str, horizon: str, data_root: str, only_stage: str | None,
@@ -45,13 +63,25 @@ def run(
     run_id = ledger.record_run(sport, run_type="rebuild-shadow-cli", horizon=horizon,
                                 params={"date": date, "only_stage": only_stage}, run_id=resume_run_id)
 
+    # Real per-stage completion check, not just a fresh run_id -- see
+    # RESUMABLE_STAGES above for exactly which stages this can honestly
+    # skip and why. Only consulted when the caller actually asked to
+    # resume; a fresh run_id always has an empty completed-stages map
+    # anyway (record_stage_result() is scoped per run_id), so this is a
+    # no-op distinction, kept explicit for clarity.
+    already_completed = ledger.get_completed_stages(run_id) if resume_run_id else {}
+
     stages_to_run = [only_stage] if only_stage else list(STAGES)
     report: dict = {"run_id": run_id, "sport": sport, "date": date, "horizon": horizon, "stages": {}}
 
     for stage in stages_to_run:
+        if stage in RESUMABLE_STAGES and already_completed.get(stage) == "SUCCESS":
+            report["stages"][stage] = {"status": "SKIPPED_ALREADY_COMPLETE", "detail": {}}
+            continue
         method = getattr(adapter, stage)
         result = method(date, run_id=run_id) if stage == "collect" else method(date, horizon, run_id=run_id)
         report["stages"][stage] = {"status": result.status, "detail": result.detail}
+        ledger.record_stage_result(run_id, stage, result.status, result.detail)
         # A stage that didn't succeed doesn't invalidate stages that already
         # ran, but there's no real reason to keep running downstream stages
         # against data that stage was supposed to produce -- stop honestly
@@ -76,11 +106,14 @@ def main() -> None:
     parser.add_argument("--decision-only", action="store_true")
     parser.add_argument(
         "--resume-run-id", default=None,
-        help="Reuse this run_id instead of minting a new one (record_run() is idempotent on it). "
-             "Real, disclosed limitation: this continues the same ledger lineage row, not in-memory "
-             "state -- MLB's predict/match_markets/decide need MLBAdapter.state from an earlier stage "
-             "in the SAME process; --decision-only --resume-run-id in a fresh process still correctly "
-             "fails closed with 'predict() must run first', it does not silently skip that requirement.",
+        help="Reuse this run_id instead of minting a new one (record_run() is idempotent on it), and "
+             "genuinely skip stages already recorded SUCCESS for it in run_stages -- but only collect "
+             "and build_features (see RESUMABLE_STAGES): both are disk-backed and idempotent, so a "
+             "fresh process re-reads their real prior output regardless of whether this call reruns "
+             "them. predict/match_markets/decide always re-run, on purpose: they need MLBAdapter.state "
+             "from an earlier stage in the SAME process, which a resumed process never has -- "
+             "--decision-only --resume-run-id in a fresh process still correctly fails closed with "
+             "'predict() must run first', it does not silently skip that requirement.",
     )
     args = parser.parse_args()
 

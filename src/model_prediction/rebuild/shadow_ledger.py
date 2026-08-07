@@ -121,6 +121,25 @@ class ShadowLedger:
                 schema_version TEXT NOT NULL
             );
 
+            -- Task 5 (true resume system): real per-stage completion
+            -- tracking, closing the gap where --resume-run-id only
+            -- continued the ledger's `runs` row -- there was no record of
+            -- which of collect/build_features/predict/match_markets/decide
+            -- had actually completed for a given run, so a resumed
+            -- invocation always re-ran every stage from scratch.
+            -- UNIQUE(run_id, stage) makes record_stage_result() idempotent
+            -- on rerun -- same shape as record_run()'s own idempotency.
+            CREATE TABLE IF NOT EXISTS run_stages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                stage TEXT NOT NULL,
+                status TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                detail_json TEXT,
+                artifact_hash TEXT,
+                UNIQUE(run_id, stage)
+            );
+
             -- TODO: schema only -- no insert/query methods implemented yet.
             -- Fields follow FOUNDATION_COMPLETION.md Phase 2's raw snapshot
             -- record contract.
@@ -507,6 +526,44 @@ class ShadowLedger:
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
         return dict(row) if row else None
+
+    # ── run stages (Task 5: true resume) ─────────────────────────────
+
+    def record_stage_result(
+        self,
+        run_id: str,
+        stage: str,
+        status: str,
+        detail: dict[str, Any] | None = None,
+        artifact_hash: str | None = None,
+    ) -> None:
+        """Record that `stage` reached `status` for `run_id` -- the real
+        completion record a resumed invocation checks before deciding
+        whether to re-run a stage. `INSERT OR REPLACE` on the real
+        UNIQUE(run_id, stage) constraint: rerunning the identical stage for
+        the identical run_id updates the one row (latest status wins) rather
+        than accumulating duplicate history -- this table records current
+        per-stage state, not an append-only event log (predictions/
+        trade_decisions elsewhere in this class are append-only; this
+        deliberately is not, since "did stage X complete for run Y" has
+        exactly one current answer)."""
+        self.conn.execute(
+            """INSERT OR REPLACE INTO run_stages(run_id, stage, status, completed_at, detail_json, artifact_hash)
+               VALUES(?, ?, ?, ?, ?, ?)""",
+            (run_id, stage, status, utc_now(),
+             json.dumps(detail, default=str) if detail else None, artifact_hash),
+        )
+        self.conn.commit()
+
+    def get_completed_stages(self, run_id: str) -> dict[str, str]:
+        """Real stage -> status map for everything already recorded for
+        `run_id` -- what a resumed invocation queries to decide which
+        stages it can honestly skip. Empty dict for an unknown or
+        brand-new run_id, not an error."""
+        rows = self.conn.execute(
+            "SELECT stage, status FROM run_stages WHERE run_id=?", (run_id,)
+        ).fetchall()
+        return {row["stage"]: row["status"] for row in rows}
 
     # ── predictions (append-only) ────────────────────────────────────
 

@@ -202,6 +202,52 @@ class TestRunRecording:
         assert count == 1
 
 
+class TestRunStages:
+    """Task 5: true resume system -- real per-stage completion tracking,
+    what a resumed invocation queries to decide which stages it can
+    honestly skip."""
+
+    def test_get_completed_stages_is_empty_for_an_unknown_run(self, ledger: ShadowLedger):
+        assert ledger.get_completed_stages("does-not-exist") == {}
+
+    def test_record_then_get_round_trips(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb", run_id="run-1")
+        ledger.record_stage_result(run_id, "collect", "SUCCESS", {"games": 5})
+
+        completed = ledger.get_completed_stages(run_id)
+
+        assert completed == {"collect": "SUCCESS"}
+
+    def test_multiple_stages_accumulate(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb", run_id="run-1")
+        ledger.record_stage_result(run_id, "collect", "SUCCESS")
+        ledger.record_stage_result(run_id, "build_features", "SUCCESS")
+        ledger.record_stage_result(run_id, "predict", "NO_DATA")
+
+        completed = ledger.get_completed_stages(run_id)
+
+        assert completed == {"collect": "SUCCESS", "build_features": "SUCCESS", "predict": "NO_DATA"}
+
+    def test_rerecording_the_same_stage_updates_not_duplicates(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb", run_id="run-1")
+        ledger.record_stage_result(run_id, "collect", "ERROR")
+        ledger.record_stage_result(run_id, "collect", "SUCCESS")
+
+        count = ledger.conn.execute(
+            "SELECT COUNT(*) AS n FROM run_stages WHERE run_id=? AND stage=?", (run_id, "collect")
+        ).fetchone()["n"]
+        assert count == 1
+        assert ledger.get_completed_stages(run_id)["collect"] == "SUCCESS"
+
+    def test_stages_are_scoped_per_run_id(self, ledger: ShadowLedger):
+        run_a = ledger.record_run("mlb", run_id="run-a")
+        run_b = ledger.record_run("mlb", run_id="run-b")
+        ledger.record_stage_result(run_a, "collect", "SUCCESS")
+
+        assert ledger.get_completed_stages(run_a) == {"collect": "SUCCESS"}
+        assert ledger.get_completed_stages(run_b) == {}
+
+
 class TestPredictionRecordingAcceptsRealDataclass:
     """Proves record_prediction takes a SportsForecast-shaped dataclass
     instance directly -- not a reinvented parallel dict schema."""

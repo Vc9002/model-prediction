@@ -44,3 +44,68 @@ class TestResumeRunId:
             "mlb", "2026-08-06", "late", str(tmp_path), "decide", resume_run_id=r1["run_id"],
         )
         assert r2["stages"]["decide"]["status"] == "ERROR"
+
+
+class TestTrueResumeSkipsCompletedResumableStages:
+    """Task 5: true resume system -- a resumed invocation must genuinely
+    skip stages already recorded SUCCESS for that run_id, not just reuse
+    the ledger row and blindly re-run everything. Directly manipulates
+    run_stages (rather than depending on a real network collect()
+    succeeding in this offline test environment) to deterministically
+    exercise the skip path itself."""
+
+    def test_collect_is_skipped_when_already_recorded_success(self, tmp_path):
+        r1 = rebuild_shadow_cli.run("nba", "2026-08-06", "late", str(tmp_path), "collect")
+        run_id = r1["run_id"]
+
+        ledger = ShadowLedger(f"{tmp_path}/shadow.db")
+        ledger.record_stage_result(run_id, "collect", "SUCCESS", {"games": 3})
+        ledger.close()
+
+        r2 = rebuild_shadow_cli.run(
+            "nba", "2026-08-06", "late", str(tmp_path), "collect", resume_run_id=run_id,
+        )
+
+        assert r2["stages"]["collect"]["status"] == "SKIPPED_ALREADY_COMPLETE"
+
+    def test_collect_is_not_skipped_without_resume_run_id(self, tmp_path):
+        r1 = rebuild_shadow_cli.run("nba", "2026-08-06", "late", str(tmp_path), "collect")
+        run_id = r1["run_id"]
+
+        ledger = ShadowLedger(f"{tmp_path}/shadow.db")
+        ledger.record_stage_result(run_id, "collect", "SUCCESS")
+        ledger.close()
+
+        # No resume_run_id passed -- a brand-new run_id is minted, so there
+        # is genuinely nothing recorded for it to skip.
+        r2 = rebuild_shadow_cli.run("nba", "2026-08-06", "late", str(tmp_path), "collect")
+
+        assert r2["stages"]["collect"]["status"] != "SKIPPED_ALREADY_COMPLETE"
+
+    def test_predict_is_never_skipped_even_if_marked_complete(self, tmp_path):
+        # predict/match_markets/decide are deliberately excluded from
+        # RESUMABLE_STAGES -- a resumed process has no real MLBAdapter
+        # in-memory state, so skipping predict() here would let
+        # match_markets()/decide() silently run against nothing rather
+        # than correctly failing closed.
+        r1 = rebuild_shadow_cli.run("mlb", "2026-08-06", "late", str(tmp_path), "predict")
+        run_id = r1["run_id"]
+
+        ledger = ShadowLedger(f"{tmp_path}/shadow.db")
+        ledger.record_stage_result(run_id, "predict", "SUCCESS")
+        ledger.close()
+
+        r2 = rebuild_shadow_cli.run(
+            "mlb", "2026-08-06", "late", str(tmp_path), "predict", resume_run_id=run_id,
+        )
+
+        assert r2["stages"]["predict"]["status"] != "SKIPPED_ALREADY_COMPLETE"
+
+    def test_stage_result_is_recorded_in_the_ledger_after_a_real_run(self, tmp_path):
+        r1 = rebuild_shadow_cli.run("nba", "2026-08-06", "late", str(tmp_path), "collect")
+
+        ledger = ShadowLedger(f"{tmp_path}/shadow.db")
+        completed = ledger.get_completed_stages(r1["run_id"])
+        ledger.close()
+
+        assert completed.get("collect") == r1["stages"]["collect"]["status"]
