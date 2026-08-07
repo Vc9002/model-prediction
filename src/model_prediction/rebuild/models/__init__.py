@@ -132,6 +132,34 @@ class JointScoreDistribution:
         self.seed = seed
         self.rng = np.random.default_rng(seed)
 
+    def _simulate_scores(self, away_exp: float, home_exp: float) -> tuple[np.ndarray, np.ndarray]:
+        """The one real simulation call site both predict_game() and
+        probability_for_market() must use -- real bug fixed here:
+        probability_for_market() previously always simulated with
+        self.rng.poisson(...) directly, silently ignoring self.method.
+        A model configured with method="negative_binomial" would price
+        moneyline (via predict_game(), which did respect self.method)
+        from a genuinely different distribution than spread/total (via
+        probability_for_market(), always Poisson) for the identical real
+        game -- exactly the "disconnected classifier silently contradicts
+        the joint score distribution" failure mode CLAUDE.md's own
+        architecture section forbids, just within one class rather than
+        across two. Verified untested before this fix (zero references to
+        "negative_binomial" anywhere in tests/, confirmed via grep)."""
+        if self.method == "negative_binomial":
+            # NB with dispersion parameter for overdispersion in run scoring
+            # n parameter estimated from mean-variance relationship in MLB (~1.2×)
+            home_n = max(1, home_exp / 1.5)
+            away_n = max(1, away_exp / 1.5)
+            home_p = home_n / (home_n + home_exp)
+            away_p = away_n / (away_n + away_exp)
+            away_scores = self.rng.negative_binomial(away_n, away_p, self.n_sim)
+            home_scores = self.rng.negative_binomial(home_n, home_p, self.n_sim)
+        else:
+            away_scores = self.rng.poisson(away_exp, self.n_sim)
+            home_scores = self.rng.poisson(home_exp, self.n_sim)
+        return away_scores, home_scores
+
     def predict_game(
         self,
         event_id: str,
@@ -147,18 +175,7 @@ class JointScoreDistribution:
         home_exp = max(0.5, (total_intensity + home_advantage) / 2)
         away_exp = max(0.5, (total_intensity - home_advantage) / 2)
 
-        if self.method == "negative_binomial":
-            # NB with dispersion parameter for overdispersion in run scoring
-            # n parameter estimated from mean-variance relationship in MLB (~1.2×)
-            home_n = max(1, home_exp / 1.5)
-            away_n = max(1, away_exp / 1.5)
-            home_p = home_n / (home_n + home_exp)
-            away_p = away_n / (away_n + away_exp)
-            away_scores = self.rng.negative_binomial(away_n, away_p, self.n_sim)
-            home_scores = self.rng.negative_binomial(home_n, home_p, self.n_sim)
-        else:
-            away_scores = self.rng.poisson(away_exp, self.n_sim)
-            home_scores = self.rng.poisson(home_exp, self.n_sim)
+        away_scores, home_scores = self._simulate_scores(away_exp, home_exp)
 
         # Moneyline
         home_wins = int((home_scores > away_scores).sum())
@@ -192,11 +209,13 @@ class JointScoreDistribution:
         market_type: 'moneyline', 'spread', 'total', 'btts'
         selection: 'home', 'away', 'over', 'under'
         """
-        # Re-simulate for the specific query (or use cached)
+        # Re-simulate for the specific query (or use cached) -- via
+        # _simulate_scores() so this respects self.method exactly like
+        # predict_game() does. See _simulate_scores()'s own docstring for
+        # the real bug this fixes.
         away_exp = pred.away_expected_runs
         home_exp = pred.home_expected_runs
-        away_scores = self.rng.poisson(away_exp, self.n_sim)
-        home_scores = self.rng.poisson(home_exp, self.n_sim)
+        away_scores, home_scores = self._simulate_scores(away_exp, home_exp)
 
         if market_type == "moneyline":
             if selection == "home":

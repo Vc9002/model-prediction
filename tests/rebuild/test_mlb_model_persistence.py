@@ -47,6 +47,54 @@ class TestSeedIsIntrospectable:
         assert dist.seed == 777
 
 
+class TestNegativeBinomialMethodConsistency:
+    """Real bug fixed: probability_for_market() previously always
+    simulated with self.rng.poisson(...) directly, ignoring self.method --
+    a model configured with method="negative_binomial" priced moneyline
+    (via predict_game(), which did respect self.method) from a genuinely
+    different distribution than spread/total (via probability_for_market(),
+    always Poisson) for the identical real game. Both now route through
+    the one shared _simulate_scores() helper."""
+
+    def test_probability_for_market_uses_negative_binomial_when_configured(self):
+        dist = JointScoreDistribution(method="negative_binomial", n_sim=500, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+
+        # If probability_for_market() fell back to Poisson, calling the
+        # poisson sampler would succeed silently and the bug would pass
+        # undetected -- instead, swap in a fake rng whose .poisson() raises,
+        # proving the negative-binomial path is what actually executes.
+        # numpy's real Generator is a C type and doesn't allow monkeypatching
+        # individual bound methods, so the whole rng is replaced.
+        class _PoissonForbiddenRng:
+            def __init__(self, real_rng):
+                self._real = real_rng
+
+            def poisson(self, *args, **kwargs):
+                raise AssertionError("probability_for_market() called rng.poisson() despite method='negative_binomial'")
+
+            def negative_binomial(self, *args, **kwargs):
+                return self._real.negative_binomial(*args, **kwargs)
+
+        dist.rng = _PoissonForbiddenRng(np.random.default_rng(1))  # type: ignore[assignment]
+
+        prob = dist.probability_for_market(pred, "total", "over", line=8.5)
+        assert 0.0 <= prob <= 1.0
+
+    def test_predict_game_and_probability_for_market_agree_on_moneyline(self):
+        # Both paths must derive the same real moneyline probability from
+        # the identical configured method -- recomputing moneyline via
+        # probability_for_market() should closely match predict_game()'s
+        # own value (small Monte Carlo noise aside, both draw from the
+        # same distribution family and expected values).
+        dist = JointScoreDistribution(method="negative_binomial", n_sim=20000, seed=2)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=1.0)
+
+        recomputed_home_prob = dist.probability_for_market(pred, "moneyline", "home")
+
+        assert abs(recomputed_home_prob - pred.home_win_prob) < 0.05
+
+
 class TestModelSaveLoadRoundTrip:
     def test_deterministic_predictions_match_exactly_after_reload(self):
         data = _synthetic_training_data()
