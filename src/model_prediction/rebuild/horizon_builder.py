@@ -152,9 +152,24 @@ def build_mlb_horizon_dataset(
 
     df = result.to_dataframe()
     if df.height > 0:
+        # Real bug fixed here (found by external review, verified before
+        # fixing): this previously hashed only {game_date, horizon,
+        # event_ids} -- metadata, not the actual feature content.
+        # FeatureStore.write_snapshot() treats snapshot_hash as an
+        # immutable content identity (a write with an already-seen hash is
+        # a silent no-op, by design -- see storage.py). If the exact same
+        # date/horizon/event_ids were rebuilt after a real source
+        # correction (a probable-starter revision, a corrected Statcast
+        # pitch, a reprocessed weather observation), the metadata-only
+        # hash would be identical even though the real feature values
+        # changed -- the corrected data would silently never be
+        # persisted, masquerading as the stale version already on disk.
+        # Hash the actual row content instead, sorted by event_id so row
+        # order never affects the hash.
+        canonical_rows = sorted(rows, key=lambda r: r["event_id"])
         payload_hash_input = json.dumps(
-            {"game_date": game_date, "horizon": horizon, "event_ids": sorted(decision_times_out)},
-            sort_keys=True,
+            {"game_date": game_date, "horizon": horizon, "rows": canonical_rows},
+            sort_keys=True, default=str,
         ).encode("utf-8")
         snapshot_hash = hashlib.sha256(payload_hash_input).hexdigest()
         store = FeatureStore(f"{data_root}/features")

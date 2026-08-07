@@ -47,8 +47,56 @@
         "horizon",
         "decision_time_utc"
       ]
+    },
+    {
+      "sport": "mlb",
+      "horizon": "late",
+      "snapshot_hash": "59f8a20f9c49b8300eb59aa5e427c25d0394776740d4f62cc158b887c1eeb67c",
+      "created_at_utc": "2026-08-07T07:38:00.284045+00:00",
+      "row_count": 5,
+      "columns": [
+        "event_id",
+        "game_date",
+        "event_start_utc",
+        "home_team",
+        "away_team",
+        "home_starter_name",
+        "away_starter_name",
+        "home_sp_availability",
+        "home_sp_starts_seen",
+        "home_sp_avg_velocity",
+        "home_sp_k_pct",
+        "home_sp_bb_pct",
+        "home_sp_csw_pct",
+        "home_sp_whiff_pct",
+        "home_sp_days_rest",
+        "home_sp_pitches_last_start",
+        "away_sp_availability",
+        "away_sp_starts_seen",
+        "away_sp_avg_velocity",
+        "away_sp_k_pct",
+        "away_sp_bb_pct",
+        "away_sp_csw_pct",
+        "away_sp_whiff_pct",
+        "away_sp_days_rest",
+        "away_sp_pitches_last_start",
+        "home_bp_availability",
+        "home_bp_bullpen_pitches",
+        "home_bp_bullpen_avg_velocity",
+        "home_bp_bullpen_appearances",
+        "away_bp_availability",
+        "away_bp_bullpen_pitches",
+        "away_bp_bullpen_avg_velocity",
+        "away_bp_bullpen_appearances",
+        "park_factor",
+        "weather_availability",
+        "temp_f_mean",
+        "wind_mph_mean",
+        "horizon",
+        "decision_time_utc"
+      ]
     }
   ],
-  "latest_snapshot_hash": "7fa9f153187229b2843e0bcbc43e0dc44683994d39105cbba131f8dc7b9b4f8d",
-  "updated_at_utc": "2026-08-07T07:08:10.889345+00:00"
+  "latest_snapshot_hash": "59f8a20f9c49b8300eb59aa5e427c25d0394776740d4f62cc158b887c1eeb67c",
+  "updated_at_utc": "2026-08-07T07:38:00.287010+00:00"
 }

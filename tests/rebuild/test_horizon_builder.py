@@ -4,11 +4,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import polars as pl
 import pytest
 
 from model_prediction.rebuild.horizon_builder import build_mlb_horizon_dataset
-from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
+from model_prediction.rebuild.storage import FeatureStore, NormalizedStore, provenance_row, utc_now
 
 
 def _write_scoreboard(data_root, event_id: str, event_start_utc: str, home: str, away: str) -> None:
@@ -86,3 +88,61 @@ class TestMissingnessIsHonest:
         result = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", [])
         assert result.coverage["total_games"] == 0
         assert result.coverage["rows_built"] == 0
+
+
+class TestSnapshotHashReflectsRealContent:
+    """Real bug found by external review, verified then fixed: snapshot_hash
+    was computed from {game_date, horizon, event_ids} only -- metadata, not
+    the actual feature values. FeatureStore.write_snapshot() treats a
+    repeated hash as an immutable identity (a no-op write) -- a real source
+    correction that changed feature values without changing event_ids would
+    silently never persist, masquerading as the stale prior version."""
+
+    def test_same_event_ids_but_different_feature_content_yields_different_hashes(self, tmp_path):
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
+        records = [{
+            "event_id": "401", "observed_at_utc": "2026-08-06T21:30:00+00:00",
+            "home_starter": "Pitcher A", "away_starter": "Pitcher B",
+        }]
+
+        first_row = {"event_id": "401", "home_sp_avg_velocity": 93.0}
+        second_row = {"event_id": "401", "home_sp_avg_velocity": 97.5}  # a real corrected value
+
+        with patch(
+            "model_prediction.rebuild.mlb_features.build_live_game_feature_row",
+            return_value=first_row,
+        ):
+            first = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", records)
+
+        with patch(
+            "model_prediction.rebuild.mlb_features.build_live_game_feature_row",
+            return_value=second_row,
+        ):
+            second = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", records)
+
+        assert first.snapshot_hash != second.snapshot_hash, (
+            "a real change in feature content for the same event_ids must "
+            "produce a different snapshot_hash, or the corrected data "
+            "silently never persists (FeatureStore treats a repeated hash "
+            "as an already-seen, no-op write)"
+        )
+
+        # And the corrected content is actually the one readable back --
+        # not silently discarded in favor of the stale version.
+        store = FeatureStore(str(tmp_path) + "/features")
+        stored = store.read_version("mlb", "late", second.snapshot_hash)
+        assert stored["home_sp_avg_velocity"][0] == 97.5
+
+    def test_identical_content_yields_the_same_hash(self, tmp_path):
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
+        records = [{
+            "event_id": "401", "observed_at_utc": "2026-08-06T21:30:00+00:00",
+            "home_starter": "Pitcher A", "away_starter": "Pitcher B",
+        }]
+        row = {"event_id": "401", "home_sp_avg_velocity": 93.0}
+
+        with patch("model_prediction.rebuild.mlb_features.build_live_game_feature_row", return_value=row):
+            first = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", records)
+            second = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", records)
+
+        assert first.snapshot_hash == second.snapshot_hash
