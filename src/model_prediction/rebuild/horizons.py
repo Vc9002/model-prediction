@@ -13,10 +13,41 @@ Horizons:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Any
+
+import polars as pl
 
 HORIZONS = ("early", "mid", "late")
 HORIZON_HOURS_BEFORE = {"early": 36, "mid": 6, "late": 0.5}
+
+
+def compute_decision_times(
+    scoreboard: pl.DataFrame, game_date: str, horizon: str,
+) -> dict[str, datetime]:
+    """Real, sport-agnostic decision_time_utc computation for every
+    scheduled event on `game_date`: `event_start_utc - HORIZON_HOURS_BEFORE[horizon]`.
+
+    Extracted from horizon_builder.py's build_mlb_horizon_dataset(), where
+    this exact logic was previously inlined and MLB-only (Task 4: finish
+    horizon architecture) -- factored out here so a future real
+    non-MLB horizon builder (correctly out of scope today per CLAUDE.md's
+    own sequencing: those sports have no real feature builders yet to
+    build a dataset from) can reuse the identical, already-tested
+    computation instead of re-deriving it. `scoreboard` must carry
+    `event_id` and `event_start_utc` columns -- the same shape every real
+    ESPN scoreboard collector in this codebase already writes.
+
+    Filters to rows whose `event_start_utc` starts with `game_date`,
+    matching build_mlb_horizon_dataset()'s own filter."""
+    if horizon not in HORIZONS:
+        raise ValueError(f"horizon must be one of {HORIZONS}, got {horizon!r}")
+    todays_games = scoreboard.filter(pl.col("event_start_utc").str.starts_with(game_date))
+    hours_before = HORIZON_HOURS_BEFORE[horizon]
+    return {
+        g["event_id"]: datetime.fromisoformat(g["event_start_utc"]) - timedelta(hours=hours_before)
+        for g in todays_games.iter_rows(named=True)
+    }
 
 
 @dataclass

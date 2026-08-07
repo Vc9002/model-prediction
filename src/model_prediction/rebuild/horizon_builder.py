@@ -23,12 +23,11 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from typing import Any
 
 import polars as pl
 
-from .horizons import HORIZON_HOURS_BEFORE, HORIZONS
+from .horizons import HORIZONS, compute_decision_times, horizon_specs_for_sport
 from .mlb_features import (
     dedupe_scoreboard,
     identify_starters,
@@ -48,6 +47,7 @@ class HorizonBuildResult:
     rows: list[dict[str, Any]] = field(default_factory=list)
     coverage: dict[str, Any] = field(default_factory=dict)
     missingness: dict[str, Any] = field(default_factory=dict)
+    available_information: list[str] = field(default_factory=list)  # CLAUDE.md Part 1 sec 9
     snapshot_hash: str | None = None
 
     def to_dataframe(self) -> pl.DataFrame:
@@ -96,11 +96,7 @@ def build_mlb_horizon_dataset(
         scoreboard = pl.DataFrame(schema={"event_id": pl.Utf8, "event_start_utc": pl.Utf8, "status": pl.Utf8})
     todays_games = scoreboard.filter(pl.col("event_start_utc").str.starts_with(game_date))
 
-    hours_before = HORIZON_HOURS_BEFORE[horizon]
-    decision_times: dict[str, datetime] = {}
-    for g in todays_games.iter_rows(named=True):
-        event_start = datetime.fromisoformat(g["event_start_utc"])
-        decision_times[g["event_id"]] = event_start - timedelta(hours=hours_before)
+    decision_times = compute_decision_times(scoreboard, game_date, horizon)
 
     starters_by_event = point_in_time_probable_starters(decision_times, probable_starter_records)
 
@@ -118,6 +114,7 @@ def build_mlb_horizon_dataset(
     rows: list[dict[str, Any]] = []
     missing_reasons: dict[str, int] = {}
     decision_times_out: dict[str, str] = {}
+    available_features = horizon_specs_for_sport("mlb")[horizon].available_features
 
     for g in todays_games.iter_rows(named=True):
         event_id = g["event_id"]
@@ -141,6 +138,16 @@ def build_mlb_horizon_dataset(
 
         row["horizon"] = horizon
         row["decision_time_utc"] = decision_times_out[event_id]
+        # CLAUDE.md Part 1 sec 9: "Every prediction must store:
+        # decision_timestamp, horizon, available_information." Real gap
+        # closed here: horizon_specs_for_sport() declared per-horizon
+        # available_features for every sport but had zero real callers
+        # anywhere in this codebase (verified via grep) -- a real spec
+        # disconnected from any actual prediction record. Comma-joined
+        # (not a list column) since FeatureStore.write_snapshot() writes
+        # plain columnar Parquet with no list-type handling exercised
+        # elsewhere in this module.
+        row["available_information"] = ",".join(available_features)
         rows.append(row)
 
     total_games = todays_games.height
@@ -158,6 +165,7 @@ def build_mlb_horizon_dataset(
         sport="mlb", horizon=horizon, game_date=game_date,
         decision_times=decision_times_out, rows=rows,
         coverage=coverage, missingness=missingness,
+        available_information=available_features,
     )
 
     df = result.to_dataframe()

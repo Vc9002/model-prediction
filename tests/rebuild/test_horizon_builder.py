@@ -10,6 +10,7 @@ import polars as pl
 import pytest
 
 from model_prediction.rebuild.horizon_builder import build_mlb_horizon_dataset
+from model_prediction.rebuild.horizons import horizon_specs_for_sport
 from model_prediction.rebuild.storage import FeatureStore, NormalizedStore, provenance_row, utc_now
 
 
@@ -48,6 +49,30 @@ class TestDecisionTimesDifferByHorizon:
         assert early.decision_times["401"] != mid.decision_times["401"] != late.decision_times["401"]
         # early is furthest before start, late is closest
         assert early.decision_times["401"] < mid.decision_times["401"] < late.decision_times["401"]
+
+
+class TestAvailableInformationIsRecorded:
+    """CLAUDE.md Part 1 sec 9: 'Every prediction must store:
+    decision_timestamp, horizon, available_information.' Real gap closed
+    here: horizon_specs_for_sport() declared per-horizon available
+    features for every sport but had zero real callers anywhere in this
+    codebase (verified via grep) before this."""
+
+    def test_result_carries_the_real_declared_features_for_this_horizon(self, tmp_path):
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
+
+        result = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "mid", [])
+
+        assert result.available_information == horizon_specs_for_sport("mlb")["mid"].available_features
+        assert result.available_information != []
+
+    def test_early_and_late_declare_different_available_information(self, tmp_path):
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
+
+        early = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "early", [])
+        late = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", [])
+
+        assert early.available_information != late.available_information
 
 
 class TestMissingnessIsHonest:

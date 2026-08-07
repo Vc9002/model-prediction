@@ -34,8 +34,8 @@ from model_prediction.rebuild.xgboost_stress import (
     run_stress_tests, stress_test_summary, STRESS_SCENARIOS,
 )
 from model_prediction.rebuild.horizons import (
-    horizon_specs_for_sport, horizon_from_time_to_start,
-    validate_horizon_separation, HORIZONS,
+    compute_decision_times, horizon_specs_for_sport, horizon_from_time_to_start,
+    validate_horizon_separation, HORIZONS, HORIZON_HOURS_BEFORE,
 )
 from model_prediction.rebuild.calibration import (
     PlattCalibrator, IsotonicCalibrator, TemperatureScaling, fit_calibrator,
@@ -513,6 +513,45 @@ class TestHorizons:
         late_only = {"confirmed_batting_order", "wind_vector"}
         assert not (late_only & early_features), \
             f"Late features {late_only & early_features} leaked into early"
+
+
+class TestComputeDecisionTimes:
+    """Sport-agnostic decision_time_utc computation (Task 4: finish horizon
+    architecture) -- extracted from horizon_builder.py's
+    build_mlb_horizon_dataset(), where this was previously MLB-only inlined
+    logic, so a future real non-MLB horizon builder can reuse it without
+    re-deriving the same computation."""
+
+    def _scoreboard(self):
+        import polars as pl
+        return pl.DataFrame([
+            {"event_id": "1", "event_start_utc": "2026-07-20T22:35:00+00:00"},
+            {"event_id": "2", "event_start_utc": "2026-07-20T18:05:00+00:00"},
+            {"event_id": "3", "event_start_utc": "2026-07-21T18:05:00+00:00"},  # different date
+        ])
+
+    def test_filters_to_the_given_game_date(self):
+        times = compute_decision_times(self._scoreboard(), "2026-07-20", "late")
+        assert set(times.keys()) == {"1", "2"}
+
+    def test_decision_time_is_start_minus_horizon_hours(self):
+        from datetime import datetime
+        times = compute_decision_times(self._scoreboard(), "2026-07-20", "early")
+        expected = datetime.fromisoformat("2026-07-20T22:35:00+00:00").timestamp() - HORIZON_HOURS_BEFORE["early"] * 3600
+        assert times["1"].timestamp() == expected
+
+    def test_rejects_an_unknown_horizon(self):
+        try:
+            compute_decision_times(self._scoreboard(), "2026-07-20", "not_a_real_horizon")
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised
+
+    def test_empty_scoreboard_returns_empty(self):
+        import polars as pl
+        empty = pl.DataFrame(schema={"event_id": pl.Utf8, "event_start_utc": pl.Utf8})
+        assert compute_decision_times(empty, "2026-07-20", "mid") == {}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
