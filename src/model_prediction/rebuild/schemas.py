@@ -132,6 +132,24 @@ SCOREBOARD_CONTRACT = TableContract(
     ],
 )
 
+ROSTER_CONTRACT = TableContract(
+    name="roster",
+    primary_key=["team_id", "player_id", "observed_at_utc"],
+    conflict_policy="keep_latest",
+    columns=[
+        ColumnSpec("team_id", str, nullable=False),  # source-native (ESPN) team id
+        ColumnSpec("player_id", str, nullable=False),  # source-native (ESPN) athlete id
+        ColumnSpec("player_name", str, nullable=False),
+        ColumnSpec("player_canonical_id", str, nullable=True),
+        ColumnSpec("team_canonical_id", str, nullable=True),
+        ColumnSpec("position", str, nullable=True),
+        ColumnSpec("jersey", str, nullable=True),
+        ColumnSpec("season", int, nullable=False),
+        ColumnSpec("observed_at_utc", str, nullable=False),
+        ColumnSpec("source", str, nullable=False),
+    ],
+)
+
 MARKET_SNAPSHOT_CONTRACT = TableContract(
     name="market_snapshot",
     primary_key=["market_id", "team_or_side", "line", "observed_at_utc"],

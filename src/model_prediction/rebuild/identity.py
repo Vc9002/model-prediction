@@ -622,6 +622,79 @@ def resolve_or_link_polymarket_event_id(
     return canonical_event_id
 
 
+def resolve_or_register_player(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    source_player_id: str,
+    player_name: str,
+    effective_from_utc: str,
+    attributes: dict[str, Any] | None = None,
+) -> CanonicalIdentity:
+    """The real entry point for canonical player identity outside MLB --
+    a straightforward register-or-reuse keyed on (source_id,
+    source_player_id), the same shape as resolve_mlbam_player_id(), not
+    resolve_or_register_team()'s fuzzy-name-match shape.
+
+    Deliberately no fuzzy name matching here, unlike teams/venues: a
+    confident same-sport name match is a reasonable bridge across sources
+    for a team (there really is only one "Seattle Mariners"), but real
+    distinct players commonly share full names -- CLAUDE.md's own
+    canonical-identity test list names "duplicate player names" as a
+    required case precisely because propose_match()'s Jaccard similarity
+    would score two unrelated same-named players as a perfect match and
+    silently merge them into one identity. With only one real source
+    (ESPN rosters) feeding this today, there's no cross-source linking
+    need yet; a second source would need a real disambiguating signal
+    (team + position + an external ID crosswalk) to link safely, not a
+    name-alone guess -- correctly left as future work rather than solved
+    incorrectly now."""
+    existing = registry.resolve(source_id, source_player_id)
+    if existing is not None:
+        return existing
+    return registry.register(
+        entity_type="player", canonical_name=player_name, sport=sport,
+        effective_from_utc=effective_from_utc,
+        source_id=source_id, source_entity_id=source_player_id,
+        attributes=attributes,
+    )
+
+
+def resolve_espn_roster_player_id(
+    registry: IdentityRegistry,
+    sport: str,
+    source_id: str,
+    athlete_obj: dict[str, Any],
+    team_canonical_id: str | None,
+    effective_from_utc: str,
+) -> str | None:
+    """The real helper an ESPN-roster-shaped collector calls for canonical
+    player identity outside MLB -- same shape as
+    resolve_espn_scoreboard_venue_id(), namespacing source_id by sport for
+    the same defensive reason team/event/venue ids are namespaced.
+    Verified against a real cached ESPN roster athlete object
+    (data/availability/wnba/espn_rosters/): a real, stable numeric `id`
+    alongside `displayName`. Returns None (never guessed) when either is
+    missing."""
+    player_id = athlete_obj.get("id")
+    player_name = athlete_obj.get("displayName") or athlete_obj.get("fullName", "")
+    if not player_id or not player_name:
+        return None
+    namespaced_source_id = f"{source_id}:{sport}"
+    position = (athlete_obj.get("position") or {}).get("abbreviation")
+    identity = resolve_or_register_player(
+        registry, sport=sport, source_id=namespaced_source_id,
+        source_player_id=str(player_id), player_name=player_name,
+        effective_from_utc=effective_from_utc,
+        attributes={
+            "team_canonical_id": team_canonical_id,
+            "position": position,
+            "jersey": athlete_obj.get("jersey"),
+        },
+    )
+    return identity.entity_id
+
+
 def resolve_mlbam_player_id(
     registry: IdentityRegistry, sport: str, player_name: str, mlbam_id: int, effective_from_utc: str,
 ) -> str:

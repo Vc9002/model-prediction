@@ -15,12 +15,13 @@ import polars as pl
 
 from .identity import (
     IdentityRegistry,
+    resolve_espn_roster_player_id,
     resolve_espn_scoreboard_event_id,
     resolve_espn_scoreboard_team_ids,
     resolve_espn_scoreboard_venue_id,
     resolve_polymarket_team_id,
 )
-from .schemas import MARKET_SNAPSHOT_CONTRACT, SCOREBOARD_CONTRACT
+from .schemas import MARKET_SNAPSHOT_CONTRACT, ROSTER_CONTRACT, SCOREBOARD_CONTRACT
 from .storage import MarketStore, NormalizedStore, RawStore, provenance_row, utc_now
 
 DEFAULT_RATE_LIMIT = 0.6  # seconds between calls
@@ -40,6 +41,78 @@ def _competitor_identity_obj(competitor: dict[str, Any]) -> dict[str, Any]:
     if athlete:
         return {"id": competitor.get("id"), "displayName": athlete.get("displayName", "")}
     return {"id": None, "displayName": ""}
+
+
+def _collect_espn_roster(collector: Any, sport: str, league: str, team_id: str, season: int) -> dict[str, Any]:
+    """Real ESPN roster collection + canonical player identity resolution
+    (Task 3: player identity outside MLB), shared by every non-MLB
+    collector -- MLB's player identity comes from pybaseball's player
+    register instead (resolve_mlbam_player_id()), which has no
+    roster-endpoint equivalent needed here. Duck-types on `collector`
+    (needs .raw/.norm/.identity/.meta/._throttle -- every real collector
+    class in this module already has that exact shape) instead of a
+    shared base class, matching this module's existing convention of
+    small per-sport classes over one large shared implementation.
+
+    Real athlete-id shape verified against a real cached ESPN roster
+    payload (data/availability/wnba/espn_rosters/): a real, stable
+    numeric `id` alongside `displayName` -- same shape
+    resolve_espn_roster_player_id() expects."""
+    source = "espn_public"
+    record_id = f"{sport}_roster_{team_id}_{season}"
+    collector._throttle()
+    try:
+        from model_prediction.data_sources.espn import ESPNClient
+    except ImportError:
+        return {"status": "no_espn_client", "team_id": team_id}
+
+    client = ESPNClient()
+    payload = client.roster(league, team_id, season)
+    snapshot_hash = collector.raw.write(source, str(season), record_id, payload).snapshot_hash
+    collector.meta.update_source_health(source, "active")
+
+    observed_at = utc_now().isoformat()
+    # Real team canonical id, if this team was already resolved via
+    # scoreboard collection (resolve_espn_scoreboard_team_ids()'s same
+    # sport-namespaced source_id) -- honestly None, not fabricated, when
+    # roster collection runs before/without scoreboard collection for
+    # this team.
+    existing_team = collector.identity.resolve(f"{source}:{sport}", str(team_id))
+    team_canonical_id = existing_team.entity_id if existing_team else None
+
+    rows: list[dict[str, Any]] = []
+    for athlete in payload.get("athletes", []):
+        player_canonical_id = resolve_espn_roster_player_id(
+            collector.identity, sport, source, athlete, team_canonical_id, observed_at,
+        )
+        player_id = str(athlete.get("id", ""))
+        if not player_id:
+            continue
+        rows.append({
+            **provenance_row(
+                source=source, source_record_id=f"{team_id}_{player_id}",
+                source_version="espn_public_v1", observed_at_utc=observed_at,
+                effective_at_utc=observed_at, event_start_utc="",
+                raw_snapshot_hash=snapshot_hash,
+            ),
+            "team_id": str(team_id),
+            "player_id": player_id,
+            "player_name": athlete.get("displayName", ""),
+            "player_canonical_id": player_canonical_id,
+            "team_canonical_id": team_canonical_id,
+            "position": (athlete.get("position") or {}).get("abbreviation"),
+            "jersey": athlete.get("jersey"),
+            "season": season,
+        })
+
+    if rows:
+        collector.norm.write(
+            sport, "roster", pl.DataFrame(rows),
+            primary_key=["team_id", "player_id"], contract=ROSTER_CONTRACT,
+        )
+        collector.meta.audit_event("collect_espn_roster", {"sport": sport, "team_id": team_id, "players": len(rows)})
+        return {"status": "ok", "sport": sport, "team_id": team_id, "players": len(rows)}
+    return {"status": "no_players", "sport": sport, "team_id": team_id}
 
 
 class MLBCollector:
@@ -565,6 +638,15 @@ class NBACollector:
 
         return {"status": "no_games", "sport": sport, "date": game_date}
 
+    # ── ESPN Roster (canonical player identity, Task 3) ─────────────────
+
+    def collect_espn_roster(self, team_id: str, season: int, sport: str = "nba") -> dict[str, Any]:
+        """Real per-team roster collection for NBA or WNBA -- resolves
+        each real athlete to a canonical player identity via
+        resolve_espn_roster_player_id(), same shape as
+        collect_espn_scoreboard()'s team-identity resolution."""
+        return _collect_espn_roster(self, sport, sport.upper(), team_id, season)
+
     # ── Polymarket Markets ───────────────────────────────────────────────
 
     def _collect_markets(self, sport: str, game_date: str) -> dict[str, Any]:
@@ -642,6 +724,11 @@ class NFLCollector:
         if elapsed < self.rate_limit:
             time.sleep(self.rate_limit - elapsed)
         self._last_call = time.monotonic()
+
+    def collect_espn_roster(self, team_id: str, season: int) -> dict[str, Any]:
+        """Real per-team roster collection -- resolves each real athlete
+        to a canonical player identity (Task 3)."""
+        return _collect_espn_roster(self, "nfl", "NFL", team_id, season)
 
     def _collect_espn(self, game_date: str) -> dict[str, Any]:
         sport = "nfl"; source = "espn_public"
@@ -760,6 +847,14 @@ class SoccerCollector:
         self.markets = MarketStore(self.root / "markets")
         self.identity = IdentityRegistry(meta)
         self._last_call = 0.0
+
+    def collect_espn_roster(self, team_id: str, season: int, league: str = "EPL") -> dict[str, Any]:
+        """Real per-team roster collection -- resolves each real athlete
+        to a canonical player identity (Task 3). `league` matches
+        collect_date()'s own real-vs-guessed-umbrella-competition
+        constraint (see collect_date()'s docstring): soccer has no single
+        ESPN league path, so a real one must be named explicitly."""
+        return _collect_espn_roster(self, "soccer", league, team_id, season)
 
     def _collect_date(self, game_date: str, sport: str, league: str) -> dict[str, Any]:
         results: dict[str, Any] = {"date": game_date, "sport": sport}

@@ -17,12 +17,14 @@ from model_prediction.rebuild.identity import (
     IdentityRegistry,
     jaccard_similarity,
     normalize_name,
+    resolve_espn_roster_player_id,
     resolve_espn_scoreboard_event_id,
     resolve_espn_scoreboard_team_ids,
     resolve_espn_scoreboard_venue_id,
     resolve_event_by_team_pair,
     resolve_or_link_polymarket_event_id,
     resolve_or_register_event,
+    resolve_or_register_player,
     resolve_or_register_team,
     resolve_or_register_venue,
 )
@@ -597,3 +599,111 @@ class TestResolveEspnScoreboardVenueId:
             registry, "mlb", "espn_public", venue_obj, "2026-07-21T20:00:00+00:00",
         )
         assert first == second
+
+
+class TestResolveOrRegisterPlayer:
+    """Real entry point for canonical player identity outside MLB (Task 3)
+    -- MLB uses resolve_mlbam_player_id() instead, keyed on pybaseball's
+    real collision-free numeric ID; no equivalent stable crosswalk exists
+    yet for NBA/NFL/soccer/tennis, so this uses the same
+    register-or-reuse-or-fuzzy-match shape as resolve_or_register_team()."""
+
+    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path):
+        registry = _registry(tmp_path)
+        identity = resolve_or_register_player(
+            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
+            player_name="Jayson Tatum", effective_from_utc="2026-01-01",
+        )
+        assert identity.entity_type == "player"
+        assert identity.canonical_name == "Jayson Tatum"
+
+    def test_repeated_observation_reuses_the_identity(self, tmp_path):
+        registry = _registry(tmp_path)
+        first = resolve_or_register_player(
+            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
+            player_name="Jayson Tatum", effective_from_utc="2026-01-01",
+        )
+        second = resolve_or_register_player(
+            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
+            player_name="Jayson Tatum", effective_from_utc="2026-06-01",
+        )
+        assert second.entity_id == first.entity_id
+
+    def test_two_genuinely_different_players_get_different_identities(self, tmp_path):
+        registry = _registry(tmp_path)
+        p1 = resolve_or_register_player(
+            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
+            player_name="Jayson Tatum", effective_from_utc="2026-01-01",
+        )
+        p2 = resolve_or_register_player(
+            registry, sport="nba", source_id="espn_public:nba", source_player_id="3975",
+            player_name="LeBron James", effective_from_utc="2026-01-01",
+        )
+        assert p1.entity_id != p2.entity_id
+
+    def test_duplicate_player_names_get_different_identities(self, tmp_path):
+        # CLAUDE.md names "duplicate player names" as a required test case:
+        # two genuinely different real players who happen to share a full
+        # name must resolve to two distinct canonical identities, not be
+        # silently merged the way resolve_or_register_team()'s fuzzy name
+        # matching would merge them (see resolve_or_register_player()'s
+        # docstring for why fuzzy matching is deliberately not used here).
+        registry = _registry(tmp_path)
+        first = resolve_or_register_player(
+            registry, sport="nba", source_id="espn_public:nba", source_player_id="111",
+            player_name="Chris Johnson", effective_from_utc="2026-01-01",
+        )
+        second = resolve_or_register_player(
+            registry, sport="nba", source_id="espn_public:nba", source_player_id="222",
+            player_name="Chris Johnson", effective_from_utc="2026-01-01",
+        )
+        assert first.entity_id != second.entity_id
+        assert registry.resolve("espn_public:nba", "111").entity_id == first.entity_id
+        assert registry.resolve("espn_public:nba", "222").entity_id == second.entity_id
+
+
+class TestResolveEspnRosterPlayerId:
+    """The real helper an ESPN-roster-shaped collector calls for canonical
+    player identity outside MLB. Real athlete shape verified against a
+    real cached ESPN roster payload
+    (data/availability/wnba/espn_rosters/2026-8.json): id, displayName,
+    position.abbreviation, jersey."""
+
+    def test_missing_id_returns_none(self, tmp_path):
+        registry = _registry(tmp_path)
+        result = resolve_espn_roster_player_id(
+            registry, "wnba", "espn_public", {"displayName": "Maya Caldwell"},
+            None, "2026-07-20T20:00:00+00:00",
+        )
+        assert result is None
+
+    def test_real_athlete_shape_resolves_with_available_real_fields(self, tmp_path):
+        registry = _registry(tmp_path)
+        athlete = {
+            "id": 4280850, "displayName": "Maya Caldwell",
+            "position": {"abbreviation": "G"}, "jersey": "12",
+        }
+        player_id = resolve_espn_roster_player_id(
+            registry, "wnba", "espn_public", athlete, "wnba:team:atl",
+            "2026-07-20T20:00:00+00:00",
+        )
+        assert player_id is not None
+        resolved = registry.resolve("espn_public:wnba", "4280850")
+        assert resolved is not None
+        assert resolved.canonical_name == "Maya Caldwell"
+        assert resolved.attributes["team_canonical_id"] == "wnba:team:atl"
+        assert resolved.attributes["position"] == "G"
+
+    def test_same_espn_athlete_id_in_two_sports_resolves_to_two_different_players(self, tmp_path):
+        # Same defensive namespacing as every other resolve_espn_* helper
+        # here.
+        registry = _registry(tmp_path)
+        nba_player = resolve_espn_roster_player_id(
+            registry, "nba", "espn_public", {"id": 500, "displayName": "Player A"},
+            None, "2026-07-20T20:00:00+00:00",
+        )
+        wnba_player = resolve_espn_roster_player_id(
+            registry, "wnba", "espn_public", {"id": 500, "displayName": "Player B"},
+            None, "2026-07-20T20:00:00+00:00",
+        )
+        assert nba_player != wnba_player
