@@ -45,7 +45,7 @@ from model_prediction.rebuild.mlb_market_matching import (
     real_total_lines,
     resolve_polymarket_event_id,
 )
-from model_prediction.rebuild.models import MLBTwoHeadModel
+from model_prediction.rebuild.models import BootstrapMLBEnsemble, MLBTwoHeadModel
 from model_prediction.rebuild.shadow_ledger import ShadowLedger
 
 # Only the "late" horizon (CLAUDE.md: start minus 60 minutes) is implemented
@@ -67,36 +67,68 @@ DIFFERENTIAL_FEATURES = [
 ]
 
 
-def train_through(features: pl.DataFrame, cutoff_date: str) -> MLBTwoHeadModel:
+def train_through(features: pl.DataFrame, cutoff_date: str) -> tuple[MLBTwoHeadModel, BootstrapMLBEnsemble, int]:
     """Walk-forward retrain: fit only on games strictly before cutoff_date.
     No artifact-reload mechanism exists yet for the fitted sklearn models
     (MLBTwoHeadModel.to_artifact() only persists metadata/hashes, not the
     model itself) -- retraining fresh each run is the honest current
-    behavior, not a shortcut, and is disclosed as a Checkpoint 9 gap below."""
+    behavior, not a shortcut, and is disclosed as a Checkpoint 9 gap below.
+
+    Also fits a BootstrapMLBEnsemble on the identical training data, used by
+    build_forecast() for real conservative_probability bounds (CLAUDE.md's
+    bootstrap_uncertainty requirement) instead of a fixed haircut."""
     train = features.filter(pl.col("game_date") < cutoff_date)
     model = MLBTwoHeadModel(seed=42)
     model.fit(train, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
-    return model, train.height
+    bootstrap = BootstrapMLBEnsemble(n_bootstrap=20, seed=42)
+    bootstrap.fit(train, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+    return model, bootstrap, train.height
 
 
 def build_forecast(
     model: MLBTwoHeadModel, row: dict,
     total_lines: list[float] | None = None,
     spread_line_side_pairs: list[tuple[float, str]] | None = None,
+    bootstrap: BootstrapMLBEnsemble | None = None,
+    lower_quantile: float = 0.10,
     uncertainty_haircut: float = 0.03,
 ) -> SportsForecast:
     pred = model.predict_row(row["event_id"], row)
     predicted_winner = "home" if pred.home_win_prob >= pred.away_win_prob else "away"
     calibrated = {"home": pred.home_win_prob, "away": pred.away_win_prob}
-    # Conservative/lower-bound: haircut toward 50/50 by a fixed uncertainty
-    # margin. A real bootstrap/model-disagreement-based uncertainty (per
-    # CLAUDE.md's conservative_probability spec) is a real gap, disclosed
-    # below, not silently treated as equivalent to this simple haircut.
-    lower = {
-        side: max(0.0, min(1.0, p - uncertainty_haircut if p >= 0.5 else p + uncertainty_haircut))
-        for side, p in calibrated.items()
-    }
-    upper = {side: min(1.0, p + uncertainty_haircut) for side, p in calibrated.items()}
+
+    totals_probabilities: dict[float, dict[str, float]] = {}
+    totals_probabilities_lower: dict[float, dict[str, float]] = {}
+    spread_probabilities: dict[float, dict[str, float]] = {}
+    spread_probabilities_lower: dict[float, dict[str, float]] = {}
+
+    if bootstrap is not None and bootstrap.fitted:
+        # Real, data-driven conservative bound (CLAUDE.md's
+        # `bootstrap_uncertainty` requirement): refit both heads on 20
+        # bootstrap resamples of the identical training data, re-predict
+        # this row from every replicate, and use the empirical
+        # [lower_quantile, 1-lower_quantile] spread of each market's
+        # probability. Replaces the flat 3% haircut previously applied
+        # uniformly regardless of how much any given prediction actually
+        # depended on particular training games.
+        home_lower, home_upper = bootstrap.market_probability_bounds(
+            row, model.distribution, "moneyline", "home", lower_quantile=lower_quantile,
+        )
+        away_lower, away_upper = bootstrap.market_probability_bounds(
+            row, model.distribution, "moneyline", "away", lower_quantile=lower_quantile,
+        )
+        lower = {"home": home_lower, "away": away_lower}
+        upper = {"home": home_upper, "away": away_upper}
+    else:
+        # Fallback for callers without a fitted bootstrap ensemble (e.g.
+        # a unit test constructing build_forecast() output directly): a
+        # fixed haircut toward 50/50, disclosed as a strictly weaker
+        # substitute for the real bootstrap bound above.
+        lower = {
+            side: max(0.0, min(1.0, p - uncertainty_haircut if p >= 0.5 else p + uncertainty_haircut))
+            for side, p in calibrated.items()
+        }
+        upper = {side: min(1.0, p + uncertainty_haircut) for side, p in calibrated.items()}
 
     # Real per-line OVER/UNDER probability from the same joint score
     # distribution the moneyline came from — computed here, before any
@@ -104,10 +136,17 @@ def build_forecast(
     # sports-only. Previously this was never populated at all, so every
     # total market silently produced NO_BET/no_forecast_for_line regardless
     # of price (see outputs/rebuild/takeover_status.md Checkpoint 9).
-    totals_probabilities: dict[float, dict[str, float]] = {}
     for line in total_lines or []:
         over_p = model.distribution.probability_for_market(pred, "total", "over", line)
         totals_probabilities[line] = {"over": over_p, "under": 1.0 - over_p}
+        if bootstrap is not None and bootstrap.fitted:
+            over_lower, _ = bootstrap.market_probability_bounds(
+                row, model.distribution, "total", "over", line, lower_quantile=lower_quantile,
+            )
+            under_lower, _ = bootstrap.market_probability_bounds(
+                row, model.distribution, "total", "under", line, lower_quantile=lower_quantile,
+            )
+            totals_probabilities_lower[line] = {"over": over_lower, "under": under_lower}
 
     # Real per-(line, side) cover probability. Confirmed bug fixed here: a
     # spread was previously priced using the moneyline win probability, not
@@ -116,10 +155,14 @@ def build_forecast(
     # favorite's line and the away side's line on the same real market are
     # not the same number), computed here, before any market spread price
     # is inspected.
-    spread_probabilities: dict[float, dict[str, float]] = {}
     for line, side in spread_line_side_pairs or []:
         cover_p = model.distribution.probability_for_market(pred, "spread", side, line)
         spread_probabilities.setdefault(line, {})[side] = cover_p
+        if bootstrap is not None and bootstrap.fitted:
+            cover_lower, _ = bootstrap.market_probability_bounds(
+                row, model.distribution, "spread", side, line, lower_quantile=lower_quantile,
+            )
+            spread_probabilities_lower.setdefault(line, {})[side] = cover_lower
 
     return SportsForecast(
         event_id=row["event_id"], predicted_winner=predicted_winner,
@@ -127,9 +170,11 @@ def build_forecast(
         probability_lower=lower, probability_upper=upper,
         expected_home_score=pred.home_expected_runs, expected_away_score=pred.away_expected_runs,
         model_artifact_hash=model.to_artifact().get("artifact_hash", ""),
-        calibration_artifact_hash="uncalibrated_haircut_v1",
+        calibration_artifact_hash="uncalibrated_haircut_v1" if bootstrap is None else "bootstrap_uncertainty_v1",
         totals_probabilities=totals_probabilities,
         spread_probabilities=spread_probabilities,
+        totals_probabilities_lower=totals_probabilities_lower,
+        spread_probabilities_lower=spread_probabilities_lower,
     )
 
 
@@ -169,8 +214,9 @@ def main() -> None:
         print("Not enough historical games to train. Stopping honestly.")
         sys.exit(0)
 
-    model, train_n = train_through(features, target_date)
-    print(f"4. Model retrained on {train_n} real games (walk-forward, strictly before {target_date})")
+    model, bootstrap, train_n = train_through(features, target_date)
+    print(f"4. Model retrained on {train_n} real games (walk-forward, strictly before {target_date}), "
+          f"{bootstrap.n_bootstrap} bootstrap replicates fit for conservative_probability")
 
     # Real bug this fixes: fixing quote_age_seconds to be real (see
     # mlb_market_matching.py) immediately exposed that this script never
@@ -258,7 +304,7 @@ def main() -> None:
             spread_pairs = real_spread_line_side_pairs(market_rows, resolved_event_id) if resolved_event_id else []
             candidates = real_market_candidates(market_rows, g["home_team"], g["away_team"])
 
-        forecast = build_forecast(model, row, total_lines, spread_pairs)
+        forecast = build_forecast(model, row, total_lines, spread_pairs, bootstrap=bootstrap)
         decisions = evaluate_game(forecast, candidates, limits)
         bet_decisions = [d for d in decisions if d.action == "BET"]
 

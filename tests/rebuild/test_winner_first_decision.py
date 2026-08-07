@@ -35,6 +35,7 @@ from model_prediction.rebuild.economic import SizeLimits
 def _forecast(
     predicted_winner="home", home_prob=0.60, away_prob=0.40, lower_margin=0.05,
     totals_probabilities=None, spread_probabilities=None,
+    totals_probabilities_lower=None, spread_probabilities_lower=None,
 ):
     return SportsForecast(
         event_id="game-1",
@@ -47,6 +48,8 @@ def _forecast(
         model_artifact_hash="abc123", calibration_artifact_hash="def456",
         totals_probabilities=totals_probabilities or {},
         spread_probabilities=spread_probabilities or {},
+        totals_probabilities_lower=totals_probabilities_lower or {},
+        spread_probabilities_lower=spread_probabilities_lower or {},
     )
 
 
@@ -175,6 +178,78 @@ class TestWinnerAlignedSpreadMayQualify:
         decision = decide_team_market(forecast, spread_market)
         assert decision.action == "NO_BET"
         assert decision.units == 0.0
+
+
+class TestSpreadAndTotalUseConservativeBoundWhenAvailable:
+    """Real gap fixed: before spread_probabilities_lower/
+    totals_probabilities_lower existed, decide_team_market()'s spread branch
+    and decide_total() priced cost_adjusted_edge directly off the raw
+    point-estimate probability -- unlike moneyline, which always used
+    probability_lower. A spread/total market with a thin positive point-
+    estimate edge that a real conservative bound would erase was
+    incorrectly qualified as a BET."""
+
+    def test_spread_bet_that_only_qualifies_on_point_estimate_is_rejected_with_real_lower_bound(self):
+        forecast = _forecast(
+            predicted_winner="home", home_prob=0.60,
+            spread_probabilities={-1.5: {"home": 0.55, "away": 0.45}},
+            spread_probabilities_lower={-1.5: {"home": 0.48, "away": 0.40}},
+        )
+        spread_market = _market(
+            team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
+        )
+        decision = decide_team_market(forecast, spread_market, limits=SizeLimits(min_depth_units=0.0))
+        assert decision.action == "NO_BET", (
+            "point estimate (0.55) minus ask (0.50) is a positive edge, but the real "
+            "conservative bound (0.48) minus ask (0.50) is negative -- the conservative "
+            "bound must be what actually gates the decision"
+        )
+        assert decision.cost_adjusted_edge < 0
+
+    def test_spread_without_a_lower_bound_falls_back_to_point_estimate(self):
+        # Backward-compatible fallback: a caller (e.g. most existing tests)
+        # that never populates spread_probabilities_lower still gets the
+        # pre-existing point-estimate-based behavior, not a crash.
+        forecast = _forecast(
+            predicted_winner="home", home_prob=0.60,
+            spread_probabilities={-1.5: {"home": 0.55, "away": 0.45}},
+        )
+        spread_market = _market(
+            team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
+        )
+        decision = decide_team_market(
+            forecast, spread_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
+        )
+        assert decision.action == "BET"
+
+    def test_total_bet_that_only_qualifies_on_point_estimate_is_rejected_with_real_lower_bound(self):
+        forecast = _forecast(
+            predicted_winner="home", home_prob=0.60,
+            totals_probabilities={8.5: {"over": 0.58, "under": 0.42}},
+            totals_probabilities_lower={8.5: {"over": 0.48, "under": 0.35}},
+        )
+        total_market = _market(
+            team_or_side="over", ask=0.52, depth_price=0.52, market_type="total", line=8.5,
+        )
+        decision = decide_total(forecast, total_market, limits=SizeLimits(min_depth_units=0.0))
+        assert decision.action == "NO_BET", (
+            "point estimate (0.58) minus ask (0.52) is a positive edge, but the real "
+            "conservative bound (0.48) minus ask (0.52) is negative"
+        )
+        assert decision.cost_adjusted_edge < 0
+
+    def test_total_without_a_lower_bound_falls_back_to_point_estimate(self):
+        forecast = _forecast(
+            predicted_winner="home", home_prob=0.60,
+            totals_probabilities={8.5: {"over": 0.58, "under": 0.42}},
+        )
+        total_market = _market(
+            team_or_side="over", ask=0.52, depth_price=0.52, market_type="total", line=8.5,
+        )
+        decision = decide_total(
+            forecast, total_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
+        )
+        assert decision.action == "BET"
 
 
 class TestStaleQuoteFailsClosed:

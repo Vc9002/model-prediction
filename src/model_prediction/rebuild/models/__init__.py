@@ -368,3 +368,88 @@ class MLBTwoHeadModel:
         model._differential_features = metadata["differential_features"]
         model._fitted = True
         return model
+
+
+# ── Bootstrap uncertainty ────────────────────────────────────────────────────
+
+
+class BootstrapMLBEnsemble:
+    """Real, data-driven bootstrap uncertainty for MLBTwoHeadModel predictions
+    -- CLAUDE.md's `conservative_probability` spec names `bootstrap_uncertainty`
+    as a required component of the lower-bound probability; until this class,
+    `mlb_shadow_run.py`'s `build_forecast()` used a disclosed flat 3% haircut
+    in its place, which was a fixed number regardless of how much the
+    prediction actually depended on any particular training game.
+
+    Fits `n_bootstrap` independent copies of both heads, each on a bootstrap
+    resample (sampling with replacement) of the same chronological training
+    data used to fit the primary model. For a given row and market, the
+    empirical spread of that market's probability across replicates measures
+    how much the prediction would have moved under resampled training data --
+    a real uncertainty measurement, not an assumption.
+    """
+
+    def __init__(self, n_bootstrap: int = 20, seed: int = 42) -> None:
+        self.n_bootstrap = n_bootstrap
+        self.seed = seed
+        self._replicates: list[tuple[RunIntensityHead, RunDifferentialHead]] = []
+        self._intensity_features: list[str] = []
+        self._differential_features: list[str] = []
+
+    @property
+    def fitted(self) -> bool:
+        return bool(self._replicates)
+
+    def fit(
+        self,
+        data: pl.DataFrame,
+        intensity_features: list[str],
+        differential_features: list[str],
+        total_runs_col: str = "total_runs",
+        home_margin_col: str = "home_margin",
+    ) -> BootstrapMLBEnsemble:
+        self._intensity_features = intensity_features
+        self._differential_features = differential_features
+        rng = np.random.default_rng(self.seed)
+        n = data.height
+        self._replicates = []
+        for _ in range(self.n_bootstrap):
+            idx = rng.integers(0, n, size=n).tolist()
+            sample = data[idx]
+            X_int = sample.select(intensity_features).to_numpy()
+            y_int = sample[total_runs_col].to_numpy()
+            X_diff = sample.select(differential_features).to_numpy()
+            y_diff = sample[home_margin_col].to_numpy()
+            ih = RunIntensityHead().fit(X_int, y_int, intensity_features)
+            dh = RunDifferentialHead().fit(X_diff, y_diff, differential_features)
+            self._replicates.append((ih, dh))
+        return self
+
+    def market_probability_bounds(
+        self,
+        row: dict[str, float],
+        distribution: JointScoreDistribution,
+        market_type: str,
+        selection: str,
+        line: float | None = None,
+        lower_quantile: float = 0.10,
+    ) -> tuple[float, float]:
+        """Empirical [lower_quantile, 1-lower_quantile] bounds on one
+        market's probability for this row, across bootstrap replicates.
+        Market-type-agnostic on purpose: the same bootstrap machinery
+        prices moneyline, spread, and total lower bounds uniformly, unlike
+        the pre-fix code where only moneyline had any lower bound at all."""
+        if not self._replicates:
+            raise RuntimeError("BootstrapMLBEnsemble not fitted")
+        probs = []
+        for ih, dh in self._replicates:
+            x_int = np.array([[row.get(f, 0.0) for f in self._intensity_features]])
+            x_diff = np.array([[row.get(f, 0.0) for f in self._differential_features]])
+            total = max(1.0, float(ih.predict(x_int)[0]))
+            margin = float(dh.predict(x_diff)[0])
+            pred = distribution.predict_game(str(row.get("event_id", "bootstrap")), total, margin)
+            probs.append(distribution.probability_for_market(pred, market_type, selection, line))
+        probs_arr = np.array(probs)
+        lower = float(np.quantile(probs_arr, lower_quantile))
+        upper = float(np.quantile(probs_arr, 1.0 - lower_quantile))
+        return lower, upper

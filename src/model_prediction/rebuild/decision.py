@@ -53,6 +53,19 @@ class SportsForecast:
     # a materially different, usually lower, probability) — that produced
     # real, confirmed 20%+ fabricated "edges" on real spread markets.
     spread_probabilities: dict[float, dict[str, float]] = field(default_factory=dict)
+    # Real, data-driven conservative (lower-bound) probability per exact
+    # (line, side) -- optional, defaults empty. Before this field existed,
+    # spread and total markets had *no* conservative haircut at all: their
+    # cost_adjusted_edge was computed directly from the raw point-estimate
+    # probability in `spread_probabilities`/`totals_probabilities`, unlike
+    # moneyline, which always used `probability_lower`. When populated
+    # (typically from BootstrapMLBEnsemble), decide_team_market()/
+    # decide_total() prefer this value; when absent for a given (line, side)
+    # they fall back to the point estimate, so callers that don't build a
+    # bootstrap ensemble (e.g. most existing unit tests) keep working
+    # unchanged.
+    totals_probabilities_lower: dict[float, dict[str, float]] = field(default_factory=dict)
+    spread_probabilities_lower: dict[float, dict[str, float]] = field(default_factory=dict)
 
     def frozen_totals_side(self, line: float) -> Literal["over", "under"] | None:
         """The more probable side for this exact line, decided from the
@@ -169,8 +182,9 @@ def decide_team_market(
         line_probs = forecast.spread_probabilities.get(candidate.line) if candidate.line is not None else None
         if line_probs is None or forecast.predicted_winner not in line_probs:
             return _no_bet(forecast, candidate.market_type, NO_FORECAST_FOR_LINE, evaluated=candidate)
-        conservative_prob = line_probs[forecast.predicted_winner]
-        model_prob = conservative_prob
+        model_prob = line_probs[forecast.predicted_winner]
+        lower_line_probs = forecast.spread_probabilities_lower.get(candidate.line, {})
+        conservative_prob = lower_line_probs.get(forecast.predicted_winner, model_prob)
     else:
         conservative_prob = forecast.probability_lower[forecast.predicted_winner]
         model_prob = forecast.calibrated_probabilities[forecast.predicted_winner]
@@ -226,13 +240,15 @@ def decide_total(
     if gate_reason is not None:
         return _no_bet(forecast, "total", gate_reason, evaluated=candidate)
 
-    conservative_prob = forecast.totals_probabilities[candidate.line][frozen_side]
+    model_prob = forecast.totals_probabilities[candidate.line][frozen_side]
+    lower_line_probs = forecast.totals_probabilities_lower.get(candidate.line, {})
+    conservative_prob = lower_line_probs.get(frozen_side, model_prob)
     cost_adjusted_edge = conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
     if cost_adjusted_edge <= 0:
         return _no_bet(forecast, "total", NO_EDGE_AFTER_COSTS, cost_adjusted_edge, evaluated=candidate)
 
     sizing = edge_scaled_units(
-        model_prob=conservative_prob, conservative_prob=conservative_prob,
+        model_prob=model_prob, conservative_prob=conservative_prob,
         best_ask=candidate.executable_ask, limits=limits,
     )
     units = sizing.get("units", 0.0)

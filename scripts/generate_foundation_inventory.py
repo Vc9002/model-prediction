@@ -87,9 +87,10 @@ def main() -> None:
     capabilities["other_sport_market_matching"] = "NOT_STARTED"
 
     # Decision engine
-    capabilities["winner_first_decision_engine"] = "VERIFIED"  # decision.py, 20 tests matching CLAUDE.md's exact critical-test list
+    capabilities["winner_first_decision_engine"] = "VERIFIED"  # decision.py, 20+4 tests matching CLAUDE.md's exact critical-test list plus conservative-bound preference
     capabilities["spread_cover_probability"] = "VERIFIED"  # fixed this session, real bug found in production report
     capabilities["evaluated_market_audit_trail"] = "VERIFIED"
+    capabilities["conservative_probability_bootstrap_uncertainty"] = "VERIFIED"  # BootstrapMLBEnsemble, real per-row empirical bound applied uniformly to moneyline/spread/total, replaces flat 3% haircut; still missing calibration/lineup/missingness/model-disagreement components of CLAUDE.md's full spec
 
     # Execution evidence
     capabilities["real_quote_depth"] = "NOT_STARTED"  # Polymarket source doesn't expose this; fabricated 999.0 still in mlb_market_matching.py
@@ -124,6 +125,8 @@ def main() -> None:
         "point_in_time_join() is now correct and tested but is dead code — the real MLB pipeline uses its own point-in-time filtering in mlb_features.py instead of this shared utility",
         "Real order-book depth is unavailable from the current Polymarket source — available_depth remains a fabricated 999.0 placeholder in mlb_market_matching.py (quote_age_seconds itself is real)",
         "8 of the shadow ledger's 16 required tables (raw_snapshots, normalized_observations, feature_snapshots, dataset_manifests, model_artifacts, calibration_artifacts, closing_prices, reviews) are schema-only — no insert/query methods, nothing writes to them yet",
+        "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained)",
+        "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck",
         "No CI run status verified for the current head — no gh CLI auth in this session",
         "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing",
         "MLB model held-out evaluation remains genuinely inconclusive on ~20-25 games — more real backfill days is the only way to resolve this, not further feature engineering",

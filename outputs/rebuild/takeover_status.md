@@ -959,12 +959,67 @@ style suggestions, etc.) untouched by and unrelated to this session's work.
 
 Priority list, updated: (1) more real backfill days is still the only way
 to get a real answer on model quality — now the single highest-leverage
-open item; (2) real `conservative_probability` (CLAUDE.md's full
-bootstrap/calibration/lineup/missingness uncertainty spec — today's
-`build_forecast` uses a disclosed flat 3% haircut placeholder); (3) wire
-`point_in_time_join()` into an actual call site (fixed and tested, still
-dead code); (4) canonical identity (`IdentityRegistry` exists, not wired
-into collectors/features/market-matching uniformly — Phase 4); (5) formal
-schema registry (Phase 5); (6) shared multi-sport CLI (Phase 13); (7)
-monitoring/governance reports (Phase 14). No sport beyond MLB has started
-per CLAUDE.md's explicit sequencing (MLB must clear its own gate first).
+open item; (2) wire `point_in_time_join()` into an actual call site (fixed
+and tested, still dead code); (3) canonical identity (`IdentityRegistry`
+exists, not wired into collectors/features/market-matching uniformly —
+Phase 4); (4) formal schema registry (Phase 5); (5) shared multi-sport CLI
+(Phase 13); (6) monitoring/governance reports (Phase 14). No sport beyond
+MLB has started per CLAUDE.md's explicit sequencing (MLB must clear its
+own gate first).
+
+## Real bootstrap conservative_probability, replacing the flat 3% haircut (2026-08-07)
+
+CLAUDE.md's `conservative_probability` spec names `bootstrap_uncertainty` as
+a required component of the lower-bound probability that gates every BET.
+`build_forecast()` previously used a disclosed flat +/-3% haircut toward
+50/50 for moneyline only — a fixed number regardless of how much any given
+prediction actually depended on particular training games — and spread/total
+markets had **no conservative haircut of any kind**: `decide_team_market()`'s
+spread branch and `decide_total()` both priced `cost_adjusted_edge` directly
+off the raw point-estimate probability.
+
+**Fixed with a real, data-driven bound.** Added `BootstrapMLBEnsemble`
+(`src/model_prediction/rebuild/models/__init__.py`): fits 20 independent
+copies of both heads, each on a bootstrap resample (with replacement) of the
+identical chronological training data used for the primary model, and
+reports the empirical [10th, 90th] percentile spread of a market's
+probability across replicates for a given row — market-type-agnostic, so the
+same machinery prices moneyline/spread/total lower bounds uniformly.
+`train_through()` in `mlb_shadow_run.py` now fits this ensemble alongside
+the primary model; `build_forecast()` uses it for `probability_lower`/
+`probability_upper` (moneyline) and populates two new `SportsForecast`
+fields, `spread_probabilities_lower`/`totals_probabilities_lower`, which
+`decide_team_market()`/`decide_total()` now prefer over the point estimate
+when present (falling back to the point estimate when absent, so existing
+callers/tests without a bootstrap ensemble are unaffected).
+
+**Real result, reported honestly, not spun:** the bootstrap bounds are
+*far* wider than the old flat haircut, not narrower. Live run against the
+2026-08-06 slate: game 1 calibrated home-win probability 0.49, real
+bootstrap bound [0.271, 0.671] (vs. the old flat-haircut bound of roughly
+[0.46, 0.52]); game 2 calibrated 0.485, real bound [0.136, 0.735]. This
+means the model's predictions are far less stable under resampled training
+data than the flat 3% placeholder implied — with only 126 training games,
+individual games can swing the fitted heads substantially. The honest
+interpretation is that the *previous* placeholder was systematically
+overconfident, not that this fix made the system more conservative than it
+should be. Practical consequence: real conservative bounds this wide will
+make almost every market fail `NO_EDGE_AFTER_COSTS`, which is the correct,
+safe behavior given genuine data scarcity — it is not evidence the bootstrap
+implementation is broken, and reinforces item (1) above as the real
+bottleneck (more backfill days narrows real bootstrap bounds; nothing else
+does, honestly).
+
+7 new tests for `BootstrapMLBEnsemble` (`tests/rebuild/
+test_bootstrap_uncertainty.py`) plus 4 new tests for the spread/total
+conservative-bound preference in `decide_team_market()`/`decide_total()`
+(`tests/rebuild/test_winner_first_decision.py`), each confirmed failing
+pre-fix. **870 tests pass, 1 skipped** (up from 860). `ruff check` clean on
+every touched file. Verified live end-to-end (not just unit tests):
+reran `scripts/mlb_shadow_run.py --date 2026-08-06`, confirmed real
+(non-placeholder) `probability_lower`/`probability_upper` values landed in
+`data/rebuild/shadow.db`'s `predictions` table with
+`calibration_artifact_hash="bootstrap_uncertainty_v1"` (vs. the old
+`"uncalibrated_haircut_v1"`), and that the ledger wiring/idempotency fixes
+from the prior checkpoint still hold (2 predictions, 32 trade decisions, 0
+duplicates on rerun).
