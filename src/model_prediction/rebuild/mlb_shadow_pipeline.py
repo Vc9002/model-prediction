@@ -384,6 +384,14 @@ def decide_stage(
     limits = limits if limits is not None else SizeLimits()
     games_report = []
     n_bets = 0
+    n_predictions_recorded = 0
+    n_decisions_recorded = 0
+    n_decisions_deduped = 0
+    # Real team names for the report, looked up once rather than per game --
+    # state.rows_by_event only carries event_id, not the original scoreboard
+    # row (needed so scripts/mlb_shadow_run.py's thin wrapper doesn't need
+    # its own second pass over state.tonight just for display).
+    team_names = {r["event_id"]: (r["home_team"], r["away_team"]) for r in state.tonight.iter_rows(named=True)}
 
     for event_id, row in state.rows_by_event.items():
         candidates = state.candidates_by_event.get(event_id, [])
@@ -403,10 +411,11 @@ def decide_stage(
         decision_time_utc = state.decision_times[event_id].isoformat()
 
         if ledger is not None and run_id is not None:
-            ledger.record_prediction(
+            _, pred_created = ledger.record_prediction(
                 run_id=run_id, sport="mlb", event_id=event_id, horizon=HORIZON_LATE,
                 decision_time_utc=decision_time_utc, forecast=forecast,
             )
+            n_predictions_recorded += 1 if pred_created else 0
             market_eval_ids: dict[tuple, int] = {}
             for c in candidates:
                 eval_row_id = ledger.record_market_evaluation(
@@ -425,7 +434,7 @@ def decide_stage(
                     (d.evaluated_market.market_id, d.evaluated_market.market_type,
                      d.evaluated_market.team_or_side, d.evaluated_market.line)
                 ) if d.evaluated_market else None
-                ledger.record_trade_decision(
+                _, decision_created = ledger.record_trade_decision(
                     run_id=run_id, sport="mlb", event_id=event_id, horizon=HORIZON_LATE,
                     decision_time_utc=decision_time_utc,
                     model_artifact_hash=forecast.model_artifact_hash,
@@ -434,16 +443,40 @@ def decide_stage(
                     decision=d, selected_market_evaluation_id=selected_id,
                     evaluated_market_evaluation_id=evaluated_id,
                 )
+                n_decisions_recorded += 1 if decision_created else 0
+                n_decisions_deduped += 0 if decision_created else 1
 
+        home_team, away_team = team_names.get(event_id, ("", ""))
         games_report.append({
             "event_id": event_id,
+            "home_team": home_team,
+            "away_team": away_team,
             "predicted_winner": forecast.predicted_winner,
             "home_win_prob": forecast.calibrated_probabilities["home"],
             "away_win_prob": forecast.calibrated_probabilities["away"],
             "expected_home_score": forecast.expected_home_score,
             "expected_away_score": forecast.expected_away_score,
             "candidate_markets_evaluated": len(candidates),
+            # evaluated_market (not selected_market) is used here so a
+            # NO_BET row still shows the exact market/side/line/ask that
+            # was rejected -- matches scripts/mlb_shadow_run.py's original
+            # per-game report shape exactly (see its own comment for the
+            # real audit-trail bug this fixed).
+            "decisions": [
+                {"market_type": d.market_type, "action": d.action, "units": d.units, "reason": d.reason_code,
+                 "market_id": d.evaluated_market.market_id if d.evaluated_market else None,
+                 "team_or_side": d.evaluated_market.team_or_side if d.evaluated_market else None,
+                 "line": d.evaluated_market.line if d.evaluated_market else None,
+                 "executable_ask": d.evaluated_market.executable_ask if d.evaluated_market else None,
+                 "cost_adjusted_edge": d.cost_adjusted_edge}
+                for d in decisions
+            ],
             "bets": len(bet_decisions),
         })
 
-    return {"status": "ok", "games": games_report, "total_bets": n_bets, "skipped": dict(state.skipped)}
+    return {
+        "status": "ok", "games": games_report, "total_bets": n_bets, "skipped": dict(state.skipped),
+        "predictions_recorded": n_predictions_recorded,
+        "trade_decisions_recorded": n_decisions_recorded,
+        "trade_decisions_deduped": n_decisions_deduped,
+    }

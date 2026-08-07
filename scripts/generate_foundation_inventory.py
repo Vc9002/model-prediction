@@ -181,16 +181,30 @@ def main() -> None:
     # itself imports train_through/build_forecast from) -- live-verified
     # to produce byte-identical probabilities/decisions to the standalone
     # script for the real 2026-08-06 slate, and idempotent on rerun (64
-    # trade_decisions before and after). Still PARTIAL, not VERIFIED:
-    # every sport besides MLB is collect-only through this same interface
-    # (predict/match_markets/decide correctly NOT_IMPLEMENTED for them);
-    # esports is now registered too but its collector is an honest stub
-    # (collect() correctly reports NOT_IMPLEMENTED, not a fabricated
-    # SUCCESS); KBO/NPB still correctly raise (no collector exists); and
-    # mlb_shadow_run.py itself has not been retired/reduced to a thin
-    # wrapper -- both real code paths still exist side by side.
+    # trade_decisions before and after). mlb_shadow_run.py is now a real
+    # thin wrapper -- checked directly below, not asserted -- around the
+    # same load_state/predict_stage/match_markets_stage/decide_stage
+    # functions MLBAdapter calls, live-verified this session to produce
+    # byte-identical predicted_winner/win-probabilities/expected-scores to
+    # the pre-refactor script for the real 2026-08-07 slate. Still PARTIAL,
+    # not VERIFIED: every sport besides MLB is collect-only through this
+    # same interface (predict/match_markets/decide correctly
+    # NOT_IMPLEMENTED for them); esports is registered but its collector is
+    # an honest stub (collect() correctly reports NOT_IMPLEMENTED, not a
+    # fabricated SUCCESS); KBO/NPB still correctly raise (no collector
+    # exists).
     cli_path = REPO_ROOT / "scripts/rebuild_shadow_cli.py"
     pipeline_path = REPO_ROOT / "src/model_prediction/rebuild/mlb_shadow_pipeline.py"
+    mlb_script_src = (REPO_ROOT / "scripts/mlb_shadow_run.py").read_text()
+    mlb_script_is_thin_wrapper = (
+        "predict_stage" in mlb_script_src and "decide_stage" in mlb_script_src
+        and "match_markets_stage" in mlb_script_src
+        # The real pre-refactor duplication was a hand-inlined per-game loop
+        # calling build_forecast()/evaluate_game() directly -- their absence
+        # here means that loop is gone, not just that the stage functions
+        # are imported alongside it.
+        and "build_forecast(" not in mlb_script_src and "evaluate_game(" not in mlb_script_src
+    )
     capabilities["multi_sport_shared_cli"] = (
         "PARTIAL" if cli_path.exists() and pipeline_path.exists() else "NOT_STARTED"
     )
@@ -220,7 +234,11 @@ def main() -> None:
         "Canonical identity: resolve_espn_scoreboard_team_ids() is real, tested, and now wired into all 5 real ESPN scoreboard collectors (MLB/NBA/NFL/Soccer/Tennis), live-verified against real network data. Still unmigrated: player/event/venue/market-contract entity types, and every non-collection downstream consumer (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict, mlb_market_matching.py's raw name comparison).",
         "point_in_time_join() has one real caller (mlb_features.point_in_time_probable_starters, used by both mlb_shadow_run.py and horizon_builder.py) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own day-granularity point-in-time filtering directly -- a genuinely different computational shape, not a drop-in fit for the shared utility as written.",
         "Horizon orchestration (PARTIAL): horizon_builder.py is real, tested, and live-verified for MLB across all 3 horizons (0/12, 2/12, 5/12 real coverage on the 2026-08-06 slate) -- but no other sport has a horizon builder, and MLB's rolling Statcast features are calendar-day granularity regardless of horizon (disclosed in the module's own docstring; the real available granularity given Statcast has no wall-clock pitch timestamp).",
-        "Multi-sport shared CLI (PARTIAL): rebuild_shadow_cli.py + sport_adapter.py now run the REAL MLB pipeline end-to-end (predict/match_markets/decide via mlb_shadow_pipeline.py, live-verified byte-identical to scripts/mlb_shadow_run.py and idempotent on rerun) -- the single largest remaining item from the prior blocker list is now closed. Still open: every sport besides MLB is collect-only through this interface (collection itself now genuinely succeeds for all 5 -- the prior soccer/tennis ESPN-league-code bug is fixed); mlb_shadow_run.py has not been retired or reduced to a thin wrapper -- both real code paths still exist; esports/KBO/NPB are not registered in the adapter at all; --resume-run-id is not implemented.",
+        "Multi-sport shared CLI (PARTIAL): rebuild_shadow_cli.py + sport_adapter.py now run the REAL MLB pipeline end-to-end (predict/match_markets/decide via mlb_shadow_pipeline.py, live-verified byte-identical to scripts/mlb_shadow_run.py and idempotent on rerun). "
+        + ("scripts/mlb_shadow_run.py is now a real thin wrapper (checked directly: no inlined build_forecast()/evaluate_game() loop of its own) around the same stage functions MLBAdapter calls -- the duplicate-orchestration drift risk is closed."
+           if mlb_script_is_thin_wrapper else
+           "scripts/mlb_shadow_run.py has NOT been reduced to a thin wrapper -- both real code paths still exist and can drift.")
+        + " Still open: every sport besides MLB is collect-only through this interface (collection itself now genuinely succeeds for all 5 -- the prior soccer/tennis ESPN-league-code and tennis groupings/athlete-shape bugs are fixed); esports is registered wrapping its honest stub collector; KBO/NPB are not registered (no collector exists); --resume-run-id continues ledger lineage only, not real in-memory stage state across processes.",
         "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained). Deliberately deferred to the model-development phase, not foundation work.",
         "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck for the model-development phase.",
         "This script can't verify CI over the network (no gh CLI installed, generation must stay a pure code-derived check) -- CI was manually verified green via the public GitHub API 7 consecutive times this session (commits 184558c, 25f1924, 9e741f9, b6534f2, cd22964, 1a5c6dc, 07bd438), after finding and fixing: ci.yml's Ruff step running full-repo with no continue-on-error against ~190 pre-existing legacy findings (CI had never been green on any prior head either); and a real staging mistake (ruff --fix'd files never git added) that made local runs look clean while a genuinely fresh clone still failed. Also ran a fully genuine fresh-clone reproduction from origin (not a local copy) this session: fresh venv, pip install -e '.[dev]', import, rebuild-scoped ruff/mypy, full pytest (949 passed), and a real cold shared-CLI smoke run against an empty data_root -- all passed. ci_attached_to_current_head stays UNVERIFIED in this generated table on principle -- confirm manually for whatever HEAD is current when reading this.",
