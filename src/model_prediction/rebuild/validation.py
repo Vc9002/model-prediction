@@ -20,11 +20,23 @@ import polars as pl
 
 @dataclass(frozen=True)
 class ChronologicalFold:
-    """One fold: train on dates < train_end, validate on val_dates, test (if supplied) untouched."""
+    """One fold: train on dates < train_end, validate on val_dates, test (if supplied) untouched.
+
+    train_start/embargo_start/embargo_end are additive (CLAUDE.md Part 2
+    SS2's exact split-manifest schema names all three) -- real gap this
+    closes: expanding_folds()/rolling_folds() already enforced the
+    embargo (the `gap` parameter genuinely separates train_end from
+    val_start), but never recorded the embargo's own date boundaries or
+    where training data actually started, so a persisted split manifest
+    couldn't show either even though both were real, already-correct
+    behavior."""
     fold_index: int
     train_end: str          # ISO date — everything before this is train
     val_start: str          # ISO date
     val_end: str            # ISO date
+    train_start: str | None = None      # first date included in this fold's training window
+    embargo_start: str | None = None    # first date excluded as publication embargo (day after train_end)
+    embargo_end: str | None = None      # last date excluded as publication embargo (day before val_start)
     test_start: str | None = None   # separate economic test, not used in Part 2
     test_end: str | None = None
 
@@ -51,11 +63,15 @@ def expanding_folds(
         val_end_idx = min(len(sorted_dates) - test_size, val_start_idx + val_size)
         if val_end_idx <= val_start_idx:
             break
+        has_embargo = val_start_idx > train_end_idx
         folds.append(ChronologicalFold(
             fold_index=i,
             train_end=train_dates[train_end_idx - 1],
             val_start=sorted_dates[val_start_idx],
             val_end=sorted_dates[val_end_idx - 1],
+            train_start=train_dates[0],  # expanding: every fold's window starts at the same earliest date
+            embargo_start=sorted_dates[train_end_idx] if has_embargo else None,
+            embargo_end=sorted_dates[val_start_idx - 1] if has_embargo else None,
             test_start=sorted_dates[-test_size] if test_size > 0 else None,
             test_end=sorted_dates[-1] if test_size > 0 else None,
         ))
@@ -81,15 +97,61 @@ def rolling_folds(
         val_end_idx = val_start_idx + val_size
         if val_end_idx >= len(sorted_dates) - test_size:
             break
+        has_embargo = val_start_idx > train_end_idx
         folds.append(ChronologicalFold(
             fold_index=i,
             train_end=sorted_dates[train_end_idx - 1],
             val_start=sorted_dates[val_start_idx],
             val_end=sorted_dates[val_end_idx - 1],
+            train_start=sorted_dates[offset],  # rolling: fixed-size window slides forward with i
+            embargo_start=sorted_dates[train_end_idx] if has_embargo else None,
+            embargo_end=sorted_dates[val_start_idx - 1] if has_embargo else None,
             test_start=sorted_dates[-test_size] if test_size > 0 else None,
             test_end=sorted_dates[-1] if test_size > 0 else None,
         ))
     return folds
+
+
+def build_split_manifest(
+    sport: str,
+    horizon: str,
+    dataset_hash: str,
+    folds: Sequence[ChronologicalFold],
+    final_test_start: str,
+    final_test_end: str,
+    final_test_consumed: bool = False,
+) -> dict[str, Any]:
+    """Real split manifest in CLAUDE.md Part 2 SS2's exact required shape --
+    real gap this closes: the only real caller that persisted a manifest
+    (scripts/train_mlb_rebuild_real_features.py) built its own ad-hoc dict
+    with per-fold *metrics* (fold_metrics: log_loss/brier/ece) but never
+    the per-fold *date ranges* CLAUDE.md's own spec names (folds[].
+    train_start/train_end/embargo_start/embargo_end/validation_start/
+    validation_end) -- those boundaries existed only as positional slice
+    indices in the script's own memory while it ran, unrecoverable from
+    any persisted artifact afterward. This doesn't replace that script's
+    richer fold_metrics (real per-fold predictive scores are useful and
+    stay); it's the missing complementary piece -- real fold provenance,
+    not fold performance."""
+    return {
+        "sport": sport,
+        "horizon": horizon,
+        "dataset_hash": dataset_hash,
+        "folds": [
+            {
+                "train_start": f.train_start,
+                "train_end": f.train_end,
+                "embargo_start": f.embargo_start,
+                "embargo_end": f.embargo_end,
+                "validation_start": f.val_start,
+                "validation_end": f.val_end,
+            }
+            for f in folds
+        ],
+        "final_test_start": final_test_start,
+        "final_test_end": final_test_end,
+        "final_test_consumed": final_test_consumed,
+    }
 
 
 # ── Bootstrap ────────────────────────────────────────────────────────────────
@@ -111,6 +173,46 @@ def date_cluster_bootstrap(
     for _ in range(n_bootstrap):
         sampled = rng.choice(group_keys, size=len(group_keys), replace=True)
         sample_vals = [v for k in sampled for v in date_groups[k]]
+        if sample_vals:
+            means.append(float(np.mean(sample_vals)))
+    means_arr = np.array(means)
+    return {
+        "mean": float(np.mean(means_arr)),
+        "ci_lower": float(np.percentile(means_arr, 2.5)),
+        "ci_upper": float(np.percentile(means_arr, 97.5)),
+        "std": float(np.std(means_arr)),
+        "n_bootstrap": n_bootstrap,
+    }
+
+
+def team_cluster_bootstrap(
+    values: Sequence[float],
+    teams: Sequence[str],
+    n_bootstrap: int = 1000,
+    seed: int = 42,
+) -> dict[str, float]:
+    """Bootstrap with team clusters (preserves within-team correlation --
+    e.g. a genuinely mispriced park factor or a systematically miscalibrated
+    matchup feature affects every game a given team plays in, not just one
+    independent observation). CLAUDE.md Part 2 SS2 names both "date-cluster
+    and team-cluster bootstrap intervals" as required; only the date-cluster
+    version existed until now. Same resampling shape as
+    date_cluster_bootstrap(), clustering on `teams` instead of `dates`.
+
+    `teams` should carry one cluster key per value -- for a two-team game,
+    callers report the same value under both team keys (one row per team
+    per game), matching how a team-level correlation risk actually shows
+    up (a bad Rockies-specific feature affects every Rockies game, home or
+    away)."""
+    rng = np.random.default_rng(seed)
+    team_groups: dict[str, list[float]] = defaultdict(list)
+    for t, v in zip(teams, values, strict=True):
+        team_groups[t].append(v)
+    group_keys = list(team_groups.keys())
+    means: list[float] = []
+    for _ in range(n_bootstrap):
+        sampled = rng.choice(group_keys, size=len(group_keys), replace=True)
+        sample_vals = [v for k in sampled for v in team_groups[k]]
         if sample_vals:
             means.append(float(np.mean(sample_vals)))
     means_arr = np.array(means)

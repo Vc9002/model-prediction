@@ -9,7 +9,7 @@
       "test_start": "2026-08-02T20:05Z",
       "test_end": "2026-08-04T23:40Z",
       "consumed": true,
-      "consumed_at_utc": "2026-08-07T05:45:13.460546+00:00",
+      "consumed_at_utc": "2026-08-07T19:08:55.544480+00:00",
       "note": "real held-out evaluation, n=21, accuracy=0.381, brier=0.3211 -- small-sample, RESEARCH_ONLY per outputs/rebuild/model_cards/mlb-two-head-v1.md"
     },
     "mlb_spread": {

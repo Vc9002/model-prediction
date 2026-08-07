@@ -34,7 +34,13 @@ from model_prediction.rebuild.mlb_features import (
     normalize_statcast_pitches,
 )
 from model_prediction.rebuild.models import MLBTwoHeadModel
-from model_prediction.rebuild.validation import brier_score, ece, expanding_folds, log_loss
+from model_prediction.rebuild.validation import (
+    brier_score,
+    build_split_manifest,
+    ece,
+    expanding_folds,
+    log_loss,
+)
 
 INTENSITY_FEATURES = [
     "home_sp_avg_velocity", "away_sp_avg_velocity",
@@ -249,8 +255,20 @@ def main() -> None:
     # only existed as positional slice indices inside this script's own
     # memory -- nothing recorded the real date ranges anywhere, so that
     # checklist item wasn't actually satisfiable by inspecting any artifact.
+    # Real CLAUDE.md Part 2 SS2-exact per-fold date-range provenance
+    # (train_start/train_end/embargo_start/embargo_end/validation_start/
+    # validation_end) -- additive to fold_metrics below (real per-fold
+    # predictive scores), not a replacement for it. See
+    # build_split_manifest()'s own docstring for the real gap this closes.
+    claude_fold_ranges = build_split_manifest(
+        sport="mlb", horizon="late", dataset_hash=artifact.get("artifact_hash", ""),
+        folds=folds, final_test_start=str(test_final["event_start_utc"].min()),
+        final_test_end=str(test_final["event_start_utc"].max()), final_test_consumed=True,
+    )["folds"]
+
     split_manifest = {
         "sport": "mlb", "horizon": "late", "dataset_hash": artifact.get("artifact_hash", ""),
+        "folds": claude_fold_ranges,
         "fold_metrics": fold_metrics,
         "train_start": str(train_final["event_start_utc"].min()),
         "train_end": str(train_final["event_start_utc"].max()),

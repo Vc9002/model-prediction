@@ -2,7 +2,7 @@
   "model_version": "mlb-two-head-v1",
   "feature_set": "real_statcast_v1",
   "matched_games": 126,
-  "unmatched_games": 24,
+  "unmatched_games": 35,
   "fold_metrics": [
     {
       "fold": 0,

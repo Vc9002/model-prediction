@@ -23,7 +23,8 @@ from model_prediction.rebuild import (
 )
 from model_prediction.rebuild.validation import (
     expanding_folds, rolling_folds, log_loss, brier_score, ece,
-    calibration_curve, date_cluster_bootstrap,
+    calibration_curve, date_cluster_bootstrap, team_cluster_bootstrap,
+    build_split_manifest, ChronologicalFold,
 )
 from model_prediction.rebuild.missingness import (
     FeatureRecord, MissingnessReport, compute_missingness_report,
@@ -227,6 +228,100 @@ class TestValidation:
         result = date_cluster_bootstrap(vals, dates, n_bootstrap=50)
         assert "ci_lower" in result
         assert "ci_upper" in result
+
+    def test_team_cluster_bootstrap(self):
+        # CLAUDE.md Part 2 SS2 names both date-cluster and team-cluster
+        # bootstrap as required; only date-cluster existed until now.
+        vals = [0.1, -0.2, 0.3, 0.0, 0.1, -0.1]
+        teams = ["SEA", "SEA", "DET", "DET", "NYY", "NYY"]
+        result = team_cluster_bootstrap(vals, teams, n_bootstrap=50)
+        assert "ci_lower" in result
+        assert "ci_upper" in result
+        assert result["ci_lower"] <= result["mean"] <= result["ci_upper"]
+
+    def test_expanding_folds_carry_train_start_and_embargo_dates(self):
+        # Real gap closed: fold date-range provenance (CLAUDE.md's exact
+        # split-manifest schema) was previously computed but never
+        # recorded on the fold object itself.
+        dates = [f"2026-{m:02d}-{d:02d}" for m in range(1, 13) for d in range(1, 29)]
+        folds = expanding_folds(dates, n_splits=3, val_size=10, gap=2, test_size=30)
+        assert len(folds) >= 1
+        for f in folds:
+            assert f.train_start is not None
+            assert f.train_start <= f.train_end
+            assert f.embargo_start is not None
+            assert f.embargo_end is not None
+            # The embargo sits strictly between train_end and val_start.
+            assert f.train_end < f.embargo_start <= f.embargo_end < f.val_start
+
+    def test_expanding_folds_zero_gap_has_no_embargo(self):
+        dates = [f"2026-{m:02d}-{d:02d}" for m in range(1, 13) for d in range(1, 29)]
+        folds = expanding_folds(dates, n_splits=3, val_size=10, gap=0, test_size=30)
+        assert len(folds) >= 1
+        for f in folds:
+            assert f.embargo_start is None
+            assert f.embargo_end is None
+
+    def test_rolling_folds_carry_train_start_and_embargo_dates(self):
+        dates = [f"2026-{m:02d}-{d:02d}" for m in range(1, 13) for d in range(1, 29)]
+        folds = rolling_folds(dates, n_splits=3, train_size=60, val_size=10, gap=2)
+        assert len(folds) >= 1
+        for f in folds:
+            assert f.train_start is not None
+            assert f.train_start <= f.train_end
+            assert f.train_end < f.embargo_start <= f.embargo_end < f.val_start
+
+    def test_rolling_folds_train_start_advances_across_folds(self):
+        # Rolling (unlike expanding) has a fixed-size window that slides
+        # forward -- train_start must differ across folds, not stay fixed.
+        dates = [f"2026-{m:02d}-{d:02d}" for m in range(1, 13) for d in range(1, 29)]
+        folds = rolling_folds(dates, n_splits=3, train_size=60, val_size=10, gap=1)
+        assert len(folds) >= 2
+        starts = [f.train_start for f in folds]
+        assert len(set(starts)) > 1
+
+
+class TestBuildSplitManifest:
+    """CLAUDE.md Part 2 SS2's exact required split-manifest schema."""
+
+    def test_matches_the_required_schema_shape(self):
+        folds = [
+            ChronologicalFold(
+                fold_index=0, train_end="2026-01-10", val_start="2026-01-12", val_end="2026-01-20",
+                train_start="2026-01-01", embargo_start="2026-01-11", embargo_end="2026-01-11",
+            ),
+        ]
+        manifest = build_split_manifest(
+            sport="mlb", horizon="late", dataset_hash="abc123", folds=folds,
+            final_test_start="2026-02-01", final_test_end="2026-02-10",
+        )
+        assert manifest["sport"] == "mlb"
+        assert manifest["horizon"] == "late"
+        assert manifest["dataset_hash"] == "abc123"
+        assert manifest["final_test_consumed"] is False
+        assert manifest["folds"] == [{
+            "train_start": "2026-01-01", "train_end": "2026-01-10",
+            "embargo_start": "2026-01-11", "embargo_end": "2026-01-11",
+            "validation_start": "2026-01-12", "validation_end": "2026-01-20",
+        }]
+
+    def test_final_test_consumed_defaults_false(self):
+        manifest = build_split_manifest(
+            sport="mlb", horizon="late", dataset_hash="x", folds=[],
+            final_test_start="2026-02-01", final_test_end="2026-02-10",
+        )
+        assert manifest["final_test_consumed"] is False
+
+    def test_real_expanding_folds_round_trip_into_a_valid_manifest(self):
+        dates = [f"2026-{m:02d}-{d:02d}" for m in range(1, 13) for d in range(1, 29)]
+        folds = expanding_folds(dates, n_splits=3, val_size=10, gap=1, test_size=30)
+        manifest = build_split_manifest(
+            sport="mlb", horizon="late", dataset_hash="h", folds=folds,
+            final_test_start=dates[-30], final_test_end=dates[-1], final_test_consumed=True,
+        )
+        assert len(manifest["folds"]) == len(folds)
+        for entry in manifest["folds"]:
+            assert entry["train_start"] <= entry["train_end"] < entry["validation_start"] <= entry["validation_end"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
