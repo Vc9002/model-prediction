@@ -16,6 +16,7 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+import pytest
 
 from model_prediction.rebuild.models import JointScoreDistribution, MLBTwoHeadModel
 
@@ -93,6 +94,84 @@ class TestNegativeBinomialMethodConsistency:
         recomputed_home_prob = dist.probability_for_market(pred, "moneyline", "home")
 
         assert abs(recomputed_home_prob - pred.home_win_prob) < 0.05
+
+
+class TestSkellamMethod:
+    """method="skellam" prices moneyline/spread via the exact closed-form
+    fact that the difference of two independent Poisson random variables
+    is exactly Skellam(mu1, mu2) -- no simulation, no Monte Carlo noise.
+    Cross-checked against a real large-sample independent-Poisson Monte
+    Carlo simulation (not just internal self-consistency) before being
+    wired into predict_game()/probability_for_market()."""
+
+    def test_moneyline_matches_a_real_independent_poisson_monte_carlo(self):
+        home_exp, away_exp = 4.5, 4.0
+        rng = np.random.default_rng(0)
+        n = 2_000_000
+        home_mc = rng.poisson(home_exp, n)
+        away_mc = rng.poisson(away_exp, n)
+        mc_home_prob = ((home_mc > away_mc).sum() + 0.5 * (home_mc == away_mc).sum()) / n
+
+        dist = JointScoreDistribution(method="skellam", seed=1)
+        pred = dist.predict_game("g1", total_intensity=home_exp + away_exp, home_advantage=home_exp - away_exp)
+
+        assert abs(pred.home_win_prob - mc_home_prob) < 0.002
+
+    def test_spread_matches_a_real_independent_poisson_monte_carlo(self):
+        home_exp, away_exp = 5.0, 3.5
+        rng = np.random.default_rng(0)
+        n = 2_000_000
+        home_mc = rng.poisson(home_exp, n)
+        away_mc = rng.poisson(away_exp, n)
+        line = -1.5
+        margin = home_mc - away_mc + line
+        mc_home_cover = ((margin > 0).sum() + 0.5 * (margin == 0).sum()) / n
+
+        dist = JointScoreDistribution(method="skellam", seed=1)
+        pred = dist.predict_game("g1", total_intensity=home_exp + away_exp, home_advantage=home_exp - away_exp)
+        cover_prob = dist.probability_for_market(pred, "spread", "home", line=line)
+
+        assert abs(cover_prob - mc_home_cover) < 0.002
+
+    def test_integer_line_push_probability_matches_monte_carlo(self):
+        # Integer spread/moneyline lines have a real, nonzero push
+        # probability -- the case a naive half-integer-only implementation
+        # would get wrong.
+        home_exp, away_exp = 4.0, 4.0
+        rng = np.random.default_rng(0)
+        n = 2_000_000
+        home_mc = rng.poisson(home_exp, n)
+        away_mc = rng.poisson(away_exp, n)
+        mc_push = (home_mc == away_mc).mean()
+
+        dist = JointScoreDistribution(method="skellam", seed=1)
+        _, push_prob = dist._skellam_margin_prob(home_exp, away_exp, threshold=0.0)
+
+        assert abs(push_prob - mc_push) < 0.002
+
+    def test_home_and_away_probabilities_sum_to_one(self):
+        dist = JointScoreDistribution(method="skellam", seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        assert pred.home_win_prob + pred.away_win_prob == pytest.approx(1.0, abs=1e-9)
+
+    def test_moneyline_via_probability_for_market_matches_predict_game(self):
+        dist = JointScoreDistribution(method="skellam", seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=1.0)
+
+        recomputed = dist.probability_for_market(pred, "moneyline", "home")
+
+        # Exact, not approximate -- both paths use the identical closed-form
+        # computation, so there's no Monte Carlo noise to allow for.
+        assert recomputed == pytest.approx(pred.home_win_prob, abs=1e-12)
+
+    def test_totals_still_come_from_simulated_scores_not_fabricated(self):
+        # Skellam models the score difference, not the sum -- totals must
+        # still come from real simulated scores (independent Poisson, the
+        # same underlying rates), not a value skipped or guessed.
+        dist = JointScoreDistribution(method="skellam", n_sim=20000, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        over_prob = dist.probability_for_market(pred, "total", "over", line=8.5)
+        assert 0.0 < over_prob < 1.0
 
 
 class TestModelSaveLoadRoundTrip:
