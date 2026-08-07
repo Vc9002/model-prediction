@@ -97,7 +97,7 @@ class MLBCollector:
 
         if games:
             df = pl.DataFrame(games)
-            self.norm.write("mlb", "scoreboard", df)
+            self.norm.write("mlb", "scoreboard", df, primary_key=["event_id"])
             self.meta.audit_event("collect_espn_scoreboard", {"date": game_date, "games": len(games)})
             return {"status": "ok", "date": game_date, "games": len(games)}
 

@@ -111,6 +111,68 @@ class TestNormalizedStore:
             result = store.read("test", "data")
             assert result.height == 2
 
+    def test_primary_key_deduplicates_repeated_collection(self):
+        """Real bug fixed (see outputs/rebuild/takeover_status.md
+        Checkpoint 9): append mode previously had no primary-key awareness
+        at all, so repeated collection of the same real event produced
+        duplicate rows — 188 real STATUS_FINAL MLB scoreboard rows were
+        only 135 real unique games."""
+        with tempfile.TemporaryDirectory() as td:
+            store = NormalizedStore(td)
+            row1 = pl.DataFrame({"event_id": ["E1"], "observed_at_utc": ["t1"], "home_score": [3]})
+            row2 = pl.DataFrame({"event_id": ["E1"], "observed_at_utc": ["t2"], "home_score": [3]})
+            store.write("mlb", "scoreboard", row1, primary_key=["event_id"])
+            store.write("mlb", "scoreboard", row2, primary_key=["event_id"])
+            result = store.read("mlb", "scoreboard")
+            assert result.height == 1
+
+    def test_primary_key_keeps_latest_content_on_legitimate_update(self):
+        """A game's score/status legitimately changes across re-collections
+        — keep_latest must reflect the newest state, not the first."""
+        with tempfile.TemporaryDirectory() as td:
+            store = NormalizedStore(td)
+            in_progress = pl.DataFrame({
+                "event_id": ["E1"], "observed_at_utc": ["t1"],
+                "home_score": [0], "status": ["STATUS_IN_PROGRESS"],
+            })
+            final = pl.DataFrame({
+                "event_id": ["E1"], "observed_at_utc": ["t2"],
+                "home_score": [5], "status": ["STATUS_FINAL"],
+            })
+            store.write("mlb", "scoreboard", in_progress, primary_key=["event_id"])
+            store.write("mlb", "scoreboard", final, primary_key=["event_id"])
+            result = store.read("mlb", "scoreboard")
+            assert result.height == 1
+            assert result["home_score"][0] == 5
+            assert result["status"][0] == "STATUS_FINAL"
+
+    def test_fail_closed_conflict_policy_raises_on_real_conflict(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = NormalizedStore(td)
+            row1 = pl.DataFrame({"game_pk": [1], "observed_at_utc": ["t1"], "pitcher_id": [100]})
+            row2 = pl.DataFrame({"game_pk": [1], "observed_at_utc": ["t2"], "pitcher_id": [200]})
+            store.write("mlb", "starters", row1, primary_key=["game_pk"])
+            with pytest.raises(ValueError, match="Conflicting content"):
+                store.write("mlb", "starters", row2, primary_key=["game_pk"], conflict_policy="fail_closed")
+
+    def test_fail_closed_conflict_policy_allows_identical_recollection(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = NormalizedStore(td)
+            row1 = pl.DataFrame({"game_pk": [1], "observed_at_utc": ["t1"], "pitcher_id": [100]})
+            row2 = pl.DataFrame({"game_pk": [1], "observed_at_utc": ["t2"], "pitcher_id": [100]})
+            store.write("mlb", "starters", row1, primary_key=["game_pk"])
+            store.write("mlb", "starters", row2, primary_key=["game_pk"], conflict_policy="fail_closed")
+            result = store.read("mlb", "starters")
+            assert result.height == 1
+
+    def test_no_primary_key_preserves_old_unconditional_append_behavior(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = NormalizedStore(td)
+            store.write("test", "data", pl.DataFrame({"x": [1]}))
+            store.write("test", "data", pl.DataFrame({"x": [1]}))
+            result = store.read("test", "data")
+            assert result.height == 2, "without primary_key, behavior must be unchanged (no dedup)"
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Validation tests

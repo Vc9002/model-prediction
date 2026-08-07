@@ -193,17 +193,80 @@ class NormalizedStore:
     def path(self, sport: str, table: str) -> Path:
         return self.root / sport / f"{table}.parquet"
 
-    def write(self, sport: str, table: str, df: pl.DataFrame, *, mode: str = "append") -> int:
-        """Write a DataFrame to a Parquet table. mode='append' or 'overwrite'."""
+    def write(
+        self, sport: str, table: str, df: pl.DataFrame, *,
+        mode: str = "append",
+        primary_key: list[str] | None = None,
+        conflict_policy: str = "keep_latest",
+    ) -> int:
+        """Write a DataFrame to a Parquet table. mode='append' or 'overwrite'.
+
+        Real bug fixed here (see outputs/rebuild/takeover_status.md
+        Checkpoint 9 / FOUNDATION_COMPLETION.md Phase 2): append mode
+        previously concatenated unconditionally, with no primary-key
+        awareness at all — repeated collection of the same real event
+        produced multiple identical-content rows (verified live: 188
+        STATUS_FINAL MLB scoreboard rows were only 135 real unique games).
+        A consumer-side `dedupe_scoreboard()` worked around this for
+        already-written data; this fixes it at the write path so future
+        writes don't need that workaround.
+
+        When `primary_key` is given, rows sharing the same key value(s)
+        are deduplicated after every write:
+          - conflict_policy="keep_latest" (default): keeps the
+            last-written row per key — correct for observational tables
+            where a later collection legitimately reflects newer state
+            (e.g. a game's status/score changing as it progresses).
+          - conflict_policy="fail_closed": raises if two rows share a key
+            but differ in content outside the standard provenance columns
+            — correct for tables whose primary key is meant to be
+            genuinely immutable (identical re-collection is still fine and
+            silently deduped; a real conflicting value is not).
+        """
         p = self.path(sport, table)
         p.parent.mkdir(parents=True, exist_ok=True)
         if mode == "overwrite" or not p.exists():
-            df.write_parquet(str(p))
+            combined = df
         else:
             existing = pl.read_parquet(str(p))
             combined = pl.concat([existing, df], how="diagonal_relaxed")
-            combined.write_parquet(str(p))
+
+        if primary_key:
+            combined = self._dedupe_by_primary_key(combined, primary_key, conflict_policy)
+
+        combined.write_parquet(str(p))
         return df.height
+
+    @staticmethod
+    def _dedupe_by_primary_key(
+        df: pl.DataFrame, primary_key: list[str], conflict_policy: str,
+    ) -> pl.DataFrame:
+        provenance_ish = {
+            "observed_at_utc", "effective_at_utc", "ingested_at_utc",
+            "raw_snapshot_hash", "source", "source_record_id", "source_version",
+        }
+        compare_cols = [c for c in df.columns if c not in provenance_ish and c not in primary_key]
+
+        if conflict_policy == "fail_closed" and compare_cols:
+            distinct_content = (
+                df.select([*primary_key, *compare_cols])
+                .unique()
+                .group_by(primary_key)
+                .agg(pl.len().alias("_distinct_variants"))
+                .filter(pl.col("_distinct_variants") > 1)
+            )
+            if distinct_content.height > 0:
+                raise ValueError(
+                    f"Conflicting content for primary key {primary_key} in "
+                    f"{distinct_content.height} row(s) — fail_closed conflict_policy "
+                    f"requires identical content per key, not just a key match."
+                )
+
+        # "Last write wins": since new rows are concatenated after existing
+        # ones above, .last() per key naturally keeps the most recently
+        # written row — the intended "keep_latest" semantics for both
+        # policies (fail_closed already verified there's no real conflict).
+        return df.group_by(primary_key, maintain_order=True).last()
 
     def read(self, sport: str, table: str) -> pl.DataFrame:
         return pl.read_parquet(str(self.path(sport, table)))
