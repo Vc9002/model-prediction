@@ -14,6 +14,7 @@ import polars as pl
 import pytest
 
 from model_prediction.rebuild.mlb_features import (
+    build_game_feature_row,
     bullpen_rolling_features,
     dedupe_scoreboard,
     identify_starters,
@@ -23,6 +24,7 @@ from model_prediction.rebuild.mlb_features import (
     pitcher_clean_rate_features,
     pitcher_rolling_features,
     point_in_time_probable_starters,
+    resolve_horizon_starter_names,
 )
 
 
@@ -366,3 +368,165 @@ class TestPointInTimeProbableStarters:
         assert point_in_time_probable_starters(
             {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")}, [],
         ) == {}
+
+
+def _pit_probable(event_id, observed_at_utc, home_starter, away_starter, *, pit_eligible=True):
+    return {
+        "event_id": event_id, "observed_at_utc": observed_at_utc,
+        "home_starter": home_starter, "away_starter": away_starter,
+        "pit_eligible": pit_eligible,
+    }
+
+
+def _espn_game(event_id="401", event_start_utc="2026-08-06T22:10:00+00:00"):
+    return {
+        "event_id": event_id, "event_start_utc": event_start_utc,
+        "home_team": "Seattle Mariners", "away_team": "Detroit Tigers",
+        "home_score": 4, "away_score": 2, "venue": "T-Mobile Park",
+    }
+
+
+class TestResolveHorizonStarterNames:
+    """Task 1 (historical starter train-serving parity): historical
+    training must resolve starters the same point-in-time-safe way live
+    inference does -- never from the completed game's own actual pitcher.
+    The exact regression case specified for this fix: a starter revision
+    observed after the late horizon's decision time must not leak in."""
+
+    def test_late_horizon_uses_the_probable_known_at_decision_time_not_a_later_revision(self):
+        # event_start_utc=22:10Z, so late decision_time = 21:10Z (T-60m).
+        game = _espn_game()
+        records = [
+            _pit_probable("401", "2026-08-06T16:00:00+00:00", "Pitcher A", "Away Pitcher"),
+            # Real revision, but observed at 21:40Z -- *after* the late
+            # decision cutoff of 21:10Z. Must not leak into a "late" row.
+            _pit_probable("401", "2026-08-06T21:40:00+00:00", "Pitcher B", "Away Pitcher"),
+        ]
+
+        home, _away, missing_reason = resolve_horizon_starter_names(game, "late", records)
+
+        assert home == "Pitcher A"
+        assert missing_reason is None
+
+    def test_early_horizon_at_the_same_game_only_sees_the_earlier_probable_too(self):
+        # Sanity check that the fix is horizon-aware, not just a fixed
+        # cutoff -- the "early" decision time (T-36h) is well before both
+        # real observations here, so neither is usable yet.
+        game = _espn_game()
+        records = [
+            _pit_probable("401", "2026-08-06T16:00:00+00:00", "Pitcher A", "Away Pitcher"),
+        ]
+
+        home, away, missing_reason = resolve_horizon_starter_names(game, "early", records)
+
+        assert (home, away) == (None, None)
+        assert missing_reason == "no_valid_probable_at_horizon"
+
+    def test_retroactively_scraped_record_is_never_used_even_if_timestamp_would_pass(self):
+        # pit_eligible=False means this was scraped after the fact
+        # (provenance="retroactive_or_unverifiable_non_pit") -- its
+        # observed_at_utc doesn't reflect a real pregame observation and
+        # must never be trusted as a genuine probable, even though its
+        # timestamp alone would satisfy the point-in-time filter.
+        game = _espn_game()
+        records = [
+            _pit_probable("401", "2026-08-06T16:00:00+00:00", "Pitcher A", "Away Pitcher", pit_eligible=False),
+        ]
+
+        home, away, missing_reason = resolve_horizon_starter_names(game, "late", records)
+
+        assert (home, away) == (None, None)
+        assert missing_reason == "no_valid_probable_at_horizon"
+
+    def test_no_records_at_all_fails_closed_with_a_real_reason_not_none(self):
+        home, away, missing_reason = resolve_horizon_starter_names(_espn_game(), "late", [])
+        assert (home, away) == (None, None)
+        assert missing_reason == "no_valid_probable_at_horizon"
+
+    def test_invalid_horizon_raises(self):
+        with pytest.raises(ValueError, match="horizon"):
+            resolve_horizon_starter_names(_espn_game(), "nonsense", [])
+
+
+class TestBuildGameFeatureRowStarterParity:
+    """End-to-end regression for Task 1: build_game_feature_row() must
+    never fall back to identify_starters()'s actual-pitcher-of-record for
+    the game being featurized, even when a real point-in-time-valid
+    probable exists that names someone else (e.g. a real late starter
+    swap). Proven here by giving the ACTUAL Statcast-inferred starter and
+    the real point-in-time PROBABLE starter distinct, real prior-history
+    signals (a different avg_velocity each) and asserting the row carries
+    the probable's signal, not the actual starter's."""
+
+    def _pitches_and_starters(self):
+        # This completed game (game_pk=100): pitcher 2 actually threw
+        # SEA's first pitch -- the real, actual starter of record.
+        this_game = [
+            _pitch_row(100, "2026-08-06", pitcher=2, at_bat_number=1, pitch_number=1,
+                       home_team="SEA", away_team="DET", release_speed=80.0),
+        ]
+        # Real prior starts (before 2026-08-06) for each pitcher, with
+        # deliberately distinct velocities so the test can tell which
+        # pitcher's history actually fed the row.
+        prior = [
+            _pitch_row(50, "2026-08-01", pitcher=1, at_bat_number=1, pitch_number=1,
+                       home_team="SEA", away_team="DET", release_speed=99.0),  # Pitcher A
+            _pitch_row(51, "2026-07-31", pitcher=2, at_bat_number=1, pitch_number=1,
+                       home_team="SEA", away_team="DET", release_speed=80.0),  # Pitcher B (actual starter)
+        ]
+        pitches = normalize_statcast_pitches(pl.DataFrame(this_game + prior))
+        return pitches, identify_starters(pitches)
+
+    def test_uses_the_real_point_in_time_probable_not_the_actual_completed_game_starter(self):
+        game = _espn_game()
+        # Real point-in-time probable at the late decision time: Pitcher A
+        # -- Pitcher B (the real actual starter, per Statcast) only shows
+        # up in a revision observed after the late cutoff and must not be
+        # used for a "late" row.
+        records = [
+            _pit_probable("401", "2026-08-06T16:00:00+00:00", "Pitcher A", "Away Pitcher"),
+            _pit_probable("401", "2026-08-06T21:40:00+00:00", "Pitcher B", "Away Pitcher"),
+        ]
+        pitches, starters = self._pitches_and_starters()
+
+        with patch(
+            "model_prediction.rebuild.mlb_features.lookup_pitcher_id",
+            side_effect=lambda name: {"Pitcher A": 1, "Pitcher B": 2, "Away Pitcher": 3}.get(name),
+        ):
+            row = build_game_feature_row(game, pitches, starters, "data/rebuild", "late", records)
+
+        assert row is not None
+        assert row["starters_known"] == 1.0
+        assert row["starter_missing_reason"] == ""
+        # Pitcher A's real prior avg_velocity (99.0) -- not Pitcher B's
+        # (80.0), even though Pitcher B is who actually started this game.
+        assert row["home_sp_avg_velocity"] == pytest.approx(99.0)
+
+    def test_no_valid_probable_zeroes_starter_features_instead_of_using_the_actual_starter(self):
+        game = _espn_game()
+        pitches, starters = self._pitches_and_starters()
+
+        # No probable-starter archive at all for this event -- must not
+        # silently fall back to Pitcher B (the real actual starter).
+        row = build_game_feature_row(game, pitches, starters, "data/rebuild", "late", [])
+
+        assert row is not None
+        assert row["starters_known"] == 0.0
+        assert row["starter_missing_reason"] == "no_valid_probable_at_horizon"
+        assert row["home_sp_availability"] == 0.0
+        assert row["home_sp_avg_velocity"] == 0.0
+
+    def test_name_that_cannot_be_resolved_to_a_statcast_id_also_zeroes_not_falls_back(self):
+        game = _espn_game()
+        records = [
+            _pit_probable("401", "2026-08-06T16:00:00+00:00", "Unresolvable Name", "Away Pitcher"),
+        ]
+        pitches, starters = self._pitches_and_starters()
+
+        with patch("model_prediction.rebuild.mlb_features.lookup_pitcher_id", return_value=None):
+            row = build_game_feature_row(game, pitches, starters, "data/rebuild", "late", records)
+
+        assert row is not None
+        assert row["starters_known"] == 0.0
+        assert row["starter_missing_reason"] == "starter_name_not_resolved_to_statcast_id"
+        assert row["home_sp_avg_velocity"] == 0.0

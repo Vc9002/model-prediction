@@ -38,10 +38,13 @@ from model_prediction.rebuild.mlb_features import (
     build_game_feature_row,
     dedupe_scoreboard,
     identify_starters,
+    load_probable_starter_records,
     load_raw_statcast_dates,
     normalize_statcast_pitches,
 )
 from model_prediction.rebuild.xgboost_stress import XGBoostChallenger
+
+HORIZON = "late"
 
 
 def _train_fn(X, y):
@@ -67,14 +70,18 @@ def main() -> None:
     raw = load_raw_statcast_dates("data/rebuild", backfill_dates)
     pitches = normalize_statcast_pitches(raw)
     starters = identify_starters(pitches)
+    probable_records = load_probable_starter_records()
 
     rows = []
     for g in completed.iter_rows(named=True):
-        row = build_game_feature_row(g, pitches, starters, "data/rebuild")
+        row = build_game_feature_row(g, pitches, starters, "data/rebuild", HORIZON, probable_records)
         if row is not None:
             rows.append(row)
     features = pl.DataFrame(rows).sort("event_start_utc") if rows else pl.DataFrame()
-    print(f"1. Feature rows: {features.height} matched to real Statcast games")
+    starters_known = int(features["starters_known"].sum()) if features.height else 0
+    print(f"1. Feature rows: {features.height} matched ({starters_known} with a point-in-time-valid "
+          f"probable starter for both teams at horizon={HORIZON}, {features.height - starters_known} "
+          f"flagged starters_known=0)")
 
     if features.height < 30:
         print("Not enough matched games to run a meaningful ablation (need >=30). Stopping honestly.")

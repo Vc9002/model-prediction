@@ -93,7 +93,7 @@ class TestMissingnessIsHonest:
         # guarantee point_in_time_probable_starters exists to provide.
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
         records = [{
-            "event_id": "401", "observed_at_utc": "2026-08-06T21:30:00+00:00",  # ~40min before start
+            "event_id": "401", "observed_at_utc": "2026-08-06T21:00:00+00:00",  # ~70min before start
             "home_starter": "Some Pitcher", "away_starter": "Other Pitcher",
         }]
 
@@ -126,7 +126,7 @@ class TestSnapshotHashReflectsRealContent:
     def test_same_event_ids_but_different_feature_content_yields_different_hashes(self, tmp_path):
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
         records = [{
-            "event_id": "401", "observed_at_utc": "2026-08-06T21:30:00+00:00",
+            "event_id": "401", "observed_at_utc": "2026-08-06T21:00:00+00:00",
             "home_starter": "Pitcher A", "away_starter": "Pitcher B",
         }]
 
@@ -161,7 +161,7 @@ class TestSnapshotHashReflectsRealContent:
     def test_identical_content_yields_the_same_hash(self, tmp_path):
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
         records = [{
-            "event_id": "401", "observed_at_utc": "2026-08-06T21:30:00+00:00",
+            "event_id": "401", "observed_at_utc": "2026-08-06T21:00:00+00:00",
             "home_starter": "Pitcher A", "away_starter": "Pitcher B",
         }]
         row = {"event_id": "401", "home_sp_avg_velocity": 93.0}

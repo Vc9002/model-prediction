@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import gzip
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 
 from .asof import point_in_time_join
+from .horizons import HORIZON_HOURS_BEFORE
 from .storage import utc_now
 
 # Coarse, static single-season park factors (100 = neutral run environment).
@@ -107,6 +108,23 @@ def dedupe_scoreboard(sb: pl.DataFrame) -> pl.DataFrame:
         .group_by("event_id", maintain_order=True)
         .last()
     )
+
+
+def load_probable_starter_records(
+    path: str | Path = "data/point_in_time/mlb_probable_starters.jsonl",
+) -> list[dict]:
+    """Load the real archived probable-starter observations every horizon-
+    aware starter resolution (resolve_horizon_starter_names(),
+    point_in_time_probable_starters()) reads from. One shared loader so
+    every script/pipeline that needs historical PIT-safe starters (training
+    scripts, mlb_shadow_pipeline.py) reads the identical file the identical
+    way, rather than each re-implementing its own JSONL read. Returns an
+    empty list, not an error, when the archive doesn't exist yet -- callers
+    already treat "no valid probable" as honest missingness, not a crash."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def load_raw_statcast_dates(raw_root: str | Path, dates: list[str]) -> pl.DataFrame:
@@ -531,7 +549,13 @@ def find_statcast_game_pk(
     two sources. Not doubleheader-safe: if two games between the same teams
     on the same date exist, this returns the first match by game_pk, which
     is a known, disclosed limitation (see CLAUDE.md Part 1 section 7's
-    doubleheader identity requirement — not yet built)."""
+    doubleheader identity requirement — Task 2 of the next rebuild phase).
+    No longer called by build_game_feature_row() as of the horizon-safe
+    starter fix (Task 1) — that function now resolves starters from the
+    point-in-time probable-starter feed, not from this game's own Statcast
+    game_pk, so it no longer needs this join at all. Left in place,
+    unused, for Task 2 to fix and wire back in for whatever still needs a
+    real game_pk (e.g. a future point-in-time lineup join)."""
     match = pitches.filter(
         (pl.col("game_date_str") == game_date)
         & (pl.col("home_team") == home_abbrev)
@@ -542,18 +566,86 @@ def find_statcast_game_pk(
     return int(match["game_pk"].sort()[0])
 
 
+_NO_STARTER_ROLLING = {
+    "availability": 0.0, "starts_seen": 0.0, "avg_velocity": 0.0,
+    "k_pct": 0.0, "bb_pct": 0.0, "csw_pct": 0.0, "whiff_pct": 0.0,
+    "days_rest": 0.0, "pitches_last_start": 0.0,
+}
+_NO_STARTER_CLEAN = {
+    "availability": 0.0,
+    "first_inning_clean_rate": 0.0, "first_inning_clean_n": 0.0,
+    "scoreless_inning_rate": 0.0, "scoreless_inning_n": 0.0,
+    "clean_appearance_rate": 0.0, "clean_appearance_n": 0.0,
+}
+
+
+def resolve_horizon_starter_names(
+    espn_game: dict, horizon: str, probable_records: list[dict],
+) -> tuple[str | None, str | None, str | None]:
+    """Real, point-in-time-safe probable starter names for one game at the
+    given horizon's decision time: (home_starter_name, away_starter_name,
+    missing_reason). missing_reason is None only when both names were
+    resolved from a genuinely prospective observation
+    (pit_eligible=True/provenance="prospective_pregame") strictly before
+    decision_time = event_start_utc - HORIZON_HOURS_BEFORE[horizon].
+
+    Records with pit_eligible=False (provenance
+    "retroactive_or_unverifiable_non_pit" -- collected after the fact, so
+    observed_at_utc doesn't reflect a real pregame observation) are never
+    used here, even if their timestamp would otherwise pass the point-in-time
+    filter -- using one could silently leak the actual/final starter
+    disguised as a "probable" one, exactly the train-serving leak this
+    function exists to close (see CLAUDE.md's historical starter-parity
+    requirement). When no valid observation exists,
+    missing_reason="no_valid_probable_at_horizon" and both names are None --
+    callers must not fall back to the game's actual completed-game starter.
+    """
+    if horizon not in HORIZON_HOURS_BEFORE:
+        raise ValueError(f"horizon must be one of {tuple(HORIZON_HOURS_BEFORE)}, got {horizon!r}")
+    decision_time = datetime.fromisoformat(espn_game["event_start_utc"]) - timedelta(
+        hours=HORIZON_HOURS_BEFORE[horizon]
+    )
+    pit_records = [r for r in probable_records if r.get("pit_eligible") is True]
+    resolved = point_in_time_probable_starters({espn_game["event_id"]: decision_time}, pit_records)
+    names = resolved.get(espn_game["event_id"])
+    if names is None:
+        return None, None, "no_valid_probable_at_horizon"
+    return names["home_starter"], names["away_starter"], None
+
+
 def build_game_feature_row(
     espn_game: dict,
     pitches: pl.DataFrame,
     starters: pl.DataFrame,
     raw_root: str | Path,
+    horizon: str,
+    probable_records: list[dict],
 ) -> dict[str, float] | None:
     """Real feature row for one completed ESPN-scoreboard game: starter and
-    bullpen rolling features for both teams (point-in-time-safe — computed
-    strictly before this game's date), park factor, and weather. Returns
-    None when the game can't be matched to a Statcast game_pk (e.g. a date
-    with no real Statcast collection) rather than filling in fabricated
-    features for an unmatched game.
+    bullpen rolling features for both teams, park factor, and weather.
+
+    Train-serving parity fix (see outputs/rebuild/takeover_status.md):
+    starters are resolved the same way live inference resolves them --
+    from the point-in-time-valid probable-starter observation at this
+    horizon's decision time (resolve_horizon_starter_names(), the same
+    point_in_time_probable_starters() lookup build_live_game_feature_row()
+    already used) -- never from identify_starters() on this game's own
+    completed Statcast pitches, which is the actual pitcher and can differ
+    from what was knowable at the decision horizon (a late starter swap).
+    When no point-in-time-valid probable exists (or the resolved name can't
+    be matched to a real Statcast pitcher ID), starter features are
+    returned zeroed and explicitly flagged
+    (`starters_known`/`starter_missing_reason`) rather than silently
+    substituted with the actual starter -- missingness is data, not a gap
+    to paper over.
+
+    All rolling-feature computation remains point-in-time-safe on its own
+    terms (strictly before this game's date); this fix is specifically
+    about *which pitcher* those rolling features are computed for.
+
+    Returns None only when the ESPN team names can't be mapped to a real
+    Statcast club abbreviation (see ESPN_TO_STATCAST_ABBREV) -- every other
+    case, including a fully unknown starter, still produces a row.
     """
     game_date = espn_game["event_start_utc"][:10]
     home_name, away_name = espn_game["home_team"], espn_game["away_team"]
@@ -562,39 +654,45 @@ def build_game_feature_row(
     if home_abbrev is None or away_abbrev is None:
         return None
 
-    game_pk = find_statcast_game_pk(pitches, game_date, home_abbrev, away_abbrev)
-    if game_pk is None:
-        return None
+    home_starter_name, away_starter_name, missing_reason = resolve_horizon_starter_names(
+        espn_game, horizon, probable_records,
+    )
 
-    game_starters = starters.filter(pl.col("game_pk") == game_pk)
-    home_starter_row = game_starters.filter(pl.col("pitching_team") == home_abbrev)
-    away_starter_row = game_starters.filter(pl.col("pitching_team") == away_abbrev)
-    if home_starter_row.is_empty() or away_starter_row.is_empty():
-        return None
-    home_starter_id = int(home_starter_row["pitcher"][0])
-    away_starter_id = int(away_starter_row["pitcher"][0])
+    home_starter_id = lookup_pitcher_id(home_starter_name) if home_starter_name else None
+    away_starter_id = lookup_pitcher_id(away_starter_name) if away_starter_name else None
+    if missing_reason is None and (home_starter_id is None or away_starter_id is None):
+        missing_reason = "starter_name_not_resolved_to_statcast_id"
 
-    home_p = pitcher_rolling_features(pitches, home_starter_id, game_date)
-    away_p = pitcher_rolling_features(pitches, away_starter_id, game_date)
-    # Distinct "home_sp_clean_" prefix (not "home_sp_") -- both dicts
-    # have their own "availability" key, so sharing home_p's prefix would
-    # silently let one clobber the other in the merged row below.
-    home_clean = pitcher_clean_rate_features(pitches, home_starter_id, game_date)
-    away_clean = pitcher_clean_rate_features(pitches, away_starter_id, game_date)
+    starter_known = missing_reason is None
+    if starter_known:
+        home_p = pitcher_rolling_features(pitches, home_starter_id, game_date)  # type: ignore[arg-type]
+        away_p = pitcher_rolling_features(pitches, away_starter_id, game_date)  # type: ignore[arg-type]
+        # Distinct "home_sp_clean_" prefix (not "home_sp_") -- both dicts
+        # have their own "availability" key, so sharing home_p's prefix
+        # would silently let one clobber the other in the merged row below.
+        home_clean = pitcher_clean_rate_features(pitches, home_starter_id, game_date)  # type: ignore[arg-type]
+        away_clean = pitcher_clean_rate_features(pitches, away_starter_id, game_date)  # type: ignore[arg-type]
+    else:
+        home_p = away_p = dict(_NO_STARTER_ROLLING)
+        home_clean = away_clean = dict(_NO_STARTER_CLEAN)
+
     home_bp = bullpen_rolling_features(pitches, home_abbrev, game_date, starters)
     away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
     park = park_factor(espn_game.get("venue", ""))
     weather = load_weather_daily_aggregate(raw_root, espn_game.get("venue", ""), game_date)
 
+    # Targets attached last, after every feature above is frozen from
+    # point-in-time-safe inputs only -- the actual result never influences
+    # what features get computed.
     home_score, away_score = espn_game["home_score"], espn_game["away_score"]
     return {
         "event_id": espn_game["event_id"],
         "game_date": game_date,
         "event_start_utc": espn_game["event_start_utc"],
+        "horizon": horizon,
         "home_team": home_name, "away_team": away_name,
-        "total_runs": float(home_score + away_score),
-        "home_margin": float(home_score - away_score),
-        "home_score": float(home_score), "away_score": float(away_score),
+        "starters_known": 1.0 if starter_known else 0.0,
+        "starter_missing_reason": missing_reason or "",
         # Starter features (prefixed by side)
         **{f"home_sp_{k}": v for k, v in home_p.items()},
         **{f"away_sp_{k}": v for k, v in away_p.items()},
@@ -608,6 +706,9 @@ def build_game_feature_row(
         "weather_availability": weather["availability"],
         "temp_f_mean": weather["temp_f_mean"],
         "wind_mph_mean": weather["wind_mph_mean"],
+        "total_runs": float(home_score + away_score),
+        "home_margin": float(home_score - away_score),
+        "home_score": float(home_score), "away_score": float(away_score),
     }
 
 

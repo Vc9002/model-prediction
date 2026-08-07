@@ -30,9 +30,12 @@ from model_prediction.rebuild.mlb_features import (
     build_game_feature_row,
     dedupe_scoreboard,
     identify_starters,
+    load_probable_starter_records,
     load_raw_statcast_dates,
     normalize_statcast_pitches,
 )
+
+HORIZON = "late"
 from model_prediction.rebuild.models import MLBTwoHeadModel
 from model_prediction.rebuild.validation import (
     brier_score,
@@ -70,18 +73,24 @@ def main() -> None:
     raw = load_raw_statcast_dates("data/rebuild", backfill_dates)
     pitches = normalize_statcast_pitches(raw)
     starters = identify_starters(pitches)
-    print(f"2. Statcast: {pitches.height} real pitches, {starters.height} real starter-game entries")
+    probable_records = load_probable_starter_records()
+    print(f"2. Statcast: {pitches.height} real pitches, {starters.height} real starter-game entries; "
+          f"{len(probable_records)} real archived probable-starter observations")
 
     rows = []
     unmatched = 0
     for g in completed.iter_rows(named=True):
-        row = build_game_feature_row(g, pitches, starters, "data/rebuild")
+        row = build_game_feature_row(g, pitches, starters, "data/rebuild", HORIZON, probable_records)
         if row is None:
             unmatched += 1
             continue
         rows.append(row)
     features = pl.DataFrame(rows).sort("game_date")
-    print(f"3. Feature rows: {features.height} matched to real Statcast games ({unmatched} unmatched, not fabricated)")
+    starters_known = int(features["starters_known"].sum()) if features.height else 0
+    print(f"3. Feature rows: {features.height} matched ({unmatched} team-unresolved, not fabricated); "
+          f"{starters_known}/{features.height} have a point-in-time-valid probable starter for both "
+          f"teams at horizon={HORIZON} ({features.height - starters_known} flagged starters_known=0, "
+          f"not silently filled with the actual starter)")
 
     if features.height < 30:
         print("Not enough matched games to train meaningfully (need >=30). Stopping honestly, not faking a result.")

@@ -19,7 +19,15 @@ from typing import Any
 import polars as pl
 
 HORIZONS = ("early", "mid", "late")
-HORIZON_HOURS_BEFORE = {"early": 36, "mid": 6, "late": 0.5}
+# CLAUDE.md's own definition: "late: start minus 60 minutes" (1.0 hours).
+# Real bug fixed here: this previously said 0.5 (30 minutes), inconsistent
+# with both CLAUDE.md's spec and mlb_shadow_pipeline.py's actual live
+# decision-time computation, which already hardcoded 60 minutes directly
+# rather than using this shared constant -- meaning this constant's only
+# real caller (horizon_builder.py's compute_decision_times, used for
+# dataset-building tooling) was silently 30 minutes earlier than the
+# horizon it claimed to model.
+HORIZON_HOURS_BEFORE = {"early": 36, "mid": 6, "late": 1.0}
 
 
 def compute_decision_times(
@@ -77,37 +85,37 @@ def horizon_specs_for_sport(sport: str) -> dict[str, HorizonSpec]:
         return {
             "early": HorizonSpec("early", 36, common_early + ["season_stats", "pitcher_season_era"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["starter_k_bb_pct", "bullpen_availability"]),
-            "late": HorizonSpec("late", 0.5, common_late + ["confirmed_batting_order", "wind_vector"]),
+            "late": HorizonSpec("late", 1.0, common_late + ["confirmed_batting_order", "wind_vector"]),
         }
     elif sport in ("nba", "wnba"):
         return {
             "early": HorizonSpec("early", 36, common_early + ["team_ortg", "team_drtg", "pace"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["player_availability", "lineup_continuity"]),
-            "late": HorizonSpec("late", 0.5, common_late + ["starting_lineup_confirmed", "referee_crew"]),
+            "late": HorizonSpec("late", 1.0, common_late + ["starting_lineup_confirmed", "referee_crew"]),
         }
     elif sport in ("nfl",):
         return {
             "early": HorizonSpec("early", 36, common_early + ["qb_status", "team_epa", "drive_efficiency"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["injury_report", "weather_forecast"]),
-            "late": HorizonSpec("late", 0.5, common_late + ["inactive_list", "game_time_weather"]),
+            "late": HorizonSpec("late", 1.0, common_late + ["inactive_list", "game_time_weather"]),
         }
     elif sport in ("soccer",):
         return {
             "early": HorizonSpec("early", 36, common_early + ["xg_form", "attack_strength", "defense_strength"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["starting_xi", "goalkeeper_confirmed"]),
-            "late": HorizonSpec("late", 0.5, common_late + ["final_lineup", "market_depth"]),
+            "late": HorizonSpec("late", 1.0, common_late + ["final_lineup", "market_depth"]),
         }
     elif sport in ("tennis",):
         return {
             "early": HorizonSpec("early", 36, common_early + ["surface_elo", "overall_elo"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["serve_pct", "return_pct", "recent_workload"]),
-            "late": HorizonSpec("late", 0.5, common_late + ["withdrawal_risk"]),
+            "late": HorizonSpec("late", 1.0, common_late + ["withdrawal_risk"]),
         }
     else:
         return {
             "early": HorizonSpec("early", 36, common_early),
             "mid": HorizonSpec("mid", 6, common_mid),
-            "late": HorizonSpec("late", 0.5, common_late),
+            "late": HorizonSpec("late", 1.0, common_late),
         }
 
 

@@ -19,7 +19,6 @@ script for the same real slate.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -248,11 +247,27 @@ def predict_stage(
     before any market data is inspected, per CLAUDE.md's winner-first
     requirement. decide_stage() rebuilds the full forecast once real market
     lines are known (Phase 10-required market data, not sports probability)."""
-    from .mlb_features import build_game_feature_row  # deferred: heavy pybaseball import path
+    # Deferred: heavy pybaseball import path.
+    from .mlb_features import build_game_feature_row, load_probable_starter_records
+
+    # Loaded once, up front, and reused below for both the historical
+    # retraining rows and tonight's live probables_by_event lookup -- the
+    # same real archive, read once, not two independent reads of the same
+    # file. Train-serving parity fix (see outputs/rebuild/takeover_status.md):
+    # the walk-forward retraining below used to call build_game_feature_row()
+    # with no starter-horizon awareness at all, which internally used
+    # identify_starters() on each completed game's own final Statcast
+    # pitches -- the actual pitcher, not what was knowable at this horizon's
+    # decision time. That is the identical leak already fixed in the
+    # training scripts; this is the live pipeline's own copy of it.
+    probable_records = load_probable_starter_records()
 
     sb = dedupe_scoreboard(pl.read_parquet(f"{data_root}/normalized/mlb/scoreboard.parquet"))
     completed = sb.filter(pl.col("status") == "STATUS_FINAL").sort("event_start_utc")
-    rows = [build_game_feature_row(g, state.pitches, state.starters, data_root) for g in completed.iter_rows(named=True)]
+    rows = [
+        build_game_feature_row(g, state.pitches, state.starters, data_root, HORIZON_LATE, probable_records)
+        for g in completed.iter_rows(named=True)
+    ]
     rows = [r for r in rows if r is not None]
     features = pl.DataFrame(rows).sort("game_date") if rows else pl.DataFrame()
 
@@ -274,11 +289,9 @@ def predict_stage(
             training_end=state.target_date,
         )
 
-    probables_path = Path("data/point_in_time/mlb_probable_starters.jsonl")
     probables_by_event: dict[str, dict] = {}
-    if probables_path.exists() and state.decision_times:
-        records = [json.loads(line) for line in probables_path.read_text().splitlines() if line.strip()]
-        probables_by_event = point_in_time_probable_starters(state.decision_times, records)
+    if state.decision_times:
+        probables_by_event = point_in_time_probable_starters(state.decision_times, probable_records)
 
     # Real canonical player identity for probable starters (identity.
     # resolve_mlbam_player_id) -- constructed once per predict_stage call,
