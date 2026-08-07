@@ -102,9 +102,18 @@ def main() -> None:
     capabilities["canonical_identity_registry"] = "PARTIAL" if identity_wired_in_collectors else "INTERFACE_ONLY"
     capabilities["mlb_starter_name_to_id_resolution"] = "OPERATIONAL"  # lookup_pitcher_id() in mlb_features.py, live-verified, tested
 
-    # Horizons
-    horizon_callers = real_callers_of("horizons")
-    capabilities["horizon_orchestration"] = "INTERFACE_ONLY" if not horizon_callers else "PARTIAL"
+    # Horizons. horizon_builder.py (not horizons.py, which is only
+    # declarative metadata) is the real orchestrator -- checked directly
+    # since it's a rebuild module, not a top-level pipeline script.
+    horizon_builder_path = REPO_ROOT / "src/model_prediction/rebuild/horizon_builder.py"
+    # PARTIAL, not VERIFIED: real, tested, live-verified for MLB only.
+    # early/mid/late all produce genuinely different real coverage
+    # (0/12, 2/12, 5/12 on the real 2026-08-06 slate) via real
+    # decision-time-sensitive point-in-time joins, but the underlying
+    # rolling-feature history is calendar-day granularity (disclosed in
+    # horizon_builder.py's own module docstring), and no sport besides
+    # MLB has a real horizon builder wired in yet.
+    capabilities["horizon_orchestration"] = "PARTIAL" if horizon_builder_path.exists() else "INTERFACE_ONLY"
 
     # Market matching
     capabilities["mlb_market_event_isolation"] = "VERIFIED"  # mlb_market_matching.py, 7 tests, live-verified against real Polymarket data
@@ -138,14 +147,43 @@ def main() -> None:
 
     # Persistence
     shadow_ledger_callers = real_callers_of("shadow_ledger")
-    capabilities["sqlite_shadow_ledger"] = "VERIFIED" if shadow_ledger_callers else "PARTIAL"  # data/rebuild/shadow.db; runs/predictions/market_snapshots/market_evaluations/trade_decisions/paper_orders/settlements/audit_events fully implemented and wired into scripts/mlb_shadow_run.py; raw_snapshots/normalized_observations/feature_snapshots/dataset_manifests/model_artifacts/calibration_artifacts/closing_prices/reviews remain schema-only
+    # All 16 required tables now have real insert/query methods (verified
+    # by grep for `def record_` below), not just the original 8 -- the
+    # remaining honest caveat is that only 2 of the 8 newly-added methods
+    # (record_raw_snapshot, record_model_artifact) have been called
+    # against the real data/rebuild/shadow.db; the other 6 are real,
+    # tested, but not yet wired into scripts/mlb_shadow_run.py's actual run.
+    ledger_src = (REPO_ROOT / "src/model_prediction/rebuild/shadow_ledger.py").read_text()
+    all_16_tables_have_methods = all(
+        f"def record_{t}" in ledger_src or f"def record_{t[:-1]}" in ledger_src
+        for t in ["raw_snapshot", "normalized_observation", "feature_snapshot",
+                   "dataset_manifest", "model_artifact", "calibration_artifact",
+                   "closing_price", "review"]
+    )
+    capabilities["sqlite_shadow_ledger"] = (
+        "VERIFIED" if shadow_ledger_callers and all_16_tables_have_methods else "PARTIAL"
+    )
     capabilities["rerun_idempotency"] = "VERIFIED" if shadow_ledger_callers else "NOT_STARTED"  # live-verified: real 2-game slate, first run wrote 2 predictions + 32 trade_decisions, immediate rerun wrote 0 new of either (32 deduped) -- two real bugs found and fixed getting here, see takeover_status.md
 
     # Orchestration
     capabilities["one_command_mlb_shadow_run"] = "OPERATIONAL"  # scripts/mlb_shadow_run.py, real live runs, now with real ledger persistence
-    capabilities["multi_sport_shared_cli"] = "NOT_STARTED"
+    # PARTIAL, not VERIFIED: scripts/rebuild_shadow_cli.py + sport_adapter.py
+    # are real and live-verified for MLB/NBA/tennis this session (collect
+    # works for 5 real sports; predict/match_markets/decide are honestly
+    # NOT_IMPLEMENTED through the shared interface for every sport,
+    # including MLB, since that logic still only exists in
+    # scripts/mlb_shadow_run.py's own inline code, not ported here yet).
+    cli_path = REPO_ROOT / "scripts/rebuild_shadow_cli.py"
+    capabilities["multi_sport_shared_cli"] = "PARTIAL" if cli_path.exists() else "NOT_STARTED"
 
-    # Other sports
+    # Other sports. Real collection now works for nba/wnba/nfl (verified
+    # live this session); soccer/tennis collection is real code but a real,
+    # disclosed pre-existing bug (ESPN league codes "SOCCER"/"TENNIS" don't
+    # exist in data_sources/espn.py) means it currently fails closed with a
+    # real ERROR, not silently. No sport has identity/features/predict/
+    # markets/decide/persistence/coverage -- the full gate requires all of
+    # those, so NOT_STARTED remains correct per CLAUDE.md's own 14-item list,
+    # even though real partial progress (collection) now exists for 5 of 8.
     for sport in ["nba", "wnba", "nfl", "soccer", "tennis", "esports", "kbo", "npb"]:
         capabilities[f"{sport}_foundation_gate"] = "NOT_STARTED"
 
@@ -155,14 +193,16 @@ def main() -> None:
     capabilities["ci_attached_to_current_head"] = "UNVERIFIED"  # no gh CLI auth available in this session — genuinely unknown, not assumed passing
 
     known_blockers = [
-        "Real order-book depth still doesn't exist as a data source — real_market_candidates() now honestly sets depth_available=False instead of a fabricated 999.0 (fixed), but that only makes every real market correctly fail INSUFFICIENT_DEPTH; it doesn't create the missing capability. Order-book walking (walk_asks) is also NOT_STARTED — nothing to walk without a real depth source.",
-        "point_in_time_join() now has one real caller (mlb_shadow_run.py's probable-starter lookup, via mlb_features.point_in_time_probable_starters) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own point-in-time filtering directly — a different computational shape (aggregate a window of prior rows vs. attach one latest observation), not yet migrated and not obviously a drop-in fit for the shared utility as written",
-        "8 of the shadow ledger's 16 required tables (raw_snapshots, normalized_observations, feature_snapshots, dataset_manifests, model_artifacts, calibration_artifacts, closing_prices, reviews) are schema-only — no insert/query methods, nothing writes to them yet",
-        "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained)",
-        "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck",
-        "This script can't verify CI over the network (no gh CLI installed, generation must stay a pure code-derived check) -- but CI was manually verified green via the public GitHub API for commit 184558c this session, after finding and fixing two real gaps: ci.yml's Ruff step ran full-repo (src/ tests/) with no continue-on-error against ~190 pre-existing legacy findings unrelated to rebuild work, so CI had never actually been green on any recent head including before this session; and a real staging mistake (files fixed by ruff --fix but never git added) that made local runs look clean while a genuinely fresh clone still failed the same way CI's runner did. ci_attached_to_current_head stays UNVERIFIED in this generated table on principle -- confirm manually for whatever HEAD is current when reading this",
-        "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing",
-        "MLB model held-out evaluation remains genuinely inconclusive on ~20-25 games — more real backfill days is the only way to resolve this, not further feature engineering",
+        "Real order-book depth still doesn't exist as a data source — real_market_candidates() honestly sets depth_available=False, which makes every real market correctly fail INSUFFICIENT_DEPTH; it doesn't create the missing capability. Order-book walking (walk_asks) is also NOT_STARTED — nothing to walk without a real depth source. External blocker, not internal foundation debt.",
+        "Canonical identity (PARTIAL): resolve_or_register_team() is real, tested, and wired into MLB scoreboard collection only. NBA/WNBA/NFL/Soccer/Tennis collectors, player/event/venue/market-contract entity types, and every downstream consumer (mlb_features.py's ESPN_TO_STATCAST_ABBREV dict, mlb_market_matching.py's raw name comparison) are still unmigrated bespoke matching.",
+        "point_in_time_join() has one real caller (mlb_features.point_in_time_probable_starters, used by both mlb_shadow_run.py and horizon_builder.py) but the rolling-feature lookback windows (pitcher/bullpen) still implement their own day-granularity point-in-time filtering directly -- a genuinely different computational shape, not a drop-in fit for the shared utility as written.",
+        "Horizon orchestration (PARTIAL): horizon_builder.py is real, tested, and live-verified for MLB across all 3 horizons (0/12, 2/12, 5/12 real coverage on the 2026-08-06 slate) -- but no other sport has a horizon builder, and MLB's rolling Statcast features are calendar-day granularity regardless of horizon (disclosed in the module's own docstring; the real available granularity given Statcast has no wall-clock pitch timestamp).",
+        "Multi-sport shared CLI (PARTIAL): scripts/rebuild_shadow_cli.py + sport_adapter.py are real, tested, and live-verified (collect works for mlb/nba/nfl/soccer/wnba; a real pre-existing bug makes soccer/tennis ESPN collection fail closed with a clean ERROR instead of crashing). predict/match_markets/decide are honestly NOT_IMPLEMENTED through the shared interface for every sport including MLB -- that logic still only exists inside scripts/mlb_shadow_run.py's own inline code, not yet extracted.",
+        "conservative_probability implements bootstrap_uncertainty only -- CLAUDE.md's full spec also requires calibration_uncertainty, lineup_uncertainty, missingness_penalty, and model_disagreement (the last requires multiple independently-trained model families, which don't exist yet -- only one model architecture is trained). Deliberately deferred to the model-development phase, not foundation work.",
+        "Real bootstrap bounds are wide given only 126 real training games (e.g. a 0.49 point estimate with a real [0.27, 0.67] bound) -- this correctly makes almost every market fail the edge-after-costs gate, which is honest behavior given genuine data scarcity, not a bug, and reinforces backfill volume as the real bottleneck for the model-development phase.",
+        "This script can't verify CI over the network (no gh CLI installed, generation must stay a pure code-derived check) -- CI was manually verified green via the public GitHub API 7 consecutive times this session (commits 184558c, 25f1924, 9e741f9, b6534f2, cd22964, 1a5c6dc, 07bd438), after finding and fixing: ci.yml's Ruff step running full-repo with no continue-on-error against ~190 pre-existing legacy findings (CI had never been green on any prior head either); and a real staging mistake (ruff --fix'd files never git added) that made local runs look clean while a genuinely fresh clone still failed. Also ran a fully genuine fresh-clone reproduction from origin (not a local copy) this session: fresh venv, pip install -e '.[dev]', import, rebuild-scoped ruff/mypy, full pytest (949 passed), and a real cold shared-CLI smoke run against an empty data_root -- all passed. ci_attached_to_current_head stays UNVERIFIED in this generated table on principle -- confirm manually for whatever HEAD is current when reading this.",
+        "8 sports (NBA/WNBA/NFL/soccer/tennis/esports/KBO/NPB) have zero foundation-gate items complete — correctly out of scope until MLB clears its own gate per CLAUDE.md's own sequencing. Real collection now works for 5 of them (nba/wnba/nfl/soccer/tennis have real Collector classes; soccer/tennis are currently broken via the ESPN-league bug above) but a foundation gate requires identity+features+predict+markets+decide+persistence+coverage together, not collection alone.",
+        "MLB model held-out evaluation remains genuinely inconclusive on ~20-25 games — more real backfill days is the only way to resolve this, not further feature engineering. Deliberately not attempted this session per explicit instruction to finish the shared foundation first.",
     ]
 
     inventory = {

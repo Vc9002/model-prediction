@@ -1133,3 +1133,129 @@ the 8 schema-only shadow-ledger tables; (6) shared multi-sport CLI (Phase
 depth-dependent economic qualification remains permanently blocked, which
 is the honest state, not a gap to paper over. No sport beyond MLB has
 started, per CLAUDE.md's explicit sequencing.
+
+## Foundation-completion session: items 1-2-4-5-6-7 of the priority list, CI verified green (2026-08-07)
+
+Explicit instruction this session: stop MLB model work entirely, finish
+the shared software foundation. Six real, tested, live-verified commits
+on top of the earlier storage/depth/PIT/CI session, each independently
+committed and pushed:
+
+**(1) Canonical identity, PARTIAL.** `resolve_or_register_team()`
+(identity.py) is real: resolves via exact source-id match, falls back to
+confident same-sport fuzzy name match (reusing an existing entity instead
+of duplicating), else registers new — low-confidence match fails closed
+into registration, never a guess. Building its first real tests
+immediately found a second real bug matching `c2a55d0`'s
+`update_source_health` fix: `IdentityRegistry.map()` hit the same
+`entity_mappings` foreign-key gap. Fixed with `ensure_source_exists()`
+(status-neutral, unlike reusing `update_source_health` which would
+silently reset a source's real tracked status). Wired into
+`MLBCollector.collect_espn_scoreboard()` only — additive
+(`home_team_canonical_id`/`away_team_canonical_id` columns), display-name
+columns unchanged so existing consumers are unaffected. Live-verified
+against real ESPN data, including investigating what first looked like a
+bug (two rows for the same matchup with different canonical-id states) and
+confirming it was a real 2-game series, not an error.
+
+**(2) Formal schema contracts, real and enforced.** New `schemas.py`:
+`TableContract`/`ColumnSpec` declare primary key, required columns,
+nullability, dtype; `validate_or_raise()` fails closed on schema drift.
+Wired as actual validation-before-persistence into
+`NormalizedStore.write()` and `MarketStore.write_books()`, and into every
+real collector call site across all 5 sports. Real bug found by running
+the existing suite against newly-enforced contracts: an all-null nullable
+column infers as polars' `Null` dtype, not its eventual real dtype —
+fixed. Live-verified against real network collection (15 real scoreboard
+rows, 450 real market rows) with zero false-positive rejections.
+
+**(4) All 16 shadow-ledger tables now have real methods.** The 8
+remaining schema-only tables (raw_snapshots, normalized_observations,
+feature_snapshots, dataset_manifests, model_artifacts,
+calibration_artifacts, closing_prices, reviews) got real record_*/query
+methods matching the file's existing idempotency conventions (content-hash
+or natural-key dedup for lineage tables, fail-closed on real conflicts for
+closing_prices, plain append for reviews). Live-verified against the real
+`data/rebuild/shadow.db`. Honestly disclosed: only 2 of the 8 new methods
+have a real caller outside their own tests so far (a standalone
+verification call) — none are wired into `mlb_shadow_run.py`'s actual run
+yet.
+
+**(5) Shared `SportAdapter` protocol.** New `sport_adapter.py`: one
+interface (`collect` → `build_features` → `predict` → `match_markets` →
+`decide`), honestly scoped — MLB's `predict`/`match_markets`/`decide`
+report `NOT_IMPLEMENTED` through the shared interface, since that logic
+still only exists in `mlb_shadow_run.py`'s own inline code; porting it
+under time pressure risked breaking the one pipeline this project depends
+on most. `collect()` is real for all 5 sports with a real Collector class.
+Real bug found live (not from reading code): Soccer/TennisCollector call
+the real ESPN client with league codes (`"SOCCER"`/`"TENNIS"`) that don't
+exist in `data_sources/espn.py`'s `LEAGUE_PATHS` — real collection has
+never worked for either sport. Adapter now catches this and reports a
+clean per-stage `ERROR` instead of crashing.
+
+**(6) Shared multi-sport CLI.** `scripts/rebuild_shadow_cli.py`:
+`rebuild-shadow --sport <sport> --date <date> --horizon <horizon>` (plus
+`--collect-only`/`--features-only`/`--predict-only`/`--markets-only`/
+`--decision-only`), routing through the adapter registry, persisting one
+real `runs` row per invocation. Live-verified for MLB (collect + real
+horizon-feature build succeeded, predict honestly stopped at
+`NOT_IMPLEMENTED`) and NBA (real network call, honest `NO_DATA` for an
+offseason date) — genuine multi-sport routing through one command, not
+per-sport scripts.
+
+**(7) Automatic coverage/missingness reports.**
+`scripts/generate_coverage_report.py` writes
+`outputs/rebuild/coverage/{sport}_{horizon}.json` and
+`outputs/rebuild/missingness/{sport}_{horizon}.json` from real
+`horizon_builder.py` output. Live-verified: real, different coverage per
+horizon for the 2026-08-06 slate (0/12, 2/12, 5/12).
+
+**Horizon builder (carried over from the prior entry in this same
+session, listed here for completeness).** `horizon_builder.py`'s
+`build_mlb_horizon_dataset()` is the first real implementation beyond
+`horizons.py`'s declarative metadata — computes real decision_time_utc
+per horizon, resolves probable starters through the real point-in-time
+join, persists an immutable versioned snapshot via `FeatureStore`. A real
+bug (only decision dates were backfilled for Statcast history, not real
+prior games) was found and fixed via live verification, not unit tests
+alone.
+
+**CI: verified green 7 consecutive times this session** (commits
+`184558c`, `25f1924`, `9e741f9`, `b6534f2`, `cd22964`, `1a5c6dc`,
+`07bd438`), via the public GitHub API (no `gh` CLI available). Two real
+process bugs found and fixed to get there: `ci.yml`'s Ruff step ran
+unscoped with no `continue-on-error` against ~190 pre-existing legacy
+findings unrelated to rebuild work (CI had never been green on any prior
+head, including before this session); and a real staging mistake — files
+already fixed locally by `ruff --fix` were never `git add`ed for the
+commit that claimed the fix, so local checks looked clean while a
+genuinely fresh clone still failed the exact same way CI did. Caught by
+actually reproducing a fresh clone locally to diagnose the CI failure, not
+by re-trusting local state.
+
+**Fresh-clone reproduction, done deliberately and completely** (not just
+as a CI side-effect): cloned directly from `git@github.com:Vc9002/
+model-prediction.git` (not a local copy) into `/tmp`, fresh venv, `pip
+install -e ".[dev]"`, `import model_prediction.rebuild`, rebuild-scoped
+ruff (clean) and mypy (33 pre-existing findings, matches the persistent
+dev venv exactly), full `pytest` (949 passed, 1 skipped), and a real cold
+`rebuild_shadow_cli.py` smoke run against a genuinely empty `--data-root`
+— all passed.
+
+**949 tests pass** (up from 906 at the start of this entry's session),
+1 skipped. `ruff check src/model_prediction/rebuild tests/rebuild` clean.
+`foundation_inventory.json`/`foundation_status.md` regenerated from code.
+
+**What remains, honestly, for a complete foundation:** identity migration
+for the other 4 collectors + every downstream consumer (mlb_features.py's
+abbreviation dict, mlb_market_matching.py's name comparison); extracting
+`mlb_shadow_run.py`'s real predict/match_markets/decide logic into
+`MLBAdapter` so the shared CLI can actually run a full decision, not just
+collect+features; a real horizon builder for any sport beyond MLB; wiring
+the 6 not-yet-called ledger methods into the real pipeline; fixing the
+real Soccer/Tennis ESPN-league bug; and the two items explicitly and
+correctly deferred to the model-development phase (more MLB backfill,
+multi-model-family OOF ensemble). Real order-book depth remains an
+external blocker, not internal foundation debt, per this session's own
+explicit instruction to treat it that way.
