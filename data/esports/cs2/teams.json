@@ -9596,12 +9596,110 @@
     "source_team_id": 25026,
     "team_id": "bo3:1:25026"
   },
+  "bo3:1:25031": {
+    "acronym": null,
+    "name": "JAM",
+    "slug": "jam",
+    "source_team_id": 25031,
+    "team_id": "bo3:1:25031"
+  },
+  "bo3:1:25032": {
+    "acronym": null,
+    "name": "GamersLab Esports",
+    "slug": "gamerslab-esports",
+    "source_team_id": 25032,
+    "team_id": "bo3:1:25032"
+  },
+  "bo3:1:25052": {
+    "acronym": "KRE",
+    "name": "Kreazion",
+    "slug": "kreazion",
+    "source_team_id": 25052,
+    "team_id": "bo3:1:25052"
+  },
+  "bo3:1:25053": {
+    "acronym": "NIO",
+    "name": "NIO",
+    "slug": "nio-",
+    "source_team_id": 25053,
+    "team_id": "bo3:1:25053"
+  },
   "bo3:1:2506": {
     "acronym": null,
     "name": "Rare Atom",
     "slug": "rare-atom",
     "source_team_id": 2506,
     "team_id": "bo3:1:2506"
+  },
+  "bo3:1:25067": {
+    "acronym": "FKO",
+    "name": "FKOMAR",
+    "slug": "fkomar",
+    "source_team_id": 25067,
+    "team_id": "bo3:1:25067"
+  },
+  "bo3:1:25068": {
+    "acronym": null,
+    "name": "REM",
+    "slug": "rem",
+    "source_team_id": 25068,
+    "team_id": "bo3:1:25068"
+  },
+  "bo3:1:25069": {
+    "acronym": "CIT",
+    "name": "Citron",
+    "slug": "citron",
+    "source_team_id": 25069,
+    "team_id": "bo3:1:25069"
+  },
+  "bo3:1:25070": {
+    "acronym": "GPN",
+    "name": "Giant Pandas",
+    "slug": "giant-pandas",
+    "source_team_id": 25070,
+    "team_id": "bo3:1:25070"
+  },
+  "bo3:1:25071": {
+    "acronym": "AOG",
+    "name": "Aogiri",
+    "slug": "aogiri-cs",
+    "source_team_id": 25071,
+    "team_id": "bo3:1:25071"
+  },
+  "bo3:1:25072": {
+    "acronym": "GR",
+    "name": "Galactik rebels",
+    "slug": "galactik-rebels",
+    "source_team_id": 25072,
+    "team_id": "bo3:1:25072"
+  },
+  "bo3:1:25073": {
+    "acronym": "LFX",
+    "name": "lafox",
+    "slug": "lafox",
+    "source_team_id": 25073,
+    "team_id": "bo3:1:25073"
+  },
+  "bo3:1:25074": {
+    "acronym": "QC",
+    "name": "QueenConso",
+    "slug": "queenconso",
+    "source_team_id": 25074,
+    "team_id": "bo3:1:25074"
+  },
+  "bo3:1:25075": {
+    "acronym": "ZTF",
+    "name": "z to forward",
+    "slug": "z-to-forward",
+    "source_team_id": 25075,
+    "team_id": "bo3:1:25075"
+  },
+  "bo3:1:25082": {
+    "acronym": null,
+    "name": "NoTime",
+    "slug": "notime",
+    "source_team_id": 25082,
+    "team_id": "bo3:1:25082"
   },
   "bo3:1:2509": {
     "acronym": "CG",

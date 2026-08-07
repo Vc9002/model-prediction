@@ -3,22 +3,22 @@
     "from": "2020-01-01",
     "to": "2026-07-27"
   },
-  "extracted_at_utc": "2026-08-05T13:55:40.984408Z",
+  "extracted_at_utc": "2026-08-07T15:23:27.793462Z",
   "limitations": [
     "BO3 does not publish a stable public API contract; schema availability may change.",
     "Historical corrections after extraction require a new versioned backfill.",
     "Team IDs do not encode point-in-time rosters or substitutions."
   ],
-  "match_count": 10917,
-  "matches_sha256": "1f781b58f6e42def2745add4d060c54094124499751c3f7e7f4fd54ba187e92c",
+  "match_count": 10926,
+  "matches_sha256": "e904e7bf38245bfcac311fbac04e82857fd5b5ab3626ab653e181fa98b302f7c",
   "refresh_method": "refresh_recent_matches (incremental merge, not a full backfill)",
   "request_pages": {
     "matches": 2,
-    "teams": 1
+    "teams": 31
   },
   "requested_window": {
-    "from": "2026-07-22",
-    "to": "2026-08-05"
+    "from": "2026-07-24",
+    "to": "2026-08-07"
   },
   "requires_api_key": false,
   "requires_signup": false,
@@ -28,7 +28,7 @@
   "source_base_url": "https://api.bo3.gg/api/v1",
   "source_terms_url": "https://bo3.gg/wiki/use-of-services",
   "team_count": 1035,
-  "teams_sha256": "057609f373c4f1fab263c9f87893e01c41e34f9782f4bb63660c75b59e9683b2",
+  "teams_sha256": "740425e31ba47cca7402cc7c4473e44bcf768d0a58eeddbc7f7168844762ed42",
   "title": "dota2",
   "title_name": "Dota 2"
 }

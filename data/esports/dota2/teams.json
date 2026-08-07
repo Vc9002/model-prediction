@@ -1065,7 +1065,7 @@
   },
   "bo3:4:15038": {
     "acronym": null,
-    "name": "1w Team",
+    "name": "Iron Wing",
     "slug": "1win-dota2",
     "source_team_id": 15038,
     "team_id": "bo3:4:15038"
@@ -1457,7 +1457,7 @@
   },
   "bo3:4:15098": {
     "acronym": null,
-    "name": "L1GA TEAM",
+    "name": "HULIGANI",
     "slug": "l1ga-team",
     "source_team_id": 15098,
     "team_id": "bo3:4:15098"
@@ -2472,7 +2472,7 @@
   },
   "bo3:4:15526": {
     "acronym": null,
-    "name": "BetBoom Team",
+    "name": "BoomBoys",
     "slug": "betboom-team-dota2",
     "source_team_id": 15526,
     "team_id": "bo3:4:15526"
@@ -3522,7 +3522,7 @@
   },
   "bo3:4:18604": {
     "acronym": "VSN",
-    "name": "PARIVISION",
+    "name": "TEAM VISION",
     "slug": "parivision-dota2",
     "source_team_id": 18604,
     "team_id": "bo3:4:18604"

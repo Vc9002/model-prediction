@@ -1,0 +1,20 @@
+{
+  "entries": [
+    {
+      "athlete_id": "924",
+      "current_status": "Questionable",
+      "player_name": "Alysha Clark",
+      "raw_status": "Day-To-Day",
+      "reason": "Back",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-08-05T15:48:00+00:00",
+      "team": "Dallas Wings"
+    }
+  ],
+  "event_id": "401857117",
+  "observed_at_utc": "2026-08-05T17:01:48.219316+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "6db509e25b92d8f962ced6b0a400a6cda82eaf6796677987b284c819f50d9dee",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}
