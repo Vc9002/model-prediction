@@ -117,3 +117,44 @@ class TestBuildForecastCalledExactlyOncePerGame:
         assert state is not None
         with pytest.raises(ValueError, match="predict_stage"):
             pipeline.decide_stage(state)
+
+
+class TestModelArtifactLineage:
+    """Real gap closed: predict_stage() trains a real model but never
+    recorded which real artifact this run's predictions are bound to --
+    record_model_artifact() (added earlier this session) had no real
+    caller wiring it into the actual pipeline."""
+
+    def test_predict_stage_records_a_real_model_artifact_when_given_a_ledger(self, tmp_path):
+        from model_prediction.rebuild.shadow_ledger import ShadowLedger
+
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        for i in range(30):
+            _write_scoreboard(tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00",
+                               "A", "B", "STATUS_FINAL")
+        state = pipeline.load_state(str(tmp_path), "2026-08-06")
+        assert state is not None
+
+        fake_model = MagicMock()
+        fake_model.to_artifact.return_value = {"model_id": "mlb-two-head-v1", "artifact_hash": "real_test_hash_abc"}
+
+        ledger = ShadowLedger(f"{tmp_path}/shadow.db")
+        run_id = ledger.record_run("mlb", run_type="test")
+
+        with patch(
+            "model_prediction.rebuild.mlb_features.build_game_feature_row",
+            return_value={"game_date": "2026-07-01", "event_id": "hist"},
+        ), patch(
+            "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
+            return_value=(fake_model, MagicMock(), 30),
+        ), patch(
+            "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters", return_value={},
+        ):
+            pipeline.predict_stage(state, str(tmp_path), ledger=ledger, run_id=run_id)
+
+        row = ledger.conn.execute(
+            "SELECT run_id, artifact_hash FROM model_artifacts WHERE artifact_hash='real_test_hash_abc'"
+        ).fetchone()
+        ledger.close()
+        assert row is not None
+        assert row["run_id"] == run_id

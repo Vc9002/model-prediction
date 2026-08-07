@@ -259,6 +259,19 @@ def predict_stage(
 
     state.model, state.bootstrap, state.train_n = train_through(features, state.target_date)
 
+    if ledger is not None and run_id is not None:
+        # Real lineage: the trained model artifact this run's predictions
+        # are bound to (idempotent on artifact_hash -- retraining on
+        # identical data produces the identical hash, real no-op per
+        # record_model_artifact()'s own contract).
+        artifact = state.model.to_artifact()
+        ledger.record_model_artifact(
+            run_id=run_id, sport="mlb", model_name=artifact.get("model_id", "mlb-two-head-v1"),
+            model_version=artifact.get("model_id", "unknown"),
+            artifact_hash=artifact.get("artifact_hash", ""), horizon=HORIZON_LATE,
+            training_end=state.target_date,
+        )
+
     probables_path = Path("data/point_in_time/mlb_probable_starters.jsonl")
     probables_by_event: dict[str, dict] = {}
     if probables_path.exists() and state.decision_times:
