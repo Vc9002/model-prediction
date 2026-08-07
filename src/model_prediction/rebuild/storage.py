@@ -17,7 +17,7 @@ import os
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import duckdb
 import polars as pl
@@ -29,6 +29,25 @@ def utc_now() -> datetime:
 
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _atomic_write_parquet(df: pl.DataFrame, path: Path) -> None:
+    """Write a Parquet file via temp file + rename so a crash or kill mid-write
+    cannot leave a truncated file at `path` masquerading as a valid table.
+
+    Applies the same real fix RawStore.write() already has (FOUNDATION_COMPLETION.md
+    Phase 2 "Interrupted writes cannot create a valid artifact") to every
+    other Parquet writer in this module — previously only RawStore had it;
+    NormalizedStore/FeatureStore/MarketStore all wrote straight to the final
+    path.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.tmp")
+    try:
+        df.write_parquet(str(tmp))
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def _json_default(obj: Any) -> Any:
@@ -252,7 +271,7 @@ class NormalizedStore:
         if primary_key:
             combined = self._dedupe_by_primary_key(combined, primary_key, conflict_policy)
 
-        combined.write_parquet(str(p))
+        _atomic_write_parquet(combined, p)
         return df.height
 
     @staticmethod
@@ -316,19 +335,37 @@ class NormalizedStore:
 
 
 class FeatureStore:
-    """Point-in-time feature snapshots under data/rebuild/features/{sport}/."""
+    """Immutable, versioned point-in-time feature snapshots under
+    data/rebuild/features/{sport}/{horizon}/.
+
+    FOUNDATION_COMPLETION.md Phase 2 "Feature snapshots" requires snapshots
+    be immutable and versioned by dataset_hash — this previously wrote
+    directly to {sport}/{horizon}.parquet and said outright "Overwrites for
+    that horizon," destroying every earlier version on each rebuild. Every
+    write now lands at an immutable dataset_hash-named path; a `latest.json`
+    manifest records version history and points `read()`/`read_meta()` at
+    the current version so existing callers of the "give me the current
+    snapshot" behavior are unaffected, while `read_version()`/
+    `list_versions()` expose full history.
+    """
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
 
-    def path(self, sport: str, horizon: str) -> Path:
-        """data/rebuild/features/{sport}/{horizon}.parquet
+    def _horizon_dir(self, sport: str, horizon: str) -> Path:
+        """data/rebuild/features/{sport}/{horizon}/
         horizon is one of: early, mid, late
         """
-        return self.root / sport / f"{horizon}.parquet"
+        return self.root / sport / horizon
+
+    def _version_path(self, sport: str, horizon: str, snapshot_hash: str) -> Path:
+        return self._horizon_dir(sport, horizon) / f"{snapshot_hash}.parquet"
+
+    def _manifest_path(self, sport: str, horizon: str) -> Path:
+        return self._horizon_dir(sport, horizon) / "latest.json"
 
     def exists(self, sport: str, horizon: str) -> bool:
-        return self.path(sport, horizon).exists()
+        return self._manifest_path(sport, horizon).exists()
 
     def write_snapshot(
         self,
@@ -337,10 +374,15 @@ class FeatureStore:
         df: pl.DataFrame,
         snapshot_hash: str,
     ) -> int:
-        """Write a feature snapshot. Overwrites for that horizon."""
-        p = self.path(sport, horizon)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        meta = {
+        """Write an immutable feature snapshot version and advance the
+        latest-version manifest. Writing the same `snapshot_hash` twice is
+        idempotent — the existing immutable file is left untouched, only the
+        manifest's `updated_at_utc` and history entry are refreshed.
+        """
+        d = self._horizon_dir(sport, horizon)
+        d.mkdir(parents=True, exist_ok=True)
+        version_path = self._version_path(sport, horizon, snapshot_hash)
+        version_meta = {
             "sport": sport,
             "horizon": horizon,
             "snapshot_hash": snapshot_hash,
@@ -348,24 +390,51 @@ class FeatureStore:
             "row_count": df.height,
             "columns": df.columns,
         }
-        meta_path = p.with_suffix(".meta.json")
-        meta_path.write_text(json.dumps(meta, indent=2))
-        df.write_parquet(str(p))
+        if not version_path.exists():
+            _atomic_write_parquet(df, version_path)
+            version_path.with_suffix(".meta.json").write_text(json.dumps(version_meta, indent=2))
+
+        manifest_path = self._manifest_path(sport, horizon)
+        manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"history": []}
+        if not any(h["snapshot_hash"] == snapshot_hash for h in manifest["history"]):
+            manifest["history"].append(version_meta)
+        manifest["latest_snapshot_hash"] = snapshot_hash
+        manifest["updated_at_utc"] = utc_now().isoformat()
+        manifest_path.write_text(json.dumps(manifest, indent=2))
         return df.height
 
     def read(self, sport: str, horizon: str) -> pl.DataFrame:
-        return pl.read_parquet(str(self.path(sport, horizon)))
+        """Read the current (latest) version for a horizon."""
+        manifest = json.loads(self._manifest_path(sport, horizon).read_text())
+        return self.read_version(sport, horizon, manifest["latest_snapshot_hash"])
+
+    def read_version(self, sport: str, horizon: str, snapshot_hash: str) -> pl.DataFrame:
+        return pl.read_parquet(str(self._version_path(sport, horizon, snapshot_hash)))
 
     def read_meta(self, sport: str, horizon: str) -> dict[str, Any]:
-        p = self.path(sport, horizon).with_suffix(".meta.json")
-        return json.loads(p.read_text()) if p.exists() else {}
+        p = self._manifest_path(sport, horizon)
+        if not p.exists():
+            return {}
+        manifest = json.loads(p.read_text())
+        latest = manifest["latest_snapshot_hash"]
+        for h in manifest["history"]:
+            if h["snapshot_hash"] == latest:
+                return h
+        return {}
+
+    def list_versions(self, sport: str, horizon: str) -> list[dict[str, Any]]:
+        """Full immutable version history, oldest first."""
+        p = self._manifest_path(sport, horizon)
+        if not p.exists():
+            return []
+        return list(json.loads(p.read_text())["history"])
 
     def available_horizons(self, sport: str) -> list[str]:
         if not self.root.joinpath(sport).exists():
             return []
         return sorted(
-            p.stem for p in self.root.joinpath(sport).glob("*.parquet")
-            if p.stem != "metadata"
+            d.name for d in self.root.joinpath(sport).iterdir()
+            if d.is_dir() and (d / "latest.json").exists()
         )
 
 
@@ -382,19 +451,51 @@ class MarketStore:
         """data/rebuild/markets/{sport}/{date}.parquet"""
         return self.root / sport / f"{date_str}.parquet"
 
+    # FOUNDATION_COMPLETION.md Phase 2 "Market snapshots" keys observations by
+    # (market_id, side_id, line, period, observed_at_utc). The real collector
+    # schema (collectors.py) doesn't have side_id/period columns yet — market
+    # side is carried in team_or_side and period isn't modeled at the market
+    # row level at all — so this uses the closest columns that actually exist
+    # today. Distinct observed_at_utc values are legitimate append-only
+    # observations (a later collection sees a real, later book state); this
+    # only dedupes true content-identical repeats of the same row, e.g. a
+    # collection run retried against the same not-yet-changed API response.
+    DEFAULT_PRIMARY_KEY: ClassVar[list[str]] = ["market_id", "team_or_side", "line", "observed_at_utc"]
+
     def write_books(
         self,
         sport: str,
         date_str: str,
         df: pl.DataFrame,
+        *,
+        primary_key: list[str] | None = None,
     ) -> int:
-        """Write market snapshots for one date. Appends if exists."""
+        """Write market snapshots for one date. Appends if exists.
+
+        Real bug fixed here (FOUNDATION_COMPLETION.md Phase 2 "Market
+        snapshots" + the reviewer-identified gap from the last takeover
+        session): this previously concatenated unconditionally with no key
+        awareness at all, so a retried/duplicated collection call could
+        write exact-duplicate rows with no way to detect it later. Dedupes
+        on `primary_key` (defaults to `DEFAULT_PRIMARY_KEY`) using the same
+        keep_latest semantics as `NormalizedStore.write()`; pass
+        `primary_key=None` explicitly is not supported — pass `[]` to opt
+        out entirely if a caller genuinely needs raw concatenation.
+        """
         p = self.path(sport, date_str)
         p.parent.mkdir(parents=True, exist_ok=True)
         if p.exists():
             existing = pl.read_parquet(str(p))
-            df = pl.concat([existing, df], how="diagonal_relaxed")
-        df.write_parquet(str(p))
+            combined = pl.concat([existing, df], how="diagonal_relaxed")
+        else:
+            combined = df
+
+        key = self.DEFAULT_PRIMARY_KEY if primary_key is None else primary_key
+        key = [k for k in key if k in combined.columns]
+        if key:
+            combined = NormalizedStore._dedupe_by_primary_key(combined, key, "keep_latest")
+
+        _atomic_write_parquet(combined, p)
         return df.height
 
     def read(self, sport: str, date_str: str) -> pl.DataFrame:

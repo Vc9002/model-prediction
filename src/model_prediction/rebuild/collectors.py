@@ -484,7 +484,7 @@ class NBACollector:
 
         if games:
             df = pl.DataFrame(games)
-            self.norm.write(sport, "scoreboard", df)
+            self.norm.write(sport, "scoreboard", df, primary_key=["event_id"])
             self.meta.audit_event("collect_espn_scoreboard", {"sport": sport, "date": game_date, "games": len(games)})
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
 
@@ -600,7 +600,7 @@ class NFLCollector:
                 "venue": (comp.get("venue", {}) or {}).get("fullName", ""),
             })
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games))
+            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"])
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
@@ -700,7 +700,7 @@ class SoccerCollector:
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
                 "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games))
+            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"])
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
@@ -801,7 +801,7 @@ class TennisCollector:
                 "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
                 "venue": (comp.get("venue", {}) or {}).get("fullName", ""),})
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games))
+            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"])
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
