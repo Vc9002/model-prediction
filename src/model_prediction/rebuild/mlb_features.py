@@ -157,13 +157,36 @@ def load_raw_statcast_dates(raw_root: str | Path, dates: list[str]) -> pl.DataFr
     return pl.concat(frames, how="diagonal_relaxed")
 
 
+_NORMALIZED_PITCH_SCHEMA: dict[str, pl.PolarsDataType] = {
+    "game_pk": pl.Int64, "game_date": pl.Utf8, "pitcher": pl.Int64, "batter": pl.Int64,
+    "home_team": pl.Utf8, "away_team": pl.Utf8, "inning": pl.Int64, "inning_topbot": pl.Utf8,
+    "at_bat_number": pl.Int64, "pitch_number": pl.Int64, "pitch_type": pl.Utf8,
+    "release_speed": pl.Float64, "release_spin_rate": pl.Float64, "description": pl.Utf8,
+    "events": pl.Utf8, "zone": pl.Int64, "p_throws": pl.Utf8, "stand": pl.Utf8,
+    "pitcher_days_since_prev_game": pl.Int64, "n_thruorder_pitcher": pl.Int64,
+    "bat_score": pl.Int64, "post_bat_score": pl.Int64,
+    "pitching_team": pl.Utf8, "game_date_str": pl.Utf8,
+}
+
+
 def normalize_statcast_pitches(pitches: pl.DataFrame) -> pl.DataFrame:
     """Select/type the columns feature-building actually needs, and derive
     the pitching team per row (Statcast doesn't label it directly — the
     pitching team is whichever team isn't batting: away bats in the top of
     the inning, home bats in the bottom)."""
     if pitches.is_empty():
-        return pitches
+        # Real bug fixed here (found via build_mlb_historical_horizon_dataset()
+        # exercising a genuinely real case for the first time: a date range
+        # with real completed games in the scoreboard but zero raw Statcast
+        # collection for those dates -- e.g. a backfill gap). A bare
+        # pl.DataFrame() has no columns at all; every downstream consumer
+        # (bullpen_rolling_features, pitcher_rolling_features, identify_starters)
+        # filters by real column names like "pitching_team" and raised
+        # ColumnNotFoundError instead of honestly reporting zero prior
+        # history. Returning a well-typed, zero-row frame with the real
+        # expected schema lets every downstream .filter(pl.col(...)) resolve
+        # to "no rows match" instead of "no such column".
+        return pl.DataFrame(schema=_NORMALIZED_PITCH_SCHEMA)
     keep = [
         "game_pk", "game_date", "pitcher", "batter", "home_team", "away_team",
         "inning", "inning_topbot", "at_bat_number", "pitch_number",

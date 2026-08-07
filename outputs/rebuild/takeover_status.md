@@ -1585,3 +1585,87 @@ now correctly call the fixed `build_game_feature_row()`, but should
 converge on one real, shared `MLBHistoricalHorizonDatasetBuilder` per
 CLAUDE.md's own instruction, rather than four independently-maintained
 loops that could silently drift from each other.
+
+### Task 4 — unified MLB historical horizon dataset builder
+
+**Built** `build_mlb_historical_horizon_dataset(data_root, start_date,
+end_date, horizon)` (`horizon_builder.py`, alongside the existing
+per-date `build_mlb_horizon_dataset`) — the one authoritative loop over
+every real completed MLB game in a date range, calling the already-fixed
+`build_game_feature_row()` once per game (Task 1's starter-parity fix,
+so no separate "training feature path" exists to drift from live
+inference). Returns `MLBHistoricalDatasetResult` (`.features`, real
+`.matched_games`/`.starters_known_games` properties, `.unmatched_games`,
+and a real content-addressed `.dataset_hash` — sorted by `event_id`, not
+insertion order, matching `build_mlb_horizon_dataset()`'s own
+metadata-vs-content hashing fix). Every real completed game in range
+gets a row; a missing starter is flagged (`starters_known=0.0`), never
+dropped, matching Task 1's "missingness is data" contract — only an
+unmapped ESPN team name (no real Statcast club abbreviation) excludes a
+game, exactly as `build_game_feature_row()` already does on its own.
+
+**Wired into all three training scripts**
+(`train_mlb_rebuild_real_features.py`, `train_mlb_xgboost_ensemble.py`,
+`train_mlb_feature_ablation.py`), replacing each one's own copy of the
+scoreboard-dedupe -> Statcast-load -> starter-identify -> probables-load
+-> per-game-loop sequence with a single call. `start_date`/`end_date`
+are the real min/max `event_start_utc` among that run's own completed
+games (i.e. "all available real history"), not a hardcoded range.
+
+**A real, latent bug this refactor surfaced and fixed**:
+`normalize_statcast_pitches()` returned a bare, zero-column
+`pl.DataFrame()` when given empty input, rather than a well-typed empty
+frame. Every existing test happened to pass non-empty pitch rows, so
+this was never exercised — but `build_mlb_historical_horizon_dataset()`'s
+own new tests (a real completed game with real scoreboard data but zero
+raw Statcast collection for its dates — a genuinely realistic scenario,
+e.g. a backfill gap) hit it immediately:
+`bullpen_rolling_features()`/`pitcher_rolling_features()`/`identify_starters()`
+all filter by real column names like `pitching_team`, and raised
+`ColumnNotFoundError` instead of honestly reporting zero prior history.
+Fixed by returning a real, explicitly-typed empty schema
+(`_NORMALIZED_PITCH_SCHEMA`) instead of a bare empty frame.
+
+**Scope boundary, disclosed**: `mlb_shadow_pipeline.py`'s `predict_stage`
+(the live shadow pipeline's own walk-forward retraining step) is *not*
+switched to the new builder — it already correctly calls the fixed
+`build_game_feature_row()` (Task 1), but legitimately reuses
+`state.pitches`/`state.starters` already loaded once by `load_state()`
+rather than reloading Statcast raw data a second time in a
+latency-sensitive live-prediction path. CLAUDE.md's own Task 4 wording
+names the three training scripts specifically ("Then make:
+train_mlb_rebuild_real_features.py, train_mlb_xgboost_ensemble.py,
+train_mlb_feature_ablation.py all consume this dataset") — the live
+pipeline's copy is a fourth, related-but-distinct case with a real
+performance reason to stay separate, not an oversight.
+
+**Live-verified end to end**: ran the real (refactored)
+`train_mlb_feature_ablation.py` against the actual backfilled data (safe
+to run — unlike the other two training scripts, it never touches
+`test_consumption_registry.json`). Real result: **161 matched games, 104
+with a point-in-time-valid probable starter for both teams (57 flagged
+`starters_known=0`)** — identical to the numbers this session already
+observed from the pre-refactor code path, confirming the refactor
+preserved real behavior exactly. Real ablation report regenerated
+(`outputs/rebuild/mlb_feature_ablation.json`), included in this commit
+as current evidence: bullpen remains the strongest isolated group
+(`delta_log_loss=+0.049`), the rest are directionally small and, per the
+report's own disclosed caveat, not yet a statistically robust ranking at
+n=135.
+
+**Tests**: `tests/rebuild/test_horizon_builder.py::TestBuildMlbHistoricalHorizonDataset`
+(8 tests: date-range filtering, scheduled-not-yet-played exclusion,
+unmatched-team-name counting, missing-starter rows kept-not-dropped,
+deterministic/content-sensitive hashing, per-horizon feature
+differences, invalid-horizon rejection) plus the new
+`normalize_statcast_pitches` empty-schema regression coverage.
+
+**1129 tests pass** (up from 1122), 1 skipped. `ruff check` clean.
+
+**Next task:** Task 5 — encode explicit MLB feature missingness.
+Currently `pitcher_rolling_features()`/`pitcher_clean_rate_features()`/
+`bullpen_rolling_features()` already return an `availability` flag
+alongside zeroed values when there's no real prior history, but XGBoost
+still receives that zero as an ordinary numeric value (not a native
+missing/NaN), and linear-model consumers have no paired
+imputed-value-plus-indicator convention yet.

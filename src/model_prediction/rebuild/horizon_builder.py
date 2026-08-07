@@ -29,8 +29,10 @@ import polars as pl
 
 from .horizons import HORIZONS, compute_decision_times, horizon_specs_for_sport
 from .mlb_features import (
+    build_game_feature_row,
     dedupe_scoreboard,
     identify_starters,
+    load_probable_starter_records,
     load_raw_statcast_dates,
     normalize_statcast_pitches,
     point_in_time_probable_starters,
@@ -202,3 +204,103 @@ def build_mlb_horizon_dataset(
             )
 
     return result
+
+
+@dataclass
+class MLBHistoricalDatasetResult:
+    """One immutable historical feature dataset (CLAUDE.md's next-phase
+    Task 4: "ONE DATASET -> all model-family experiments"), covering every
+    real completed MLB game between start_date and end_date at one
+    horizon. Every model-family training/ablation script should consume
+    this instead of independently rebuilding the same feature-row loop --
+    before this, three real training scripts plus mlb_shadow_pipeline.py's
+    own walk-forward retraining step each had their own copy of it, which
+    could silently drift from each other."""
+    horizon: str
+    start_date: str
+    end_date: str
+    features: pl.DataFrame
+    unmatched_games: int  # real completed games whose ESPN team names never mapped to a real Statcast club
+    dataset_hash: str
+
+    @property
+    def matched_games(self) -> int:
+        return self.features.height
+
+    @property
+    def starters_known_games(self) -> int:
+        return int(self.features["starters_known"].sum()) if self.features.height else 0
+
+
+def build_mlb_historical_horizon_dataset(
+    data_root: str, start_date: str, end_date: str, horizon: str,
+) -> MLBHistoricalDatasetResult:
+    """The one authoritative historical MLB feature dataset builder.
+
+    Required sequence (CLAUDE.md): canonical event -> horizon decision
+    timestamp -> point-in-time-safe probable starter -> prior-only
+    Statcast pitcher/bullpen history -> park/environment -> explicit
+    missingness -> targets attached only after features freeze. This is
+    exactly what build_game_feature_row() already does per game (Task 1's
+    starter-parity fix); this function is the shared loop over every real
+    completed game in [start_date, end_date] that calls it once, instead
+    of four independent copies of that loop.
+
+    Uses the identical real feature definitions the live pipeline uses --
+    build_game_feature_row() and build_live_game_feature_row() both
+    ultimately call the same underlying pitcher/bullpen/park/weather
+    functions in mlb_features.py, so there is no separate "training-only"
+    feature computation path to silently drift from live inference.
+
+    Every real completed game in range gets a row (never dropped for a
+    missing starter -- starters_known=0.0/starter_missing_reason marks
+    that explicitly instead, per CLAUDE.md's "missingness is data"
+    principle), except when the ESPN team names themselves can't be
+    mapped to a real Statcast club abbreviation, which build_game_feature_row()
+    already treats as un-buildable rather than fabricated.
+
+    dataset_hash is a real content hash (sorted by event_id, not
+    insertion order) over the actual row values -- an immutable identity
+    for exactly this dataset, matching horizon_builder.build_mlb_horizon_dataset()'s
+    own snapshot_hash fix (metadata-only hashing would silently mask a
+    real feature-value correction that didn't also change which games
+    matched).
+    """
+    if horizon not in HORIZONS:
+        raise ValueError(f"horizon must be one of {HORIZONS}, got {horizon!r}")
+
+    sb = dedupe_scoreboard(pl.read_parquet(f"{data_root}/normalized/mlb/scoreboard.parquet"))
+    completed = sb.filter(
+        (pl.col("status") == "STATUS_FINAL")
+        & (pl.col("event_start_utc") >= start_date)
+        & (pl.col("event_start_utc") <= f"{end_date}T23:59:59")
+    ).sort("event_start_utc")
+
+    backfill_dates = sorted({row["event_start_utc"][:10] for row in completed.iter_rows(named=True)})
+    raw = load_raw_statcast_dates(data_root, backfill_dates)
+    pitches = normalize_statcast_pitches(raw)
+    starters = identify_starters(pitches)
+    probable_records = load_probable_starter_records()
+
+    rows: list[dict[str, Any]] = []
+    unmatched = 0
+    for g in completed.iter_rows(named=True):
+        row = build_game_feature_row(g, pitches, starters, data_root, horizon, probable_records)
+        if row is None:
+            unmatched += 1
+            continue
+        rows.append(row)
+
+    features = pl.DataFrame(rows).sort("event_start_utc") if rows else pl.DataFrame()
+    canonical_rows = sorted(rows, key=lambda r: r["event_id"])
+    dataset_hash = hashlib.sha256(
+        json.dumps(
+            {"start_date": start_date, "end_date": end_date, "horizon": horizon, "rows": canonical_rows},
+            sort_keys=True, default=str,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    return MLBHistoricalDatasetResult(
+        horizon=horizon, start_date=start_date, end_date=end_date,
+        features=features, unmatched_games=unmatched, dataset_hash=dataset_hash,
+    )

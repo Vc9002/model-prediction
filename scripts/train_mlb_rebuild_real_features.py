@@ -26,16 +26,8 @@ import polars as pl
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from model_prediction.rebuild.calibration import PlattCalibrator
-from model_prediction.rebuild.mlb_features import (
-    build_game_feature_row,
-    dedupe_scoreboard,
-    identify_starters,
-    load_probable_starter_records,
-    load_raw_statcast_dates,
-    normalize_statcast_pitches,
-)
-
-HORIZON = "late"
+from model_prediction.rebuild.horizon_builder import build_mlb_historical_horizon_dataset
+from model_prediction.rebuild.mlb_features import dedupe_scoreboard
 from model_prediction.rebuild.models import MLBTwoHeadModel
 from model_prediction.rebuild.validation import (
     brier_score,
@@ -44,6 +36,8 @@ from model_prediction.rebuild.validation import (
     expanding_folds,
     log_loss,
 )
+
+HORIZON = "late"
 
 INTENSITY_FEATURES = [
     "home_sp_avg_velocity", "away_sp_avg_velocity",
@@ -69,27 +63,24 @@ def main() -> None:
     completed = sb.filter(pl.col("status") == "STATUS_FINAL").sort("event_start_utc")
     print(f"1. Scoreboard: {sb.height} total rows (deduped), {completed.height} completed games")
 
-    backfill_dates = sorted({row["event_start_utc"][:10] for row in completed.iter_rows(named=True)})
-    raw = load_raw_statcast_dates("data/rebuild", backfill_dates)
-    pitches = normalize_statcast_pitches(raw)
-    starters = identify_starters(pitches)
-    probable_records = load_probable_starter_records()
-    print(f"2. Statcast: {pitches.height} real pitches, {starters.height} real starter-game entries; "
-          f"{len(probable_records)} real archived probable-starter observations")
+    if completed.height == 0:
+        print("No completed games. Stopping honestly, not faking a result.")
+        sys.exit(0)
+    start_date = completed["event_start_utc"][0][:10]
+    end_date = completed["event_start_utc"][-1][:10]
 
-    rows = []
-    unmatched = 0
-    for g in completed.iter_rows(named=True):
-        row = build_game_feature_row(g, pitches, starters, "data/rebuild", HORIZON, probable_records)
-        if row is None:
-            unmatched += 1
-            continue
-        rows.append(row)
-    features = pl.DataFrame(rows).sort("game_date")
-    starters_known = int(features["starters_known"].sum()) if features.height else 0
-    print(f"3. Feature rows: {features.height} matched ({unmatched} team-unresolved, not fabricated); "
-          f"{starters_known}/{features.height} have a point-in-time-valid probable starter for both "
-          f"teams at horizon={HORIZON} ({features.height - starters_known} flagged starters_known=0, "
+    # Task 4: the one authoritative historical dataset builder, replacing
+    # this script's own copy of the feature-row loop (now shared with
+    # train_mlb_xgboost_ensemble.py, train_mlb_feature_ablation.py, and
+    # mlb_shadow_pipeline.py's walk-forward retraining).
+    dataset = build_mlb_historical_horizon_dataset("data/rebuild", start_date, end_date, HORIZON)
+    features = dataset.features.sort("game_date") if dataset.features.height else dataset.features
+    print(f"2. Dataset builder: {dataset.matched_games} matched games in [{start_date}, {end_date}] "
+          f"({dataset.unmatched_games} team-unresolved, not fabricated); dataset_hash={dataset.dataset_hash[:12]}")
+    print(f"3. Feature rows: {dataset.matched_games} matched; "
+          f"{dataset.starters_known_games}/{dataset.matched_games} have a point-in-time-valid probable "
+          f"starter for both teams at horizon={HORIZON} "
+          f"({dataset.matched_games - dataset.starters_known_games} flagged starters_known=0, "
           f"not silently filled with the actual starter)")
 
     if features.height < 30:
@@ -238,7 +229,7 @@ def main() -> None:
         "test_games": test_final.height,
         "total_completed_games": completed.height,
         "matched_games": features.height,
-        "unmatched_games": unmatched,
+        "unmatched_games": dataset.unmatched_games,
     })
 
     artifact_dir = Path("config/models/challengers")
@@ -250,7 +241,7 @@ def main() -> None:
     results_path = Path("outputs/rebuild/mlb_training_results_real_features.json")
     results_path.write_text(json.dumps({
         "model_version": artifact["model_id"], "feature_set": "real_statcast_v1",
-        "matched_games": features.height, "unmatched_games": unmatched,
+        "matched_games": features.height, "unmatched_games": dataset.unmatched_games,
         "fold_metrics": fold_metrics, "final_metrics": final_metrics,
         "quality_filtered_metrics": quality_metrics,
         "cold_start_composition": {"train_mean_availability": train_avail, "test_mean_availability": test_avail},
