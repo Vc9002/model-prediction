@@ -2628,3 +2628,107 @@ except the one deliberate correction edit.
 **Next**: unchanged from before this correction -- further progress
 genuinely depends on new prospective games and a closing-price poller
 running through real market close, not further architecture work.
+
+## Checkpoint: Phase 0 -- multi-sport execution spec kickoff (2026-08-09)
+
+New master execution spec received: MLB continues prospective validation
+while WNBA/NBA/NFL/Soccer/Tennis/Esports/KBO/NPB are built in parallel,
+without waiting for MLB profitability. Full task breakdown tracked via
+TaskCreate (18 tasks: Phase 0 checkpoint, MLB-1..8 live-deployment items,
+multisport status artifacts, shared framework, one build task per sport,
+esports/KBO/NPB audits, generalized poller/settlement/dashboard).
+
+Repository checkpoint:
+
+```text
+branch: rebuild/clean-slate-v1
+HEAD: 62e6a7f fix(rebuild): type HEAD_FACTORIES to eliminate real new mypy errors
+python: 3.14.5
+pytest: 1220 passed, 1 skipped
+ruff (rebuild + tests/rebuild): clean
+mypy (src/model_prediction/rebuild only): 37 errors (baseline -- unchanged
+  by this session's own commits; the whole-repo mypy count reported after
+  git push includes non-rebuild modules and is a larger, separate number)
+dirty tree: only pre-existing background-collector data files outside
+  rebuild scope (data/odds, data/availability, data/flat, data/main,
+  data/research, data/gated_research, esports/international-baseball
+  manifests) -- not touched this session, left as-is
+```
+
+**Real, disclosed scope for this turn**: given the size of the full
+multi-sport spec (a multi-week program by its own admission -- 8 sports,
+each with a full PIT data/model/calibration/prospective-test pipeline,
+plus a generalized poller/settlement/dashboard layer), this session
+executes Phase 0 (this checkpoint) plus as much of Phase 1 (MLB live
+deployment of the already-frozen candidate) as fits, then reports honest
+progress rather than fabricating a completed multi-sport buildout. The
+task list above persists the full remaining scope for continuation.
+
+## Checkpoint: MLB-1, MLB-2, MLB-3 -- wire frozen model + calibrator into live shadow inference (2026-08-09)
+
+**MLB-3** (persisted separately below): added `to_artifact()`/`save()`/
+`load()` to `XGBoostTwoHeadModel` (mirrors `MLBTwoHeadModel`'s real
+joblib-bundle pattern exactly) -- previously this class had no persistence
+at all, so it could only be exercised inside one comparison-script
+process. 6 new round-trip tests (`TestXGBoostTwoHeadModelSaveLoadRoundTrip`),
+including the same "non-default seed/method must survive reload, not
+silently reset" regression `MLBTwoHeadModel`'s own tests guard against.
+
+**MLB-1**: `mlb_shadow_pipeline.py`'s `train_through()` now builds
+`XGBoostTwoHeadModel(seed=42, method="negative_binomial")` -- the exact
+frozen `mlb_moneyline_v2` combination -- instead of
+`MLBTwoHeadModel(seed=42)` (sklearn heads, default Poisson, a materially
+different, never-frozen combination). Real, disclosed dependency found
+and fixed first: `BootstrapMLBEnsemble` was hardcoded to sklearn heads
+(`RunIntensityHead`/`RunDifferentialHead`) -- bootstrapping the wrong head
+family would have silently measured a different model's uncertainty than
+the one actually running live. Generalized it with a real `head_family`
+param (`"sklearn"` default, `"xgboost"` new), 3 new tests confirming both
+paths construct the real correct head classes and produce valid bounds.
+
+**MLB-2**: added `load_calibrator(method, parameters)` to `calibration.py`
+-- reconstructs a fitted calibrator directly from a persisted artifact's
+`method`/`parameters` with no refit (isotonic explicitly unsupported and
+fails loudly, since its real fitted curve isn't a small JSON-friendly
+parameter set; the frozen live combination uses temperature scaling,
+which this does support). 6 new tests confirm exact round-trip transform
+behavior. Wired `load_frozen_calibrator()` into `decide_stage()` (loaded
+once per run, not per game) and threaded it through `build_forecast()`:
+`raw_probabilities` and `calibrated_probabilities` are now genuinely
+different real values (previously the same dict was passed to both
+fields -- an real, confirmed instance of exactly the gap flagged: "cannot
+treat raw_probability == calibrated_probability as acceptable").
+`probability_lower`/`probability_upper` (bootstrap bounds) are computed in
+raw-probability space then passed through the identical calibrator
+transform, preserving `lower <= calibrated <= upper` (calibration is
+monotonic). Only moneyline is calibrated -- totals/spread stay real,
+disclosed, uncalibrated sports-only probabilities (no cross-fit totals/
+spread calibrator has ever been validated).
+
+**Live-verified**, real run, `scripts/mlb_shadow_run.py --date 2026-08-09`
+(paper-only, no order adapter called, confirmed by the script's own final
+line): 2 of 16 real scheduled games had a resolvable feature row and were
+evaluated against 16+10 real market candidates, 0 BET (consistent with
+the small real sample and conservative winner-first gating). Ledger rows
+confirm the fix live: `raw_probabilities_json={"home": 0.384, "away":
+0.616}` vs `calibrated_probabilities_json={"home": 0.488, "away": 0.512}`
+for one real game -- substantial real shrinkage toward 0.5, consistent
+with the disclosed temperature=10.0 finding (the model barely beats
+coin-flip). `calibration_artifact_hash` on both new real prediction rows
+matches the persisted artifact's own `calibrator_hash` exactly
+(`bea0335a...`), not a placeholder string. `model_artifact_hash` is a real
+sha256 matching `XGBoostTwoHeadModel.to_artifact()`'s scheme.
+
+**Registry-safe**: `test_consumption_registry.json` MD5-verified unchanged
+(matches `git show HEAD:...`) before and after every live run.
+
+**1235 tests pass** (up from 1220), 1 skipped. `ruff check` clean. mypy
+(`src/model_prediction/rebuild`): 37 errors, unchanged baseline -- zero
+new errors from this checkpoint's changes.
+
+**Real, disclosed scope not yet done**: MLB-4 (cross-process resume using
+the new save/load), MLB-5 (full uncertainty decomposition wired into live
+`SportsForecast` -- model-family disagreement across coherent XGB-NB /
+direct XGBoost / sklearn coherent baseline), MLB-6/7 (event-date-aware
+close lookup, explicit closing-quote taxonomy), MLB-8 (freeze + start
+prospective collection accounting). Tracked as open tasks.

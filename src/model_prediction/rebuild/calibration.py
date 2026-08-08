@@ -183,6 +183,28 @@ def fit_calibrator(
         return IdentityCalibrator()
 
 
+def load_calibrator(method: str, parameters: dict[str, float]) -> Calibrator:
+    """Reconstruct a fitted calibrator directly from a persisted artifact's
+    `method`/`parameters` (e.g. `config/models/challengers/mlb-*-calibrator-v1.json`)
+    -- no refit, no training data required. This is the real bridge live
+    inference needs: a calibrator must be loaded once from its frozen
+    artifact and reused for every prediction, never refit per request (that
+    would silently make "the calibrator" a moving target across requests).
+
+    isotonic is not supported here -- IsotonicCalibrator's real fitted
+    curve is a full IsotonicRegression object, not a small JSON-friendly
+    parameter set, so its persisted artifact (if one existed) could not be
+    reconstructed this way; the frozen live combination uses temperature
+    scaling, which this function does support."""
+    if method == "platt":
+        return PlattCalibrator(intercept=parameters["intercept"], slope=parameters["slope"])
+    elif method == "temperature":
+        return TemperatureScaling(temperature=parameters["temperature"])
+    elif method == "identity":
+        return IdentityCalibrator()
+    raise ValueError(f"load_calibrator does not support method={method!r} (no reconstructible parameter set)")
+
+
 # ── Chronological cross-fit calibration evaluation ───────────────────────────
 #
 # Real gap this closes (CLAUDE.md's next-phase Task 14): the four

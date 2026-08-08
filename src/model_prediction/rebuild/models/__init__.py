@@ -705,6 +705,80 @@ class XGBoostTwoHeadModel:
     def probability(self, pred: GamePrediction, market_type: str, selection: str, line: float | None = None) -> float:
         return self.distribution.probability_for_market(pred, market_type, selection, line)
 
+    def to_artifact(self) -> dict[str, Any]:
+        """Mirrors MLBTwoHeadModel.to_artifact() field-for-field (same real
+        consumers: shadow_ledger.record_model_artifact(), the live
+        pipeline's forecast.model_artifact_hash) so the live pipeline can
+        swap model families without a second, differently-shaped artifact
+        schema."""
+        import json
+        raw = {
+            "model_id": self.MODEL_VERSION,
+            "method": self.distribution.method,
+            "intensity_features": self._intensity_features,
+            "differential_features": self._differential_features,
+            "fitted": self._fitted,
+        }
+        artifact_hash = hashlib.sha256(json.dumps(raw, sort_keys=True).encode()).hexdigest()
+        raw["artifact_hash"] = artifact_hash
+        return raw
+
+    def save(self, path: str | Path) -> None:
+        """Real, loadable artifact bundle -- same real gap MLBTwoHeadModel's
+        save()/load() closed (FOUNDATION_COMPLETION.md Phase 8), for the
+        XGBoost head family: until this, XGBoostTwoHeadModel could only be
+        exercised inside one comparison-script process, never persisted for
+        live inference to load without a full retrain.
+
+        Writes `path/model.joblib` (both fitted XGBRegressor boosters +
+        distribution config) and `path/metadata.json` (feature names,
+        version, artifact hash)."""
+        import joblib
+
+        if not self._fitted:
+            raise RuntimeError("cannot save an unfitted model")
+        out = Path(path)
+        out.mkdir(parents=True, exist_ok=True)
+        joblib.dump({
+            "intensity_model": self.intensity_head.model,
+            "intensity_feature_names": self.intensity_head._feature_names,
+            "differential_model": self.differential_head.model,
+            "differential_feature_names": self.differential_head._feature_names,
+            "distribution_method": self.distribution.method,
+            "distribution_n_sim": self.distribution.n_sim,
+            "distribution_seed": self.distribution.seed,
+            "seed": self.seed,
+        }, out / "model.joblib")
+        (out / "metadata.json").write_text(json.dumps(self.to_artifact(), indent=2, default=str))
+
+    @classmethod
+    def load(cls, path: str | Path) -> XGBoostTwoHeadModel:
+        """Load a bundle written by save(). Round-trip-tested (see
+        test_mlb_model_persistence.py) to produce identical predictions to
+        the original in-memory model."""
+        import json
+
+        import joblib
+
+        src = Path(path)
+        bundle = joblib.load(src / "model.joblib")
+        metadata = json.loads((src / "metadata.json").read_text())
+
+        model = cls(seed=bundle.get("seed", 42), method=bundle["distribution_method"])
+        model.intensity_head.model = bundle["intensity_model"]
+        model.intensity_head._feature_names = bundle["intensity_feature_names"]
+        model.differential_head.model = bundle["differential_model"]
+        model.differential_head._feature_names = bundle["differential_feature_names"]
+        model.distribution = JointScoreDistribution(
+            method=bundle["distribution_method"],
+            n_sim=bundle["distribution_n_sim"],
+            seed=bundle["distribution_seed"],
+        )
+        model._intensity_features = metadata["intensity_features"]
+        model._differential_features = metadata["differential_features"]
+        model._fitted = True
+        return model
+
 
 # ── Bootstrap uncertainty ────────────────────────────────────────────────────
 
@@ -723,12 +797,21 @@ class BootstrapMLBEnsemble:
     empirical spread of that market's probability across replicates measures
     how much the prediction would have moved under resampled training data --
     a real uncertainty measurement, not an assumption.
+
+    `head_family` (multi-sport execution spec MLB-1/MLB-5): the live model
+    switched from sklearn (ElasticNet/HistGradientBoosting) heads to
+    XGBoost heads (the frozen mlb_moneyline_v2 combination), but this class
+    was hardcoded to sklearn heads only -- bootstrapping the wrong head
+    family would silently measure the uncertainty of a model that isn't
+    actually running live. `"xgboost"` fits `XGBoostRunHead` replicates
+    instead, matching whichever family the primary model actually uses.
     """
 
-    def __init__(self, n_bootstrap: int = 20, seed: int = 42) -> None:
+    def __init__(self, n_bootstrap: int = 20, seed: int = 42, head_family: str = "sklearn") -> None:
         self.n_bootstrap = n_bootstrap
         self.seed = seed
-        self._replicates: list[tuple[RunIntensityHead, RunDifferentialHead]] = []
+        self.head_family = head_family
+        self._replicates: list[tuple[Any, Any]] = []
         self._intensity_features: list[str] = []
         self._differential_features: list[str] = []
 
@@ -756,9 +839,14 @@ class BootstrapMLBEnsemble:
             y_int = sample[total_runs_col].to_numpy()
             X_diff = sample.select(differential_features).to_numpy()
             y_diff = sample[home_margin_col].to_numpy()
-            ih = RunIntensityHead().fit(X_int, y_int, intensity_features)
-            dh = RunDifferentialHead().fit(X_diff, y_diff, differential_features)
-            self._replicates.append((ih, dh))
+            if self.head_family == "xgboost":
+                ih_x: Any = XGBoostRunHead().fit(X_int, y_int, intensity_features, seed=self.seed)
+                dh_x: Any = XGBoostRunHead().fit(X_diff, y_diff, differential_features, seed=self.seed)
+                self._replicates.append((ih_x, dh_x))
+            else:
+                ih_s: Any = RunIntensityHead().fit(X_int, y_int, intensity_features)
+                dh_s: Any = RunDifferentialHead().fit(X_diff, y_diff, differential_features)
+                self._replicates.append((ih_s, dh_s))
         return self
 
     def market_probability_bounds(

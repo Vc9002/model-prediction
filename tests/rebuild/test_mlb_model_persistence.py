@@ -18,7 +18,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from model_prediction.rebuild.models import JointScoreDistribution, MLBTwoHeadModel
+from model_prediction.rebuild.models import JointScoreDistribution, MLBTwoHeadModel, XGBoostTwoHeadModel
 
 INTENSITY_FEATURES = ["f1", "f2"]
 DIFFERENTIAL_FEATURES = ["g1", "g2"]
@@ -347,6 +347,91 @@ class TestModelSaveLoadRoundTrip:
 
     def test_saving_an_unfitted_model_raises(self):
         model = MLBTwoHeadModel(seed=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                model.save(tmp)
+                raised = False
+            except RuntimeError:
+                raised = True
+            assert raised, "saving an unfitted model must fail loudly, not silently write a broken bundle"
+
+
+class TestXGBoostTwoHeadModelSaveLoadRoundTrip:
+    """MLB-3 (multi-sport execution spec): XGBoostTwoHeadModel previously had
+    no save()/load() at all -- every live use had to retrain from scratch.
+    Mirrors TestModelSaveLoadRoundTrip's real assertions for the sklearn
+    head family, applied to the XGBoost head family the live pipeline is
+    being switched to."""
+
+    def test_deterministic_predictions_match_exactly_after_reload(self):
+        data = _synthetic_training_data()
+        model = XGBoostTwoHeadModel(seed=42, method="negative_binomial")
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+        row = {"f1": 4.5, "f2": 4.2, "g1": 0.5, "g2": -0.2}
+
+        pred_before = model.predict_row("e1", row)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save(tmp)
+            loaded = XGBoostTwoHeadModel.load(tmp)
+            pred_after = loaded.predict_row("e1", row)
+
+        assert pred_after.home_expected_runs == pred_before.home_expected_runs
+        assert pred_after.away_expected_runs == pred_before.away_expected_runs
+
+    def test_non_default_seed_and_method_preserved_not_silently_reset(self):
+        data = _synthetic_training_data()
+        model = XGBoostTwoHeadModel(seed=777, method="negative_binomial")
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+        row = {"f1": 4.5, "f2": 4.2, "g1": 0.5, "g2": -0.2}
+
+        pred_before = model.predict_row("e1", row)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save(tmp)
+            loaded = XGBoostTwoHeadModel.load(tmp)
+
+        assert loaded.distribution.seed == 777
+        assert loaded.distribution.method == "negative_binomial"
+        pred_after = loaded.predict_row("e1", row)
+        assert pred_after.home_win_prob == pred_before.home_win_prob
+
+    def test_loaded_model_is_marked_fitted(self):
+        data = _synthetic_training_data()
+        model = XGBoostTwoHeadModel(seed=1, method="negative_binomial")
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save(tmp)
+            loaded = XGBoostTwoHeadModel.load(tmp)
+
+        assert loaded._fitted is True
+        loaded.predict_row("e1", {"f1": 4.0, "f2": 4.0, "g1": 0.0, "g2": 0.0})  # must not raise
+
+    def test_feature_names_are_preserved(self):
+        data = _synthetic_training_data()
+        model = XGBoostTwoHeadModel(seed=1, method="negative_binomial")
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save(tmp)
+            loaded = XGBoostTwoHeadModel.load(tmp)
+
+        assert loaded._intensity_features == INTENSITY_FEATURES
+        assert loaded._differential_features == DIFFERENTIAL_FEATURES
+
+    def test_save_writes_a_real_metadata_json(self):
+        data = _synthetic_training_data()
+        model = XGBoostTwoHeadModel(seed=1, method="negative_binomial")
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save(tmp)
+            assert (Path(tmp) / "model.joblib").exists()
+            assert (Path(tmp) / "metadata.json").exists()
+
+    def test_saving_an_unfitted_model_raises(self):
+        model = XGBoostTwoHeadModel(seed=1)
         with tempfile.TemporaryDirectory() as tmp:
             try:
                 model.save(tmp)

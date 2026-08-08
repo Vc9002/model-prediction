@@ -121,3 +121,42 @@ class TestMarketProbabilityBounds:
 
         assert 0.0 <= spread_lower <= spread_upper <= 1.0
         assert 0.0 <= total_lower <= total_upper <= 1.0
+
+
+class TestXGBoostHeadFamily:
+    """MLB-1/MLB-5 (multi-sport execution spec): the live model switched
+    from sklearn heads to XGBoost heads (the frozen mlb_moneyline_v2
+    combination) -- bootstrapping the wrong head family would silently
+    measure a different model's uncertainty than the one actually running
+    live."""
+
+    def test_xgboost_head_family_fits_xgboost_replicates(self):
+        from model_prediction.rebuild.models import XGBoostRunHead
+
+        ensemble = BootstrapMLBEnsemble(n_bootstrap=5, seed=1, head_family="xgboost")
+        ensemble.fit(_synthetic_training_data(), INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+        assert ensemble.fitted is True
+        assert len(ensemble._replicates) == 5
+        assert isinstance(ensemble._replicates[0][0], XGBoostRunHead)
+        assert isinstance(ensemble._replicates[0][1], XGBoostRunHead)
+
+    def test_xgboost_head_family_produces_real_valid_bounds(self):
+        ensemble = BootstrapMLBEnsemble(n_bootstrap=10, seed=1, head_family="xgboost")
+        ensemble.fit(_synthetic_training_data(), INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+        distribution = JointScoreDistribution(method="negative_binomial", seed=1)
+        row = {"f1": 4.5, "f2": 4.2, "g1": 0.5, "g2": -0.2, "event_id": "e1"}
+
+        lower, upper = ensemble.market_probability_bounds(row, distribution, "moneyline", "home")
+
+        assert 0.0 <= lower <= upper <= 1.0
+
+    def test_default_head_family_is_still_sklearn(self):
+        # Real backward-compatibility check: every pre-existing real caller
+        # (train_mlb_uncertainty_demo.py, mlb_shadow_run.py's own prior
+        # sklearn-model usage) must keep working unchanged.
+        from model_prediction.rebuild.models import RunDifferentialHead, RunIntensityHead
+
+        ensemble = BootstrapMLBEnsemble(n_bootstrap=3, seed=1)
+        ensemble.fit(_synthetic_training_data(), INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+        assert isinstance(ensemble._replicates[0][0], RunIntensityHead)
+        assert isinstance(ensemble._replicates[0][1], RunDifferentialHead)

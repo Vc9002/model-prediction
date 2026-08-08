@@ -19,6 +19,7 @@ script for the same real slate.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,6 +27,7 @@ from typing import Any, Literal
 
 import polars as pl
 
+from .calibration import Calibrator, IdentityCalibrator, load_calibrator
 from .decision import SportsForecast, evaluate_game
 from .economic import SizeLimits
 from .identity import resolve_or_link_polymarket_event_id
@@ -48,10 +50,46 @@ from .mlb_market_matching import (
     real_total_lines,
     resolve_polymarket_event_id,
 )
-from .models import BootstrapMLBEnsemble, MLBTwoHeadModel
+from .models import BootstrapMLBEnsemble, XGBoostTwoHeadModel
 
 HORIZON_LATE = "late"
 DECISION_POLICY_VERSION = "winner_first_v1"
+
+# Multi-sport execution spec MLB-1: the frozen mlb_moneyline_v2 research
+# candidate (outputs/rebuild/test_consumption_registry.json's own
+# frozen_choices) -- XGBoost intensity + differential heads reconciled via
+# a negative-binomial joint score distribution. The live pipeline
+# previously used MLBTwoHeadModel (sklearn heads, default Poisson
+# distribution) -- a materially different, never-frozen combination.
+FROZEN_HEAD_FAMILY = "xgboost"
+FROZEN_DISTRIBUTION_METHOD = "negative_binomial"
+
+# MLB-2: the real, cross-fit-validated calibrator for the exact frozen
+# combination above (see outputs/rebuild/mlb_head_distribution_cartesian.json).
+# Relative to the repo root, matching every other real path convention in
+# this codebase (config/models/challengers/, outputs/rebuild/, etc. are
+# never resolved relative to data_root).
+FROZEN_CALIBRATOR_ARTIFACT_PATH = "config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
+
+
+def load_frozen_calibrator(artifact_path: str = FROZEN_CALIBRATOR_ARTIFACT_PATH) -> tuple[Calibrator, str]:
+    """Real, no-refit load of the frozen calibrator artifact. Returns
+    (calibrator, calibrator_hash) -- the hash is the artifact's own
+    persisted `calibrator_hash`, not recomputed, so it always matches
+    exactly what train_mlb_head_distribution_cartesian.py wrote.
+
+    Fails closed to IdentityCalibrator with an empty hash (never silently
+    fabricates a hash) if the artifact does not exist -- this is a real,
+    disclosed degraded state (raw_probability == calibrated_probability),
+    not a crash, so a shadow run can still produce honestly-labeled
+    uncalibrated forecasts rather than refuse to run entirely."""
+    path = Path(artifact_path)
+    if not path.exists():
+        return IdentityCalibrator(), ""
+    artifact = json.loads(path.read_text())
+    calibrator = load_calibrator(artifact["method"], artifact["parameters"])
+    return calibrator, artifact.get("calibrator_hash", "")
+
 
 # Task 5: the one shared feature-list definition (mlb_features.py), also
 # used by the two real-feature training scripts -- this is the live
@@ -61,35 +99,63 @@ INTENSITY_FEATURES = MLB_INTENSITY_FEATURES
 DIFFERENTIAL_FEATURES = MLB_DIFFERENTIAL_FEATURES
 
 
-def train_through(features: pl.DataFrame, cutoff_date: str) -> tuple[MLBTwoHeadModel, BootstrapMLBEnsemble, int]:
-    """Walk-forward retrain: fit only on games strictly before cutoff_date.
-    No artifact-reload mechanism exists yet for the fitted sklearn models
-    (MLBTwoHeadModel.to_artifact() only persists metadata/hashes, not the
-    model itself) -- retraining fresh each run is the honest current
-    behavior, not a shortcut, and is disclosed as a Checkpoint 9 gap below.
+def train_through(features: pl.DataFrame, cutoff_date: str) -> tuple[XGBoostTwoHeadModel, BootstrapMLBEnsemble, int]:
+    """Walk-forward retrain: fit only on games strictly before cutoff_date,
+    using the exact frozen mlb_moneyline_v2 combination (XGBoost heads +
+    negative-binomial distribution -- FROZEN_HEAD_FAMILY/
+    FROZEN_DISTRIBUTION_METHOD above). Previously used MLBTwoHeadModel
+    (sklearn heads, default Poisson) -- a materially different, never
+    actually frozen or validated combination (multi-sport execution spec
+    MLB-1).
 
-    Also fits a BootstrapMLBEnsemble on the identical training data, used by
-    build_forecast() for real conservative_probability bounds (CLAUDE.md's
-    bootstrap_uncertainty requirement) instead of a fixed haircut."""
+    Retraining fresh each real walk-forward day is the correct
+    chronological behavior (today's model must see every real game through
+    yesterday), not a shortcut -- MLB-3's save()/load() exists for
+    cross-process resume within one run (MLB-4), not to avoid this daily
+    walk-forward refit.
+
+    Also fits a BootstrapMLBEnsemble on the identical training data and
+    identical head family, used by build_forecast() for real
+    conservative_probability bounds (CLAUDE.md's bootstrap_uncertainty
+    requirement) instead of a fixed haircut."""
     train = features.filter(pl.col("game_date") < cutoff_date)
-    model = MLBTwoHeadModel(seed=42)
+    model = XGBoostTwoHeadModel(seed=42, method=FROZEN_DISTRIBUTION_METHOD)
     model.fit(train, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
-    bootstrap = BootstrapMLBEnsemble(n_bootstrap=20, seed=42)
+    bootstrap = BootstrapMLBEnsemble(n_bootstrap=20, seed=42, head_family=FROZEN_HEAD_FAMILY)
     bootstrap.fit(train, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
     return model, bootstrap, train.height
 
 
 def build_forecast(
-    model: MLBTwoHeadModel, row: dict,
+    model: XGBoostTwoHeadModel, row: dict,
     total_lines: list[float] | None = None,
     spread_line_side_pairs: list[tuple[float, str]] | None = None,
     bootstrap: BootstrapMLBEnsemble | None = None,
     lower_quantile: float = 0.10,
     uncertainty_haircut: float = 0.03,
+    calibrator: Calibrator | None = None,
+    calibrator_hash: str = "",
 ) -> SportsForecast:
+    """`calibrator`/`calibrator_hash` (multi-sport execution spec MLB-2):
+    real, cross-fit-validated calibration applied to the moneyline
+    probability BEFORE market inspection -- calibrated_probabilities is no
+    longer just raw_probabilities copied into a second field. Defaults to
+    IdentityCalibrator (raw == calibrated, but as two genuinely separate,
+    explicitly-identity-calibrated values, not implicitly the same dict) so
+    every existing caller that doesn't pass a calibrator keeps working.
+
+    Only the moneyline probability is calibrated -- the frozen calibrator
+    artifact was validated for moneyline only (train_mlb_head_distribution_cartesian.py
+    never cross-fit a totals/spread calibrator). totals_probabilities/
+    spread_probabilities stay real, uncalibrated sports-only probabilities,
+    disclosed here rather than silently calibrated with an unvalidated
+    transform."""
     pred = model.predict_row(row["event_id"], row)
-    predicted_winner: Literal["home", "away"] = "home" if pred.home_win_prob >= pred.away_win_prob else "away"
-    calibrated = {"home": pred.home_win_prob, "away": pred.away_win_prob}
+    calibrator = calibrator if calibrator is not None else IdentityCalibrator()
+    raw = {"home": pred.home_win_prob, "away": pred.away_win_prob}
+    calibrated_home = calibrator.transform(pred.home_win_prob)
+    calibrated = {"home": calibrated_home, "away": 1.0 - calibrated_home}
+    predicted_winner: Literal["home", "away"] = "home" if calibrated["home"] >= calibrated["away"] else "away"
 
     totals_probabilities: dict[float, dict[str, float]] = {}
     totals_probabilities_lower: dict[float, dict[str, float]] = {}
@@ -104,20 +170,29 @@ def build_forecast(
         # [lower_quantile, 1-lower_quantile] spread of each market's
         # probability. Replaces the flat 3% haircut previously applied
         # uniformly regardless of how much any given prediction actually
-        # depended on particular training games.
-        home_lower, home_upper = bootstrap.market_probability_bounds(
+        # depended on particular training games. Bounds are computed in
+        # raw-probability space (the bootstrap replicates never go through
+        # the calibrator, matching how the calibrator itself was validated
+        # only against the primary model's own OOF predictions) then
+        # passed through the identical calibrator transform -- calibration
+        # is monotonic, so ordering (lower <= calibrated <= upper) is
+        # preserved, and probability_lower/upper stay in the same
+        # probability space as calibrated_probabilities.
+        home_lower_raw, home_upper_raw = bootstrap.market_probability_bounds(
             row, model.distribution, "moneyline", "home", lower_quantile=lower_quantile,
         )
-        away_lower, away_upper = bootstrap.market_probability_bounds(
+        away_lower_raw, away_upper_raw = bootstrap.market_probability_bounds(
             row, model.distribution, "moneyline", "away", lower_quantile=lower_quantile,
         )
-        lower = {"home": home_lower, "away": away_lower}
-        upper = {"home": home_upper, "away": away_upper}
+        lower = {"home": calibrator.transform(home_lower_raw), "away": calibrator.transform(away_lower_raw)}
+        upper = {"home": calibrator.transform(home_upper_raw), "away": calibrator.transform(away_upper_raw)}
     else:
         # Fallback for callers without a fitted bootstrap ensemble (e.g.
         # a unit test constructing build_forecast() output directly): a
         # fixed haircut toward 50/50, disclosed as a strictly weaker
-        # substitute for the real bootstrap bound above.
+        # substitute for the real bootstrap bound above, applied in
+        # calibrated-probability space directly since there is no raw
+        # bootstrap distribution to transform.
         lower = {
             side: max(0.0, min(1.0, p - uncertainty_haircut if p >= 0.5 else p + uncertainty_haircut))
             for side, p in calibrated.items()
@@ -130,6 +205,7 @@ def build_forecast(
     # sports-only. Previously this was never populated at all, so every
     # total market silently produced NO_BET/no_forecast_for_line regardless
     # of price (see outputs/rebuild/takeover_status.md Checkpoint 9).
+    # Real, uncalibrated (see this function's docstring).
     for line in total_lines or []:
         over_p = model.distribution.probability_for_market(pred, "total", "over", line)
         totals_probabilities[line] = {"over": over_p, "under": 1.0 - over_p}
@@ -148,7 +224,7 @@ def build_forecast(
     # on a real spread market. Each side keeps its own signed line (a home
     # favorite's line and the away side's line on the same real market are
     # not the same number), computed here, before any market spread price
-    # is inspected.
+    # is inspected. Real, uncalibrated (see this function's docstring).
     for line, side in spread_line_side_pairs or []:
         cover_p = model.distribution.probability_for_market(pred, "spread", side, line)
         spread_probabilities.setdefault(line, {})[side] = cover_p
@@ -160,11 +236,11 @@ def build_forecast(
 
     return SportsForecast(
         event_id=row["event_id"], predicted_winner=predicted_winner,
-        raw_probabilities=calibrated, calibrated_probabilities=calibrated,
+        raw_probabilities=raw, calibrated_probabilities=calibrated,
         probability_lower=lower, probability_upper=upper,
         expected_home_score=pred.home_expected_runs, expected_away_score=pred.away_expected_runs,
         model_artifact_hash=model.to_artifact().get("artifact_hash", ""),
-        calibration_artifact_hash="uncalibrated_haircut_v1" if bootstrap is None else "bootstrap_uncertainty_v1",
+        calibration_artifact_hash=calibrator_hash or f"uncalibrated_{calibrator.method}",
         totals_probabilities=totals_probabilities,
         spread_probabilities=spread_probabilities,
         totals_probabilities_lower=totals_probabilities_lower,
@@ -186,7 +262,7 @@ class MLBRunState:
     tonight: pl.DataFrame
     pitches: pl.DataFrame = field(default_factory=pl.DataFrame)
     starters: pl.DataFrame = field(default_factory=pl.DataFrame)
-    model: MLBTwoHeadModel | None = None
+    model: XGBoostTwoHeadModel | None = None
     bootstrap: BootstrapMLBEnsemble | None = None
     train_n: int = 0
     decision_times: dict[str, datetime] = field(default_factory=dict)
@@ -426,6 +502,11 @@ def decide_stage(
     if state.model is None:
         raise ValueError("decide_stage requires predict_stage to have run first (state.model is None)")
 
+    # MLB-2: loaded once per decide_stage() call, not once per game --
+    # "the calibrator" is one frozen artifact for the whole run, never
+    # refit or reselected per prediction.
+    calibrator, calibrator_hash = load_frozen_calibrator()
+
     limits = limits if limits is not None else SizeLimits()
     games_report = []
     n_bets = 0
@@ -446,7 +527,10 @@ def decide_stage(
         # Rebuild with real market-derived lines now known -- predicted_winner
         # itself was already frozen in predict_stage() and is unchanged here
         # (build_forecast recomputes deterministically from the same model/row).
-        forecast = build_forecast(state.model, row, total_lines, spread_pairs, bootstrap=state.bootstrap)
+        forecast = build_forecast(
+            state.model, row, total_lines, spread_pairs, bootstrap=state.bootstrap,
+            calibrator=calibrator, calibrator_hash=calibrator_hash,
+        )
         state.forecasts[event_id] = forecast
 
         decisions = evaluate_game(forecast, candidates, limits)
