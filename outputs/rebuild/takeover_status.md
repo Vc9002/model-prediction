@@ -2446,3 +2446,80 @@ set with a fixed-membership assumption -- confirmed by grep before editing).
 settlement collection in parallel (does not require the new final test to
 be evaluated first; only requires it to exist and stay untouched, which it
 now does).
+
+## Checkpoint: Task 19 -- start Part 3 prospective settlement/closing capture (2026-08-09)
+
+Real gap found: `ShadowLedger`'s `predictions`/`market_evaluations`/
+`trade_decisions` tables were already real and populated (293 real MLB/
+tennis/WNBA `trade_decisions` -- all 293 MLB rows are `NO_BET`, confirming
+the winner-first/stale-quote/not-aligned gates are firing on real data),
+but `settlements` and `closing_prices` had zero rows -- nothing had ever
+closed the loop from an evaluated market back to a real outcome, including
+for the NO_BET rows the instruction explicitly called out ("capture
+settlement/closing data for ALL evaluated research opportunities including
+NO_BET, not just paper orders").
+
+**Built** `scripts/mlb_settle_and_capture_closing.py`: for every real MLB
+`trade_decisions` row without an existing settlement, once its event goes
+`STATUS_FINAL`, determines the real WIN/LOSS/PUSH outcome of the exact
+evaluated market/side/line from the real final score
+(`determine_outcome()`, using each side's own real signed line rather than
+assuming a mirrored pair -- real captured spread lines from independent
+market quotes aren't always symmetric), and records it via
+`ShadowLedger.record_settlement()`. Idempotent (LEFT JOIN against existing
+settlements; a second real run settled 0 new rows).
+
+**Real data gap found and fixed first**: the real scoreboard backfill had
+stalled at `2026-08-07T01:40Z` (matches Task 17's dataset cutoff) --
+zero completed games existed past that point, so nothing could be
+settled yet. Re-ran the real ESPN scoreboard collector
+(`MLBCollector.collect_espn_scoreboard`) for 2026-08-06 through
+2026-08-09 -- safe, idempotent, immutable-raw-snapshot, additive-only,
+does not touch the registry (confirmed by MD5/`git diff` before and
+after). This brought 451 real completed games into
+`data/rebuild/normalized/mlb/scoreboard.parquet` (up from 436), enabling
+192 of the 256 real MLB decisions with an evaluated market to be settled
+(96 WIN / 96 LOSS / 0 PUSH across all evaluated sides, BET and NO_BET
+alike); 64 remain pending because their events haven't gone final yet.
+
+**Real, disclosed limitation found while building closing-price
+capture**: attempted `collector.collect_polymarket_books()` for the past
+dates in question -- it returned `no_mlb_markets` for both, confirming
+Polymarket's public endpoint only serves currently open/active markets,
+not historical order books for already-resolved ones. Separately
+verified that `data/rebuild/markets/mlb/{date}.parquet` (the one real
+market snapshot that does exist for these dates) is a single decision-time
+capture, not a series of quotes through resolution -- reusing it as a
+"closing price" would silently be the same entry-time price already
+recorded in `market_evaluations`, not real closing-price evidence, so it
+was deliberately NOT used. `closing_price` stays real `None` for all 192
+real settlements this session, each with an explicit note explaining why,
+rather than fabricating or reconstructing a historical price (CLAUDE.md:
+"Do not use... reconstructed historical prices"). The real fix is running
+this script (or a standalone poller) prospectively, close to and through
+each event's real market close, in future sessions.
+
+**Tests**: `tests/rebuild/test_mlb_settlement.py` (14 tests covering
+moneyline/spread/total WIN/LOSS/PUSH determination, including a whole-
+integer-line push case and independent, non-mirrored real side lines).
+
+**1210 tests pass** (up from 1196), 1 skipped. `ruff check` clean.
+Registry-safe, confirmed by diffing `test_consumption_registry.json`
+before and after every real run in this checkpoint (zero diff).
+
+**Real, disclosed scope not completed**: `paper_orders` is still real
+empty (zero real BET decisions exist yet at this small sample size and
+these thresholds) -- the BET/pnl branch in the settlement script is
+implemented and exercised by nothing live this session, only ready for
+when a real BET row exists. Tennis and WNBA rows in the ledger (37 total)
+were left unsettled -- this session's real settlement work was scoped to
+MLB per the explicit instruction; the same script's logic generalizes but
+wasn't run for those sports.
+
+**Next**: Part 2 and this first slice of Part 3 (settlement/closing
+capture) are now real and running. Remaining Part 3 work (real market-
+residual model training on real settled outcomes, executable-value
+gating tuning, prospective closing-price poller) genuinely depends on
+more real games and, especially, a poller running close to real market
+close -- both accumulate with time and further sessions, not further
+architecture work right now.
