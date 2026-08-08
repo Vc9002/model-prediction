@@ -1,0 +1,17 @@
+{
+  "model_name": "xgb_two_head_negative_binomial",
+  "head_family": "xgboost",
+  "distribution": "negative_binomial",
+  "method": "temperature",
+  "parameters": {
+    "temperature": 10.0
+  },
+  "base_model_hash": "3a6f9434be9a262341c72fe24fe5db14efbdcf7f8fcbf26bfa78e9b4cc008b3d",
+  "dataset_hash": "e0c513aa4a544211980f7095da0de69ad3cb647a75981cbdb3c46512834ee2eb",
+  "training_range": {
+    "start": "2026-07-01",
+    "end": "2026-08-08"
+  },
+  "n_training_oof": 223,
+  "calibrator_hash": "bea0335ac2889f8365611c5dca7167c122e0004959c795c7f52bdc5ac57f2f01"
+}

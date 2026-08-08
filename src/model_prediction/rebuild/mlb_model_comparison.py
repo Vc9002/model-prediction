@@ -83,3 +83,50 @@ def build_mlb_moneyline_oof(features: pl.DataFrame, folds) -> dict[str, dict[str
             oof[name]["cohorts"].extend(cohorts)
 
     return oof
+
+
+HEAD_FACTORIES = {
+    "sklearn": MLBTwoHeadModel,
+    "xgboost": XGBoostTwoHeadModel,
+}
+
+
+def build_mlb_coherent_oof_for_combo(
+    features: pl.DataFrame, folds, head_family: str, method: str,
+    intensity_features: list[str] | None = None, differential_features: list[str] | None = None,
+) -> dict[str, list]:
+    """Real chronological OOF moneyline predictions for one exact
+    (head_family, distribution method) combination -- e.g.
+    ("xgboost", "negative_binomial"). Used by the real Cartesian
+    head-family x distribution comparison: `build_mlb_moneyline_oof()`
+    only ever exercises each head family against its constructor's
+    default distribution (independent_poisson for both), so it cannot by
+    itself validate a combination like XGBoost heads + negative binomial
+    -- that combination must be actually fit and OOF-scored, not
+    assembled after the fact from two separate single-family
+    experiments. `intensity_features`/`differential_features` default to
+    the real MLB feature schema (module-level constants) but are
+    overridable so this can be exercised against a small synthetic
+    dataset in tests. Returns {"probs": [...], "labels": [...]} in real
+    chronological order."""
+    intensity_features = intensity_features if intensity_features is not None else INTENSITY_FEATURES
+    differential_features = differential_features if differential_features is not None else DIFFERENTIAL_FEATURES
+    factory = HEAD_FACTORIES[head_family]
+    result: dict[str, list] = {"probs": [], "labels": []}
+    for fold in folds:
+        train_df = features.filter(pl.col("game_date") <= fold.train_end)
+        val_df = features.filter(
+            (pl.col("game_date") >= fold.val_start) & (pl.col("game_date") <= fold.val_end)
+        )
+        if train_df.height < 10 or val_df.height < 3:
+            continue
+        y_val_fold = _home_win_labels(val_df)
+        val_rows = list(val_df.iter_rows(named=True))
+
+        model = factory(seed=42, method=method)
+        model.fit(train_df, intensity_features, differential_features)
+        probs = [model.predict_row(r["event_id"], r).home_win_prob for r in val_rows]
+
+        result["probs"].extend(probs)
+        result["labels"].extend(y_val_fold)
+    return result

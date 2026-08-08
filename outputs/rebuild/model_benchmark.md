@@ -1,7 +1,7 @@
 # Model Benchmark Report
 
-**Date:** 2026-08-05, MLB section updated 2026-08-09 (Task 17 refresh: real chronological OOF moneyline/distribution/totals/spread + cross-fitted calibration + meta-cross-fit ensemble + uncertainty decomposition)
-**Status:** PARTIAL — full benchmark requires trained challenger models for all sports. MLB section below is RESEARCH_ONLY throughout; no promotion decision is made from the already-consumed final test (`outputs/rebuild/mlb_split_manifest.json`, `test_consumption_registry.json`).
+**Date:** 2026-08-05, MLB section updated 2026-08-09 (Task 17 refresh, then corrected same day: the frozen head-family/distribution combination was never validated together — see "Correction (2026-08-09)" below)
+**Status:** PARTIAL — full benchmark requires trained challenger models for all sports. MLB section below is RESEARCH_ONLY throughout; no promotion decision is made from the already-consumed final test (`outputs/rebuild/mlb_split_manifest.json`, `test_consumption_registry.json`). The frozen challenger does not yet clearly beat a naive constant-0.5 baseline on the identical rows — see the naive-baseline table below.
 
 ## Production model baselines
 
@@ -183,6 +183,76 @@ wired into the live shadow pipeline's `build_forecast()` (disclosed gap:
 that requires loading and predicting with all three model families at
 live-prediction time, which isn't currently wired there).
 
+### Correction (2026-08-09): the frozen v2 model was never validated as one exact combination
+
+A real bug was found in the Task 17 refresh above and Task 18's registry
+freeze: `xgb_two_head`'s "best calibrated coherent model" result (used
+throughout the sections above) was always constructed as
+`XGBoostTwoHeadModel(seed=42)` — its constructor default distribution is
+`independent_poisson` — at every real call site
+(`train_mlb_score_model_comparison.py`, `train_mlb_calibration_comparison.py`,
+`train_mlb_calibrated_ensemble_comparison.py`). Meanwhile `negative_binomial`
+was validated as the best distribution only against `MLBTwoHeadModel`
+(sklearn heads), in the separate score-distribution-family comparison
+above. `mlb_moneyline_v2`'s frozen definition combined these two winners
+from different experiments — `xgboost heads + negative_binomial` had
+never actually been fit and OOF-scored together anywhere.
+
+**Fix**: `train_mlb_head_distribution_cartesian.py` fits and cross-fit
+calibrates all 6 real combinations (2 head families × 3 distributions),
+picking the winner as one exact combination:
+
+| Head family | Distribution | Best calibration | Cross-fit LogLoss | Cross-fit Brier | Cross-fit ECE |
+|---|---|---|---|---|---|
+| sklearn | independent_poisson | temperature | 0.6992 | — | — |
+| sklearn | negative_binomial | temperature | 0.6990 | — | — |
+| sklearn | skellam | temperature | 0.6993 | — | — |
+| xgboost | independent_poisson | temperature | 0.6933 | — | — |
+| **xgboost** | **negative_binomial** | **temperature** | **0.6927** | **0.2498** | **0.0326** |
+| xgboost | skellam | temperature | 0.6933 | — | — |
+
+`xgboost + negative_binomial` does turn out to be the real winner (n=223
+OOF, n=168 cross-fit eval, 450 matched games as of this refreshed run) —
+but it is now actually validated as one combination, not assembled after
+the fact. The registry's `mlb_moneyline_v2` entry has been corrected
+in place (superseded, not silently overwritten — see its own
+`correction_note`), including moving `test_start` forward to strictly
+after the real games this correction's own comparisons used for
+selection.
+
+`train_mlb_corrected_ensemble_comparison.py` re-ran the Task 15 ensemble
+comparison using each head family's own real best distribution instead of
+its constructor default. Conclusion unchanged: every ensemble method
+still scores worse than or indistinguishable from the single best
+calibrated model alone (`xgb_two_head` meta-cross-fit log loss 0.6916 vs.
+`xgb_direct` 0.6930, equal-weight 0.6954, inverse-log-loss 0.6955,
+logistic-stacking 0.6997) — the single calibrated `xgb_two_head` model
+remains the moneyline research benchmark.
+
+#### Naive and incumbent baselines (real, added to close a gap: "beats another challenger" was never checked against "beats a naive forecast")
+
+Computed on the identical 223 real OOF rows the corrected Cartesian
+comparison uses (`build_mlb_naive_baselines.py`):
+
+| Baseline | n | LogLoss | Brier |
+|---|---|---|---|
+| Constant 0.5 | 223 | 0.6931 | 0.2500 |
+| Expanding historical home-win base rate (real, chronological, no leakage) | 223 | 0.6944 | 0.2506 |
+| **Frozen `xgb_two_head` (xgboost + negative_binomial + temperature), cross-fit** | **168** | **0.6927** | **0.2498** |
+| Incumbent `elo-trend-lr-v8` (real, but a DIFFERENT n=67 sample/date range — not row-identical to the above) | 67 | 0.6839 | 0.2455 |
+
+**Real, disclosed reading**: the frozen challenger's real cross-fit log
+loss (0.6927) barely beats a constant-0.5 baseline (0.6931) on the
+identical rows — not yet a real discriminative edge at this sample size.
+It also does not clearly beat the incumbent's own real log loss (0.6839),
+though that number comes from a different, smaller, non-overlapping real
+sample and is not a strict apples-to-apples comparison. "Best challenger"
+in this document should never be read as "better than a naive forecast"
+or "better than the incumbent" — neither claim is supported yet. A real
+timestamp-valid market no-vig probability baseline is not included: no
+real market quote is currently linked to these exact OOF games (the same
+real gap disclosed in `economic_report.md`).
+
 **Note:** Only MLB has real rebuild challengers. All other sports are pending collector completion.
 
 ## Common characteristics across all models
@@ -234,11 +304,19 @@ qualification gate on this small a sample, the real OOF comparisons
 above (n=203, n=153, n=102 depending on stage) are directional, and no
 sport has attempted economic qualification (see
 `outputs/rebuild/economic_report.md`: real shadow ledger data shows zero
-real trades have ever been placed, an honest economic data blocker, not
-a missing-code one).
+real BET decisions have ever been placed — 192 real settlements now
+exist for NO_BET/research rows, but zero carry a real closing price yet,
+an honest data-timing blocker, not a missing-code one).
+
+Critically, the frozen `mlb_moneyline_v2` challenger's own real cross-fit
+log loss (0.6927) barely beats a constant-0.5 naive baseline (0.6931) on
+the identical rows, and does not clearly beat the incumbent's real log
+loss (0.6839, different sample). "Architecture-completeness" and
+"predictively qualified" are not the same claim, and this document does
+not make the second one.
 
 `outputs/rebuild/model_benchmark.parquet` (this document's machine-readable
 counterpart) exists as of 2026-08-09 with one real row per MLB
-model/market/line combination above. It cannot be extended to other
-sports until challenger models are trained for at least one sport beyond
-MLB.
+model/market/line combination above, plus real naive/incumbent baseline
+rows. It cannot be extended to other sports until challenger models are
+trained for at least one sport beyond MLB.
