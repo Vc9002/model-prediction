@@ -240,6 +240,22 @@ class TestModelSaveLoadRoundTrip:
         assert loaded._intensity_features == INTENSITY_FEATURES
         assert loaded._differential_features == DIFFERENTIAL_FEATURES
 
+    def test_distribution_method_is_configurable_and_preserved_through_reload(self):
+        # Task 12: a real caller needs to compare distribution families
+        # (independent_poisson/negative_binomial/skellam) on the
+        # identical two fitted heads -- MLBTwoHeadModel.__init__() didn't
+        # expose `method` at all before, hardcoding independent_poisson.
+        data = _synthetic_training_data()
+        model = MLBTwoHeadModel(seed=1, method="skellam")
+        assert model.distribution.method == "skellam"
+        model.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save(tmp)
+            loaded = MLBTwoHeadModel.load(tmp)
+
+        assert loaded.distribution.method == "skellam"
+
     def test_save_writes_a_real_metadata_json(self):
         data = _synthetic_training_data()
         model = MLBTwoHeadModel(seed=1)

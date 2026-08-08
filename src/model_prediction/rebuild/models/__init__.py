@@ -385,10 +385,15 @@ class MLBTwoHeadModel:
 
     MODEL_VERSION = "mlb-two-head-v1"
 
-    def __init__(self, seed: int = 42) -> None:
+    def __init__(self, seed: int = 42, method: str = "independent_poisson") -> None:
         self.intensity_head = RunIntensityHead()
         self.differential_head = RunDifferentialHead()
-        self.distribution = JointScoreDistribution(seed=seed)
+        # `method` lets a real caller compare distribution families
+        # (independent_poisson/negative_binomial/skellam) on the identical
+        # two fitted heads -- the same expected-run heads can feed
+        # different score distributions (CLAUDE.md Part 2 SS12's "The same
+        # expected-run heads can feed different score distributions").
+        self.distribution = JointScoreDistribution(method=method, seed=seed)
         self._fitted = False
         self._intensity_features: list[str] = []
         self._differential_features: list[str] = []

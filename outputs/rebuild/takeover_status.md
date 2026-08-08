@@ -1988,3 +1988,43 @@ including the joint-distribution methods already implemented in
 `JointScoreDistribution` -- independent Poisson/negative
 binomial/Skellam -- but never compared against each other on real
 chronological OOF folds).
+
+### Task 12 (partial) — joint-distribution method comparison
+
+**Real gap closed**: `JointScoreDistribution` already implemented all
+three methods (`independent_poisson`, `negative_binomial`, `skellam` --
+the last added and tested in an earlier session), but
+`MLBTwoHeadModel.__init__()` never exposed `method` at construction time
+at all -- every real caller silently got `independent_poisson`, and
+nothing ever compared the three against each other. Added a real
+`method` parameter (`MLBTwoHeadModel(seed=..., method=...)`), persisted
+through `save()`/`load()` (already correctly wired via
+`self.distribution.method`, verified not just assumed).
+
+**Built** `scripts/train_mlb_distribution_comparison.py`: fits three
+independent `MLBTwoHeadModel` instances per real date-cluster-safe fold
+(Task 8's fold construction, reused identically), one per distribution
+method, isolating the comparison to distribution choice alone (same
+underlying feature fitting each time). Registry-safe -- does not touch
+`test_consumption_registry.json`, confirmed by diffing it after a real
+run.
+
+**Live-verified real result** (n=203 real OOF predictions, 3 real folds,
+35 real distinct dates after the backfill extension): `negative_binomial`
+log_loss=0.7580, `independent_poisson`=0.8232, `skellam`=0.8219 --
+negative binomial's overdispersion modeling shows a real, directional
+edge on this sample. Per the explicit Part-2 go-ahead above, reported as
+directional signal on a still-small sample (203 OOF rows, 3 folds), not
+a promotion-grade result -- no final test touched, no distribution
+method frozen.
+
+**Real, disclosed scope not completed**: this compares the three
+distribution methods against each other, not against the frozen
+incumbent (pre-rebuild) benchmark -- that requires loading the legacy
+model interface, a separate integration not attempted here. Task 13
+(a coherent XGBoost-based score-model challenger, distinct from the
+existing direct XGBoost binary classifier) also remains open.
+
+**Tests**: `test_mlb_model_persistence.py::test_distribution_method_is_configurable_and_preserved_through_reload`.
+
+**1145 tests pass** (up from 1144), 1 skipped. `ruff check` clean.
