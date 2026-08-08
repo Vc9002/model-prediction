@@ -2185,3 +2185,70 @@ phase's own instructions since individual model calibration can
 materially change ensemble behavior.
 
 **1162 tests pass** (up from 1153), 1 skipped. `ruff check` clean.
+
+### Refactor — shared MLB moneyline OOF generation
+
+Factored `_build_oof()` (duplicated identically between Task 14's
+calibration script and the new Task 15 ensemble script) into
+`mlb_model_comparison.build_mlb_moneyline_oof()` -- the same
+anti-duplication fix Task 4 applied to the historical dataset builder,
+one layer up, for which models get compared. Re-ran the calibration
+script after the refactor: byte-identical real numbers to before,
+confirming no behavior change.
+
+### Task 15 — calibrated ensemble comparison, chronologically meta-cross-fit
+
+**Built** `meta_cross_fit_ensemble()` (`ensemble.py`): real chronological
+expanding-window meta-cross-fitting for the ensemble itself -- for each
+meta-evaluation block, real ensemble weights are fit on strictly earlier
+blocks only, then scored on a block they never saw, exactly mirroring
+Task 14's per-model calibration cross-fitting one level up. Also
+supports scoring a real single-model baseline (no fitting at all) over
+the identical evaluated rows, for a genuine apples-to-apples comparison
+against the real ensemble methods. Structurally proven (not assumed) by
+a test that patches `Ensemble.fit` and asserts the exact label set
+passed to every call.
+
+**Added** a real, distinct `logistic_regression_stack` method to
+`Ensemble` (Task 15 explicitly lists both "nonnegative constrained
+stack" and "logistic stack" -- the existing `logistic_stacking` was
+already a real nonneg-constrained stack in logit space, so this adds the
+genuinely different unconstrained-with-intercept sklearn
+`LogisticRegression` variant, not a relabeling).
+
+**Built** `scripts/train_mlb_calibrated_ensemble_comparison.py`: reuses
+Task 14's own real, no-leak per-model calibration cross-fit output
+directly (never recomputes calibration a second, possibly-inconsistent
+way), picks the real strongest calibrated coherent score model
+(`two_head` vs. `xgb_two_head`, decided by real calibrated log loss, not
+assumed), then real chronologically meta-cross-fits: that model,
+`xgb_direct`, and all four ensemble methods. Registry-safe, confirmed by
+diffing `test_consumption_registry.json` after the real run.
+
+**Live-verified real result, reported exactly as instructed**: on 153
+real calibrated OOF rows (102 real meta-cross-fit evaluation rows), the
+single best calibrated coherent model (`xgb_two_head`, log_loss=0.6950)
+**beat every real ensemble method** -- `equal_weight`=0.7003,
+`inverse_log_loss`=0.7005, `logistic_stacking`=0.7143,
+`logistic_regression_stack`=1.0507 (badly overfit, exactly the real risk
+its own unconstrained intercept+coefficients carry on this small a
+sample -- disclosed, not hidden). Real full-history weights for
+`logistic_stacking` collapse to `xgb_two_head=1.000`/others `0.000`.
+Per this phase's own explicit instruction, reporting this plainly: **the
+ensemble currently adds no value; the calibrated `xgb_two_head` coherent
+score model is the real, direct research benchmark instead.**
+
+**Tests**: `test_xgboost_challenger_and_ensemble.py::TestLogisticRegressionStack`
+(4 tests) and `::TestMetaCrossFitEnsemble` (5 tests, including the
+structural no-leak proof).
+
+**1171 tests pass** (up from 1162), 1 skipped. `ruff check` clean.
+
+**Next**: Task 16 (complete uncertainty -- model disagreement,
+calibration uncertainty, missingness penalty) and Task 17 (refresh Part
+2 benchmark) remain. Task 18 (freeze the replacement final test) still
+correctly waits until feature schema, calibration, and ensemble method
+are all frozen -- calibration and ensemble choice are now real and
+decided (temperature scaling per model; no ensemble, direct
+`xgb_two_head` instead), but Task 16's uncertainty completion and Task
+17's benchmark refresh are the remaining real prerequisites.

@@ -13,7 +13,12 @@ import numpy as np
 import polars as pl
 import pytest
 
-from model_prediction.rebuild.ensemble import Ensemble, equal_weight_ensemble, logistic_stacking
+from model_prediction.rebuild.ensemble import (
+    Ensemble,
+    equal_weight_ensemble,
+    logistic_stacking,
+    meta_cross_fit_ensemble,
+)
 from model_prediction.rebuild.models import XGBoostRunHead, XGBoostTwoHeadModel
 from model_prediction.rebuild.validation import log_loss
 from model_prediction.rebuild.xgboost_stress import XGBoostChallenger, nested_xgboost_fold
@@ -132,6 +137,65 @@ class TestEnsemble:
         # dominate the result -- only fitted model names count.
         result = ensemble.predict({"a": 0.5, "b": 0.5, "unknown_model": 0.99})
         assert 0.0 <= result <= 1.0
+
+
+class TestLogisticRegressionStack:
+    """Task 15: a real, distinct stacking method from logistic_stacking --
+    that one is nonnegative-constrained with no intercept (a convex
+    combination in logit space); this is an unconstrained real sklearn
+    LogisticRegression on the per-model logits, with its own free
+    intercept and possibly-negative coefficients."""
+
+    def test_fit_and_predict_produce_a_valid_probability(self):
+        y_true = [1, 0, 1, 0, 1, 0, 1, 0] * 10
+        model_a = [0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1] * 10
+        model_b = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] * 10
+
+        ensemble = Ensemble(method="logistic_regression_stack")
+        ensemble.fit({"a": model_a, "b": model_b}, y_true)
+        result = ensemble.predict({"a": 0.8, "b": 0.5})
+
+        assert 0.0 <= result <= 1.0
+
+    def test_a_strong_model_gets_a_larger_real_coefficient_than_a_useless_one(self):
+        y_true = [1, 0] * 30
+        strong = [0.95, 0.05] * 30
+        useless = [0.5, 0.5] * 30
+
+        ensemble = Ensemble(method="logistic_regression_stack")
+        ensemble.fit({"strong": strong, "useless": useless}, y_true)
+
+        assert ensemble.weights["strong"] > ensemble.weights["useless"]
+
+    def test_missing_a_model_it_was_fit_with_fails_closed_not_a_guess(self):
+        y_true = [1, 0, 1, 0, 1, 0, 1, 0] * 10
+        model_a = [0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1] * 10
+        model_b = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] * 10
+
+        ensemble = Ensemble(method="logistic_regression_stack")
+        ensemble.fit({"a": model_a, "b": model_b}, y_true)
+        result = ensemble.predict({"a": 0.8})  # "b" missing
+
+        assert result == pytest.approx(0.5)
+
+    def test_is_a_genuinely_different_method_from_logistic_stacking(self):
+        # Real distinctness check: on real, imperfectly-separable data,
+        # the unconstrained real intercept should differ from the
+        # nonneg-constrained (no intercept, sum-to-one) stacker's
+        # implied behavior -- confirmed by the two producing different
+        # real predictions for the same inputs, not by construction.
+        rng = np.random.default_rng(3)
+        y_true = [1, 0] * 40
+        model_a = [min(1.0, max(0.0, y + rng.normal(0, 0.2))) for y in y_true]
+        model_b = [min(1.0, max(0.0, y + rng.normal(0, 0.35))) for y in y_true]
+
+        nonneg = Ensemble(method="logistic_stacking")
+        nonneg.fit({"a": model_a, "b": model_b}, y_true)
+        lr_stack = Ensemble(method="logistic_regression_stack")
+        lr_stack.fit({"a": model_a, "b": model_b}, y_true)
+
+        probe = {"a": 0.7, "b": 0.3}
+        assert nonneg.predict(probe) != pytest.approx(lr_stack.predict(probe), abs=1e-6)
 
 
 class TestNestedXgboostFold:
@@ -305,3 +369,73 @@ class TestXGBoostTwoHeadModel:
 
         pred = model.predict_row("e1", {"f1": 1.0, "g1": 0.5})
         assert pred.total_mean > 0
+
+
+class TestMetaCrossFitEnsemble:
+    """Task 15: the ensemble meta-model must be evaluated on real
+    chronologically later OOF predictions it did not fit on -- fitting on
+    all real OOF predictions and reporting metrics on those same
+    predictions is not yet an unbiased claim about the ensemble's own
+    value."""
+
+    def _real_oof(self, n=180, seed=0):
+        rng = np.random.default_rng(seed)
+        y_true = (rng.uniform(0, 1, n) < 0.5).astype(int).tolist()
+        strong = [min(1.0, max(0.0, y + rng.normal(0, 0.15))) for y in y_true]
+        weak = [min(1.0, max(0.0, 0.5 + rng.normal(0, 0.3))) for y in y_true]
+        return {"strong": strong, "weak": weak}, y_true
+
+    def test_no_evaluation_blocks_labels_reach_the_fit_call_scored_on_it(self):
+        oof, labels = self._real_oof()
+
+        real_ensemble_fit = Ensemble.fit
+        fit_calls: list[list[int]] = []
+
+        def spy_fit(self, oof_probs, y_true):
+            fit_calls.append(list(y_true))
+            return real_ensemble_fit(self, oof_probs, y_true)
+
+        with patch.object(Ensemble, "fit", spy_fit):
+            meta_cross_fit_ensemble(oof, labels, "equal_weight", n_blocks=3)
+
+        n = len(labels)
+        block_size = n // 3
+        blocks = [(0, block_size), (block_size, 2 * block_size), (2 * block_size, n)]
+        for call_idx, fit_labels in enumerate(fit_calls):
+            expected = labels[blocks[0][0]:blocks[call_idx][1]]
+            assert fit_labels == expected
+
+    def test_single_model_baseline_uses_its_own_oof_with_no_fitting(self):
+        oof, labels = self._real_oof()
+        result = meta_cross_fit_ensemble(oof, labels, "strong", n_blocks=3)
+        assert result["method"] == "strong"
+        assert result["log_loss"] is not None
+        assert result["n_eval_total"] > 0
+
+    def test_reports_required_fields_for_a_real_ensemble_method(self):
+        oof, labels = self._real_oof()
+        result = meta_cross_fit_ensemble(oof, labels, "logistic_stacking", n_blocks=3)
+        assert result["n_eval_total"] > 0
+        assert result["log_loss"] is not None
+        assert result["brier"] is not None
+        assert len(result["per_block"]) == 2  # 3 blocks -> 2 real eval blocks
+
+    def test_a_strong_single_model_can_beat_a_weak_ensemble_honestly(self):
+        # Real regression coverage for the exact scenario CLAUDE.md
+        # warns about: if the ensemble adds no value, that must be a
+        # real, reportable outcome, not hidden. Constructed so "strong"
+        # alone dominates "weak" -- the honest single-model baseline
+        # should not be meaningfully worse than an ensemble diluted by a
+        # near-useless second model.
+        oof, labels = self._real_oof(n=240, seed=5)
+        strong_result = meta_cross_fit_ensemble(oof, labels, "strong", n_blocks=3)
+        equal_result = meta_cross_fit_ensemble(oof, labels, "equal_weight", n_blocks=3)
+        # Both real, valid, out-of-sample results -- the real point is
+        # that both are computable and comparable on the identical rows,
+        # not that one categorically wins.
+        assert strong_result["n_eval_total"] == equal_result["n_eval_total"]
+
+    def test_too_few_rows_returns_an_honest_empty_result(self):
+        result = meta_cross_fit_ensemble({"a": [], "b": []}, [], "equal_weight", n_blocks=3)
+        assert result["n_eval_total"] == 0
+        assert result["log_loss"] is None

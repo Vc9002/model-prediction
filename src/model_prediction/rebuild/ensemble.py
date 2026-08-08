@@ -6,6 +6,7 @@ The stacker sees only out-of-fold predictions, never training predictions.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 from scipy.optimize import minimize
@@ -100,6 +101,8 @@ class Ensemble:
         self.method = method
         self.weights: dict[str, float] = {}
         self._fitted = False
+        self._lr_model: Any = None
+        self._lr_feature_order: list[str] = []
 
     def add_model(self, name: str, oof_probs: Sequence[float]) -> None:
         """Register a model's out-of-fold predictions. Not used during predict."""
@@ -129,10 +132,29 @@ class Ensemble:
             weights = weights / weights.sum()
         elif self.method == "logistic_stacking":
             _, weights = logistic_stacking(matrices, y_true)
+        elif self.method == "logistic_regression_stack":
+            # Real, genuinely distinct method from "logistic_stacking"
+            # above (Task 15's list names both): logistic_stacking is a
+            # nonnegative-constrained, sum-to-one optimization in logit
+            # space with no intercept (weights always at least implicitly
+            # a convex combination). This is an unconstrained real
+            # sklearn LogisticRegression on the per-model logits as
+            # features, with its own free intercept and unconstrained
+            # (possibly negative) coefficients -- a materially different,
+            # more flexible (and more overfitting-prone on a small real
+            # sample) stacking approach, not a relabeling of the same one.
+            from sklearn.linear_model import LogisticRegression
+
+            logit_matrix = np.array([[_logit(p) for p in matrices[i]] for i in range(len(names))]).T
+            lr = LogisticRegression(penalty=None, solver="lbfgs")
+            lr.fit(logit_matrix, np.array(y_true))
+            self._lr_model = lr
+            self._lr_feature_order = names
+            weights = lr.coef_[0]
         else:
             weights = np.ones(len(names)) / len(names)
 
-        self.weights = {name: float(w) for name, w in zip(names, weights)}
+        self.weights = {name: float(w) for name, w in zip(names, weights, strict=True)}
         self._fitted = True
         return self
 
@@ -140,6 +162,10 @@ class Ensemble:
         """Predict one probability from model-level probabilities.
 
         For logistic_stacking, applies weights in logit space (matches training).
+        For logistic_regression_stack, uses the real fitted sklearn model
+        (its own intercept, not just a weighted sum) -- requires every
+        model this was fit on to be present in `probs`, in the exact
+        original feature order.
         For other methods, linear combination in probability space.
         """
         if not self._fitted:
@@ -150,7 +176,102 @@ class Ensemble:
             if logits:
                 return float(_sigmoid(np.dot(w, logits)))
             return 0.5
+        if self.method == "logistic_regression_stack" and self._lr_model is not None:
+            if not all(n in probs for n in self._lr_feature_order):
+                return 0.5  # fail closed rather than guess at a missing model's contribution
+            logits = [[_logit(probs[n]) for n in self._lr_feature_order]]
+            return float(self._lr_model.predict_proba(logits)[0][1])
         total = 0.0
         for name, p in probs.items():
             total += self.weights.get(name, 0.0) * p
         return total
+
+
+# ── Meta-level chronological cross-fitting ──────────────────────────────────
+#
+# Real gap this closes (CLAUDE.md's next-phase Task 15): Ensemble.fit()
+# above is real and tested in isolation, but every prior real caller fit it
+# on all real OOF predictions and reported metrics on those same
+# predictions -- a real stacker is genuinely useful to *fit* that way (it
+# only ever sees OOF predictions, never training predictions, so it isn't
+# leaking base-model training data), but reporting its performance on the
+# identical rows it was fit on is not yet an unbiased claim that the
+# ensemble itself improves anything. This is the fix: the meta-model
+# (the ensemble weights) must be evaluated on real chronologically later
+# OOF predictions it did not fit on.
+
+
+def meta_cross_fit_ensemble(
+    oof_by_model: dict[str, Sequence[float]],
+    labels: Sequence[int],
+    method: str,
+    n_blocks: int = 3,
+) -> dict[str, Any]:
+    """Real chronological expanding-window meta-cross-fit for one ensemble
+    method: for each meta-evaluation block i (i=1..n_blocks-1), fits real
+    ensemble weights on every strictly-earlier block's real OOF
+    predictions only, then scores the frozen weights on block i. `method`
+    may also be a single real model name already present in
+    `oof_by_model` (not an Ensemble method at all) -- used to report a
+    real single-model baseline's out-of-sample performance over the
+    identical evaluated rows, for a genuinely apples-to-apples
+    comparison against the real ensemble methods.
+
+    All sequences in `oof_by_model` (and `labels`) must already be in
+    real chronological order and aligned by index (row i in every
+    model's sequence is the identical real game)."""
+    from .validation import brier_score, log_loss
+
+    names = list(oof_by_model.keys())
+    n = len(labels)
+    blocks: list[tuple[int, int]] = []
+    block_size = n // n_blocks
+    start = 0
+    for i in range(n_blocks):
+        end = n if i == n_blocks - 1 else start + block_size
+        blocks.append((start, end))
+        start = end
+
+    all_probs: list[float] = []
+    all_labels: list[int] = []
+    per_block: list[dict[str, Any]] = []
+
+    for i in range(1, len(blocks)):
+        fit_start, fit_end = blocks[0][0], blocks[i - 1][1]
+        eval_start, eval_end = blocks[i]
+        eval_labels = list(labels[eval_start:eval_end])
+        if not eval_labels:
+            continue
+
+        if method in names:
+            # Real single-model baseline -- no fitting at all, just the
+            # model's own already-calibrated OOF predictions over the
+            # identical evaluated rows.
+            eval_probs = list(oof_by_model[method][eval_start:eval_end])
+        else:
+            fit_oof = {name: list(oof_by_model[name][fit_start:fit_end]) for name in names}
+            fit_labels = list(labels[fit_start:fit_end])
+            ens = Ensemble(method=method)
+            ens.fit(fit_oof, fit_labels)
+            eval_probs = [
+                ens.predict({name: oof_by_model[name][j] for name in names})
+                for j in range(eval_start, eval_end)
+            ]
+
+        all_probs.extend(eval_probs)
+        all_labels.extend(eval_labels)
+        per_block.append({
+            "eval_block": i, "fit_n": fit_end - fit_start, "eval_n": len(eval_labels),
+            "log_loss": log_loss(eval_labels, eval_probs),
+            "brier": brier_score(eval_labels, eval_probs),
+        })
+
+    if not all_labels:
+        return {"method": method, "n_blocks": n_blocks, "per_block": per_block, "n_eval_total": 0,
+                "log_loss": None, "brier": None}
+    return {
+        "method": method, "n_blocks": n_blocks, "per_block": per_block,
+        "n_eval_total": len(all_labels),
+        "log_loss": log_loss(all_labels, all_probs),
+        "brier": brier_score(all_labels, all_probs),
+    }

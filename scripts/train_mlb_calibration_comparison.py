@@ -35,84 +35,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from model_prediction.rebuild.calibration import cross_fit_calibration_eval, fit_calibrator
 from model_prediction.rebuild.horizon_builder import build_mlb_historical_horizon_dataset
-from model_prediction.rebuild.mlb_features import (
-    MLB_DIFFERENTIAL_FEATURES,
-    MLB_INTENSITY_FEATURES,
-    dedupe_scoreboard,
-)
-from model_prediction.rebuild.models import MLBTwoHeadModel, XGBoostTwoHeadModel
+from model_prediction.rebuild.mlb_features import dedupe_scoreboard
+from model_prediction.rebuild.mlb_model_comparison import build_mlb_moneyline_oof
 from model_prediction.rebuild.validation import brier_score, calibration_curve, expanding_folds, log_loss
-from model_prediction.rebuild.xgboost_stress import nested_xgboost_fold
 
 HORIZON = "late"
-INTENSITY_FEATURES = MLB_INTENSITY_FEATURES
-DIFFERENTIAL_FEATURES = MLB_DIFFERENTIAL_FEATURES
-XGB_DIRECT_FEATURES = list(dict.fromkeys(INTENSITY_FEATURES + DIFFERENTIAL_FEATURES))
 CALIBRATION_METHODS = ["identity", "platt", "temperature", "isotonic"]
 N_CALIBRATION_BLOCKS = 4
-
-
-def _home_win_labels(df: pl.DataFrame) -> list[int]:
-    return [1 if r["home_score"] > r["away_score"] else 0 for r in df.iter_rows(named=True)]
-
-
-def _cohort(row: dict) -> dict[str, str]:
-    """Real data-quality cohort tags for one row -- diagnostic only, per
-    Task 14's own instruction not to select separate calibrators for
-    tiny cohorts yet."""
-    both_starters = row.get("starters_known", 0.0) == 1.0
-    return {
-        "starters": "both_available" if both_starters else "one_or_both_missing",
-        "weather": "available" if row.get("weather_availability", 0.0) == 1.0 else "unavailable",
-    }
-
-
-def _build_oof(features: pl.DataFrame, folds) -> dict[str, dict]:
-    """Real chronological OOF generation for all three model families,
-    reusing the identical date-cluster-safe folds every other real
-    training script uses. Returns {model_name: {"probs": [...], "labels":
-    [...], "cohorts": [...]}} with every list in real chronological
-    order (required by cross_fit_calibration_eval())."""
-    oof: dict[str, dict[str, list]] = {
-        name: {"probs": [], "labels": [], "cohorts": []}
-        for name in ("two_head", "xgb_two_head", "xgb_direct")
-    }
-
-    for fold in folds:
-        train_df = features.filter(pl.col("game_date") <= fold.train_end)
-        val_df = features.filter(
-            (pl.col("game_date") >= fold.val_start) & (pl.col("game_date") <= fold.val_end)
-        )
-        if train_df.height < 10 or val_df.height < 3:
-            continue
-
-        y_val_fold = _home_win_labels(val_df)
-        val_rows = list(val_df.iter_rows(named=True))
-        cohorts = [_cohort(r) for r in val_rows]
-
-        two_head = MLBTwoHeadModel(seed=42)
-        two_head.fit(train_df, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
-        two_head_probs = [two_head.predict_row(r["event_id"], r).home_win_prob for r in val_rows]
-
-        xgb_two_head = XGBoostTwoHeadModel(seed=42)
-        xgb_two_head.fit(train_df, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
-        xgb_two_head_probs = [xgb_two_head.predict_row(r["event_id"], r).home_win_prob for r in val_rows]
-
-        X_train = train_df.select(XGB_DIRECT_FEATURES).to_numpy()
-        y_train_arr = train_df.select(
-            (pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y")
-        ).to_numpy().ravel()
-        X_val = val_df.select(XGB_DIRECT_FEATURES).to_numpy()
-        nested_result = nested_xgboost_fold(X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index)
-
-        oof["two_head"]["probs"].extend(two_head_probs)
-        oof["xgb_two_head"]["probs"].extend(xgb_two_head_probs)
-        oof["xgb_direct"]["probs"].extend(nested_result.outer_probs)
-        for name in oof:
-            oof[name]["labels"].extend(y_val_fold)
-            oof[name]["cohorts"].extend(cohorts)
-
-    return oof
 
 
 def _cohort_calibration(probs: list[float], labels: list[int], cohorts: list[dict], key: str) -> dict:
@@ -169,7 +98,7 @@ def main() -> None:
     print(f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates); "
           f"oof_split_manifest_hash={fold_manifest_hash[:12]}")
 
-    oof = _build_oof(features, folds)
+    oof = build_mlb_moneyline_oof(features, folds)
     for name, data in oof.items():
         print(f"3. {name}: {len(data['labels'])} real chronological OOF predictions")
 

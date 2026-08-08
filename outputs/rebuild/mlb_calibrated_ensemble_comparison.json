@@ -1,0 +1,178 @@
+{
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "matched_games": 435,
+  "n_calibrated_oof": 153,
+  "best_calibration_method_per_model": {
+    "two_head": "temperature",
+    "xgb_two_head": "temperature",
+    "xgb_direct": "temperature"
+  },
+  "best_calibrated_coherent_score_model": "xgb_two_head",
+  "coherent_score_model_log_loss": {
+    "two_head": 0.7228486723872442,
+    "xgb_two_head": 0.696355250101579
+  },
+  "meta_cross_fit_results": {
+    "xgb_two_head": {
+      "method": "xgb_two_head",
+      "n_blocks": 3,
+      "per_block": [
+        {
+          "eval_block": 1,
+          "fit_n": 51,
+          "eval_n": 51,
+          "log_loss": 0.6847830522212188,
+          "brier": 0.24582993331569064
+        },
+        {
+          "eval_block": 2,
+          "fit_n": 102,
+          "eval_n": 51,
+          "log_loss": 0.7051349084365184,
+          "brier": 0.2559374981469261
+        }
+      ],
+      "n_eval_total": 102,
+      "log_loss": 0.6949589803288685,
+      "brier": 0.2508837157313084
+    },
+    "xgb_direct": {
+      "method": "xgb_direct",
+      "n_blocks": 3,
+      "per_block": [
+        {
+          "eval_block": 1,
+          "fit_n": 51,
+          "eval_n": 51,
+          "log_loss": 0.7234618556908763,
+          "brier": 0.2649756588258445
+        },
+        {
+          "eval_block": 2,
+          "fit_n": 102,
+          "eval_n": 51,
+          "log_loss": 0.6960664656228743,
+          "brier": 0.25145951012668505
+        }
+      ],
+      "n_eval_total": 102,
+      "log_loss": 0.7097641606568755,
+      "brier": 0.25821758447626475
+    },
+    "equal_weight": {
+      "method": "equal_weight",
+      "n_blocks": 3,
+      "per_block": [
+        {
+          "eval_block": 1,
+          "fit_n": 51,
+          "eval_n": 51,
+          "log_loss": 0.6967942414760049,
+          "brier": 0.251822699307069
+        },
+        {
+          "eval_block": 2,
+          "fit_n": 102,
+          "eval_n": 51,
+          "log_loss": 0.7038228264715247,
+          "brier": 0.25531353341071
+        }
+      ],
+      "n_eval_total": 102,
+      "log_loss": 0.7003085339737647,
+      "brier": 0.25356811635888954
+    },
+    "inverse_log_loss": {
+      "method": "inverse_log_loss",
+      "n_blocks": 3,
+      "per_block": [
+        {
+          "eval_block": 1,
+          "fit_n": 51,
+          "eval_n": 51,
+          "log_loss": 0.6972739403440543,
+          "brier": 0.2520617896983387
+        },
+        {
+          "eval_block": 2,
+          "fit_n": 102,
+          "eval_n": 51,
+          "log_loss": 0.7037289729019777,
+          "brier": 0.2552679650855124
+        }
+      ],
+      "n_eval_total": 102,
+      "log_loss": 0.7005014566230163,
+      "brier": 0.2536648773919255
+    },
+    "logistic_stacking": {
+      "method": "logistic_stacking",
+      "n_blocks": 3,
+      "per_block": [
+        {
+          "eval_block": 1,
+          "fit_n": 51,
+          "eval_n": 51,
+          "log_loss": 0.7234618556908763,
+          "brier": 0.2649756588258445
+        },
+        {
+          "eval_block": 2,
+          "fit_n": 102,
+          "eval_n": 51,
+          "log_loss": 0.7051349084365184,
+          "brier": 0.2559374981469261
+        }
+      ],
+      "n_eval_total": 102,
+      "log_loss": 0.7142983820636972,
+      "brier": 0.2604565784863853
+    },
+    "logistic_regression_stack": {
+      "method": "logistic_regression_stack",
+      "n_blocks": 3,
+      "per_block": [
+        {
+          "eval_block": 1,
+          "fit_n": 51,
+          "eval_n": 51,
+          "log_loss": 1.4023740626545804,
+          "brier": 0.4327466188269803
+        },
+        {
+          "eval_block": 2,
+          "fit_n": 102,
+          "eval_n": 51,
+          "log_loss": 0.6989849002456405,
+          "brier": 0.2527314974346231
+        }
+      ],
+      "n_eval_total": 102,
+      "log_loss": 1.0506794814501104,
+      "brier": 0.34273905813080174
+    }
+  },
+  "best_method_by_meta_log_loss": "xgb_two_head",
+  "full_history_ensemble_weights": {
+    "equal_weight": {
+      "two_head": 0.3333333333333333,
+      "xgb_two_head": 0.3333333333333333,
+      "xgb_direct": 0.3333333333333333
+    },
+    "inverse_log_loss": {
+      "two_head": 0.3259121613554211,
+      "xgb_two_head": 0.3383117463631865,
+      "xgb_direct": 0.33577609228139227
+    },
+    "logistic_stacking": {
+      "two_head": 0.0,
+      "xgb_two_head": 0.9999999999999999,
+      "xgb_direct": 9.71445146547012e-17
+    },
+    "logistic_regression_stack": {
+      "two_head": -0.8335502127686415,
+      "xgb_two_head": 0.8262459319608471,
+      "xgb_direct": -1.2986332137890728
+    }
+  }
+}
