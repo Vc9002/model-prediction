@@ -18,6 +18,16 @@ direct classifier has no totals probability at all -- that's exactly the
 point being tested). Registry-safe: does not touch
 test_consumption_registry.json.
 
+Task 13.5 fix: the totals diagnostic previously chose its evaluation line
+from the game's own realized total_runs ("a line the actual total legitimately
+straddles") -- that is fine for a quick sanity check but cannot be used for
+model selection, since the line itself is a function of the outcome being
+scored. Real timestamp-valid pregame market total lines aren't wired into
+this comparison yet (that's Task 19's prospective market capture), so this
+uses a fixed, predeclared line grid instead -- chosen before looking at any
+result, identical across every game and every model, never a function of
+what actually happened.
+
 Usage:
     PYTHONPATH=src:. .venv/bin/python scripts/train_mlb_score_model_comparison.py
 """
@@ -46,6 +56,12 @@ HORIZON = "late"
 INTENSITY_FEATURES = MLB_INTENSITY_FEATURES
 DIFFERENTIAL_FEATURES = MLB_DIFFERENTIAL_FEATURES
 XGB_DIRECT_FEATURES = list(dict.fromkeys(INTENSITY_FEATURES + DIFFERENTIAL_FEATURES))
+# Predeclared, fixed before looking at any result -- never derived from a
+# realized game outcome. Real MLB total-runs are always integers, so the
+# half-integer lines here can never push in reality; the whole-integer
+# lines (8.0, 9.0) real can, and that's reported explicitly, not folded
+# silently into over/under.
+TOTALS_LINE_GRID = [7.5, 8.0, 8.5, 9.0, 9.5]
 
 
 def _home_win_labels(df: pl.DataFrame) -> list[int]:
@@ -84,9 +100,12 @@ def main() -> None:
     oof: dict[str, list[float]] = {"two_head": [], "xgb_two_head": [], "xgb_direct": []}
     # Real totals-probability comparison between the two coherent score
     # models only -- the direct classifier has no totals probability to
-    # compare, which is exactly what this task is checking for.
-    totals_oof: dict[str, list[float]] = {"two_head": [], "xgb_two_head": []}
-    totals_labels: list[int] = []
+    # compare, which is exactly what this task is checking for. One
+    # record list per (model, predeclared line).
+    totals_records: dict[str, dict[float, list[dict]]] = {
+        "two_head": {line: [] for line in TOTALS_LINE_GRID},
+        "xgb_two_head": {line: [] for line in TOTALS_LINE_GRID},
+    }
     y_true: list[int] = []
     per_fold_report = []
 
@@ -124,16 +143,26 @@ def main() -> None:
         oof["xgb_direct"].extend(xgb_direct_probs)
         y_true.extend(y_val_fold)
 
-        # Real per-game totals check at each game's own real total_runs
-        # rounded to the nearest half-line -- both coherent models price
-        # the identical real line for the identical real game.
-        for r, th_prob, xgb_prob in zip(val_rows, two_head_probs, xgb_two_head_probs, strict=True):
-            line = float(r["total_runs"]) - 0.5  # a line the actual total legitimately straddles
+        # Task 13.5: every real game in this fold is priced against the
+        # SAME predeclared line grid (TOTALS_LINE_GRID) -- never a line
+        # chosen from that game's own realized total_runs. Both coherent
+        # models price the identical real lines for the identical real
+        # games.
+        for r in val_rows:
             pred_th = two_head.predict_row(r["event_id"], r)
             pred_xgb = xgb_two_head.predict_row(r["event_id"], r)
-            totals_oof["two_head"].append(two_head.probability(pred_th, "total", "over", line))
-            totals_oof["xgb_two_head"].append(xgb_two_head.probability(pred_xgb, "total", "over", line))
-            totals_labels.append(1 if r["total_runs"] > line else 0)
+            for line in TOTALS_LINE_GRID:
+                breakdown_th = two_head.distribution.total_market_breakdown(pred_th, line)
+                breakdown_xgb = xgb_two_head.distribution.total_market_breakdown(pred_xgb, line)
+                is_push = float(r["total_runs"]) == line
+                totals_records["two_head"][line].append({
+                    "over": breakdown_th["over"], "under": breakdown_th["under"], "push": breakdown_th["push"],
+                    "is_push": is_push, "label": None if is_push else (1 if r["total_runs"] > line else 0),
+                })
+                totals_records["xgb_two_head"][line].append({
+                    "over": breakdown_xgb["over"], "under": breakdown_xgb["under"], "push": breakdown_xgb["push"],
+                    "is_push": is_push, "label": None if is_push else (1 if r["total_runs"] > line else 0),
+                })
 
         fold_report = {
             "fold": fold.fold_index, "train_n": train_df.height, "val_n": val_df.height,
@@ -158,21 +187,43 @@ def main() -> None:
         print(f"   {model_name:15s}: log_loss={ml_summary[model_name]['log_loss']:.4f} "
               f"brier={ml_summary[model_name]['brier']:.4f}")
 
-    print(f"\n4. Totals OOF comparison ({len(totals_labels)} real per-game over/under checks, "
-          f"coherent score models only -- xgb_direct has no totals probability):")
-    totals_summary = {}
-    for model_name, probs in totals_oof.items():
-        totals_summary[model_name] = {"log_loss": log_loss(totals_labels, probs), "brier": brier_score(totals_labels, probs)}
-        print(f"   {model_name:15s}: log_loss={totals_summary[model_name]['log_loss']:.4f} "
-              f"brier={totals_summary[model_name]['brier']:.4f}")
+    print(f"\n4. Totals OOF comparison, predeclared line grid {TOTALS_LINE_GRID} "
+          f"(coherent score models only -- xgb_direct has no totals probability):")
+    totals_summary: dict[str, dict[str, dict]] = {"two_head": {}, "xgb_two_head": {}}
+    for model_name, by_line in totals_records.items():
+        for line, records in by_line.items():
+            n_total = len(records)
+            n_push = sum(1 for rec in records if rec["is_push"])
+            non_push = [rec for rec in records if not rec["is_push"]]
+            mean_over = sum(rec["over"] for rec in records) / n_total if n_total else float("nan")
+            mean_under = sum(rec["under"] for rec in records) / n_total if n_total else float("nan")
+            mean_push = sum(rec["push"] for rec in records) / n_total if n_total else float("nan")
+            entry = {
+                "line": line, "n": n_total, "n_push_real": n_push,
+                "mean_over_probability": mean_over, "mean_under_probability": mean_under,
+                "mean_push_probability": mean_push,
+            }
+            if len(non_push) >= 5:
+                labels = [rec["label"] for rec in non_push]
+                over_probs = [rec["over"] for rec in non_push]
+                entry["log_loss"] = log_loss(labels, over_probs)
+                entry["brier"] = brier_score(labels, over_probs)
+            else:
+                entry["log_loss"] = None
+                entry["brier"] = None
+            totals_summary[model_name][str(line)] = entry
+            ll_str = f"{entry['log_loss']:.4f}" if entry["log_loss"] is not None else "n/a (too few non-push obs)"
+            print(f"   {model_name:15s} line={line:4.1f}: n={n_total} push={n_push} "
+                  f"mean_over={mean_over:.3f} log_loss={ll_str}")
 
     print(
         "\n   Real, disclosed scope: registry-safe (does not touch\n"
         "   test_consumption_registry.json). No promotion decision is made here.\n"
-        "   The totals check above uses each real game's own total_runs to pick a\n"
-        "   line it straddles by construction (not a real market line), so it\n"
-        "   measures relative calibration between the two coherent models, not\n"
-        "   real market-beating totals performance."
+        "   Totals lines above are a fixed, predeclared grid (Task 13.5) -- never\n"
+        "   chosen from a game's own realized total_runs. Real timestamp-valid\n"
+        "   pregame market lines are not wired into this comparison yet (Task 19's\n"
+        "   prospective market capture); until then this measures relative model\n"
+        "   calibration against a fixed grid, not real market-beating performance."
     )
 
     results_path = Path("outputs/rebuild/mlb_score_model_comparison.json")
@@ -180,7 +231,7 @@ def main() -> None:
         "dataset_hash": dataset.dataset_hash,
         "matched_games": dataset.matched_games,
         "n_moneyline_oof": len(y_true),
-        "n_totals_oof": len(totals_labels),
+        "totals_line_grid": TOTALS_LINE_GRID,
         "per_fold": per_fold_report,
         "moneyline_oof_summary": ml_summary,
         "totals_oof_summary": totals_summary,

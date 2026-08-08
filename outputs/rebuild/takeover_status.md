@@ -2080,3 +2080,50 @@ natively with no crash, non-positive predicted total clamped before
 reaching the simulator).
 
 **1149 tests pass** (up from 1145), 1 skipped. `ruff check` clean.
+
+### Task 13.5 — fixed the totals evaluation to use a predeclared line grid
+
+**Real bug confirmed by external review, verified before fixing**: Task
+13's totals diagnostic chose its evaluation line from the game's own
+realized `total_runs` (`line = total_runs - 0.5`, "a line the actual
+total legitimately straddles") -- fine as a quick sanity check, but the
+line itself was a function of the outcome being scored, so it could
+never be used for real model selection.
+
+**Fixed**: real timestamp-valid pregame market total lines aren't wired
+into this comparison yet (that's Task 19's job); replaced with a fixed,
+predeclared line grid (`[7.5, 8.0, 8.5, 9.0, 9.5]`) -- identical across
+every real game and both models, decided before looking at any result.
+
+**Also added** `JointScoreDistribution.total_market_breakdown()`: real
+gap found while implementing this -- `probability_for_market()`'s own
+"total" branch always splits push mass 50/50 into both the over and
+under prices (real market convention for a tradeable quote), so
+over+under always sum to 1.0 regardless of push probability and the real
+push probability can never be recovered from those two numbers alone.
+The new method exposes it directly, in one simulation call, as Task
+13.5 explicitly requires reporting over/under/push probability
+separately.
+
+**Live-verified real result on the predeclared grid** (203 real OOF
+predictions × 5 real lines): `two_head` beats `xgb_two_head` at
+**every single line** (e.g. line=8.5: log_loss 0.7952 vs. 0.9630; the
+gap widens at more extreme lines). This reinforces, on properly
+predeclared lines rather than outcome-derived ones, Task 13's original
+finding: the coherent XGBoost score engine does not currently improve
+totals pricing over the existing two-head architecture. Real integer
+pushes correctly appear only at the two whole-integer lines (22 pushes
+at 8.0, 11 at 9.0) and correctly never at the three half-integer lines
+(MLB total runs are always integers) -- confirmed live, not assumed.
+Push games are excluded from log-loss/Brier scoring (no defined
+over/under outcome to score against), matching real settlement
+convention.
+
+**Tests**: `test_mlb_model_persistence.py::TestTotalMarketBreakdown`
+(4 tests: over+under sum to 1.0, half-integer lines have zero real push
+probability, whole-integer lines have real nonzero push probability,
+agreement with `probability_for_market()`'s own over/under numbers).
+
+**1153 tests pass** (up from 1149), 1 skipped. `ruff check` clean.
+Registry-safe, confirmed by diffing `test_consumption_registry.json`
+after the real run.

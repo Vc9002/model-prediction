@@ -174,6 +174,48 @@ class TestSkellamMethod:
         assert 0.0 < over_prob < 1.0
 
 
+class TestTotalMarketBreakdown:
+    """Task 13.5: probability_for_market()'s "total" branch always splits
+    push mass 50/50 into both over and under (real market convention), so
+    over+under always sum to 1.0 regardless of real push probability --
+    it can never be recovered from those two numbers alone.
+    total_market_breakdown() exposes push directly, in one simulation
+    call."""
+
+    def test_over_under_and_push_sum_to_one(self):
+        dist = JointScoreDistribution(n_sim=20000, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        breakdown = dist.total_market_breakdown(pred, line=9.0)
+        assert breakdown["over"] + breakdown["under"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_half_integer_line_has_zero_real_push_probability(self):
+        # MLB total runs are always integers -- a half-integer line can
+        # never push in reality, and the simulation (integer-valued
+        # Poisson/NB draws) must reflect that.
+        dist = JointScoreDistribution(n_sim=20000, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        breakdown = dist.total_market_breakdown(pred, line=8.5)
+        assert breakdown["push"] == 0.0
+
+    def test_whole_integer_line_has_real_nonzero_push_probability(self):
+        dist = JointScoreDistribution(n_sim=20000, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        breakdown = dist.total_market_breakdown(pred, line=9.0)
+        assert breakdown["push"] > 0.0
+
+    def test_matches_probability_for_market_for_over_and_under(self):
+        # The two independently-computed probabilities (one via a fresh
+        # simulation each, one via the shared breakdown) must agree --
+        # both derive from the identical distribution and method.
+        dist = JointScoreDistribution(n_sim=50000, seed=7)
+        pred = dist.predict_game("g1", total_intensity=8.5, home_advantage=-0.3)
+        breakdown = dist.total_market_breakdown(pred, line=8.5)
+        over_direct = dist.probability_for_market(pred, "total", "over", line=8.5)
+        under_direct = dist.probability_for_market(pred, "total", "under", line=8.5)
+        assert breakdown["over"] == pytest.approx(over_direct, abs=0.02)
+        assert breakdown["under"] == pytest.approx(under_direct, abs=0.02)
+
+
 class TestModelSaveLoadRoundTrip:
     def test_deterministic_predictions_match_exactly_after_reload(self):
         data = _synthetic_training_data()

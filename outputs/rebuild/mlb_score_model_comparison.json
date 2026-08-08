@@ -2,7 +2,13 @@
   "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
   "matched_games": 435,
   "n_moneyline_oof": 203,
-  "n_totals_oof": 203,
+  "totals_line_grid": [
+    7.5,
+    8.0,
+    8.5,
+    9.0,
+    9.5
+  ],
   "per_fold": [
     {
       "fold": 0,
@@ -72,12 +78,108 @@
   },
   "totals_oof_summary": {
     "two_head": {
-      "log_loss": 0.722629852134451,
-      "brier": 0.21544846290640393
+      "7.5": {
+        "line": 7.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.7467911330049262,
+        "mean_under_probability": 0.2532088669950739,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8486728870833048,
+        "brier": 0.31637779418719214
+      },
+      "8.0": {
+        "line": 8.0,
+        "n": 203,
+        "n_push_real": 22,
+        "mean_over_probability": 0.6872620689655172,
+        "mean_under_probability": 0.3127379310344827,
+        "mean_push_probability": 0.11890443349753695,
+        "log_loss": 0.8305484276200509,
+        "brier": 0.3131896079834254
+      },
+      "8.5": {
+        "line": 8.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.6278926108374384,
+        "mean_under_probability": 0.3721073891625616,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.7951603592834077,
+        "brier": 0.2988278058128079
+      },
+      "9.0": {
+        "line": 9.0,
+        "n": 203,
+        "n_push_real": 11,
+        "mean_over_probability": 0.5640854679802956,
+        "mean_under_probability": 0.4359145320197044,
+        "mean_push_probability": 0.12739064039408865,
+        "log_loss": 0.7442852136802022,
+        "brier": 0.2750862716145834
+      },
+      "9.5": {
+        "line": 9.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.500035960591133,
+        "mean_under_probability": 0.49996403940886697,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.6929245885578527,
+        "brier": 0.24988969669950736
+      }
     },
     "xgb_two_head": {
-      "log_loss": 0.9204602808321589,
-      "brier": 0.23698327773399017
+      "7.5": {
+        "line": 7.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.7070802955665024,
+        "mean_under_probability": 0.2929197044334975,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.9572540905741782,
+        "brier": 0.32589880665024634
+      },
+      "8.0": {
+        "line": 8.0,
+        "n": 203,
+        "n_push_real": 22,
+        "mean_over_probability": 0.6578495073891626,
+        "mean_under_probability": 0.34215049261083746,
+        "mean_push_probability": 0.0987896551724138,
+        "log_loss": 0.9450894976845768,
+        "brier": 0.3327190848618784
+      },
+      "8.5": {
+        "line": 8.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.6082862068965518,
+        "mean_under_probability": 0.3917137931034483,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.963036338073404,
+        "brier": 0.34064218133004937
+      },
+      "9.0": {
+        "line": 9.0,
+        "n": 203,
+        "n_push_real": 11,
+        "mean_over_probability": 0.5582440886699507,
+        "mean_under_probability": 0.44175591133004927,
+        "mean_push_probability": 0.10142019704433497,
+        "log_loss": 0.9109224358099786,
+        "brier": 0.32685687468749997
+      },
+      "9.5": {
+        "line": 9.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.5072896551724138,
+        "mean_under_probability": 0.49271034482758624,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8657355499898923,
+        "brier": 0.31217721625615763
+      }
     }
   }
 }

@@ -369,6 +369,31 @@ class JointScoreDistribution:
 
         raise ValueError(f"unsupported market: {market_type}")
 
+    def total_market_breakdown(self, pred: GamePrediction, line: float) -> dict[str, float]:
+        """Real over/under/push probabilities for one total line, in one
+        simulation call.
+
+        probability_for_market()'s own "total" branch always splits push
+        mass 50/50 into both the over and under prices (matching real
+        market convention for a tradeable quote), so over+under sum to
+        1.0 regardless of push probability and the real push mass can
+        never be recovered from those two numbers alone. This method
+        exposes it directly -- needed for Task 13.5's real totals
+        diagnostic, which must report push probability explicitly, not
+        silently fold it into over/under."""
+        away_exp = pred.away_expected_runs
+        home_exp = pred.home_expected_runs
+        away_scores, home_scores = self._simulate_scores(away_exp, home_exp)
+        totals = away_scores + home_scores
+        over = float((totals > line).sum()) / self.n_sim
+        under = float((totals < line).sum()) / self.n_sim
+        push = float((totals == line).sum()) / self.n_sim
+        return {
+            "over": over + 0.5 * push,
+            "under": under + 0.5 * push,
+            "push": push,
+        }
+
 
 # ── Full MLB Model ───────────────────────────────────────────────────────────
 
