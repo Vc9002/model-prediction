@@ -453,7 +453,9 @@ class ShadowLedger:
                 side_id TEXT NOT NULL,
                 line REAL,
                 closing_price REAL,
-                observed_at_utc TEXT
+                observed_at_utc TEXT,
+                quote_type TEXT,
+                seconds_to_start REAL
             );
 
             -- TODO: schema only -- no insert/query methods implemented yet.
@@ -493,30 +495,42 @@ class ShadowLedger:
             );
         """)
         self._migrate_predictions_uncertainty_columns()
+        self._migrate_closing_prices_taxonomy_columns()
         self.conn.execute(
             "INSERT OR IGNORE INTO _meta(key, value) VALUES(?, ?)",
             ("schema_version", SCHEMA_VERSION),
         )
         self.conn.commit()
 
+    def _migrate_columns(self, table: str, new_columns: dict[str, str]) -> None:
+        """Real, generic ALTER TABLE migration: `CREATE TABLE IF NOT EXISTS`
+        alone does not add columns to an already-existing real table.
+        Each column is individually guarded -- SQLite has no `ADD COLUMN
+        IF NOT EXISTS` -- so re-running this on an already-migrated
+        database is a real no-op, not an error."""
+        existing_cols = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for name, col_type in new_columns.items():
+            if name not in existing_cols:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {col_type}")
+
     def _migrate_predictions_uncertainty_columns(self) -> None:
         """Real migration for `predictions` rows created before MLB-5
         (multi-sport execution spec) added the uncertainty-decomposition
-        columns: `CREATE TABLE IF NOT EXISTS` alone does not add columns to
-        an already-existing real table (this repo's own
-        `data/rebuild/shadow.db` has real predictions rows from before this
-        change). Each `ALTER TABLE ADD COLUMN` is individually guarded --
-        SQLite has no `ADD COLUMN IF NOT EXISTS` -- so re-running this on an
-        already-migrated database is a real no-op, not an error."""
-        existing_cols = {row["name"] for row in self.conn.execute("PRAGMA table_info(predictions)").fetchall()}
-        new_columns = {
+        columns (this repo's own `data/rebuild/shadow.db` has real
+        predictions rows from before this change)."""
+        self._migrate_columns("predictions", {
             "model_disagreement": "REAL", "calibration_uncertainty": "REAL",
             "missingness_penalty": "REAL", "missing_flags_json": "TEXT",
             "lineup_uncertainty": "REAL", "conservative_probabilities_json": "TEXT",
-        }
-        for name, col_type in new_columns.items():
-            if name not in existing_cols:
-                self.conn.execute(f"ALTER TABLE predictions ADD COLUMN {name} {col_type}")
+        })
+
+    def _migrate_closing_prices_taxonomy_columns(self) -> None:
+        """Real migration for `closing_prices` rows created before MLB-7
+        (multi-sport execution spec) added explicit quote-taxonomy
+        columns -- see record_closing_price()'s own docstring for why
+        every recorded quote must be labeled with what it actually is,
+        never an implicit, unlabeled "closing" price."""
+        self._migrate_columns("closing_prices", {"quote_type": "TEXT", "seconds_to_start": "REAL"})
 
     # ── runs ──────────────────────────────────────────────────────────
 
@@ -1226,27 +1240,42 @@ class ShadowLedger:
         self, *, run_id: str, sport: str, market_id: str, side_id: str,
         event_id: str | None = None, line: float | None = None,
         closing_price: float | None = None, observed_at_utc: str | None = None,
+        quote_type: str = "last_pregame_quote", seconds_to_start: float | None = None,
         schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
+        """`quote_type` (MLB-7, multi-sport execution spec): every recorded
+        quote must be explicitly labeled with what it actually is --
+        `"decision_quote"`, `"T-30"`, `"T-15"`, `"T-5"`,
+        `"last_pregame_quote"`, etc -- never implicitly assumed "the
+        closing quote" just because it's the one a caller happened to
+        record. Defaults to `"last_pregame_quote"` (the real, disclosed
+        current caller: mlb_settle_and_capture_closing.py's
+        real_closing_quote(), which specifically finds the latest real
+        valid pregame quote). The idempotency key includes `quote_type` so
+        multiple distinct real milestone quotes for the identical
+        market_id/side_id/line can coexist -- they are genuinely different
+        real observations, not competing values for one fact."""
         existing = self.conn.execute(
             """SELECT id, closing_price FROM closing_prices
-               WHERE market_id=? AND side_id=? AND line IS ?""",
-            (market_id, side_id, line),
+               WHERE market_id=? AND side_id=? AND line IS ? AND quote_type IS ?""",
+            (market_id, side_id, line, quote_type),
         ).fetchone()
         if existing is not None:
             if existing["closing_price"] == closing_price:
                 return int(existing["id"]), False
             raise ValueError(
                 f"conflicting closing_price for market_id={market_id!r} side_id={side_id!r} "
-                f"line={line!r} -- fail closed"
+                f"line={line!r} quote_type={quote_type!r} -- fail closed"
             )
         cur = self.conn.execute(
             """INSERT INTO closing_prices(
                 created_at, run_id, sport, event_id, schema_version, supersedes_id,
-                market_id, side_id, line, closing_price, observed_at_utc
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                market_id, side_id, line, closing_price, observed_at_utc,
+                quote_type, seconds_to_start
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (utc_now(), run_id, sport, event_id, schema_version, None,
-             market_id, side_id, line, closing_price, observed_at_utc),
+             market_id, side_id, line, closing_price, observed_at_utc,
+             quote_type, seconds_to_start),
         )
         self.conn.commit()
         return int(cur.lastrowid), True

@@ -2871,3 +2871,91 @@ available. The wiring is verified at the function/ledger level (14 new
 real tests) and against the real migrated production database; a genuine
 end-to-end live populated row will appear the next time a real game with
 resolvable starters is predicted.
+
+## Checkpoint: MLB-6, MLB-7, MLB-8 -- close user directive: finish MLB, stop before other sports (2026-08-09)
+
+Mid-session direction change: the user explicitly said to finish MLB and
+not begin WNBA/NBA/NFL/Soccer/Tennis/esports/KBO/NPB right now. The
+multi-sport execution spec's Track B (sport expansion) and the
+generalized cross-sport poller/dashboard tasks are deprioritized/removed
+from the active task list; MLB-6/7/8 below complete the MLB-only scope.
+
+### MLB-6: event-date-aware prospective market close lookup
+
+Real bug found and fixed: `mlb_settle_and_capture_closing.py` keyed its
+market-store lookup off `decision_time_utc[:10]` (when the decision was
+made), not the real event's own `event_start_utc` date. Collectors/
+MarketStore both key real storage by the event's own date -- for any
+decision made on a different real UTC calendar date than the event
+itself (an early horizon, or any event whose start crosses a UTC day
+boundary relative to decision time), the old code would silently look in
+the wrong date's file. `mlb_shadow_pipeline.py`'s own
+`match_markets_stage()` was checked and confirmed NOT to have this bug
+(`state.target_date` is already derived from each batch's real
+`event_start_utc`, by construction of `load_state()`'s own filter).
+
+Fixed with a new pure function, `real_event_market_date()`, used for both
+the collector call and the closing-quote lookup. 4 new tests.
+
+### MLB-7: explicit closing-quote taxonomy
+
+Real gap: `closing_prices` had no way to distinguish what kind of quote
+was actually recorded -- every row implicitly meant "the closing price,"
+whatever that happened to be. Added real `quote_type`/`seconds_to_start`
+columns (migrated in place via the same real `_migrate_columns()` pattern
+MLB-5 established, now generalized and reused for both `predictions` and
+`closing_prices`). `record_closing_price()` now requires/defaults
+`quote_type="last_pregame_quote"` (the real, honest label for what
+`real_closing_quote()` actually finds) and accepts a real
+`seconds_to_start`, computed live from `event_start_utc` minus the real
+quote's own `observed_at_utc`. The idempotency key now includes
+`quote_type` so multiple real distinct milestone quotes for the identical
+market/side/line can coexist as separate real facts rather than
+colliding as "conflicting." 7 new tests (ledger round-trip + a real
+migration test against a simulated pre-MLB-7 database).
+
+Real, disclosed scope not built: multi-milestone (T-30/T-15/T-5) scanning
+across a full quote history was deliberately not built this session --
+there is no real prospective quote history to scan yet (Task 19 already
+found Polymarket's public API serves only currently-open markets, so
+historical multi-snapshot capture requires a poller running prospectively
+starting now, which is future work). Building that scanning machinery
+today would be speculative infrastructure with nothing real to verify it
+against.
+
+### MLB-8: freeze mlb_moneyline_v2 + predeclared minimum-sample gate
+
+Added `minimum_sample_before_evaluation` to the registry's
+`mlb_moneyline_v2` entry: 100 real completed games, predeclared BEFORE
+any real v2 game has been evaluated, with real disclosed reasoning (sits
+meaningfully above the consumed final test's n=21; matches this
+session's own isotonic n<100 precedent) -- not a rigorously derived
+minimum-detectable-effect sample size, disclosed as such.
+
+Built `scripts/check_mlb_v2_readiness.py`: real, read-only, reports the
+real completed-game count within the v2 test window against the
+predeclared floor and a plain READY_FOR_EVALUATION/NOT_READY verdict --
+never computes or prints any aggregate accuracy/log-loss/Brier number,
+which would itself be the "peeking before the predeclared minimum
+sample" this script exists to prevent. Live-verified: real output is
+`0/100` (matches Task 19's earlier finding of zero real completed games
+past the frozen cutoff so far). Registry-safe (read-only, MD5-verified
+unchanged before/after).
+
+**1262 tests pass** (up from 1255), 1 skipped. `ruff check` clean. mypy
+(`src/model_prediction/rebuild`): 37 errors, unchanged baseline.
+
+### MLB scope: where this leaves things
+
+All 8 MLB live-deployment items (MLB-1 through MLB-8) from the
+multi-sport execution spec are complete: the frozen `mlb_moneyline_v2`
+combination runs live with real calibration, real cross-process resume,
+a real full uncertainty decomposition persisted to the ledger, a real
+event-date-correct market lookup, an explicit real quote taxonomy, and a
+real predeclared readiness gate before any prospective evaluation. Per
+the user's direction, sport expansion (WNBA and beyond) is paused --
+MLB now runs its daily shadow slate and accumulates real prospective
+evidence toward the 100-game `mlb_moneyline_v2` floor; the next
+substantive MLB action is running `check_mlb_v2_readiness.py`
+periodically until it reports READY_FOR_EVALUATION, not further
+architecture work.

@@ -19,7 +19,7 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
 
-from mlb_settle_and_capture_closing import determine_outcome, real_closing_quote
+from mlb_settle_and_capture_closing import determine_outcome, real_closing_quote, real_event_market_date
 
 from model_prediction.rebuild.storage import MarketStore
 
@@ -180,3 +180,28 @@ class TestRealClosingQuote:
             "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
         )
         assert result == (0.55, "2026-08-06T20:00:00+00:00")
+
+
+class TestRealEventMarketDate:
+    """MLB-6 (multi-sport execution spec): real bug fix -- the market-store
+    lookup must key off the event's own real event_start_utc date, never
+    decision_time_utc's date. A decision made well before an event (or any
+    event whose start crosses a UTC day boundary relative to decision
+    time) can have decision_date != event_date; using the wrong one would
+    silently look in the wrong real market-store file."""
+
+    def test_uses_event_start_date_not_decision_date(self):
+        # Real, concrete case this fixes: decision made two real calendar
+        # days before the event (an early horizon).
+        result = real_event_market_date("2026-08-11T01:00:00+00:00", "2026-08-09T13:00:00+00:00")
+        assert result == "2026-08-11"
+
+    def test_decision_date_and_event_date_genuinely_differ(self):
+        result = real_event_market_date("2026-08-10T00:30:00+00:00", "2026-08-09T22:00:00+00:00")
+        assert result == "2026-08-10"
+        assert "2026-08-09T22:00:00+00:00"[:10] == "2026-08-09"
+        assert result != "2026-08-09"
+
+    def test_falls_back_to_decision_date_when_no_real_event_start_available(self):
+        result = real_event_market_date(None, "2026-08-09T22:00:00+00:00")
+        assert result == "2026-08-09"

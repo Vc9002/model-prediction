@@ -56,6 +56,7 @@ Usage:
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -93,6 +94,22 @@ def determine_outcome(market_type: str, team_or_side: str, line: float | None, h
     if result == 0:
         return "PUSH"
     return "WIN" if result > 0 else "LOSS"
+
+
+def real_event_market_date(event_start_utc: str | None, decision_time_utc: str) -> str:
+    """The real calendar date to key market-store lookups by (MLB-6,
+    multi-sport execution spec) -- the event's own real `event_start_utc`
+    date, NOT `decision_time_utc`'s date. A decision can genuinely be made
+    on a different UTC calendar date than the event itself (an early
+    horizon well before start, or any event whose start crosses a UTC
+    day boundary relative to decision time); collectors/MarketStore both
+    key real storage by the event's own date
+    (collectors.py's collect_polymarket_books(), match_markets_stage()'s
+    own real usage), so looking up decision_time_utc's date instead would
+    silently miss the real file or read a genuinely different date's book.
+    Falls back to decision_time_utc's date only when no real event_start_utc
+    is available at all (never crashes on missing scoreboard data)."""
+    return event_start_utc[:10] if event_start_utc is not None else decision_time_utc[:10]
 
 
 def real_closing_quote(
@@ -185,7 +202,20 @@ def main() -> None:
         )
         outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
 
-        game_date = row["decision_time_utc"][:10]
+        # MLB-6 (multi-sport execution spec): real bug fixed here -- this
+        # previously keyed the market-store lookup off
+        # decision_time_utc[:10] (when the DECISION was made), not the
+        # real event's own date. The collector/MarketStore both key
+        # storage by the real event's calendar date
+        # (collectors.py's collect_polymarket_books() docstring, matching
+        # match_markets_stage()'s own real usage) -- for a decision made
+        # well before the event (an early horizon, or any event whose
+        # start crosses a UTC calendar-day boundary from its decision
+        # time), decision_date != event_date, and looking up the wrong
+        # date's file would silently find nothing (or, worse, a genuinely
+        # different real date's book) rather than the real event's market.
+        event_start_utc = event_start_by_id.get(event_id)
+        game_date = real_event_market_date(event_start_utc, row["decision_time_utc"])
         if game_date not in closing_attempted_dates:
             closing_attempted_dates.add(game_date)
             closing_attempted += 1
@@ -195,7 +225,6 @@ def main() -> None:
                 print(f"   (real closing-price fetch failed for {game_date}: {e!r} -- continuing without it)")
 
         closing_price: float | None = None
-        event_start_utc = event_start_by_id.get(event_id)
         if event_start_utc is not None:
             quote = real_closing_quote(
                 market_store, SPORT, game_date, row["evaluated_market_id"], row["evaluated_team_or_side"],
@@ -203,10 +232,18 @@ def main() -> None:
             )
             if quote is not None:
                 closing_price, quote_observed_at = quote
+                # MLB-7: explicit real taxonomy -- this is specifically
+                # the last real valid pregame quote (real_closing_quote()'s
+                # own definition), never an arbitrary later observation
+                # implicitly assumed to be "the closing price."
+                seconds_to_start = (
+                    datetime.fromisoformat(event_start_utc) - datetime.fromisoformat(quote_observed_at)
+                ).total_seconds()
                 ledger.record_closing_price(
                     run_id=run_id, sport=SPORT, event_id=event_id,
                     market_id=row["evaluated_market_id"], side_id=row["evaluated_team_or_side"],
                     line=row["evaluated_line"], closing_price=closing_price, observed_at_utc=quote_observed_at,
+                    quote_type="last_pregame_quote", seconds_to_start=seconds_to_start,
                 )
                 closing_found += 1
 

@@ -924,6 +924,68 @@ class TestClosingPricesLedger:
         with pytest.raises(ValueError, match="conflicting closing_price"):
             ledger.record_closing_price(run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.60)
 
+    def test_quote_type_defaults_to_last_pregame_quote(self, ledger: ShadowLedger):
+        # MLB-7: never an unlabeled "closing" price.
+        run_id = ledger.record_run("mlb")
+        pred_id, _ = ledger.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+        )
+        row = ledger.conn.execute("SELECT quote_type FROM closing_prices WHERE id=?", (pred_id,)).fetchone()
+        assert row["quote_type"] == "last_pregame_quote"
+
+    def test_distinct_quote_types_for_the_same_market_coexist(self, ledger: ShadowLedger):
+        # A real T-30 quote and the real last-pregame quote for the
+        # identical market/side/line are two genuinely different real
+        # observations, not competing values for one fact -- must not
+        # collide as a "conflicting closing_price".
+        run_id = ledger.record_run("mlb")
+        id1, created1 = ledger.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.50,
+            quote_type="T-30", seconds_to_start=1800.0,
+        )
+        id2, created2 = ledger.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+            quote_type="last_pregame_quote", seconds_to_start=120.0,
+        )
+        assert created1 and created2
+        assert id1 != id2
+
+    def test_seconds_to_start_round_trips(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        pred_id, _ = ledger.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+            seconds_to_start=95.5,
+        )
+        row = ledger.conn.execute("SELECT seconds_to_start FROM closing_prices WHERE id=?", (pred_id,)).fetchone()
+        assert row["seconds_to_start"] == pytest.approx(95.5)
+
+    def test_migration_adds_taxonomy_columns_to_a_pre_existing_database(self, tmp_path: Path):
+        db_path = tmp_path / "legacy_shadow.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""
+            CREATE TABLE closing_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL, run_id TEXT, sport TEXT, event_id TEXT,
+                schema_version TEXT, supersedes_id INTEGER,
+                market_id TEXT, side_id TEXT, line REAL, closing_price REAL, observed_at_utc TEXT
+            )
+        """)
+        conn.execute("CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, created_at TEXT, sport TEXT, run_type TEXT, horizon TEXT, status TEXT, params_json TEXT, schema_version TEXT)")
+        conn.commit()
+        conn.close()
+
+        migrated = ShadowLedger(db_path)
+        cols = {row["name"] for row in migrated.conn.execute("PRAGMA table_info(closing_prices)").fetchall()}
+        assert "quote_type" in cols
+        assert "seconds_to_start" in cols
+
+        run_id = migrated.record_run("mlb")
+        _, created = migrated.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+            quote_type="T-15", seconds_to_start=900.0,
+        )
+        assert created is True
+
 
 class TestReviewsLedger:
     def test_record_and_query_by_subject(self, ledger: ShadowLedger):
