@@ -64,6 +64,28 @@ def _neutralize_always_missing_columns(X: np.ndarray, mask: np.ndarray) -> np.nd
     return X
 
 
+def _low_variance_columns(X: np.ndarray) -> np.ndarray:
+    """True for any column with fewer than 2 distinct real (non-NaN)
+    values.
+
+    Real second bug caught by live verification (BootstrapMLBEnsemble,
+    see outputs/rebuild/takeover_status.md Task 16): the all-NaN case
+    above is real, but a *bootstrap resample* can trigger the identical
+    HistGradientBoostingRegressor binning crash even for a column that is
+    perfectly fine in the full real training set -- sampling with
+    replacement can, by real chance, draw only one distinct real value
+    for a naturally low-cardinality feature (e.g. `park_factor`, which
+    only takes ~30 real distinct values across MLB parks) even though
+    zero values are missing. `np.all(np.isnan(X))` alone does not catch
+    this; checking real distinct-value count does."""
+    mask = np.zeros(X.shape[1], dtype=bool)
+    for j in range(X.shape[1]):
+        col = X[:, j]
+        distinct = np.unique(col[~np.isnan(col)])
+        mask[j] = len(distinct) < 2
+    return mask
+
+
 # ── Run-Intensity Head (predicts total scoring environment) ──────────────────
 
 
@@ -81,7 +103,7 @@ class RunIntensityHead:
     def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None) -> RunIntensityHead:
         self._feature_names = feature_names or [f"f{i}" for i in range(X.shape[1])]
         X = np.asarray(X, dtype=float)
-        self._always_missing_mask = np.all(np.isnan(X), axis=0)
+        self._always_missing_mask = _low_variance_columns(X)
         X = _neutralize_always_missing_columns(X, self._always_missing_mask)
         X_scaled = self.scaler.fit_transform(X)
         self.model = HistGradientBoostingRegressor(
@@ -139,7 +161,7 @@ class RunDifferentialHead:
         # column from its output rather than erroring (confirmed live) --
         # neutralizing first keeps every column present and the feature
         # matrix's width/order aligned with self._feature_names.
-        self._always_missing_mask = np.all(np.isnan(X), axis=0)
+        self._always_missing_mask = _low_variance_columns(X)
         X = _neutralize_always_missing_columns(X, self._always_missing_mask)
         X_imputed = self.imputer.fit_transform(X)
         X_scaled = self.scaler.fit_transform(X_imputed)

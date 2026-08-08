@@ -2252,3 +2252,90 @@ are all frozen -- calibration and ensemble choice are now real and
 decided (temperature scaling per model; no ensemble, direct
 `xgb_two_head` instead), but Task 16's uncertainty completion and Task
 17's benchmark refresh are the remaining real prerequisites.
+
+### Task 16 — complete uncertainty (model disagreement, calibration uncertainty, missingness penalty)
+
+**Built** `uncertainty.py`: the four remaining real components CLAUDE.md's
+`conservative_probability` spec names (bootstrap uncertainty already
+existed and is wired live).
+
+- `model_disagreement()`: real max-min range across named model-family
+  probabilities for the identical event -- matches CLAUDE.md's own
+  worked example exactly (9pp disagreement).
+- `calibration_uncertainty()`: real bootstrap of the *calibration
+  mapping itself* (distinct from `BootstrapMLBEnsemble`'s base-model
+  bootstrap) -- resamples the real calibration-training data N times,
+  refits the calibrator each time, and measures the empirical spread of
+  the calibrated output for one fixed raw probability.
+- `missingness_penalty()`: real, predeclared, partially-validated
+  per-flag penalty. Real validation attempt performed and reported
+  honestly rather than glossed over: Task 14's own real cohort
+  calibration comparison shows a real log-loss difference between
+  "starters available" and "missing" cohorts for all three model
+  families, but the *direction* is inconsistent across families at this
+  sample size (two_head: missing-starters cohort scores *better*, n=65
+  vs n=138; the two XGBoost families: missing-starters cohort scores
+  *worse*, as expected) -- and the weather cohort currently has zero
+  real "available" observations to compare against at all (100%
+  unavailable in the real backfill). Given real evidence that
+  missingness correlates with *some* real calibration difference but not
+  yet a reliably-signed magnitude, uses a small, capped, predeclared
+  penalty (0.02 per missing critical flag, capped at 0.08) rather than
+  either zero or an overconfident empirically-fit number the data
+  doesn't yet support.
+- `lineup_uncertainty` stays an explicit `None` ("unavailable") sentinel
+  throughout -- no real timestamp-valid lineup source exists in this
+  codebase, and CLAUDE.md is explicit: "Do not fabricate it."
+- `compose_conservative_probability()`: combines all of the above with
+  the existing real bootstrap lower bound into one real
+  `conservative_probability`/`probability_lower`/`probability_upper`,
+  clipped to a real valid probability range.
+
+**A second real bug found and fixed while live-verifying this against
+`BootstrapMLBEnsemble`** (not a hypothetical): bootstrap resampling
+(sampling with replacement) can, by real chance, draw only one distinct
+real value for a naturally low-cardinality feature (`park_factor`, ~30
+real distinct MLB values) even though the column has zero missing
+values in the full real training set -- Task 5's `np.all(np.isnan(X))`
+all-NaN check never catches this, since nothing is actually NaN, but
+`HistGradientBoostingRegressor`'s binning step raised the identical real
+crash trying to find a split threshold among 1 real distinct value.
+Fixed by broadening the neutralization check from "all-NaN" to "fewer
+than 2 real distinct non-NaN values" (`_low_variance_columns()`), which
+covers both cases with one real, tested function.
+
+**Built** `scripts/train_mlb_uncertainty_demo.py`: real, live
+demonstration against the actual backfilled data -- fits `two_head`,
+`xgb_two_head`, and a real `BootstrapMLBEnsemble` on the last real
+fold's training data, then computes the full real uncertainty
+decomposition for all 76 real validation-block games. Registry-safe.
+
+**Live-verified real result**: mean real model disagreement 0.224 (a
+substantial, real signal -- the two coherent model families genuinely
+disagree by ~22 percentage points on average at this sample size), mean
+calibration uncertainty 0.011, mean missingness penalty 0.027, mean
+total real haircut from the raw probability ~0.30. Several individual
+games clip fully to the [0,1] boundary under the combined real
+widening -- real, disclosed behavior of the composition, not a bug.
+
+**Real, disclosed scope not completed**: not yet wired into the live
+shadow pipeline's `build_forecast()` (`mlb_shadow_pipeline.py`) -- live
+integration additionally requires loading and predicting with all three
+real model families at live-prediction time, which isn't currently
+wired there (`predict_stage` only fits/predicts with `MLBTwoHeadModel`).
+Flagged as the real remaining gap for a dedicated future pass, not
+silently skipped or faked.
+
+**Tests**: `tests/rebuild/test_uncertainty.py` (19 tests, all four
+components plus composition) and
+`test_mlb_model_persistence.py::TestLowVarianceColumnNeutralization`
+(2 tests, including a real `BootstrapMLBEnsemble` fit with a genuinely
+low-cardinality real column).
+
+**1192 tests pass** (up from 1171), 1 skipped. `ruff check` clean.
+Registry-safe, confirmed by diffing `test_consumption_registry.json`
+after the real run.
+
+**Next**: Task 17 (refresh Part 2 benchmark -- `model_benchmark.md`/
+`.parquet`) is the last real Part 2 item before Task 18 (freeze the
+replacement final test) can even be prepared (not evaluated).

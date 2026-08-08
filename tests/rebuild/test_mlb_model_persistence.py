@@ -400,3 +400,56 @@ class TestAlwaysMissingColumnNeutralization:
 
         assert pred_before.home_win_prob == pred_after.home_win_prob
         assert pred_before.total_mean == pred_after.total_mean
+
+
+class TestLowVarianceColumnNeutralization:
+    """Task 16: real second bug caught by live verification of
+    BootstrapMLBEnsemble against the real backfilled dataset (not the
+    Task 5 all-NaN case -- a real, separate trigger). Bootstrap
+    resampling (sampling with replacement) can, by real chance, draw only
+    one distinct real value for a naturally low-cardinality feature
+    (e.g. park_factor, ~30 real distinct MLB values) even though the
+    column has zero missing values in the full real training set --
+    np.all(np.isnan(X)) alone never catches this, since nothing is
+    actually NaN; HistGradientBoostingRegressor's binning step still
+    raised the identical real ValueError trying to find a split threshold
+    among 1 real distinct value."""
+
+    def test_fit_does_not_crash_when_a_resample_has_only_one_distinct_value(self):
+        from model_prediction.rebuild.models import RunIntensityHead
+
+        n = 40
+        X = np.column_stack([
+            np.full(n, 100.0),  # constant column -- zero real variance, no NaN at all
+            np.linspace(3.0, 6.0, n),
+        ])
+        y = np.linspace(7.0, 10.0, n)
+
+        head = RunIntensityHead().fit(X, y, ["park_factor", "f2"])
+        assert head._always_missing_mask.tolist() == [True, False]
+        pred = head.predict(X[:1])
+        assert pred.shape == (1,)
+
+    def test_bootstrap_ensemble_fit_survives_a_real_low_cardinality_column(self):
+        # Real regression coverage for the exact live crash: a real
+        # BootstrapMLBEnsemble fit over many resamples of a small real
+        # dataset containing a genuinely low-cardinality column (a
+        # handful of distinct park factors), which a real resample can
+        # draw down to a single distinct value purely by chance.
+        from model_prediction.rebuild.models import BootstrapMLBEnsemble
+
+        rng = np.random.default_rng(0)
+        n = 30
+        park_factors = rng.choice([96.0, 100.0, 104.0], size=n)
+        f2 = rng.uniform(3, 6, n)
+        g1 = rng.uniform(-2, 2, n)
+        g2 = rng.uniform(-1, 1, n)
+        data = pl.DataFrame({
+            "park_factor": park_factors, "f2": f2, "g1": g1, "g2": g2,
+            "total_runs": park_factors / 20 + f2 + rng.normal(0, 0.5, n),
+            "home_margin": g1 + g2 + rng.normal(0, 0.5, n),
+        })
+
+        bootstrap = BootstrapMLBEnsemble(n_bootstrap=30, seed=1)
+        bootstrap.fit(data, ["park_factor", "f2"], ["g1", "g2"])
+        assert bootstrap.fitted
