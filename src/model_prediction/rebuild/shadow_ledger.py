@@ -1,0 +1,1402 @@
+"""Append-only SQLite shadow ledger (FOUNDATION_COMPLETION.md Phase 12).
+
+Stored at data/rebuild/shadow.db. This is the durable persistence layer that
+turns a series of disconnected `mlb_shadow_run.py`-style JSON reports into a
+queryable history: every prediction, market observation, evaluated market,
+and BET/NO_BET decision this session records, plus paper fills and
+settlements, in one place, forever.
+
+Design contract (non-negotiable, per the plan):
+
+- `predictions`, `market_snapshots`, `market_evaluations`, and
+  `trade_decisions` are append-only. There is no UPDATE or DELETE path
+  anywhere on this class for any table. A "correction" is a new INSERT
+  whose `supersedes_id` points at the row it replaces -- the original row
+  is never touched.
+- Every row carries `created_at`, `run_id`, `sport`, `event_id` (where
+  applicable), `schema_version`, `supersedes_id` (where applicable).
+- `trade_decisions` (and, so corrections to a forecast don't silently
+  duplicate, `predictions`) enforce a real idempotency key so rerunning the
+  same job with identical inputs is a no-op, not a duplicate row. This is
+  implemented as a genuine SQLite UNIQUE index scoped to
+  `WHERE supersedes_id IS NULL` -- non-superseding duplicates collide and
+  return the existing row; an explicit correction (caller passes
+  `supersedes_id`) is exempt from the index and always appends.
+
+This module has zero import dependency on `decision.py` -- `_as_dict()`
+duck-types any dataclass instance (or plain dict) into the columns it needs,
+so it can store real `SportsForecast` / `MarketEvaluation` / `BetDecision`
+instances directly without reinventing a second, parallel definition of the
+same fields.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sqlite3
+import uuid
+from dataclasses import asdict, is_dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+SCHEMA_VERSION = "1"
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _as_dict(obj: Any) -> dict[str, Any]:
+    """Accept either a dataclass instance (decision.py's SportsForecast /
+    MarketEvaluation / BetDecision, or anything shaped like them) or a plain
+    dict. Duck-typed on purpose -- see module docstring."""
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return asdict(obj)
+    if isinstance(obj, dict):
+        return obj
+    raise TypeError(f"expected a dataclass instance or dict, got {type(obj).__name__}")
+
+
+class ShadowLedger:
+    """Central append-only shadow-execution ledger for the rebuild platform.
+
+    Tables (see FOUNDATION_COMPLETION.md Phase 12 for the required list):
+
+    Fully implemented (insert + read methods, tested):
+        runs, predictions, market_snapshots, market_evaluations,
+        trade_decisions, paper_orders, settlements, audit_events
+
+    Schema-only (CREATE TABLE exists, no insert/query methods yet -- marked
+    with a TODO comment in _init_tables()):
+        raw_snapshots, normalized_observations, feature_snapshots,
+        dataset_manifests, model_artifacts, calibration_artifacts,
+        closing_prices, reviews
+    """
+
+    TABLES: tuple[str, ...] = (
+        "runs",
+        "raw_snapshots",
+        "normalized_observations",
+        "feature_snapshots",
+        "dataset_manifests",
+        "model_artifacts",
+        "calibration_artifacts",
+        "predictions",
+        "market_snapshots",
+        "market_evaluations",
+        "trade_decisions",
+        "paper_orders",
+        "settlements",
+        "closing_prices",
+        "reviews",
+        "audit_events",
+    )
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.conn = sqlite3.connect(str(self.path))
+        self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA foreign_keys=ON")
+        self._init_tables()
+
+    def _init_tables(self) -> None:
+        self.conn.executescript("""
+            CREATE TABLE IF NOT EXISTS _meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS runs (
+                run_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                sport TEXT NOT NULL,
+                run_type TEXT NOT NULL,
+                horizon TEXT,
+                status TEXT NOT NULL DEFAULT 'started',
+                finished_at TEXT,
+                duration_seconds REAL,
+                error TEXT,
+                mode TEXT,
+                params_json TEXT,
+                schema_version TEXT NOT NULL
+            );
+
+            -- Task 5 (true resume system): real per-stage completion
+            -- tracking, closing the gap where --resume-run-id only
+            -- continued the ledger's `runs` row -- there was no record of
+            -- which of collect/build_features/predict/match_markets/decide
+            -- had actually completed for a given run, so a resumed
+            -- invocation always re-ran every stage from scratch.
+            -- UNIQUE(run_id, stage) makes record_stage_result() idempotent
+            -- on rerun -- same shape as record_run()'s own idempotency.
+            CREATE TABLE IF NOT EXISTS run_stages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                stage TEXT NOT NULL,
+                status TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                detail_json TEXT,
+                artifact_hash TEXT,
+                duration_seconds REAL,
+                error TEXT,
+                mode TEXT,
+                row_count INTEGER,
+                UNIQUE(run_id, stage)
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            -- Fields follow FOUNDATION_COMPLETION.md Phase 2's raw snapshot
+            -- record contract.
+            CREATE TABLE IF NOT EXISTS raw_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES raw_snapshots(id),
+                source TEXT NOT NULL,
+                source_record_id TEXT NOT NULL,
+                observed_at_utc TEXT NOT NULL,
+                effective_at_utc TEXT,
+                ingested_at_utc TEXT,
+                snapshot_hash TEXT NOT NULL,
+                path TEXT,
+                http_status INTEGER,
+                request_params_hash TEXT
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            CREATE TABLE IF NOT EXISTS normalized_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES normalized_observations(id),
+                table_name TEXT NOT NULL,
+                primary_key_json TEXT NOT NULL,
+                observed_at_utc TEXT,
+                source TEXT,
+                raw_snapshot_hash TEXT,
+                payload_json TEXT
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            CREATE TABLE IF NOT EXISTS feature_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT,
+                horizon TEXT,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES feature_snapshots(id),
+                decision_time_utc TEXT,
+                feature_schema_version TEXT,
+                dataset_hash TEXT,
+                row_count INTEGER,
+                payload_path TEXT
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            CREATE TABLE IF NOT EXISTS dataset_manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES dataset_manifests(id),
+                horizon TEXT,
+                dataset_hash TEXT NOT NULL,
+                split_manifest_json TEXT,
+                final_test_start TEXT,
+                final_test_end TEXT,
+                final_test_consumed INTEGER NOT NULL DEFAULT 0
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            CREATE TABLE IF NOT EXISTS model_artifacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES model_artifacts(id),
+                model_name TEXT NOT NULL,
+                model_version TEXT NOT NULL,
+                market_family TEXT,
+                horizon TEXT,
+                training_start TEXT,
+                training_end TEXT,
+                dataset_hash TEXT,
+                split_manifest_hash TEXT,
+                code_revision TEXT,
+                dependency_lock_hash TEXT,
+                artifact_hash TEXT NOT NULL,
+                artifact_path TEXT
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            CREATE TABLE IF NOT EXISTS calibration_artifacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES calibration_artifacts(id),
+                model_artifact_hash TEXT NOT NULL,
+                calibration_hash TEXT NOT NULL,
+                method TEXT,
+                fitted_on_hash TEXT
+            );
+
+            -- Fully implemented: record_prediction / get_prediction /
+            -- predictions_for_event. Mirrors decision.py's SportsForecast.
+            CREATE TABLE IF NOT EXISTS predictions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT NOT NULL,
+                horizon TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES predictions(id),
+                decision_time_utc TEXT NOT NULL,
+                predicted_winner TEXT,
+                raw_probabilities_json TEXT,
+                calibrated_probabilities_json TEXT,
+                probability_lower_json TEXT,
+                probability_upper_json TEXT,
+                expected_home_score REAL,
+                expected_away_score REAL,
+                model_artifact_hash TEXT NOT NULL,
+                calibration_artifact_hash TEXT NOT NULL,
+                totals_probabilities_json TEXT,
+                spread_probabilities_json TEXT,
+                model_disagreement REAL,
+                calibration_uncertainty REAL,
+                missingness_penalty REAL,
+                missing_flags_json TEXT,
+                lineup_uncertainty REAL,
+                conservative_probabilities_json TEXT
+            );
+
+            -- "Ideally" idempotent per the plan: a rerun with identical
+            -- inputs and no explicit supersedes_id must not duplicate.
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_predictions_idempotency
+            ON predictions(
+                sport, event_id, horizon, decision_time_utc,
+                model_artifact_hash, calibration_artifact_hash
+            )
+            WHERE supersedes_id IS NULL;
+
+            -- Fully implemented: record_market_snapshot. Append-only, keyed
+            -- per FOUNDATION_COMPLETION.md Phase 2's market snapshot key
+            -- (market_id, side_id, line, period, observed_at_utc).
+            CREATE TABLE IF NOT EXISTS market_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES market_snapshots(id),
+                market_id TEXT NOT NULL,
+                side_id TEXT NOT NULL,
+                line REAL,
+                period TEXT NOT NULL,
+                observed_at_utc TEXT NOT NULL,
+                best_bid REAL,
+                best_ask REAL,
+                depth_json TEXT,
+                market_state TEXT,
+                quote_age_seconds REAL,
+                order_book_hash TEXT,
+                content_hash TEXT NOT NULL
+            );
+
+            -- Fully implemented: record_market_evaluation. Mirrors
+            -- decision.py's MarketEvaluation field-for-field.
+            CREATE TABLE IF NOT EXISTS market_evaluations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES market_evaluations(id),
+                decision_time_utc TEXT,
+                market_id TEXT NOT NULL,
+                market_type TEXT NOT NULL,
+                team_or_side TEXT NOT NULL,
+                line REAL,
+                executable_ask REAL,
+                depth_adjusted_price REAL,
+                quote_age_seconds REAL,
+                available_depth REAL
+            );
+
+            -- Fully implemented: record_trade_decision. Mirrors decision.py's
+            -- BetDecision plus the plan's required idempotency key.
+            CREATE TABLE IF NOT EXISTS trade_decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT NOT NULL,
+                horizon TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES trade_decisions(id),
+                decision_time_utc TEXT NOT NULL,
+                model_artifact_hash TEXT NOT NULL,
+                market_snapshot_hash TEXT NOT NULL,
+                decision_policy_version TEXT NOT NULL,
+                action TEXT NOT NULL CHECK(action IN ('BET','NO_BET')),
+                predicted_winner TEXT,
+                market_type TEXT,
+                units REAL NOT NULL,
+                reason_code TEXT,
+                cost_adjusted_edge REAL,
+                selected_market_evaluation_id INTEGER REFERENCES market_evaluations(id),
+                evaluated_market_evaluation_id INTEGER REFERENCES market_evaluations(id),
+                evaluated_market_id TEXT,
+                evaluated_team_or_side TEXT,
+                evaluated_line REAL
+            );
+
+            -- The required idempotency key (sport, event_id, horizon,
+            -- decision_time_utc, model_artifact_hash, market_snapshot_hash,
+            -- decision_policy_version), scoped to non-superseding rows so a
+            -- genuine correction (supersedes_id set) can still append even
+            -- if every other field is identical to what it replaces.
+            --
+            -- evaluated_market_id/evaluated_team_or_side/evaluated_line are
+            -- real, required parts of this key -- a single real game
+            -- produces one BetDecision per candidate market (moneyline,
+            -- each spread line, each total line), all sharing the exact
+            -- same sport/event_id/horizon/decision_time_utc/
+            -- model_artifact_hash/market_snapshot_hash/
+            -- decision_policy_version. Without the evaluated market's own
+            -- identity in the key, every decision after the first one for a
+            -- game collided with it and was silently discarded as an
+            -- "idempotent rerun" -- confirmed live: a real 2-game slate
+            -- produced 32 real BetDecision objects (16 markets/game) but
+            -- only 2 ever reached trade_decisions before this fix.
+            -- COALESCE wraps the three nullable identity columns: SQLite
+            -- treats every NULL as distinct from every other NULL for
+            -- UNIQUE-index purposes, so without this a moneyline decision
+            -- (whose evaluated_line is a real, legitimate NULL) would never
+            -- collide with a second identical moneyline decision at the raw
+            -- SQL/UNIQUE-index level -- only the application-level
+            -- check-before-insert (which correctly uses "IS ?") would catch
+            -- it, leaving the "actual guarantee against races" half of the
+            -- contract silently unenforced for exactly the most common
+            -- market_type. -999999.0 is out of the real domain of a spread
+            -- or total line.
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_trade_decisions_idempotency
+            ON trade_decisions(
+                sport, event_id, horizon, decision_time_utc,
+                model_artifact_hash, market_snapshot_hash, decision_policy_version,
+                market_type, COALESCE(evaluated_market_id, ''),
+                COALESCE(evaluated_team_or_side, ''), COALESCE(evaluated_line, -999999.0)
+            )
+            WHERE supersedes_id IS NULL;
+
+            -- Fully implemented: record_paper_order.
+            CREATE TABLE IF NOT EXISTS paper_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES paper_orders(id),
+                trade_decision_id INTEGER NOT NULL REFERENCES trade_decisions(id),
+                market_id TEXT NOT NULL,
+                side TEXT NOT NULL,
+                requested_units REAL NOT NULL,
+                avg_fill_price REAL,
+                worst_fill_price REAL,
+                filled_units REAL,
+                unfilled_units REAL,
+                slippage REAL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                placed_at_utc TEXT
+            );
+
+            -- Fully implemented: record_settlement.
+            CREATE TABLE IF NOT EXISTS settlements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES settlements(id),
+                paper_order_id INTEGER REFERENCES paper_orders(id),
+                trade_decision_id INTEGER REFERENCES trade_decisions(id),
+                outcome TEXT NOT NULL,
+                settled_price REAL,
+                pnl REAL,
+                settled_at_utc TEXT,
+                notes TEXT
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            CREATE TABLE IF NOT EXISTS closing_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT NOT NULL,
+                event_id TEXT,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES closing_prices(id),
+                market_id TEXT NOT NULL,
+                side_id TEXT NOT NULL,
+                line REAL,
+                closing_price REAL,
+                observed_at_utc TEXT,
+                quote_type TEXT,
+                seconds_to_start REAL
+            );
+
+            -- TODO: schema only -- no insert/query methods implemented yet.
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(run_id),
+                sport TEXT,
+                event_id TEXT,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES reviews(id),
+                subject_table TEXT,
+                subject_id INTEGER,
+                reviewer TEXT,
+                verdict TEXT,
+                notes TEXT,
+                reviewed_at_utc TEXT
+            );
+
+            -- Fully implemented: record_audit_event. Hash-chained like
+            -- metadata.py's MetadataDB.audit_event, ordered by the
+            -- autoincrement id rather than created_at so the chain stays
+            -- deterministic even when two events share a timestamp.
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                audit_uuid TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL,
+                run_id TEXT,
+                sport TEXT,
+                event_id TEXT,
+                schema_version TEXT NOT NULL,
+                supersedes_id INTEGER REFERENCES audit_events(id),
+                event_type TEXT NOT NULL,
+                details_json TEXT,
+                previous_hash TEXT,
+                event_hash TEXT NOT NULL
+            );
+        """)
+        self._migrate_predictions_uncertainty_columns()
+        self._migrate_closing_prices_taxonomy_columns()
+        self._migrate_run_health_columns()
+        self.conn.execute(
+            "INSERT OR IGNORE INTO _meta(key, value) VALUES(?, ?)",
+            ("schema_version", SCHEMA_VERSION),
+        )
+        self.conn.commit()
+
+    def _migrate_columns(self, table: str, new_columns: dict[str, str]) -> None:
+        """Real, generic ALTER TABLE migration: `CREATE TABLE IF NOT EXISTS`
+        alone does not add columns to an already-existing real table.
+        Each column is individually guarded -- SQLite has no `ADD COLUMN
+        IF NOT EXISTS` -- so re-running this on an already-migrated
+        database is a real no-op, not an error."""
+        existing_cols = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for name, col_type in new_columns.items():
+            if name not in existing_cols:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {col_type}")
+
+    def _migrate_predictions_uncertainty_columns(self) -> None:
+        """Real migration for `predictions` rows created before MLB-5
+        (multi-sport execution spec) added the uncertainty-decomposition
+        columns (this repo's own `data/rebuild/shadow.db` has real
+        predictions rows from before this change)."""
+        self._migrate_columns("predictions", {
+            "model_disagreement": "REAL", "calibration_uncertainty": "REAL",
+            "missingness_penalty": "REAL", "missing_flags_json": "TEXT",
+            "lineup_uncertainty": "REAL", "conservative_probabilities_json": "TEXT",
+        })
+
+    def _migrate_closing_prices_taxonomy_columns(self) -> None:
+        """Real migration for `closing_prices` rows created before MLB-7
+        (multi-sport execution spec) added explicit quote-taxonomy
+        columns -- see record_closing_price()'s own docstring for why
+        every recorded quote must be labeled with what it actually is,
+        never an implicit, unlabeled "closing" price."""
+        self._migrate_columns("closing_prices", {"quote_type": "TEXT", "seconds_to_start": "REAL"})
+
+    def _migrate_run_health_columns(self) -> None:
+        """Add terminal and stage health fields to pre-integration ledgers."""
+        self._migrate_columns("runs", {
+            "finished_at": "TEXT", "duration_seconds": "REAL", "error": "TEXT", "mode": "TEXT",
+        })
+        self._migrate_columns("run_stages", {
+            "duration_seconds": "REAL", "error": "TEXT", "mode": "TEXT", "row_count": "INTEGER",
+        })
+
+    # ── runs ──────────────────────────────────────────────────────────
+
+    def record_run(
+        self,
+        sport: str,
+        run_type: str = "shadow",
+        horizon: str | None = None,
+        params: dict[str, Any] | None = None,
+        run_id: str | None = None,
+        mode: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> str:
+        """Create (or return the existing) run. Calling this twice with the
+        same explicit `run_id` is a no-op on the second call -- it does not
+        overwrite the first row -- matching the pipeline's "rerunning the
+        same timestamped job must be idempotent" requirement at the run
+        level."""
+        run_id = run_id or f"{sport}_{run_type}_{uuid.uuid4().hex[:12]}"
+        existing = self.conn.execute(
+            "SELECT run_id FROM runs WHERE run_id=?", (run_id,)
+        ).fetchone()
+        if existing is not None:
+            return str(existing["run_id"])
+        self.conn.execute(
+            """INSERT INTO runs(
+                   run_id, created_at, sport, run_type, horizon, status, mode, params_json, schema_version
+               ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (run_id, utc_now(), sport, run_type, horizon, "started", mode,
+             json.dumps(params) if params else None, schema_version),
+        )
+        self.conn.commit()
+        return run_id
+
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        return dict(row) if row else None
+
+    def finish_run(
+        self,
+        run_id: str,
+        status: str,
+        *,
+        duration_seconds: float,
+        error: str | None = None,
+        mode: str | None = None,
+    ) -> None:
+        """Finalize terminal run health without inventing unavailable data."""
+        self.conn.execute(
+            """UPDATE runs
+               SET status=?, finished_at=?, duration_seconds=?, error=?, mode=COALESCE(?, mode)
+               WHERE run_id=?""",
+            (status, utc_now(), duration_seconds, error, mode, run_id),
+        )
+        self.conn.commit()
+
+    # ── run stages (Task 5: true resume) ─────────────────────────────
+
+    def record_stage_result(
+        self,
+        run_id: str,
+        stage: str,
+        status: str,
+        detail: dict[str, Any] | None = None,
+        artifact_hash: str | None = None,
+        duration_seconds: float | None = None,
+        error: str | None = None,
+        mode: str | None = None,
+        row_count: int | None = None,
+    ) -> None:
+        """Record that `stage` reached `status` for `run_id` -- the real
+        completion record a resumed invocation checks before deciding
+        whether to re-run a stage. `INSERT OR REPLACE` on the real
+        UNIQUE(run_id, stage) constraint: rerunning the identical stage for
+        the identical run_id updates the one row (latest status wins) rather
+        than accumulating duplicate history -- this table records current
+        per-stage state, not an append-only event log (predictions/
+        trade_decisions elsewhere in this class are append-only; this
+        deliberately is not, since "did stage X complete for run Y" has
+        exactly one current answer)."""
+        self.conn.execute(
+            """INSERT OR REPLACE INTO run_stages(
+                   run_id, stage, status, completed_at, detail_json, artifact_hash,
+                   duration_seconds, error, mode, row_count
+               ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (run_id, stage, status, utc_now(),
+             json.dumps(detail, default=str) if detail is not None else None, artifact_hash,
+             duration_seconds, error, mode, row_count),
+        )
+        self.conn.commit()
+
+    def get_stage_result(self, run_id: str, stage: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM run_stages WHERE run_id=? AND stage=?", (run_id, stage)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def get_completed_stages(self, run_id: str) -> dict[str, str]:
+        """Real stage -> status map for everything already recorded for
+        `run_id` -- what a resumed invocation queries to decide which
+        stages it can honestly skip. Empty dict for an unknown or
+        brand-new run_id, not an error."""
+        rows = self.conn.execute(
+            "SELECT stage, status FROM run_stages WHERE run_id=?", (run_id,)
+        ).fetchall()
+        return {row["stage"]: row["status"] for row in rows}
+
+    # ── predictions (append-only) ────────────────────────────────────
+
+    def record_prediction(
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        event_id: str,
+        horizon: str,
+        decision_time_utc: str,
+        forecast: Any,
+        supersedes_id: int | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        """Insert a prediction from a SportsForecast dataclass instance (or a
+        dict shaped like one). Returns (row_id, created) -- created=False
+        means an identical-key row already existed and nothing new was
+        inserted (idempotent rerun); created=True means a fresh row was
+        appended (either the first time, or an explicit correction via
+        `supersedes_id`)."""
+        f = _as_dict(forecast)
+        model_artifact_hash = f["model_artifact_hash"]
+        calibration_artifact_hash = f["calibration_artifact_hash"]
+
+        if supersedes_id is None:
+            existing = self.conn.execute(
+                """SELECT id FROM predictions
+                   WHERE sport=? AND event_id=? AND horizon=? AND decision_time_utc=?
+                     AND model_artifact_hash=? AND calibration_artifact_hash=?
+                     AND supersedes_id IS NULL""",
+                (sport, event_id, horizon, decision_time_utc,
+                 model_artifact_hash, calibration_artifact_hash),
+            ).fetchone()
+            if existing is not None:
+                return int(existing["id"]), False
+
+        cur = self._insert_prediction_row(
+            run_id, sport, event_id, horizon, schema_version, supersedes_id,
+            decision_time_utc, f, model_artifact_hash, calibration_artifact_hash,
+        )
+        return cur, True
+
+    def _insert_prediction_row(
+        self, run_id, sport, event_id, horizon, schema_version, supersedes_id,
+        decision_time_utc, f, model_artifact_hash, calibration_artifact_hash,
+    ) -> int:
+        try:
+            cur = self.conn.execute(
+                """INSERT INTO predictions(
+                    created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
+                    decision_time_utc, predicted_winner, raw_probabilities_json,
+                    calibrated_probabilities_json, probability_lower_json, probability_upper_json,
+                    expected_home_score, expected_away_score, model_artifact_hash,
+                    calibration_artifact_hash, totals_probabilities_json, spread_probabilities_json,
+                    model_disagreement, calibration_uncertainty, missingness_penalty,
+                    missing_flags_json, lineup_uncertainty, conservative_probabilities_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    utc_now(), run_id, sport, event_id, horizon, schema_version, supersedes_id,
+                    decision_time_utc, f.get("predicted_winner"),
+                    json.dumps(f.get("raw_probabilities", {})),
+                    json.dumps(f.get("calibrated_probabilities", {})),
+                    json.dumps(f.get("probability_lower", {})),
+                    json.dumps(f.get("probability_upper", {})),
+                    f.get("expected_home_score"), f.get("expected_away_score"),
+                    model_artifact_hash, calibration_artifact_hash,
+                    json.dumps(f.get("totals_probabilities", {})),
+                    json.dumps(f.get("spread_probabilities", {})),
+                    f.get("model_disagreement"), f.get("calibration_uncertainty"),
+                    f.get("missingness_penalty"), json.dumps(f.get("missing_flags", [])),
+                    f.get("lineup_uncertainty"), json.dumps(f.get("conservative_probabilities", {})),
+                ),
+            )
+        except sqlite3.IntegrityError:
+            # Race-condition fallback: another writer inserted the identical
+            # non-superseding key between our pre-check and this INSERT. The
+            # UNIQUE index is the real guarantee; the pre-check above is just
+            # the fast, common path.
+            existing = self.conn.execute(
+                """SELECT id FROM predictions
+                   WHERE sport=? AND event_id=? AND horizon=? AND decision_time_utc=?
+                     AND model_artifact_hash=? AND calibration_artifact_hash=?
+                     AND supersedes_id IS NULL""",
+                (sport, event_id, horizon, decision_time_utc,
+                 model_artifact_hash, calibration_artifact_hash),
+            ).fetchone()
+            if existing is None:
+                raise
+            return int(existing["id"])
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def get_prediction(self, id_: int) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM predictions WHERE id=?", (id_,)).fetchone()
+        return dict(row) if row else None
+
+    def predictions_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM predictions WHERE sport=? AND event_id=? ORDER BY id",
+            (sport, event_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── market_snapshots (append-only) ───────────────────────────────
+
+    def record_market_snapshot(
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        event_id: str | None,
+        market_id: str,
+        side_id: str,
+        line: float | None,
+        period: str,
+        observed_at_utc: str,
+        best_bid: float | None = None,
+        best_ask: float | None = None,
+        depth: Any = None,
+        market_state: str | None = None,
+        quote_age_seconds: float | None = None,
+        order_book_hash: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        """Insert a market observation. Idempotent on
+        (market_id, side_id, line, period, observed_at_utc): a byte-identical
+        repeated snapshot returns the existing row rather than duplicating
+        (Phase 2: "repeated identical snapshots must be idempotent"). A
+        *different* payload sharing that same key fails closed with a
+        ValueError and an audit event, rather than silently storing two
+        conflicting observations under what is supposed to be one immutable
+        key (Phase 2: "conflicting rows ... must fail closed")."""
+        content_key = json.dumps(
+            {"best_bid": best_bid, "best_ask": best_ask, "depth": depth,
+             "market_state": market_state, "order_book_hash": order_book_hash},
+            sort_keys=True, default=str,
+        )
+        content_hash = hashlib.sha256(content_key.encode()).hexdigest()
+
+        existing = self.conn.execute(
+            """SELECT id, content_hash FROM market_snapshots
+               WHERE market_id=? AND side_id=? AND line IS ? AND period=? AND observed_at_utc=?""",
+            (market_id, side_id, line, period, observed_at_utc),
+        ).fetchone()
+        if existing is not None:
+            if existing["content_hash"] == content_hash:
+                return int(existing["id"]), False
+            self.record_audit_event(
+                "market_snapshot_conflict",
+                details={
+                    "market_id": market_id, "side_id": side_id, "line": line,
+                    "period": period, "observed_at_utc": observed_at_utc,
+                },
+                run_id=run_id, sport=sport, event_id=event_id,
+            )
+            raise ValueError(
+                f"conflicting market_snapshot content for identical key "
+                f"(market_id={market_id!r}, side_id={side_id!r}, line={line!r}, "
+                f"period={period!r}, observed_at_utc={observed_at_utc!r}) -- fail closed"
+            )
+
+        cur = self.conn.execute(
+            """INSERT INTO market_snapshots(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                market_id, side_id, line, period, observed_at_utc,
+                best_bid, best_ask, depth_json, market_state, quote_age_seconds,
+                order_book_hash, content_hash
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                utc_now(), run_id, sport, event_id, schema_version, None,
+                market_id, side_id, line, period, observed_at_utc,
+                best_bid, best_ask, json.dumps(depth) if depth is not None else None,
+                market_state, quote_age_seconds, order_book_hash, content_hash,
+            ),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    def market_snapshots_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM market_snapshots WHERE sport=? AND event_id=? ORDER BY id",
+            (sport, event_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── market_evaluations (append-only) ─────────────────────────────
+
+    def record_market_evaluation(
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        event_id: str,
+        evaluation: Any,
+        decision_time_utc: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> int:
+        """Insert a MarketEvaluation dataclass instance (or dict shaped like
+        one). Always appends -- market_evaluations has no idempotency-key
+        requirement in the plan, only predictions and trade_decisions do."""
+        e = _as_dict(evaluation)
+        cur = self.conn.execute(
+            """INSERT INTO market_evaluations(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                decision_time_utc, market_id, market_type, team_or_side, line,
+                executable_ask, depth_adjusted_price, quote_age_seconds, available_depth
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                utc_now(), run_id, sport, event_id, schema_version, None,
+                decision_time_utc, e["market_id"], e["market_type"], e["team_or_side"],
+                e.get("line"), e.get("executable_ask"), e.get("depth_adjusted_price"),
+                e.get("quote_age_seconds"), e.get("available_depth"),
+            ),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def get_market_evaluation(self, id_: int) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM market_evaluations WHERE id=?", (id_,)).fetchone()
+        return dict(row) if row else None
+
+    # ── trade_decisions (append-only, idempotent) ────────────────────
+
+    def record_trade_decision(
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        event_id: str,
+        horizon: str,
+        decision_time_utc: str,
+        model_artifact_hash: str,
+        market_snapshot_hash: str,
+        decision_policy_version: str,
+        decision: Any,
+        selected_market_evaluation_id: int | None = None,
+        evaluated_market_evaluation_id: int | None = None,
+        supersedes_id: int | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        """Insert a BetDecision dataclass instance (or dict shaped like one).
+
+        Idempotency key (per the plan, required, plus the evaluated market's
+        own identity -- see the CREATE TABLE comment above for why: a single
+        real game produces one BetDecision per candidate market, and without
+        market identity in the key they collided with each other, not just
+        across reruns):
+            (sport, event_id, horizon, decision_time_utc, model_artifact_hash,
+             market_snapshot_hash, decision_policy_version, market_type,
+             evaluated_market_id, evaluated_team_or_side, evaluated_line)
+
+        Rerunning the same job with identical inputs and no explicit
+        `supersedes_id` returns the existing row (created=False) instead of
+        duplicating it. This is enforced two ways: an explicit
+        check-before-insert (the fast path, and what makes the "only one row
+        after two inserts" behavior deterministic and easy to test) plus a
+        real SQLite UNIQUE index as the actual guarantee against races.
+        """
+        d = _as_dict(decision)
+        evaluated = d.get("evaluated_market") or {}
+        evaluated_market_id = evaluated.get("market_id")
+        evaluated_team_or_side = evaluated.get("team_or_side")
+        evaluated_line = evaluated.get("line")
+
+        if supersedes_id is None:
+            existing = self._find_trade_decision(
+                sport, event_id, horizon, decision_time_utc,
+                model_artifact_hash, market_snapshot_hash, decision_policy_version,
+                d.get("market_type"), evaluated_market_id, evaluated_team_or_side, evaluated_line,
+            )
+            if existing is not None:
+                return existing, False
+
+        try:
+            cur = self.conn.execute(
+                """INSERT INTO trade_decisions(
+                    created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
+                    decision_time_utc, model_artifact_hash, market_snapshot_hash,
+                    decision_policy_version, action, predicted_winner, market_type, units,
+                    reason_code, cost_adjusted_edge, selected_market_evaluation_id,
+                    evaluated_market_evaluation_id, evaluated_market_id, evaluated_team_or_side,
+                    evaluated_line
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    utc_now(), run_id, sport, event_id, horizon, schema_version, supersedes_id,
+                    decision_time_utc, model_artifact_hash, market_snapshot_hash,
+                    decision_policy_version, d["action"], d.get("predicted_winner"),
+                    d.get("market_type"), d["units"], d.get("reason_code"),
+                    d.get("cost_adjusted_edge"), selected_market_evaluation_id,
+                    evaluated_market_evaluation_id, evaluated_market_id, evaluated_team_or_side,
+                    evaluated_line,
+                ),
+            )
+        except sqlite3.IntegrityError:
+            existing = self._find_trade_decision(
+                sport, event_id, horizon, decision_time_utc,
+                model_artifact_hash, market_snapshot_hash, decision_policy_version,
+                d.get("market_type"), evaluated_market_id, evaluated_team_or_side, evaluated_line,
+            )
+            if existing is None:
+                raise
+            return existing, False
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    def _find_trade_decision(
+        self, sport, event_id, horizon, decision_time_utc,
+        model_artifact_hash, market_snapshot_hash, decision_policy_version,
+        market_type=None, evaluated_market_id=None, evaluated_team_or_side=None, evaluated_line=None,
+    ) -> int | None:
+        # "IS ?" (not "=") for the nullable identity columns -- a moneyline
+        # decision has a real, legitimate NULL evaluated_line, and SQL NULLs
+        # never compare equal to each other with "=".
+        row = self.conn.execute(
+            """SELECT id FROM trade_decisions
+               WHERE sport=? AND event_id=? AND horizon=? AND decision_time_utc=?
+                 AND model_artifact_hash=? AND market_snapshot_hash=? AND decision_policy_version=?
+                 AND market_type IS ? AND evaluated_market_id IS ?
+                 AND evaluated_team_or_side IS ? AND evaluated_line IS ?
+                 AND supersedes_id IS NULL""",
+            (sport, event_id, horizon, decision_time_utc,
+             model_artifact_hash, market_snapshot_hash, decision_policy_version,
+             market_type, evaluated_market_id, evaluated_team_or_side, evaluated_line),
+        ).fetchone()
+        return int(row["id"]) if row is not None else None
+
+    def get_trade_decision(self, id_: int) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM trade_decisions WHERE id=?", (id_,)).fetchone()
+        return dict(row) if row else None
+
+    def trade_decisions_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM trade_decisions WHERE sport=? AND event_id=? ORDER BY id",
+            (sport, event_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── paper_orders (append-only) ───────────────────────────────────
+
+    def record_paper_order(
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        event_id: str,
+        trade_decision_id: int,
+        market_id: str,
+        side: str,
+        requested_units: float,
+        avg_fill_price: float | None = None,
+        worst_fill_price: float | None = None,
+        filled_units: float | None = None,
+        unfilled_units: float | None = None,
+        slippage: float | None = None,
+        status: str = "PENDING",
+        placed_at_utc: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> int:
+        cur = self.conn.execute(
+            """INSERT INTO paper_orders(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                trade_decision_id, market_id, side, requested_units, avg_fill_price,
+                worst_fill_price, filled_units, unfilled_units, slippage, status, placed_at_utc
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                utc_now(), run_id, sport, event_id, schema_version, None,
+                trade_decision_id, market_id, side, requested_units, avg_fill_price,
+                worst_fill_price, filled_units, unfilled_units, slippage, status, placed_at_utc,
+            ),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def get_paper_order(self, id_: int) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM paper_orders WHERE id=?", (id_,)).fetchone()
+        return dict(row) if row else None
+
+    # ── settlements (append-only) ────────────────────────────────────
+
+    def record_settlement(
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        event_id: str,
+        outcome: str,
+        paper_order_id: int | None = None,
+        trade_decision_id: int | None = None,
+        settled_price: float | None = None,
+        pnl: float | None = None,
+        settled_at_utc: str | None = None,
+        notes: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> int:
+        cur = self.conn.execute(
+            """INSERT INTO settlements(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                paper_order_id, trade_decision_id, outcome, settled_price, pnl,
+                settled_at_utc, notes
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                utc_now(), run_id, sport, event_id, schema_version, None,
+                paper_order_id, trade_decision_id, outcome, settled_price, pnl,
+                settled_at_utc, notes,
+            ),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def get_settlement(self, id_: int) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM settlements WHERE id=?", (id_,)).fetchone()
+        return dict(row) if row else None
+
+    # ── raw_snapshots (real caller: RawStore.write() results) ──────────
+    # FOUNDATION_COMPLETION.md's 8 remaining schema-only tables, wired up
+    # together: real insert/query paths so the DB can reconstruct full
+    # lineage (raw -> normalized -> feature -> dataset -> model ->
+    # calibration -> prediction -> ... -> settlement), not just the
+    # decision-layer half that already worked. Idempotent on snapshot_hash
+    # (RawStore is itself content-addressed -- the same hash is always the
+    # same real bytes, recording it twice is a no-op, not a duplicate).
+
+    def record_raw_snapshot(
+        self, *, run_id: str, sport: str, source: str, source_record_id: str,
+        observed_at_utc: str, snapshot_hash: str, event_id: str | None = None,
+        effective_at_utc: str | None = None, ingested_at_utc: str | None = None,
+        path: str | None = None, http_status: int | None = None,
+        request_params_hash: str | None = None, schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        existing = self.conn.execute(
+            "SELECT id FROM raw_snapshots WHERE snapshot_hash=? AND source=? AND source_record_id=?",
+            (snapshot_hash, source, source_record_id),
+        ).fetchone()
+        if existing is not None:
+            return int(existing["id"]), False
+        cur = self.conn.execute(
+            """INSERT INTO raw_snapshots(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                source, source_record_id, observed_at_utc, effective_at_utc,
+                ingested_at_utc, snapshot_hash, path, http_status, request_params_hash
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, event_id, schema_version, None,
+             source, source_record_id, observed_at_utc, effective_at_utc,
+             ingested_at_utc, snapshot_hash, path, http_status, request_params_hash),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    def raw_snapshots_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM raw_snapshots WHERE sport=? AND event_id=? ORDER BY id", (sport, event_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── normalized_observations (real caller: NormalizedStore.write() rows) ──
+    # Idempotent on (table_name, primary_key_json, observed_at_utc) via a
+    # content hash of the payload -- same real gap NormalizedStore.write()
+    # itself had before a4e03a1, not repeated here for the ledger copy.
+
+    def record_normalized_observation(
+        self, *, run_id: str, sport: str, table_name: str, primary_key: dict[str, Any],
+        event_id: str | None = None, observed_at_utc: str | None = None,
+        source: str | None = None, raw_snapshot_hash: str | None = None,
+        payload: dict[str, Any] | None = None, schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        pk_json = json.dumps(primary_key, sort_keys=True, default=str)
+        content_hash = hashlib.sha256(
+            json.dumps(payload or {}, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        existing = self.conn.execute(
+            """SELECT id, payload_json FROM normalized_observations
+               WHERE table_name=? AND primary_key_json=? AND observed_at_utc IS ?""",
+            (table_name, pk_json, observed_at_utc),
+        ).fetchone()
+        if existing is not None:
+            existing_hash = hashlib.sha256(
+                (existing["payload_json"] or "{}").encode()
+            ).hexdigest()
+            if existing_hash == content_hash:
+                return int(existing["id"]), False
+        cur = self.conn.execute(
+            """INSERT INTO normalized_observations(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                table_name, primary_key_json, observed_at_utc, source,
+                raw_snapshot_hash, payload_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, event_id, schema_version, None,
+             table_name, pk_json, observed_at_utc, source, raw_snapshot_hash,
+             json.dumps(payload, default=str) if payload is not None else None),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    # ── feature_snapshots (real caller: horizon_builder / FeatureStore) ──
+    # Idempotent on dataset_hash -- FeatureStore.write_snapshot() is itself
+    # content-addressed by snapshot_hash, so recording the same real
+    # snapshot twice is a no-op here too.
+
+    def record_feature_snapshot(
+        self, *, run_id: str, sport: str, horizon: str, dataset_hash: str,
+        event_id: str | None = None, decision_time_utc: str | None = None,
+        feature_schema_version: str | None = None, row_count: int | None = None,
+        payload_path: str | None = None, schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        existing = self.conn.execute(
+            "SELECT id FROM feature_snapshots WHERE sport=? AND horizon=? AND dataset_hash=?",
+            (sport, horizon, dataset_hash),
+        ).fetchone()
+        if existing is not None:
+            return int(existing["id"]), False
+        cur = self.conn.execute(
+            """INSERT INTO feature_snapshots(
+                created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
+                decision_time_utc, feature_schema_version, dataset_hash, row_count, payload_path
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, event_id, horizon, schema_version, None,
+             decision_time_utc, feature_schema_version, dataset_hash, row_count, payload_path),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    def feature_snapshots_for_horizon(self, sport: str, horizon: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM feature_snapshots WHERE sport=? AND horizon=? ORDER BY id",
+            (sport, horizon),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── dataset_manifests (real caller: mlb_split_manifest.json-style splits) ──
+    # Idempotent on dataset_hash -- a real split manifest is a deterministic
+    # function of the training data it was computed from (same real games in,
+    # same real split out), so recomputing it isn't a new fact worth a new row.
+
+    def record_dataset_manifest(
+        self, *, run_id: str, sport: str, dataset_hash: str,
+        horizon: str | None = None, split_manifest: dict[str, Any] | None = None,
+        final_test_start: str | None = None, final_test_end: str | None = None,
+        final_test_consumed: bool = False, schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        existing = self.conn.execute(
+            "SELECT id FROM dataset_manifests WHERE sport=? AND dataset_hash=?",
+            (sport, dataset_hash),
+        ).fetchone()
+        if existing is not None:
+            return int(existing["id"]), False
+        cur = self.conn.execute(
+            """INSERT INTO dataset_manifests(
+                created_at, run_id, sport, schema_version, supersedes_id, horizon,
+                dataset_hash, split_manifest_json, final_test_start, final_test_end,
+                final_test_consumed
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, schema_version, None, horizon, dataset_hash,
+             json.dumps(split_manifest, default=str) if split_manifest is not None else None,
+             final_test_start, final_test_end, int(final_test_consumed)),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    # ── model_artifacts (real caller: MLBTwoHeadModel.to_artifact()) ──
+    # Idempotent on artifact_hash -- matches the real artifact-hash
+    # convention already used across config/models/challengers/*.json.
+
+    def record_model_artifact(
+        self, *, run_id: str, sport: str, model_name: str, model_version: str,
+        artifact_hash: str, market_family: str | None = None, horizon: str | None = None,
+        training_start: str | None = None, training_end: str | None = None,
+        dataset_hash: str | None = None, split_manifest_hash: str | None = None,
+        code_revision: str | None = None, dependency_lock_hash: str | None = None,
+        artifact_path: str | None = None, schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        existing = self.conn.execute(
+            "SELECT id FROM model_artifacts WHERE sport=? AND artifact_hash=?",
+            (sport, artifact_hash),
+        ).fetchone()
+        if existing is not None:
+            return int(existing["id"]), False
+        cur = self.conn.execute(
+            """INSERT INTO model_artifacts(
+                created_at, run_id, sport, schema_version, supersedes_id,
+                model_name, model_version, market_family, horizon,
+                training_start, training_end, dataset_hash, split_manifest_hash,
+                code_revision, dependency_lock_hash, artifact_hash, artifact_path
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, schema_version, None,
+             model_name, model_version, market_family, horizon,
+             training_start, training_end, dataset_hash, split_manifest_hash,
+             code_revision, dependency_lock_hash, artifact_hash, artifact_path),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    def get_model_artifact_by_hash(self, sport: str, artifact_hash: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM model_artifacts WHERE sport=? AND artifact_hash=?",
+            (sport, artifact_hash),
+        ).fetchone()
+        return dict(row) if row else None
+
+    # ── calibration_artifacts (real caller: PlattCalibrator / BootstrapMLBEnsemble) ──
+    # Idempotent on calibration_hash, bound to the model_artifact_hash it
+    # was fit against -- CLAUDE.md: "Store base model and calibrator as
+    # separately hashed, mutually bound artifacts."
+
+    def record_calibration_artifact(
+        self, *, run_id: str, sport: str, model_artifact_hash: str, calibration_hash: str,
+        method: str | None = None, fitted_on_hash: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        existing = self.conn.execute(
+            """SELECT id FROM calibration_artifacts
+               WHERE sport=? AND model_artifact_hash=? AND calibration_hash=?""",
+            (sport, model_artifact_hash, calibration_hash),
+        ).fetchone()
+        if existing is not None:
+            return int(existing["id"]), False
+        cur = self.conn.execute(
+            """INSERT INTO calibration_artifacts(
+                created_at, run_id, sport, schema_version, supersedes_id,
+                model_artifact_hash, calibration_hash, method, fitted_on_hash
+            ) VALUES (?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, schema_version, None,
+             model_artifact_hash, calibration_hash, method, fitted_on_hash),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    # ── closing_prices (real caller: post-settlement CLV measurement) ──
+    # Append-only observation log, same idempotency shape as
+    # market_snapshots: identical key -> no-op, conflicting content -> fail
+    # closed (a real closing price is a settled fact, not a moving quote).
+
+    def record_closing_price(
+        self, *, run_id: str, sport: str, market_id: str, side_id: str,
+        event_id: str | None = None, line: float | None = None,
+        closing_price: float | None = None, observed_at_utc: str | None = None,
+        quote_type: str = "last_pregame_quote", seconds_to_start: float | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> tuple[int, bool]:
+        """`quote_type` (MLB-7, multi-sport execution spec): every recorded
+        quote must be explicitly labeled with what it actually is --
+        `"decision_quote"`, `"T-30"`, `"T-15"`, `"T-5"`,
+        `"last_pregame_quote"`, etc -- never implicitly assumed "the
+        closing quote" just because it's the one a caller happened to
+        record. Defaults to `"last_pregame_quote"` (the real, disclosed
+        current caller: mlb_settle_and_capture_closing.py's
+        real_closing_quote(), which specifically finds the latest real
+        valid pregame quote). The idempotency key includes `quote_type` so
+        multiple distinct real milestone quotes for the identical
+        market_id/side_id/line can coexist -- they are genuinely different
+        real observations, not competing values for one fact."""
+        existing = self.conn.execute(
+            """SELECT id, closing_price FROM closing_prices
+               WHERE market_id=? AND side_id=? AND line IS ? AND quote_type IS ?""",
+            (market_id, side_id, line, quote_type),
+        ).fetchone()
+        if existing is not None:
+            if existing["closing_price"] == closing_price:
+                return int(existing["id"]), False
+            raise ValueError(
+                f"conflicting closing_price for market_id={market_id!r} side_id={side_id!r} "
+                f"line={line!r} quote_type={quote_type!r} -- fail closed"
+            )
+        cur = self.conn.execute(
+            """INSERT INTO closing_prices(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                market_id, side_id, line, closing_price, observed_at_utc,
+                quote_type, seconds_to_start
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, event_id, schema_version, None,
+             market_id, side_id, line, closing_price, observed_at_utc,
+             quote_type, seconds_to_start),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid), True
+
+    # ── reviews (human/operator annotations -- always append) ──────────
+
+    def record_review(
+        self, *, run_id: str, subject_table: str, subject_id: int, verdict: str,
+        sport: str | None = None, event_id: str | None = None, reviewer: str | None = None,
+        notes: str | None = None, schema_version: str = SCHEMA_VERSION,
+    ) -> int:
+        cur = self.conn.execute(
+            """INSERT INTO reviews(
+                created_at, run_id, sport, event_id, schema_version, supersedes_id,
+                subject_table, subject_id, reviewer, verdict, notes, reviewed_at_utc
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (utc_now(), run_id, sport, event_id, schema_version, None,
+             subject_table, subject_id, reviewer, verdict, notes, utc_now()),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def reviews_for_subject(self, subject_table: str, subject_id: int) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM reviews WHERE subject_table=? AND subject_id=? ORDER BY id",
+            (subject_table, subject_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── audit_events ──────────────────────────────────────────────────
+
+    def record_audit_event(
+        self,
+        event_type: str,
+        details: dict[str, Any] | None = None,
+        run_id: str | None = None,
+        sport: str | None = None,
+        event_id: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+    ) -> str:
+        """Hash-chained audit trail, same pattern as metadata.py's
+        MetadataDB.audit_event. Returns the new entry's audit_uuid."""
+        audit_uuid = uuid.uuid4().hex
+        now = utc_now()
+        prev = self.conn.execute(
+            "SELECT event_hash FROM audit_events ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        previous_hash = prev["event_hash"] if prev else ""
+        raw = json.dumps({
+            "audit_uuid": audit_uuid, "event_type": event_type, "run_id": run_id,
+            "sport": sport, "event_id": event_id, "details": details,
+            "previous_hash": previous_hash, "created_at": now,
+        }, sort_keys=True, default=str)
+        event_hash = hashlib.sha256(raw.encode()).hexdigest()
+        self.conn.execute(
+            """INSERT INTO audit_events(
+                audit_uuid, created_at, run_id, sport, event_id, schema_version,
+                supersedes_id, event_type, details_json, previous_hash, event_hash
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (audit_uuid, now, run_id, sport, event_id, schema_version, None,
+             event_type, json.dumps(details) if details else None, previous_hash, event_hash),
+        )
+        self.conn.commit()
+        return audit_uuid
+
+    def audit_events_all(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute("SELECT * FROM audit_events ORDER BY id").fetchall()
+        return [dict(r) for r in rows]
+
+    # ── lifecycle ─────────────────────────────────────────────────────
+
+    def close(self) -> None:
+        self.conn.close()
