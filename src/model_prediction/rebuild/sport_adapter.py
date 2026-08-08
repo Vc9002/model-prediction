@@ -158,6 +158,23 @@ class MLBAdapter(_NotImplementedStagesMixin):
         # build_forecast from -- see module docstring.
         from . import mlb_shadow_pipeline as pipeline
 
+        # MLB-4 real cross-process resume: if a prior invocation of this
+        # exact run_id already trained a model and resolved feature rows
+        # for this date, reload them from disk instead of retraining --
+        # the real, expensive part predict_stage() does. Falls through to
+        # a full real run below (never silently fails) when no resume
+        # state exists, e.g. a brand-new run_id or a run whose predict()
+        # never reached success.
+        if run_id is not None:
+            resumed = pipeline.load_resume_state(self.data_root, run_id, date)
+            if resumed is not None:
+                self._state = resumed
+                return StageResult("predict", STAGE_SUCCESS, {
+                    "status": "resumed_from_disk", "train_games": resumed.train_n,
+                    "games_predicted": len(resumed.rows_by_event),
+                    "games_total": resumed.tonight.height, "skipped": dict(resumed.skipped),
+                })
+
         state = pipeline.load_state(self.data_root, date)
         if state is None:
             return StageResult("predict", STAGE_NO_DATA, {"reason": "no real scheduled games for this date"})

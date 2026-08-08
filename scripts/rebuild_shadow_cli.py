@@ -27,21 +27,23 @@ from model_prediction.rebuild.sport_adapter import SUPPORTED_SPORTS, build_adapt
 STAGES = ("collect", "build_features", "predict", "match_markets", "decide")
 
 # Task 5 (true resume system): only these two stages are honestly
-# skippable on resume. Both are disk-backed and idempotent (RawStore/
-# NormalizedStore for collect, FeatureStore for build_features) -- a
-# resumed invocation re-reads their real prior output straight from disk
-# regardless of whether this call actually re-executes them, so skipping
-# a completed one is a genuine time/network-call saving, not a shortcut
-# that changes behavior. predict/match_markets/decide are NOT in this set
-# on purpose: MLBAdapter (sport_adapter.py) holds their real output in
-# `self._state`, populated only by predict() running earlier in THIS
-# process -- a fresh process resuming after a crash has no such state, so
-# skipping any of these three would make match_markets/decide fail closed
-# against a state that was never populated this run, not silently succeed
-# against stale data. They correctly always re-run; real cross-process
-# resume for them requires real fitted-model artifact reload (see
-# mlb_shadow_pipeline.py's train_through() docstring for that disclosed,
-# separate gap), not orchestration logic.
+# skippable *at the orchestration level* (the loop below never even calls
+# the adapter method again). Both are disk-backed and idempotent
+# (RawStore/NormalizedStore for collect, FeatureStore for build_features)
+# -- a resumed invocation re-reads their real prior output straight from
+# disk regardless of whether this call actually re-executes them, so
+# skipping the call entirely is a genuine time/network-call saving. predict
+# is deliberately NOT in this set even after MLB-4's real resume support:
+# MLBAdapter._state (needed by match_markets/decide) is only ever populated
+# by predict() actually running in THIS process -- skipping the call here
+# would leave self._state unset and fail match_markets/decide closed for
+# no reason. Real resume for predict lives one layer down instead:
+# MLBAdapter.predict() (sport_adapter.py) now checks for a saved
+# resume-state bundle (trained model + resolved feature rows,
+# mlb_shadow_pipeline.save_resume_state()/load_resume_state()) and reloads
+# it instead of retraining when one exists -- the call still happens, it's
+# just fast. match_markets/decide always re-run regardless (market data
+# must be freshly collected either way, and decide is cheap).
 RESUMABLE_STAGES = frozenset({"collect", "build_features"})
 
 

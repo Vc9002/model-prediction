@@ -217,3 +217,90 @@ class TestPlayerIdentityLineage:
         assert resolved.canonical_name == "Juan Soto"
         assert resolved.entity_type == "player"
         assert resolved.sport == "mlb"
+
+
+class TestResumeState:
+    """MLB-4 (multi-sport execution spec): real cross-process resume --
+    save_resume_state()/load_resume_state() must persist and reload the
+    real trained model plus resolved feature rows, producing identical
+    real predictions to the original in-memory state, not just "loads
+    without error." """
+
+    def _fit_real_model_and_state(self, tmp_path, target_date="2026-08-06"):
+        import numpy as np
+
+        from model_prediction.rebuild.mlb_shadow_pipeline import (
+            DIFFERENTIAL_FEATURES,
+            INTENSITY_FEATURES,
+            MLBRunState,
+            train_through,
+        )
+
+        _write_scoreboard(tmp_path, "401", f"{target_date}T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        rng = np.random.default_rng(0)
+        n = 40
+        data = {f: rng.uniform(1, 5, n) for f in INTENSITY_FEATURES}
+        data.update({f: rng.uniform(-2, 2, n) for f in DIFFERENTIAL_FEATURES})
+        data["total_runs"] = sum(data[f] for f in INTENSITY_FEATURES) / len(INTENSITY_FEATURES) + rng.normal(0, 0.3, n)
+        data["home_margin"] = sum(data[f] for f in DIFFERENTIAL_FEATURES) / len(DIFFERENTIAL_FEATURES)
+        data["game_date"] = [f"2026-07-{(i % 28) + 1:02d}" for i in range(n)]
+        features = pl.DataFrame(data)
+
+        model, bootstrap, train_n = train_through(features, target_date)
+        row = {f: float(rng.uniform(1, 5)) for f in INTENSITY_FEATURES}
+        row.update({f: float(rng.uniform(-2, 2)) for f in DIFFERENTIAL_FEATURES})
+
+        state = MLBRunState(
+            target_date=target_date, tonight=pl.DataFrame({"event_id": ["401"]}),
+            model=model, bootstrap=bootstrap, train_n=train_n,
+            rows_by_event={"401": row}, skipped={"402": "no_probable_starters_available"},
+        )
+        return state, row
+
+    def test_save_then_load_produces_identical_real_predictions(self, tmp_path):
+        state, row = self._fit_real_model_and_state(tmp_path)
+        pred_before = state.model.predict_row("401", row)
+
+        pipeline.save_resume_state(state, str(tmp_path), "run123")
+        loaded = pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
+
+        assert loaded is not None
+        pred_after = loaded.model.predict_row("401", loaded.rows_by_event["401"])
+        assert pred_after.home_expected_runs == pred_before.home_expected_runs
+        assert pred_after.away_expected_runs == pred_before.away_expected_runs
+        assert pred_after.home_win_prob == pred_before.home_win_prob
+
+    def test_loaded_state_preserves_train_n_and_skipped(self, tmp_path):
+        state, _ = self._fit_real_model_and_state(tmp_path)
+        pipeline.save_resume_state(state, str(tmp_path), "run123")
+        loaded = pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
+
+        assert loaded is not None
+        assert loaded.train_n == state.train_n
+        assert loaded.skipped == {"402": "no_probable_starters_available"}
+
+    def test_loaded_state_has_no_bootstrap_real_disclosed_gap(self, tmp_path):
+        state, _ = self._fit_real_model_and_state(tmp_path)
+        assert state.bootstrap is not None  # the original state DID fit one
+        pipeline.save_resume_state(state, str(tmp_path), "run123")
+        loaded = pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
+
+        assert loaded is not None
+        assert loaded.bootstrap is None
+
+    def test_no_saved_resume_state_returns_none(self, tmp_path):
+        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        assert pipeline.load_resume_state(str(tmp_path), "nonexistent_run", "2026-08-06") is None
+
+    def test_mismatched_date_returns_none_not_stale_state(self, tmp_path):
+        state, _ = self._fit_real_model_and_state(tmp_path, target_date="2026-08-06")
+        pipeline.save_resume_state(state, str(tmp_path), "run123")
+
+        assert pipeline.load_resume_state(str(tmp_path), "run123", "2026-08-07") is None
+
+    def test_saving_before_training_fails_loudly(self, tmp_path):
+        from model_prediction.rebuild.mlb_shadow_pipeline import MLBRunState
+
+        state = MLBRunState(target_date="2026-08-06", tonight=pl.DataFrame({"event_id": ["401"]}))
+        with pytest.raises(ValueError):
+            pipeline.save_resume_state(state, str(tmp_path), "run123")

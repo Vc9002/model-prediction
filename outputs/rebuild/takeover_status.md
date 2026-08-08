@@ -2732,3 +2732,58 @@ the new save/load), MLB-5 (full uncertainty decomposition wired into live
 direct XGBoost / sklearn coherent baseline), MLB-6/7 (event-date-aware
 close lookup, explicit closing-quote taxonomy), MLB-8 (freeze + start
 prospective collection accounting). Tracked as open tasks.
+
+## Checkpoint: MLB-4 -- real cross-process resume (2026-08-09)
+
+Real gap closed: `predict()`/`match_markets()`/`decide()` required
+`MLBAdapter._state` populated in the SAME process -- a resumed invocation
+after a `market FAIL` always re-ran real walk-forward retraining (the
+expensive part) from scratch, even though MLB-3 now makes persisting a
+trained model possible.
+
+**Built**: `save_resume_state()`/`load_resume_state()`
+(`mlb_shadow_pipeline.py`) persist the two genuinely expensive-to-recompute
+real artifacts from a successful `predict_stage()` run -- the trained
+`XGBoostTwoHeadModel` (via MLB-3's `save()`) and the resolved per-game
+feature rows (JSON, with a real numpy-scalar-safe encoder: `.item()`
+before falling back to `str()`, so a stray `numpy.float64` doesn't
+silently become an unusable string on reload). `tonight`/`pitches`/
+`starters`/`decision_times` are NOT persisted -- rebuilt via the ordinary
+`load_state()`, which is already real, disk-backed, and idempotent, so
+persisting them separately would just be redundant storage.
+
+`MLBAdapter.predict()` now checks for saved resume state first (when a
+`run_id` is given) and reloads instead of retraining when found; falls
+through to a real, full run otherwise -- never silently proceeds against
+stale or missing state.
+
+**Real, disclosed gap**: `BootstrapMLBEnsemble` has no `save()`/`load()`
+yet, so `state.bootstrap` is `None` after a resume -- forecasts built from
+resumed state fall back to `build_forecast()`'s existing flat-haircut
+uncertainty path rather than the full bootstrap bound. Disclosed, not
+silently degraded.
+
+**Live-verified**, real run, same `mlb_moneyline_v2` frozen model, real
+2026-08-09 slate: a fresh `--predict-only` run took 19.9s (real
+walk-forward retrain over 450 games); a `--resume-run-id`-flagged
+`--predict-only` rerun against the same real run_id took 4.9s and
+reported `"status": "resumed_from_disk"` -- a real, measured ~4x speedup,
+not just a claimed one. A full unrestricted resumed run (all 5 stages)
+correctly resumed predict, freshly re-ran match_markets/decide (by
+design -- market data must be fresh regardless), and correctly deduped
+all 26 real trade_decisions as already-recorded (`trade_decisions_deduped:
+26`) rather than double-inserting them. Also confirmed the pre-existing,
+correct, disclosed limitation still holds: `--markets-only
+--resume-run-id` alone (without `predict` in the same invocation) still
+fails closed with "predict() must run first" -- real resume only ever
+skips retraining inside a `predict()` call that actually happens, never
+skips the call itself.
+
+**Tests**: 6 new (`TestResumeState` in `test_mlb_shadow_pipeline.py`) --
+exact prediction round-trip after save/load, train_n/skipped preservation,
+the disclosed bootstrap gap, fail-closed on missing/mismatched resume
+state, fail-loud on saving before training.
+
+**1241 tests pass** (up from 1235), 1 skipped. `ruff check` clean. mypy
+(`src/model_prediction/rebuild`): 37 errors, unchanged baseline.
+Registry-safe, confirmed by `git diff` before and after every live run.

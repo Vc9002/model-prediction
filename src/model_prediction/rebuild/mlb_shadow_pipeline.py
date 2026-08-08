@@ -276,6 +276,94 @@ class MLBRunState:
     skipped: dict[str, str] = field(default_factory=dict)  # event_id -> real skip reason
 
 
+# ── MLB-4 (multi-sport execution spec): real cross-process resume ─────────
+#
+# Real gap this closes: predict()/match_markets()/decide() previously
+# always required MLBAdapter._state from an earlier stage in the SAME
+# process -- a fresh process resuming after a "market FAIL" had no such
+# state, so predict() (real walk-forward retraining, the expensive part)
+# always re-ran even when it had already succeeded. MLB-3's save()/load()
+# for XGBoostTwoHeadModel makes real resume possible: persist the trained
+# model plus the resolved per-game feature rows (the two genuinely
+# expensive-to-recompute real artifacts) once predict_stage() succeeds,
+# and reload them on a resumed invocation instead of retraining.
+#
+# Real, disclosed scope: `state.bootstrap` is NOT persisted here --
+# BootstrapMLBEnsemble has no save()/load() yet (a separate real gap, not
+# silently worked around). A resumed run's forecasts fall back to
+# build_forecast()'s existing flat-haircut uncertainty path (bootstrap=None)
+# rather than the full bootstrap bound -- an accepted, disclosed
+# degradation, not a crash or a fabricated bound.
+
+
+def _resume_state_dir(data_root: str, run_id: str) -> Path:
+    return Path(data_root) / "resume_state" / "mlb" / run_id
+
+
+def save_resume_state(state: MLBRunState, data_root: str, run_id: str) -> None:
+    """Persist the real, expensive-to-recompute parts of a successful
+    predict_stage() run: the trained model (via XGBoostTwoHeadModel.save())
+    and the resolved per-game feature rows/decision times/skip reasons
+    (JSON). Requires state.model to be fitted (predict_stage() always sets
+    it before returning "status": "ok")."""
+    if state.model is None:
+        raise ValueError("cannot save resume state before predict_stage() has trained a model")
+    out = _resume_state_dir(data_root, run_id)
+    out.mkdir(parents=True, exist_ok=True)
+    state.model.save(out / "model")
+    # rows_by_event's real feature values can be numpy scalars (e.g. from
+    # pandas/numpy-backed feature computation upstream) -- plain
+    # json.dumps(default=str) would silently stringify those into text
+    # that predict_row()'s later `row.get(f, float("nan"))` numeric usage
+    # would break on. `.item()` converts a numpy scalar to its native
+    # Python type first; only genuinely non-numeric leftovers fall back to
+    # str().
+    def _json_default(o: Any) -> Any:
+        if hasattr(o, "item"):
+            return o.item()
+        return str(o)
+
+    (out / "state.json").write_text(json.dumps({
+        "target_date": state.target_date,
+        "train_n": state.train_n,
+        "rows_by_event": state.rows_by_event,
+        "decision_times": {k: v.isoformat() for k, v in state.decision_times.items()},
+        "skipped": state.skipped,
+    }, indent=2, default=_json_default))
+
+
+def load_resume_state(data_root: str, run_id: str, target_date: str) -> MLBRunState | None:
+    """Real reload of a prior predict_stage() success for this exact
+    run_id/date. Returns None (honest, not an error) if no resume state was
+    ever saved for this run_id, or it belongs to a different date -- the
+    caller falls back to a real, full predict_stage() run in that case,
+    never silently proceeds against mismatched state.
+
+    tonight/pitches/starters/decision_times are rebuilt via the ordinary
+    load_state() (real, disk-backed, idempotent -- the same real cost every
+    fresh run already pays for these) rather than persisted separately;
+    only the two genuinely expensive artifacts (model, resolved feature
+    rows) are actually reloaded from disk instead of recomputed."""
+    resume_dir = _resume_state_dir(data_root, run_id)
+    state_path = resume_dir / "state.json"
+    model_path = resume_dir / "model"
+    if not state_path.exists() or not model_path.exists():
+        return None
+    saved = json.loads(state_path.read_text())
+    if saved["target_date"] != target_date:
+        return None
+
+    state = load_state(data_root, target_date)
+    if state is None:
+        return None
+    state.model = XGBoostTwoHeadModel.load(model_path)
+    state.bootstrap = None  # real, disclosed gap -- see this section's module comment
+    state.train_n = saved["train_n"]
+    state.rows_by_event = saved["rows_by_event"]
+    state.skipped = saved["skipped"]
+    return state
+
+
 def load_state(data_root: str, target_date: str) -> MLBRunState | None:
     """Real scheduled-games + historical-features load, matching
     mlb_shadow_run.py's steps 1-3 exactly. Returns None (honest stop) when
@@ -418,6 +506,14 @@ def predict_stage(
         # exactly (single call per game).
         state.rows_by_event[event_id] = row
         n_predicted += 1
+
+    if run_id is not None:
+        # MLB-4: persist the real, expensive-to-recompute artifacts
+        # (trained model + resolved feature rows) so a later, resumed
+        # invocation of this same run_id can skip real retraining --
+        # see save_resume_state()'s own docstring for exactly what is and
+        # isn't persisted.
+        save_resume_state(state, data_root, run_id)
 
     return {
         "status": "ok", "train_games": state.train_n,
