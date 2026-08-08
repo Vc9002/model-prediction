@@ -1928,3 +1928,63 @@ was already real and working before this fix (`build_split_manifest()`,
 wired into `train_mlb_rebuild_real_features.py`) -- this task fixed the
 *granularity* of what goes into it, not its persistence, which was
 already correct.
+
+## Real Statcast/ESPN backfill extension + explicit Part 2 go-ahead (2026-08-08)
+
+User checkpoint: with all applicable stop-condition items resolved,
+asked how to proceed given the real structural backfill limit (15
+calendar dates). Explicit decision: **proceed into Part 2 (model-family
+work) now on the current real sample, with every result explicitly
+labeled small-sample/directional, not promotion-grade** -- not "wait for
+more real data" and not "silently treat the small sample as sufficient
+for promotion."
+
+**Real backfill extension, run live**: ESPN scoreboard already covered
+2026-07-03 through 2026-08-07, but Statcast (pybaseball) only covered
+2026-07-26 onward -- the real bottleneck. Backfilled Statcast +
+confirmed ESPN for 2026-07-01 through 2026-07-25 (25 real dates; 2 real
+MLB All-Star-break off-days correctly returned `no_games`/`no_data`, not
+errors). Real result: 32 real Statcast dates on disk now (up from 10),
+~125k real pitches (up from ~40k).
+
+**Deliberately did not backfill weather or Polymarket for these dates**:
+weather collected *today* for a *past* date would carry
+`observed_at_utc=now`, which can never satisfy
+`load_weather_at_decision_time()`'s `observed_at_utc <= decision_time`
+filter for any real historical decision time (Task 3) -- it would be a
+wasted real API call for data that can never be used, not a shortcut.
+Polymarket order books for already-settled historical dates don't
+meaningfully exist either.
+
+**What this backfill can and cannot fix, verified live, not assumed**:
+cannot manufacture historical point-in-time probable-starter data --
+`data/point_in_time/mlb_probable_starters.jsonl`'s real
+`pit_eligible=True` coverage still starts exactly 2026-07-26 (when this
+collector actually started running prospectively), unchanged. Confirmed
+via the real (registry-safe) ablation script: matched games rose from
+161 to 435 (more real completed games in the already-ESPN-covered range
+now have matching Statcast), while `starters_known` stayed at exactly
+104 -- the correct, honest effect. What it *does* fix: real
+prior-history depth for the games that were already scorable. Verified
+directly: among the 104 real `starters_known=1` games, home starter
+prior-history availability is now **104/104 (100%)**, away starter
+**98/104 (94%)**, bullpen **104/104 (100%)** -- up from meaningfully
+worse coverage before this backfill. Diminishing-returns check also
+performed: `pitcher_rolling_features`'s own `lookback_starts=3` and
+`bullpen_rolling_features`'s `lookback_days=3` only ever look at each
+pitcher/team's 3 most recent real starts/days, so backfilling
+substantially further back than this (e.g. to real season start) would
+not improve these specific rolling features further -- it would only
+matter once Task 14's disclosed-as-not-yet-built rolling-10/rolling-20
+clean-rate variants exist.
+
+Committed as `chore(data)` commits (real collected data, not source
+code) -- this branch's own established convention already scopes
+`data/rebuild/` as real, trackable, in-repo collected evidence, not
+speculative or synthetic.
+
+**Next**: proceeding into Part 2 (Task 12 -- model-family comparison,
+including the joint-distribution methods already implemented in
+`JointScoreDistribution` -- independent Poisson/negative
+binomial/Skellam -- but never compared against each other on real
+chronological OOF folds).
