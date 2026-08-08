@@ -13,6 +13,9 @@ of two near-identical copies.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 import polars as pl
 
 from .mlb_features import MLB_DIFFERENTIAL_FEATURES, MLB_INTENSITY_FEATURES
@@ -85,7 +88,7 @@ def build_mlb_moneyline_oof(features: pl.DataFrame, folds) -> dict[str, dict[str
     return oof
 
 
-HEAD_FACTORIES = {
+HEAD_FACTORIES: dict[str, Callable[..., Any]] = {
     "sklearn": MLBTwoHeadModel,
     "xgboost": XGBoostTwoHeadModel,
 }
