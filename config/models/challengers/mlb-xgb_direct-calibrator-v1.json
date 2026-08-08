@@ -1,0 +1,16 @@
+{
+  "model_name": "xgb_direct",
+  "method": "temperature",
+  "parameters": {
+    "temperature": 10.0
+  },
+  "base_model_hash": "2881c9d33e5233d880ece9e3065cd482e6d1a5f3299dedcdc18a29703e174507",
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "oof_split_manifest_hash": "1c51e275a03424ad6bcda655826eae54b2374d01ae9bcd096d03922cb289db21",
+  "training_range": {
+    "start": "2026-07-01",
+    "end": "2026-08-07"
+  },
+  "n_training_oof": 203,
+  "calibrator_hash": "e4f83d30d4cf8ab083e9caf64cf22ff1eb418c08948227692fb3f7719336050b"
+}
