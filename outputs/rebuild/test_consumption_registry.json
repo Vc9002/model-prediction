@@ -12,6 +12,21 @@
       "consumed_at_utc": "2026-08-07T19:08:55.544480+00:00",
       "note": "real held-out evaluation, n=21, accuracy=0.381, brier=0.3211 -- small-sample, RESEARCH_ONLY per outputs/rebuild/model_cards/mlb-two-head-v1.md"
     },
+    "mlb_moneyline_v2": {
+      "test_start": "2026-08-07T01:45Z",
+      "test_end": null,
+      "consumed": false,
+      "created_utc": "2026-08-09",
+      "note": "Task 18 (prepared, not evaluated): replacement prospective final test for mlb_moneyline, chronologically strictly after every real game used for model-family/calibration/ensemble selection (dataset_hash b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd, real games through 2026-08-07T01:40Z -- see outputs/rebuild/model_benchmark.md's Task 17 refresh). test_end is intentionally open (null) -- as of 2026-08-09 zero real completed games exist in data/rebuild/normalized/mlb/scoreboard.parquet after the cutoff, so there is nothing to evaluate yet; the range will be closed and evaluated once enough new games accumulate, and never before. This test must remain untouched (no peeking) until that evaluation is deliberately performed.",
+      "frozen_choices": {
+        "primary_moneyline_model": "xgb_two_head (coherent XGBoost score-distribution model), calibrated with temperature scaling -- best calibrated coherent model per outputs/rebuild/mlb_calibrated_ensemble_comparison.json",
+        "independent_moneyline_challenger": "xgb_direct (direct XGBoost binary classifier) -- may disagree with the coherent model (model_family_disagreement) but must never generate spread/total",
+        "score_distribution_family": "negative_binomial -- best OOF log loss per outputs/rebuild/mlb_distribution_comparison.json",
+        "calibration_method": "temperature scaling, selected independently per model via 4-method (identity/Platt/temperature/isotonic) chronological cross-fit comparison, outputs/rebuild/mlb_calibration_comparison.json; calibrator artifacts config/models/challengers/mlb-{two_head,xgb_two_head,xgb_direct}-calibrator-v1.json",
+        "ensemble_decision": "no ensemble -- meta-cross-fit comparison (outputs/rebuild/mlb_calibrated_ensemble_comparison.json) found every ensemble method scores worse than or indistinguishable from the single best calibrated model alone; the single calibrated xgb_two_head model is used directly, not a constructed ensemble",
+        "feature_schema": "MLB_INTENSITY_FEATURES / MLB_DIFFERENTIAL_FEATURES / XGB_DIRECT_FEATURES as defined in src/model_prediction/rebuild/mlb_features.py at commit 0ede6e6"
+      }
+    },
     "mlb_spread": {
       "test_start": null,
       "test_end": null,

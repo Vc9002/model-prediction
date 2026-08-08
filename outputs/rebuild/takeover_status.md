@@ -2404,3 +2404,45 @@ touched files.
 definition -- chronologically later than the consumed range, recorded
 `consumed=false`), then Task 19 (start Part 3 prospective market/
 closing-price/settlement collection in parallel).
+
+## Checkpoint: Task 18 -- prepare (not evaluate) the replacement final test (2026-08-09)
+
+Added `mlb_moneyline_v2` to `outputs/rebuild/test_consumption_registry.json`'s
+`active_tests`, per the explicit, deliberate, authorized Task 18 process
+(the one process allowed to touch this file outside the two registry-writing
+training scripts). Does not modify or remove the existing consumed
+`mlb_moneyline` entry.
+
+**Real boundary chosen**: `test_start = 2026-08-07T01:45Z` -- strictly after
+the last real completed game (`2026-08-07T01:40Z`) used anywhere in Task
+12-17's model-family/calibration/ensemble selection (dataset_hash
+`b3d8249d46ec...`). `test_end` is intentionally left open (`null`): a real
+check of `data/rebuild/normalized/mlb/scoreboard.parquet` confirms zero
+completed games exist after that cutoff as of this checkpoint, so there is
+nothing to evaluate yet, and nothing was evaluated. The range will be
+closed and the test evaluated only once enough new games have genuinely
+accumulated -- not before, and not peeked at in the meantime.
+
+**Frozen choices recorded in the registry entry itself** (satisfying the
+registry's own `features_hyperparams_ensemble_calibrator_must_be_frozen_before_test`
+policy field): primary moneyline model (`xgb_two_head`, temperature-calibrated),
+independent moneyline challenger (`xgb_direct`, may disagree but never
+overwrites spread/total), score-distribution family (`negative_binomial`),
+calibration method (temperature scaling, real per-model cross-fit
+selection), ensemble decision (none -- real meta-cross-fit comparison
+found ensembling adds no value, so the single calibrated model is used
+directly), and feature schema (`mlb_features.py` at commit `0ede6e6`).
+
+**Verified before editing**: `train_mlb_rebuild_real_features.py` (the
+script that writes `mlb_moneyline`'s consumption state) assigns
+`registry["active_tests"]["mlb_moneyline"] = {...}` by key, not a full-dict
+replacement -- so a future run of that script cannot silently clobber the
+new `mlb_moneyline_v2` entry.
+
+**Tests**: still 1196 pass, 1 skipped (no test parses the registry's key
+set with a fixed-membership assumption -- confirmed by grep before editing).
+
+**Next**: Task 19 -- start Part 3 prospective market/closing-price/
+settlement collection in parallel (does not require the new final test to
+be evaluated first; only requires it to exist and stay untouched, which it
+now does).
