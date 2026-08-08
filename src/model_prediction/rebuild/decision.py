@@ -66,6 +66,26 @@ class SportsForecast:
     # unchanged.
     totals_probabilities_lower: dict[float, dict[str, float]] = field(default_factory=dict)
     spread_probabilities_lower: dict[float, dict[str, float]] = field(default_factory=dict)
+    # Multi-sport execution spec MLB-5: the full uncertainty decomposition
+    # (uncertainty.py), wired into the live moneyline forecast. All default
+    # to real "not computed" values (0.0 / empty / None), not fabricated
+    # non-zero numbers, so callers/tests that don't populate them keep
+    # working unchanged.
+    model_disagreement: float = 0.0
+    calibration_uncertainty: float = 0.0
+    missingness_penalty: float = 0.0
+    missing_flags: list[str] = field(default_factory=list)
+    # None means "unavailable" (no real timestamp-valid lineup source) --
+    # never fabricated as 0.0, which would silently claim zero real risk.
+    lineup_uncertainty: float | None = None
+    # Real composed conservative probability per side (bootstrap bound +
+    # model_disagreement + calibration_uncertainty + missingness_penalty +
+    # lineup_uncertainty, uncertainty.compose_conservative_probability()).
+    # When populated, this is the real, preferred source for the decision
+    # gate over the plainer `probability_lower` (see evaluate_game()/
+    # decide_team_market() below); empty for callers that don't compute it,
+    # which then fall back to `probability_lower` unchanged.
+    conservative_probabilities: dict[str, float] = field(default_factory=dict)
 
     def frozen_totals_side(self, line: float) -> Literal["over", "under"] | None:
         """The more probable side for this exact line, decided from the
@@ -194,7 +214,17 @@ def decide_team_market(
         lower_line_probs = forecast.spread_probabilities_lower.get(candidate.line, {})
         conservative_prob = lower_line_probs.get(forecast.predicted_winner, model_prob)
     else:
-        conservative_prob = forecast.probability_lower[forecast.predicted_winner]
+        # MLB-5: prefer the real, fully-composed conservative probability
+        # (bootstrap bound + model_disagreement + calibration_uncertainty
+        # + missingness_penalty + lineup_uncertainty) when the forecast
+        # populated it; fall back to the plainer bootstrap-only
+        # probability_lower for any caller/sport/test that doesn't (never
+        # an error -- conservative_probabilities defaults to an empty
+        # dict, so this is a real, backward-compatible preference, not a
+        # required field).
+        conservative_prob = forecast.conservative_probabilities.get(
+            forecast.predicted_winner, forecast.probability_lower[forecast.predicted_winner],
+        )
         model_prob = forecast.calibrated_probabilities[forecast.predicted_winner]
 
     cost_adjusted_edge = conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin

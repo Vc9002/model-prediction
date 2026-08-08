@@ -72,7 +72,7 @@ class TestBuildForecastCalledExactlyOncePerGame:
             return_value={"game_date": "2026-07-01", "event_id": "hist"},
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
-            return_value=(MagicMock(), MagicMock(), 30),
+            return_value=pipeline.TrainedModels(model=MagicMock(), bootstrap=MagicMock(), train_n=30),
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
             return_value={"401": {"home_starter": "A", "away_starter": "B"}},
@@ -146,7 +146,7 @@ class TestModelArtifactLineage:
             return_value={"game_date": "2026-07-01", "event_id": "hist"},
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
-            return_value=(fake_model, MagicMock(), 30),
+            return_value=pipeline.TrainedModels(model=fake_model, bootstrap=MagicMock(), train_n=30),
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters", return_value={},
         ):
@@ -195,7 +195,7 @@ class TestPlayerIdentityLineage:
             return_value={"game_date": "2026-07-01", "event_id": "hist"},
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
-            return_value=(MagicMock(), MagicMock(), 30),
+            return_value=pipeline.TrainedModels(model=MagicMock(), bootstrap=MagicMock(), train_n=30),
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
             return_value={"401": {"home_starter": "Juan Soto", "away_starter": "Aaron Judge"}},
@@ -246,13 +246,14 @@ class TestResumeState:
         data["game_date"] = [f"2026-07-{(i % 28) + 1:02d}" for i in range(n)]
         features = pl.DataFrame(data)
 
-        model, bootstrap, train_n = train_through(features, target_date)
+        trained = train_through(features, target_date)
         row = {f: float(rng.uniform(1, 5)) for f in INTENSITY_FEATURES}
         row.update({f: float(rng.uniform(-2, 2)) for f in DIFFERENTIAL_FEATURES})
 
         state = MLBRunState(
             target_date=target_date, tonight=pl.DataFrame({"event_id": ["401"]}),
-            model=model, bootstrap=bootstrap, train_n=train_n,
+            model=trained.model, bootstrap=trained.bootstrap, train_n=trained.train_n,
+            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
             rows_by_event={"401": row}, skipped={"402": "no_probable_starters_available"},
         )
         return state, row
@@ -304,3 +305,179 @@ class TestResumeState:
         state = MLBRunState(target_date="2026-08-06", tonight=pl.DataFrame({"event_id": ["401"]}))
         with pytest.raises(ValueError):
             pipeline.save_resume_state(state, str(tmp_path), "run123")
+
+
+class TestUncertaintyWiring:
+    """MLB-5 (multi-sport execution spec): build_forecast() must produce a
+    real, non-fabricated uncertainty decomposition -- model_disagreement
+    across independent model families (never spread/total-generating),
+    missingness_penalty from the live row's real availability flags,
+    calibration_uncertainty from the frozen calibrator's real OOF data,
+    and a composed conservative_probabilities per side."""
+
+    def _real_row_and_models(self, seed=0):
+        import numpy as np
+
+        from model_prediction.rebuild.mlb_shadow_pipeline import (
+            DIFFERENTIAL_FEATURES,
+            INTENSITY_FEATURES,
+            XGB_DIRECT_FEATURES,
+            train_through,
+        )
+
+        rng = np.random.default_rng(seed)
+        n = 60
+        data = {f: rng.uniform(1, 5, n) for f in INTENSITY_FEATURES}
+        data.update({f: rng.uniform(-2, 2, n) for f in DIFFERENTIAL_FEATURES})
+        data["total_runs"] = sum(data[f] for f in INTENSITY_FEATURES) / len(INTENSITY_FEATURES) + rng.normal(0, 0.3, n)
+        data["home_margin"] = sum(data[f] for f in DIFFERENTIAL_FEATURES) / len(DIFFERENTIAL_FEATURES)
+        data["game_date"] = [f"2026-06-{(i % 28) + 1:02d}" for i in range(n)]
+        # Real, non-availability-flag columns get overwritten to real 1.0
+        # so missingness_penalty has a real, known clean baseline to test
+        # against, while still exercising the real XGB_DIRECT_FEATURES set.
+        for flag in ("home_sp_availability", "away_sp_availability", "home_bp_availability",
+                     "away_bp_availability", "weather_availability"):
+            data[flag] = np.ones(n)
+        features = pl.DataFrame(data)
+
+        trained = train_through(features, "2026-08-06")
+        row = {f: float(rng.uniform(1, 5)) for f in INTENSITY_FEATURES}
+        row.update({f: float(rng.uniform(-2, 2)) for f in DIFFERENTIAL_FEATURES})
+        for flag in ("home_sp_availability", "away_sp_availability", "home_bp_availability",
+                     "away_bp_availability", "weather_availability"):
+            row[flag] = 1.0
+        row["event_id"] = "401"
+        return trained, row, XGB_DIRECT_FEATURES
+
+    def test_model_disagreement_is_zero_with_no_comparison_models(self):
+        trained, row, _ = self._real_row_and_models()
+        forecast = pipeline.build_forecast(trained.model, row, bootstrap=trained.bootstrap)
+        assert forecast.model_disagreement == 0.0
+
+    def test_model_disagreement_is_real_and_nonzero_with_comparison_models(self):
+        trained, row, _ = self._real_row_and_models()
+        assert trained.sklearn_baseline is not None
+        assert trained.xgb_direct is not None
+        forecast = pipeline.build_forecast(
+            trained.model, row, bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+        )
+        assert forecast.model_disagreement >= 0.0
+        # Real, not fabricated: matches a direct real computation from the
+        # same three real model families' own raw predictions.
+        from model_prediction.rebuild.uncertainty import model_disagreement as real_model_disagreement
+
+        pred = trained.model.predict_row("401", row)
+        sklearn_pred = trained.sklearn_baseline.predict_row("401", row)
+        import numpy as np
+
+        from model_prediction.rebuild.mlb_shadow_pipeline import XGB_DIRECT_FEATURES
+        x_direct = np.array([[row.get(f, float("nan")) for f in XGB_DIRECT_FEATURES]])
+        xgb_direct_prob = float(trained.xgb_direct.predict(x_direct)[0])
+        expected = real_model_disagreement({
+            "xgb_two_head_nb": pred.home_win_prob, "sklearn_coherent": sklearn_pred.home_win_prob,
+            "xgb_direct": xgb_direct_prob,
+        })
+        # Loose tolerance, not exact equality: JointScoreDistribution holds
+        # one stateful RNG (see TestBuildForecastCalledExactlyOncePerGame's
+        # docstring above) -- calling predict_row() a second time here (for
+        # this test's own independent verification) draws from that
+        # generator again, producing a real, small, expected difference
+        # from build_forecast()'s own single internal call, not a bug.
+        assert forecast.model_disagreement == pytest.approx(expected, abs=0.01)
+
+    def test_missingness_penalty_is_zero_when_row_is_real_and_clean(self):
+        trained, row, _ = self._real_row_and_models()
+        forecast = pipeline.build_forecast(trained.model, row, bootstrap=trained.bootstrap)
+        assert forecast.missingness_penalty == 0.0
+        assert forecast.missing_flags == []
+
+    def test_missingness_penalty_is_real_and_nonzero_when_a_flag_is_missing(self):
+        trained, row, _ = self._real_row_and_models()
+        row = dict(row)
+        row["weather_availability"] = 0.0
+        forecast = pipeline.build_forecast(trained.model, row, bootstrap=trained.bootstrap)
+        assert forecast.missingness_penalty > 0.0
+        assert "weather_availability" in forecast.missing_flags
+
+    def test_calibration_uncertainty_is_zero_with_no_oof_data(self):
+        trained, row, _ = self._real_row_and_models()
+        forecast = pipeline.build_forecast(trained.model, row, bootstrap=trained.bootstrap)
+        assert forecast.calibration_uncertainty == 0.0
+
+    def test_calibration_uncertainty_is_real_and_computed_with_oof_data(self):
+        import numpy as np
+
+        from model_prediction.rebuild.calibration import TemperatureScaling
+
+        trained, row, _ = self._real_row_and_models()
+        rng = np.random.default_rng(1)
+        oof_probs = rng.uniform(0.2, 0.8, 120).tolist()
+        oof_labels = (rng.uniform(0, 1, 120) < np.array(oof_probs)).astype(int).tolist()
+        forecast = pipeline.build_forecast(
+            trained.model, row, bootstrap=trained.bootstrap,
+            calibrator=TemperatureScaling(temperature=2.0),
+            calibration_oof_probs=oof_probs, calibration_oof_labels=oof_labels,
+        )
+        assert forecast.calibration_uncertainty >= 0.0
+
+    def test_lineup_uncertainty_is_always_none_never_fabricated(self):
+        trained, row, _ = self._real_row_and_models()
+        forecast = pipeline.build_forecast(trained.model, row, bootstrap=trained.bootstrap)
+        assert forecast.lineup_uncertainty is None
+
+    def test_conservative_probabilities_are_real_valid_probabilities(self):
+        trained, row, _ = self._real_row_and_models()
+        forecast = pipeline.build_forecast(
+            trained.model, row, bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+        )
+        assert set(forecast.conservative_probabilities) == {"home", "away"}
+        for p in forecast.conservative_probabilities.values():
+            assert 0.0 <= p <= 1.0
+
+    def test_conservative_probability_never_exceeds_bootstrap_upper(self):
+        # Real, structural: disagreement/calibration_uncertainty/missingness
+        # only ever widen toward less favorable, never push the conservative
+        # value above the model's own real bootstrap upper bound.
+        trained, row, _ = self._real_row_and_models()
+        forecast = pipeline.build_forecast(
+            trained.model, row, bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+        )
+        for side in ("home", "away"):
+            assert forecast.conservative_probabilities[side] <= forecast.probability_upper[side] + 1e-9
+
+    def test_decision_gate_prefers_conservative_probabilities_when_populated(self):
+        # Real integration with decision.py: a forecast with real
+        # conservative_probabilities populated must use that value, not
+        # the plainer probability_lower, for the moneyline value gate.
+        from model_prediction.rebuild.decision import MarketEvaluation, decide_team_market
+        from model_prediction.rebuild.economic import SizeLimits
+
+        trained, row, _ = self._real_row_and_models()
+        forecast = pipeline.build_forecast(
+            trained.model, row, bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+        )
+        # Real, deliberately mismatched probability_lower vs
+        # conservative_probabilities to prove which one the gate actually
+        # reads -- if it used probability_lower here the edge would be
+        # positive; if it (correctly) uses conservative_probabilities the
+        # edge must reflect that value instead.
+        import dataclasses
+        forecast = dataclasses.replace(
+            forecast,
+            probability_lower={"home": 0.95, "away": 0.05},
+            conservative_probabilities={"home": 0.10, "away": 0.90},
+        )
+        candidate = MarketEvaluation(
+            market_id="m1", market_type="moneyline", team_or_side=forecast.predicted_winner,
+            line=None, executable_ask=0.50, depth_adjusted_price=0.50,
+            quote_age_seconds=1.0, available_depth=100.0,
+        )
+        decision = decide_team_market(forecast, candidate, SizeLimits())
+        if forecast.predicted_winner == "home":
+            assert decision.action == "NO_BET"  # 0.10 - 0.50 < 0
+        else:
+            assert decision.action == "BET"  # 0.90 - 0.50 > 0

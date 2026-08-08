@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import polars as pl
 
 from .calibration import Calibrator, IdentityCalibrator, load_calibrator
@@ -50,7 +51,14 @@ from .mlb_market_matching import (
     real_total_lines,
     resolve_polymarket_event_id,
 )
-from .models import BootstrapMLBEnsemble, XGBoostTwoHeadModel
+from .models import BootstrapMLBEnsemble, MLBTwoHeadModel, XGBoostTwoHeadModel
+from .uncertainty import (
+    calibration_uncertainty,
+    compose_conservative_probability,
+    missingness_penalty,
+    model_disagreement,
+)
+from .xgboost_stress import XGBoostChallenger
 
 HORIZON_LATE = "late"
 DECISION_POLICY_VERSION = "winner_first_v1"
@@ -72,23 +80,43 @@ FROZEN_DISTRIBUTION_METHOD = "negative_binomial"
 FROZEN_CALIBRATOR_ARTIFACT_PATH = "config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
 
 
-def load_frozen_calibrator(artifact_path: str = FROZEN_CALIBRATOR_ARTIFACT_PATH) -> tuple[Calibrator, str]:
-    """Real, no-refit load of the frozen calibrator artifact. Returns
-    (calibrator, calibrator_hash) -- the hash is the artifact's own
-    persisted `calibrator_hash`, not recomputed, so it always matches
-    exactly what train_mlb_head_distribution_cartesian.py wrote.
+@dataclass
+class FrozenCalibratorBundle:
+    """Everything MLB-2/MLB-5 need from the persisted calibrator artifact:
+    the reconstructed calibrator itself, its real hash, and the real OOF
+    probabilities/labels it was fit on (MLB-5's real
+    calibration_uncertainty bootstrap resamples this exact data -- there is
+    no other real source for it live)."""
+    calibrator: Calibrator
+    calibrator_hash: str
+    oof_probs: list[float] = field(default_factory=list)
+    oof_labels: list[int] = field(default_factory=list)
 
-    Fails closed to IdentityCalibrator with an empty hash (never silently
-    fabricates a hash) if the artifact does not exist -- this is a real,
-    disclosed degraded state (raw_probability == calibrated_probability),
-    not a crash, so a shadow run can still produce honestly-labeled
-    uncalibrated forecasts rather than refuse to run entirely."""
+
+def load_frozen_calibrator(artifact_path: str = FROZEN_CALIBRATOR_ARTIFACT_PATH) -> FrozenCalibratorBundle:
+    """Real, no-refit load of the frozen calibrator artifact.
+    `calibrator_hash` is the artifact's own persisted value, not
+    recomputed, so it always matches exactly what
+    train_mlb_head_distribution_cartesian.py wrote.
+
+    Fails closed to IdentityCalibrator with an empty hash and empty OOF
+    arrays (never fabricates any of it) if the artifact does not exist --
+    a real, disclosed degraded state (raw_probability ==
+    calibrated_probability, calibration_uncertainty forced to 0.0 downstream
+    since there is no real data to bootstrap), not a crash, so a shadow run
+    can still produce honestly-labeled uncalibrated forecasts rather than
+    refuse to run entirely."""
     path = Path(artifact_path)
     if not path.exists():
-        return IdentityCalibrator(), ""
+        return FrozenCalibratorBundle(IdentityCalibrator(), "")
     artifact = json.loads(path.read_text())
     calibrator = load_calibrator(artifact["method"], artifact["parameters"])
-    return calibrator, artifact.get("calibrator_hash", "")
+    return FrozenCalibratorBundle(
+        calibrator=calibrator,
+        calibrator_hash=artifact.get("calibrator_hash", ""),
+        oof_probs=artifact.get("oof_probs", []),
+        oof_labels=artifact.get("oof_labels", []),
+    )
 
 
 # Task 5: the one shared feature-list definition (mlb_features.py), also
@@ -99,7 +127,25 @@ INTENSITY_FEATURES = MLB_INTENSITY_FEATURES
 DIFFERENTIAL_FEATURES = MLB_DIFFERENTIAL_FEATURES
 
 
-def train_through(features: pl.DataFrame, cutoff_date: str) -> tuple[XGBoostTwoHeadModel, BootstrapMLBEnsemble, int]:
+XGB_DIRECT_FEATURES = list(dict.fromkeys(INTENSITY_FEATURES + DIFFERENTIAL_FEATURES))
+
+
+@dataclass
+class TrainedModels:
+    """Real walk-forward-trained models for one decision date: the frozen
+    primary combination plus two independent model families used only for
+    MLB-5's real model_disagreement measurement (multi-sport execution
+    spec) -- never for spread/total, per CLAUDE.md's architecture rule that
+    a disconnected classifier may contribute disagreement evidence but must
+    never generate spread/total on its own."""
+    model: XGBoostTwoHeadModel
+    bootstrap: BootstrapMLBEnsemble
+    train_n: int
+    sklearn_baseline: MLBTwoHeadModel | None = None
+    xgb_direct: XGBoostChallenger | None = None
+
+
+def train_through(features: pl.DataFrame, cutoff_date: str) -> TrainedModels:
     """Walk-forward retrain: fit only on games strictly before cutoff_date,
     using the exact frozen mlb_moneyline_v2 combination (XGBoost heads +
     negative-binomial distribution -- FROZEN_HEAD_FAMILY/
@@ -115,15 +161,51 @@ def train_through(features: pl.DataFrame, cutoff_date: str) -> tuple[XGBoostTwoH
     walk-forward refit.
 
     Also fits a BootstrapMLBEnsemble on the identical training data and
-    identical head family, used by build_forecast() for real
-    conservative_probability bounds (CLAUDE.md's bootstrap_uncertainty
-    requirement) instead of a fixed haircut."""
+    identical head family (real conservative_probability bounds), plus two
+    independent model families (MLB-5): a sklearn coherent baseline
+    (MLBTwoHeadModel, default Poisson) and a direct XGBoost binary
+    classifier (XGBoostChallenger) -- real, live model-family disagreement
+    inputs, never a spread/total source. Both are skipped (None) when there
+    isn't enough real training data for a real chronological validation
+    tail, rather than fit on a degenerate split."""
     train = features.filter(pl.col("game_date") < cutoff_date)
     model = XGBoostTwoHeadModel(seed=42, method=FROZEN_DISTRIBUTION_METHOD)
     model.fit(train, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
     bootstrap = BootstrapMLBEnsemble(n_bootstrap=20, seed=42, head_family=FROZEN_HEAD_FAMILY)
     bootstrap.fit(train, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
-    return model, bootstrap, train.height
+
+    sklearn_baseline: MLBTwoHeadModel | None = None
+    xgb_direct: XGBoostChallenger | None = None
+    if train.height >= 30:
+        sklearn_baseline = MLBTwoHeadModel(seed=42)
+        sklearn_baseline.fit(train, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
+
+        # Real chronological validation tail (last ~15% of real training
+        # dates) for XGBoostChallenger's early stopping -- never a random
+        # split, matching every other chronological split in this codebase.
+        dates = sorted(train["game_date"].unique().to_list())
+        tail_start_idx = max(1, int(len(dates) * 0.85))
+        tail_start = dates[tail_start_idx]
+        fit_rows = train.filter(pl.col("game_date") < tail_start)
+        eval_rows = train.filter(pl.col("game_date") >= tail_start)
+        if fit_rows.height >= 20 and eval_rows.height >= 5:
+            # Derived from home_margin (already a required training column
+            # for the differential head, home_margin = home_score -
+            # away_score by construction) rather than home_score/away_score
+            # directly -- avoids introducing a new column dependency real
+            # callers/tests that only ever populated total_runs/home_margin
+            # wouldn't have.
+            X_fit = fit_rows.select(XGB_DIRECT_FEATURES).to_numpy()
+            y_fit = fit_rows.select((pl.col("home_margin") > 0).cast(pl.Int8).alias("y")).to_numpy().ravel()
+            X_eval = eval_rows.select(XGB_DIRECT_FEATURES).to_numpy()
+            y_eval = eval_rows.select((pl.col("home_margin") > 0).cast(pl.Int8).alias("y")).to_numpy().ravel()
+            xgb_direct = XGBoostChallenger(seed=42)
+            xgb_direct.fit(X_fit, y_fit, XGB_DIRECT_FEATURES, eval_set=(X_eval, y_eval))
+
+    return TrainedModels(
+        model=model, bootstrap=bootstrap, train_n=train.height,
+        sklearn_baseline=sklearn_baseline, xgb_direct=xgb_direct,
+    )
 
 
 def build_forecast(
@@ -135,6 +217,10 @@ def build_forecast(
     uncertainty_haircut: float = 0.03,
     calibrator: Calibrator | None = None,
     calibrator_hash: str = "",
+    sklearn_baseline: MLBTwoHeadModel | None = None,
+    xgb_direct: XGBoostChallenger | None = None,
+    calibration_oof_probs: list[float] | None = None,
+    calibration_oof_labels: list[int] | None = None,
 ) -> SportsForecast:
     """`calibrator`/`calibrator_hash` (multi-sport execution spec MLB-2):
     real, cross-fit-validated calibration applied to the moneyline
@@ -149,13 +235,46 @@ def build_forecast(
     never cross-fit a totals/spread calibrator). totals_probabilities/
     spread_probabilities stay real, uncalibrated sports-only probabilities,
     disclosed here rather than silently calibrated with an unvalidated
-    transform."""
+    transform.
+
+    `sklearn_baseline`/`xgb_direct` (MLB-5): two independent model
+    families, used ONLY to measure real model_disagreement -- neither ever
+    generates spread/total (CLAUDE.md's architecture rule). Missing
+    (None, e.g. too little real training data) real, disclosed degrades
+    model_disagreement to 0.0, not a fabricated number.
+    `calibration_oof_probs`/`calibration_oof_labels` (MLB-5): the frozen
+    calibrator's own real OOF fitting data, used to bootstrap a real
+    calibration_uncertainty; empty real, disclosed degrades it to 0.0."""
     pred = model.predict_row(row["event_id"], row)
     calibrator = calibrator if calibrator is not None else IdentityCalibrator()
     raw = {"home": pred.home_win_prob, "away": pred.away_win_prob}
     calibrated_home = calibrator.transform(pred.home_win_prob)
     calibrated = {"home": calibrated_home, "away": 1.0 - calibrated_home}
     predicted_winner: Literal["home", "away"] = "home" if calibrated["home"] >= calibrated["away"] else "away"
+
+    # MLB-5: real model-family disagreement, on RAW (uncalibrated)
+    # probabilities from each independent family -- comparing a calibrated
+    # probability against two raw ones would conflate calibration
+    # correction with genuine model disagreement, not measure either
+    # cleanly. Only families that actually fit (real training-data
+    # requirements met) contribute; a family that never trained isn't
+    # silently treated as "agreeing."
+    disagreement_probs: dict[str, float] = {"xgb_two_head_nb": pred.home_win_prob}
+    if sklearn_baseline is not None:
+        sklearn_pred = sklearn_baseline.predict_row(row["event_id"], row)
+        disagreement_probs["sklearn_coherent"] = sklearn_pred.home_win_prob
+    if xgb_direct is not None:
+        x_direct = np.array([[row.get(f, float("nan")) for f in XGB_DIRECT_FEATURES]])
+        disagreement_probs["xgb_direct"] = float(xgb_direct.predict(x_direct)[0])
+    real_model_disagreement = model_disagreement(disagreement_probs)
+
+    real_missingness_penalty, real_missing_flags = missingness_penalty(row)
+
+    real_calibration_uncertainty = 0.0
+    if calibration_oof_probs and calibration_oof_labels:
+        real_calibration_uncertainty = calibration_uncertainty(
+            pred.home_win_prob, calibration_oof_probs, calibration_oof_labels, calibrator.method,
+        )
 
     totals_probabilities: dict[float, dict[str, float]] = {}
     totals_probabilities_lower: dict[float, dict[str, float]] = {}
@@ -234,6 +353,24 @@ def build_forecast(
             )
             spread_probabilities_lower.setdefault(line, {})[side] = cover_lower
 
+    # MLB-5: real conservative_probability per side, composing the
+    # bootstrap bound (already calibrated-space, above) with real
+    # model_disagreement/calibration_uncertainty/missingness_penalty.
+    # lineup_uncertainty stays None ("unavailable") -- no real
+    # timestamp-valid lineup source exists, never fabricated.
+    conservative_probabilities: dict[str, float] = {}
+    for side in ("home", "away"):
+        result = compose_conservative_probability(
+            calibrated_probability=calibrated[side],
+            bootstrap_lower=lower[side], bootstrap_upper=upper[side],
+            model_disagreement=real_model_disagreement,
+            calibration_uncertainty=real_calibration_uncertainty,
+            missingness_penalty=real_missingness_penalty,
+            raw_probability=raw[side], missing_flags=real_missing_flags,
+            lineup_uncertainty=None,
+        )
+        conservative_probabilities[side] = result.conservative_probability
+
     return SportsForecast(
         event_id=row["event_id"], predicted_winner=predicted_winner,
         raw_probabilities=raw, calibrated_probabilities=calibrated,
@@ -245,6 +382,12 @@ def build_forecast(
         spread_probabilities=spread_probabilities,
         totals_probabilities_lower=totals_probabilities_lower,
         spread_probabilities_lower=spread_probabilities_lower,
+        model_disagreement=real_model_disagreement,
+        calibration_uncertainty=real_calibration_uncertainty,
+        missingness_penalty=real_missingness_penalty,
+        missing_flags=real_missing_flags,
+        lineup_uncertainty=None,
+        conservative_probabilities=conservative_probabilities,
     )
 
 
@@ -264,6 +407,10 @@ class MLBRunState:
     starters: pl.DataFrame = field(default_factory=pl.DataFrame)
     model: XGBoostTwoHeadModel | None = None
     bootstrap: BootstrapMLBEnsemble | None = None
+    # MLB-5: independent model families, used only for real
+    # model_disagreement measurement -- never spread/total.
+    sklearn_baseline: MLBTwoHeadModel | None = None
+    xgb_direct: XGBoostChallenger | None = None
     train_n: int = 0
     decision_times: dict[str, datetime] = field(default_factory=dict)
     rows_by_event: dict[str, dict] = field(default_factory=dict)  # real feature row per game
@@ -434,7 +581,9 @@ def predict_stage(
     if features.height < 30:
         return {"status": "insufficient_history", "historical_games": features.height}
 
-    state.model, state.bootstrap, state.train_n = train_through(features, state.target_date)
+    trained = train_through(features, state.target_date)
+    state.model, state.bootstrap, state.train_n = trained.model, trained.bootstrap, trained.train_n
+    state.sklearn_baseline, state.xgb_direct = trained.sklearn_baseline, trained.xgb_direct
 
     if ledger is not None and run_id is not None:
         # Real lineage: the trained model artifact this run's predictions
@@ -598,10 +747,11 @@ def decide_stage(
     if state.model is None:
         raise ValueError("decide_stage requires predict_stage to have run first (state.model is None)")
 
-    # MLB-2: loaded once per decide_stage() call, not once per game --
+    # MLB-2/MLB-5: loaded once per decide_stage() call, not once per game --
     # "the calibrator" is one frozen artifact for the whole run, never
-    # refit or reselected per prediction.
-    calibrator, calibrator_hash = load_frozen_calibrator()
+    # refit or reselected per prediction. Its real OOF probs/labels feed
+    # MLB-5's calibration_uncertainty bootstrap below.
+    calibrator_bundle = load_frozen_calibrator()
 
     limits = limits if limits is not None else SizeLimits()
     games_report = []
@@ -625,7 +775,9 @@ def decide_stage(
         # (build_forecast recomputes deterministically from the same model/row).
         forecast = build_forecast(
             state.model, row, total_lines, spread_pairs, bootstrap=state.bootstrap,
-            calibrator=calibrator, calibrator_hash=calibrator_hash,
+            calibrator=calibrator_bundle.calibrator, calibrator_hash=calibrator_bundle.calibrator_hash,
+            sklearn_baseline=state.sklearn_baseline, xgb_direct=state.xgb_direct,
+            calibration_oof_probs=calibrator_bundle.oof_probs, calibration_oof_labels=calibrator_bundle.oof_labels,
         )
         state.forecasts[event_id] = forecast
 

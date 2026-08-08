@@ -270,7 +270,13 @@ class ShadowLedger:
                 model_artifact_hash TEXT NOT NULL,
                 calibration_artifact_hash TEXT NOT NULL,
                 totals_probabilities_json TEXT,
-                spread_probabilities_json TEXT
+                spread_probabilities_json TEXT,
+                model_disagreement REAL,
+                calibration_uncertainty REAL,
+                missingness_penalty REAL,
+                missing_flags_json TEXT,
+                lineup_uncertainty REAL,
+                conservative_probabilities_json TEXT
             );
 
             -- "Ideally" idempotent per the plan: a rerun with identical
@@ -486,11 +492,31 @@ class ShadowLedger:
                 event_hash TEXT NOT NULL
             );
         """)
+        self._migrate_predictions_uncertainty_columns()
         self.conn.execute(
             "INSERT OR IGNORE INTO _meta(key, value) VALUES(?, ?)",
             ("schema_version", SCHEMA_VERSION),
         )
         self.conn.commit()
+
+    def _migrate_predictions_uncertainty_columns(self) -> None:
+        """Real migration for `predictions` rows created before MLB-5
+        (multi-sport execution spec) added the uncertainty-decomposition
+        columns: `CREATE TABLE IF NOT EXISTS` alone does not add columns to
+        an already-existing real table (this repo's own
+        `data/rebuild/shadow.db` has real predictions rows from before this
+        change). Each `ALTER TABLE ADD COLUMN` is individually guarded --
+        SQLite has no `ADD COLUMN IF NOT EXISTS` -- so re-running this on an
+        already-migrated database is a real no-op, not an error."""
+        existing_cols = {row["name"] for row in self.conn.execute("PRAGMA table_info(predictions)").fetchall()}
+        new_columns = {
+            "model_disagreement": "REAL", "calibration_uncertainty": "REAL",
+            "missingness_penalty": "REAL", "missing_flags_json": "TEXT",
+            "lineup_uncertainty": "REAL", "conservative_probabilities_json": "TEXT",
+        }
+        for name, col_type in new_columns.items():
+            if name not in existing_cols:
+                self.conn.execute(f"ALTER TABLE predictions ADD COLUMN {name} {col_type}")
 
     # ── runs ──────────────────────────────────────────────────────────
 
@@ -618,8 +644,10 @@ class ShadowLedger:
                     decision_time_utc, predicted_winner, raw_probabilities_json,
                     calibrated_probabilities_json, probability_lower_json, probability_upper_json,
                     expected_home_score, expected_away_score, model_artifact_hash,
-                    calibration_artifact_hash, totals_probabilities_json, spread_probabilities_json
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    calibration_artifact_hash, totals_probabilities_json, spread_probabilities_json,
+                    model_disagreement, calibration_uncertainty, missingness_penalty,
+                    missing_flags_json, lineup_uncertainty, conservative_probabilities_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     utc_now(), run_id, sport, event_id, horizon, schema_version, supersedes_id,
                     decision_time_utc, f.get("predicted_winner"),
@@ -631,6 +659,9 @@ class ShadowLedger:
                     model_artifact_hash, calibration_artifact_hash,
                     json.dumps(f.get("totals_probabilities", {})),
                     json.dumps(f.get("spread_probabilities", {})),
+                    f.get("model_disagreement"), f.get("calibration_uncertainty"),
+                    f.get("missingness_penalty"), json.dumps(f.get("missing_flags", [])),
+                    f.get("lineup_uncertainty"), json.dumps(f.get("conservative_probabilities", {})),
                 ),
             )
         except sqlite3.IntegrityError:

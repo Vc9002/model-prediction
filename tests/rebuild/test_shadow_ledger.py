@@ -26,6 +26,7 @@ dataclass instance directly, not just a same-shaped dict.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -51,6 +52,14 @@ class _SportsForecast:
     calibration_artifact_hash: str
     totals_probabilities: dict[float, dict[str, float]] = field(default_factory=dict)
     spread_probabilities: dict[float, dict[str, float]] = field(default_factory=dict)
+    totals_probabilities_lower: dict[float, dict[str, float]] = field(default_factory=dict)
+    spread_probabilities_lower: dict[float, dict[str, float]] = field(default_factory=dict)
+    model_disagreement: float = 0.0
+    calibration_uncertainty: float = 0.0
+    missingness_penalty: float = 0.0
+    missing_flags: list[str] = field(default_factory=list)
+    lineup_uncertainty: float | None = None
+    conservative_probabilities: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -290,6 +299,107 @@ class TestPredictionRecordingAcceptsRealDataclass:
     def test_as_dict_rejects_unrelated_types(self):
         with pytest.raises(TypeError):
             _as_dict(object())
+
+
+class TestPredictionUncertaintyColumns:
+    """MLB-5 (multi-sport execution spec): the uncertainty decomposition
+    (model_disagreement, calibration_uncertainty, missingness_penalty,
+    missing_flags, lineup_uncertainty, conservative_probabilities) must
+    round-trip through record_prediction()/get_prediction() -- not just
+    live transiently on the in-memory SportsForecast."""
+
+    def test_real_uncertainty_fields_round_trip(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        forecast = _forecast(
+            model_disagreement=0.09, calibration_uncertainty=0.02, missingness_penalty=0.04,
+            missing_flags=["weather_availability", "home_sp_availability"],
+            lineup_uncertainty=None, conservative_probabilities={"home": 0.50, "away": 0.44},
+        )
+        pred_id, created = ledger.record_prediction(
+            run_id=run_id, sport="mlb", event_id=forecast.event_id, horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=forecast,
+        )
+        assert created is True
+        row = ledger.get_prediction(pred_id)
+        assert row is not None
+        assert row["model_disagreement"] == pytest.approx(0.09)
+        assert row["calibration_uncertainty"] == pytest.approx(0.02)
+        assert row["missingness_penalty"] == pytest.approx(0.04)
+        assert json.loads(row["missing_flags_json"]) == ["weather_availability", "home_sp_availability"]
+        assert row["lineup_uncertainty"] is None
+        assert json.loads(row["conservative_probabilities_json"]) == {"home": 0.50, "away": 0.44}
+
+    def test_defaults_to_real_zero_not_fabricated_when_forecast_omits_them(self, ledger: ShadowLedger):
+        # A forecast dict (not the full dataclass) that doesn't populate
+        # the new fields at all must not crash or silently fabricate a
+        # nonzero value -- NULL/empty, matching "not computed."
+        run_id = ledger.record_run("mlb")
+        forecast_dict = {
+            "event_id": "mlb_2026-08-07_X_Y", "predicted_winner": "home",
+            "raw_probabilities": {"home": 0.5, "away": 0.5},
+            "calibrated_probabilities": {"home": 0.5, "away": 0.5},
+            "probability_lower": {"home": 0.45, "away": 0.45},
+            "probability_upper": {"home": 0.55, "away": 0.55},
+            "expected_home_score": 4.0, "expected_away_score": 4.0,
+            "model_artifact_hash": "model-x", "calibration_artifact_hash": "calib-x",
+        }
+        pred_id, _ = ledger.record_prediction(
+            run_id=run_id, sport="mlb", event_id="mlb_2026-08-07_X_Y", horizon="late",
+            decision_time_utc="2026-08-07T23:00:00+00:00", forecast=forecast_dict,
+        )
+        row = ledger.get_prediction(pred_id)
+        assert row is not None
+        assert row["model_disagreement"] is None
+        assert row["conservative_probabilities_json"] == "{}"
+
+    def test_migration_adds_columns_to_a_pre_existing_database(self, tmp_path: Path):
+        # Real, adversarial: simulate a real database created before MLB-5
+        # (a bare predictions table missing every new column), then confirm
+        # opening it with the current ShadowLedger migrates in place rather
+        # than crashing on the missing columns.
+        db_path = tmp_path / "legacy_shadow.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""
+            CREATE TABLE predictions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL, run_id TEXT, sport TEXT, event_id TEXT,
+                horizon TEXT, schema_version TEXT, supersedes_id INTEGER,
+                decision_time_utc TEXT, predicted_winner TEXT,
+                raw_probabilities_json TEXT, calibrated_probabilities_json TEXT,
+                probability_lower_json TEXT, probability_upper_json TEXT,
+                expected_home_score REAL, expected_away_score REAL,
+                model_artifact_hash TEXT, calibration_artifact_hash TEXT,
+                totals_probabilities_json TEXT, spread_probabilities_json TEXT
+            )
+        """)
+        conn.execute("CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, created_at TEXT, sport TEXT, run_type TEXT, horizon TEXT, status TEXT, params_json TEXT, schema_version TEXT)")
+        conn.commit()
+        conn.close()
+
+        migrated = ShadowLedger(db_path)
+        cols = {row["name"] for row in migrated.conn.execute("PRAGMA table_info(predictions)").fetchall()}
+        assert "model_disagreement" in cols
+        assert "conservative_probabilities_json" in cols
+
+        # And it's actually usable, not just present.
+        run_id = migrated.record_run("mlb")
+        forecast = _forecast(model_disagreement=0.05)
+        pred_id, created = migrated.record_prediction(
+            run_id=run_id, sport="mlb", event_id=forecast.event_id, horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=forecast,
+        )
+        assert created is True
+        row = migrated.get_prediction(pred_id)
+        assert row is not None
+        assert row["model_disagreement"] == pytest.approx(0.05)
+
+    def test_migration_is_idempotent_on_an_already_migrated_database(self, tmp_path: Path):
+        db_path = tmp_path / "shadow.db"
+        ShadowLedger(db_path)  # first open creates + migrates
+        # Second open must not raise "duplicate column name".
+        second = ShadowLedger(db_path)
+        cols = {row["name"] for row in second.conn.execute("PRAGMA table_info(predictions)").fetchall()}
+        assert "model_disagreement" in cols
 
 
 class TestPredictionAppendOnlyCorrections:

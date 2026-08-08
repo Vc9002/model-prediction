@@ -176,6 +176,15 @@ def main() -> None:
     calibrator_artifact["calibrator_hash"] = hashlib.sha256(
         json.dumps(calibrator_artifact, sort_keys=True, default=str).encode()
     ).hexdigest()
+    # Added after calibrator_hash is computed -- these are supplementary
+    # real evidence (the exact OOF rows the calibrator was fit on), not
+    # part of the calibrator's own identity, so calibrator_hash stays
+    # stable and doesn't change if this evidence is ever refreshed
+    # separately. MLB-5 (multi-sport execution spec) needs these live: a
+    # real calibration_uncertainty bootstrap requires resampling the
+    # actual calibration-fitting data, which nothing else persists.
+    calibrator_artifact["oof_probs"] = winner_oof["probs"]
+    calibrator_artifact["oof_labels"] = winner_oof["labels"]
     artifact_dir = Path("config/models/challengers")
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / f"mlb-{artifact_model_name}-calibrator-v1.json"
