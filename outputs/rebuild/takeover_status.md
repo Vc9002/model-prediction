@@ -2339,3 +2339,68 @@ after the real run.
 **Next**: Task 17 (refresh Part 2 benchmark -- `model_benchmark.md`/
 `.parquet`) is the last real Part 2 item before Task 18 (freeze the
 replacement final test) can even be prepared (not evaluated).
+
+## Checkpoint: Task 17 -- refresh Part 2 benchmark (2026-08-09)
+
+Consolidated every real Task 12-16 result (score-distribution comparison,
+raw and calibrated moneyline OOF, totals, spread, cross-fitted calibration,
+meta-cross-fit ensemble, uncertainty decomposition -- all sharing dataset_hash
+`b3d8249d46ec...`, real games 2026-07-01 to 2026-08-07, 435 matched, never
+touching the already-consumed final test) into `outputs/rebuild/model_benchmark.md`'s
+MLB section and a new machine-readable `outputs/rebuild/model_benchmark.parquet`
+(46 real rows, one per model/market/line/calibration-method combination
+actually reported by this session's comparison scripts).
+
+**Real gap found and fixed first**: `probability_for_market()`'s "spread"
+branch has the identical push-folding bug Task 13.5 fixed for totals --
+it always splits push mass 50/50 into home/away, so real push probability
+can never be recovered from home+away alone. Added
+`JointScoreDistribution.spread_market_breakdown()` (mirrors
+`total_market_breakdown()`) and wired a predeclared signed home-line grid
+`[-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]` into
+`train_mlb_score_model_comparison.py`, reporting real n/push/log_loss/Brier
+per (model, line) for the two coherent score models. Real, disclosed
+finding: push probability is 0 at every grid line by construction (the grid
+is all half-integer, matching the real MLB run-line convention, and real
+run margins are always integers) -- push is still computed and reported
+explicitly rather than assumed, so a future whole-integer line would be
+priced correctly too. Committed separately (`7848627`) before building the
+benchmark, with 4 new tests
+(`TestSpreadMarketBreakdown` in `test_mlb_model_persistence.py`).
+
+**Real headline findings now consolidated in `model_benchmark.md`**:
+- Raw moneyline: `xgb_direct` leads (log_loss 0.7221) over `xgb_two_head`
+  (0.7869) over `two_head` (0.8232), n=203 OOF.
+- Score distribution family: negative binomial leads (log_loss 0.7580)
+  over Skellam (0.8219) and independent Poisson (0.8232), same 203 OOF.
+- Totals (predeclared grid): `two_head` beats `xgb_two_head` at every one
+  of 5 lines -- the reverse ranking from moneyline, a real disclosed
+  model-family disagreement.
+- Spread (predeclared grid): same reversal pattern as totals across all 6
+  lines.
+- Calibration: temperature scaling wins for all three model families
+  (cross-fit log loss 0.7228 / 0.6964 / 0.7016 for two_head / xgb_two_head
+  / xgb_direct respectively), selected independently per model via real
+  4-method cross-fit comparison, not assumed.
+- Calibrated ensemble: **adds no value** -- every meta-cross-fit ensemble
+  method scores worse than (or statistically indistinguishable from) the
+  single best calibrated model (`xgb_two_head` alone, log_loss 0.6950 vs.
+  ensemble methods at 0.6950-1.0507). The full-history logistic stack
+  independently collapsed to `{two_head: 0, xgb_two_head: 1, xgb_direct:
+  ~0}` -- the exact `two_head=0, xgboost=1` collapse pattern flagged in
+  advance. Per instruction, `xgb_two_head` alone (not a constructed
+  ensemble) is the moneyline research benchmark going forward.
+- Uncertainty: mean real model disagreement 0.224, mean total haircut from
+  raw to conservative probability ~0.30, on the 76-game demonstration set.
+
+**Registry-safe**: `test_consumption_registry.json` MD5 unchanged
+(`10f7fb5f1ce5ced31f24561a2c1e457a`) before and after every live run in
+this checkpoint, confirmed explicitly, not assumed.
+
+**Tests**: 1196 pass (up from 1192), 1 skipped. `ruff check` clean on all
+touched files.
+
+**Next**: Task 18 (prepare, but do not evaluate, the replacement final-test
+definition -- chronologically later than the consumed range, recorded
+`consumed=false`), then Task 19 (start Part 3 prospective market/
+closing-price/settlement collection in parallel).
