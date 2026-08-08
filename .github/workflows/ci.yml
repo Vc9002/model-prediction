@@ -5,19 +5,174 @@ on:
     branches: ["**"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  incumbent-compatibility:
+    name: Incumbent system (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Confirm exact workflow revision
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install clean development environment
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[dev]"
+          python -m pip check
+      - name: Compile incumbent and integration surfaces
+        run: |
+          python -m compileall -q src tests scripts dashboard
+          python -m py_compile dashboard_server.py
+      - name: Full repository tests
+        env:
+          PYTHONPATH: src:.
+        run: python -m pytest -q --junitxml=full-compat.xml
+      - name: Upload compatibility test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-tests-python-${{ matrix.python-version }}
+          path: full-compat.xml
+
+  rebuild-python314:
+    name: Rebuild acceptance (Python 3.14)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Confirm exact workflow revision
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Install
+          python-version: "3.14"
+          cache: pip
+      - name: Install clean development environment
         run: |
-          python -m pip install --upgrade pip
-          pip install -e . pytest ruff
-      - name: Ruff
-        run: ruff check src/ tests/
-      - name: Tests
-        run: PYTHONPATH=src:. python -m pytest tests/ -q
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[dev]"
+          python -m pip check | tee pip-check.txt
+          printf 'passed\n' > pip-check.status
+      - name: Compile all Python surfaces
+        run: |
+          python -m compileall -q src tests scripts dashboard
+          python -m py_compile dashboard_server.py
+          printf 'passed\n' > compile.status
+      - name: Import and CLI smoke
+        run: |
+          python -c 'import model_prediction; import model_prediction.rebuild; print("IMPORT_OK")'
+          model-prediction --help
+          rebuild-shadow --help
+          printf 'passed\n' > import-cli.status
+      - name: Rebuild isolation gate
+        run: |
+          python scripts/check_rebuild_isolation.py --base-ref origin/main --json | tee isolation.json
+          printf 'passed\n' > isolation.status
+      - name: Rebuild Ruff gate
+        run: ruff check --output-format=json src/model_prediction/rebuild tests/rebuild > ruff-rebuild.json
+      - name: Legacy Ruff no-new-fingerprint gate
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/main-ruff-baseline" origin/main
+          ruff check --output-format=json \
+            "$RUNNER_TEMP/main-ruff-baseline/src" \
+            "$RUNNER_TEMP/main-ruff-baseline/tests" > ruff-main.json || true
+          ruff check --output-format=json src tests > ruff-current.json || true
+          python scripts/check_static_analysis_delta.py \
+            --tool ruff --baseline ruff-main.json --current ruff-current.json
+      - name: Rebuild mypy no-new-fingerprint gate
+        env:
+          REBUILD_BASELINE_SHA: 70250b10889ce58452b9685c12dbf515028b7d81
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/rebuild-mypy-baseline" "$REBUILD_BASELINE_SHA"
+          MYPYPATH="$RUNNER_TEMP/rebuild-mypy-baseline/src" \
+            mypy --config-file pyproject.toml --show-error-codes --no-error-summary \
+            "$RUNNER_TEMP/rebuild-mypy-baseline/src/model_prediction/rebuild" \
+            > mypy-baseline.txt || true
+          mypy --config-file pyproject.toml --show-error-codes --no-error-summary \
+            src/model_prediction/rebuild > mypy-current.txt || true
+          python scripts/check_static_analysis_delta.py \
+            --tool mypy --baseline mypy-baseline.txt --current mypy-current.txt
+      - name: Rebuild tests
+        env:
+          PYTHONPATH: src:.
+        run: python -m pytest -q tests/rebuild --junitxml=rebuild-py314.xml
+      - name: Dashboard no-data and HTTP smoke
+        env:
+          PYTHONPATH: src:.
+        run: |
+          python dashboard/rebuild_status.py > dashboard-status.json
+          python dashboard_server.py --port 8765 > dashboard-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8765/ > /dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              cat dashboard-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          for route in status sports benchmark economics runs health; do
+            curl --fail --silent "http://127.0.0.1:8765/api/rebuild/$route" > /dev/null
+          done
+          printf 'passed\n' > dashboard-smoke.status
+      - name: Validate generated multi-sport status
+        run: |
+          python scripts/generate_multisport_status.py \
+            --json-output "$RUNNER_TEMP/multisport_status.json" \
+            --markdown-output "$RUNNER_TEMP/multisport_status.md"
+      - name: Full repository tests on acceptance Python
+        env:
+          PYTHONPATH: src:.
+        run: python -m pytest -q --junitxml=full-py314.xml
+      - name: Generate machine-derived verification artifact
+        run: |
+          python scripts/generate_rebuild_verification.py \
+            --full-pytest-junit full-py314.xml \
+            --rebuild-pytest-junit rebuild-py314.xml \
+            --ruff-json ruff-rebuild.json \
+            --mypy-current mypy-current.txt \
+            --mypy-baseline mypy-baseline.txt \
+            --receipt pip_check=pip-check.status \
+            --receipt compile=compile.status \
+            --receipt import_cli=import-cli.status \
+            --receipt isolation=isolation.status \
+            --receipt dashboard_smoke=dashboard-smoke.status \
+            --output outputs/rebuild/verification.json
+      - name: Upload exact-head rebuild evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuild-verification-python314
+          path: |
+            outputs/rebuild/verification.json
+            full-py314.xml
+            rebuild-py314.xml
+            ruff-rebuild.json
+            ruff-current.json
+            ruff-main.json
+            mypy-current.txt
+            mypy-baseline.txt
+            isolation.json
+            dashboard-status.json
+            dashboard-server.log

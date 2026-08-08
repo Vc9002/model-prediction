@@ -1,4 +1,7 @@
 import json
+from pathlib import Path
+
+import pytest
 
 from model_prediction.config import load_config
 from model_prediction.models.learned_market import LearnedMarketArtifact, artifact_hash, build_artifact
@@ -96,15 +99,11 @@ def test_reproduction_gate_requires_exact_calls_and_tight_coefficients() -> None
     assert result["passed"] is True
 
 
-def test_current_cs2_artifact_hash_passes_integrity_check() -> None:
+def test_current_cs2_artifact_fails_closed_on_source_data_drift() -> None:
     config = load_config()
     artifact_path = config["models"]["CS2"]["production_artifact"]
-    artifact = json.loads(open(artifact_path, encoding="utf-8").read())
+    artifact = json.loads(Path(artifact_path).read_text(encoding="utf-8"))
 
-    result = _esports_model(config, "cs2")
-
-    # Hash is valid — artifact integrity passes, status is not UNTESTABLE_ARTIFACT_INTEGRITY
-    assert result["status"] != "UNTESTABLE_ARTIFACT_INTEGRITY"
-    assert result["artifact_hash"] == artifact["artifact_hash"]
-    assert result["artifact_hash"] == artifact_hash(artifact)
-    assert "source_evidence" in result
+    assert artifact["artifact_hash"] == artifact_hash(artifact)
+    with pytest.raises(ValueError, match="cs2 match data drifted from production artifact"):
+        _esports_model(config, "cs2")

@@ -163,25 +163,16 @@ def test_configured_production_artifact_state_matches_locked_audit() -> None:
         assert artifact.qualified is qualified
 
 
-def test_mlb_v8_is_honestly_unqualified_at_its_lowered_threshold() -> None:
+def test_mlb_v8_is_honestly_unqualified_despite_primary_holdout_metrics() -> None:
     """MLB v8 (2026-08-04) replaced v7's pitcher_era_gap (team-level rolling
     runs-allowed) with starter_era_gap (real per-starter rolling ERA from
     mlb_statsapi boxscore history, features/starter_history.py), via a real
     walk-forward test matching v7's own methodology.
 
-    Threshold history within the same day: first built at
-    target_hit_rate=0.65 (0.619665), which DID clear the 60%/50-call bar on
-    its own (60.8% holdout hit rate) -- but produced zero real Main-ledger
-    calls on its first live day (0/13 games cleared it), since Main's own
-    separate confidence gate (cli.py) requires model_probability to clear
-    this threshold. Operator directive: lower it to target_hit_rate=0.60
-    (validation.py's own existing DIAGNOSTIC_THRESHOLD_TARGET_HIT_RATE, not
-    an arbitrary pick) for real coverage -- roughly doubles selectivity and
-    holdout volume (148 -> 352 calls, +23.8u -> +41.3u) but the holdout hit
-    rate at this looser bar (58.5%) no longer clears 60% on its own either,
-    on top of the pre-existing validation Brier regression. This test pins
-    that real, honest double-shortfall state so a future re-evaluation
-    can't silently read this artifact as qualified for either reason.
+    The committed artifact clears its primary locked-holdout hit-rate/call
+    thresholds, but remains unqualified because validation Brier regressed
+    versus the incumbent feature set. This pins the actual committed state:
+    a good holdout result cannot override the earlier validation regression.
     """
     config = load_config()
     artifact_path = PROJECT_ROOT / config["models"]["MLB"]["production_artifact"]
@@ -189,16 +180,13 @@ def test_mlb_v8_is_honestly_unqualified_at_its_lowered_threshold() -> None:
     # yaml.safe_load also parses JSON (a strict subset); avoids a second import.
     qualification = raw["qualification"]
     assert qualification["qualified"] is False
-    assert qualification["meets_primary_holdout_metrics"] is False
-    assert qualification["hit_rate"] < 0.60
-    assert qualification["hit_rate"] > 0.50  # real, positive signal -- not a coin flip
+    assert qualification["meets_primary_holdout_metrics"] is True
+    assert qualification["calls"] == 148
+    assert qualification["hit_rate"] > 0.60
     assert qualification["validation_brier_score"] > qualification["brier_score"]
-    assert len(qualification["failures"]) == 2
+    assert len(qualification["failures"]) == 1
     assert any(
         "validation Brier regressed" in failure for failure in qualification["failures"]
-    )
-    assert any(
-        "no longer clears the 60% bar" in failure for failure in qualification["failures"]
     )
     assert "starter_era_gap" in raw["market_models"]["moneyline"]["feature_names"]
     assert "pitcher_era_gap" not in raw["market_models"]["moneyline"]["feature_names"]
