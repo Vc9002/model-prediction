@@ -12,10 +12,25 @@ event has since gone STATUS_FINAL in the real ESPN scoreboard, this script:
    units) was ever put behind it, which is exactly what NO_BET rows need
    for later CLV/predictive-accuracy research.
 2. Attempts to capture a real closing price for that exact market_id/side
-   by re-querying the same Polymarket collector used at decision time.
+   by re-querying the same Polymarket collector used at decision time,
+   then reading the actual store that collector writes to
+   (`data/rebuild/markets/mlb/{date}.parquet` via `MarketStore`) -- NOT
+   the shadow ledger's own `market_snapshots` SQL table, which nothing in
+   this codebase currently populates (a real, separate wiring gap this
+   script must not silently assume is populated).
 3. Records both via ShadowLedger.record_closing_price() /
    record_settlement() -- append-only, idempotent (skips any
    trade_decision that already has a settlement row).
+
+A candidate quote is only accepted as a real "closing" observation when
+its own real `observed_at_utc` is strictly after the decision's
+`decision_time_utc` (a later real observation than what informed the
+decision) and at or before the event's real `event_start_utc` (a genuine
+pregame closing quote, not in-play data -- CLAUDE.md: "Do not use...
+in-play data for a pregame test"). The quote's own real observed_at_utc
+is what gets recorded, never `utc_now()` -- reusing the capture-time
+timestamp as the quote's timestamp would misrepresent when the market was
+actually observed.
 
 Real, disclosed limitation found while building this: Polymarket's public
 markets endpoint only serves currently open/active markets, not historical
@@ -51,6 +66,7 @@ from model_prediction.rebuild.collectors import MLBCollector
 from model_prediction.rebuild.metadata import MetadataDB
 from model_prediction.rebuild.mlb_features import dedupe_scoreboard
 from model_prediction.rebuild.shadow_ledger import ShadowLedger, utc_now
+from model_prediction.rebuild.storage import MarketStore
 
 DATA_ROOT = "data/rebuild"
 SPORT = "mlb"
@@ -79,6 +95,38 @@ def determine_outcome(market_type: str, team_or_side: str, line: float | None, h
     return "WIN" if result > 0 else "LOSS"
 
 
+def real_closing_quote(
+    market_store: MarketStore, sport: str, game_date: str, market_id: str, team_or_side: str,
+    line: float | None, decision_time_utc: str, event_start_utc: str,
+) -> tuple[float, str] | None:
+    """The real most-recent quote for one exact market_id/side/line on
+    `game_date`, read from the actual store the collector writes to
+    (`data/rebuild/markets/{sport}/{date}.parquet`), accepted as a real
+    closing observation only if its own real observed_at_utc is strictly
+    after `decision_time_utc` and at or before `event_start_utc` (a real
+    later, still-pregame quote -- never in-play data, never the same
+    snapshot already used at decision time). Returns
+    (closing_price, observed_at_utc) or None if no such real row exists."""
+    path = market_store.path(sport, game_date)
+    if not path.exists():
+        return None
+    books = market_store.read(sport, game_date)
+    matches = books.filter(
+        (pl.col("market_id") == market_id)
+        & (pl.col("team_or_side") == team_or_side)
+        & ((pl.col("line") == line) if line is not None else pl.col("line").is_null())
+        & (pl.col("observed_at_utc") > decision_time_utc)
+        & (pl.col("observed_at_utc") <= event_start_utc)
+    ).sort("observed_at_utc", descending=True)
+    if matches.height == 0:
+        return None
+    latest = matches.row(0, named=True)
+    price = latest.get("executable_price")
+    if price is None:
+        return None
+    return float(price), str(latest["observed_at_utc"])
+
+
 def main() -> None:
     sb_path = Path(DATA_ROOT) / "normalized/mlb/scoreboard.parquet"
     if not sb_path.exists():
@@ -90,11 +138,15 @@ def main() -> None:
     final_scores: dict[str, tuple[int, int]] = {
         r["event_id"]: (int(r["home_score"]), int(r["away_score"])) for r in final_games.iter_rows(named=True)
     }
+    event_start_by_id: dict[str, str] = {
+        r["event_id"]: r["event_start_utc"] for r in final_games.iter_rows(named=True)
+    }
     print(f"1. Real completed games available for settlement: {len(final_scores)}")
 
     ledger = ShadowLedger(f"{DATA_ROOT}/shadow.db")
     meta = MetadataDB(f"{DATA_ROOT}/metadata.db")
     collector = MLBCollector(DATA_ROOT, meta)
+    market_store = MarketStore(f"{DATA_ROOT}/markets")
 
     pending = ledger.conn.execute(
         """SELECT td.id, td.event_id, td.action, td.market_type, td.units,
@@ -143,19 +195,20 @@ def main() -> None:
                 print(f"   (real closing-price fetch failed for {game_date}: {e!r} -- continuing without it)")
 
         closing_price: float | None = None
-        market_snapshot = ledger.conn.execute(
-            """SELECT best_bid, best_ask FROM market_snapshots
-               WHERE sport=? AND market_id=? AND side_id=? ORDER BY observed_at_utc DESC LIMIT 1""",
-            (SPORT, row["evaluated_market_id"], row["evaluated_team_or_side"]),
-        ).fetchone()
-        if market_snapshot is not None and market_snapshot["best_ask"] is not None:
-            closing_price = float(market_snapshot["best_ask"])
-            ledger.record_closing_price(
-                run_id=run_id, sport=SPORT, event_id=event_id,
-                market_id=row["evaluated_market_id"], side_id=row["evaluated_team_or_side"],
-                line=row["evaluated_line"], closing_price=closing_price, observed_at_utc=utc_now(),
+        event_start_utc = event_start_by_id.get(event_id)
+        if event_start_utc is not None:
+            quote = real_closing_quote(
+                market_store, SPORT, game_date, row["evaluated_market_id"], row["evaluated_team_or_side"],
+                row["evaluated_line"], row["decision_time_utc"], event_start_utc,
             )
-            closing_found += 1
+            if quote is not None:
+                closing_price, quote_observed_at = quote
+                ledger.record_closing_price(
+                    run_id=run_id, sport=SPORT, event_id=event_id,
+                    market_id=row["evaluated_market_id"], side_id=row["evaluated_team_or_side"],
+                    line=row["evaluated_line"], closing_price=closing_price, observed_at_utc=quote_observed_at,
+                )
+                closing_found += 1
 
         # Real, disclosed: no real paper_order exists for any NO_BET row
         # (units=0 by definition), so pnl stays None for every real row

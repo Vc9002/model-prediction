@@ -2523,3 +2523,108 @@ gating tuning, prospective closing-price poller) genuinely depends on
 more real games and, especially, a poller running close to real market
 close -- both accumulate with time and further sessions, not further
 architecture work right now.
+
+## Checkpoint: external review correction (2026-08-09) -- real model-freeze bug + 3 smaller fixes
+
+An external review of pushed commit `0bc0c40` found one critical issue and
+three smaller ones. All four verified against real code/data before
+fixing (not assumed correct on the reviewer's say-so) and fixed same-day.
+
+### 1. Critical: `mlb_moneyline_v2`'s frozen model was never validated as one exact combination
+
+Verified real: `XGBoostTwoHeadModel(seed=42)`'s constructor default is
+`method="independent_poisson"`, and grepping every real call site
+(`train_mlb_score_model_comparison.py`, `train_mlb_calibration_comparison.py`,
+`train_mlb_calibrated_ensemble_comparison.py`) confirmed none ever passed
+a different `method` -- `xgb_two_head` was always Poisson everywhere it
+was selected as a winner. `negative_binomial` was validated as the best
+distribution only against `MLBTwoHeadModel` (sklearn heads), in
+`train_mlb_distribution_comparison.py`, a completely separate real
+experiment. Task 18's registry froze the two winners together as if
+validated as one combination -- they never were.
+
+**Fixed**: added `build_mlb_coherent_oof_for_combo()` (`mlb_model_comparison.py`,
+6 new tests in `test_mlb_model_comparison.py`) and a new
+`train_mlb_head_distribution_cartesian.py` that fits and cross-fit
+calibrates all 6 real (head_family x distribution) combinations. Real
+result (450 matched games, dataset_hash `e0c513aa4a54`, n=223 OOF,
+n=168 cross-fit eval): `xgboost + negative_binomial + temperature` wins
+(cross_fit_log_loss=0.6927, brier=0.2498, ece=0.0326) -- it turns out to
+be the real winner, but now actually validated together. Persisted a
+distinctly-named calibrator artifact
+(`config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json`)
+rather than overwriting the pre-existing (still real, still valid for its
+own unvalidated-as-frozen purpose) `mlb-xgb_two_head-calibrator-v1.json`.
+
+Also re-ran Task 15's ensemble comparison correctly
+(`train_mlb_corrected_ensemble_comparison.py` --
+`mlb_corrected_ensemble_comparison.json`), using each head family's own
+real best distribution instead of its constructor default. Conclusion
+unchanged: ensemble still adds no value (single calibrated `xgb_two_head`
+meta-cross-fit log loss 0.6916 beats every ensemble method and
+`xgb_direct` alone).
+
+**Registry corrected in place** (`test_consumption_registry.json`):
+`mlb_moneyline_v2`'s entry now carries a `correction_note` explaining
+exactly what was wrong and citing the real fix, corrected
+`frozen_choices` pointing at the validated combination and its real
+calibrator artifact, and `test_start` moved forward from
+`2026-08-07T01:45Z` to `2026-08-08T02:20Z` -- strictly after the real
+games (through `2026-08-08T02:15Z`) this correction's own comparisons
+used for selection; the original boundary had gone stale once model
+selection re-ran on a freshly refreshed scoreboard that extended past it.
+Not evaluated -- still correctly `consumed: false`.
+
+### 2. Closing-price capture queried the wrong store
+
+Verified real: `collect_polymarket_books()` writes to
+`data/rebuild/markets/{sport}/{date}.parquet` via `MarketStore`, but
+`mlb_settle_and_capture_closing.py` was querying `shadow.db`'s own
+`market_snapshots` SQL table -- which nothing in this codebase
+populates (confirmed: 0 rows, always). The fresh collector call was a
+real no-op for closing-price purposes regardless of whether it returned
+real data.
+
+**Fixed**: added `real_closing_quote()` (7 new tests in
+`test_mlb_settlement.py`) reading the actual `MarketStore` parquet,
+accepting a candidate only when its own real `observed_at_utc` is
+strictly after `decision_time_utc` and at or before real
+`event_start_utc` -- never reusing the decision-time snapshot as a fake
+"closing" price, never accepting in-play data. The quote's own real
+timestamp is recorded, not `utc_now()`. Re-ran live: still 0 real
+closing prices recoverable for these past events (same real Polymarket
+public-API limitation as before), confirming the fix doesn't change
+today's honest result count -- it fixes the mechanism for when a real
+prospective poller starts producing real data to read.
+
+### 3. `economic_report.md` was stale
+
+Verified real: the checked-in report said "settlements recorded: 0"
+after Task 19 had already recorded 192. Regenerated via the existing
+`generate_economic_report.py` (which already existed and queries the
+ledger live -- just hadn't been re-run), extended with a real settlement
+outcome breakdown (96 WIN / 96 LOSS) and honest closing-price-coverage
+narrative (0 of 192 carry a real closing price, explained).
+
+### 4. No naive/incumbent baselines in the benchmark
+
+Added `build_mlb_naive_baselines.py`: computes constant-0.5 and a real
+expanding chronological home-win base rate on the identical 223 OOF rows
+the corrected Cartesian comparison uses, plus a real (differently
+sampled, disclosed) incumbent `elo-trend-lr-v8` reference from
+`current_model_baselines.parquet`. **Real, disclosed finding**: the
+frozen challenger's cross-fit log loss (0.6927) barely beats constant-0.5
+(0.6931) on the identical rows, and does not clearly beat the incumbent's
+own log loss (0.6839, different sample) -- "best challenger" is not
+"better than naive" at this sample size, now stated plainly in
+`model_benchmark.md` rather than implied by ranking tables alone. Market
+no-vig probability baseline: real, disclosed `unavailable` -- no real
+market quote is currently linked to these exact OOF games.
+
+**Tests**: 1220 pass (up from 1210), 1 skipped. `ruff check` clean.
+Registry MD5-verified unchanged across every live run this checkpoint
+except the one deliberate correction edit.
+
+**Next**: unchanged from before this correction -- further progress
+genuinely depends on new prospective games and a closing-price poller
+running through real market close, not further architecture work.

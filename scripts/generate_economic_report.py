@@ -54,6 +54,13 @@ def main() -> None:
     n_paper_orders = conn.execute("SELECT COUNT(*) AS n FROM paper_orders").fetchone()["n"]
     n_settlements = conn.execute("SELECT COUNT(*) AS n FROM settlements").fetchone()["n"]
     n_closing_prices = conn.execute("SELECT COUNT(*) AS n FROM closing_prices").fetchone()["n"]
+    settlement_outcome_counts = {
+        row["outcome"]: row["n"]
+        for row in conn.execute("SELECT outcome, COUNT(*) AS n FROM settlements GROUP BY outcome").fetchall()
+    }
+    n_settlements_with_closing_price = conn.execute(
+        "SELECT COUNT(*) AS n FROM settlements WHERE settled_price IS NOT NULL"
+    ).fetchone()["n"]
     n_predictions = conn.execute("SELECT COUNT(*) AS n FROM predictions").fetchone()["n"]
     n_market_evaluations = conn.execute("SELECT COUNT(*) AS n FROM market_evaluations").fetchone()["n"]
     n_runs = conn.execute("SELECT COUNT(*) AS n FROM runs").fetchone()["n"]
@@ -104,6 +111,20 @@ def main() -> None:
     lines.append(f"- closing_prices recorded: {n_closing_prices}")
     lines.append(f"- runs recorded: {n_runs}")
     lines.append("")
+    if n_settlements > 0:
+        lines.append("### Settlement outcomes (real WIN/LOSS/PUSH for every evaluated side, BET and NO_BET alike)")
+        lines.append("")
+        for outcome, n in sorted(settlement_outcome_counts.items(), key=lambda kv: -kv[1]):
+            lines.append(f"- {outcome}: {n}")
+        lines.append("")
+        lines.append(
+            f"Of {n_settlements} real settlements, {n_settlements_with_closing_price} carry a real "
+            f"captured closing price; the rest have `settled_price = NULL` with an explicit per-row "
+            f"note (Polymarket's public API serves only currently open markets, so no historical "
+            f"closing quote could be recovered for these already-resolved past events -- see "
+            f"`mlb_settle_and_capture_closing.py`'s module docstring)."
+        )
+        lines.append("")
     lines.append("## What this means")
     lines.append("")
     lines.append(
@@ -113,15 +134,36 @@ def main() -> None:
         "bottleneck is quote freshness and winner-first alignment (both correct, intended gating "
         "behavior per CLAUDE.md's winner-first policy), not primarily the disclosed missing "
         "order-book-depth data source. Zero paper_orders means order-book walking has never been "
-        "exercised against a real fill. Zero settlements/closing_prices means CLV and PnL cannot "
-        "be computed from anything real yet."
+        "exercised against a real fill."
     )
     lines.append("")
+    if n_settlements > 0 and n_settlements_with_closing_price == 0:
+        lines.append(
+            f"{n_settlements} real settlements now exist (real WIN/LOSS/PUSH determined from the real "
+            "final score for every evaluated market/side, including NO_BET rows -- see the "
+            "breakdown above), but zero carry a real closing price, so CLV still cannot be computed "
+            "from anything real yet. This is a genuine, disclosed data-timing gap, not a code gap: "
+            "closing-price capture requires a poller running prospectively, through each event's "
+            "real market close, which has not yet run continuously for any of these past events."
+        )
+    elif n_settlements == 0:
+        lines.append(
+            "Zero settlements/closing_prices means CLV and PnL cannot be computed from anything "
+            "real yet."
+        )
+    else:
+        lines.append(
+            f"{n_settlements} real settlements exist, {n_settlements_with_closing_price} with a real "
+            "closing price -- CLV can be computed for those rows."
+        )
+    lines.append("")
     lines.append(
-        "No PnL, ROI, or CLV figures are reported here -- reporting them from zero real trades "
-        "would mean fabricating them. Real economic evaluation requires real BET decisions to "
-        "occur first (more real backfill days, fresher quote collection cadence, or lower-friction "
-        "markets), then real settlement against real final scores."
+        "No PnL, ROI, or CLV figures are reported here -- reporting them from zero real accepted "
+        "trades would mean fabricating them (real settlement outcomes exist for research/NO_BET "
+        "rows, per above, but zero real paper fills exist to compute a real PnL/ROI from). Real "
+        "economic evaluation requires real BET decisions to occur first (more real backfill days, "
+        "fresher quote collection cadence, or lower-friction markets), then real settlement against "
+        "real final scores and a real captured closing price."
     )
     lines.append("")
     lines.append("## Executable edge methodology (real, architectural -- not session-specific)")

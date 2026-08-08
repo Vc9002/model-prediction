@@ -3,6 +3,11 @@
 determine_outcome() must correctly resolve moneyline/spread/total
 WIN/LOSS/PUSH from a real final score against one evaluated side/line,
 using each side's own signed line, not an assumed mirrored pair.
+
+Also tests real_closing_quote() -- the real bridge from MarketStore's
+actual parquet books to a validated "closing" observation, fixing a real
+bug where the settlement script queried the shadow ledger's own
+market_snapshots SQL table, which nothing in this codebase populates.
 """
 
 from __future__ import annotations
@@ -10,9 +15,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import polars as pl
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
 
-from mlb_settle_and_capture_closing import determine_outcome
+from mlb_settle_and_capture_closing import determine_outcome, real_closing_quote
+
+from model_prediction.rebuild.storage import MarketStore
 
 
 class TestMoneylineOutcome:
@@ -72,3 +81,102 @@ class TestTotalOutcome:
     def test_whole_integer_total_can_push(self):
         assert determine_outcome("total", "over", 8.0, home_score=5, away_score=3) == "PUSH"
         assert determine_outcome("total", "under", 8.0, home_score=5, away_score=3) == "PUSH"
+
+
+def _write_books(store: MarketStore, rows: list[dict]) -> None:
+    store.write_books("mlb", "2026-08-06", pl.DataFrame(rows), primary_key=[])
+
+
+class TestRealClosingQuote:
+    """real_closing_quote() must read MarketStore's actual parquet books
+    (not the empty ledger table), and only accept a quote as real closing
+    evidence when it is strictly later than the decision and no later than
+    real event start -- never in-play data, never the same decision-time
+    snapshot reused as a fake closing price."""
+
+    def _store(self, tmp_path: Path) -> MarketStore:
+        return MarketStore(str(tmp_path / "markets"))
+
+    def test_no_file_for_the_date_returns_none(self, tmp_path: Path):
+        store = self._store(tmp_path)
+        result = real_closing_quote(
+            store, "mlb", "2026-08-06", "m1", "home", -1.5,
+            "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
+        )
+        assert result is None
+
+    def test_later_pregame_quote_is_accepted_as_closing(self, tmp_path: Path):
+        store = self._store(tmp_path)
+        _write_books(store, [{
+            "market_id": "m1", "team_or_side": "home", "line": -1.5,
+            "observed_at_utc": "2026-08-06T20:00:00+00:00", "executable_price": 0.55,
+        }])
+        result = real_closing_quote(
+            store, "mlb", "2026-08-06", "m1", "home", -1.5,
+            "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
+        )
+        assert result == (0.55, "2026-08-06T20:00:00+00:00")
+
+    def test_quote_at_or_before_decision_time_is_rejected(self, tmp_path: Path):
+        # Reusing the same (or an earlier) snapshot already used at
+        # decision time is not real closing-price evidence.
+        store = self._store(tmp_path)
+        _write_books(store, [{
+            "market_id": "m1", "team_or_side": "home", "line": -1.5,
+            "observed_at_utc": "2026-08-06T10:00:00+00:00", "executable_price": 0.55,
+        }])
+        result = real_closing_quote(
+            store, "mlb", "2026-08-06", "m1", "home", -1.5,
+            "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
+        )
+        assert result is None
+
+    def test_in_play_quote_after_event_start_is_rejected(self, tmp_path: Path):
+        store = self._store(tmp_path)
+        _write_books(store, [{
+            "market_id": "m1", "team_or_side": "home", "line": -1.5,
+            "observed_at_utc": "2026-08-07T01:00:00+00:00", "executable_price": 0.80,
+        }])
+        result = real_closing_quote(
+            store, "mlb", "2026-08-06", "m1", "home", -1.5,
+            "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
+        )
+        assert result is None
+
+    def test_picks_the_latest_of_multiple_valid_quotes(self, tmp_path: Path):
+        store = self._store(tmp_path)
+        _write_books(store, [
+            {"market_id": "m1", "team_or_side": "home", "line": -1.5,
+             "observed_at_utc": "2026-08-06T18:00:00+00:00", "executable_price": 0.50},
+            {"market_id": "m1", "team_or_side": "home", "line": -1.5,
+             "observed_at_utc": "2026-08-06T22:00:00+00:00", "executable_price": 0.60},
+        ])
+        result = real_closing_quote(
+            store, "mlb", "2026-08-06", "m1", "home", -1.5,
+            "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
+        )
+        assert result == (0.60, "2026-08-06T22:00:00+00:00")
+
+    def test_wrong_market_id_is_ignored(self, tmp_path: Path):
+        store = self._store(tmp_path)
+        _write_books(store, [{
+            "market_id": "different_market", "team_or_side": "home", "line": -1.5,
+            "observed_at_utc": "2026-08-06T20:00:00+00:00", "executable_price": 0.55,
+        }])
+        result = real_closing_quote(
+            store, "mlb", "2026-08-06", "m1", "home", -1.5,
+            "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
+        )
+        assert result is None
+
+    def test_moneyline_with_null_line_matches_null_line_rows(self, tmp_path: Path):
+        store = self._store(tmp_path)
+        _write_books(store, [{
+            "market_id": "m1", "team_or_side": "home", "line": None,
+            "observed_at_utc": "2026-08-06T20:00:00+00:00", "executable_price": 0.55,
+        }])
+        result = real_closing_quote(
+            store, "mlb", "2026-08-06", "m1", "home", None,
+            "2026-08-06T10:00:00+00:00", "2026-08-06T23:00:00+00:00",
+        )
+        assert result == (0.55, "2026-08-06T20:00:00+00:00")
