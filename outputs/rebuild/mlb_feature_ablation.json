@@ -1,73 +1,75 @@
 {
   "groups_tested": 8,
-  "rejected_groups": [],
+  "rejected_groups": [
+    "bullpen"
+  ],
   "warned_groups": [],
   "results": [
     {
       "group": "starter_pitching",
-      "delta_log_loss": 0.0006038605993911039,
-      "delta_brier": 0.000513702321615267,
+      "delta_log_loss": -0.004947238085770911,
+      "delta_brier": -0.002199886445286847,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "bullpen",
-      "delta_log_loss": 0.05058222183475669,
-      "delta_brier": 0.027617712612045542,
+      "delta_log_loss": -0.06346950709336874,
+      "delta_brier": -0.025106580438792603,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
-      "verdict": "PASS"
+      "verdict": "REJECT"
     },
     {
       "group": "clean_rates",
-      "delta_log_loss": -0.001699552238319857,
-      "delta_brier": -0.00031438544243933553,
+      "delta_log_loss": -0.0006802998996700005,
+      "delta_brier": -0.0005012897481466161,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "park_weather",
-      "delta_log_loss": -0.0030473952219934874,
-      "delta_brier": -0.0011353039194566539,
+      "delta_log_loss": 0.0029693769240228818,
+      "delta_brier": 0.0016225586819128002,
       "coverage_impact": 1.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
-      "group": "cumulative_bullpen",
-      "delta_log_loss": -0.046140785305083254,
-      "delta_brier": -0.024414741207745533,
-      "coverage_impact": 0.0,
-      "fold_stability": 0.0,
-      "verdict": "PASS"
-    },
-    {
-      "group": "cumulative_starter_pitching",
-      "delta_log_loss": -0.04215863591129132,
-      "delta_brier": -0.02297737288138188,
+      "group": "cumulative_park_weather",
+      "delta_log_loss": 0.007678040088391014,
+      "delta_brier": 0.003816456078189978,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
       "group": "cumulative_clean_rates",
-      "delta_log_loss": -0.041395744653605404,
-      "delta_brier": -0.022958145337980407,
+      "delta_log_loss": 0.007247815724196416,
+      "delta_brier": 0.003606022576403578,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     },
     {
-      "group": "cumulative_park_weather",
-      "delta_log_loss": -0.04058925929598789,
-      "delta_brier": -0.0227105647515769,
+      "group": "cumulative_starter_pitching",
+      "delta_log_loss": 0.007729244128198309,
+      "delta_brier": 0.0038415033487489425,
+      "coverage_impact": 0.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "cumulative_bullpen",
+      "delta_log_loss": 0.07038371436741231,
+      "delta_brier": 0.028572596576212195,
       "coverage_impact": 0.0,
       "fold_stability": 0.0,
       "verdict": "PASS"
     }
   ],
-  "n_games": 135,
-  "final_test_excluded": 26
+  "n_games": 363,
+  "final_test_excluded": 72
 }
