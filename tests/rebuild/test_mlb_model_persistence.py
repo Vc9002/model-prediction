@@ -216,6 +216,43 @@ class TestTotalMarketBreakdown:
         assert breakdown["under"] == pytest.approx(under_direct, abs=0.02)
 
 
+class TestSpreadMarketBreakdown:
+    """Task 17: the same real push-folding bug as TestTotalMarketBreakdown,
+    but for spread -- probability_for_market()'s "spread" branch always
+    splits push mass 50/50 into home and away, so home+away always sum to
+    1.0 regardless of real push probability. spread_market_breakdown()
+    exposes push directly, in one simulation call."""
+
+    def test_home_away_and_push_sum_to_one(self):
+        dist = JointScoreDistribution(n_sim=20000, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        breakdown = dist.spread_market_breakdown(pred, home_line=-1.5)
+        assert breakdown["home"] + breakdown["away"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_half_integer_line_has_zero_real_push_probability(self):
+        # MLB run margins are always integers -- a half-integer line can
+        # never push in reality.
+        dist = JointScoreDistribution(n_sim=20000, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        breakdown = dist.spread_market_breakdown(pred, home_line=-1.5)
+        assert breakdown["push"] == 0.0
+
+    def test_whole_integer_line_has_real_nonzero_push_probability(self):
+        dist = JointScoreDistribution(n_sim=20000, seed=1)
+        pred = dist.predict_game("g1", total_intensity=9.0, home_advantage=0.5)
+        breakdown = dist.spread_market_breakdown(pred, home_line=0.0)
+        assert breakdown["push"] > 0.0
+
+    def test_matches_probability_for_market_for_home_and_away(self):
+        dist = JointScoreDistribution(n_sim=50000, seed=7)
+        pred = dist.predict_game("g1", total_intensity=8.5, home_advantage=-0.3)
+        breakdown = dist.spread_market_breakdown(pred, home_line=-1.5)
+        home_direct = dist.probability_for_market(pred, "spread", "home", line=-1.5)
+        away_direct = dist.probability_for_market(pred, "spread", "away", line=1.5)
+        assert breakdown["home"] == pytest.approx(home_direct, abs=0.02)
+        assert breakdown["away"] == pytest.approx(away_direct, abs=0.02)
+
+
 class TestModelSaveLoadRoundTrip:
     def test_deterministic_predictions_match_exactly_after_reload(self):
         data = _synthetic_training_data()

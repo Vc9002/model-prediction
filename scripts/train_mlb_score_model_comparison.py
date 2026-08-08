@@ -28,6 +28,11 @@ uses a fixed, predeclared line grid instead -- chosen before looking at any
 result, identical across every game and every model, never a function of
 what actually happened.
 
+Task 17 addition: the identical treatment for run-line spread, using the
+same real fix (spread_market_breakdown()) that closes the same push-folding
+gap probability_for_market() has for spread. Predeclared, fixed signed
+home-team line grid, never a function of a game's own realized margin.
+
 Usage:
     PYTHONPATH=src:. .venv/bin/python scripts/train_mlb_score_model_comparison.py
 """
@@ -62,6 +67,16 @@ XGB_DIRECT_FEATURES = list(dict.fromkeys(INTENSITY_FEATURES + DIFFERENTIAL_FEATU
 # lines (8.0, 9.0) real can, and that's reported explicitly, not folded
 # silently into over/under.
 TOTALS_LINE_GRID = [7.5, 8.0, 8.5, 9.0, 9.5]
+# Predeclared signed home-team run-line grid, mirroring TOTALS_LINE_GRID's
+# reasoning -- the real standard MLB run line (-1.5/+1.5) plus the common
+# real alternates (-0.5/+0.5, -2.5/+2.5) real books actually offer, all
+# half-integer since MLB run lines (unlike totals) are conventionally
+# never quoted on a whole integer. Real, disclosed consequence: since MLB
+# run margins are always integers, every line in this grid has zero real
+# push probability by construction -- push is still computed and reported
+# explicitly via spread_market_breakdown() rather than assumed, so a
+# future whole-integer line would be handled correctly too.
+SPREAD_LINE_GRID = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]
 
 
 def _home_win_labels(df: pl.DataFrame) -> list[int]:
@@ -105,6 +120,10 @@ def main() -> None:
     totals_records: dict[str, dict[float, list[dict]]] = {
         "two_head": {line: [] for line in TOTALS_LINE_GRID},
         "xgb_two_head": {line: [] for line in TOTALS_LINE_GRID},
+    }
+    spread_records: dict[str, dict[float, list[dict]]] = {
+        "two_head": {line: [] for line in SPREAD_LINE_GRID},
+        "xgb_two_head": {line: [] for line in SPREAD_LINE_GRID},
     }
     y_true: list[int] = []
     per_fold_report = []
@@ -163,6 +182,20 @@ def main() -> None:
                     "over": breakdown_xgb["over"], "under": breakdown_xgb["under"], "push": breakdown_xgb["push"],
                     "is_push": is_push, "label": None if is_push else (1 if r["total_runs"] > line else 0),
                 })
+            home_margin = float(r["home_score"]) - float(r["away_score"])
+            for line in SPREAD_LINE_GRID:
+                breakdown_th = two_head.distribution.spread_market_breakdown(pred_th, line)
+                breakdown_xgb = xgb_two_head.distribution.spread_market_breakdown(pred_xgb, line)
+                is_push = (home_margin + line) == 0.0
+                label = None if is_push else (1 if (home_margin + line) > 0 else 0)
+                spread_records["two_head"][line].append({
+                    "home": breakdown_th["home"], "away": breakdown_th["away"], "push": breakdown_th["push"],
+                    "is_push": is_push, "label": label,
+                })
+                spread_records["xgb_two_head"][line].append({
+                    "home": breakdown_xgb["home"], "away": breakdown_xgb["away"], "push": breakdown_xgb["push"],
+                    "is_push": is_push, "label": label,
+                })
 
         fold_report = {
             "fold": fold.fold_index, "train_n": train_df.height, "val_n": val_df.height,
@@ -216,14 +249,44 @@ def main() -> None:
             print(f"   {model_name:15s} line={line:4.1f}: n={n_total} push={n_push} "
                   f"mean_over={mean_over:.3f} log_loss={ll_str}")
 
+    print(f"\n5. Spread OOF comparison, predeclared signed home-line grid {SPREAD_LINE_GRID} "
+          f"(coherent score models only -- xgb_direct has no spread probability):")
+    spread_summary: dict[str, dict[str, dict]] = {"two_head": {}, "xgb_two_head": {}}
+    for model_name, by_line in spread_records.items():
+        for line, records in by_line.items():
+            n_total = len(records)
+            n_push = sum(1 for rec in records if rec["is_push"])
+            non_push = [rec for rec in records if not rec["is_push"]]
+            mean_home = sum(rec["home"] for rec in records) / n_total if n_total else float("nan")
+            mean_away = sum(rec["away"] for rec in records) / n_total if n_total else float("nan")
+            mean_push = sum(rec["push"] for rec in records) / n_total if n_total else float("nan")
+            entry = {
+                "home_line": line, "n": n_total, "n_push_real": n_push,
+                "mean_home_probability": mean_home, "mean_away_probability": mean_away,
+                "mean_push_probability": mean_push,
+            }
+            if len(non_push) >= 5:
+                labels = [rec["label"] for rec in non_push]
+                home_probs = [rec["home"] for rec in non_push]
+                entry["log_loss"] = log_loss(labels, home_probs)
+                entry["brier"] = brier_score(labels, home_probs)
+            else:
+                entry["log_loss"] = None
+                entry["brier"] = None
+            spread_summary[model_name][str(line)] = entry
+            ll_str = f"{entry['log_loss']:.4f}" if entry["log_loss"] is not None else "n/a (too few non-push obs)"
+            print(f"   {model_name:15s} home_line={line:5.1f}: n={n_total} push={n_push} "
+                  f"mean_home={mean_home:.3f} log_loss={ll_str}")
+
     print(
         "\n   Real, disclosed scope: registry-safe (does not touch\n"
         "   test_consumption_registry.json). No promotion decision is made here.\n"
-        "   Totals lines above are a fixed, predeclared grid (Task 13.5) -- never\n"
-        "   chosen from a game's own realized total_runs. Real timestamp-valid\n"
-        "   pregame market lines are not wired into this comparison yet (Task 19's\n"
-        "   prospective market capture); until then this measures relative model\n"
-        "   calibration against a fixed grid, not real market-beating performance."
+        "   Totals and spread lines above are fixed, predeclared grids (Task 13.5,\n"
+        "   Task 17) -- never chosen from a game's own realized total_runs or margin.\n"
+        "   Real timestamp-valid pregame market lines are not wired into this\n"
+        "   comparison yet (Task 19's prospective market capture); until then this\n"
+        "   measures relative model calibration against a fixed grid, not real\n"
+        "   market-beating performance."
     )
 
     results_path = Path("outputs/rebuild/mlb_score_model_comparison.json")
@@ -232,11 +295,13 @@ def main() -> None:
         "matched_games": dataset.matched_games,
         "n_moneyline_oof": len(y_true),
         "totals_line_grid": TOTALS_LINE_GRID,
+        "spread_line_grid": SPREAD_LINE_GRID,
         "per_fold": per_fold_report,
         "moneyline_oof_summary": ml_summary,
         "totals_oof_summary": totals_summary,
+        "spread_oof_summary": spread_summary,
     }, indent=2, default=str))
-    print(f"5. Results saved to {results_path}")
+    print(f"6. Results saved to {results_path}")
 
 
 if __name__ == "__main__":

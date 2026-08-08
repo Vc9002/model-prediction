@@ -416,6 +416,34 @@ class JointScoreDistribution:
             "push": push,
         }
 
+    def spread_market_breakdown(self, pred: GamePrediction, home_line: float) -> dict[str, float]:
+        """Real home/away/push probabilities for one signed run line, in one
+        simulation call.
+
+        Same real bug as total_market_breakdown() but for spread:
+        probability_for_market()'s "spread" branch always splits push mass
+        50/50 into home and away (matching real market convention for a
+        tradeable quote), so over+under -- home+away here -- sum to 1.0
+        regardless of push probability and push can never be recovered from
+        those two numbers alone. This method exposes it directly.
+
+        home_line is the signed line applied to the home team's margin
+        (e.g. home_line=-1.5 prices "home -1.5"; home_line=+1.5 prices
+        "home +1.5"). The away side is the mirrored line (home_line=-1.5
+        implies away +1.5)."""
+        away_exp = pred.away_expected_runs
+        home_exp = pred.home_expected_runs
+        away_scores, home_scores = self._simulate_scores(away_exp, home_exp)
+        home_margin = home_scores - away_scores + home_line
+        home_win = float((home_margin > 0).sum()) / self.n_sim
+        away_win = float((home_margin < 0).sum()) / self.n_sim
+        push = float((home_margin == 0).sum()) / self.n_sim
+        return {
+            "home": home_win + 0.5 * push,
+            "away": away_win + 0.5 * push,
+            "push": push,
+        }
+
 
 # ── Full MLB Model ───────────────────────────────────────────────────────────
 
