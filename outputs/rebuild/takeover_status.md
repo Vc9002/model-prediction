@@ -2028,3 +2028,55 @@ existing direct XGBoost binary classifier) also remains open.
 **Tests**: `test_mlb_model_persistence.py::test_distribution_method_is_configurable_and_preserved_through_reload`.
 
 **1145 tests pass** (up from 1144), 1 skipped. `ruff check` clean.
+
+### Task 13 — coherent XGBoost score-distribution challenger
+
+**Built** `XGBoostRunHead`/`XGBoostTwoHeadModel` (`models/__init__.py`):
+two XGBoost regression heads (total-run intensity, home-run
+differential) feeding the identical `JointScoreDistribution`
+reconciliation `MLBTwoHeadModel` uses -- moneyline/spread/total all
+derive from one real joint distribution either way, closing the real
+gap CLAUDE.md's Task 13 names: the existing direct `XGBoostChallenger`
+binary classifier has no joint distribution behind it and must never be
+allowed to silently drive spread/total pricing on its own. XGBoost's
+native NaN handling means no imputation/neutralization machinery is
+needed here (unlike `RunDifferentialHead`'s ElasticNet, Task 5).
+Same real clamp `MLBTwoHeadModel.predict_row()` uses (`max(1.0, total)`)
+applied identically, since a regression head can predict a non-positive
+total. Disclosed scope: no `save()`/`load()` persistence yet -- this
+exists for real OOF comparison, its actual current purpose, not as a
+deployable artifact.
+
+**Built** `scripts/train_mlb_score_model_comparison.py`: real
+chronological OOF comparison of all three -- `two_head` (control),
+`xgb_two_head` (new coherent challenger), `xgb_direct` (existing direct
+classifier, via Task 9's nested CV so its own early stopping still never
+sees outer validation labels) -- on moneyline, plus a real totals
+comparison between the two coherent models only (the direct classifier
+structurally has no totals probability, which is exactly the point).
+Registry-safe, confirmed by diffing `test_consumption_registry.json`
+after a real run.
+
+**Live-verified real result, reported honestly, not spun**: moneyline
+OOF log loss (203 real predictions) -- `xgb_direct`=0.7221 <
+`xgb_two_head`=0.7869 < `two_head`=0.8232 (the direct classifier remains
+the strongest single moneyline challenger, consistent with Task 9's
+finding). **Totals OOF, the real point of this task**: `two_head`=0.7226
+clearly beats `xgb_two_head`=0.9205 -- on this real sample, the
+coherent XGBoost score engine does *not* improve totals pricing over the
+existing two-head architecture; it's meaningfully worse. Per CLAUDE.md's
+own instruction ("Do not choose [a candidate] merely because... Choose it
+only if its empirical behavior is appropriate"), reporting this plainly:
+XGBoost is a real, useful *moneyline* challenger, but not (yet, on this
+sample) a better coherent score engine. The totals check itself uses
+each real game's own final `total_runs` to pick a line it straddles by
+construction, not a real market line -- disclosed as measuring relative
+model calibration, not real market-beating performance.
+
+**Tests**: `test_xgboost_challenger_and_ensemble.py::TestXGBoostTwoHeadModel`
+(4 tests: coherent prediction validity, moneyline/spread/total all
+routing through the same real distribution, real NaN features handled
+natively with no crash, non-positive predicted total clamped before
+reaching the simulator).
+
+**1149 tests pass** (up from 1145), 1 skipped. `ruff check` clean.

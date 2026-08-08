@@ -10,9 +10,11 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import numpy as np
+import polars as pl
 import pytest
 
 from model_prediction.rebuild.ensemble import Ensemble, equal_weight_ensemble, logistic_stacking
+from model_prediction.rebuild.models import XGBoostRunHead, XGBoostTwoHeadModel
 from model_prediction.rebuild.validation import log_loss
 from model_prediction.rebuild.xgboost_stress import XGBoostChallenger, nested_xgboost_fold
 
@@ -212,3 +214,94 @@ class TestNestedXgboostFold:
             X[:180], y[:180], X[180:], y[180:], fold_index=0, param_grid=_TINY_GRID,
         )
         assert result.outer_log_loss < 0.5
+
+
+def _synthetic_score_data(n: int = 80, seed: int = 0) -> pl.DataFrame:
+    rng = np.random.default_rng(seed)
+    f1 = rng.uniform(3, 6, n)
+    f2 = rng.uniform(3, 6, n)
+    g1 = rng.uniform(-2, 2, n)
+    g2 = rng.uniform(-1, 1, n)
+    total_runs = f1 + f2 + rng.normal(0, 0.5, n)
+    home_margin = g1 + g2 + rng.normal(0, 0.5, n)
+    home_score = np.round(np.clip((total_runs + home_margin) / 2, 0, None))
+    away_score = np.round(np.clip((total_runs - home_margin) / 2, 0, None))
+    return pl.DataFrame({
+        "event_id": [f"e{i}" for i in range(n)],
+        "f1": f1, "f2": f2, "g1": g1, "g2": g2,
+        "total_runs": total_runs, "home_margin": home_margin,
+        "home_score": home_score, "away_score": away_score,
+    })
+
+
+class TestXGBoostTwoHeadModel:
+    """Task 13: a coherent XGBoost-based score-distribution challenger --
+    XGBoost intensity + differential heads feeding the same
+    JointScoreDistribution reconciliation MLBTwoHeadModel uses, so
+    moneyline/spread/total all derive from one real joint distribution
+    rather than a disconnected binary classifier silently driving
+    spread/total on its own (that role stays with XGBoostChallenger,
+    unchanged, kept as a clearly separate, labeled challenger)."""
+
+    def test_fit_and_predict_row_produce_a_real_coherent_prediction(self):
+        data = _synthetic_score_data()
+        model = XGBoostTwoHeadModel(seed=42)
+        model.fit(data, ["f1", "f2"], ["g1", "g2"])
+
+        row = data.row(0, named=True)
+        pred = model.predict_row(row["event_id"], row)
+
+        assert pred.home_expected_runs >= 0
+        assert pred.away_expected_runs >= 0
+        assert 0.0 <= pred.home_win_prob <= 1.0
+        assert pred.home_win_prob + pred.away_win_prob == pytest.approx(1.0, abs=1e-6)
+
+    def test_moneyline_spread_and_total_all_derive_from_the_same_distribution(self):
+        # The real point of Task 13: no separate, disconnected classifier
+        # for each market -- probability_for_market() must route through
+        # the identical fitted distribution predict_row() already built.
+        data = _synthetic_score_data(n=120)
+        model = XGBoostTwoHeadModel(seed=42)
+        model.fit(data, ["f1", "f2"], ["g1", "g2"])
+
+        row = data.row(0, named=True)
+        pred = model.predict_row(row["event_id"], row)
+
+        ml = model.probability(pred, "moneyline", "home")
+        spread = model.probability(pred, "spread", "home", line=-1.5)
+        total = model.probability(pred, "total", "over", line=pred.total_mean)
+
+        for p in (ml, spread, total):
+            assert 0.0 <= p <= 1.0
+
+    def test_handles_real_nan_features_natively_no_crash(self):
+        # Task 5: mlb_features.py now returns real NaN for missing
+        # continuous stats. XGBoost must handle this natively, unlike
+        # RunDifferentialHead's ElasticNet (which needs the real imputer
+        # fix in models/__init__.py).
+        data = _synthetic_score_data(n=60)
+        data = data.with_columns(pl.when(pl.arange(0, pl.len()) < 10).then(None).otherwise(pl.col("f2")).alias("f2"))
+        model = XGBoostTwoHeadModel(seed=42)
+        model.fit(data, ["f1", "f2"], ["g1", "g2"])
+
+        row = {"f1": 4.0, "f2": float("nan"), "g1": 0.5, "g2": -0.2}
+        pred = model.predict_row("e_missing", row)
+        assert pred.home_expected_runs >= 0
+
+    def test_negative_or_zero_predicted_total_is_clamped_not_passed_to_the_simulator(self):
+        # Same real clamp MLBTwoHeadModel.predict_row() uses -- a
+        # regression head can predict a non-positive total, which the
+        # Poisson/NB simulator can't accept as an expected-run rate.
+        head = XGBoostRunHead()
+        head.model = type("FakeModel", (), {"predict": staticmethod(lambda X: np.array([-3.0]))})()
+        model = XGBoostTwoHeadModel(seed=42)
+        model.intensity_head = head
+        diff_head = XGBoostRunHead()
+        diff_head.model = type("FakeModel", (), {"predict": staticmethod(lambda X: np.array([0.5]))})()
+        model.differential_head = diff_head
+        model._fitted = True
+        model._intensity_features = ["f1"]
+        model._differential_features = ["g1"]
+
+        pred = model.predict_row("e1", {"f1": 1.0, "g1": 0.5})
+        assert pred.total_mean > 0

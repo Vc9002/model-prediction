@@ -519,6 +519,118 @@ class MLBTwoHeadModel:
         return model
 
 
+# ── Coherent XGBoost score-distribution challenger ───────────────────────────
+#
+# CLAUDE.md's next-phase Task 13: the direct XGBoost binary classifier
+# (XGBoostChallenger, xgboost_stress.py) is a useful independent moneyline
+# challenger on its own, but it has no joint score distribution behind it --
+# nothing stops it from silently driving spread/total probabilities that
+# contradict what a real score model would say, which CLAUDE.md's own
+# architecture section forbids ("No disconnected classifier may silently
+# contradict the joint score distribution"). XGBoostRunHead/
+# XGBoostTwoHeadModel below are a *coherent* XGBoost-based challenger built
+# the same way MLBTwoHeadModel is -- two expected-run regression heads
+# feeding the identical JointScoreDistribution reconciliation -- so
+# moneyline/spread/total all derive from one real joint distribution either
+# way; only which regressor produces the two expected-run numbers differs.
+
+
+class XGBoostRunHead:
+    """XGBoost regression head -- predicts either total-run intensity or
+    home-run differential, reused for both roles (unlike RunIntensityHead/
+    RunDifferentialHead, which need different sklearn estimators because
+    ElasticNet has no native NaN support). XGBoost handles the real NaN
+    values mlb_features.py now produces for missing continuous stats
+    (Task 5) natively -- no imputation or always-missing-column
+    neutralization needed here, unlike RunDifferentialHead."""
+
+    def __init__(self, seed: int = 42) -> None:
+        self.model: Any = None
+        self._feature_names: list[str] = []
+
+    def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None, seed: int = 42) -> XGBoostRunHead:
+        import xgboost as xgb
+
+        self._feature_names = feature_names or [f"f{i}" for i in range(X.shape[1])]
+        self.model = xgb.XGBRegressor(
+            objective="reg:squarederror",
+            max_depth=3, learning_rate=0.05, n_estimators=200,
+            min_child_weight=5, subsample=0.85, colsample_bytree=0.8,
+            reg_alpha=1.0, reg_lambda=2.0,
+            random_state=seed, n_jobs=2, verbosity=0,
+        )
+        self.model.fit(np.asarray(X, dtype=float), y)
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        if self.model is None:
+            raise RuntimeError("XGBoostRunHead not fitted")
+        return self.model.predict(np.asarray(X, dtype=float))
+
+
+class XGBoostTwoHeadModel:
+    """Coherent XGBoost score-distribution model: XGBoost intensity head +
+    XGBoost differential head -> the same JointScoreDistribution
+    reconciliation MLBTwoHeadModel uses. Same real predict_row()/
+    probability() interface as MLBTwoHeadModel so a real comparison script
+    can swap one for the other without duplicating fold/OOF logic.
+
+    Real, disclosed scope: unlike MLBTwoHeadModel, this does not yet
+    implement save()/load() artifact persistence -- it exists for real
+    chronological OOF comparison (its actual current purpose), not as a
+    deployable artifact. Add persistence if/when this challenger is
+    promoted past comparison.
+    """
+
+    MODEL_VERSION = "mlb-xgboost-two-head-v1"
+
+    def __init__(self, seed: int = 42, method: str = "independent_poisson") -> None:
+        self.seed = seed
+        self.intensity_head = XGBoostRunHead()
+        self.differential_head = XGBoostRunHead()
+        self.distribution = JointScoreDistribution(method=method, seed=seed)
+        self._fitted = False
+        self._intensity_features: list[str] = []
+        self._differential_features: list[str] = []
+
+    def fit(
+        self,
+        data: pl.DataFrame,
+        intensity_features: list[str],
+        differential_features: list[str],
+        total_runs_col: str = "total_runs",
+        home_margin_col: str = "home_margin",
+    ) -> XGBoostTwoHeadModel:
+        self._intensity_features = intensity_features
+        self._differential_features = differential_features
+
+        X_intensity = data.select(intensity_features).to_numpy()
+        y_intensity = data[total_runs_col].to_numpy()
+        X_diff = data.select(differential_features).to_numpy()
+        y_diff = data[home_margin_col].to_numpy()
+
+        self.intensity_head.fit(X_intensity, y_intensity, intensity_features, seed=self.seed)
+        self.differential_head.fit(X_diff, y_diff, differential_features, seed=self.seed)
+        self._fitted = True
+        return self
+
+    def predict_row(self, event_id: str, row: dict[str, float]) -> GamePrediction:
+        if not self._fitted:
+            raise RuntimeError("XGBoostTwoHeadModel not fitted")
+        X_intensity = np.array([[row.get(f, float("nan")) for f in self._intensity_features]])
+        X_diff = np.array([[row.get(f, float("nan")) for f in self._differential_features]])
+        total = float(self.intensity_head.predict(X_intensity)[0])
+        margin = float(self.differential_head.predict(X_diff)[0])
+        # Same real clamp MLBTwoHeadModel.predict_row() uses -- a
+        # regression head (XGBoost included) can predict a non-positive
+        # total, which the Poisson/NB simulation below can't accept as an
+        # expected-run rate.
+        return self.distribution.predict_game(event_id, max(1.0, total), margin)
+
+    def probability(self, pred: GamePrediction, market_type: str, selection: str, line: float | None = None) -> float:
+        return self.distribution.probability_for_market(pred, market_type, selection, line)
+
+
 # ── Bootstrap uncertainty ────────────────────────────────────────────────────
 
 

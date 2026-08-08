@@ -1,0 +1,83 @@
+{
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "matched_games": 435,
+  "n_moneyline_oof": 203,
+  "n_totals_oof": 203,
+  "per_fold": [
+    {
+      "fold": 0,
+      "train_n": 102,
+      "val_n": 55,
+      "two_head": {
+        "log_loss": 0.6976580011812773,
+        "brier": 0.24963622140909086
+      },
+      "xgb_two_head": {
+        "log_loss": 0.7969873977985641,
+        "brier": 0.2780368600454545
+      },
+      "xgb_direct": {
+        "log_loss": 0.7039565438060046,
+        "brier": 0.2553953544718856
+      }
+    },
+    {
+      "fold": 1,
+      "train_n": 209,
+      "val_n": 72,
+      "two_head": {
+        "log_loss": 0.781865934269729,
+        "brier": 0.28621250493055556
+      },
+      "xgb_two_head": {
+        "log_loss": 0.7830348055415466,
+        "brier": 0.2776901140625
+      },
+      "xgb_direct": {
+        "log_loss": 0.7212570817868479,
+        "brier": 0.2633148087209001
+      }
+    },
+    {
+      "fold": 2,
+      "train_n": 312,
+      "val_n": 76,
+      "two_head": {
+        "log_loss": 0.9532244589122232,
+        "brier": 0.3011221258223684
+      },
+      "xgb_two_head": {
+        "log_loss": 0.7831413730957278,
+        "brier": 0.28786376845394734
+      },
+      "xgb_direct": {
+        "log_loss": 0.7359858005525852,
+        "brier": 0.2711755627299095
+      }
+    }
+  ],
+  "moneyline_oof_summary": {
+    "two_head": {
+      "log_loss": 0.8232049074370429,
+      "brier": 0.281884601453202
+    },
+    "xgb_two_head": {
+      "log_loss": 0.7868549617398415,
+      "brier": 0.2815929158497537
+    },
+    "xgb_direct": {
+      "log_loss": 0.7220839440393096,
+      "brier": 0.2641120861641953
+    }
+  },
+  "totals_oof_summary": {
+    "two_head": {
+      "log_loss": 0.722629852134451,
+      "brier": 0.21544846290640393
+    },
+    "xgb_two_head": {
+      "log_loss": 0.9204602808321589,
+      "brier": 0.23698327773399017
+    }
+  }
+}
