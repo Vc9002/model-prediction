@@ -3,6 +3,12 @@
 Shadow-first multi-sport prediction, research, ledger, and local dashboard
 system with Polymarket US market-data integration.
 
+The repository also contains an isolated clean-slate shadow rebuild under
+`src/model_prediction/rebuild`. Use `rebuild-shadow --help` for its separate
+CLI and read [`docs/rebuild/README.md`](docs/rebuild/README.md) before operating
+it. Rebuild output cannot submit live orders, write incumbent ledgers, or
+promote a model into production.
+
 **Last updated**: 2026-08-03
 
 The current operational verdict and audit evidence live in

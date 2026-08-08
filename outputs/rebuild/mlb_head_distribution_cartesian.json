@@ -1,0 +1,273 @@
+{
+  "dataset_hash": "e0c513aa4a544211980f7095da0de69ad3cb647a75981cbdb3c46512834ee2eb",
+  "matched_games": 450,
+  "n_calibration_blocks": 4,
+  "combinations": {
+    "sklearn__independent_poisson": {
+      "head_family": "sklearn",
+      "distribution": "independent_poisson",
+      "n_oof": 223,
+      "raw_log_loss": 0.7460597246608573,
+      "raw_brier": 0.2680926075336323,
+      "calibration_methods": {
+        "identity": {
+          "log_loss": 0.7470038631305964,
+          "brier": 0.26895251864583336,
+          "ece": 0.11619315476190473,
+          "n_eval_total": 168
+        },
+        "platt": {
+          "log_loss": 0.7021926639795437,
+          "brier": 0.2542146506164758,
+          "ece": 0.052859990906631314,
+          "n_eval_total": 168
+        },
+        "temperature": {
+          "log_loss": 0.6991768001765838,
+          "brier": 0.2528489664706663,
+          "ece": 0.03414690847198837,
+          "n_eval_total": 168
+        },
+        "isotonic": {
+          "log_loss": 0.7237447788346836,
+          "brier": 0.26037792888497324,
+          "ece": 0.08348103745306375,
+          "n_eval_total": 168
+        }
+      },
+      "best_calibration_method": "temperature",
+      "best_cross_fit_log_loss": 0.6991768001765838,
+      "best_cross_fit_brier": 0.2528489664706663,
+      "best_cross_fit_ece": 0.03414690847198837,
+      "best_cross_fit_n": 168
+    },
+    "sklearn__negative_binomial": {
+      "head_family": "sklearn",
+      "distribution": "negative_binomial",
+      "n_oof": 223,
+      "raw_log_loss": 0.7141707687392599,
+      "raw_brier": 0.25874416100896863,
+      "calibration_methods": {
+        "identity": {
+          "log_loss": 0.7195870247849193,
+          "brier": 0.26104103827380953,
+          "ece": 0.07523273809523796,
+          "n_eval_total": 168
+        },
+        "platt": {
+          "log_loss": 0.7015021640330187,
+          "brier": 0.2539230022517119,
+          "ece": 0.051185608995709224,
+          "n_eval_total": 168
+        },
+        "temperature": {
+          "log_loss": 0.6990385304065698,
+          "brier": 0.2528032483129551,
+          "ece": 0.033786332826772035,
+          "n_eval_total": 168
+        },
+        "isotonic": {
+          "log_loss": 0.7177137792919681,
+          "brier": 0.2607615128488118,
+          "ece": 0.09193802021864216,
+          "n_eval_total": 168
+        }
+      },
+      "best_calibration_method": "temperature",
+      "best_cross_fit_log_loss": 0.6990385304065698,
+      "best_cross_fit_brier": 0.2528032483129551,
+      "best_cross_fit_ece": 0.033786332826772035,
+      "best_cross_fit_n": 168
+    },
+    "sklearn__skellam": {
+      "head_family": "sklearn",
+      "distribution": "skellam",
+      "n_oof": 223,
+      "raw_log_loss": 0.7475296826714293,
+      "raw_brier": 0.2687428822931198,
+      "calibration_methods": {
+        "identity": {
+          "log_loss": 0.7480344323487615,
+          "brier": 0.26950113592632724,
+          "ece": 0.11618403887219093,
+          "n_eval_total": 168
+        },
+        "platt": {
+          "log_loss": 0.7018393265091102,
+          "brier": 0.2540787635361269,
+          "ece": 0.051147524209778,
+          "n_eval_total": 168
+        },
+        "temperature": {
+          "log_loss": 0.6992547555666957,
+          "brier": 0.25290394797818,
+          "ece": 0.033805660138560255,
+          "n_eval_total": 168
+        },
+        "isotonic": {
+          "log_loss": 0.7267073793933351,
+          "brier": 0.2617066711115263,
+          "ece": 0.08254157460267277,
+          "n_eval_total": 168
+        }
+      },
+      "best_calibration_method": "temperature",
+      "best_cross_fit_log_loss": 0.6992547555666957,
+      "best_cross_fit_brier": 0.25290394797818,
+      "best_cross_fit_ece": 0.033805660138560255,
+      "best_cross_fit_n": 168
+    },
+    "xgboost__independent_poisson": {
+      "head_family": "xgboost",
+      "distribution": "independent_poisson",
+      "n_oof": 223,
+      "raw_log_loss": 0.8973134297037091,
+      "raw_brier": 0.31003986400224215,
+      "calibration_methods": {
+        "identity": {
+          "log_loss": 0.8798918002459349,
+          "brier": 0.3075440867113095,
+          "ece": 0.21160922619047617,
+          "n_eval_total": 168
+        },
+        "platt": {
+          "log_loss": 0.6945071272063137,
+          "brier": 0.2506789348254004,
+          "ece": 0.035200694412251904,
+          "n_eval_total": 168
+        },
+        "temperature": {
+          "log_loss": 0.6932675967755858,
+          "brier": 0.25005667897269773,
+          "ece": 0.034045485969114386,
+          "n_eval_total": 168
+        },
+        "isotonic": {
+          "log_loss": 0.9481691112929594,
+          "brier": 0.29221783742213864,
+          "ece": 0.14368336209839178,
+          "n_eval_total": 168
+        }
+      },
+      "best_calibration_method": "temperature",
+      "best_cross_fit_log_loss": 0.6932675967755858,
+      "best_cross_fit_brier": 0.25005667897269773,
+      "best_cross_fit_ece": 0.034045485969114386,
+      "best_cross_fit_n": 168
+    },
+    "xgboost__negative_binomial": {
+      "head_family": "xgboost",
+      "distribution": "negative_binomial",
+      "n_oof": 223,
+      "raw_log_loss": 0.7874943368240871,
+      "raw_brier": 0.284056725896861,
+      "calibration_methods": {
+        "identity": {
+          "log_loss": 0.7775976785215098,
+          "brier": 0.2816128929315476,
+          "ece": 0.13918363095238093,
+          "n_eval_total": 168
+        },
+        "platt": {
+          "log_loss": 0.6945783791048082,
+          "brier": 0.2507143875332855,
+          "ece": 0.029154698173401286,
+          "n_eval_total": 168
+        },
+        "temperature": {
+          "log_loss": 0.6927270179041045,
+          "brier": 0.24978951835463872,
+          "ece": 0.03264266002650017,
+          "n_eval_total": 168
+        },
+        "isotonic": {
+          "log_loss": 0.8982111252385678,
+          "brier": 0.27923416996293005,
+          "ece": 0.11771882490112091,
+          "n_eval_total": 168
+        }
+      },
+      "best_calibration_method": "temperature",
+      "best_cross_fit_log_loss": 0.6927270179041045,
+      "best_cross_fit_brier": 0.24978951835463872,
+      "best_cross_fit_ece": 0.03264266002650017,
+      "best_cross_fit_n": 168
+    },
+    "xgboost__skellam": {
+      "head_family": "xgboost",
+      "distribution": "skellam",
+      "n_oof": 223,
+      "raw_log_loss": 0.8982327790812917,
+      "raw_brier": 0.30995944146167664,
+      "calibration_methods": {
+        "identity": {
+          "log_loss": 0.8801961309283326,
+          "brier": 0.30732883651499715,
+          "ece": 0.2114823451178202,
+          "n_eval_total": 168
+        },
+        "platt": {
+          "log_loss": 0.6944914329851579,
+          "brier": 0.25067111636277,
+          "ece": 0.029242691757092265,
+          "n_eval_total": 168
+        },
+        "temperature": {
+          "log_loss": 0.6932697097829588,
+          "brier": 0.2500563782536538,
+          "ece": 0.03410572235891837,
+          "n_eval_total": 168
+        },
+        "isotonic": {
+          "log_loss": 0.8750220368159811,
+          "brier": 0.2897273559955189,
+          "ece": 0.15017801294391175,
+          "n_eval_total": 168
+        }
+      },
+      "best_calibration_method": "temperature",
+      "best_cross_fit_log_loss": 0.6932697097829588,
+      "best_cross_fit_brier": 0.2500563782536538,
+      "best_cross_fit_ece": 0.03410572235891837,
+      "best_cross_fit_n": 168
+    }
+  },
+  "ranked_by_cross_fit_log_loss": [
+    {
+      "combo": "xgboost__negative_binomial",
+      "calibration": "temperature",
+      "cross_fit_log_loss": 0.6927270179041045
+    },
+    {
+      "combo": "xgboost__independent_poisson",
+      "calibration": "temperature",
+      "cross_fit_log_loss": 0.6932675967755858
+    },
+    {
+      "combo": "xgboost__skellam",
+      "calibration": "temperature",
+      "cross_fit_log_loss": 0.6932697097829588
+    },
+    {
+      "combo": "sklearn__negative_binomial",
+      "calibration": "temperature",
+      "cross_fit_log_loss": 0.6990385304065698
+    },
+    {
+      "combo": "sklearn__independent_poisson",
+      "calibration": "temperature",
+      "cross_fit_log_loss": 0.6991768001765838
+    },
+    {
+      "combo": "sklearn__skellam",
+      "calibration": "temperature",
+      "cross_fit_log_loss": 0.6992547555666957
+    }
+  ],
+  "winner": {
+    "head_family": "xgboost",
+    "distribution": "negative_binomial",
+    "calibration_method": "temperature",
+    "calibrator_artifact_path": "config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
+  }
+}
