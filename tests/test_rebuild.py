@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import polars as pl
@@ -40,6 +41,7 @@ from model_prediction.rebuild.horizons import (
 )
 from model_prediction.rebuild.calibration import (
     PlattCalibrator, IsotonicCalibrator, TemperatureScaling, fit_calibrator,
+    calibration_intercept_slope, chronological_calibration_blocks, cross_fit_calibration_eval,
 )
 from model_prediction.rebuild.ensemble import Ensemble, equal_weight_ensemble
 from model_prediction.rebuild.economic import (
@@ -563,6 +565,120 @@ class TestCalibration:
     def test_platt_identity_for_small_sample(self):
         cal = PlattCalibrator().fit([0.6, 0.4], [1, 0])
         assert cal.slope == 1.0  # Falls back to identity with <50 samples
+
+
+class TestChronologicalCalibrationBlocks:
+    def test_splits_into_the_requested_number_of_contiguous_blocks(self):
+        blocks = chronological_calibration_blocks(100, n_blocks=4)
+        assert len(blocks) == 4
+        assert blocks[0][0] == 0
+        assert blocks[-1][1] == 100
+        # Contiguous, no gaps or overlaps.
+        import itertools
+        for (_s1, e1), (s2, _e2) in itertools.pairwise(blocks):
+            assert e1 == s2
+
+    def test_last_block_absorbs_the_remainder(self):
+        blocks = chronological_calibration_blocks(10, n_blocks=3)
+        sizes = [e - s for s, e in blocks]
+        assert sum(sizes) == 10
+        assert sizes[0] == sizes[1]  # equal-sized except the last
+
+    def test_fewer_than_two_blocks_raises(self):
+        with pytest.raises(ValueError, match="at least 2 blocks"):
+            chronological_calibration_blocks(10, n_blocks=1)
+
+
+class TestCrossFitCalibrationEval:
+    """Task 14: real chronological expanding-window calibration cross-
+    fitting -- CLAUDE.md's own rule: "fit calibrator on all OOF
+    predictions, then report calibration performance on those same
+    predictions" is calibration-set overfitting. Every real block's
+    calibrator here must be fit only on strictly earlier blocks."""
+
+    def test_no_evaluation_blocks_labels_reach_the_calibrator_fit_on_it(self):
+        # Real structural proof: patch fit_calibrator to record exactly
+        # which labels it was given each call, then confirm none of them
+        # match the labels of the block that call's calibrator later
+        # scores.
+        import model_prediction.rebuild.calibration as calibration_mod
+
+        n = 200
+        probs = [0.3 + 0.4 * ((i % 7) / 7) for i in range(n)]
+        labels = [1 if (i * 37) % 5 < 3 else 0 for i in range(n)]
+
+        fit_calls: list[list[int]] = []
+        real_fit_calibrator = calibration_mod.fit_calibrator
+
+        def spy(method, y_prob, y_true, base_model_hash=""):
+            fit_calls.append(list(y_true))
+            return real_fit_calibrator(method, y_prob, y_true, base_model_hash)
+
+        with patch.object(calibration_mod, "fit_calibrator", spy):
+            result = cross_fit_calibration_eval(probs, labels, "platt", n_blocks=4)
+
+        blocks = chronological_calibration_blocks(n, n_blocks=4)
+        # fit_calls[i] corresponds to eval block i+1 (blocks[0] is fit-only,
+        # never evaluated) -- its own eval-block labels must not appear as
+        # the *only* content fit on (a real overlap check: the fit set for
+        # block i must exactly equal blocks[0:i]'s real labels, never
+        # include block i's own).
+        for call_idx, fit_labels in enumerate(fit_calls):
+            # The structural proof: the fit set for eval block i+1 is
+            # *exactly* blocks[0:i+1]'s real labels -- by construction
+            # (disjoint index ranges) this can never include block i+1's
+            # own labels, whether or not the values happen to coincide.
+            expected_fit_labels = labels[blocks[0][0]:blocks[call_idx][1]]
+            assert fit_labels == expected_fit_labels
+        assert result.n_eval_total == sum(e - s for s, e in blocks[1:])
+
+    def test_reports_required_fields(self):
+        n = 200
+        probs = [0.3 + 0.4 * ((i % 7) / 7) for i in range(n)]
+        labels = [1 if (i * 37) % 5 < 3 else 0 for i in range(n)]
+
+        result = cross_fit_calibration_eval(probs, labels, "platt", n_blocks=4)
+
+        assert result.method == "platt"
+        assert result.n_blocks == 4
+        assert len(result.per_block) == 3  # 4 blocks -> 3 real eval blocks
+        assert result.log_loss is not None
+        assert result.brier is not None
+        assert result.ece is not None
+        assert result.calibration_intercept is not None
+        assert result.calibration_slope is not None
+
+    def test_identity_is_a_valid_winner_not_forced_out(self):
+        # Already well-calibrated random data -- a real calibrator
+        # shouldn't systematically beat identity by construction.
+        rng_probs = [0.1, 0.3, 0.5, 0.7, 0.9] * 40
+        rng_labels = [0, 0, 1, 1, 1] * 40
+        identity_result = cross_fit_calibration_eval(rng_probs, rng_labels, "identity", n_blocks=4)
+        platt_result = cross_fit_calibration_eval(rng_probs, rng_labels, "platt", n_blocks=4)
+        # Not asserting identity wins (that would be circular) -- just
+        # that both produce real, valid, comparable results.
+        assert identity_result.log_loss is not None
+        assert platt_result.log_loss is not None
+
+    def test_zero_rows_returns_honest_empty_result(self):
+        result = cross_fit_calibration_eval([], [], "platt", n_blocks=4)
+        assert result.n_eval_total == 0
+        assert result.log_loss is None
+
+
+class TestCalibrationInterceptSlope:
+    def test_perfectly_calibrated_predictions_are_near_intercept_zero_slope_one(self):
+        rng = np.random.default_rng(0)
+        n = 2000
+        true_p = rng.uniform(0.05, 0.95, n)
+        labels = (rng.uniform(0, 1, n) < true_p).astype(int).tolist()
+        intercept, slope = calibration_intercept_slope(true_p.tolist(), labels)
+        assert abs(intercept) < 0.2
+        assert abs(slope - 1.0) < 0.2
+
+    def test_below_sample_floor_returns_the_real_non_answer_not_a_guess(self):
+        intercept, slope = calibration_intercept_slope([0.6, 0.4], [1, 0])
+        assert (intercept, slope) == (0.0, 1.0)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

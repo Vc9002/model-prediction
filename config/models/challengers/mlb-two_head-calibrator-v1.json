@@ -1,0 +1,16 @@
+{
+  "model_name": "two_head",
+  "method": "temperature",
+  "parameters": {
+    "temperature": 10.0
+  },
+  "base_model_hash": "0eda26de8a2098277bb7bb55f78ff035d4c25b9e3cbf9974a199c075b8531af4",
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "oof_split_manifest_hash": "1c51e275a03424ad6bcda655826eae54b2374d01ae9bcd096d03922cb289db21",
+  "training_range": {
+    "start": "2026-07-01",
+    "end": "2026-08-07"
+  },
+  "n_training_oof": 203,
+  "calibrator_hash": "eb5e7004d4ec7d5d510437621654ffc4e3c0bd12ff131975330495d57264ff32"
+}

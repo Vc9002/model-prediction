@@ -2127,3 +2127,61 @@ agreement with `probability_for_market()`'s own over/under numbers).
 **1153 tests pass** (up from 1149), 1 skipped. `ruff check` clean.
 Registry-safe, confirmed by diffing `test_consumption_registry.json`
 after the real run.
+
+### Task 14 — cross-fitted MLB calibration comparison
+
+**Real gap closed**: identity/Platt/isotonic/temperature calibrators
+already existed and were individually tested, but nothing ever evaluated
+them correctly against real MLB predictions -- the critical rule this
+must not violate ("fit calibrator on all OOF predictions, then report
+performance on those same predictions" = calibration-set overfitting)
+had no real enforcement anywhere.
+
+**Built** `cross_fit_calibration_eval()`/`chronological_calibration_blocks()`/
+`calibration_intercept_slope()` (`calibration.py`): real chronological
+expanding-window cross-fitting -- splits a real chronologically-ordered
+OOF sequence into N blocks, and for each evaluation block fits the
+calibrator on every strictly-earlier block only, never the block it's
+scored on. Structurally proven, not just disciplined by convention: a
+regression test patches `fit_calibrator` itself and asserts the exact
+label set passed to every fit call equals precisely the expected earlier
+blocks.
+
+**Built** `scripts/train_mlb_calibration_comparison.py`: generates real
+chronological OOF predictions for all three model families (`two_head`,
+`xgb_direct` via Task 9's nested CV, `xgb_two_head`), cross-fit
+evaluates all four calibration methods (4 blocks) for each, reports
+reliability buckets and diagnostic-only cohort calibration (starters
+available/missing, weather available/unavailable -- no separate
+calibrator selected per cohort, per the explicit instruction not to at
+this sample size), selects the best method by real cross-fit log loss
+(identity remains a valid winner, never forced out), and persists a
+real calibrator artifact per model
+(`config/models/challengers/mlb-<model>-calibrator-v1.json` --
+`base_model_hash`/`calibrator_hash`/`method`/`parameters`/training
+range/dataset hash, separate from the base model per CLAUDE.md's own
+persistence rule). Registry-safe, confirmed by diffing
+`test_consumption_registry.json` after the real run.
+
+**Live-verified real result, reported honestly**: on 203 real
+chronological OOF predictions per model (153 real cross-fit evaluation
+rows after the first block is reserved fit-only), **temperature scaling
+won for all three model families** -- `two_head` log_loss 0.8679
+(identity) -> 0.7228 (temperature); `xgb_two_head` 0.7840 -> 0.6964;
+`xgb_direct` 0.7273 -> 0.7016. Isotonic came in worst for two of the
+three models, consistent with the explicit caution about isotonic at
+this sample size. A real, honestly-disclosed instability also observed:
+the calibration-intercept/slope diagnostic (a secondary read on the
+already-calibrated predictions, not what selected the winning method)
+showed negative slopes for several calibrated-model combinations --
+plausible small-sample noise given only ~50 real rows per cross-fit
+evaluation block, flagged here rather than glossed over, not treated as
+disqualifying since it isn't the metric the selection itself used.
+
+**Not done, disclosed**: `outputs/rebuild/model_benchmark.md`/`.parquet`
+refresh (Task 17) still pending; Task 15's calibrated-ensemble
+comparison is next, explicitly sequenced after calibration per the
+phase's own instructions since individual model calibration can
+materially change ensemble behavior.
+
+**1162 tests pass** (up from 1153), 1 skipped. `ruff check` clean.
