@@ -1,0 +1,42 @@
+[
+  {
+    "game_id": "2024_01_NYJ_SF",
+    "season": 2024,
+    "game_type": "REG",
+    "week": 1,
+    "gameday": "2024-09-09",
+    "gametime": "20:15",
+    "away_team": "NYJ",
+    "home_team": "SF",
+    "away_score": 19,
+    "home_score": 32,
+    "overtime": 0,
+    "stadium": "Levi's Stadium",
+    "roof": "outdoors",
+    "surface": "grass",
+    "temp": 70,
+    "wind": 10,
+    "away_rest": 7,
+    "home_rest": 7
+  },
+  {
+    "game_id": "2025_01_DAL_PHI",
+    "season": 2025,
+    "game_type": "REG",
+    "week": 1,
+    "gameday": "2025-09-04",
+    "gametime": "20:20",
+    "away_team": "DAL",
+    "home_team": "PHI",
+    "away_score": null,
+    "home_score": null,
+    "overtime": 0,
+    "stadium": "Lincoln Financial Field",
+    "roof": "outdoors",
+    "surface": "grass",
+    "temp": null,
+    "wind": null,
+    "away_rest": 7,
+    "home_rest": 7
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "competition": {"code": "PL", "name": "Premier League"},
+  "matches": [
+    {
+      "id": 800001,
+      "utcDate": "2026-08-09T15:00:00Z",
+      "lastUpdated": "2026-08-09T17:05:00Z",
+      "status": "FINISHED",
+      "season": {"id": 2026},
+      "homeTeam": {"id": 10, "name": "Alpha FC"},
+      "awayTeam": {"id": 20, "name": "Beta FC"},
+      "score": {"fullTime": {"home": 1, "away": 1}}
+    }
+  ]
+}

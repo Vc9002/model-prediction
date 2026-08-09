@@ -1,0 +1,39 @@
+sportsdataverse:
+  min_interval_seconds: 1.0
+  retries: 3
+
+mlb_stats:
+  min_interval_seconds: 0.5
+  retries: 3
+
+statcast:
+  min_interval_seconds: 2.0
+  retries: 3
+
+nflverse:
+  min_interval_seconds: 1.0
+  retries: 3
+
+football_data:
+  min_interval_seconds: 6.5
+  retries: 3
+
+statsbomb:
+  min_interval_seconds: 1.0
+  retries: 3
+
+tennis_mylife:
+  min_interval_seconds: 1.0
+  retries: 3
+
+tennis_espn:
+  min_interval_seconds: 1.0
+  retries: 3
+
+open_meteo:
+  min_interval_seconds: 1.0
+  retries: 3
+
+polymarket:
+  min_interval_seconds: 0.5
+  retries: 3

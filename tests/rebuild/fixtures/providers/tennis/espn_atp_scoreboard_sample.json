@@ -1,0 +1,555 @@
+{
+  "events": [
+    {
+      "id": "421-2026",
+      "uid": "s:850~l:851~e:421-2026",
+      "date": "2026-08-01T04:00Z",
+      "endDate": "2026-08-14T03:59Z",
+      "major": false,
+      "name": "National Bank Open presented by Rogers",
+      "shortName": "National Bank Open presented by Rogers",
+      "season": {
+        "year": 2026,
+        "type": 2
+      },
+      "groupings": [
+        {
+          "grouping": {
+            "id": "1",
+            "slug": "mens-singles",
+            "displayName": "Men's Singles"
+          },
+          "competitions": [
+            {
+              "id": "183332",
+              "uid": "s:850~l:851~e:421-2026~c:183332",
+              "date": "2026-08-01T14:40Z",
+              "startDate": "2026-08-01T14:40Z",
+              "timeValid": true,
+              "recent": false,
+              "status": {
+                "period": 3,
+                "type": {
+                  "id": "3",
+                  "name": "STATUS_FINAL",
+                  "state": "post",
+                  "completed": true,
+                  "description": "Final",
+                  "detail": "Final",
+                  "shortDetail": "Final"
+                }
+              },
+              "venue": {
+                "fullName": "Toronto, Canada",
+                "court": "Court 9"
+              },
+              "format": {
+                "regulation": {
+                  "periods": 5
+                }
+              },
+              "notes": [
+                {
+                  "text": "Nicolas Mejia (COL) bt Marco Trungelliti (ARG) 7-6 (7-5) 3-6 6-1",
+                  "type": "event"
+                }
+              ],
+              "geoBroadcasts": [],
+              "broadcasts": [],
+              "broadcast": "",
+              "competitors": [
+                {
+                  "id": "3371",
+                  "uid": "s:850~l:851~a:3371",
+                  "type": "athlete",
+                  "order": 2,
+                  "homeAway": "away",
+                  "winner": true,
+                  "linescores": [
+                    {
+                      "value": 7.0,
+                      "tiebreak": 7,
+                      "winner": true
+                    },
+                    {
+                      "value": 3.0,
+                      "winner": false
+                    },
+                    {
+                      "value": 6.0,
+                      "winner": true
+                    }
+                  ],
+                  "athlete": {
+                    "guid": "96f728d3-8c8c-2972-ca1d-2d1d22b0f4b8",
+                    "displayName": "Nicolas Mejia",
+                    "shortName": "N. Mejia",
+                    "fullName": "Nicolas Mejia",
+                    "flag": {
+                      "href": "https://a.espncdn.com/i/teamlogos/countries/500/col.png",
+                      "alt": "Colombia",
+                      "rel": [
+                        "country-flag"
+                      ]
+                    },
+                    "links": [
+                      {
+                        "language": "en-US",
+                        "rel": [
+                          "playercard",
+                          "desktop",
+                          "athlete"
+                        ],
+                        "href": "https://www.espn.com/tennis/player/_/id/3371/nicolas-mejia",
+                        "text": "Player Card",
+                        "shortText": "Player Card",
+                        "isExternal": false,
+                        "isPremium": false,
+                        "isHidden": false
+                      }
+                    ]
+                  },
+                  "statistics": []
+                },
+                {
+                  "id": "2278",
+                  "uid": "s:850~l:851~a:2278",
+                  "type": "athlete",
+                  "order": 1,
+                  "homeAway": "home",
+                  "winner": false,
+                  "linescores": [
+                    {
+                      "value": 6.0,
+                      "tiebreak": 5,
+                      "winner": false
+                    },
+                    {
+                      "value": 6.0,
+                      "winner": true
+                    },
+                    {
+                      "value": 1.0,
+                      "winner": false
+                    }
+                  ],
+                  "athlete": {
+                    "guid": "9384b7bc-5401-cd53-1c91-0dabafa79f0d",
+                    "displayName": "Marco Trungelliti",
+                    "shortName": "M. Trungelliti",
+                    "fullName": "Marco Trungelliti",
+                    "flag": {
+                      "href": "https://a.espncdn.com/i/teamlogos/countries/500/arg.png",
+                      "alt": "Argentina",
+                      "rel": [
+                        "country-flag"
+                      ]
+                    },
+                    "links": [
+                      {
+                        "language": "en-US",
+                        "rel": [
+                          "playercard",
+                          "desktop",
+                          "athlete"
+                        ],
+                        "href": "https://www.espn.com/tennis/player/_/id/2278/marco-trungelliti",
+                        "text": "Player Card",
+                        "shortText": "Player Card",
+                        "isExternal": false,
+                        "isPremium": false,
+                        "isHidden": false
+                      }
+                    ]
+                  },
+                  "statistics": []
+                }
+              ],
+              "tournamentId": 421,
+              "type": {
+                "id": "1",
+                "text": "Men's Singles",
+                "slug": "mens-singles"
+              },
+              "round": {
+                "id": "14",
+                "displayName": "Qualifying Final"
+              },
+              "wasSuspended": false
+            },
+            {
+              "id": "183335",
+              "uid": "s:850~l:851~e:421-2026~c:183335",
+              "date": "2026-08-01T14:40Z",
+              "startDate": "2026-08-01T14:40Z",
+              "timeValid": true,
+              "recent": false,
+              "status": {
+                "period": 2,
+                "type": {
+                  "id": "3",
+                  "name": "STATUS_FINAL",
+                  "state": "post",
+                  "completed": true,
+                  "description": "Final",
+                  "detail": "Final",
+                  "shortDetail": "Final"
+                }
+              },
+              "venue": {
+                "fullName": "Toronto, Canada",
+                "court": "Rogers Court"
+              },
+              "format": {
+                "regulation": {
+                  "periods": 5
+                }
+              },
+              "notes": [
+                {
+                  "text": "Martin Damm (USA) bt Henrique Rocha (POR) 6-3 7-6 (7-3)",
+                  "type": "event"
+                }
+              ],
+              "geoBroadcasts": [],
+              "broadcasts": [],
+              "broadcast": "",
+              "competitors": [
+                {
+                  "id": "10248",
+                  "uid": "s:850~l:851~a:10248",
+                  "type": "athlete",
+                  "order": 2,
+                  "homeAway": "away",
+                  "winner": false,
+                  "linescores": [
+                    {
+                      "value": 3.0,
+                      "winner": false
+                    },
+                    {
+                      "value": 6.0,
+                      "tiebreak": 3,
+                      "winner": false
+                    }
+                  ],
+                  "athlete": {
+                    "guid": "c848a645-259e-3b39-bf55-f5e94e556b1a",
+                    "displayName": "Henrique Rocha",
+                    "shortName": "H. Rocha",
+                    "fullName": "Henrique Rocha",
+                    "flag": {
+                      "href": "https://a.espncdn.com/i/teamlogos/countries/500/por.png",
+                      "alt": "Portugal",
+                      "rel": [
+                        "country-flag"
+                      ]
+                    },
+                    "links": [
+                      {
+                        "language": "en-US",
+                        "rel": [
+                          "playercard",
+                          "desktop",
+                          "athlete"
+                        ],
+                        "href": "https://www.espn.com/tennis/player/_/id/10248/henrique-rocha",
+                        "text": "Player Card",
+                        "shortText": "Player Card",
+                        "isExternal": false,
+                        "isPremium": false,
+                        "isHidden": false
+                      }
+                    ]
+                  },
+                  "statistics": []
+                },
+                {
+                  "id": "10130",
+                  "uid": "s:850~l:851~a:10130",
+                  "type": "athlete",
+                  "order": 1,
+                  "homeAway": "home",
+                  "winner": true,
+                  "linescores": [
+                    {
+                      "value": 6.0,
+                      "winner": true
+                    },
+                    {
+                      "value": 7.0,
+                      "tiebreak": 7,
+                      "winner": true
+                    }
+                  ],
+                  "athlete": {
+                    "guid": "be55e40c-2229-3bcf-be1c-2dcec81be0be",
+                    "displayName": "Martin Damm",
+                    "shortName": "M. Damm",
+                    "fullName": "Martin Damm",
+                    "flag": {
+                      "href": "https://a.espncdn.com/i/teamlogos/countries/500/usa.png",
+                      "alt": "USA",
+                      "rel": [
+                        "country-flag"
+                      ]
+                    },
+                    "links": [
+                      {
+                        "language": "en-US",
+                        "rel": [
+                          "playercard",
+                          "desktop",
+                          "athlete"
+                        ],
+                        "href": "https://www.espn.com/tennis/player/_/id/10130/martin-damm",
+                        "text": "Player Card",
+                        "shortText": "Player Card",
+                        "isExternal": false,
+                        "isPremium": false,
+                        "isHidden": false
+                      }
+                    ]
+                  },
+                  "statistics": []
+                }
+              ],
+              "tournamentId": 421,
+              "type": {
+                "id": "1",
+                "text": "Men's Singles",
+                "slug": "mens-singles"
+              },
+              "round": {
+                "id": "14",
+                "displayName": "Qualifying Final"
+              },
+              "wasSuspended": false
+            }
+          ]
+        }
+      ],
+      "status": {
+        "period": 3,
+        "type": {
+          "id": "3",
+          "name": "STATUS_FINAL",
+          "state": "post",
+          "completed": true,
+          "description": "Final",
+          "detail": "Final",
+          "shortDetail": "Final"
+        }
+      },
+      "venue": {
+        "displayName": "Toronto, Canada"
+      },
+      "links": [
+        {
+          "language": "en-US",
+          "rel": [
+            "summary",
+            "desktop",
+            "event"
+          ],
+          "href": "https://www.espn.com/tennis/scoreboard/tournament/_/eventId/421-2026/competitionType/1",
+          "text": "Summary",
+          "shortText": "Summary",
+          "isExternal": false,
+          "isPremium": false,
+          "isHidden": false
+        },
+        {
+          "language": "en-US",
+          "rel": [
+            "bracket",
+            "desktop",
+            "event"
+          ],
+          "href": "https://www.espn.com/tennis/bracket/_/year/2026/tournamentId/421/type/1",
+          "text": "Bracket",
+          "shortText": "Bracket",
+          "isExternal": false,
+          "isPremium": false,
+          "isHidden": false
+        }
+      ],
+      "previousWinners": [
+        {
+          "displayName": "Ben Shelton",
+          "shortDisplayName": "B. Shelton",
+          "type": {
+            "id": "1",
+            "text": "Men's Singles",
+            "slug": "mens-singles"
+          },
+          "links": [
+            {
+              "language": "en-US",
+              "rel": [
+                "playercard",
+                "desktop",
+                "athlete"
+              ],
+              "href": "https://www.espn.com/tennis/player/_/id/9250/ben-shelton",
+              "text": "Player Card",
+              "shortText": "Player Card",
+              "isExternal": false,
+              "isPremium": false,
+              "isHidden": false
+            }
+          ]
+        },
+        {
+          "displayName": "Victoria Mboko",
+          "shortDisplayName": "V. Mboko",
+          "type": {
+            "id": "2",
+            "text": "Women's Singles",
+            "slug": "womens-singles"
+          },
+          "links": [
+            {
+              "language": "en-US",
+              "rel": [
+                "playercard",
+                "desktop",
+                "athlete"
+              ],
+              "href": "https://www.espn.com/tennis/player/_/id/11219/victoria-mboko",
+              "text": "Player Card",
+              "shortText": "Player Card",
+              "isExternal": false,
+              "isPremium": false,
+              "isHidden": false
+            }
+          ]
+        },
+        {
+          "displayName": "Julian Cash / Lloyd Glasspool",
+          "shortDisplayName": "J. Cash / L. Glasspool",
+          "type": {
+            "id": "3",
+            "text": "Men's Doubles",
+            "slug": "mens-doubles"
+          },
+          "athletes": [
+            {
+              "displayName": "Julian Cash",
+              "shortDisplayName": "J. Cash",
+              "links": [
+                {
+                  "language": "en-US",
+                  "rel": [
+                    "playercard",
+                    "desktop",
+                    "athlete"
+                  ],
+                  "href": "https://www.espn.com/tennis/player/_/id/2420/julian-cash",
+                  "text": "Player Card",
+                  "shortText": "Player Card",
+                  "isExternal": false,
+                  "isPremium": false,
+                  "isHidden": false
+                }
+              ]
+            },
+            {
+              "displayName": "Lloyd Glasspool",
+              "shortDisplayName": "L. Glasspool",
+              "links": [
+                {
+                  "language": "en-US",
+                  "rel": [
+                    "playercard",
+                    "desktop",
+                    "athlete"
+                  ],
+                  "href": "https://www.espn.com/tennis/player/_/id/3064/lloyd-glasspool",
+                  "text": "Player Card",
+                  "shortText": "Player Card",
+                  "isExternal": false,
+                  "isPremium": false,
+                  "isHidden": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "displayName": "Coco Gauff / McCartney Kessler",
+          "shortDisplayName": "C. Gauff / M. Kessler",
+          "type": {
+            "id": "4",
+            "text": "Women's Doubles",
+            "slug": "womens-doubles"
+          },
+          "athletes": [
+            {
+              "displayName": "Coco Gauff",
+              "shortDisplayName": "C. Gauff",
+              "headshot": "https://a.espncdn.com/i/headshots/tennis/players/full/3626.png",
+              "links": [
+                {
+                  "language": "en-US",
+                  "rel": [
+                    "playercard",
+                    "desktop",
+                    "athlete"
+                  ],
+                  "href": "https://www.espn.com/tennis/player/_/id/3626/coco-gauff",
+                  "text": "Player Card",
+                  "shortText": "Player Card",
+                  "isExternal": false,
+                  "isPremium": false,
+                  "isHidden": false
+                }
+              ]
+            },
+            {
+              "displayName": "McCartney Kessler",
+              "shortDisplayName": "M. Kessler",
+              "links": [
+                {
+                  "language": "en-US",
+                  "rel": [
+                    "playercard",
+                    "desktop",
+                    "athlete"
+                  ],
+                  "href": "https://www.espn.com/tennis/player/_/id/5528/mccartney-kessler",
+                  "text": "Player Card",
+                  "shortText": "Player Card",
+                  "isExternal": false,
+                  "isPremium": false,
+                  "isHidden": false
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "calendar": {
+        "type": "day",
+        "timeZone": "America/New_York",
+        "startDate": "2026-08-01T04:00Z",
+        "endDate": "2026-08-13T04:00Z",
+        "calendar": [
+          "2026-08-01T04:00Z",
+          "2026-08-02T04:00Z",
+          "2026-08-03T04:00Z",
+          "2026-08-04T04:00Z",
+          "2026-08-05T04:00Z",
+          "2026-08-06T04:00Z",
+          "2026-08-07T04:00Z",
+          "2026-08-08T04:00Z",
+          "2026-08-09T04:00Z",
+          "2026-08-10T04:00Z",
+          "2026-08-11T04:00Z",
+          "2026-08-12T04:00Z",
+          "2026-08-13T04:00Z"
+        ]
+      }
+    }
+  ]
+}
