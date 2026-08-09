@@ -17,6 +17,8 @@ from typing import Any, Callable
 
 import yaml
 
+from model_prediction.runtime_paths import RuntimePaths
+
 ROOT = Path(__file__).resolve().parents[1]
 SPORTS = ("mlb", "wnba", "nba", "nfl", "soccer", "tennis", "esports", "kbo", "npb")
 STAGES = ("collect", "build_features", "predict", "match_markets", "decide", "settle")
@@ -42,12 +44,18 @@ def _safe_json(path: Path) -> tuple[Any | None, str | None]:
 class RebuildStatusReader:
     """Build API payloads without creating or modifying rebuild state."""
 
-    def __init__(self, root: Path = ROOT) -> None:
-        self.root = root.resolve()
-        self.output_root = self.root / "outputs" / "rebuild"
-        self.data_root = self.root / "data" / "rebuild"
-        self.shadow_db = self.data_root / "shadow.db"
-        self.metadata_db = self.data_root / "metadata.db"
+    def __init__(self, root: Path = ROOT, *, paths: RuntimePaths | None = None) -> None:
+        # `root` (repo checkout) stays supported directly for callers that
+        # don't care about the runtime-root split -- resolves the same way
+        # RuntimePaths always has (runtime data colocated under repo/data
+        # unless MODEL_PREDICTION_RUNTIME_ROOT is set). Pass `paths=` to
+        # control the runtime root explicitly, e.g. in tests.
+        resolved = paths or RuntimePaths.resolve(repo_root=root)
+        self.root = resolved.repo_root
+        self.output_root = resolved.rebuild_output_root
+        self.data_root = resolved.rebuild_root
+        self.shadow_db = resolved.rebuild_shadow_db
+        self.metadata_db = resolved.rebuild_metadata_db
 
     def _json(self, name: str) -> tuple[Any | None, str | None]:
         return _safe_json(self.output_root / name)
@@ -523,8 +531,8 @@ _READERS: dict[str, Callable[[RebuildStatusReader], dict[str, Any]]] = {
 }
 
 
-def read_rebuild_view(view: str, root: Path = ROOT) -> dict[str, Any]:
-    reader = RebuildStatusReader(root)
+def read_rebuild_view(view: str, root: Path = ROOT, *, paths: RuntimePaths | None = None) -> dict[str, Any]:
+    reader = RebuildStatusReader(root, paths=paths)
     builder = _READERS.get(view)
     return builder(reader) if builder else _unavailable(f"unknown rebuild view: {view}")
 

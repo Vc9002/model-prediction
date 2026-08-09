@@ -1,0 +1,127 @@
+"""Canonical repo-root/runtime-root path resolution.
+
+Not rebuild-specific: the incumbent system may eventually route its own
+mutable state through this too, so it lives at the package top level rather
+than under `rebuild/`. Only the rebuild dashboard reader is actually wired
+to it yet (see `dashboard/rebuild_status.py`) -- this module just stops that
+one real, identified coupling (mutable rebuild DB state living inside
+whichever Git checkout happens to launch the dashboard) rather than
+attempting a wider migration in the same change.
+
+Two roots, two different lifecycles:
+
+- `repo_root`: the Git checkout. Versioned research evidence
+  (`outputs/rebuild/`) belongs here -- it's reviewed, committed, meant to
+  survive a `git log`.
+- `runtime_root`: mutable, disposable, machine-local state (raw provider
+  cache, normalized Parquet, SQLite databases, resume state, logs). Belongs
+  outside Git entirely so that switching worktrees/branches, or even
+  deleting and re-cloning the repo, can never silently orphan or corrupt it.
+
+Resolution order for `runtime_root`:
+1. `MODEL_PREDICTION_RUNTIME_ROOT` env var, if set -- the real external
+   location once the operational cutover has happened.
+2. `repo_root / "data"` otherwise -- the historical, repo-local behavior,
+   preserved as a safe default so an unconfigured dev checkout (or a test
+   that forgets to override) keeps working exactly as it always has,
+   rather than silently writing somewhere unexpected.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+
+class RuntimePathError(ValueError):
+    """A resolved or explicitly-constructed path configuration is unsafe."""
+
+
+def _default_repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+@dataclass(frozen=True)
+class RuntimePaths:
+    repo_root: Path
+    runtime_root: Path
+
+    def __post_init__(self) -> None:
+        repo_root = self.repo_root.resolve()
+        runtime_root = self.runtime_root.resolve()
+        object.__setattr__(self, "repo_root", repo_root)
+        object.__setattr__(self, "runtime_root", runtime_root)
+        if runtime_root == repo_root / "src" / "model_prediction":
+            raise RuntimePathError("runtime root must not be the production source package")
+        if ".git" in runtime_root.parts:
+            raise RuntimePathError("runtime root must not live inside a .git directory")
+
+    # ── versioned evidence: stays with the repo ──────────────────────────
+
+    @property
+    def rebuild_output_root(self) -> Path:
+        return self.repo_root / "outputs" / "rebuild"
+
+    # ── mutable rebuild state: lives under runtime_root ──────────────────
+
+    @property
+    def rebuild_root(self) -> Path:
+        return self.runtime_root / "rebuild"
+
+    @property
+    def rebuild_raw_root(self) -> Path:
+        return self.rebuild_root / "raw"
+
+    @property
+    def rebuild_normalized_root(self) -> Path:
+        return self.rebuild_root / "normalized"
+
+    @property
+    def rebuild_feature_root(self) -> Path:
+        return self.rebuild_root / "features"
+
+    @property
+    def rebuild_market_root(self) -> Path:
+        return self.rebuild_root / "markets"
+
+    @property
+    def rebuild_resume_root(self) -> Path:
+        return self.rebuild_root / "resume_state"
+
+    @property
+    def rebuild_shadow_db(self) -> Path:
+        # Directly under rebuild_root, not a "databases/" subfolder: matches
+        # where these two files actually live today
+        # (data/rebuild/shadow.db). A future migration is free to introduce
+        # a subfolder, but that's a real data-relocation decision for the
+        # live cutover to make deliberately, not something this path
+        # resolver should invent as a side effect -- doing so here already
+        # broke an existing test that (correctly) expects today's real
+        # layout.
+        return self.rebuild_root / "shadow.db"
+
+    @property
+    def rebuild_metadata_db(self) -> Path:
+        return self.rebuild_root / "metadata.db"
+
+    @property
+    def log_root(self) -> Path:
+        return self.runtime_root / "logs"
+
+    @classmethod
+    def resolve(cls, *, repo_root: Path | str | None = None) -> RuntimePaths:
+        """Resolve from environment, with the repo-local dev fallback described above."""
+        resolved_repo_root = Path(repo_root) if repo_root is not None else _default_repo_root()
+        runtime_root_env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
+        runtime_root = Path(runtime_root_env) if runtime_root_env else resolved_repo_root / "data"
+        return cls(repo_root=resolved_repo_root, runtime_root=runtime_root)
+
+    @classmethod
+    def for_test(cls, tmp_path: Path) -> RuntimePaths:
+        """Isolated roots for tests -- never the real repo or runtime directory."""
+        repo_root = tmp_path / "repo"
+        runtime_root = tmp_path / "runtime"
+        repo_root.mkdir(parents=True, exist_ok=True)
+        runtime_root.mkdir(parents=True, exist_ok=True)
+        return cls(repo_root=repo_root, runtime_root=runtime_root)
