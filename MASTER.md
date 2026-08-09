@@ -321,6 +321,15 @@ Comprehensive codebase audit covering error handling, dead code, file growth, co
 | DD-9 | **No pre-commit ruff hook** | Project config | Lint violations accumulate between CI runs. 126 ruff findings exist (mostly EXE002 shebangs — cosmetic) |
 | DD-10 | **126 ruff findings (baseline) — 79 are EXE002 shebang** | `tests/` directory | 79 test files have executable bits set without shebangs — harmless but noisy. Remaining 47 are style/formatting |
 
+### 🔴 New — found 2026-08-05 deep debug
+
+| # | Issue | Location | Impact |
+|---|---|---|---|
+| DD-11 | **FIP pipeline built and validated but not wired into live serving** | `learned_forward.py:98-117` | Live MLB forecasts still use `starter_era_gap` (ERA) despite locked-holdout proof that `starter_fip_gap` beats it: +1pp hit rate, -39% calibration ECE, +11 units/season. FIP pipeline exists in `features/starter_history.py` (`starter_rolling_fip`, `starter_fip_gap_live`) and `validation.py` (`_load_starter_fip_map`, `_starter_fip_gap`) but learned_forward.py still imports and calls `starter_era_gap_live` |
+| DD-12 | **starter_era_gap NO_CALL silently defaults to 0.0 without operator-visible warning** | `learned_forward.py:115-117` | When either starter lacks sufficient history, the gap silently becomes 0.0 — the model still produces a pick with a fabricated feature value. The unavailable reason IS captured in the `unavailable` list returned by the forecast, but it's buried in the forecast result dict, not visible on the dashboard's Today tab |
+| DD-13 | **Git push failing — LFS upload timeout** | Background push task | Both LFS-tracked files (`data/events.jsonl` 85MB, `data/mlb_statsapi/game_snapshots.jsonl` 61MB) fail to upload: `read tcp ... i/o timeout` from GitHub's S3. The LFS objects push but the connection drops during upload. All 7 local commits are ahead of origin |
+| DD-14 | **Flat Ledger picks sometimes missing model_version** | Flat ledger rows, dashboard display | Some flat ledger picks are created without `model_version` populated (e.g. manually-created picks, legacy rows). Fixed the dashboard display to show "unknown" as fallback (commit `453a01d`), but the root cause — some pick creation paths not setting model_version — remains uninvestigated |
+
 ### ✅ Verified good
 
 - **675 tests pass, 0 fail** — all P1 fixes + deep debug changes verified
