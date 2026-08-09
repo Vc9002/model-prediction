@@ -19,6 +19,7 @@ from .cache import ProviderRawCache
 from .http import HttpProviderClient
 
 MLB_STATS_BASE = "https://statsapi.mlb.com/api"
+PARSER_VERSION = "mlb-stats-v1"
 
 
 class MLBStatsProvider:
@@ -40,8 +41,21 @@ class MLBStatsProvider:
     ) -> ProviderResult:
         cached = self.cache.latest(self.provider_id, "mlb", endpoint_family, parameters)
         if cached is not None and not force:
+            if cached.metadata.http_status != 200:
+                return ProviderResult.unavailable(
+                    f"cached MLB Stats response has HTTP {cached.metadata.http_status}",
+                    cached.metadata,
+                )
             try:
-                return parser(cached.read_bytes(), cached.metadata)
+                result = parser(cached.read_bytes(), cached.metadata)
+                self.cache.record_parse_result(
+                    result.metadata or cached.metadata,
+                    parser_version=PARSER_VERSION,
+                    status=result.status.value,
+                    schema_hash=(result.metadata or cached.metadata).schema_hash,
+                    reason=result.reason,
+                )
+                return result
             except Exception as exc:  # noqa: BLE001 - source parser boundary
                 return ProviderResult(ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}")
         try:
@@ -72,8 +86,23 @@ class MLBStatsProvider:
         if fetched.status_code != 200:
             return ProviderResult.unavailable(f"MLB Stats returned HTTP {fetched.status_code}", metadata)
         try:
-            return parser(fetched.body, metadata)
+            result = parser(fetched.body, metadata)
+            self.cache.record_parse_result(
+                result.metadata or metadata,
+                parser_version=PARSER_VERSION,
+                status=result.status.value,
+                schema_hash=(result.metadata or metadata).schema_hash,
+                reason=result.reason,
+            )
+            return result
         except Exception as exc:  # noqa: BLE001 - source parser boundary
+            self.cache.record_parse_result(
+                metadata,
+                parser_version=PARSER_VERSION,
+                status=ProviderStatus.DEGRADED.value,
+                schema_hash=None,
+                reason=str(exc),
+            )
             return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"MLB Stats schema drift: {exc}")
 
     @staticmethod
@@ -124,6 +153,11 @@ class MLBStatsProvider:
         if not isinstance(game_data, dict) or not isinstance(live_data, dict):
             raise TypeError("game feed lacks gameData/liveData")
         game_pk = int(game_data["game"]["pk"])
+        requested_game_pk = metadata.source_event_id or metadata.requested_parameters.get("game_pk")
+        if requested_game_pk is not None and str(requested_game_pk) != str(game_pk):
+            raise ValueError(
+                f"MLB game-feed identity mismatch: requested {requested_game_pk}, payload {game_pk}"
+            )
         teams = game_data.get("teams", {})
         probable = game_data.get("probablePitchers", {})
         players = game_data.get("players", {})

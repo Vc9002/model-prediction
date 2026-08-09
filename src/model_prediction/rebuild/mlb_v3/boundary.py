@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -30,3 +32,22 @@ class MLBV3DataBoundary:
                 "MLB v3 research may not read prospective/v2 evidence or unapproved data roots"
             )
         return resolved
+
+
+@dataclass(frozen=True)
+class MLBV3GuardedRepository:
+    """The only filesystem read gateway for MLB v3 research artifacts."""
+
+    boundary: MLBV3DataBoundary
+
+    def resolve(self, path: str | Path) -> Path:
+        return self.boundary.assert_read_path(path)
+
+    def read_bytes(self, path: str | Path) -> bytes:
+        return self.resolve(path).read_bytes()
+
+    def read_text(self, path: str | Path) -> str:
+        return self.resolve(path).read_text()
+
+    def read_json(self, path: str | Path) -> Any:
+        return json.loads(self.read_text(path))

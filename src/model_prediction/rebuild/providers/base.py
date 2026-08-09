@@ -29,6 +29,14 @@ class SourceGrade(StrEnum):
     D = "D"  # derived or imputed
 
 
+class DataUseContext(StrEnum):
+    RESEARCH = "RESEARCH"
+    PRODUCTION_DATASET = "PRODUCTION_DATASET"
+    PRODUCTION_MODEL = "PRODUCTION_MODEL"
+    SHADOW_ECONOMICS = "SHADOW_ECONOMICS"
+    LIVE_EXECUTION = "LIVE_EXECUTION"
+
+
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
@@ -71,6 +79,16 @@ def assert_production_use_allowed(metadata: SourceResponseMetadata) -> None:
             f"provider {metadata.provider} is not production-cleared: "
             f"{metadata.commercial_use_status}"
         )
+
+
+def assert_frame_use_allowed(frame: pl.DataFrame, context: DataUseContext) -> None:
+    """Require explicit source-rights clearance outside tagged research use."""
+    if context is DataUseContext.RESEARCH:
+        return
+    if "production_allowed" not in frame.columns:
+        raise PermissionError(f"{context.value} input lacks production-rights provenance")
+    if frame.is_empty() or not bool(frame["production_allowed"].all()):
+        raise PermissionError(f"{context.value} input contains source data not cleared for production use")
 
 
 @dataclass(frozen=True)

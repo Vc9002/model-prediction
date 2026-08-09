@@ -75,6 +75,7 @@ def _mlb_foundation(
         return (
             MLBV3Foundation(
                 data_root / "normalized",
+                repo_root=default_repo_root(),
                 mlb_stats=MLBStatsProvider(http, cache),
             ),
             http,
@@ -82,6 +83,7 @@ def _mlb_foundation(
     return (
         MLBV3Foundation(
             data_root / "normalized",
+            repo_root=default_repo_root(),
             statcast=StatcastProvider(http, cache),
         ),
         http,

@@ -32,6 +32,19 @@ DENIED_IMPORTS = (
     "model_prediction.research_ledgers",
     "model_prediction.xlsx_ledger",
 )
+MLB_V3_DENIED_IMPORTS = (
+    "model_prediction.rebuild.mlb_shadow_pipeline",
+    "model_prediction.rebuild.shadow_ledger",
+    "model_prediction.rebuild.dashboard_status",
+)
+MLB_V3_SEALED_PATH_MARKERS = (
+    "data/rebuild/shadow.db",
+    "data/rebuild/metadata.db",
+    "outputs/rebuild/test_consumption_registry.json",
+    "outputs/rebuild/verification.json",
+    "outputs/rebuild/economic_report",
+    "outputs/rebuild/runtime/",
+)
 PROTECTED_DATA_PREFIXES = (
     "data/main/",
     "data/flat/",
@@ -119,6 +132,7 @@ def _scan_python(repo: Path) -> list[str]:
     errors: list[str] = []
     for path in _python_files(repo):
         relative = path.relative_to(repo).as_posix()
+        is_mlb_v3 = relative.startswith("src/model_prediction/rebuild/mlb_v3/")
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
         except (OSError, SyntaxError) as exc:
@@ -144,6 +158,13 @@ def _scan_python(repo: Path) -> list[str]:
                         errors.append(
                             f"{relative}:{node.lineno}: prohibited incumbent import {alias.name}"
                         )
+                    if is_mlb_v3 and (
+                        alias.name in MLB_V3_DENIED_IMPORTS
+                        or alias.name.startswith(tuple(f"{name}." for name in MLB_V3_DENIED_IMPORTS))
+                    ):
+                        errors.append(
+                            f"{relative}:{node.lineno}: prohibited MLB v3 sealed-evidence import {alias.name}"
+                        )
             elif isinstance(node, ast.ImportFrom):
                 imported = node.module
                 parts = set((imported or "").lower().replace("-", "_").split("."))
@@ -158,6 +179,13 @@ def _scan_python(repo: Path) -> list[str]:
                 ):
                     errors.append(
                         f"{relative}:{node.lineno}: prohibited incumbent import {imported}"
+                    )
+                if is_mlb_v3 and imported and (
+                    imported in MLB_V3_DENIED_IMPORTS
+                    or imported.startswith(tuple(f"{name}." for name in MLB_V3_DENIED_IMPORTS))
+                ):
+                    errors.append(
+                        f"{relative}:{node.lineno}: prohibited MLB v3 sealed-evidence import {imported}"
                     )
             elif isinstance(node, ast.Call):
                 function = node.func
@@ -174,6 +202,10 @@ def _scan_python(repo: Path) -> list[str]:
                 and id(node) not in docstrings
             ):
                 normalized = node.value.replace("\\", "/").lstrip("./")
+                if is_mlb_v3 and any(marker in normalized for marker in MLB_V3_SEALED_PATH_MARKERS):
+                    errors.append(
+                        f"{relative}:{getattr(node, 'lineno', '?')}: prohibited MLB v3 sealed-evidence path {node.value!r}"
+                    )
                 for prefix in PROTECTED_DATA_PREFIXES:
                     if prefix in allowed_prefixes:
                         continue

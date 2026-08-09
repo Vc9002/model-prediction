@@ -15,6 +15,7 @@ from .http import HttpProviderClient
 
 STATCAST_CSV_URL = "https://baseballsavant.mlb.com/statcast_search/csv"
 MAX_STATCAST_DAYS = 7
+PARSER_VERSION = "statcast-csv-v1"
 
 
 class StatcastProvider:
@@ -61,8 +62,21 @@ class StatcastProvider:
         }
         cached = self.cache.latest(self.provider_id, "mlb", "statcast_pitches", params)
         if cached is not None and not force:
+            if cached.metadata.http_status != 200:
+                return ProviderResult.unavailable(
+                    f"cached Statcast response has HTTP {cached.metadata.http_status}",
+                    cached.metadata,
+                )
             try:
-                return self._parse(cached.read_bytes(), cached.metadata)
+                result = self._parse(cached.read_bytes(), cached.metadata)
+                self.cache.record_parse_result(
+                    result.metadata or cached.metadata,
+                    parser_version=PARSER_VERSION,
+                    status=result.status.value,
+                    schema_hash=(result.metadata or cached.metadata).schema_hash,
+                    reason=result.reason,
+                )
+                return result
             except Exception as exc:  # noqa: BLE001 - cache boundary
                 return ProviderResult(ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}")
         try:
@@ -89,4 +103,12 @@ class StatcastProvider:
         self.cache.store(metadata, fetched.body)
         if fetched.status_code != 200:
             return ProviderResult.unavailable(f"Statcast returned HTTP {fetched.status_code}", metadata)
-        return self._parse(fetched.body, metadata)
+        result = self._parse(fetched.body, metadata)
+        self.cache.record_parse_result(
+            result.metadata or metadata,
+            parser_version=PARSER_VERSION,
+            status=result.status.value,
+            schema_hash=(result.metadata or metadata).schema_hash,
+            reason=result.reason,
+        )
+        return result

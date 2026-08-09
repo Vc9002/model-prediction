@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import polars as pl
@@ -49,6 +49,8 @@ def normalize_schedule(frame: pl.DataFrame, metadata: SourceResponseMetadata) ->
         game_pk = int(row["game_pk"])
         event_start = _utc_iso(row["game_date"])
         status = str(row.get("status_detailed") or row.get("status_abstract") or "UNKNOWN")
+        status_lower = status.lower()
+        resume_date = _text_id(row.get("resume_date"))
         rows.append({
             **_provenance(metadata, str(game_pk)),
             "canonical_event_id": canonical_event_id(game_pk),
@@ -63,10 +65,13 @@ def normalize_schedule(frame: pl.DataFrame, metadata: SourceResponseMetadata) ->
             "period": "FULL_GAME",
             "status": status,
             "status_code": _text_id(row.get("status_code")),
-            "postponed": "postpon" in status.lower() or str(row.get("status_code") or "") == "D",
+            "postponed": "postpon" in status_lower,
+            "delayed": "delay" in status_lower,
+            "suspended": "suspend" in status_lower,
+            "resumed": "resum" in status_lower or resume_date is not None,
             "rescheduled_from_date": _text_id(row.get("rescheduled_from_date")),
             "reschedule_date": _text_id(row.get("reschedule_date")),
-            "resume_date": _text_id(row.get("resume_date")),
+            "resume_date": resume_date,
             "original_date": _text_id(row.get("original_date")),
             "home_probable_pitcher_id": _text_id(row.get("home_probable_pitcher_id")),
             "away_probable_pitcher_id": _text_id(row.get("away_probable_pitcher_id")),
@@ -169,15 +174,32 @@ def normalize_statcast(frame: pl.DataFrame, metadata: SourceResponseMetadata) ->
 
 def normalize_weather(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataFrame:
     game_pk = int(metadata.source_event_id or metadata.requested_parameters["game_pk"])
+    fixed_lead_days = metadata.requested_parameters.get("fixed_lead_days")
+    exact_run = metadata.requested_parameters.get("forecast_run_issued_at_utc")
     rows = []
     for row in frame.iter_rows(named=True):
+        valid_time = datetime.fromisoformat(str(row["valid_time"]))
+        if valid_time.tzinfo is None:
+            valid_time = valid_time.replace(tzinfo=UTC)
+        valid_time = valid_time.astimezone(UTC)
+        if exact_run is not None:
+            issued_at: str | None = _utc_iso(exact_run)
+            quality = "A_EXACT_SINGLE_RUN"
+        elif fixed_lead_days is not None:
+            issued_at = (valid_time - timedelta(days=int(fixed_lead_days))).isoformat()
+            quality = f"A_FIXED_LEAD_{int(fixed_lead_days) * 24}H"
+        else:
+            # Capture time proves when this forecast was observed, not when the
+            # underlying model run was initialized.
+            issued_at = None
+            quality = "A_LIVE_CAPTURE_ISSUE_UNKNOWN"
         rows.append({
             **_provenance(metadata, str(game_pk)),
             "canonical_event_id": canonical_event_id(game_pk),
             "game_pk": game_pk,
-            "valid_time_utc": _utc_iso(row["valid_time"]),
-            "forecast_issued_at_utc": _utc_iso(metadata.observed_at_utc),
-            "weather_source_quality": "A_FORECAST_CAPTURE",
+            "valid_time_utc": valid_time.isoformat(),
+            "forecast_issued_at_utc": issued_at,
+            "weather_source_quality": quality,
             **{key: value for key, value in row.items() if key != "valid_time"},
         })
     output = pl.DataFrame(rows)

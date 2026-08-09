@@ -82,6 +82,36 @@ class ProviderRawCache:
         self._atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"))
         return CachedResponse(metadata, body_path, manifest_path)
 
+    def record_parse_result(
+        self,
+        metadata: SourceResponseMetadata,
+        *,
+        parser_version: str,
+        status: str,
+        schema_hash: str | None,
+        reason: str | None = None,
+    ) -> Path:
+        """Append immutable parser evidence without mutating the raw observation.
+
+        Raw bytes must exist before parsing.  The resulting schema belongs to a
+        particular parser version, not to the HTTP observation itself, so it is
+        recorded in a separate content-addressed manifest.
+        """
+        key = cache_key(metadata.endpoint_family, metadata.requested_parameters)
+        root = self._request_root(metadata.provider, metadata.sport, metadata.endpoint_family, key)
+        payload = {
+            "content_hash": metadata.content_hash,
+            "parser_version": parser_version,
+            "schema_hash": schema_hash,
+            "status": status,
+            "reason": reason,
+        }
+        digest = hashlib.sha256(canonical_json(payload)).hexdigest()
+        path = root / "parse_results" / f"{digest}.json"
+        if not path.exists():
+            self._atomic_write(path, json.dumps(payload, indent=2, sort_keys=True).encode("utf-8"))
+        return path
+
     def latest(
         self, provider: str, sport: str, endpoint: str, parameters: dict[str, Any]
     ) -> CachedResponse | None:
