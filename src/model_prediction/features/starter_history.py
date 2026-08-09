@@ -37,7 +37,10 @@ DEFAULT_LOOKBACK_STARTS = 5
 MINIMUM_PRIOR_STARTS = 2
 FIP_CONSTANT = 3.10  # MLB league-average FIP constant; updated annually
 
-_STARTER_INDEX_CACHE: dict[Path, dict[str, list[tuple[datetime, float, float]]]] = {}
+# (game_start, innings, earned_runs, strikeouts, walks, home_runs, hit_by_pitch)
+# -- widened for FIP (F-68); ERA-only callers just ignore the last four fields.
+_StarterRow = tuple[datetime, float, float, float, float, float, float]
+_STARTER_INDEX_CACHE: dict[Path, dict[str, list[_StarterRow]]] = {}
 
 
 def _baseball_innings(value: Any) -> float:
@@ -54,7 +57,7 @@ def _normalize_name(name: str) -> str:
 
 def load_starter_index(
     snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
-) -> dict[str, list[tuple[datetime, float, float]]]:
+) -> dict[str, list[_StarterRow]]:
     """Normalized starter name -> chronological (game_start, innings, earned_runs).
 
     Only the game's own starter (``pitcher_order[0]``), and only when that
@@ -65,7 +68,7 @@ def load_starter_index(
     path = Path(snapshot_path)
     if path in _STARTER_INDEX_CACHE:
         return _STARTER_INDEX_CACHE[path]
-    index: dict[str, list[tuple[datetime, float, float, float, float, float, float]]] = {}
+    index: dict[str, list[_StarterRow]] = {}
     if not path.exists():
         _STARTER_INDEX_CACHE[path] = index
         return index
