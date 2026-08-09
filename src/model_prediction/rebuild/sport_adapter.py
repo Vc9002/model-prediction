@@ -13,9 +13,9 @@ Honest scope, not fabricated:
   OpenDota network integration yet), so collect() reports
   NOT_IMPLEMENTED rather than SUCCESS. KBO/NPB have no collector at all
   and correctly raise from build_adapter().
-- `build_features()`: real for MLB and basic non-WNBA foundation sports.
-  WNBA explicitly fails closed until the production adapter uses the same
-  released point-in-time feature builder as the WNBA foundation.
+- `build_features()`: real for MLB, WNBA, and basic foundation sports.
+  WNBA replay and live entrypoints share one normalized PIT store and team-
+  form transform; its later model/economic stages remain disabled.
 - `predict()` / `match_markets()` / `decide()`: real for MLB, via
   mlb_shadow_pipeline.py's predict_stage/match_markets_stage/decide_stage
   -- the exact same functions (train_through, build_forecast,
@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 import polars as pl
@@ -263,25 +264,26 @@ class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
         return StageResult("collect", status_map.get(result.get("status"), STAGE_ERROR), result)
 
 
-class _WNBAFoundationBlockedAdapter(_NotImplementedStagesMixin):
-    """Permit research collection but block every production-facing WNBA stage.
+class _WNBAAdapter(_NotImplementedStagesMixin):
+    """Research collection and canonical PIT features; later stages blocked.
 
-    The existing generic Elo path does not use the released WNBA PIT builder,
-    and the SportsDataverse/ESPN data rights review is unresolved. Silently
-    retaining that path would create a second, non-canonical feature system.
+    Replay and live feature entrypoints both consume WNBANormalizedStore via
+    the same WNBA horizon builder. No model or economic stage is enabled, and
+    the SportsDataverse/ESPN data rights review remains unresolved.
     """
 
     sport = "wnba"
 
-    def __init__(self, collector: Any) -> None:
+    def __init__(self, data_root: str, collector: Any) -> None:
+        self.data_root = data_root
         self.collector = collector
 
     @staticmethod
     def _blocked(stage: str) -> StageResult:
         return StageResult(stage, STAGE_NOT_IMPLEMENTED, {
             "reason": (
-                "WNBA foundation is not released: canonical PIT feature wiring and "
-                "commercial data rights must be cleared before production stages"
+                "WNBA model/economic stages are not released and commercial data "
+                "rights must be cleared before production use"
             ),
             "qualification_status": "FOUNDATION_BLOCKED",
             "commercial_use_status": "unresolved",
@@ -302,8 +304,92 @@ class _WNBAFoundationBlockedAdapter(_NotImplementedStagesMixin):
         }
         return StageResult("collect", status_map.get(str(result.get("status", "")), STAGE_ERROR), detail)
 
+    def _build_features(
+        self,
+        date: str,
+        horizon: str,
+        *,
+        mode: str,
+        run_id: str | None = None,
+        knowledge_time_utc: datetime | None = None,
+    ) -> StageResult:
+        from .shadow_ledger import ShadowLedger
+        from .wnba.horizon_builder import (
+            build_wnba_live_features,
+            build_wnba_replay_features,
+        )
+
+        ledger = ShadowLedger(f"{self.data_root}/shadow.db") if run_id else None
+        try:
+            if mode == "live":
+                result = build_wnba_live_features(
+                    self.data_root,
+                    date,
+                    horizon,
+                    ledger=ledger,
+                    run_id=run_id,
+                    knowledge_time_utc=knowledge_time_utc,
+                )
+            else:
+                result = build_wnba_replay_features(
+                    self.data_root,
+                    date,
+                    horizon,
+                    ledger=ledger,
+                    run_id=run_id,
+                )
+        except Exception as exc:  # noqa: BLE001 -- corrupt PIT input must fail closed visibly
+            return StageResult("build_features", STAGE_ERROR, {
+                "reason": "invalid_or_unavailable_wnba_pit_features",
+                "error": str(exc)[:300],
+                "production_allowed": False,
+            })
+        finally:
+            if ledger is not None:
+                ledger.close()
+        detail = {
+            "mode": result.mode,
+            "target_games": result.target_games,
+            "rows_built": len(result.rows),
+            "missing_reasons": result.missing_reasons,
+            "snapshot_hash": result.snapshot_hash,
+            "feature_schema_hash": result.feature_schema_hash,
+            "payload_path": result.payload_path,
+            "use_scope": "RESEARCH_SHADOW_ONLY",
+            "commercial_use_status": "unresolved",
+            "production_allowed": False,
+        }
+        status = STAGE_SUCCESS if result.rows else STAGE_NO_DATA
+        return StageResult("build_features", status, detail)
+
+    def build_replay_features(
+        self, date: str, horizon: str, run_id: str | None = None,
+    ) -> StageResult:
+        return self._build_features(date, horizon, mode="replay", run_id=run_id)
+
+    def build_live_features(
+        self,
+        date: str,
+        horizon: str,
+        run_id: str | None = None,
+        *,
+        knowledge_time_utc: datetime | None = None,
+    ) -> StageResult:
+        return self._build_features(
+            date,
+            horizon,
+            mode="live",
+            run_id=run_id,
+            knowledge_time_utc=knowledge_time_utc,
+        )
+
     def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
-        return self._blocked("build_features")
+        try:
+            target_date = datetime.fromisoformat(date).date()
+        except ValueError as exc:
+            return StageResult("build_features", STAGE_ERROR, {"error": str(exc)})
+        mode = "replay" if target_date < datetime.now(UTC).date() else "live"
+        return self._build_features(date, horizon, mode=mode, run_id=run_id)
 
     def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         return self._blocked("predict")
@@ -487,7 +573,7 @@ def build_adapter(
 
     meta = MetadataDB(f"{data_root}/metadata.db")
     if sport == "wnba":
-        return _WNBAFoundationBlockedAdapter(NBACollector(data_root, meta))
+        return _WNBAAdapter(data_root, NBACollector(data_root, meta))
     if sport == "nba":
         nba_collector = NBACollector(data_root, meta)
         return _BasicEloAdapter(sport, data_root, nba_collector, lambda d: nba_collector.collect_date(d, sport=sport))

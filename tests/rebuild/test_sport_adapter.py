@@ -3,6 +3,9 @@ FOUNDATION_COMPLETION.md Phase 13 / item 5)."""
 
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
+
 import pytest
 
 from model_prediction.rebuild.sport_adapter import (
@@ -189,8 +192,10 @@ class TestBasicEloAdapter:
 
     def test_wnba_production_stages_fail_closed_until_foundation_release(self, tmp_path):
         adapter = build_adapter("wnba", str(tmp_path))
+        cold_features = adapter.build_features("2026-08-06", "late")
+        assert cold_features.status == STAGE_NO_DATA
+        assert cold_features.detail["production_allowed"] is False
         for result in (
-            adapter.build_features("2026-08-06", "late"),
             adapter.predict("2026-08-06", "late"),
             adapter.match_markets("2026-08-06", "late"),
             adapter.decide("2026-08-06", "late"),
@@ -199,6 +204,159 @@ class TestBasicEloAdapter:
             assert result.detail["qualification_status"] == "FOUNDATION_BLOCKED"
             assert result.detail["commercial_use_status"] == "unresolved"
             assert result.detail["production_allowed"] is False
+
+    def test_wnba_replay_and_live_adapter_paths_have_identical_pit_features(self, tmp_path):
+        import json
+
+        import polars as pl
+
+        from model_prediction.rebuild.shadow_ledger import ShadowLedger
+        from model_prediction.rebuild.storage import FeatureStore
+        from model_prediction.rebuild.wnba.store import WNBANormalizedStore
+
+        store = WNBANormalizedStore(tmp_path / "normalized")
+        games = pl.DataFrame([
+            {
+                "event_id": "prior",
+                "event_start_utc": "2026-08-01T22:00:00+00:00",
+                "observed_at_utc": "2026-08-02T00:00:00+00:00",
+                "completed": True,
+                "pit_eligible": True,
+                "home_team_id": "A",
+                "away_team_id": "B",
+                "home_team_canonical_id": "wnba:team:a",
+                "away_team_canonical_id": "wnba:team:b",
+            },
+            {
+                "event_id": "target",
+                "event_start_utc": "2026-08-10T22:00:00+00:00",
+                "observed_at_utc": "2026-08-10T20:00:00+00:00",
+                "completed": False,
+                "pit_eligible": True,
+                "home_team_id": "A",
+                "away_team_id": "B",
+                "home_team_canonical_id": "wnba:team:a",
+                "away_team_canonical_id": "wnba:team:b",
+            },
+        ])
+        boxes = pl.DataFrame([
+            {
+                "event_id": "prior",
+                "event_start_utc": "2026-08-01T22:00:00+00:00",
+                "observed_at_utc": "2026-08-02T00:00:00+00:00",
+                "pit_eligible": True,
+                "team_id": team,
+                "opponent_team_id": opponent,
+                "points": points,
+                "field_goals_made": 30,
+                "field_goals_attempted": 70,
+                "three_points_made": 8,
+                "three_points_attempted": 22,
+                "free_throws_made": 14,
+                "free_throws_attempted": 18,
+                "offensive_rebounds": 9,
+                "defensive_rebounds": 27,
+                "turnovers": 11,
+            }
+            for team, opponent, points in (("A", "B", 82), ("B", "A", 77))
+        ])
+        store.write("games", 2026, games)
+        store.write("team_box", 2026, boxes)
+
+        ledger = ShadowLedger(tmp_path / "shadow.db")
+        run_id = ledger.record_run("wnba", run_type="test")
+        ledger.close()
+        adapter = build_adapter("wnba", str(tmp_path))
+        before_cutoff = adapter.build_live_features(
+            "2026-08-10",
+            "late",
+            knowledge_time_utc=datetime.fromisoformat("2026-08-10T20:59:59+00:00"),
+        )
+        assert before_cutoff.status == STAGE_NO_DATA
+        assert before_cutoff.detail["missing_reasons"] == {"decision_cutoff_not_reached": 1}
+        replay = adapter.build_replay_features("2026-08-10", "late", run_id=run_id)
+        live = adapter.build_live_features(
+            "2026-08-10",
+            "late",
+            run_id=run_id,
+            knowledge_time_utc=datetime.fromisoformat("2026-08-10T21:00:00+00:00"),
+        )
+
+        assert replay.status == STAGE_SUCCESS
+        assert live.status == STAGE_SUCCESS
+        assert replay.detail["snapshot_hash"] == live.detail["snapshot_hash"]
+        assert replay.detail["feature_schema_hash"] == live.detail["feature_schema_hash"]
+        persisted = FeatureStore(tmp_path / "features").read("wnba", "late")
+        assert persisted.height == 1
+        assert persisted["decision_time_utc"][0] == "2026-08-10T21:00:00+00:00"
+        assert persisted["production_allowed"][0] is False
+        schema_path = replay.detail["payload_path"].replace(".parquet", ".schema.json")
+        schema = json.loads(Path(schema_path).read_text())
+        assert schema["feature_schema_hash"] == replay.detail["feature_schema_hash"]
+        ledger = ShadowLedger(tmp_path / "shadow.db")
+        lineage = ledger.feature_snapshots_for_horizon("wnba", "late")
+        ledger.close()
+        assert len(lineage) == 1
+        assert lineage[0]["dataset_hash"] == replay.detail["snapshot_hash"]
+
+    def test_wnba_adapter_fails_closed_on_malformed_team_metrics(self, tmp_path):
+        import polars as pl
+
+        from model_prediction.rebuild.wnba.store import WNBANormalizedStore
+
+        store = WNBANormalizedStore(tmp_path / "normalized")
+        store.write("games", 2026, pl.DataFrame([
+            {
+                "event_id": "prior",
+                "event_start_utc": "2026-08-01T22:00:00+00:00",
+                "observed_at_utc": "2026-08-02T00:00:00+00:00",
+                "completed": True,
+                "pit_eligible": True,
+                "home_team_id": "A",
+                "away_team_id": "B",
+                "home_team_canonical_id": "wnba:team:a",
+                "away_team_canonical_id": "wnba:team:b",
+            },
+            {
+                "event_id": "target",
+                "event_start_utc": "2026-08-10T22:00:00+00:00",
+                "observed_at_utc": "2026-08-10T20:00:00+00:00",
+                "completed": False,
+                "pit_eligible": True,
+                "home_team_id": "A",
+                "away_team_id": "B",
+                "home_team_canonical_id": "wnba:team:a",
+                "away_team_canonical_id": "wnba:team:b",
+            },
+        ]))
+        store.write("team_box", 2026, pl.DataFrame([
+            {
+                "event_id": "prior",
+                "event_start_utc": "2026-08-01T22:00:00+00:00",
+                "observed_at_utc": "2026-08-02T00:00:00+00:00",
+                "pit_eligible": True,
+                "team_id": team,
+                "opponent_team_id": opponent,
+                "points": points,
+                "field_goals_made": "30",
+                "field_goals_attempted": "70",
+                "three_points_made": "8",
+                "three_points_attempted": "22",
+                "free_throws_made": "14",
+                "free_throws_attempted": "18",
+                "offensive_rebounds": "9",
+                "defensive_rebounds": "27",
+                "turnovers": "11",
+            }
+            for team, opponent, points in (("A", "B", "malformed"), ("B", "A", "77"))
+        ]))
+        result = build_adapter("wnba", str(tmp_path)).build_live_features(
+            "2026-08-10",
+            "late",
+            knowledge_time_utc=datetime.fromisoformat("2026-08-10T21:00:00+00:00"),
+        )
+        assert result.status == STAGE_ERROR
+        assert result.detail["production_allowed"] is False
 
     def test_nba_predict_on_a_cold_empty_data_root_is_honest_no_data_not_a_crash(self, tmp_path):
         adapter = build_adapter("nba", str(tmp_path))
