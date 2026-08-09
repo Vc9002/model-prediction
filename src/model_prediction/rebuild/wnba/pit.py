@@ -21,18 +21,30 @@ def eligible_prior_team_games(
     required_box = {"event_id", "team_id", "observed_at_utc", "pit_eligible"}
     if not required_games.issubset(games.columns) or not required_box.issubset(team_box.columns):
         raise ValueError("WNBA PIT input is missing required provenance columns")
-    prior_games = games.filter(
-        pl.col("completed")
-        & pl.col("pit_eligible")
-        & (pl.col("event_start_utc") < decision)
-        & (pl.col("observed_at_utc") <= decision)
-    ).select(["event_id", "event_start_utc"])
-    return (
+    prior_games = (
+        games.filter(
+            pl.col("completed")
+            & pl.col("pit_eligible")
+            & (pl.col("event_start_utc") < decision)
+            & (pl.col("observed_at_utc") <= decision)
+        )
+        .sort("observed_at_utc")
+        .group_by("event_id", maintain_order=True)
+        .last()
+        .select(["event_id", "event_start_utc"])
+    )
+    eligible_boxes = (
         team_box.filter(
             (pl.col("team_id") == team_id)
             & pl.col("pit_eligible")
             & (pl.col("observed_at_utc") <= decision)
         )
+        .sort("observed_at_utc")
+        .group_by(["event_id", "team_id"], maintain_order=True)
+        .last()
+    )
+    return (
+        eligible_boxes
         .join(prior_games, on="event_id", how="inner", suffix="_game")
         .sort("event_start_utc")
     )
