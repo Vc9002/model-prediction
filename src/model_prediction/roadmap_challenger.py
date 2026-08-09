@@ -812,7 +812,7 @@ def _independent_effect_label(
         return "REJECT_DEGENERATE"
     if unique_values <= 1:
         return "NO_VARIANCE"
-    if adjusted_p_value <= 0.05:
+    if adjusted_p_value <= 0.05:  # source of truth: config.SIGNIFICANCE_THRESHOLD
         if validation_delta < 0 and holdout_delta < 0:
             return "RELIABLE_POSITIVE"
         if holdout_delta > 0:

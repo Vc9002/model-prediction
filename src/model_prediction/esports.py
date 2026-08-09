@@ -783,7 +783,7 @@ def validate_esports_baseline(
     ]
     viable = [
         row for row in threshold_scores
-        if int(row["observations"]) >= 50 and float(row["accuracy"] or 0) >= 0.60
+        if int(row["observations"]) >= 50 and float(row["accuracy"] or 0) >= 0.60  # source: config.ESPORTS_MIN_*
     ]
     # Unlike K above, Brier is NOT a valid criterion here: restricting to an
     # ever-smaller, ever-more-confident subset mechanically improves Brier
