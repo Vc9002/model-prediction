@@ -159,16 +159,17 @@ class MLBAdapter(_NotImplementedStagesMixin):
         # build_forecast from -- see module docstring.
         from . import mlb_shadow_pipeline as pipeline
 
-        # MLB-4 real cross-process resume: if a prior invocation of this
-        # exact run_id already trained a model and resolved feature rows
-        # for this date, reload them from disk instead of retraining --
-        # the real, expensive part predict_stage() does. Falls through to
-        # a full real run below (never silently fails) when no resume
-        # state exists, e.g. a brand-new run_id or a run whose predict()
-        # never reached success.
+        # MLB-4 cross-process resume: run-specific feature rows are reloaded
+        # only after the exact frozen bundle is verified again. Runtime
+        # prediction never retrains or substitutes an uncertainty component.
         if run_id is not None:
             try:
-                resumed = pipeline.load_resume_state(self.data_root, run_id, date)
+                resumed = pipeline.load_resume_state(
+                    self.data_root,
+                    run_id,
+                    date,
+                    challenger_root=self.challenger_root,
+                )
             except Exception as exc:  # noqa: BLE001 -- corrupt external artifact is reported as a stage error
                 return StageResult("predict", STAGE_ERROR, {"reason": "invalid_resume_model", "error": str(exc)[:300]})
             if resumed is not None:
@@ -186,13 +187,17 @@ class MLBAdapter(_NotImplementedStagesMixin):
 
         ledger = self._ledger(run_id)
         try:
-            result = pipeline.predict_stage(state, self.data_root, ledger=ledger, run_id=run_id)
+            result = pipeline.predict_stage(
+                state,
+                self.data_root,
+                ledger=ledger,
+                run_id=run_id,
+                challenger_root=self.challenger_root,
+            )
         finally:
             if ledger is not None:
                 ledger.close()
 
-        if result["status"] == "insufficient_history":
-            return StageResult("predict", STAGE_NO_DATA, result)
         status = STAGE_SUCCESS if result["games_predicted"] > 0 else STAGE_NO_DATA
         return StageResult("predict", status, result)
 

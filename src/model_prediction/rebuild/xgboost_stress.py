@@ -13,8 +13,11 @@ A system that fails under minor realistic degradation remains research-only.
 
 from __future__ import annotations
 
+import hashlib
 import itertools
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -82,6 +85,58 @@ class XGBoostChallenger:
         if not self._fitted or self.model is None:
             return np.full(X.shape[0], 0.5)
         return self.predict_proba(X)[:, 1]
+
+    def save(self, path: str | Path) -> None:
+        """Persist the exact fitted disagreement model with byte hashes."""
+        import joblib
+
+        if not self._fitted or self.model is None:
+            raise RuntimeError("cannot save an unfitted XGBoost challenger")
+        out = Path(path)
+        out.mkdir(parents=True, exist_ok=True)
+        bundle_path = out / "model.joblib"
+        joblib.dump(
+            {
+                "model": self.model,
+                "seed": self.seed,
+                "n_jobs": self.n_jobs,
+                "feature_names": self._feature_names,
+            },
+            bundle_path,
+        )
+        metadata = {
+            "seed": self.seed,
+            "n_jobs": self.n_jobs,
+            "feature_names": self._feature_names,
+            "bundle_sha256": hashlib.sha256(bundle_path.read_bytes()).hexdigest(),
+        }
+        metadata["metadata_sha256"] = hashlib.sha256(
+            json.dumps(metadata, sort_keys=True).encode()
+        ).hexdigest()
+        (out / "metadata.json").write_text(json.dumps(metadata, indent=2))
+
+    @classmethod
+    def load(cls, path: str | Path) -> XGBoostChallenger:
+        """Load :meth:`save` output after verifying metadata and model bytes."""
+        import joblib
+
+        src = Path(path)
+        metadata = json.loads((src / "metadata.json").read_text())
+        expected_metadata_hash = metadata.get("metadata_sha256")
+        identity = {key: value for key, value in metadata.items() if key != "metadata_sha256"}
+        actual_metadata_hash = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+        if not expected_metadata_hash or expected_metadata_hash != actual_metadata_hash:
+            raise ValueError("XGBoost challenger metadata hash mismatch")
+        bundle_path = src / "model.joblib"
+        actual_bundle_hash = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+        if not metadata.get("bundle_sha256") or metadata["bundle_sha256"] != actual_bundle_hash:
+            raise ValueError("XGBoost challenger bundle hash mismatch")
+        payload = joblib.load(bundle_path)
+        challenger = cls(seed=int(payload["seed"]), n_jobs=int(payload["n_jobs"]))
+        challenger.model = payload["model"]
+        challenger._feature_names = list(payload["feature_names"])
+        challenger._fitted = True
+        return challenger
 
 
 # ── Nested chronological XGBoost validation ──────────────────────────────────
