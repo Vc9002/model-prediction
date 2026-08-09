@@ -449,7 +449,7 @@ def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path
     assert model["model_definition_and_backfill_valid"] is False
 
 
-def test_current_configured_production_artifacts_all_valid(monkeypatch) -> None:
+def test_current_configured_artifacts_expose_rejected_external_validation(monkeypatch) -> None:
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
 
     result = dashboard_server.production_evidence()
@@ -460,10 +460,16 @@ def test_current_configured_production_artifacts_all_valid(monkeypatch) -> None:
     }
 
     assert {model["sport"]: model["active_model_version"] for model in result["models"]} == configured
-    assert result["all_model_definitions_and_backfills_valid"] is True
+    assert result["all_model_definitions_and_backfills_valid"] is False
     assert result["feature_registry"]["valid"] is True
     assert len(result["feature_registry"]["features"]) == 27
     assert len(result["feature_registry"]["production_ablation_summary"]) == 15
+    rejected = {
+        model["sport"]
+        for model in result["models"]
+        if not model["model_definition_and_backfill_valid"]
+    }
+    assert rejected == {"lol", "cs2", "dota2", "valorant"}
     for model in result["models"]:
         assert model["artifact"]["version_matches_config"] is True
         assert model["artifact"]["lineage_matches_config"] is True

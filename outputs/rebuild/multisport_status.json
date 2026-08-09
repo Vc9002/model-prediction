@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-08-08T20:14:43.952585+00:00",
+  "code_revision": "793a3a1247cb03c5bee016d5cd7d52ffe8031d02-dirty",
+  "mode": "SHADOW_ONLY",
+  "execution_enabled": false,
+  "production_promotion": false,
+  "hard_gates": {
+    "shadow_only": true,
+    "execution_disabled": true,
+    "production_promotion_disabled": true,
+    "live_orders_disabled": true,
+    "production_ledger_writes_disabled": true
+  },
+  "sports": [
+    {
+      "sport": "mlb",
+      "enabled": true,
+      "configured_status": "prospective_validation",
+      "model": {
+        "status": "available",
+        "model_id": "xgb_two_head_negative_binomial",
+        "head_family": "xgboost",
+        "distribution": "negative_binomial",
+        "calibration": "temperature",
+        "ensemble": "none",
+        "model_hash": "3a6f9434be9a262341c72fe24fe5db14efbdcf7f8fcbf26bfa78e9b4cc008b3d",
+        "calibrator_hash": "bea0335ac2889f8365611c5dca7167c122e0004959c795c7f52bdc5ac57f2f01",
+        "dataset_hash": "e0c513aa4a544211980f7095da0de69ad3cb647a75981cbdb3c46512834ee2eb",
+        "oof_sample": 223,
+        "dataset_size": 450,
+        "benchmark_sample": 168,
+        "artifact": "config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
+      },
+      "dataset_size": 450,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "prospective and economic evidence not established"
+    },
+    {
+      "sport": "wnba",
+      "enabled": true,
+      "configured_status": "data_foundation",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "no rebuild challenger artifact is present"
+    },
+    {
+      "sport": "nba",
+      "enabled": true,
+      "configured_status": "data_foundation",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "no rebuild challenger artifact is present"
+    },
+    {
+      "sport": "nfl",
+      "enabled": true,
+      "configured_status": "data_foundation",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "no rebuild challenger artifact is present"
+    },
+    {
+      "sport": "soccer",
+      "enabled": true,
+      "configured_status": "data_foundation",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "no rebuild challenger artifact is present"
+    },
+    {
+      "sport": "tennis",
+      "enabled": true,
+      "configured_status": "data_foundation",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "no rebuild challenger artifact is present"
+    },
+    {
+      "sport": "esports",
+      "enabled": false,
+      "configured_status": "research_only",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "sport disabled; research-only"
+    },
+    {
+      "sport": "kbo",
+      "enabled": false,
+      "configured_status": "research_only",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "sport disabled; research-only"
+    },
+    {
+      "sport": "npb",
+      "enabled": false,
+      "configured_status": "research_only",
+      "model": {
+        "status": "unavailable",
+        "reason": "no rebuild challenger artifact is present"
+      },
+      "dataset_size": null,
+      "prospective_sample": null,
+      "last_run": null,
+      "predictive_qualification": "NOT_ESTABLISHED",
+      "economic_qualification": "NOT_ESTABLISHED",
+      "main_blocker": "sport disabled; research-only"
+    }
+  ],
+  "sources": [
+    "config/rebuild.yaml",
+    "config/models/challengers/",
+    "outputs/rebuild/mlb_head_distribution_cartesian.json"
+  ]
+}

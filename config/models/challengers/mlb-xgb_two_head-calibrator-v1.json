@@ -1,0 +1,16 @@
+{
+  "model_name": "xgb_two_head",
+  "method": "temperature",
+  "parameters": {
+    "temperature": 7.924828983539178
+  },
+  "base_model_hash": "6f323d53016d6fc9bafca921b1546e5ec1e1e4f3ae1642890360c054dcd7dbf9",
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "oof_split_manifest_hash": "1c51e275a03424ad6bcda655826eae54b2374d01ae9bcd096d03922cb289db21",
+  "training_range": {
+    "start": "2026-07-01",
+    "end": "2026-08-07"
+  },
+  "n_training_oof": 203,
+  "calibrator_hash": "4f73a03861661bec9cc67e9c735eb73f37c7a5729c0731e4fc05c80701eff53b"
+}

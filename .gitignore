@@ -20,3 +20,18 @@ data/*.bak-*
 data/*.before-backtest-cleanup-*
 data/*.pre-fix-*
 data/logs/*.log
+
+# Clean-slate rebuild runtime state
+data/rebuild/raw/
+data/rebuild/normalized/
+data/rebuild/features/
+data/rebuild/markets/
+data/rebuild/resume_state/
+data/rebuild/logs/
+data/rebuild/*.db
+data/rebuild/*.db-*
+data/rebuild/*.sqlite
+data/rebuild/*.sqlite-*
+outputs/rebuild/runtime/
+outputs/rebuild/verification.json
+outputs/rebuild/main_integration_verification.md

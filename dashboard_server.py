@@ -241,6 +241,13 @@ def _read_json(path: Path):
         return None
 
 
+def rebuild_view(name: str) -> dict:
+    """Return one isolated rebuild projection without importing writer classes."""
+    from dashboard.rebuild_status import read_rebuild_view
+
+    return read_rebuild_view(name, ROOT)
+
+
 def _unit_value_usd() -> float:
     try:
         payload = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
@@ -3912,6 +3919,8 @@ def _latest_persisted_action(action: str) -> dict | None:
 # HTTP
 # ---------------------------------------------------------------------------
 
+_REBUILD_VIEWS = {"status", "sports", "benchmark", "economics", "runs", "health"}
+
 
 class Handler(BaseHTTPRequestHandler):
     def _send(self, payload, content_type="application/json", code=200) -> None:
@@ -3925,6 +3934,14 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
             pass  # client disconnected — nothing to do
+
+    def _send_head(self, payload, content_type="application/json", code=200) -> None:
+        body = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
 
     def log_message(self, fmt, *args):  # quiet
         pass
@@ -4057,12 +4074,39 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_load_orders())
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(timezone.utc).isoformat()[:19]})
+            elif route.startswith("/api/rebuild/"):
+                view = route.removeprefix("/api/rebuild/")
+                if view in _REBUILD_VIEWS:
+                    self._send(_cached(f"rebuild:{view}", 30, lambda: rebuild_view(view)))
+                else:
+                    self._send({"error": "unknown route"}, code=404)
             else:
                 self._send({"error": "unknown route"}, code=404)
         except InvalidSportError as error:
             self._send({"error": str(error)}, code=400)
         except Exception as error:  # noqa: BLE001
             self._send({"error": f"{type(error).__name__}: {error}"}, code=500)
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        route = urlparse(self.path).path
+        if route.startswith("/api/rebuild/"):
+            view = route.removeprefix("/api/rebuild/")
+            if view in _REBUILD_VIEWS:
+                try:
+                    self._send_head(_cached(f"rebuild:{view}", 30, lambda: rebuild_view(view)))
+                except Exception as error:  # noqa: BLE001
+                    self._send_head({"error": f"{type(error).__name__}: {error}"}, code=500)
+                return
+        self._send_head({"error": "unknown route"}, code=404)
+
+    def _reject_rebuild_mutation(self) -> bool:
+        if urlparse(self.path).path.startswith("/api/rebuild/"):
+            self._send(
+                {"error": "method not allowed", "allowed_methods": ["GET", "HEAD"]},
+                code=405,
+            )
+            return True
+        return False
 
     def _local_origin_ok(self) -> bool:
         """Reject cross-site (CSRF) POSTs: browser requests from any web page
@@ -4077,6 +4121,8 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self) -> None:  # noqa: N802
+        if self._reject_rebuild_mutation():
+            return
         if not self._local_origin_ok():
             self._send({"status": "refused", "error": "cross-origin request rejected"}, code=403)
             return
@@ -4121,6 +4167,18 @@ class Handler(BaseHTTPRequestHandler):
             pct = float(payload.get("pct", 10))
             self._send(_auto_adjust_unit_value(pct))
         else:
+            self._send({"error": "unknown route"}, code=404)
+
+    def do_PUT(self) -> None:  # noqa: N802
+        if not self._reject_rebuild_mutation():
+            self._send({"error": "unknown route"}, code=404)
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        if not self._reject_rebuild_mutation():
+            self._send({"error": "unknown route"}, code=404)
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        if not self._reject_rebuild_mutation():
             self._send({"error": "unknown route"}, code=404)
 
 

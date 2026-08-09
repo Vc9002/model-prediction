@@ -1,0 +1,43 @@
+rebuild:
+  enabled: true
+  shadow_only: true
+  execution_enabled: false
+  production_promotion: false
+
+paths:
+  data_root: data/rebuild
+  output_root: outputs/rebuild
+  challenger_root: config/models/challengers
+
+execution:
+  allow_live_orders: false
+  allow_production_ledger_write: false
+
+sports:
+  mlb:
+    enabled: true
+    status: prospective_validation
+  wnba:
+    enabled: true
+    status: data_foundation
+  nba:
+    enabled: true
+    status: data_foundation
+  nfl:
+    enabled: true
+    status: data_foundation
+  soccer:
+    enabled: true
+    status: data_foundation
+  tennis:
+    enabled: true
+    status: data_foundation
+  esports:
+    enabled: false
+    status: research_only
+  kbo:
+    enabled: false
+    status: research_only
+  npb:
+    enabled: false
+    status: research_only

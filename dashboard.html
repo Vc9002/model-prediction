@@ -267,6 +267,21 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 .evidence-list{padding-left:18px;line-height:1.55}
 @media(max-width:1000px){.evidence-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.evidence-head{display:block}.evidence-status{display:inline-block;margin-top:8px}.evidence-card{padding:11px}.evidence-table{min-width:540px}}
+
+/* isolated clean-slate rebuild monitoring */
+.rebuild-banner{border:1px solid var(--yellow);background:rgba(242,169,60,.09);border-radius:10px;padding:14px;margin-bottom:14px}
+.rebuild-banner h2{color:var(--yellow);font-size:15px;margin-bottom:5px}
+.rebuild-kpis,.rebuild-sports{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.rebuild-kpi,.rebuild-sport{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:11px;min-width:0}
+.rebuild-kpi b{display:block;font:700 18px var(--mono);overflow-wrap:anywhere}
+.rebuild-kpi span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.rebuild-sport h3{font:700 14px var(--mono);margin-bottom:8px}
+.rebuild-detail{display:grid;grid-template-columns:1fr auto;gap:5px 9px;font-size:11px}
+.rebuild-detail dt{color:var(--dim)}.rebuild-detail dd{text-align:right;overflow-wrap:anywhere}
+.rebuild-state{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:10px;text-transform:uppercase}
+.rebuild-state.rejected{color:var(--yellow);border-color:rgba(242,169,60,.55)}
+.rebuild-state.failed{color:var(--red);border-color:rgba(255,92,92,.55)}
+.rebuild-state.available{color:var(--green);border-color:rgba(51,209,126,.55)}
 </style>
 </head>
 <body>
@@ -320,6 +335,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
+      <button data-tab="rebuild">Rebuild Shadow</button>
       <button data-tab="evidence">Evidence</button>
       <button data-tab="settings">Settings</button>
     </div>
@@ -374,6 +390,36 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <h2>Live Comparison — one event, every applicable model</h2>
       <div class="small dim">Open predictions only; settled history is in the evidence table above.</div>
       <div id="modelLedgerEvents" style="margin-top:9px"><div class="dim">Loading...</div></div>
+    </div>
+  </section>
+
+  <section id="tab-rebuild" style="display:none">
+    <div class="rebuild-banner" role="status">
+      <h2>CLEAN-SLATE REBUILD — SHADOW ONLY</h2>
+      <div>No rebuild output can submit a live order. <b>NO LIVE EXECUTION</b></div>
+    </div>
+    <div class="card">
+      <h2>Rebuild Overview</h2>
+      <div class="small dim" id="rebuildMeta">Read-only evidence has not been loaded.</div>
+      <div class="rebuild-kpis" id="rebuildKpis" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>Sport Status</h2>
+      <div class="small dim">A rejected challenger is a research outcome, not a system failure.</div>
+      <div class="rebuild-sports" id="rebuildSports" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>MLB Authoritative Challenger</h2>
+      <div id="rebuildBenchmark" class="small dim">Unavailable until loaded.</div>
+    </div>
+    <div class="card">
+      <h2>Prospective Test Protection</h2>
+      <div class="small dim">Unconsumed final-test performance is redacted by the server.</div>
+      <div id="rebuildSealed" style="margin-top:9px"></div>
+    </div>
+    <div class="health-grid">
+      <div class="card"><h2>Economics</h2><div id="rebuildEconomics"></div></div>
+      <div class="card"><h2>Run Health</h2><div id="rebuildHealth"></div></div>
     </div>
   </section>
 
@@ -640,6 +686,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.cl
   if(b.dataset.tab==="market")loadMarket();
   if(b.dataset.tab==="today")renderToday();
   if(b.dataset.tab==="folio"&&state.livePortfolio)renderFolioHistory();
+  if(b.dataset.tab==="rebuild")loadRebuild();
 });
 
 /* ---------- settings ---------- */
@@ -676,6 +723,87 @@ const passesDisplaySettings=p=>{
 
 /* ---------- fetch helpers ---------- */
 async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);return r.json();}
+let rebuildLoaded=false,rebuildLoading=null;
+const rebuildValue=value=>value===null||value===undefined||value===""?"—":String(value);
+const rebuildPercent=value=>value===null||value===undefined?"unavailable":`${(Number(value)*100).toFixed(1)}%`;
+function rebuildStateClass(value){
+  const state=String(value||"").toUpperCase();
+  if(state.includes("REJECT"))return "rejected";
+  if(state.includes("FAIL")||state.includes("ERROR")||state.includes("DOWN"))return "failed";
+  if(state.includes("QUALIFIED")&&!state.includes("NOT_"))return "available";
+  return "";
+}
+function renderRebuild(status,sports,benchmark,economics,runs,health){
+  const reason=[status.reason,sports.reason,benchmark.reason,economics.reason,runs.reason,health.reason].filter(Boolean).join(" · ");
+  $("#rebuildMeta").textContent=`Revision ${status.code_revision||"unavailable"} · ${status.status||"unavailable"}${reason?` · ${reason}`:""}`;
+  const tests=status.tests||{},k=status.kpis||{};
+  const testText=tests.passed==null?(tests.status||"unavailable"):`${tests.passed} passed${tests.failed?`, ${tests.failed} failed`:""}`;
+  const kpis=[
+    [status.code_revision?String(status.code_revision).slice(0,10):"—","Code revision"],
+    [testText,"Tests"],[k.sports_with_data??"—","Sports with data"],
+    [k.sports_with_models??"—","Sports with models"],[k.prospective_tests??"—","Prospective tests"],
+    [k.predictively_qualified_sports??"—","Predictively qualified"],
+    [k.economically_qualified_sports??"—","Economically qualified"],
+    [rebuildPercent(k.closing_price_coverage),"Closing-price coverage"]
+  ];
+  $("#rebuildKpis").innerHTML=kpis.map(([value,label])=>`<div class="rebuild-kpi"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join("");
+
+  const cards=sports.sports||[];
+  $("#rebuildSports").innerHTML=cards.length?cards.map(card=>`<article class="rebuild-sport">
+    <h3>${esc(String(card.sport||"unknown").toUpperCase())} <span class="rebuild-state ${rebuildStateClass(card.system_state)}">${esc(card.system_state||"unavailable")}</span></h3>
+    <dl class="rebuild-detail">
+      <dt>Current model</dt><dd>${esc(rebuildValue(card.current_model))}</dd>
+      <dt>Dataset size</dt><dd>${esc(rebuildValue(card.dataset_size))}</dd>
+      <dt>OOF sample</dt><dd>${esc(rebuildValue(card.oof_sample))}</dd>
+      <dt>Prospective sample</dt><dd>${esc(rebuildValue(card.prospective_sample))}</dd>
+      <dt>Last run</dt><dd>${esc(rebuildValue(card.last_run))}</dd>
+      <dt>Predictive</dt><dd><span class="rebuild-state ${rebuildStateClass(card.predictive_qualification)}">${esc(card.predictive_qualification||"NOT_ESTABLISHED")}</span></dd>
+      <dt>Economic</dt><dd><span class="rebuild-state ${rebuildStateClass(card.economic_qualification)}">${esc(card.economic_qualification||"NOT_ESTABLISHED")}</span></dd>
+      <dt>Main blocker</dt><dd>${esc(rebuildValue(card.main_blocker))}</dd>
+    </dl></article>`).join(""):'<div class="dim">Sport status is unavailable.</div>';
+
+  const b=benchmark.authoritative;
+  $("#rebuildBenchmark").innerHTML=b?`<div class="rebuild-kpis">
+    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.head_family))}</b><span>Head family</span></div>
+    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.distribution))}</b><span>Distribution</span></div>
+    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.calibration))}</b><span>Calibration</span></div>
+    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.ensemble))}</b><span>Ensemble</span></div>
+    <div class="rebuild-kpi"><b>${b.candidate_log_loss==null?"—":Number(b.candidate_log_loss).toFixed(4)}</b><span>Candidate OOF log loss</span></div>
+    <div class="rebuild-kpi"><b>${b.constant_0_5_log_loss==null?"—":Number(b.constant_0_5_log_loss).toFixed(4)}</b><span>Constant 0.5 log loss</span></div>
+    <div class="rebuild-kpi"><b>NOT ESTABLISHED</b><span>Predictive qualification</span></div>
+    <div class="rebuild-kpi"><b>NOT ESTABLISHED</b><span>Economic qualification</span></div>
+  </div><p class="small dim" style="margin-top:9px">Winning among challengers does not establish meaningful edge.</p>`:
+  '<div class="dim">Authoritative corrected benchmark is unavailable.</div>';
+
+  const sealed=(status.sealed_tests||[]).filter(test=>test.consumed===false);
+  $("#rebuildSealed").innerHTML=sealed.length?`<div style="overflow-x:auto"><table class="data"><tr><th>Test</th><th>Start</th><th>End</th><th>Model hash</th><th>Calibrator hash</th><th>Predictions</th><th>Coverage</th></tr>${sealed.map(test=>`<tr><td>${esc(test.test_id)}</td><td>${esc(rebuildValue(test.test_start))}</td><td>${esc(rebuildValue(test.test_end))}</td><td class="mono">${esc(rebuildValue(test.model_hash))}</td><td class="mono">${esc(rebuildValue(test.calibrator_hash))}</td><td>${esc(rebuildValue(test.prediction_count))}</td><td>${esc(rebuildPercent(test.coverage))}</td></tr>`).join("")}</table></div>`:
+  '<div class="dim small">No unconsumed tests are registered.</div>';
+
+  const money=value=>value==null?"unavailable":Number(value).toFixed(3);
+  $("#rebuildEconomics").innerHTML=`<dl class="rebuild-detail">
+    <dt>Market evaluations</dt><dd>${esc(rebuildValue(economics.market_evaluations))}</dd>
+    <dt>BET</dt><dd>${esc(rebuildValue(economics.bet))}</dd><dt>NO_BET</dt><dd>${esc(rebuildValue(economics.no_bet))}</dd>
+    <dt>Paper orders</dt><dd>${esc(rebuildValue(economics.paper_orders))}</dd><dt>Settlements</dt><dd>${esc(rebuildValue(economics.settlements))}</dd>
+    <dt>Closing prices</dt><dd>${esc(rebuildValue(economics.closing_prices))}</dd><dt>CLV coverage</dt><dd>${esc(rebuildPercent(economics.clv_coverage))}</dd>
+    <dt>P&amp;L</dt><dd>${money(economics.pnl)}</dd><dt>ROI</dt><dd>${economics.roi==null?"unavailable":rebuildPercent(economics.roi)}</dd><dt>CLV</dt><dd>${money(economics.clv)}</dd>
+  </dl><div class="small dim" style="margin-top:9px">${esc((economics.reason_codes||[]).map(row=>`${row.reason}: ${row.count}`).join(" · ")||economics.reason||"")}</div>`;
+
+  const stages=health.stages||[];
+  $("#rebuildHealth").innerHTML=stages.length?stages.map(stage=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:9px"><span>${esc(stage.stage)}</span><span class="rebuild-state ${rebuildStateClass(stage.status)}">${esc(stage.status||"unavailable")}</span><span class="dim">${esc(rebuildValue(stage.last_run))}</span></div><div class="small dim" style="margin-top:3px">duration ${esc(rebuildValue(stage.duration_seconds))}s · rows ${esc(rebuildValue(stage.rows))} · mode ${esc(rebuildValue(stage.mode))}${stage.error?` · error ${esc(stage.error)}`:""}</div></div>`).join(""):
+  `<div class="dim small">${esc(health.reason||runs.reason||"Run health is unavailable.")}</div>`;
+}
+async function loadRebuild(force=false){
+  if(rebuildLoaded&&!force)return;
+  if(rebuildLoading)return rebuildLoading;
+  $("#rebuildMeta").textContent="Loading read-only rebuild evidence…";
+  rebuildLoading=Promise.all([
+    api("/api/rebuild/status"),api("/api/rebuild/sports"),api("/api/rebuild/benchmark"),
+    api("/api/rebuild/economics"),api("/api/rebuild/runs"),api("/api/rebuild/health")
+  ]).then(payloads=>{renderRebuild(...payloads);rebuildLoaded=true;}).catch(error=>{
+    $("#rebuildMeta").textContent=`Rebuild evidence unavailable: ${error.message}`;
+  }).finally(()=>{rebuildLoading=null;});
+  return rebuildLoading;
+}
 async function saveUnitValue(){
   const input=$("#unitValueInput"),value=Number(input.value);
   if(!Number.isFinite(value)||value<0.01||value>100000){

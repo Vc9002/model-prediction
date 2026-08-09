@@ -31,6 +31,9 @@ gated dashboard surface — treat anything touching it as high-stakes.
 5. `docs/ARCHITECTURE.md` — the durable architecture contract (data flow,
    validation contract, invariants). Doesn't change often; check it before
    assuming something about the pipeline shape.
+6. `docs/rebuild/*` — the separate clean-slate rebuild contract. Read these
+   before rebuild work; its shadow-only and no-production-write boundaries
+   are hard invariants, not configurable operating modes.
 
 ## The one invariant that matters most
 
