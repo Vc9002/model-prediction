@@ -18,8 +18,18 @@ def eligible_prior_team_games(
         raise ValueError("decision_time_utc must be timezone-aware")
     decision = decision_time_utc.astimezone(UTC)
     event_cutoff = decision
-    required_games = {"event_id", "event_start_utc", "observed_at_utc", "completed", "pit_eligible"}
-    required_box = {"event_id", "team_id", "observed_at_utc", "pit_eligible"}
+    required_games = {
+        "event_id",
+        "event_start_utc",
+        "sports_event_date",
+        "observed_at_utc",
+        "raw_snapshot_hash",
+        "completed",
+        "pit_eligible",
+    }
+    required_box = {
+        "event_id", "team_id", "observed_at_utc", "raw_snapshot_hash", "pit_eligible",
+    }
     if not required_games.issubset(games.columns) or not required_box.issubset(team_box.columns):
         raise ValueError("WNBA PIT input is missing required provenance columns")
     prior_games = (
@@ -39,7 +49,12 @@ def eligible_prior_team_games(
             & pl.col("pit_eligible")
             & (pl.col("_event_start") < event_cutoff)
         )
-        .select(["event_id", "event_start_utc"])
+        .select(
+            "event_id",
+            "event_start_utc",
+            "sports_event_date",
+            pl.col("raw_snapshot_hash").alias("game_raw_snapshot_hash"),
+        )
     )
     eligible_boxes = (
         team_box.with_columns(

@@ -19,6 +19,7 @@ from model_prediction.rebuild.providers.base import SourceResponseMetadata
 from model_prediction.rebuild.schemas import validate_or_raise
 
 from .contracts import WNBA_CONTRACTS
+from .time import sports_event_date
 
 ESPN_WNBA_IDENTITY_SOURCE = "espn_public:wnba"
 
@@ -181,6 +182,7 @@ def _schedule(
             "season": int(row["season"]),
             "season_type": _as_int(row.get("season_type")),
             "event_start_utc": event_start,
+            "sports_event_date": sports_event_date(event_start),
             "status": str(row.get("status_type_name") or row.get("status_type_description") or "UNKNOWN"),
             "completed": completed,
             "home_team_id": str(row["home_id"]),
@@ -217,6 +219,7 @@ def _team_box(
             "event_id": event_id,
             "season": int(row["season"]),
             "event_start_utc": event_start,
+            "sports_event_date": sports_event_date(event_start),
             "team_id": team_id,
             "team_canonical_id": team_canonical_id,
             "opponent_team_id": opponent_id,
@@ -255,6 +258,7 @@ def _player_box(
             "event_id": event_id,
             "season": int(row["season"]),
             "event_start_utc": event_start,
+            "sports_event_date": sports_event_date(event_start),
             "team_id": team_id,
             "player_id": player_id,
             "team_canonical_id": team_canonical_id,
@@ -311,12 +315,14 @@ def _pbp(
     rows: list[dict[str, Any]] = []
     for row in frame.iter_rows(named=True):
         event_id, play_id = str(row["game_id"]), str(row["id"])
+        event_start = _utc_iso(row["game_date_time"])
         rows.append({
             **_provenance(metadata, f"{event_id}:{play_id}"),
             "event_id": event_id,
             "play_id": play_id,
             "season": int(row["season"]),
-            "event_start_utc": _utc_iso(row["game_date_time"]),
+            "event_start_utc": event_start,
+            "sports_event_date": sports_event_date(event_start),
             "period": int(row["period_number"]),
             "clock": str(row.get("clock_display_value") or row.get("time") or ""),
             "text": str(row.get("text") or ""),

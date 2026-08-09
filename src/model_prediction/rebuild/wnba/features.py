@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from typing import Any
 
 import polars as pl
+
+from model_prediction.rebuild.providers.base import canonical_json
 
 from .pit import eligible_prior_team_games
 
@@ -116,8 +119,19 @@ def build_team_form_snapshot(
             "event_id": row["event_id"],
             "event_start_utc": row["event_start_utc"],
             "observed_at_utc": max(str(row["observed_at_utc"]), str(opponent["observed_at_utc"])),
+            "raw_snapshot_hashes": sorted({
+                str(row["raw_snapshot_hash"]),
+                str(opponent["raw_snapshot_hash"]),
+                str(row["game_raw_snapshot_hash"]),
+            }),
             **_game_metrics(row, opponent),
         })
+
+    raw_snapshot_hashes = sorted({
+        digest
+        for row in game_rows
+        for digest in row["raw_snapshot_hashes"]
+    })
 
     result: dict[str, Any] = {
         "team_id": team_id,
@@ -125,6 +139,15 @@ def build_team_form_snapshot(
         "status": "AVAILABLE" if game_rows else "UNAVAILABLE",
         "sample_size": len(game_rows),
         "source_watermark_utc": max((row["observed_at_utc"] for row in game_rows), default=None),
+        "source_raw_snapshot_hashes": raw_snapshot_hashes,
+        "source_manifest_hash": (
+            hashlib.sha256(canonical_json({
+                "event_ids": [str(row["event_id"]) for row in game_rows],
+                "raw_snapshot_hashes": raw_snapshot_hashes,
+            })).hexdigest()
+            if game_rows
+            else None
+        ),
     }
     rolling_groups = [(f"last_{window}", game_rows[-window:]) for window in WINDOWS]
     for label, rows in [*rolling_groups, ("season", game_rows)]:

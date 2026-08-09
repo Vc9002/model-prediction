@@ -12,7 +12,9 @@ def _games() -> pl.DataFrame:
     return pl.DataFrame({
         "event_id": ["g1", "g2"],
         "event_start_utc": ["2024-05-01T00:00:00+00:00", "2024-05-03T00:00:00+00:00"],
+        "sports_event_date": ["2024-04-30", "2024-05-02"],
         "observed_at_utc": ["2026-08-09T00:00:00+00:00", "2026-08-09T00:00:00+00:00"],
+        "raw_snapshot_hash": ["game-g1", "game-g2"],
         "completed": [True, True],
         "pit_eligible": [True, True],
     })
@@ -26,6 +28,7 @@ def _boxes() -> pl.DataFrame:
                 "event_id": event_id,
                 "event_start_utc": "2024-05-01T00:00:00+00:00",
                 "observed_at_utc": "2026-08-09T00:00:00+00:00",
+                "raw_snapshot_hash": f"box-{event_id}-a",
                 "pit_eligible": True,
                 "team_id": "A",
                 "opponent_team_id": "B",
@@ -44,6 +47,7 @@ def _boxes() -> pl.DataFrame:
                 "event_id": event_id,
                 "event_start_utc": "2024-05-01T00:00:00+00:00",
                 "observed_at_utc": "2026-08-09T00:00:00+00:00",
+                "raw_snapshot_hash": f"box-{event_id}-b",
                 "pit_eligible": True,
                 "team_id": "B",
                 "opponent_team_id": "A",

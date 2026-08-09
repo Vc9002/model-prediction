@@ -20,8 +20,15 @@ from model_prediction.rebuild.storage import FeatureStore
 
 from .features import METRICS, WINDOWS, build_team_form_snapshot
 from .store import WNBANormalizedStore
+from .time import sports_event_date
 
 FEATURE_SCHEMA_VERSION = "wnba_team_form_v1"
+RESEARCH_PROVENANCE_COLUMNS = {
+    "availability_basis",
+    "commercial_use_status",
+    "production_allowed",
+    "raw_snapshot_hash",
+}
 
 
 @dataclass(frozen=True)
@@ -41,8 +48,27 @@ def _increment(reasons: dict[str, int], reason: str) -> None:
     reasons[reason] = reasons.get(reason, 0) + 1
 
 
+def _assert_research_source_provenance(frame: pl.DataFrame, table: str) -> None:
+    """Reject missing/unknown rights metadata before any PIT filtering."""
+
+    missing = sorted(RESEARCH_PROVENANCE_COLUMNS - set(frame.columns))
+    if missing:
+        raise ValueError(f"WNBA {table} source is missing provenance columns: {missing}")
+    for column in RESEARCH_PROVENANCE_COLUMNS:
+        if frame[column].null_count():
+            raise ValueError(f"WNBA {table} source has null provenance: {column}")
+    if frame.filter(pl.col("availability_basis") != "capture_time_only").height:
+        raise ValueError(f"WNBA {table} source has unsupported availability provenance")
+    if frame.filter(pl.col("commercial_use_status") != "unresolved").height:
+        raise ValueError(f"WNBA {table} source commercial-use rights are not research-blocked")
+    if frame.filter(pl.col("production_allowed") != False).height:
+        raise ValueError(f"WNBA {table} source is production-enabled")
+    if frame.filter(pl.col("raw_snapshot_hash").cast(pl.String).str.len_chars() == 0).height:
+        raise ValueError(f"WNBA {table} source has empty raw snapshot hashes")
+
+
 def _latest_targets(games: pl.DataFrame, game_date: str) -> pl.DataFrame:
-    required = {"event_id", "event_start_utc", "observed_at_utc"}
+    required = {"event_id", "event_start_utc", "sports_event_date", "observed_at_utc"}
     if games.is_empty() or not required.issubset(games.columns):
         return pl.DataFrame()
     return (
@@ -57,7 +83,7 @@ def _latest_targets(games: pl.DataFrame, game_date: str) -> pl.DataFrame:
         .sort("_observed")
         .group_by("event_id", maintain_order=True)
         .last()
-        .filter(pl.col("_event_start").dt.date() == datetime.fromisoformat(game_date).date())
+        .filter(pl.col("sports_event_date") == game_date)
         .drop("_observed")
     )
 
@@ -126,19 +152,31 @@ def _feature_row(
         .isoformat(),
         "decision_time_utc": decision_time.astimezone(UTC).isoformat(),
         "horizon": horizon,
+        "sports_event_date": str(target["sports_event_date"]),
         "home_team_id": str(target["home_team_id"]),
         "away_team_id": str(target["away_team_id"]),
         "home_team_canonical_id": str(target["home_team_canonical_id"]),
         "away_team_canonical_id": str(target["away_team_canonical_id"]),
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
-        "availability_basis": "capture_time_only",
-        "commercial_use_status": "unresolved",
-        "production_allowed": False,
+        "availability_basis": str(target["availability_basis"]),
+        "commercial_use_status": str(target["commercial_use_status"]),
+        "production_allowed": bool(target["production_allowed"]),
+        "target_raw_snapshot_hash": str(target["raw_snapshot_hash"]),
     }
     for side, snapshot in (("home", home), ("away", away)):
         for key, value in snapshot.items():
             if key not in {"team_id", "status", "as_of_utc"}:
                 row[f"{side}_{key}"] = value
+    source_hashes = sorted({
+        str(target["raw_snapshot_hash"]),
+        *(str(value) for value in home["source_raw_snapshot_hashes"]),
+        *(str(value) for value in away["source_raw_snapshot_hashes"]),
+    })
+    row["source_raw_snapshot_hashes"] = source_hashes
+    row["source_manifest_hash"] = hashlib.sha256(canonical_json({
+        "event_id": str(target["event_id"]),
+        "raw_snapshot_hashes": source_hashes,
+    })).hexdigest()
     return row
 
 
@@ -207,6 +245,10 @@ def _build(
     normalized = WNBANormalizedStore(root / "normalized")
     games = normalized.read_observations("games", season)
     team_box = normalized.read_observations("team_box", season)
+    if not games.is_empty():
+        _assert_research_source_provenance(games, "games")
+    if not team_box.is_empty():
+        _assert_research_source_provenance(team_box, "team_box")
     targets = _latest_targets(games, game_date)
     reasons: dict[str, int] = {}
     rows: list[dict[str, Any]] = []
@@ -227,8 +269,8 @@ def _build(
         if live_knowledge_time is not None and live_knowledge_time < decision_time:
             _increment(reasons, "decision_cutoff_not_reached")
             continue
-        target_start_date = datetime.fromisoformat(str(target["event_start_utc"])).astimezone(UTC).date()
-        if target_start_date != parsed_date.date():
+        target_sports_date = sports_event_date(str(target["event_start_utc"]))
+        if target_sports_date != game_date or str(target["sports_event_date"]) != game_date:
             _increment(reasons, "target_date_changed_after_cutoff")
             continue
         required_target = {
