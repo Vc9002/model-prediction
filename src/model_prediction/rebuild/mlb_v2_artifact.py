@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -30,8 +31,10 @@ MLB_V2_CANDIDATE_VERSION = "mlb_moneyline_v2_frozen_v1"
 MLB_V2_BUNDLE_DIRNAME = MLB_V2_CANDIDATE_VERSION
 MLB_V2_MANIFEST = "manifest.json"
 MLB_V2_SCHEMA_VERSION = "1"
+MLB_V2_REGISTRY_PATH = "outputs/rebuild/test_consumption_registry.json"
 FROZEN_HEAD_FAMILY = "xgboost"
 FROZEN_DISTRIBUTION_METHOD = "negative_binomial"
+FROZEN_CALIBRATION_METHOD = "temperature"
 FROZEN_CALIBRATOR_ARTIFACT_NAME = "mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
 XGB_DIRECT_FEATURES = list(dict.fromkeys(MLB_INTENSITY_FEATURES + MLB_DIFFERENTIAL_FEATURES))
 
@@ -42,6 +45,142 @@ def _sha256_file(path: Path) -> str:
 
 def _canonical_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _require_sha256(value: Any, field_name: str) -> str:
+    if not isinstance(value, str) or len(value) != 64:
+        raise ValueError(f"{field_name} must be a 64-character SHA-256")
+    try:
+        int(value, 16)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be hexadecimal") from exc
+    return value.lower()
+
+
+def _primary_content_hash(model: XGBoostTwoHeadModel) -> str:
+    """Hash learned booster bytes plus inference-critical reconciliation state.
+
+    ``to_artifact()['artifact_hash']`` intentionally describes only model
+    family/schema metadata.  It is identical for two independently fitted
+    models with the same feature list, so it cannot bind a calibrator to the
+    learned primary candidate.  XGBoost's raw booster representation is stable
+    across save/load and captures the fitted trees themselves.
+    """
+    if not model._fitted or model.intensity_head.model is None or model.differential_head.model is None:
+        raise ValueError("cannot fingerprint an unfitted MLB v2 primary model")
+    digest = hashlib.sha256()
+    for label, fitted in (
+        ("intensity", model.intensity_head.model),
+        ("differential", model.differential_head.model),
+    ):
+        digest.update(label.encode())
+        digest.update(b"\0")
+        digest.update(bytes(fitted.get_booster().save_raw(raw_format="json")))
+        digest.update(b"\0")
+    digest.update(json.dumps({
+        "seed": model.seed,
+        "distribution_method": model.distribution.method,
+        "distribution_n_sim": model.distribution.n_sim,
+        "distribution_seed": model.distribution.seed,
+        "intensity_features": model._intensity_features,
+        "differential_features": model._differential_features,
+    }, sort_keys=True, separators=(",", ":")).encode())
+    return digest.hexdigest()
+
+
+SOURCE_FINGERPRINT_PATHS = (
+    "src/model_prediction/rebuild",
+    "scripts/mlb_shadow_run.py",
+    "scripts/check_mlb_v2_readiness.py",
+    "config/rebuild.yaml",
+    "pyproject.toml",
+)
+
+
+def verified_source_tree_hash(repo_root: str | Path | None = None) -> str:
+    """Hash the clean inference source tree, independent of the merge SHA.
+
+    A Git commit hash cannot be embedded in a bundle committed by the next
+    commit and still equal runtime ``HEAD``.  The content fingerprint remains
+    stable through a merge commit when the inference bytes are unchanged, while
+    the explicit status check rejects both staged and unstaged source edits.
+    """
+    root = Path(repo_root).resolve() if repo_root is not None else default_repo_root()
+    try:
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all", "--", *SOURCE_FINGERPRINT_PATHS],
+            cwd=root, check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        tracked_raw = subprocess.run(
+            ["git", "ls-files", "-z", "--", *SOURCE_FINGERPRINT_PATHS],
+            cwd=root, check=True, capture_output=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError("cannot verify frozen MLB v2 source tree") from exc
+    if dirty:
+        raise ValueError("frozen MLB v2 inference source tree is dirty")
+    if isinstance(tracked_raw, bytes):
+        tracked_raw = tracked_raw.decode()
+    paths = sorted(item for item in tracked_raw.split("\0") if item)
+    if not paths:
+        raise ValueError("frozen MLB v2 source fingerprint has no tracked files")
+    digest = hashlib.sha256()
+    for relative in paths:
+        path = root / relative
+        digest.update(relative.encode())
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+@dataclass(frozen=True)
+class FrozenMLBV2Anchor:
+    status: str
+    bundle_manifest_sha256: str
+    bundle_hash: str
+    primary_content_sha256: str
+    primary_artifact_sha256: str
+    calibrator_artifact_sha256: str
+    calibrator_hash: str
+    source_tree_sha256: str
+
+
+def parse_frozen_mlb_v2_anchor(raw: dict[str, Any]) -> FrozenMLBV2Anchor:
+    """Parse only immutable cohort identity fields from one registry entry."""
+    if raw.get("candidate_version") != MLB_V2_CANDIDATE_VERSION:
+        raise ValueError("MLB v2 registry candidate version mismatch")
+    anchor = raw.get("frozen_artifact_anchor")
+    if not isinstance(anchor, dict):
+        # ValueError, not TypeError: untrusted registry JSON content,
+        # consistent with the sibling candidate-version/status checks in
+        # this function.
+        raise ValueError("MLB v2 registry frozen artifact anchor is missing")  # noqa: TRY004
+    status = anchor.get("status")
+    if status != "sealed":
+        raise ValueError(f"MLB v2 frozen artifact anchor is not sealed (status={status!r})")
+    return FrozenMLBV2Anchor(
+        status=status,
+        bundle_manifest_sha256=_require_sha256(anchor.get("bundle_manifest_sha256"), "bundle_manifest_sha256"),
+        bundle_hash=_require_sha256(anchor.get("bundle_hash"), "bundle_hash"),
+        primary_content_sha256=_require_sha256(anchor.get("primary_content_sha256"), "primary_content_sha256"),
+        primary_artifact_sha256=_require_sha256(anchor.get("primary_artifact_sha256"), "primary_artifact_sha256"),
+        calibrator_artifact_sha256=_require_sha256(
+            anchor.get("calibrator_artifact_sha256"), "calibrator_artifact_sha256",
+        ),
+        calibrator_hash=_require_sha256(anchor.get("calibrator_hash"), "calibrator_hash"),
+        source_tree_sha256=_require_sha256(anchor.get("source_tree_sha256"), "source_tree_sha256"),
+    )
+
+
+def load_frozen_mlb_v2_anchor(registry_path: str | Path | None = None) -> FrozenMLBV2Anchor:
+    """Read only immutable cohort identity fields from the external registry."""
+    path = Path(registry_path) if registry_path is not None else default_repo_root() / MLB_V2_REGISTRY_PATH
+    registry = json.loads(path.read_text())
+    raw = registry.get("active_tests", {}).get(MLB_V2_TEST_ID, {})
+    if not isinstance(raw, dict):
+        raise ValueError("MLB v2 registry entry is missing")  # noqa: TRY004 -- untrusted JSON, see note above
+    return parse_frozen_mlb_v2_anchor(raw)
 
 
 def current_code_revision(repo_root: str | Path | None = None) -> str:
@@ -101,14 +240,30 @@ def load_frozen_calibrator(
         raise ValueError("calibrator artifact hash mismatch")
     if len(artifact.get("oof_probs", [])) != len(artifact.get("oof_labels", [])):
         raise ValueError("calibrator artifact OOF arrays are misaligned")
+    if artifact["method"] != FROZEN_CALIBRATION_METHOD:
+        raise ValueError("frozen MLB v2 requires temperature calibration")
+    temperature = artifact.get("parameters", {}).get("temperature")
+    if not isinstance(temperature, (int, float)) or isinstance(temperature, bool) \
+            or not math.isfinite(float(temperature)) or float(temperature) <= 0:
+        raise ValueError("frozen MLB v2 temperature must be finite and positive")
+    oof_probs = artifact.get("oof_probs", [])
+    oof_labels = artifact.get("oof_labels", [])
+    if any(
+        not isinstance(value, (int, float)) or isinstance(value, bool)
+        or not math.isfinite(float(value)) or not 0.0 <= float(value) <= 1.0
+        for value in oof_probs
+    ):
+        raise ValueError("calibrator OOF probabilities must be finite values in [0,1]")
+    if any(value not in (0, 1) or isinstance(value, bool) for value in oof_labels):
+        raise ValueError("calibrator OOF labels must be binary integers")
     return FrozenCalibratorBundle(
         calibrator=load_calibrator(artifact["method"], artifact["parameters"]),
         calibrator_hash=str(artifact["calibrator_hash"]),
         base_model_hash=str(artifact["base_model_hash"]),
         dataset_hash=str(artifact["dataset_hash"]),
         artifact_sha256=_sha256_file(path),
-        oof_probs=list(artifact.get("oof_probs", [])),
-        oof_labels=list(artifact.get("oof_labels", [])),
+        oof_probs=[float(value) for value in oof_probs],
+        oof_labels=[int(value) for value in oof_labels],
     )
 
 
@@ -124,7 +279,11 @@ class FrozenMLBV2Bundle:
     training_cutoff_utc: str
     training_rows: int
     code_revision: str
+    source_tree_sha256: str
     dependency_hash: str
+    manifest_sha256: str
+    primary_content_sha256: str
+    primary_artifact_sha256: str
     bundle_path: Path
     test_id: str = MLB_V2_TEST_ID
     candidate_version: str = MLB_V2_CANDIDATE_VERSION
@@ -151,6 +310,7 @@ def write_frozen_mlb_v2_bundle(
     training_rows: int,
     code_revision: str,
     dependency_manifest: str | Path,
+    source_tree_sha256: str | None = None,
 ) -> Path:
     """Seal already-fitted objects into a new immutable candidate directory.
 
@@ -165,6 +325,9 @@ def write_frozen_mlb_v2_bundle(
         raise ValueError("dataset hash, training cutoff, and positive training rows are required")
     if len(code_revision) != 40:
         raise ValueError("code_revision must be an exact 40-character Git SHA")
+    source_hash = _require_sha256(
+        source_tree_sha256 or verified_source_tree_hash(), "source_tree_sha256",
+    )
 
     out.mkdir(parents=True)
     primary.save(out / "primary")
@@ -176,9 +339,11 @@ def write_frozen_mlb_v2_bundle(
     calibrator = load_frozen_calibrator(calibrator_target, challenger_root=out)
 
     primary_metadata = json.loads((out / "primary" / "metadata.json").read_text())
-    primary_model_hash = str(primary_metadata.get("artifact_hash", ""))
-    if calibrator.base_model_hash != primary_model_hash:
-        raise ValueError("calibrator base_model_hash is not bound to the frozen primary model schema")
+    primary_metadata_hash = str(primary_metadata.get("artifact_hash", ""))
+    primary_artifact_sha256 = _sha256_file(out / "primary" / "model.joblib")
+    primary_content_sha256 = _primary_content_hash(primary)
+    if calibrator.base_model_hash != primary_content_sha256:
+        raise ValueError("calibrator base_model_hash is not bound to the learned frozen primary model")
     if calibrator.dataset_hash != dataset_hash:
         raise ValueError("calibrator dataset_hash does not match the frozen training dataset")
 
@@ -190,6 +355,7 @@ def write_frozen_mlb_v2_bundle(
         "created_at_utc": datetime.now(UTC).isoformat(),
         "head_family": FROZEN_HEAD_FAMILY,
         "distribution_method": FROZEN_DISTRIBUTION_METHOD,
+        "calibration_method": FROZEN_CALIBRATION_METHOD,
         "feature_order": {
             "intensity": list(MLB_INTENSITY_FEATURES),
             "differential": list(MLB_DIFFERENTIAL_FEATURES),
@@ -200,7 +366,11 @@ def write_frozen_mlb_v2_bundle(
             "training_cutoff_utc": training_cutoff_utc,
             "training_rows": training_rows,
         },
-        "code_revision": code_revision,
+        "code_provenance": {
+            "training_revision": code_revision,
+            "source_tree_sha256": source_hash,
+            "policy": "exact_clean_source_tree_v1",
+        },
         "dependency": {
             "path": dependency_path.name,
             "sha256": _sha256_file(dependency_path),
@@ -208,7 +378,9 @@ def write_frozen_mlb_v2_bundle(
         "components": {
             "primary": {
                 **_component_receipt(out / "primary", "model.joblib"),
-                "model_metadata_hash": primary_model_hash,
+                "model_metadata_hash": primary_metadata_hash,
+                "learned_content_sha256": primary_content_sha256,
+                "artifact_sha256": primary_artifact_sha256,
             },
             "bootstrap": _component_receipt(out / "bootstrap", "bootstrap.joblib"),
             "sklearn_baseline": _component_receipt(out / "sklearn_baseline", "model.joblib"),
@@ -244,19 +416,27 @@ def load_frozen_mlb_v2_bundle(
     challenger_root: str | Path | None = None,
     *,
     repo_root: str | Path | None = None,
-    expected_code_revision: str | None = None,
+    registry_path: str | Path | None = None,
+    expected_anchor: FrozenMLBV2Anchor | None = None,
+    _test_expected_source_tree_sha256: str | None = None,
 ) -> FrozenMLBV2Bundle:
     """Load the exact sealed candidate and reject every provenance mismatch."""
+    anchor = expected_anchor or load_frozen_mlb_v2_anchor(registry_path)
     challenger = Path(challenger_root).resolve() if challenger_root is not None else (
         default_repo_root() / "config" / "models" / "challengers"
     ).resolve()
     root = assert_challenger_artifact_path(challenger / MLB_V2_BUNDLE_DIRNAME, challenger)
     manifest_path = assert_challenger_artifact_path(root / MLB_V2_MANIFEST, challenger)
+    manifest_sha256 = _sha256_file(manifest_path)
+    if manifest_sha256 != anchor.bundle_manifest_sha256:
+        raise ValueError("frozen MLB v2 manifest is not the externally anchored manifest")
     manifest = json.loads(manifest_path.read_text())
     expected_bundle_hash = manifest.get("bundle_hash")
     identity = {key: value for key, value in manifest.items() if key != "bundle_hash"}
     if not expected_bundle_hash or _canonical_hash(identity) != expected_bundle_hash:
         raise ValueError("frozen MLB v2 manifest hash mismatch")
+    if expected_bundle_hash != anchor.bundle_hash:
+        raise ValueError("frozen MLB v2 bundle hash is not externally anchored")
     if manifest.get("schema_version") != MLB_V2_SCHEMA_VERSION:
         raise ValueError("unsupported frozen MLB v2 manifest schema")
     if manifest.get("test_id") != MLB_V2_TEST_ID or manifest.get("candidate_version") != MLB_V2_CANDIDATE_VERSION:
@@ -265,11 +445,25 @@ def load_frozen_mlb_v2_bundle(
         raise ValueError("frozen MLB v2 head family mismatch")
     if manifest.get("distribution_method") != FROZEN_DISTRIBUTION_METHOD:
         raise ValueError("frozen MLB v2 distribution mismatch")
+    if manifest.get("calibration_method") != FROZEN_CALIBRATION_METHOD:
+        raise ValueError("frozen MLB v2 calibration method mismatch")
 
     repository = Path(repo_root).resolve() if repo_root is not None else default_repo_root()
-    revision = expected_code_revision or current_code_revision(repository)
-    if manifest.get("code_revision") != revision:
-        raise ValueError("frozen MLB v2 code revision mismatch")
+    code_provenance = manifest.get("code_provenance", {})
+    if code_provenance.get("policy") != "exact_clean_source_tree_v1":
+        raise ValueError("frozen MLB v2 code provenance policy mismatch")
+    training_revision = code_provenance.get("training_revision")
+    if not isinstance(training_revision, str) or len(training_revision) != 40:
+        raise ValueError("frozen MLB v2 training revision is invalid")
+    runtime_source_hash = (
+        _require_sha256(_test_expected_source_tree_sha256, "test source_tree_sha256")
+        if _test_expected_source_tree_sha256 is not None
+        else verified_source_tree_hash(repository)
+    )
+    if code_provenance.get("source_tree_sha256") != runtime_source_hash:
+        raise ValueError("frozen MLB v2 source tree fingerprint mismatch")
+    if runtime_source_hash != anchor.source_tree_sha256:
+        raise ValueError("frozen MLB v2 source tree is not externally anchored")
     dependency = manifest.get("dependency", {})
     dependency_path = repository / str(dependency.get("path", ""))
     if _sha256_file(dependency_path) != dependency.get("sha256"):
@@ -287,6 +481,10 @@ def load_frozen_mlb_v2_bundle(
 
     calibrator_receipt = components["calibrator"]
     calibrator_path = (root / str(calibrator_receipt["path"])).resolve()
+    try:
+        calibrator_path.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("frozen MLB v2 calibrator escapes bundle root") from exc
     if _sha256_file(calibrator_path) != calibrator_receipt.get("artifact_sha256"):
         raise ValueError("frozen MLB v2 calibrator file hash mismatch")
     calibrator = load_frozen_calibrator(calibrator_path, challenger_root=root)
@@ -294,13 +492,27 @@ def load_frozen_mlb_v2_bundle(
     primary_metadata_hash = primary.to_artifact().get("artifact_hash", "")
     if primary_metadata_hash != components["primary"].get("model_metadata_hash"):
         raise ValueError("frozen MLB v2 primary model metadata mismatch")
-    if calibrator.base_model_hash != primary_metadata_hash:
+    primary_content_sha256 = _primary_content_hash(primary)
+    primary_artifact_sha256 = _sha256_file(primary_path / "model.joblib")
+    if primary_content_sha256 != components["primary"].get("learned_content_sha256"):
+        raise ValueError("frozen MLB v2 learned primary content mismatch")
+    if primary_artifact_sha256 != components["primary"].get("artifact_sha256"):
+        raise ValueError("frozen MLB v2 primary artifact byte hash mismatch")
+    if primary_content_sha256 != anchor.primary_content_sha256:
+        raise ValueError("frozen MLB v2 learned primary content is not externally anchored")
+    if primary_artifact_sha256 != anchor.primary_artifact_sha256:
+        raise ValueError("frozen MLB v2 primary artifact bytes are not externally anchored")
+    if calibrator.base_model_hash != primary_content_sha256:
         raise ValueError("frozen MLB v2 calibrator is not bound to the primary model")
     dataset = manifest.get("dataset", {})
     if calibrator.dataset_hash != dataset.get("sha256"):
         raise ValueError("frozen MLB v2 calibrator dataset mismatch")
     if calibrator.calibrator_hash != calibrator_receipt.get("calibrator_hash"):
         raise ValueError("frozen MLB v2 calibrator identity mismatch")
+    if calibrator.artifact_sha256 != anchor.calibrator_artifact_sha256:
+        raise ValueError("frozen MLB v2 calibrator artifact is not externally anchored")
+    if calibrator.calibrator_hash != anchor.calibrator_hash:
+        raise ValueError("frozen MLB v2 calibrator identity is not externally anchored")
 
     feature_order = manifest.get("feature_order", {})
     if feature_order.get("intensity") != list(MLB_INTENSITY_FEATURES):
@@ -319,6 +531,8 @@ def load_frozen_mlb_v2_bundle(
         raise ValueError("frozen MLB v2 bootstrap intensity features mismatch")
     if bootstrap._differential_features != list(MLB_DIFFERENTIAL_FEATURES):
         raise ValueError("frozen MLB v2 bootstrap differential features mismatch")
+    if bootstrap.head_family != FROZEN_HEAD_FAMILY:
+        raise ValueError("frozen MLB v2 bootstrap head family mismatch")
     if sklearn_baseline._intensity_features != list(MLB_INTENSITY_FEATURES):
         raise ValueError("frozen MLB v2 baseline intensity features mismatch")
     if sklearn_baseline._differential_features != list(MLB_DIFFERENTIAL_FEATURES):
@@ -336,7 +550,11 @@ def load_frozen_mlb_v2_bundle(
         dataset_hash=str(dataset["sha256"]),
         training_cutoff_utc=str(dataset["training_cutoff_utc"]),
         training_rows=int(dataset["training_rows"]),
-        code_revision=str(manifest["code_revision"]),
+        code_revision=training_revision,
+        source_tree_sha256=runtime_source_hash,
         dependency_hash=str(dependency["sha256"]),
+        manifest_sha256=manifest_sha256,
+        primary_content_sha256=primary_content_sha256,
+        primary_artifact_sha256=primary_artifact_sha256,
         bundle_path=root,
     )

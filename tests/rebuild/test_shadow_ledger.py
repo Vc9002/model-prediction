@@ -944,6 +944,7 @@ class TestCalibrationArtifactsLedger:
         )
         id2, created2 = ledger.record_calibration_artifact(
             run_id=run_id, sport="mlb", model_artifact_hash="model1", calibration_hash="calib1",
+            method="bootstrap_uncertainty",
         )
         assert created1 and not created2
         assert id1 == id2

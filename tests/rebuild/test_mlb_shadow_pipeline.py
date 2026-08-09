@@ -87,7 +87,11 @@ def _fake_bundle(tmp_path, *, primary=None, bootstrap=None) -> FrozenMLBV2Bundle
         training_cutoff_utc="2026-08-07T23:59:00+00:00",
         training_rows=30,
         code_revision="a" * 40,
+        source_tree_sha256="b" * 64,
         dependency_hash="dependency-hash",
+        manifest_sha256="c" * 64,
+        primary_content_sha256="d" * 64,
+        primary_artifact_sha256="e" * 64,
         bundle_path=Path(tmp_path) / "candidate",
     )
 
@@ -302,7 +306,9 @@ class TestResumeState:
         return state, frozen
 
     def _load(self, tmp_path, state, frozen):
-        with patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen):
+        with patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen), patch.object(
+            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 1, tzinfo=UTC),
+        ):
             return pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
 
     def test_save_then_load_restores_identical_candidate_and_rows(self, tmp_path):
@@ -351,6 +357,18 @@ class TestResumeState:
         state = MLBRunState(target_date="2026-08-06", tonight=pl.DataFrame({"event_id": ["401"]}))
         with pytest.raises(ValueError):
             pipeline.save_resume_state(state, str(tmp_path), "run123")
+
+    def test_tampered_resume_feature_or_timestamp_fails_closed(self, tmp_path):
+        state, frozen = self._frozen_state(tmp_path)
+        pipeline.save_resume_state(state, str(tmp_path), "run123")
+        path = tmp_path / "resume_state" / "mlb" / "run123" / "state.json"
+        saved = json.loads(path.read_text())
+        saved["rows_by_event"]["401"]["feature"] = 999999.0
+        saved["prediction_observed_at_by_event"]["401"] = "2020-01-01T00:00:00+00:00"
+        path.write_text(json.dumps(saved))
+
+        with pytest.raises(ValueError, match="content hash mismatch"):
+            self._load(tmp_path, state, frozen)
 
 
 class TestUncertaintyWiring:
