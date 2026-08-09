@@ -1,0 +1,18 @@
+[
+  {
+    "game_id": 401000001,
+    "season": 2024,
+    "season_type": 2,
+    "game_date_time": "2024-05-15T23:00:00+00:00",
+    "status_type_name": "STATUS_FINAL",
+    "status_type_completed": true,
+    "home_id": 1,
+    "away_id": 2,
+    "home_display_name": "Home Example",
+    "away_display_name": "Away Example",
+    "home_score": 82,
+    "away_score": 78,
+    "venue_id": 10,
+    "venue_full_name": "Example Arena"
+  }
+]
