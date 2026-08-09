@@ -14,6 +14,8 @@ from model_prediction.rebuild.mlb_v2_artifact import (
     FROZEN_DISTRIBUTION_METHOD,
     MLB_V2_BUNDLE_DIRNAME,
     XGB_DIRECT_FEATURES,
+    FrozenMLBV2Anchor,
+    _primary_content_hash,
     write_frozen_mlb_v2_bundle,
 )
 from model_prediction.rebuild.models import BootstrapMLBEnsemble, MLBTwoHeadModel, XGBoostTwoHeadModel
@@ -21,6 +23,7 @@ from model_prediction.rebuild.xgboost_stress import XGBoostChallenger
 
 TEST_CODE_REVISION = "a" * 40
 TEST_DATASET_HASH = "d" * 64
+TEST_SOURCE_TREE_HASH = "e" * 64
 
 
 def fitted_components(seed: int = 7):
@@ -53,7 +56,7 @@ def build_test_bundle(challenger_root: Path, repo_root: Path):
         "model_name": "xgb_two_head_negative_binomial",
         "method": "temperature",
         "parameters": {"temperature": 1.25},
-        "base_model_hash": primary.to_artifact()["artifact_hash"],
+        "base_model_hash": _primary_content_hash(primary),
         "dataset_hash": TEST_DATASET_HASH,
         "n_training_oof": 2,
     }
@@ -78,5 +81,21 @@ def build_test_bundle(challenger_root: Path, repo_root: Path):
         training_rows=40,
         code_revision=TEST_CODE_REVISION,
         dependency_manifest=repo_root / "pyproject.toml",
+        source_tree_sha256=TEST_SOURCE_TREE_HASH,
     )
     return target, row
+
+
+def anchor_for_test_bundle(target: Path) -> FrozenMLBV2Anchor:
+    manifest_path = target / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    return FrozenMLBV2Anchor(
+        status="sealed",
+        bundle_manifest_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        bundle_hash=manifest["bundle_hash"],
+        primary_content_sha256=manifest["components"]["primary"]["learned_content_sha256"],
+        primary_artifact_sha256=manifest["components"]["primary"]["artifact_sha256"],
+        calibrator_artifact_sha256=manifest["components"]["calibrator"]["artifact_sha256"],
+        calibrator_hash=manifest["components"]["calibrator"]["calibrator_hash"],
+        source_tree_sha256=manifest["code_provenance"]["source_tree_sha256"],
+    )

@@ -17,6 +17,17 @@
       "test_end": null,
       "consumed": false,
       "candidate_version": "mlb_moneyline_v2_frozen_v1",
+      "frozen_artifact_anchor": {
+        "status": "sealing_required",
+        "bundle_manifest_sha256": null,
+        "bundle_hash": null,
+        "primary_content_sha256": null,
+        "primary_artifact_sha256": null,
+        "calibrator_artifact_sha256": null,
+        "calibrator_hash": null,
+        "source_tree_sha256": null,
+        "note": "Fail-closed placeholder. Populate these hashes only during a deliberate operator seal from verified pre-test inputs; no production bundle is currently materialized."
+      },
       "created_utc": "2026-08-09",
       "corrected_utc": "2026-08-09",
       "correction_note": "SUPERSEDES this entry's original 2026-08-09 version, which froze 'primary_moneyline_model: xgb_two_head' together with 'score_distribution_family: negative_binomial' as if that were one validated combination. It was not: XGBoostTwoHeadModel(seed=42)'s constructor default is method='independent_poisson', and every real call site that selected xgb_two_head (train_mlb_score_model_comparison.py, train_mlb_calibration_comparison.py, train_mlb_calibrated_ensemble_comparison.py) only ever constructed it that way -- negative_binomial was validated separately, only against MLBTwoHeadModel (sklearn heads), in train_mlb_distribution_comparison.py. The two winners were combined post hoc without ever being fit and OOF-scored together. Fixed by running the real Cartesian comparison (2 head families x 3 distributions, each cross-fit calibrated with all 4 real methods) in train_mlb_head_distribution_cartesian.py -- outputs/rebuild/mlb_head_distribution_cartesian.json. The real winner picked as one exact validated combination: head_family=xgboost, distribution=negative_binomial, calibration=temperature (cross_fit_log_loss=0.6927, cross_fit_brier=0.2498, cross_fit_ece=0.0326, n=168) -- xgboost+negative_binomial does turn out to be the real winner, but it is now actually validated together, not assembled from separate experiments. Also re-ran the Task 15 ensemble comparison using each head family's own real best-validated distribution (train_mlb_corrected_ensemble_comparison.py -- outputs/rebuild/mlb_corrected_ensemble_comparison.json): conclusion unchanged (ensemble adds no value; single calibrated xgb_two_head wins). test_start was also moved forward from 2026-08-07T01:45Z to 2026-08-08T02:20Z, strictly after the real games (through 2026-08-08T02:15Z, dataset_hash e0c513aa4a544211980f7095da0de69ad3cb647a75981cbdb3c46512834ee2eb) this correction's own comparisons used for selection -- the original boundary was stale once this correction re-ran model selection on a freshly refreshed scoreboard that extended past it.",

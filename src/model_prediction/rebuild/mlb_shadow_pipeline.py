@@ -19,6 +19,7 @@ script for the same real slate.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -58,6 +59,7 @@ from .mlb_v2_artifact import (
     MLB_V2_CANDIDATE_VERSION,
     MLB_V2_TEST_ID,
     FrozenCalibratorBundle,
+    FrozenMLBV2Anchor,
     FrozenMLBV2Bundle,
     load_frozen_calibrator,  # noqa: F401 -- compatibility re-export
     load_frozen_mlb_v2_bundle,
@@ -397,6 +399,11 @@ class MLBRunState:
     training_cutoff_utc: str = ""
     code_revision: str = ""
     dependency_hash: str = ""
+    source_tree_sha256: str = ""
+    manifest_sha256: str = ""
+    primary_content_sha256: str = ""
+    primary_artifact_sha256: str = ""
+    calibrator_artifact_sha256: str = ""
     artifact_path: str = ""
     test_id: str = MLB_V2_TEST_ID
     candidate_version: str = MLB_V2_CANDIDATE_VERSION
@@ -425,6 +432,11 @@ def _apply_frozen_bundle(state: MLBRunState, frozen: FrozenMLBV2Bundle) -> None:
     state.training_cutoff_utc = frozen.training_cutoff_utc
     state.code_revision = frozen.code_revision
     state.dependency_hash = frozen.dependency_hash
+    state.source_tree_sha256 = frozen.source_tree_sha256
+    state.manifest_sha256 = frozen.manifest_sha256
+    state.primary_content_sha256 = frozen.primary_content_sha256
+    state.primary_artifact_sha256 = frozen.primary_artifact_sha256
+    state.calibrator_artifact_sha256 = frozen.calibrator.artifact_sha256
     state.artifact_path = str(frozen.bundle_path)
     state.test_id = frozen.test_id
     state.candidate_version = frozen.candidate_version
@@ -470,17 +482,43 @@ def save_resume_state(state: MLBRunState, data_root: str, run_id: str) -> None:
             return o.item()
         return str(o)
 
-    (out / "state.json").write_text(json.dumps({
+    event_contracts: dict[str, dict[str, Any]] = {}
+    tonight_by_event = {str(row["event_id"]): row for row in state.tonight.iter_rows(named=True)}
+    for event_id in state.rows_by_event:
+        game = tonight_by_event.get(event_id)
+        if game is None:
+            raise ValueError(f"resume feature row has no scheduled event contract: {event_id}")
+        required = ("event_start_utc", "home_team", "away_team")
+        if any(not game.get(key) for key in required):
+            raise ValueError(f"resume scheduled event contract is incomplete: {event_id}")
+        event_contracts[event_id] = {
+            "event_start_utc": game["event_start_utc"],
+            "home_team": game["home_team"],
+            "away_team": game["away_team"],
+            "decision_time_utc": state.decision_times[event_id].isoformat(),
+        }
+    payload = {
         "target_date": state.target_date,
         "train_n": state.train_n,
         "frozen_bundle_hash": state.frozen_bundle_hash,
+        "manifest_sha256": state.manifest_sha256,
+        "primary_content_sha256": state.primary_content_sha256,
+        "primary_artifact_sha256": state.primary_artifact_sha256,
+        "calibrator_artifact_sha256": state.calibrator_artifact_sha256,
+        "source_tree_sha256": state.source_tree_sha256,
         "test_id": state.test_id,
         "candidate_version": state.candidate_version,
         "rows_by_event": state.rows_by_event,
+        "event_contracts": event_contracts,
         "decision_times": {k: v.isoformat() for k, v in state.decision_times.items()},
         "prediction_observed_at_by_event": state.prediction_observed_at_by_event,
         "skipped": state.skipped,
-    }, indent=2, default=_json_default))
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default)
+    envelope = {**payload, "resume_state_sha256": hashlib.sha256(canonical.encode()).hexdigest()}
+    temporary = out / "state.json.tmp"
+    temporary.write_text(json.dumps(envelope, indent=2, default=_json_default))
+    temporary.replace(out / "state.json")
 
 
 def load_resume_state(
@@ -490,7 +528,8 @@ def load_resume_state(
     *,
     challenger_root: str | Path | None = None,
     repo_root: str | Path | None = None,
-    expected_code_revision: str | None = None,
+    expected_anchor: FrozenMLBV2Anchor | None = None,
+    _test_expected_source_tree_sha256: str | None = None,
 ) -> MLBRunState | None:
     """Real reload of a prior predict_stage() success for this exact
     run_id/date. Returns None (honest, not an error) if no resume state was
@@ -508,7 +547,20 @@ def load_resume_state(
     if not state_path.exists():
         return None
     saved = json.loads(state_path.read_text())
-    if saved["target_date"] != target_date:
+    if not isinstance(saved, dict):
+        # ValueError, not TypeError: this validates untrusted on-disk JSON
+        # content, consistent with every sibling malformed-resume-state
+        # check in this function (state_hash mismatch, candidate binding
+        # mismatch, etc.), not a Python argument-type contract.
+        raise ValueError("resume state must be a JSON object")  # noqa: TRY004
+    state_hash = saved.get("resume_state_sha256")
+    identity = {key: value for key, value in saved.items() if key != "resume_state_sha256"}
+    actual_state_hash = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if not state_hash or state_hash != actual_state_hash:
+        raise ValueError("resume state content hash mismatch")
+    if saved.get("target_date") != target_date:
         return None
 
     state = load_state(data_root, target_date)
@@ -517,14 +569,60 @@ def load_resume_state(
     frozen = load_frozen_mlb_v2_bundle(
         challenger_root,
         repo_root=repo_root,
-        expected_code_revision=expected_code_revision,
+        expected_anchor=expected_anchor,
+        _test_expected_source_tree_sha256=_test_expected_source_tree_sha256,
     )
     if saved.get("frozen_bundle_hash") != frozen.bundle_hash:
         raise ValueError("resume state is bound to a different frozen MLB v2 candidate")
+    expected_bindings = {
+        "manifest_sha256": frozen.manifest_sha256,
+        "primary_content_sha256": frozen.primary_content_sha256,
+        "primary_artifact_sha256": frozen.primary_artifact_sha256,
+        "calibrator_artifact_sha256": frozen.calibrator.artifact_sha256,
+        "source_tree_sha256": frozen.source_tree_sha256,
+        "test_id": frozen.test_id,
+        "candidate_version": frozen.candidate_version,
+    }
+    mismatches = [key for key, value in expected_bindings.items() if saved.get(key) != value]
+    if mismatches:
+        raise ValueError("resume state candidate binding mismatch: " + ", ".join(mismatches))
+    rows = saved.get("rows_by_event")
+    observed_by_event = saved.get("prediction_observed_at_by_event")
+    event_contracts = saved.get("event_contracts")
+    if not isinstance(rows, dict) or not isinstance(observed_by_event, dict) or not isinstance(event_contracts, dict):
+        raise ValueError("resume state event payload is malformed")  # noqa: TRY004 -- untrusted JSON, see note above
+    tonight_by_event = {str(row["event_id"]): row for row in state.tonight.iter_rows(named=True)}
+    for event_id, row in rows.items():
+        game = tonight_by_event.get(event_id)
+        contract = event_contracts.get(event_id)
+        if not isinstance(row, dict) or row.get("event_id") != event_id:
+            raise ValueError(f"resume feature row identity mismatch: {event_id}")
+        if game is None or not isinstance(contract, dict):
+            raise ValueError(f"resume event is no longer in the scheduled slate: {event_id}")
+        actual_contract = {
+            "event_start_utc": game.get("event_start_utc"),
+            "home_team": game.get("home_team"),
+            "away_team": game.get("away_team"),
+            "decision_time_utc": state.decision_times[event_id].isoformat(),
+        }
+        if contract != actual_contract:
+            raise ValueError(f"resume scheduled event contract changed: {event_id}")
+        observed_raw = observed_by_event.get(event_id)
+        try:
+            observed = datetime.fromisoformat(observed_raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"resume prediction observation time is invalid: {event_id}") from exc
+        decision_time = state.decision_times[event_id]
+        if observed.tzinfo is None or observed.utcoffset() != timedelta(0):
+            raise ValueError(f"resume prediction observation time must be UTC: {event_id}")
+        if observed > decision_time:
+            raise ValueError(f"resume prediction observation is after cutoff: {event_id}")
+        if _utc_now_dt() > decision_time:
+            raise ValueError(f"resume prediction cutoff has passed: {event_id}")
     _apply_frozen_bundle(state, frozen)
-    state.rows_by_event = saved["rows_by_event"]
-    state.prediction_observed_at_by_event = saved.get("prediction_observed_at_by_event", {})
-    state.skipped = saved["skipped"]
+    state.rows_by_event = rows
+    state.prediction_observed_at_by_event = observed_by_event
+    state.skipped = saved.get("skipped", {})
     return state
 
 
@@ -569,7 +667,6 @@ def predict_stage(
     run_id: str | None = None,
     challenger_root: str | Path | None = None,
     repo_root: str | Path | None = None,
-    expected_code_revision: str | None = None,
 ) -> dict:
     """Load the sealed candidate and commit point-in-time feature rows.
 
@@ -582,7 +679,6 @@ def predict_stage(
     frozen = load_frozen_mlb_v2_bundle(
         challenger_root,
         repo_root=repo_root,
-        expected_code_revision=expected_code_revision,
     )
     _apply_frozen_bundle(state, frozen)
 
@@ -604,6 +700,11 @@ def predict_stage(
             code_revision=state.code_revision,
             dependency_lock_hash=state.dependency_hash,
             artifact_path=state.artifact_path,
+            manifest_sha256=state.manifest_sha256,
+            primary_content_sha256=state.primary_content_sha256,
+            primary_artifact_sha256=state.primary_artifact_sha256,
+            calibrator_artifact_sha256=state.calibrator_artifact_sha256,
+            source_tree_sha256=state.source_tree_sha256,
         )
         assert state.calibrator_bundle is not None
         ledger.record_calibration_artifact(
