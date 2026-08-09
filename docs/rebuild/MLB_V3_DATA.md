@@ -20,7 +20,9 @@ research/shadow-only:
 
 The MIT license on client code does not grant rights to third-party data.
 Economic or production use fails closed until a provider-specific review is
-documented and its metadata is deliberately changed.
+documented and its metadata is deliberately changed. MLB v3 entrypoints require
+an explicit `RESEARCH` use context; production-dataset, production-model,
+shadow-economic, and execution contexts reject any uncleared source row.
 
 ## Point-in-time boundary
 
@@ -31,6 +33,10 @@ vintage. Those rows therefore carry `availability_basis = capture_time_only`.
 They can support structural research and future prospective collection, but
 they do not prove that a probable pitcher, lineup, transaction, Statcast row,
 or forecast was known at an earlier prediction horizon.
+
+Raw observation manifests are immutable. Parser results are separate immutable
+manifests keyed by the raw hash, parser version, and resulting schema hash. A
+cached non-200 response is never parsed into an available dataset.
 
 Authoritative event identity is `game_pk`. The canonical identity also includes
 the market period, and schedule rows preserve doubleheader number,
@@ -63,9 +69,21 @@ rebuild-data audit --sport mlb --version v3 --season 2026
 ```
 
 Statcast is automatically partitioned into requests of at most seven days.
-The audit reports `NO_DATA` when nothing has been captured and `DEGRADED` when
-core starter or Statcast coverage is absent. It never reports an empty dataset
-as healthy.
+The backfill currently uses deterministic daily calendar partitions (within
+that bound), writes immutable success manifests, and resumes only when both the
+manifest and normalized part hashes validate. Unexpected in-season empty
+partitions are `DEGRADED`.
+
+The audit reports `NO_DATA` when nothing has been captured. `HEALTHY` requires
+independently measured game-level coverage for two-sided starters, completed-
+game Statcast, two-sided nine-player lineups, two-sided rosters, and weather.
+Conflicting primary keys, invalid timestamps, or missing coverage can never be
+collapsed into a healthy report.
+
+Open-Meteo modes are explicit: live captures retain unknown model-issue time;
+fixed previous-day series support only 24-hour increments; exact sub-day
+horizons require a Single Runs initialization timestamp. Retrieval time is
+never relabeled as forecast issue time.
 
 ## Deliberately not included
 
