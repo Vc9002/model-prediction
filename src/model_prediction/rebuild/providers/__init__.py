@@ -10,10 +10,14 @@ from .base import (
 from .cache import ProviderRawCache
 from .config import ProviderPolicy, RebuildSourcesConfig, load_rebuild_sources_config
 from .http import HttpFetch, HttpProviderClient, RetryPolicy
+from .nflverse import NFLVERSE_RELEASE_ASSETS, NFLVerseAsset, NFLVerseProvider
 
 __all__ = [
     "HttpFetch",
     "HttpProviderClient",
+    "NFLVERSE_RELEASE_ASSETS",
+    "NFLVerseAsset",
+    "NFLVerseProvider",
     "ProviderPolicy",
     "ProviderRawCache",
     "ProviderResult",

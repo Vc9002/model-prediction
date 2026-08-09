@@ -12,6 +12,7 @@ def test_repository_source_config_is_valid():
     root = Path(__file__).parents[2]
     config = load_rebuild_sources_config(root / "config/rebuild_sources.yaml")
     assert config.sportsdataverse.min_interval_seconds == 1.0
+    assert config.nflverse.min_interval_seconds == 1.0
     assert config.football_data.min_interval_seconds >= 6.0
 
 

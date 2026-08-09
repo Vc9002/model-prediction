@@ -12,6 +12,28 @@ def test_rebuild_data_backfill_contract():
     assert args.resume is True
 
 
+def test_rebuild_data_nfl_backfill_contract():
+    args = _parser().parse_args(
+        [
+            "backfill",
+            "--sport",
+            "nfl",
+            "--season",
+            "2024",
+            "--provider",
+            "nflverse",
+            "--table",
+            "schedule",
+            "--table",
+            "pbp",
+            "--resume",
+        ]
+    )
+    assert args.sport == "nfl"
+    assert args.provider == "nflverse"
+    assert args.table == ["schedule", "pbp"]
+
+
 def test_rebuild_data_rejects_unimplemented_sports():
     with pytest.raises(SystemExit):
         _parser().parse_args(["backfill", "--sport", "nba", "--season", "2024"])

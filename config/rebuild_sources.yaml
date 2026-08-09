@@ -2,6 +2,10 @@ sportsdataverse:
   min_interval_seconds: 1.0
   retries: 3
 
+nflverse:
+  min_interval_seconds: 1.0
+  retries: 3
+
 football_data:
   min_interval_seconds: 6.5
   retries: 3
