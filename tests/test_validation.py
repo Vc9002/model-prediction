@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import pytest
 from test_backtester import seed_games
 
 from model_prediction.validation import (
     ValidationRow,
+    _add_legacy_backfill,
     _grade,
     build_production_artifact,
     chronological_split,
@@ -375,3 +378,65 @@ def test_score_sports_multimarket_validation_requires_exact_lines(tmp_path) -> N
         assert readiness["model_parameters_changed"] is False
         assert readiness["spread"] == "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"
         assert readiness["total"] == "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"
+
+
+def test_add_legacy_backfill_logs_read_failure_instead_of_silently_discarding(
+    tmp_path, monkeypatch, caplog
+) -> None:
+    """DD-3 (deep debug audit, 2026-08-04): a genuine I/O failure reading
+    the legacy Polymarket flat file used to be a bare `except OSError: pass`
+    -- indistinguishable from a legacy file that legitimately contributed
+    nothing further. Confirms the failure is now logged (still degrades
+    gracefully rather than crashing validation reporting -- that part of
+    the behavior is correct and unchanged, only the observability gap is
+    closed)."""
+    legacy_path = tmp_path / "polymarket_us_snapshots.jsonl"
+    legacy_path.write_text('{"market_slug": "asc-nba-lal-bos"}\n', encoding="utf-8")
+
+    real_open = Path.open
+
+    def failing_open(self, *args, **kwargs):
+        if self == legacy_path:
+            raise OSError("simulated disk read failure")
+        return real_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", failing_open)
+
+    with caplog.at_level("WARNING"):
+        spread_count, total_count = _add_legacy_backfill(tmp_path, "nba", 0, 0)
+
+    assert spread_count == 0
+    assert total_count == 0
+    assert any(
+        "failed reading" in record.message and "polymarket_us_snapshots.jsonl" in record.message
+        for record in caplog.records
+    )
+
+
+def test_multi_market_readiness_logs_snapshot_read_failure(tmp_path, monkeypatch, caplog) -> None:
+    """DD-3: same regression as the legacy-backfill test above, for
+    multi_market_readiness's own Stage 2 snapshot scan (the other silent
+    `except OSError: continue` this audit item flagged)."""
+    store = seed_games(tmp_path)
+    snapshot_dir = store.data_root / "odds" / "nba" / "2026-01-01"
+    snapshot_dir.mkdir(parents=True)
+    snapshot_path = snapshot_dir / "polymarket_snapshots.jsonl"
+    snapshot_path.write_text('{"market_type": "spread", "market_slug": "asc-nba-x"}\n', encoding="utf-8")
+
+    real_open = Path.open
+
+    def failing_open(self, *args, **kwargs):
+        if self == snapshot_path:
+            raise OSError("simulated disk read failure")
+        return real_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", failing_open)
+
+    with caplog.at_level("WARNING"):
+        readiness = multi_market_readiness(store, "nba")
+
+    assert readiness["spread"] == "BLOCKED_MISSING_HISTORICAL_CONTRACT_LINES"
+    assert any(
+        "failed reading" in record.message and "polymarket_snapshots.jsonl" in record.message
+        for record in caplog.records
+    )
