@@ -2013,7 +2013,7 @@ async function renderToday(){
         <span>model <b>${conf?pct(conf):"—"}</b></span>
         <span>market <b>${noQuote?"no quote":cents(market)}</b> <span class="dim">${noQuote?"":"("+(market?pct(market):"—")+")"}</span></span>
         <span>edge <b class="${edge>0?"green":"red"}">${noQuote?"—":edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-        ${sizing?`<span>${sizing}</span>`:""}${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
+        ${sizing?`<span>${sizing}</span>`:""}${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
         ${p.unavailable_features?`<span class="pill push" title="Fell back to a neutral default for this game — every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div><div class="pick-action">${orderControl(p,true)}</div></div>
         ${noQuote?"":`<div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`}`;
@@ -2068,7 +2068,7 @@ async function loadFlatToday(token){
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div></div>`;
         d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);
@@ -2125,7 +2125,7 @@ async function loadResearchToday(token){
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
           </div></div>`;
         d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);
