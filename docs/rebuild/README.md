@@ -20,6 +20,7 @@ ledgers, dashboard order controls, and execution path remain separate.
 Read the remaining documents in this directory before changing rebuild code:
 
 - `ARCHITECTURE.md` defines isolation and data flow.
+- `DATA_SOURCES.md` defines the free/open provider, provenance, and licensing policy.
 - `OPERATIONS.md` defines safe CLI and runtime operation.
 - `VALIDATION.md` defines evidence, sealed-test, and acceptance rules.
 - `MARKETS.md` defines exact contract and economic semantics.
