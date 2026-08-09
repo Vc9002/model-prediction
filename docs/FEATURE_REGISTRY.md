@@ -19,7 +19,7 @@ amount. The registry also preserves the stricter multiplicity-adjusted decision.
 `KEEP` with blocked point-in-time provenance means research retention only; it does not
 make the feature production-safe or establish profitability.
 
-## Current state: 27 features tracked, 5 keep, 3 remove candidates, 3 reject, 1 remove, 4 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
+## Current state: 24 features tracked, 5 keep, 3 remove candidates, 3 reject, 1 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
 
 ### Production features (active in current models)
 
@@ -48,14 +48,11 @@ make the feature production-safe or establish profitability.
 | Feature | Sports | Verdict | Why |
 |---|---|---|---|
 | `defensive_trend_gap` | NBA/WNBA | remove candidate | Removal improves both validation and holdout proper scores. |
-| `starter_era_gap` | MLB | **remove** | Shipped broken in v4, removed in v5. Formally ablated 2026-08-01: removal *improves* every metric. Never reinstate. |
+| `starter_era_gap` | MLB | **remove** | Shipped broken in v4, removed in v5. Formally ablated 2026-08-01: removal *improves* every metric. Never reinstate. **2026-08-10 addendum**: a real, architecturally-different `starter_era_gap_live` provider now exists (`features/starter_history.py`, PIT-safe rolling per-starter history, not the old unservable event_id map) — dormant, not in any promoted model's feature list. Original verdict stands until an operator re-evaluates it; see `config/tested_features.json`. |
 | `starting_pitcher_fip` | MLB | **reject** | 84% coverage, zero effect. Collinear with `pitcher_era_gap`. |
 | `head_to_head` | all 5 | **reject** | +0.11pp to +0.61pp, all inside 1 SE. |
 | `lineup_strength` | NBA/WNBA | **reject** | +0.05pp / 0.00pp. Noise. |
-| `market_signals` | — | **exclude** | Architectural. Violates market isolation. |
-| `guaranteed_signal` | — | **exclude** | Post-hoc tag, not an input. |
 | `tennis_surface` | TENNIS | **exclude** | No active tennis model consuming it. |
-| `confidence_gate` | — | **exclude** | Infrastructure, not a model input. |
 
 ### Untested or blocked
 
@@ -68,6 +65,7 @@ make the feature production-safe or establish profitability.
 | `trailing_home_win_rate_30d` | MLB | **untested** | Adaptive-HFA variant; researched but not formally ablated. |
 | `player_availability` | WNBA | **keep** | Grade-B post-hoc research evidence; not in current exact-artifact ablation. |
 | `probable_starter_unavailable` | MLB | **untested (new)** | Shadow feature (`features/mlb_player_availability.py`), wired 2026-08-02. Computed and logged only; never adjusts a live forecast. |
+| `starter_fip_gap` | MLB | **untested (new)** | Shadow feature (`features/starter_history.py`), wired 2026-08-05 (F-68). Not `starting_pitcher_fip` (different mechanism, not the collinear one above). Code comment claims "+1pp hit rate, -39% ECE, +11 units vs ERA" from a locked holdout; not independently re-verified or backed by a committed evaluation artifact. Dormant, not in any promoted model. |
 
 ## Key findings from roadmap challenger (2026-07-22)
 

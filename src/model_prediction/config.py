@@ -8,6 +8,18 @@ import yaml
 
 from .units import UnitPolicy
 
+# ── Shared thresholds (DD-8) — single source of truth ──────────────────────
+# Moved from scattered hardcoded values. Identical numeric values; only the
+# location changed. Do NOT change these values here without running the full
+# ablation pipeline on locked holdout data.
+
+UNIT_MIN_EDGE: float = 0.02
+UNIT_INCREMENT: float = 0.25
+TENNIS_MODEL_UNCERTAINTY: float = 0.05
+ESPORTS_MIN_OBSERVATIONS: int = 50
+ESPORTS_MIN_ACCURACY: float = 0.60
+SIGNIFICANCE_THRESHOLD: float = 0.05
+
 CONTINUOUS_MODEL_ITERATION_POLICY: dict[str, bool | str] = {
     "status": "continuous",
     "parameter_freezes_allowed": True,

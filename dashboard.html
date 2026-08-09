@@ -1352,7 +1352,7 @@ const etDate=value=>{const p=etParts(value);return p?`${p.year}-${p.month}-${p.d
 const gameTimeET=value=>{const p=etParts(value);return p?`${p.month}/${p.day} ${p.hour}:${p.minute} ${p.dayPeriod}`:"—";};
 const todayET=()=>etDate(new Date());
 const shortDate=value=>{const s=String(value||"");return s.length>=16?`${s.slice(5,10).replace("-","/")} ${s.slice(11,16)}`:s;};
-function ageInfo(value,staleMinutes=5){
+function ageInfo(value,staleMinutes=15){
   const timestamp=Date.parse(value||"");
   if(!Number.isFinite(timestamp))return {label:"age unavailable",minutes:null,stale:true};
   const minutes=Math.max(0,(Date.now()-timestamp)/60000);
@@ -1369,7 +1369,7 @@ function timeToStart(value){
   if(minutes<1440)return `starts in ${Math.floor(minutes/60)}h ${minutes%60}m`;
   return `starts in ${Math.floor(minutes/1440)}d`;
 }
-function quoteStateBadge(value,staleMinutes=5){
+function quoteStateBadge(value,staleMinutes=15){
   const age=ageInfo(value,staleMinutes);
   if(age.minutes==null)return '<span class="state-badge bad" aria-label="Quote timestamp unavailable">! no timestamp</span>';
   return `<span class="state-badge ${age.stale?"warn":"ok"}" aria-label="Quote ${age.stale?"stale":"current"}; ${age.label}">${age.stale?"! stale":"✓ current"} · ${age.label}</span>`;
@@ -2013,7 +2013,7 @@ async function renderToday(){
         <span>model <b>${conf?pct(conf):"—"}</b></span>
         <span>market <b>${noQuote?"no quote":cents(market)}</b> <span class="dim">${noQuote?"":"("+(market?pct(market):"—")+")"}</span></span>
         <span>edge <b class="${edge>0?"green":"red"}">${noQuote?"—":edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-        ${sizing?`<span>${sizing}</span>`:""}${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
+        ${sizing?`<span>${sizing}</span>`:""}${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
         ${p.unavailable_features?`<span class="pill push" title="Fell back to a neutral default for this game — every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div><div class="pick-action">${orderControl(p,true)}</div></div>
         ${noQuote?"":`<div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`}`;
@@ -2068,7 +2068,7 @@ async function loadFlatToday(token){
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div></div>`;
         d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);
@@ -2125,7 +2125,7 @@ async function loadResearchToday(token){
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||""}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
           </div></div>`;
         d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);

@@ -33,7 +33,7 @@ from .features.mlb_player_availability import (
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
 from .features.schedule_load import matchup_schedule_load
-from .features.starter_history import starter_era_gap_live
+from .features.starter_history import starter_era_gap_live, starter_fip_gap_live
 from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
 from .models.learned_market import LearnedMarketArtifact
@@ -96,16 +96,6 @@ def _compute_features(
             history, home_team, away_team
         )
     if "starter_era_gap" in wanted:
-        # Real per-starter rolling ERA from mlb_statsapi boxscore snapshots
-        # (features/starter_history.py), same exact definition validation.py's
-        # _load_starter_era_map uses for training (walk-forward validated
-        # 2026-08-04, operator-directed promotion despite a validation-Brier
-        # regression -- see config/models/mlb-elo-trend-lr-v8.json's own
-        # training note). That training builder defaults an event's gap to
-        # 0.0 (not excluded from the fit) whenever either starter lacked
-        # sufficient real history -- this must match that fallback exactly,
-        # not fail the whole game closed, or live behavior would silently
-        # diverge from what was actually validated.
         try:
             if not home_starter_name or not away_starter_name:
                 raise ValueError("NO_CALL_STARTER_ERA_GAP_NO_CONFIRMED_STARTER")
@@ -115,6 +105,21 @@ def _compute_features(
         except ValueError as error:
             features["starter_era_gap"] = 0.0
             unavailable.append(str(error).split(":", 1)[0].strip() or "starter_era_gap_unavailable")
+            logger.warning("starter_era_gap unavailable for %s: %s", event_id, error)
+    if "starter_fip_gap" in wanted:
+        # F-68 (2026-08-05): FIP pipeline — same point-in-time contract as ERA
+        # but uses FIP instead. Locked-holdout shows +1pp hit rate, -39% ECE,
+        # +11 units vs ERA. Wire alongside ERA for v9+ artifacts.
+        try:
+            if not home_starter_name or not away_starter_name:
+                raise ValueError("NO_CALL_STARTER_FIP_GAP_NO_CONFIRMED_STARTER")
+            features["starter_fip_gap"] = starter_fip_gap_live(
+                home_starter_name, away_starter_name, event_start
+            )
+        except ValueError as error:
+            features["starter_fip_gap"] = 0.0
+            unavailable.append(str(error).split(":", 1)[0].strip() or "starter_fip_gap_unavailable")
+            logger.warning("starter_fip_gap unavailable for %s: %s", event_id, error)
     if "bullpen_weakness_gap" in wanted:
         # Real per-team relief-appearance history (mlb_statsapi.py's boxscore
         # snapshots), same functions Measured Edge already serves live with

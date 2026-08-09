@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Local operations dashboard server for the model-prediction system.
 
+HACK(DD-5): 5,121-line monolithic file with ~35 routes dispatched via manual
+if/elif path chains. Should be split into dashboard/routes.py, views.py,
+orders.py, etc. Every new feature lands here. See MASTER.md §DD-5.
+
 Serves dashboard.html plus a small JSON API computed from the project's data
 files. View clearing and order status use local dashboard state. Real order
 submission remains behind the model-prediction CLI's hard gate and a separate,
@@ -1939,7 +1943,8 @@ def _daily_pipeline_status() -> dict:
     # Parse exit codes from the log. Matched on an exact "0", not a substring
     # check, since e.g. exit code 130 (SIGINT) or 120 also contain the digit
     # "0" and would otherwise be misreported as success.
-    steps = {}
+    steps: dict[str, bool] = {}
+    unified_ok: bool | None = None
     try:
         text = latest.read_text(encoding="utf-8", errors="replace")
         for line in text.splitlines():
@@ -1952,13 +1957,18 @@ def _daily_pipeline_status() -> dict:
             elif "Flat forecast exit code:" in line:
                 steps["flat_ok"] = line.split(":")[-1].strip() == "0"
             elif "Main forecast exit code:" in line:
-                # Esports has no separate step: the dedicated "esports-forecast"
-                # step was removed (see run_daily.sh) since it fully duplicated
-                # what this main-forecast step already does per esports title,
-                # which produced near-simultaneous duplicate research rows.
                 steps["main_ok"] = line.split(":")[-1].strip() == "0"
+            elif "Unified daily exit code:" in line:
+                unified_ok = line.split(":")[-1].strip() == "0"
     except OSError:
         pass
+    # Unified pipeline (2026-08-05): slate + flat + main run as one step.
+    # When the unified exit code is present, use it as fallback for any
+    # step the log didn't report individually.
+    if unified_ok is not None:
+        for key in ("slate_ok", "flat_ok", "main_ok"):
+            if key not in steps:
+                steps[key] = unified_ok
     return {
         "last_run_at_utc": mtime.isoformat(),
         "age_hours": round(age_hours, 1),

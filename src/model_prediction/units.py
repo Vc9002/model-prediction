@@ -1,3 +1,9 @@
+"""Position sizing: edge-scaled Kelly units.
+
+TODO(DD-8): Hardcoded thresholds (min_edge=0.02, unit_increment=0.25) should
+move to a single config source. See MASTER.md §DD-8.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,7 +17,7 @@ class UnitPolicy:
     unit_value_usd: float = 7.5
     reference_units: float = 5.0
     kelly_fraction: float = 0.5
-    min_edge: float = 0.02
+    min_edge: float = 0.02  # source of truth: config.UNIT_MIN_EDGE
     # 1.0-2.0 (widened from 0.5-2.0, 2026-07-31): 1U is the floor for the
     # least confident logged pick, 2U the ceiling for the most confident.
     min_pick_units: float = 1.0
@@ -20,7 +26,7 @@ class UnitPolicy:
     max_league_daily_units: float = 3.0
     max_event_units: float = 2.0
     max_team_daily_units: float = 3.0
-    unit_increment: float = 0.25
+    unit_increment: float = 0.25  # source of truth: config.UNIT_INCREMENT
 
 
 @dataclass(frozen=True)

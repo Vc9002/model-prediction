@@ -1,5 +1,9 @@
 """model-prediction CLI.
 
+HACK(DD-6): 4,407-line monolithic file with 48 subcommands, near-zero test
+coverage. Should be split into a cli/ package with one module per command
+group (forecast, settle, daily, validate, esports, etc.). See MASTER.md §DD-6.
+
 Daily loop: polymarket-slate -> forecast --log -> settle --all-unsettled ->
 summary (or `daily` for all of it). Everything is shadow/paper by default;
 the only real-money path is the `execute` subcommand behind the hard gate in
