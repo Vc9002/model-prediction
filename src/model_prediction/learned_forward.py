@@ -119,6 +119,7 @@ def _compute_features(
         except ValueError as error:
             features["starter_fip_gap"] = 0.0
             unavailable.append(str(error).split(":", 1)[0].strip() or "starter_fip_gap_unavailable")
+            logger.warning("starter_fip_gap unavailable for %s: %s", event_id, error)
     if "bullpen_weakness_gap" in wanted:
         # Real per-team relief-appearance history (mlb_statsapi.py's boxscore
         # snapshots), same functions Measured Edge already serves live with

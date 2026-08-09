@@ -228,7 +228,8 @@
       ],
       "status": "shipped_in_v4_then_removed_in_v5",
       "tested_on": "2026-07-22",
-      "verdict": "remove"
+      "verdict": "remove",
+      "addendum_2026_08_10": "learned_forward.py now has a real starter_era_gap_live provider (src/model_prediction/features/starter_history.py, added 2026-08-05 alongside the F-68 FIP pipeline) that is architecturally different from the unservable one described above -- it indexes each pitcher's own prior starts and filters strictly before decision time, so it is genuinely live-servable rather than a constant-zero train/serve-skew feature. It is NOT in any promoted model's feature_names (dormant scaffolding only). This does not satisfy the 'Never' retest_when on its own -- the original verdict stands until an operator explicitly re-evaluates this new implementation and updates this entry -- but the 'deliberately provides NO provider' claim in this entry's own notes is now stale and should not be relied on without checking the current code."
     },
     {
       "evidence_grade": "B",
