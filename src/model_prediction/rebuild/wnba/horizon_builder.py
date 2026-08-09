@@ -131,6 +131,7 @@ def _feature_row(
         "home_team_canonical_id": str(target["home_team_canonical_id"]),
         "away_team_canonical_id": str(target["away_team_canonical_id"]),
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "availability_basis": "capture_time_only",
         "commercial_use_status": "unresolved",
         "production_allowed": False,
     }
