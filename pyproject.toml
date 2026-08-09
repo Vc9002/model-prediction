@@ -23,6 +23,7 @@ dependencies = [
   "PyYAML>=6,<7",
   "scikit-learn>=1.5,<2",
   "scipy>=1.13,<2",
+  "sportsdataverse==0.0.72",
   "xgboost>=3.2,<3.3; python_version < '3.12'",
   "xgboost>=3.4,<4; python_version >= '3.12'",
 ]
@@ -40,6 +41,7 @@ dev = [
 
 [project.scripts]
 model-prediction = "model_prediction.cli:main"
+rebuild-data = "model_prediction.rebuild.data_cli:main"
 rebuild-shadow = "model_prediction.rebuild.cli:main"
 
 [tool.hatch.build.targets.wheel]
