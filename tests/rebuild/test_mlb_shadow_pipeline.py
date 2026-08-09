@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import polars as pl
 import pytest
 
 from model_prediction.rebuild import mlb_shadow_pipeline as pipeline
+from model_prediction.rebuild.calibration import IdentityCalibrator
+from model_prediction.rebuild.mlb_v2_artifact import FrozenCalibratorBundle, FrozenMLBV2Bundle
 from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
 
 
@@ -65,6 +69,29 @@ def _write_scoreboard(data_root, event_id: str, event_start_utc: str, home: str,
     norm.write("mlb", "scoreboard", pl.DataFrame([row]), primary_key=["event_id"])
 
 
+def _fake_bundle(tmp_path, *, primary=None, bootstrap=None) -> FrozenMLBV2Bundle:
+    return FrozenMLBV2Bundle(
+        primary=primary or MagicMock(),
+        bootstrap=bootstrap or MagicMock(),
+        sklearn_baseline=MagicMock(),
+        xgb_direct=MagicMock(),
+        calibrator=FrozenCalibratorBundle(
+            calibrator=IdentityCalibrator(),
+            calibrator_hash="calibrator-hash",
+            base_model_hash="primary-schema-hash",
+            dataset_hash="dataset-hash",
+            artifact_sha256="calibrator-file-hash",
+        ),
+        bundle_hash="frozen-bundle-hash",
+        dataset_hash="dataset-hash",
+        training_cutoff_utc="2026-08-07T23:59:00+00:00",
+        training_rows=30,
+        code_revision="a" * 40,
+        dependency_hash="dependency-hash",
+        bundle_path=Path(tmp_path) / "candidate",
+    )
+
+
 class TestLoadState:
     def test_no_scoreboard_ever_collected_returns_none_not_a_crash(self, tmp_path):
         assert pipeline.load_state(str(tmp_path), "2026-08-06") is None
@@ -105,12 +132,10 @@ class TestBuildForecastCalledExactlyOncePerGame:
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
 
+        frozen = _fake_bundle(tmp_path)
         with patch(
-            "model_prediction.rebuild.mlb_features.build_game_feature_row",
-            return_value={"game_date": "2026-07-01", "event_id": "hist"},
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
-            return_value=pipeline.TrainedModels(model=MagicMock(), bootstrap=MagicMock(), train_n=30),
+            "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
+            return_value=frozen,
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
             return_value={"401": {"home_starter": "A", "away_starter": "B"}},
@@ -120,6 +145,8 @@ class TestBuildForecastCalledExactlyOncePerGame:
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.build_forecast",
             side_effect=AssertionError("build_forecast must not be called from predict_stage"),
+        ), patch.object(
+            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
         ):
             result = pipeline.predict_stage(state, str(tmp_path))
 
@@ -131,9 +158,9 @@ class TestBuildForecastCalledExactlyOncePerGame:
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
-        state.model = MagicMock()
-        state.bootstrap = MagicMock()
+        pipeline._apply_frozen_bundle(state, _fake_bundle(tmp_path))
         state.rows_by_event = {"401": {"event_id": "401"}}
+        state.prediction_observed_at_by_event = {"401": "2026-08-06T21:00:00+00:00"}
 
         fake_forecast = MagicMock()
         fake_forecast.model_artifact_hash = "hash1"
@@ -144,6 +171,8 @@ class TestBuildForecastCalledExactlyOncePerGame:
             "model_prediction.rebuild.mlb_shadow_pipeline.evaluate_game", return_value=[],
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.real_market_snapshot_hash", return_value="mkthash",
+        ), patch.object(
+            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 1, tzinfo=UTC),
         ):
             pipeline.decide_stage(state)
 
@@ -174,24 +203,23 @@ class TestModelArtifactLineage:
         assert state is not None
 
         fake_model = MagicMock()
-        fake_model.to_artifact.return_value = {"model_id": "mlb-two-head-v1", "artifact_hash": "real_test_hash_abc"}
+        frozen = _fake_bundle(tmp_path, primary=fake_model)
 
         ledger = ShadowLedger(f"{tmp_path}/shadow.db")
         run_id = ledger.record_run("mlb", run_type="test")
 
         with patch(
-            "model_prediction.rebuild.mlb_features.build_game_feature_row",
-            return_value={"game_date": "2026-07-01", "event_id": "hist"},
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
-            return_value=pipeline.TrainedModels(model=fake_model, bootstrap=MagicMock(), train_n=30),
+            "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
+            return_value=frozen,
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters", return_value={},
+        ), patch.object(
+            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
         ):
             pipeline.predict_stage(state, str(tmp_path), ledger=ledger, run_id=run_id)
 
         row = ledger.conn.execute(
-            "SELECT run_id, artifact_hash FROM model_artifacts WHERE artifact_hash='real_test_hash_abc'"
+            "SELECT run_id, artifact_hash FROM model_artifacts WHERE artifact_hash='frozen-bundle-hash'"
         ).fetchone()
         ledger.close()
         assert row is not None
@@ -229,17 +257,16 @@ class TestPlayerIdentityLineage:
             return {"event_id": "401"}
 
         with patch(
-            "model_prediction.rebuild.mlb_features.build_game_feature_row",
-            return_value={"game_date": "2026-07-01", "event_id": "hist"},
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.train_through",
-            return_value=pipeline.TrainedModels(model=MagicMock(), bootstrap=MagicMock(), train_n=30),
+            "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
+            return_value=_fake_bundle(tmp_path),
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
             return_value={"401": {"home_starter": "Juan Soto", "away_starter": "Aaron Judge"}},
         ), patch(
             "model_prediction.rebuild.mlb_shadow_pipeline.build_live_game_feature_row",
             side_effect=fake_build_live_row,
+        ), patch.object(
+            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
         ):
             pipeline.predict_stage(state, str(tmp_path))
 
@@ -258,81 +285,62 @@ class TestPlayerIdentityLineage:
 
 
 class TestResumeState:
-    """MLB-4 (multi-sport execution spec): real cross-process resume --
-    save_resume_state()/load_resume_state() must persist and reload the
-    real trained model plus resolved feature rows, producing identical
-    real predictions to the original in-memory state, not just "loads
-    without error." """
+    """Resume stores rows only and reloads the identical sealed bundle."""
 
-    def _fit_real_model_and_state(self, tmp_path, target_date="2026-08-06"):
-        import numpy as np
-
-        from model_prediction.rebuild.mlb_shadow_pipeline import (
-            DIFFERENTIAL_FEATURES,
-            INTENSITY_FEATURES,
-            MLBRunState,
-            train_through,
+    def _frozen_state(self, tmp_path, target_date="2026-08-06"):
+        _write_scoreboard(
+            tmp_path, "401", f"{target_date}T22:10:00+00:00",
+            "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED",
         )
+        state = pipeline.load_state(str(tmp_path), target_date)
+        assert state is not None
+        frozen = _fake_bundle(tmp_path)
+        pipeline._apply_frozen_bundle(state, frozen)
+        state.rows_by_event = {"401": {"event_id": "401", "feature": 1.0}}
+        state.prediction_observed_at_by_event = {"401": f"{target_date}T21:00:00+00:00"}
+        state.skipped = {"402": "no_probable_starters_available"}
+        return state, frozen
 
-        _write_scoreboard(tmp_path, "401", f"{target_date}T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
-        rng = np.random.default_rng(0)
-        n = 40
-        data = {f: rng.uniform(1, 5, n) for f in INTENSITY_FEATURES}
-        data.update({f: rng.uniform(-2, 2, n) for f in DIFFERENTIAL_FEATURES})
-        data["total_runs"] = sum(data[f] for f in INTENSITY_FEATURES) / len(INTENSITY_FEATURES) + rng.normal(0, 0.3, n)
-        data["home_margin"] = sum(data[f] for f in DIFFERENTIAL_FEATURES) / len(DIFFERENTIAL_FEATURES)
-        data["game_date"] = [f"2026-07-{(i % 28) + 1:02d}" for i in range(n)]
-        features = pl.DataFrame(data)
+    def _load(self, tmp_path, state, frozen):
+        with patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen):
+            return pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
 
-        trained = train_through(features, target_date)
-        row = {f: float(rng.uniform(1, 5)) for f in INTENSITY_FEATURES}
-        row.update({f: float(rng.uniform(-2, 2)) for f in DIFFERENTIAL_FEATURES})
-
-        state = MLBRunState(
-            target_date=target_date, tonight=pl.DataFrame({"event_id": ["401"]}),
-            model=trained.model, bootstrap=trained.bootstrap, train_n=trained.train_n,
-            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
-            rows_by_event={"401": row}, skipped={"402": "no_probable_starters_available"},
-        )
-        return state, row
-
-    def test_save_then_load_produces_identical_real_predictions(self, tmp_path):
-        state, row = self._fit_real_model_and_state(tmp_path)
-        pred_before = state.model.predict_row("401", row)
-
+    def test_save_then_load_restores_identical_candidate_and_rows(self, tmp_path):
+        state, frozen = self._frozen_state(tmp_path)
         pipeline.save_resume_state(state, str(tmp_path), "run123")
-        loaded = pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
+        loaded = self._load(tmp_path, state, frozen)
 
         assert loaded is not None
-        pred_after = loaded.model.predict_row("401", loaded.rows_by_event["401"])
-        assert pred_after.home_expected_runs == pred_before.home_expected_runs
-        assert pred_after.away_expected_runs == pred_before.away_expected_runs
-        assert pred_after.home_win_prob == pred_before.home_win_prob
+        assert loaded.model is frozen.primary
+        assert loaded.rows_by_event == state.rows_by_event
+        assert loaded.frozen_bundle_hash == frozen.bundle_hash
 
     def test_loaded_state_preserves_train_n_and_skipped(self, tmp_path):
-        state, _ = self._fit_real_model_and_state(tmp_path)
+        state, frozen = self._frozen_state(tmp_path)
         pipeline.save_resume_state(state, str(tmp_path), "run123")
-        loaded = pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
+        loaded = self._load(tmp_path, state, frozen)
 
         assert loaded is not None
         assert loaded.train_n == state.train_n
         assert loaded.skipped == {"402": "no_probable_starters_available"}
 
-    def test_loaded_state_has_no_bootstrap_real_disclosed_gap(self, tmp_path):
-        state, _ = self._fit_real_model_and_state(tmp_path)
-        assert state.bootstrap is not None  # the original state DID fit one
+    def test_loaded_state_preserves_full_uncertainty_components(self, tmp_path):
+        state, frozen = self._frozen_state(tmp_path)
         pipeline.save_resume_state(state, str(tmp_path), "run123")
-        loaded = pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
+        loaded = self._load(tmp_path, state, frozen)
 
         assert loaded is not None
-        assert loaded.bootstrap is None
+        assert loaded.bootstrap is frozen.bootstrap
+        assert loaded.sklearn_baseline is frozen.sklearn_baseline
+        assert loaded.xgb_direct is frozen.xgb_direct
+        assert loaded.calibrator_bundle is frozen.calibrator
 
     def test_no_saved_resume_state_returns_none(self, tmp_path):
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
         assert pipeline.load_resume_state(str(tmp_path), "nonexistent_run", "2026-08-06") is None
 
     def test_mismatched_date_returns_none_not_stale_state(self, tmp_path):
-        state, _ = self._fit_real_model_and_state(tmp_path, target_date="2026-08-06")
+        state, _ = self._frozen_state(tmp_path, target_date="2026-08-06")
         pipeline.save_resume_state(state, str(tmp_path), "run123")
 
         assert pipeline.load_resume_state(str(tmp_path), "run123", "2026-08-07") is None

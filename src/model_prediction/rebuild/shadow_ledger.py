@@ -268,6 +268,9 @@ class ShadowLedger:
                 schema_version TEXT NOT NULL,
                 supersedes_id INTEGER REFERENCES predictions(id),
                 decision_time_utc TEXT NOT NULL,
+                prediction_observed_at_utc TEXT,
+                test_id TEXT,
+                candidate_version TEXT,
                 predicted_winner TEXT,
                 raw_probabilities_json TEXT,
                 calibrated_probabilities_json TEXT,
@@ -503,6 +506,7 @@ class ShadowLedger:
             );
         """)
         self._migrate_predictions_uncertainty_columns()
+        self._migrate_predictions_prospective_columns()
         self._migrate_closing_prices_taxonomy_columns()
         self._migrate_run_health_columns()
         self.conn.execute(
@@ -531,6 +535,14 @@ class ShadowLedger:
             "model_disagreement": "REAL", "calibration_uncertainty": "REAL",
             "missingness_penalty": "REAL", "missing_flags_json": "TEXT",
             "lineup_uncertainty": "REAL", "conservative_probabilities_json": "TEXT",
+        })
+
+    def _migrate_predictions_prospective_columns(self) -> None:
+        """Add stable experiment identity and actual observation time."""
+        self._migrate_columns("predictions", {
+            "prediction_observed_at_utc": "TEXT",
+            "test_id": "TEXT",
+            "candidate_version": "TEXT",
         })
 
     def _migrate_closing_prices_taxonomy_columns(self) -> None:
@@ -666,6 +678,9 @@ class ShadowLedger:
         event_id: str,
         horizon: str,
         decision_time_utc: str,
+        prediction_observed_at_utc: str | None = None,
+        test_id: str | None = None,
+        candidate_version: str | None = None,
         forecast: Any,
         supersedes_id: int | None = None,
         schema_version: str = SCHEMA_VERSION,
@@ -677,6 +692,25 @@ class ShadowLedger:
         appended (either the first time, or an explicit correction via
         `supersedes_id`)."""
         f = _as_dict(forecast)
+        observed_at = prediction_observed_at_utc or utc_now()
+        created_at = utc_now()
+        if test_id is not None:
+            if prediction_observed_at_utc is None or not candidate_version:
+                raise ValueError(
+                    "prospective predictions require observation time and candidate version"
+                )
+            try:
+                observed_dt = datetime.fromisoformat(observed_at)
+                created_dt = datetime.fromisoformat(created_at)
+                cutoff_dt = datetime.fromisoformat(decision_time_utc)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("prediction timestamps must be valid ISO-8601 values") from exc
+            if observed_dt.tzinfo is None or created_dt.tzinfo is None or cutoff_dt.tzinfo is None:
+                raise ValueError("prospective prediction timestamps must include a UTC offset")
+            if observed_dt > cutoff_dt:
+                raise ValueError("prediction observation is after its declared decision cutoff")
+            if created_dt > cutoff_dt:
+                raise ValueError("prediction creation is after its declared decision cutoff")
         model_artifact_hash = f["model_artifact_hash"]
         calibration_artifact_hash = f["calibration_artifact_hash"]
 
@@ -694,28 +728,32 @@ class ShadowLedger:
 
         cur = self._insert_prediction_row(
             run_id, sport, event_id, horizon, schema_version, supersedes_id,
-            decision_time_utc, f, model_artifact_hash, calibration_artifact_hash,
+            created_at, decision_time_utc, observed_at, test_id, candidate_version,
+            f, model_artifact_hash, calibration_artifact_hash,
         )
         return cur, True
 
     def _insert_prediction_row(
         self, run_id, sport, event_id, horizon, schema_version, supersedes_id,
-        decision_time_utc, f, model_artifact_hash, calibration_artifact_hash,
+        created_at, decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
+        f, model_artifact_hash, calibration_artifact_hash,
     ) -> int:
         try:
             cur = self.conn.execute(
                 """INSERT INTO predictions(
                     created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
-                    decision_time_utc, predicted_winner, raw_probabilities_json,
+                    decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
+                    predicted_winner, raw_probabilities_json,
                     calibrated_probabilities_json, probability_lower_json, probability_upper_json,
                     expected_home_score, expected_away_score, model_artifact_hash,
                     calibration_artifact_hash, totals_probabilities_json, spread_probabilities_json,
                     model_disagreement, calibration_uncertainty, missingness_penalty,
                     missing_flags_json, lineup_uncertainty, conservative_probabilities_json
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    utc_now(), run_id, sport, event_id, horizon, schema_version, supersedes_id,
-                    decision_time_utc, f.get("predicted_winner"),
+                    created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
+                    decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
+                    f.get("predicted_winner"),
                     json.dumps(f.get("raw_probabilities", {})),
                     json.dumps(f.get("calibrated_probabilities", {})),
                     json.dumps(f.get("probability_lower", {})),
