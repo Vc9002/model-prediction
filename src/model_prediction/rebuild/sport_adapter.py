@@ -13,9 +13,9 @@ Honest scope, not fabricated:
   OpenDota network integration yet), so collect() reports
   NOT_IMPLEMENTED rather than SUCCESS. KBO/NPB have no collector at all
   and correctly raise from build_adapter().
-- `build_features()`: real for MLB only (horizon_builder.py, itself real
-  and live-verified). Every other sport correctly reports NOT_IMPLEMENTED
-  rather than fabricating a feature row.
+- `build_features()`: real for MLB and basic non-WNBA foundation sports.
+  WNBA explicitly fails closed until the production adapter uses the same
+  released point-in-time feature builder as the WNBA foundation.
 - `predict()` / `match_markets()` / `decide()`: real for MLB, via
   mlb_shadow_pipeline.py's predict_stage/match_markets_stage/decide_stage
   -- the exact same functions (train_through, build_forecast,
@@ -263,6 +263,58 @@ class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
         return StageResult("collect", status_map.get(result.get("status"), STAGE_ERROR), result)
 
 
+class _WNBAFoundationBlockedAdapter(_NotImplementedStagesMixin):
+    """Permit research collection but block every production-facing WNBA stage.
+
+    The existing generic Elo path does not use the released WNBA PIT builder,
+    and the SportsDataverse/ESPN data rights review is unresolved. Silently
+    retaining that path would create a second, non-canonical feature system.
+    """
+
+    sport = "wnba"
+
+    def __init__(self, collector: Any) -> None:
+        self.collector = collector
+
+    @staticmethod
+    def _blocked(stage: str) -> StageResult:
+        return StageResult(stage, STAGE_NOT_IMPLEMENTED, {
+            "reason": (
+                "WNBA foundation is not released: canonical PIT feature wiring and "
+                "commercial data rights must be cleared before production stages"
+            ),
+            "qualification_status": "FOUNDATION_BLOCKED",
+            "commercial_use_status": "unresolved",
+            "production_allowed": False,
+        })
+
+    def collect(self, date: str, run_id: str | None = None) -> StageResult:
+        try:
+            result = self.collector.collect_date(date, sport="wnba")
+        except Exception as exc:  # noqa: BLE001 -- visible external collector boundary
+            return StageResult("collect", STAGE_ERROR, {"error": str(exc)[:300]})
+        status_map = {"ok": STAGE_SUCCESS, "no_games": STAGE_NO_DATA, "partial": STAGE_SUCCESS}
+        detail = {
+            **result,
+            "use_scope": "RESEARCH_SHADOW_ONLY",
+            "commercial_use_status": "unresolved",
+            "production_allowed": False,
+        }
+        return StageResult("collect", status_map.get(str(result.get("status", "")), STAGE_ERROR), detail)
+
+    def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return self._blocked("build_features")
+
+    def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return self._blocked("predict")
+
+    def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return self._blocked("match_markets")
+
+    def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return self._blocked("decide")
+
+
 class _BasicEloAdapter(_CollectionOnlyAdapter):
     """Real basic foundation pipeline for NBA/WNBA/NFL/Soccer/Tennis:
     collect -> build_features -> predict -> match_markets -> decide -> the
@@ -434,7 +486,9 @@ def build_adapter(
         return MLBAdapter(data_root, challenger_root)
 
     meta = MetadataDB(f"{data_root}/metadata.db")
-    if sport in ("nba", "wnba"):
+    if sport == "wnba":
+        return _WNBAFoundationBlockedAdapter(NBACollector(data_root, meta))
+    if sport == "nba":
         nba_collector = NBACollector(data_root, meta)
         return _BasicEloAdapter(sport, data_root, nba_collector, lambda d: nba_collector.collect_date(d, sport=sport))
     if sport == "nfl":

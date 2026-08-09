@@ -163,7 +163,7 @@ def _write_nba_scoreboard(data_root, event_id: str, event_start_utc: str, home: 
 
 
 class TestBasicEloAdapter:
-    """Real basic (Elo) foundation pipeline for NBA/WNBA/NFL/Soccer/Tennis
+    """Real basic (Elo) foundation pipeline for NBA/NFL/Soccer/Tennis
     -- proves predict/match_markets/decide are genuinely real (not the
     NOT_IMPLEMENTED mixin) and fail closed the same way MLBAdapter does."""
 
@@ -186,6 +186,19 @@ class TestBasicEloAdapter:
         adapter.collector.collect_date = lambda d, sport="nba": (calls.append(sport), {"status": "no_games"})[1]
         adapter.collect("2026-08-06")
         assert calls == ["wnba"]
+
+    def test_wnba_production_stages_fail_closed_until_foundation_release(self, tmp_path):
+        adapter = build_adapter("wnba", str(tmp_path))
+        for result in (
+            adapter.build_features("2026-08-06", "late"),
+            adapter.predict("2026-08-06", "late"),
+            adapter.match_markets("2026-08-06", "late"),
+            adapter.decide("2026-08-06", "late"),
+        ):
+            assert result.status == STAGE_NOT_IMPLEMENTED
+            assert result.detail["qualification_status"] == "FOUNDATION_BLOCKED"
+            assert result.detail["commercial_use_status"] == "unresolved"
+            assert result.detail["production_allowed"] is False
 
     def test_nba_predict_on_a_cold_empty_data_root_is_honest_no_data_not_a_crash(self, tmp_path):
         adapter = build_adapter("nba", str(tmp_path))
