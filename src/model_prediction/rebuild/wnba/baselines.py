@@ -51,13 +51,18 @@ FEATURE_COLUMNS = (
 )
 REQUIRED_COLUMNS = (
     "event_id",
-    "game_date",
+    "sports_event_date",
     "event_start_utc",
     "decision_time_utc",
+    "horizon",
     "home_team_id",
     "away_team_id",
+    "home_team_canonical_id",
+    "away_team_canonical_id",
     "home_score",
     "away_score",
+    "source_feature_snapshot_hash",
+    "source_manifest_hash",
     "availability_basis",
     "commercial_use_status",
     "production_allowed",
@@ -85,11 +90,13 @@ class DateFold:
 @dataclass
 class FoldModels:
     constant_probability: float
+    expanding_home_base_probability: float
     elo: EloModel
     logistic: Pipeline
     margin: Pipeline
     total: Pipeline
     margin_residual_std: float
+    margin_total_residual_covariance: tuple[tuple[float, float], tuple[float, float]]
     use_scope: str = RESEARCH_SCOPE
     qualification_status: str = QUALIFICATION_STATUS
     production_allowed: bool = False
@@ -120,7 +127,9 @@ def load_research_baseline_dataset(
     frames: list[pl.DataFrame] = []
     for snapshot_hash in feature_snapshot_hashes:
         frame = feature_store.read_version("wnba", horizon, snapshot_hash).sort("event_id")
-        snapshot_dates = frame["event_start_utc"].str.slice(0, 10).unique().to_list()
+        if "sports_event_date" not in frame.columns:
+            raise ValueError("WNBA feature snapshot is missing canonical sports_event_date")
+        snapshot_dates = frame["sports_event_date"].unique().to_list()
         if len(snapshot_dates) != 1:
             raise ValueError("WNBA feature snapshot must contain exactly one event date")
         computed_hash = hashlib.sha256(canonical_json({
@@ -135,13 +144,7 @@ def load_research_baseline_dataset(
     features = pl.concat(frames, how="vertical_relaxed")
     if features["event_id"].n_unique() != features.height:
         raise ValueError("WNBA baseline feature snapshots contain duplicate events")
-    features = features.with_columns(
-        pl.col("event_start_utc")
-        .str.to_datetime(time_zone="UTC", strict=True)
-        .dt.strftime("%Y-%m-%d")
-        .alias("game_date")
-    )
-    seasons = sorted({int(value[:4]) for value in features["game_date"].to_list()})
+    seasons = sorted({int(value[:4]) for value in features["sports_event_date"].to_list()})
     normalized = WNBANormalizedStore(root / "normalized")
     labels: list[pl.DataFrame] = []
     for season in seasons:
@@ -153,6 +156,14 @@ def load_research_baseline_dataset(
                 "event_id",
                 pl.col("home_team_id").alias("label_home_team_id"),
                 pl.col("away_team_id").alias("label_away_team_id"),
+                pl.col("home_team_canonical_id").alias("label_home_team_canonical_id"),
+                pl.col("away_team_canonical_id").alias("label_away_team_canonical_id"),
+                pl.col("event_start_utc").alias("label_event_start_utc"),
+                pl.col("observed_at_utc").alias("label_observed_at_utc"),
+                pl.col("raw_snapshot_hash").alias("label_raw_snapshot_hash"),
+                pl.col("availability_basis").alias("label_availability_basis"),
+                pl.col("commercial_use_status").alias("label_commercial_use_status"),
+                pl.col("production_allowed").alias("label_production_allowed"),
                 "home_score",
                 "away_score",
             )
@@ -168,11 +179,43 @@ def load_research_baseline_dataset(
     if joined.filter(
         (pl.col("home_team_id") != pl.col("label_home_team_id"))
         | (pl.col("away_team_id") != pl.col("label_away_team_id"))
+        | (pl.col("home_team_canonical_id") != pl.col("label_home_team_canonical_id"))
+        | (pl.col("away_team_canonical_id") != pl.col("label_away_team_canonical_id"))
+        | (pl.col("event_start_utc") != pl.col("label_event_start_utc"))
     ).height:
-        raise ValueError("WNBA feature/label team identities disagree")
-    return joined.drop("label_home_team_id", "label_away_team_id").sort(
-        ["game_date", "event_start_utc", "event_id"]
+        raise ValueError("WNBA feature/label event identities disagree")
+    label_gate_columns = (
+        "label_observed_at_utc",
+        "label_raw_snapshot_hash",
+        "label_availability_basis",
+        "label_commercial_use_status",
+        "label_production_allowed",
     )
+    if any(joined[column].null_count() for column in label_gate_columns):
+        raise ValueError("WNBA final labels have missing provenance")
+    if joined.filter(
+        (pl.col("label_availability_basis") != "capture_time_only")
+        | (pl.col("label_commercial_use_status") != "unresolved")
+        | (pl.col("label_production_allowed") != False)
+        | (pl.col("label_raw_snapshot_hash").cast(pl.String).str.len_chars() == 0)
+    ).height:
+        raise ValueError("WNBA final labels violate research-only provenance")
+    label_observed = joined["label_observed_at_utc"].str.to_datetime(time_zone="UTC", strict=False)
+    label_starts = joined["label_event_start_utc"].str.to_datetime(time_zone="UTC", strict=False)
+    if label_observed.null_count() or label_starts.null_count() or any(
+        observed <= start for observed, start in zip(label_observed, label_starts, strict=True)
+    ):
+        raise ValueError("WNBA final labels must be observed after event start")
+    return joined.drop(
+        "label_home_team_id",
+        "label_away_team_id",
+        "label_home_team_canonical_id",
+        "label_away_team_canonical_id",
+        "label_event_start_utc",
+        "label_availability_basis",
+        "label_commercial_use_status",
+        "label_production_allowed",
+    ).sort(["sports_event_date", "event_start_utc", "event_id"])
 
 
 def chronological_date_folds(
@@ -204,17 +247,38 @@ def _validate_frame(frame: pl.DataFrame) -> pl.DataFrame:
         raise ValueError(f"WNBA baseline frame missing required columns: {missing}")
     if frame.is_empty():
         raise ValueError("WNBA baseline frame is empty")
-    ordered = frame.sort(["game_date", "event_start_utc", "event_id"])
+    ordered = frame.sort(["sports_event_date", "event_start_utc", "event_id"])
     if ordered["event_id"].n_unique() != ordered.height:
         raise ValueError("WNBA baseline frame contains duplicate events")
-    if ordered.select(pl.col("game_date").str.to_date(strict=False).is_null().any()).item():
-        raise ValueError("WNBA baseline frame contains malformed game dates")
+    if ordered.select(pl.col("sports_event_date").str.to_date(strict=False).is_null().any()).item():
+        raise ValueError("WNBA baseline frame contains malformed sports event dates")
+    gate_columns = (
+        "production_allowed",
+        "commercial_use_status",
+        "availability_basis",
+        "source_feature_snapshot_hash",
+        "source_manifest_hash",
+        "home_team_canonical_id",
+        "away_team_canonical_id",
+        "horizon",
+    )
+    if any(ordered[column].null_count() for column in gate_columns):
+        raise ValueError("WNBA baseline frame contains null rights, identity, or provenance")
     if ordered.filter(pl.col("production_allowed") != False).height:
         raise ValueError("WNBA research baselines refuse production-enabled source rows")
     if ordered.filter(pl.col("commercial_use_status") != "unresolved").height:
         raise ValueError("WNBA research baselines require unresolved commercial-use status")
     if ordered.filter(pl.col("availability_basis") != "capture_time_only").height:
         raise ValueError("WNBA research baselines require capture-time-only provenance")
+    for column in (
+        "source_feature_snapshot_hash",
+        "source_manifest_hash",
+        "home_team_canonical_id",
+        "away_team_canonical_id",
+        "horizon",
+    ):
+        if ordered.filter(pl.col(column).cast(pl.String).str.len_chars() == 0).height:
+            raise ValueError(f"WNBA baseline frame contains empty provenance: {column}")
     for column in (*FEATURE_COLUMNS, "home_score", "away_score"):
         values = ordered[column].cast(pl.Float64, strict=False)
         if values.null_count() or not all(math.isfinite(value) for value in values.to_list()):
@@ -229,6 +293,9 @@ def _validate_frame(frame: pl.DataFrame) -> pl.DataFrame:
         raise ValueError("WNBA baseline timestamps must be valid UTC-aware values")
     if any(decision >= start for decision, start in zip(observed_decisions, starts, strict=True)):
         raise ValueError("WNBA baseline decision times must precede event starts")
+    derived_dates = starts.dt.convert_time_zone("America/New_York").dt.strftime("%Y-%m-%d")
+    if derived_dates.to_list() != ordered["sports_event_date"].to_list():
+        raise ValueError("WNBA sports_event_date disagrees with league-local event start")
     return ordered
 
 
@@ -269,15 +336,36 @@ def fit_fold_models(train: pl.DataFrame) -> FoldModels:
     total.fit(X, total_target)
     residuals = margin_target - margin.predict(X)
     residual_std = max(float(np.std(residuals, ddof=1)), 1.0) if len(residuals) > 1 else 1.0
+    total_residuals = total_target - total.predict(X)
+    if len(residuals) > 1:
+        covariance = np.cov(np.column_stack([residuals, total_residuals]), rowvar=False, ddof=1)
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+        covariance = eigenvectors @ np.diag(np.maximum(eigenvalues, 1e-6)) @ eigenvectors.T
+        covariance[0, 0] = max(float(covariance[0, 0]), 1.0)
+        covariance[1, 1] = max(float(covariance[1, 1]), 1.0)
+    else:
+        covariance = np.eye(2)
 
     elo_games = train.select(
-        pl.col("home_team_id").alias("home_team"),
-        pl.col("away_team_id").alias("away_team"),
+        pl.col("home_team_canonical_id").alias("home_team"),
+        pl.col("away_team_canonical_id").alias("away_team"),
         "home_score",
         "away_score",
     )
     elo = EloModel().fit(elo_games)
-    return FoldModels(float(home_win.mean()), elo, logistic, margin, total, residual_std)
+    return FoldModels(
+        0.5,
+        float(home_win.mean()),
+        elo,
+        logistic,
+        margin,
+        total,
+        residual_std,
+        (
+            (float(covariance[0, 0]), float(covariance[0, 1])),
+            (float(covariance[1, 0]), float(covariance[1, 1])),
+        ),
+    )
 
 
 def predict_fold(models: FoldModels, validation: pl.DataFrame) -> list[dict[str, Any]]:
@@ -291,14 +379,31 @@ def predict_fold(models: FoldModels, validation: pl.DataFrame) -> list[dict[str,
     normal = NormalDist()
     output: list[dict[str, Any]] = []
     for index, row in enumerate(validation.iter_rows(named=True)):
-        elo_prob = models.elo.predict(str(row["home_team_id"]), str(row["away_team_id"]))[0]
+        elo_prob = models.elo.predict(
+            str(row["home_team_canonical_id"]), str(row["away_team_canonical_id"]),
+        )[0]
         predicted_margin = float(margin[index])
         predicted_total = float(total[index])
         home_points = (predicted_total + predicted_margin) / 2.0
         away_points = (predicted_total - predicted_margin) / 2.0
-        margin_probability = normal.cdf(predicted_margin / models.margin_residual_std)
+        covariance = models.margin_total_residual_covariance
+        margin_variance = covariance[0][0]
+        total_variance = covariance[1][1]
+        margin_total_covariance = covariance[0][1]
+        home_variance = (total_variance + margin_variance + 2.0 * margin_total_covariance) / 4.0
+        away_variance = (total_variance + margin_variance - 2.0 * margin_total_covariance) / 4.0
+        home_away_covariance = (total_variance - margin_variance) / 4.0
+        home_std = math.sqrt(max(home_variance, 0.0))
+        away_std = math.sqrt(max(away_variance, 0.0))
+        home_away_correlation = (
+            home_away_covariance / (home_std * away_std)
+            if home_std > 0.0 and away_std > 0.0
+            else 0.0
+        )
+        margin_probability = normal.cdf(predicted_margin / math.sqrt(margin_variance))
         output.append({
             "constant_home_win_probability": models.constant_probability,
+            "expanding_home_base_probability": models.expanding_home_base_probability,
             "elo_home_win_probability": elo_prob,
             "logistic_home_win_probability": float(logistic_prob[index]),
             "linear_margin_home_win_probability": float(margin_probability),
@@ -306,6 +411,13 @@ def predict_fold(models: FoldModels, validation: pl.DataFrame) -> list[dict[str,
             "linear_total_prediction": predicted_total,
             "derived_home_score": home_points,
             "derived_away_score": away_points,
+            "joint_residual_family": "bivariate_gaussian_margin_total",
+            "margin_residual_std": math.sqrt(margin_variance),
+            "total_residual_std": math.sqrt(total_variance),
+            "margin_total_residual_covariance": margin_total_covariance,
+            "derived_home_score_std": home_std,
+            "derived_away_score_std": away_std,
+            "derived_home_away_correlation": home_away_correlation,
             "use_scope": RESEARCH_SCOPE,
             "qualification_status": QUALIFICATION_STATUS,
             "production_allowed": False,
@@ -341,7 +453,7 @@ def evaluate_research_baselines(
 ) -> BaselineEvaluation:
     data = _validate_frame(frame)
     folds = chronological_date_folds(
-        data["game_date"].to_list(),
+        data["sports_event_date"].to_list(),
         n_splits=n_splits,
         min_train_dates=min_train_dates,
     )
@@ -351,8 +463,8 @@ def evaluate_research_baselines(
     records: list[dict[str, Any]] = []
     fold_records: list[dict[str, Any]] = []
     for fold in folds:
-        train = data.filter(pl.col("game_date").is_in(fold.train_dates))
-        validation = data.filter(pl.col("game_date").is_in(fold.validation_dates))
+        train = data.filter(pl.col("sports_event_date").is_in(fold.train_dates))
+        validation = data.filter(pl.col("sports_event_date").is_in(fold.validation_dates))
         if train.is_empty() or validation.is_empty():
             raise ValueError("WNBA chronological fold unexpectedly has an empty side")
         if fold.train_end >= fold.validation_start:
@@ -364,7 +476,12 @@ def evaluate_research_baselines(
             away_score = float(row["away_score"])
             records.append({
                 "event_id": str(row["event_id"]),
-                "game_date": str(row["game_date"]),
+                "sports_event_date": str(row["sports_event_date"]),
+                "horizon": str(row["horizon"]),
+                "home_team_canonical_id": str(row["home_team_canonical_id"]),
+                "away_team_canonical_id": str(row["away_team_canonical_id"]),
+                "source_feature_snapshot_hash": str(row["source_feature_snapshot_hash"]),
+                "source_manifest_hash": str(row["source_manifest_hash"]),
                 "fold": fold.fold_index,
                 "home_win": int(home_score > away_score),
                 "actual_margin": home_score - away_score,
@@ -382,11 +499,12 @@ def evaluate_research_baselines(
             "validation_n": validation.height,
         })
 
-    oof = pl.DataFrame(records).sort(["game_date", "event_id"])
+    oof = pl.DataFrame(records).sort(["sports_event_date", "event_id"])
     dataset_hash = hashlib.sha256(canonical_json(data.to_dicts())).hexdigest()
     oof_hash = hashlib.sha256(canonical_json(oof.to_dicts())).hexdigest()
     moneyline_columns = {
-        "constant": "constant_home_win_probability",
+        "constant_0_5": "constant_home_win_probability",
+        "expanding_home_base_rate": "expanding_home_base_probability",
         "elo": "elo_home_win_probability",
         "regularized_logistic": "logistic_home_win_probability",
     }
@@ -426,6 +544,16 @@ def evaluate_research_baselines(
         "dataset_hash": dataset_hash,
         "oof_hash": oof_hash,
         "same_sample_n": same_sample_n,
+        "horizons": sorted(set(data["horizon"].to_list())),
+        "sports_date_start": min(data["sports_event_date"].to_list()),
+        "sports_date_end": max(data["sports_event_date"].to_list()),
+        "feature_snapshot_hashes": sorted(set(data["source_feature_snapshot_hash"].to_list())),
+        "source_manifest_hashes": sorted(set(data["source_manifest_hash"].to_list())),
+        "model_parameters": {
+            "elo": {"k_factor": 20.0, "home_advantage": 65.0, "initial_rating": 1500.0},
+            "logistic": {"C": 1.0, "solver": "lbfgs", "max_iter": 2000},
+            "ridge": {"alpha": 10.0},
+        },
         "folds": fold_records,
         "models": model_reports,
     }
@@ -442,7 +570,10 @@ def write_research_baseline_artifacts(
 
     root = Path(output_root) / "wnba_baselines"
     root.mkdir(parents=True, exist_ok=True)
-    digest = str(evaluation.report["oof_hash"])
+    digest = hashlib.sha256(canonical_json({
+        "report": evaluation.report,
+        "oof_hash": evaluation.report["oof_hash"],
+    })).hexdigest()
     report_path = root / f"{digest}.json"
     oof_path = root / f"{digest}.parquet"
     report_bytes = json.dumps(evaluation.report, indent=2, sort_keys=True).encode("utf-8")

@@ -29,28 +29,31 @@ def _baseline_frame() -> pl.DataFrame:
             away_score = 88 + day + (0 if home_wins else 6)
             row = {
                 "event_id": f"g-{day}-{game_index}",
-                "game_date": game_date,
+                "sports_event_date": game_date,
                 "event_start_utc": f"{game_date}T22:00:00+00:00",
                 "decision_time_utc": f"{game_date}T21:00:00+00:00",
+                "horizon": "late",
                 "home_team_id": home,
                 "away_team_id": away,
+                "home_team_canonical_id": f"wnba:team:{home.lower()}",
+                "away_team_canonical_id": f"wnba:team:{away.lower()}",
                 "home_score": home_score,
                 "away_score": away_score,
+                "source_feature_snapshot_hash": f"feature-{game_date}",
+                "source_manifest_hash": f"manifest-{game_date}-{game_index}",
                 "availability_basis": "capture_time_only",
                 "commercial_use_status": "unresolved",
                 "production_allowed": False,
             }
             for feature_index, column in enumerate(FEATURE_COLUMNS):
                 side_signal = 1.0 if column.startswith("home_") else -1.0
-                row[column] = 1.0 + feature_index * 0.1 + day * 0.01 + side_signal * (
-                    0.2 if home_wins else -0.2
-                )
+                row[column] = 1.0 + feature_index * 0.1 + day * 0.01 + side_signal * game_index * 0.02
             rows.append(row)
     return pl.DataFrame(rows)
 
 
 def test_chronological_folds_keep_dates_indivisible_and_strictly_ordered():
-    dates = _baseline_frame()["game_date"].to_list()
+    dates = _baseline_frame()["sports_event_date"].to_list()
     folds = chronological_date_folds(dates, n_splits=3, min_train_dates=3)
     assert len(folds) == 3
     for fold in folds:
@@ -70,7 +73,8 @@ def test_oof_is_deterministic_same_sample_and_joint_scores_are_coherent():
     assert first.report["production_allowed"] is False
     assert first.report["same_sample_n"] == first.oof.height
     assert set(first.report["models"]) == {
-        "constant",
+        "constant_0_5",
+        "expanding_home_base_rate",
         "elo",
         "regularized_logistic",
         "linear_margin",
@@ -84,12 +88,30 @@ def test_oof_is_deterministic_same_sample_and_joint_scores_are_coherent():
         assert row["derived_home_score"] - row["derived_away_score"] == pytest.approx(
             row["linear_margin_prediction"]
         )
+        covariance = (
+            row["derived_home_away_correlation"]
+            * row["derived_home_score_std"]
+            * row["derived_away_score_std"]
+        )
+        derived_margin_variance = (
+            row["derived_home_score_std"] ** 2
+            + row["derived_away_score_std"] ** 2
+            - 2.0 * covariance
+        )
+        derived_total_variance = (
+            row["derived_home_score_std"] ** 2
+            + row["derived_away_score_std"] ** 2
+            + 2.0 * covariance
+        )
+        assert derived_margin_variance == pytest.approx(row["margin_residual_std"] ** 2)
+        assert derived_total_variance == pytest.approx(row["total_residual_std"] ** 2)
+        assert -1.0 <= row["derived_home_away_correlation"] <= 1.0
 
 
 def test_future_outcome_change_cannot_change_any_earlier_oof_prediction():
     original = _baseline_frame()
     changed = original.with_columns(
-        pl.when(pl.col("game_date") == "2026-05-12")
+        pl.when(pl.col("sports_event_date") == "2026-05-12")
         .then(pl.col("home_score") + 50)
         .otherwise(pl.col("home_score"))
         .alias("home_score")
@@ -109,11 +131,11 @@ def test_future_outcome_change_cannot_change_any_earlier_oof_prediction():
 def test_fold_training_and_serving_use_the_exact_same_feature_transform():
     data = _baseline_frame()
     fold = chronological_date_folds(
-        data["game_date"].to_list(), n_splits=3, min_train_dates=3,
+        data["sports_event_date"].to_list(), n_splits=3, min_train_dates=3,
     )[0]
-    train = data.filter(pl.col("game_date").is_in(fold.train_dates))
-    validation = data.filter(pl.col("game_date").is_in(fold.validation_dates)).sort(
-        ["game_date", "event_start_utc", "event_id"]
+    train = data.filter(pl.col("sports_event_date").is_in(fold.train_dates))
+    validation = data.filter(pl.col("sports_event_date").is_in(fold.validation_dates)).sort(
+        ["sports_event_date", "event_start_utc", "event_id"]
     )
     served = predict_fold(fit_fold_models(train), validation)
     evaluated = evaluate_research_baselines(data, n_splits=3, min_train_dates=3).oof.filter(
@@ -134,6 +156,15 @@ def test_production_enabled_or_malformed_inputs_fail_closed():
     malformed = _baseline_frame().with_columns(pl.lit(float("nan")).alias(FEATURE_COLUMNS[0]))
     with pytest.raises(ValueError, match="missing or malformed"):
         evaluate_research_baselines(malformed)
+    for column in ("production_allowed", "commercial_use_status", "availability_basis"):
+        missing_gate = _baseline_frame().with_columns(
+            pl.when(pl.col("event_id") == "g-1-0")
+            .then(None)
+            .otherwise(pl.col(column))
+            .alias(column)
+        )
+        with pytest.raises(ValueError, match="null rights"):
+            evaluate_research_baselines(missing_gate)
 
 
 def test_research_artifacts_are_immutable_idempotent_and_never_deployable(tmp_path):
@@ -157,8 +188,10 @@ def test_dataset_loader_uses_explicit_feature_hashes_and_normalized_final_labels
     from model_prediction.rebuild.storage import FeatureStore
     from model_prediction.rebuild.wnba.store import WNBANormalizedStore
 
-    complete = _baseline_frame().filter(pl.col("game_date") == "2026-05-01")
-    feature_rows = complete.drop("game_date", "home_score", "away_score").sort("event_id")
+    complete = _baseline_frame().filter(pl.col("sports_event_date") == "2026-05-01")
+    feature_rows = complete.drop(
+        "home_score", "away_score", "source_feature_snapshot_hash",
+    ).sort("event_id")
     snapshot_hash = hashlib.sha256(canonical_json({
         "game_date": "2026-05-01",
         "horizon": "late",
@@ -171,12 +204,19 @@ def test_dataset_loader_uses_explicit_feature_hashes_and_normalized_final_labels
     game_rows = complete.select(
         "event_id",
         "event_start_utc",
+        "sports_event_date",
         "home_team_id",
         "away_team_id",
+        "home_team_canonical_id",
+        "away_team_canonical_id",
         "home_score",
         "away_score",
     ).with_columns(
         pl.lit("2026-06-01T00:00:00+00:00").alias("observed_at_utc"),
+        pl.lit("label-raw-hash").alias("raw_snapshot_hash"),
+        pl.lit("capture_time_only").alias("availability_basis"),
+        pl.lit("unresolved").alias("commercial_use_status"),
+        pl.lit(False).alias("production_allowed"),
         pl.lit(True).alias("completed"),
         pl.lit(True).alias("pit_eligible"),
     )
