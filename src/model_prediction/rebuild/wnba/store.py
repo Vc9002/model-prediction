@@ -7,11 +7,20 @@ import io
 import os
 import uuid
 from pathlib import Path
+from typing import ClassVar
 
 import polars as pl
 
 
 class WNBANormalizedStore:
+    BUSINESS_KEYS: ClassVar[dict[str, list[str]]] = {
+        "games": ["event_id"],
+        "team_box": ["event_id", "team_id"],
+        "player_box": ["event_id", "team_id", "player_id"],
+        "rosters": ["season", "team_id", "player_id"],
+        "pbp": ["event_id", "play_id"],
+    }
+
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
 
@@ -39,7 +48,10 @@ class WNBANormalizedStore:
         return path
 
     def read_season(self, table: str, season: int) -> pl.DataFrame:
-        paths = sorted(self.partition_dir(table, season).glob("part-*.parquet"))
+        paths = sorted(
+            self.partition_dir(table, season).glob("part-*.parquet"),
+            key=lambda path: (path.stat().st_mtime_ns, path.name),
+        )
         if not paths:
             return pl.DataFrame()
         frame = pl.concat([pl.read_parquet(path) for path in paths], how="diagonal_relaxed")
@@ -51,3 +63,14 @@ class WNBANormalizedStore:
             "pbp": ["event_id", "play_id", "observed_at_utc"],
         }
         return frame.unique(subset=contract_keys[table], keep="last", maintain_order=True)
+
+    def read_latest(self, table: str, season: int) -> pl.DataFrame:
+        """Latest observed vintage per business key; history remains on disk/read_season."""
+        frame = self.read_season(table, season)
+        if frame.is_empty():
+            return frame
+        return (
+            frame.sort("observed_at_utc")
+            .group_by(self.BUSINESS_KEYS[table], maintain_order=True)
+            .last()
+        )

@@ -44,6 +44,8 @@ def test_schedule_normalization_preserves_capture_time_not_fake_historical_time(
     assert frame["observed_at_utc"][0] == "2026-08-09T00:00:00+00:00"
     assert frame["event_start_utc"][0].startswith("2024-05-15T23:00:00")
     assert frame["availability_basis"][0] == "capture_time_only"
+    assert frame["home_team_canonical_id"][0] == "wnba:team:espn:1"
+    assert frame["away_team_canonical_id"][0] == "wnba:team:espn:2"
 
 
 def test_historical_backfill_is_excluded_from_earlier_decision():
@@ -91,6 +93,18 @@ def test_partition_store_is_content_idempotent(tmp_path):
     second = store.write("games", 2024, games)
     assert first == second
     assert len(list(first.parent.glob("part-*.parquet"))) == 1
+
+
+def test_latest_view_keeps_history_but_selects_newest_observation(tmp_path):
+    _, old = normalize_wnba_table("schedule", _schedule_frame(), _metadata("2026-08-09T00:00:00+00:00"))
+    _, new = normalize_wnba_table("schedule", _schedule_frame(), _metadata("2026-08-10T00:00:00+00:00"))
+    store = WNBANormalizedStore(tmp_path)
+    store.write("games", 2024, old)
+    store.write("games", 2024, new)
+    assert store.read_season("games", 2024).height == 2
+    latest = store.read_latest("games", 2024)
+    assert latest.height == 1
+    assert latest["observed_at_utc"][0] == "2026-08-10T00:00:00+00:00"
 
 
 def test_audit_reports_missing_boxes_as_degraded_not_system_failure(tmp_path):

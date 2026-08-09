@@ -14,6 +14,20 @@ from model_prediction.rebuild.schemas import validate_or_raise
 from .contracts import WNBA_CONTRACTS
 
 
+def _team_canonical_id(source_id: Any) -> str:
+    value = str(source_id or "")
+    if not value:
+        raise ValueError("missing WNBA source team ID")
+    return f"wnba:team:espn:{value}"
+
+
+def _player_canonical_id(source_id: Any) -> str:
+    value = str(source_id or "")
+    if not value:
+        raise ValueError("missing WNBA source player ID")
+    return f"wnba:player:espn:{value}"
+
+
 def _utc_iso(value: Any) -> str:
     if isinstance(value, datetime):
         if value.tzinfo is None:
@@ -81,6 +95,8 @@ def _schedule(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataF
             "completed": completed,
             "home_team_id": str(row["home_id"]),
             "away_team_id": str(row["away_id"]),
+            "home_team_canonical_id": _team_canonical_id(row["home_id"]),
+            "away_team_canonical_id": _team_canonical_id(row["away_id"]),
             "home_team_name": str(row.get("home_display_name") or row.get("home_name") or ""),
             "away_team_name": str(row.get("away_display_name") or row.get("away_name") or ""),
             "home_score": _as_int(row.get("home_score")),
@@ -102,7 +118,11 @@ def _team_box(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataF
             "season": int(row["season"]),
             "event_start_utc": _utc_iso(row["game_date_time"]),
             "team_id": team_id,
+            "team_canonical_id": _team_canonical_id(team_id),
             "opponent_team_id": str(row.get("opponent_team_id") or "") or None,
+            "opponent_team_canonical_id": (
+                _team_canonical_id(row["opponent_team_id"]) if row.get("opponent_team_id") else None
+            ),
             "team_name": str(row.get("team_display_name") or row.get("team_name") or ""),
             "home_away": str(row["team_home_away"]),
             "points": _as_int(row.get("team_score")),
@@ -132,6 +152,8 @@ def _player_box(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.Dat
             "event_start_utc": _utc_iso(row["game_date_time"]),
             "team_id": team_id,
             "player_id": player_id,
+            "team_canonical_id": _team_canonical_id(team_id),
+            "player_canonical_id": _player_canonical_id(player_id),
             "player_name": str(row.get("athlete_display_name") or ""),
             "starter": bool(row.get("starter", False)),
             "active": bool(row.get("active", False)),
@@ -154,8 +176,10 @@ def _rosters(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataFr
             **_provenance(metadata, f"{season}:{team_id}:{player_id}"),
             "season": season,
             "team_id": team_id,
+            "team_canonical_id": _team_canonical_id(team_id),
             "team_name": str(row.get("team_display_name") or ""),
             "player_id": player_id,
+            "player_canonical_id": _player_canonical_id(player_id),
             "player_name": str(row.get("display_name") or row.get("full_name") or ""),
             "position": row.get("position_abbreviation"),
             "jersey": row.get("jersey"),
@@ -179,7 +203,13 @@ def _pbp(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataFrame:
             "clock": str(row.get("clock_display_value") or row.get("time") or ""),
             "text": str(row.get("text") or ""),
             "team_id": str(row.get("team_id") or "") or None,
+            "team_canonical_id": (
+                _team_canonical_id(row["team_id"]) if row.get("team_id") else None
+            ),
             "player_1_id": str(row.get("athlete_id_1") or "") or None,
+            "player_1_canonical_id": (
+                _player_canonical_id(row["athlete_id_1"]) if row.get("athlete_id_1") else None
+            ),
             "home_score": _as_int(row.get("home_score")),
             "away_score": _as_int(row.get("away_score")),
             "scoring_play": bool(row.get("scoring_play", False)),

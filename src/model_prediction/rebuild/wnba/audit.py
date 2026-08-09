@@ -16,10 +16,10 @@ def _duplicate_count(frame: pl.DataFrame, keys: list[str]) -> int:
 
 
 def audit_wnba_season(store: WNBANormalizedStore, season: int) -> dict[str, Any]:
-    games = store.read_season("games", season)
-    team_box = store.read_season("team_box", season)
-    player_box = store.read_season("player_box", season)
-    rosters = store.read_season("rosters", season)
+    games = store.read_latest("games", season)
+    team_box = store.read_latest("team_box", season)
+    player_box = store.read_latest("player_box", season)
+    rosters = store.read_latest("rosters", season)
 
     expected_games = games.select("event_id").n_unique() if not games.is_empty() else 0
     completed = games.filter(pl.col("completed")) if not games.is_empty() else games
@@ -29,6 +29,8 @@ def audit_wnba_season(store: WNBANormalizedStore, season: int) -> dict[str, Any]
 
     missing_final_scores = 0
     missing_teams = 0
+    missing_canonical_team_ids = 0
+    missing_canonical_player_ids = 0
     if not completed.is_empty():
         missing_final_scores = completed.filter(
             pl.col("home_score").is_null() | pl.col("away_score").is_null()
@@ -37,6 +39,32 @@ def audit_wnba_season(store: WNBANormalizedStore, season: int) -> dict[str, Any]
         missing_teams = games.filter(
             (pl.col("home_team_id") == "") | (pl.col("away_team_id") == "")
         ).height
+        canonical_columns = {"home_team_canonical_id", "away_team_canonical_id"}
+        if not canonical_columns.issubset(games.columns):
+            missing_canonical_team_ids += games.height
+        else:
+            missing_canonical_team_ids += games.filter(
+                pl.col("home_team_canonical_id").is_null()
+                | pl.col("away_team_canonical_id").is_null()
+                | (pl.col("home_team_canonical_id") == "")
+                | (pl.col("away_team_canonical_id") == "")
+            ).height
+    for frame in (team_box, player_box, rosters):
+        if not frame.is_empty():
+            if "team_canonical_id" not in frame.columns:
+                missing_canonical_team_ids += frame.height
+            else:
+                missing_canonical_team_ids += frame.filter(
+                    pl.col("team_canonical_id").is_null() | (pl.col("team_canonical_id") == "")
+                ).height
+    for frame in (player_box, rosters):
+        if not frame.is_empty():
+            if "player_canonical_id" not in frame.columns:
+                missing_canonical_player_ids += frame.height
+            else:
+                missing_canonical_player_ids += frame.filter(
+                    pl.col("player_canonical_id").is_null() | (pl.col("player_canonical_id") == "")
+                ).height
 
     timestamp_violations = 0
     for frame in (games, team_box, player_box, rosters):
@@ -53,6 +81,8 @@ def audit_wnba_season(store: WNBANormalizedStore, season: int) -> dict[str, Any]
         "duplicate_events": _duplicate_count(games, ["event_id", "observed_at_utc"]),
         "missing_final_scores": missing_final_scores,
         "missing_teams": missing_teams,
+        "missing_canonical_team_ids": missing_canonical_team_ids,
+        "missing_canonical_player_ids": missing_canonical_player_ids,
         "missing_team_boxscores": len(completed_ids - team_box_ids),
         "missing_player_boxscores": len(completed_ids - player_box_ids),
         "team_box_rows": team_box.height,
@@ -70,7 +100,14 @@ def audit_wnba_season(store: WNBANormalizedStore, season: int) -> dict[str, Any]
     }
     hard_fail = any(
         report[key] > 0
-        for key in ("duplicate_events", "missing_final_scores", "missing_teams", "timestamp_violations")
+        for key in (
+            "duplicate_events",
+            "missing_final_scores",
+            "missing_teams",
+            "missing_canonical_team_ids",
+            "missing_canonical_player_ids",
+            "timestamp_violations",
+        )
     )
     degraded = any(
         report[key] > 0
