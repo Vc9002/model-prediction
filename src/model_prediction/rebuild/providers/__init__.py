@@ -13,9 +13,9 @@ from .http import HttpFetch, HttpProviderClient, RetryPolicy
 from .nflverse import NFLVERSE_RELEASE_ASSETS, NFLVerseAsset, NFLVerseProvider
 
 __all__ = [
+    "NFLVERSE_RELEASE_ASSETS",
     "HttpFetch",
     "HttpProviderClient",
-    "NFLVERSE_RELEASE_ASSETS",
     "NFLVerseAsset",
     "NFLVerseProvider",
     "ProviderPolicy",
