@@ -1,0 +1,20 @@
+[
+  {
+    "player_id": "900001",
+    "first_name": "Avery",
+    "last_name": "Example",
+    "hand": "R",
+    "birth_date": "19950102",
+    "country_code": "TST",
+    "height": "183"
+  },
+  {
+    "player_id": "900002",
+    "first_name": "Blair",
+    "last_name": "Fixture",
+    "hand": "L",
+    "birth_date": "19970304",
+    "country_code": "TST",
+    "height": "176"
+  }
+]

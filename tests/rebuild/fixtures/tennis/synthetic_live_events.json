@@ -1,0 +1,14 @@
+[
+  {
+    "provider_event_id": "synthetic-live-1",
+    "tour": "ATP",
+    "event_start_utc": "2026-08-10T13:00:00+00:00",
+    "status": "SCHEDULED",
+    "discipline": "SINGLES",
+    "surface": "HARD",
+    "player_a_id": "live-a",
+    "player_b_id": "live-b",
+    "player_a_canonical_id": "tennis:player:synthetic-a",
+    "player_b_canonical_id": "tennis:player:synthetic-b"
+  }
+]

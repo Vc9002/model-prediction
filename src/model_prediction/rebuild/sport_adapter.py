@@ -6,13 +6,15 @@ without a separate `<sport>_shadow_run.py` script per sport.
 
 Honest scope, not fabricated:
 
-- `collect()`: real for all 5 sports with a real collector (MLB, NBA/WNBA,
-  NFL, Soccer, Tennis) -- reuses the exact same Collector classes
+- `collect()`: real for MLB, NBA/WNBA, NFL, and Soccer -- reuses the exact same Collector classes
   scripts/mlb_shadow_run.py and the test suite already exercise. Esports
   is registered too, but its collector is an honest stub (no real BO3/
   OpenDota network integration yet), so collect() reports
   NOT_IMPLEMENTED rather than SUCCESS. KBO/NPB have no collector at all
-  and correctly raise from build_adapter().
+  and correctly raise from build_adapter(). Tennis has an ESPN-shaped
+  collector but its historical primary source is unavailable and unapproved;
+  its adapter therefore fails closed instead of exposing the old generic Elo
+  route as a validated tennis foundation.
 - `build_features()`: real for MLB only (horizon_builder.py, itself real
   and live-verified). Every other sport correctly reports NOT_IMPLEMENTED
   rather than fabricating a feature row.
@@ -43,7 +45,6 @@ from .collectors import (
     NBACollector,
     NFLCollector,
     SoccerCollector,
-    TennisCollector,
 )
 from .metadata import MetadataDB
 
@@ -237,7 +238,7 @@ class MLBAdapter(_NotImplementedStagesMixin):
 
 class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
     """Real collection, honest NOT_IMPLEMENTED for everything past it --
-    NBA/WNBA/NFL/Soccer/Tennis have real Collector classes (proven by
+    NBA/WNBA/NFL/Soccer have real Collector classes (proven by
     their own test suites) but no real trained model or market-matching
     logic yet."""
 
@@ -264,7 +265,7 @@ class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
 
 
 class _BasicEloAdapter(_CollectionOnlyAdapter):
-    """Real basic foundation pipeline for NBA/WNBA/NFL/Soccer/Tennis:
+    """Real basic foundation pipeline for NBA/WNBA/NFL/Soccer:
     collect -> build_features -> predict -> match_markets -> decide -> the
     real shadow ledger, all real code, using a logistic Elo baseline
     (basic_elo.py/basic_sport_pipeline.py) instead of a sport-specific
@@ -284,7 +285,7 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
         # Real bug found live (2026-08-07): _CollectionOnlyAdapter.collect()
         # calls self.collector.collect_date(date) with no sport argument,
         # which is correct for the single-sport collectors (NFL/Soccer/
-        # Tennis) but silently defaulted to sport="nba" for WNBA --
+        # Soccer) but silently defaulted to sport="nba" for WNBA --
         # NBACollector.collect_date()'s own default -- so the CLI's
         # collect stage was collecting real NBA data (correctly NO_DATA,
         # off-season) while claiming to serve WNBA. predict/match_markets/
@@ -399,6 +400,38 @@ class _EsportsStubAdapter(_NotImplementedStagesMixin):
         return StageResult("collect", STAGE_NOT_IMPLEMENTED, result)
 
 
+class _TennisFoundationUnavailableAdapter(_NotImplementedStagesMixin):
+    """Explicit tennis data-foundation gate.
+
+    The former Jeff Sackmann ATP/WTA primary repositories are unavailable,
+    there is no approved checksum-pinned local snapshot, and a current
+    acquisition would not prove historical point-in-time availability.  The
+    generic team-scoreboard Elo route must not hide those facts.
+    """
+
+    sport = "tennis"
+
+    @staticmethod
+    def _detail() -> dict[str, Any]:
+        from .tennis.policy import HISTORICAL_SOURCE_POLICY
+
+        return {
+            "reason": f"SOURCE_UNAVAILABLE: {HISTORICAL_SOURCE_POLICY.reason}",
+            "source_policy": "BLOCKED",
+            "qualification_status": "DATA_FOUNDATION",
+            "historical_pit_verified": False,
+        }
+
+    def collect(self, date: str, run_id: str | None = None) -> StageResult:
+        return StageResult("collect", STAGE_NO_DATA, self._detail())
+
+    def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return StageResult("build_features", STAGE_NO_DATA, self._detail())
+
+    def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return StageResult("predict", STAGE_NO_DATA, self._detail())
+
+
 class _ResearchOnlyAdapter(_NotImplementedStagesMixin):
     """Explicit decision, not a wiring gap: KBO/NPB have no real collector
     or data source client anywhere in this codebase (checked -- the only
@@ -444,8 +477,7 @@ def build_adapter(
         soccer_collector = SoccerCollector(data_root, meta)
         return _BasicEloAdapter(sport, data_root, soccer_collector, soccer_collector.collect_date)
     if sport == "tennis":
-        tennis_collector = TennisCollector(data_root, meta)
-        return _BasicEloAdapter(sport, data_root, tennis_collector, tennis_collector.collect_date)
+        return _TennisFoundationUnavailableAdapter()
     if sport == "esports":
         return _EsportsStubAdapter(data_root, meta)
     if sport in ("kbo", "npb"):

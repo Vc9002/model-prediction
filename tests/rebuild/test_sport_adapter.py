@@ -105,30 +105,25 @@ class TestHonestNotImplementedStages:
 
 
 class TestCollectionOnlyAdapterFailsClosedNotCrashed:
-    """Real bug found live, then fixed: SoccerCollector/TennisCollector
-    called the real ESPN client with league codes ("SOCCER"/"TENNIS")
-    that don't exist in data_sources/espn.py's LEAGUE_PATHS -- a real
-    ValueError on a real call, not a mock. Fixed by defaulting to a real
-    valid league each (EPL, ATP) instead. This class now covers two
-    things: the fix actually works (real network collection succeeds),
-    and the adapter's try/except still reports a genuine failure as an
-    honest per-stage ERROR rather than crashing, for any future collector
-    bug of the same shape."""
+    """Collection failures and blocked tennis inputs stay explicit.
 
-    def test_tennis_collect_uses_the_real_default_league(self, tmp_path, monkeypatch):
-        from model_prediction.rebuild.collectors import TennisCollector
+    Tennis no longer reaches its legacy generic Elo route while the
+    historical source is unavailable. The generic collection adapter also
+    continues to report a genuine collector exception as a stage error.
+    """
 
-        captured: dict[str, str] = {}
-
-        def fake_collect_date(self, game_date: str, league: str = "ATP"):
-            captured.update(date=game_date, league=league)
-            return {"status": "no_games", "date": game_date, "sport": "tennis"}
-
-        monkeypatch.setattr(TennisCollector, "collect_date", fake_collect_date)
+    def test_tennis_fails_closed_while_historical_source_is_unavailable(self, tmp_path):
         adapter = build_adapter("tennis", str(tmp_path))
         result = adapter.collect("2026-08-06")
         assert result.status == STAGE_NO_DATA
-        assert captured == {"date": "2026-08-06", "league": "ATP"}
+        assert result.detail["source_policy"] == "BLOCKED"
+        assert result.detail["historical_pit_verified"] is False
+        assert "SOURCE_UNAVAILABLE" in result.detail["reason"]
+
+        feature_result = adapter.build_features("2026-08-06", "late")
+        prediction_result = adapter.predict("2026-08-06", "late")
+        assert feature_result.status == STAGE_NO_DATA
+        assert prediction_result.status == STAGE_NO_DATA
 
     def test_collection_only_adapter_still_reports_a_genuine_collector_failure_as_error(self, tmp_path):
         # Proves the try/except in _CollectionOnlyAdapter.collect() still
