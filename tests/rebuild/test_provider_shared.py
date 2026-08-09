@@ -141,6 +141,53 @@ def test_record_parse_result_is_separate_immutable_evidence(tmp_path):
     assert drifted.exists()
 
 
+def test_latest_success_ignores_a_cached_failure(tmp_path):
+    """The negative-cache-poisoning fix: a cached 500 must not be reusable."""
+    cache = ProviderRawCache(tmp_path)
+    body = b"error page"
+    failed = _metadata(body, datetime(2026, 1, 1, tzinfo=UTC), http_status=500)
+    cache.store(failed, body)
+
+    # latest() still returns the failure -- it's real evidence, not hidden.
+    assert cache.latest("fixture", "wnba", "schedule", {"season": 2024}) is not None
+    assert cache.latest("fixture", "wnba", "schedule", {"season": 2024}).metadata.http_status == 500
+
+    # latest_success() must not treat it as reusable content.
+    assert cache.latest_success("fixture", "wnba", "schedule", {"season": 2024}) is None
+
+
+def test_latest_success_returns_the_most_recent_successful_observation_even_after_a_later_failure(tmp_path):
+    cache = ProviderRawCache(tmp_path)
+    good_body = b"good content"
+    good = _metadata(good_body, datetime(2026, 1, 1, tzinfo=UTC), http_status=200)
+    cache.store(good, good_body)
+
+    bad_body = b"rate limited"
+    bad = _metadata(bad_body, datetime(2026, 1, 2, tzinfo=UTC), http_status=429)
+    cache.store(bad, bad_body)
+
+    # latest() picks the newest observation regardless of outcome (the 429).
+    assert cache.latest("fixture", "wnba", "schedule", {"season": 2024}).metadata.http_status == 429
+    # latest_success() skips over it and finds the real prior success.
+    success = cache.latest_success("fixture", "wnba", "schedule", {"season": 2024})
+    assert success is not None
+    assert success.metadata.http_status == 200
+    assert success.read_bytes() == good_body
+
+
+def test_latest_success_honors_custom_accepted_statuses(tmp_path):
+    """Polymarket's own synthetic 207 'partial success' status is reusable."""
+    cache = ProviderRawCache(tmp_path)
+    body = b"partial slate"
+    partial = _metadata(body, datetime(2026, 1, 1, tzinfo=UTC), http_status=207)
+    cache.store(partial, body)
+    assert cache.latest_success("fixture", "wnba", "schedule", {"season": 2024}) is None
+    found = cache.latest_success(
+        "fixture", "wnba", "schedule", {"season": 2024}, accepted_statuses=frozenset({200, 207})
+    )
+    assert found is not None and found.metadata.http_status == 207
+
+
 # ── base.py: SourceResponseMetadata / rights gates ──────────────────────
 
 
@@ -343,6 +390,64 @@ def test_http_does_not_retry_403():
     )
     assert client.get("https://example.invalid/forbidden").status_code == 403
     assert calls == 1
+
+
+def test_http_honors_retry_after_seconds_on_429():
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls < 2:
+            return httpx.Response(429, headers={"Retry-After": "5"}, request=request)
+        return httpx.Response(200, content=b"ok", request=request)
+
+    sleeps: list[float] = []
+    client = HttpProviderClient(
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        retry=RetryPolicy(attempts=3, base_delay_seconds=0.1, jitter_seconds=0),
+        sleep=sleeps.append,
+        min_interval_seconds=0,
+    )
+    result = client.get("https://example.invalid/data")
+    assert result.status_code == 200
+    # Used the real 5s from Retry-After, not the 0.1s exponential-backoff base.
+    assert sleeps == [5.0]
+
+
+def test_http_bounds_an_excessive_retry_after_value():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"Retry-After": "999999"}, request=request)
+
+    sleeps: list[float] = []
+    client = HttpProviderClient(
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        retry=RetryPolicy(attempts=2, jitter_seconds=0, max_retry_after_seconds=30.0),
+        sleep=sleeps.append,
+        min_interval_seconds=0,
+    )
+    client.get("https://example.invalid/data")
+    # A malicious/incorrect header must never be honored past the configured ceiling.
+    assert sleeps == [30.0]
+
+
+def test_http_falls_back_to_exponential_backoff_without_retry_after():
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503 if calls < 2 else 200, content=b"ok", request=request)
+
+    sleeps: list[float] = []
+    client = HttpProviderClient(
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        retry=RetryPolicy(attempts=3, base_delay_seconds=0.25, jitter_seconds=0),
+        sleep=sleeps.append,
+        min_interval_seconds=0,
+    )
+    client.get("https://example.invalid/data")
+    assert sleeps == [0.25]
 
 
 def test_http_forwards_custom_headers():

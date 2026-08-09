@@ -73,7 +73,7 @@ class FootballDataProvider:
             return ProviderResult.unavailable("TOKEN_NOT_CONFIGURED")
         parameters = {"competition": code, "dateFrom": start.isoformat(), "dateTo": end.isoformat()}
         endpoint = "competition_matches"
-        cached = self.cache.latest(self.provider_id, "soccer", endpoint, parameters)
+        cached = self.cache.latest_success(self.provider_id, "soccer", endpoint, parameters)
         if cached is not None and not force:
             return self._parse(cached.read_bytes(), cached.metadata)
         try:

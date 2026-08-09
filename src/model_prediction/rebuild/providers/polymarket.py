@@ -68,7 +68,12 @@ class PolymarketProvider:
         """Every gateway-league event for one sport-date, as raw normalized events."""
         parameters = {"sport": sport.lower(), "game_date": game_date.isoformat()}
         endpoint = "sport_slate"
-        cached = self.cache.latest(self.provider_id, sport.lower(), endpoint, parameters)
+        # 207 here is this method's own synthetic "partial success" status
+        # (some leagues errored, real events still came back for others) --
+        # genuinely reusable, unlike an actual upstream failure.
+        cached = self.cache.latest_success(
+            self.provider_id, sport.lower(), endpoint, parameters, accepted_statuses=frozenset({200, 207})
+        )
         if cached is not None and not force:
             return self._frame_from_cached_events(cached.read_bytes(), cached.metadata)
         retrieved_at = datetime.now().astimezone().isoformat()

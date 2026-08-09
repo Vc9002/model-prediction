@@ -139,7 +139,7 @@ class NFLVerseProvider:
 
         parameters = self._parameters(table, season, asset)
         endpoint = f"nfl_{table}"
-        cached = self.cache.latest(self.provider_id, "nfl", endpoint, parameters)
+        cached = self.cache.latest_success(self.provider_id, "nfl", endpoint, parameters)
         prior_schema_hash = cached.metadata.schema_hash if cached is not None else None
         if cached is not None and not force:
             try:

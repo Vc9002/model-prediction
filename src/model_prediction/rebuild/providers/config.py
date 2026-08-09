@@ -31,7 +31,8 @@ class RebuildSourcesConfig(BaseModel):
     nflverse: ProviderPolicy
     football_data: ProviderPolicy
     statsbomb: ProviderPolicy
-    sackmann_tennis: ProviderPolicy
+    tennis_mylife: ProviderPolicy
+    tennis_espn: ProviderPolicy
     open_meteo: ProviderPolicy
     polymarket: ProviderPolicy
 

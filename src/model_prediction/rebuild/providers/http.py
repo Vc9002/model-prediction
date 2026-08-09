@@ -7,11 +7,36 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, Self
 
 import httpx
 
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+def _parse_retry_after(value: str | None, *, now: datetime) -> float | None:
+    """Seconds to wait per a `Retry-After` header, or None if absent/unparseable.
+
+    Retry-After is either a delay in seconds or an HTTP-date -- both are real,
+    per RFC 9110 -- but a server's own header is untrusted input: bound the
+    result at the call site, never sleep for whatever an incorrect or
+    malicious value says.
+    """
+    if not value:
+        return None
+    value = value.strip()
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    return max(0.0, (when - now).total_seconds())
 
 
 @dataclass(frozen=True)
@@ -20,6 +45,10 @@ class RetryPolicy:
     base_delay_seconds: float = 0.5
     max_delay_seconds: float = 8.0
     jitter_seconds: float = 0.25
+    # Retry-After (429/503) can request an arbitrarily long wait; this is the
+    # hard ceiling regardless of what the header says, so an incorrect or
+    # malicious server value can never sleep this client for hours.
+    max_retry_after_seconds: float = 30.0
 
     def __post_init__(self) -> None:
         if self.attempts < 1:
@@ -80,6 +109,7 @@ class HttpProviderClient:
         for attempt in range(1, self.retry.attempts + 1):
             self._throttle()
             self._last_request_at = self._monotonic()
+            retry_after_delay: float | None = None
             try:
                 response = self.client.get(url, params=params, headers=headers)
             except httpx.RequestError as exc:
@@ -97,8 +127,15 @@ class HttpProviderClient:
                         attempts=attempt,
                         latency_seconds=self._monotonic() - started,
                     )
-            delay = min(self.retry.base_delay_seconds * (2 ** (attempt - 1)), self.retry.max_delay_seconds)
-            self._sleep(delay + self.retry.jitter_seconds * self._jitter())
+                if response.status_code in {429, 503}:
+                    parsed = _parse_retry_after(response.headers.get("Retry-After"), now=datetime.now(UTC))
+                    if parsed is not None:
+                        retry_after_delay = min(parsed, self.retry.max_retry_after_seconds)
+            if retry_after_delay is not None:
+                self._sleep(retry_after_delay + self.retry.jitter_seconds * self._jitter())
+            else:
+                delay = min(self.retry.base_delay_seconds * (2 ** (attempt - 1)), self.retry.max_delay_seconds)
+                self._sleep(delay + self.retry.jitter_seconds * self._jitter())
         if last_error is not None:
             raise last_error
         raise RuntimeError("HTTP retry loop exited without a response")

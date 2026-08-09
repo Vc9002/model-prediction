@@ -22,7 +22,11 @@ statsbomb:
   min_interval_seconds: 1.0
   retries: 3
 
-sackmann_tennis:
+tennis_mylife:
+  min_interval_seconds: 1.0
+  retries: 3
+
+tennis_espn:
   min_interval_seconds: 1.0
   retries: 3
 

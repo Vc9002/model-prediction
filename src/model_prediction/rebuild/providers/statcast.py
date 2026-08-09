@@ -81,7 +81,7 @@ class StatcastProvider:
             "game_date_lt": end.isoformat(),
             "player_type": "batter",
         }
-        cached = self.cache.latest(self.provider_id, "mlb", "statcast_pitches", params)
+        cached = self.cache.latest_success(self.provider_id, "mlb", "statcast_pitches", params)
         if cached is not None and not force:
             if cached.metadata.http_status != 200:
                 return ProviderResult.unavailable(

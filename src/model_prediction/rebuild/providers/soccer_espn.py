@@ -72,7 +72,7 @@ class ESPNSoccerProvider:
             return ProviderResult.unavailable(f"unsupported ESPN soccer league: {league}")
         parameters = {"dates": game_date.strftime("%Y%m%d"), "limit": 1000, "league": league_code}
         endpoint = "soccer_scoreboard"
-        cached = self.cache.latest(self.provider_id, "soccer", endpoint, parameters)
+        cached = self.cache.latest_success(self.provider_id, "soccer", endpoint, parameters)
         if cached is not None and not force:
             return self._parse(cached.read_bytes(), cached.metadata)
 

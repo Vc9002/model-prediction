@@ -25,11 +25,12 @@ from .nflverse import NFLVERSE_RELEASE_ASSETS, NFLVerseAsset, NFLVerseProvider
 from .open_meteo import OPEN_METEO_RIGHTS, OpenMeteoForecastProvider
 from .polymarket import POLYMARKET_RIGHTS, PolymarketProvider
 from .rights import SourceRightsProfile
-from .sackmann_tennis import SACKMANN_TENNIS_RIGHTS, SackmannTennisProvider
 from .soccer_espn import ESPN_SOCCER_RIGHTS, ESPNSoccerProvider
 from .sportsdataverse import SPORTSDATAVERSE_RIGHTS, SportsDataverseProvider
 from .statcast import STATCAST_RIGHTS, StatcastProvider
 from .statsbomb import STATSBOMB_OPEN_RIGHTS, StatsBombOpenDataProvider
+from .tennis_espn import TENNIS_ESPN_RIGHTS, ESPNTennisProvider
+from .tennis_mylife import TENNIS_MYLIFE_RIGHTS, TennisMyLifeProvider
 
 __all__ = [
     "ESPN_SOCCER_RIGHTS",
@@ -38,13 +39,15 @@ __all__ = [
     "NFLVERSE_RELEASE_ASSETS",
     "OPEN_METEO_RIGHTS",
     "POLYMARKET_RIGHTS",
-    "SACKMANN_TENNIS_RIGHTS",
     "SPORTSDATAVERSE_RIGHTS",
     "STATCAST_RIGHTS",
     "STATSBOMB_OPEN_RIGHTS",
+    "TENNIS_ESPN_RIGHTS",
+    "TENNIS_MYLIFE_RIGHTS",
     "CachedResponse",
     "DataUseContext",
     "ESPNSoccerProvider",
+    "ESPNTennisProvider",
     "FootballDataProvider",
     "HttpFetch",
     "HttpProviderClient",
@@ -59,7 +62,6 @@ __all__ = [
     "ProviderStatus",
     "RebuildSourcesConfig",
     "RetryPolicy",
-    "SackmannTennisProvider",
     "SourceGrade",
     "SourceResponseMetadata",
     "SourceRightsProfile",
@@ -67,6 +69,7 @@ __all__ = [
     "SportsDataverseProvider",
     "StatcastProvider",
     "StatsBombOpenDataProvider",
+    "TennisMyLifeProvider",
     "assert_economic_use_allowed",
     "assert_frame_use_allowed",
     "cache_key",

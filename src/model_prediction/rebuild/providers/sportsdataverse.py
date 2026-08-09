@@ -143,7 +143,7 @@ class SportsDataverseProvider:
 
         parameters = {"season": season, "table": table}
         endpoint = f"wnba_{table}"
-        cached = self.cache.latest(self.provider_id, "wnba", endpoint, parameters)
+        cached = self.cache.latest_success(self.provider_id, "wnba", endpoint, parameters)
         prior_schema_hash = cached.metadata.schema_hash if cached is not None else None
         if cached is not None and not force:
             try:
@@ -209,7 +209,7 @@ class SportsDataverseProvider:
         """Capture the current ESPN WNBA scoreboard using SDV's endpoint catalog."""
         parameters = {"dates": game_date.strftime("%Y%m%d"), "limit": 500}
         endpoint = "wnba_scoreboard"
-        cached = self.cache.latest(self.provider_id, "wnba", endpoint, parameters)
+        cached = self.cache.latest_success(self.provider_id, "wnba", endpoint, parameters)
         if cached is not None and not force:
             return self._parse_scoreboard(cached.read_bytes(), cached.metadata)
         try:

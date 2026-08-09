@@ -155,7 +155,7 @@ class OpenMeteoForecastProvider:
             endpoint = "weather_single_run"
             source_version = "Open-Meteo exact single run"
         cache_params = {**request_params, **cache_extras, "event_id": event_id}
-        cached = self.cache.latest(self.provider_id, sport, endpoint, cache_params)
+        cached = self.cache.latest_success(self.provider_id, sport, endpoint, cache_params)
         if cached is not None and not force:
             if cached.metadata.http_status != 200:
                 return ProviderResult.unavailable(

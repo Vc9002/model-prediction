@@ -143,16 +143,15 @@ class ProviderRawCache:
             self._atomic_write(path, json.dumps(payload, indent=2, sort_keys=True).encode("utf-8"))
         return path
 
-    def latest(
+    def _load_observations(
         self, provider: str, sport: str, endpoint: str, parameters: dict[str, Any]
-    ) -> CachedResponse | None:
+    ) -> list[tuple[dict[str, Any], Path]]:
         key = cache_key(endpoint, parameters)
         root = self._request_root(provider, sport, endpoint, key)
         manifests = sorted((root / "observations").glob("*.json"))
-        if not manifests:
-            return None
-        records = [(json.loads(path.read_text()), path) for path in manifests]
-        raw, manifest_path = max(records, key=lambda item: item[0]["retrieved_at_utc"])
+        return [(json.loads(path.read_text()), path) for path in manifests]
+
+    def _reconstruct(self, raw: dict[str, Any], manifest_path: Path) -> CachedResponse:
         metadata = SourceResponseMetadata(
             provider=raw["provider"],
             sport=raw["sport"],
@@ -183,3 +182,43 @@ class ProviderRawCache:
             from_cache=True,
         )
         return CachedResponse(metadata, self.root / raw["body_path"], manifest_path)
+
+    def latest(
+        self, provider: str, sport: str, endpoint: str, parameters: dict[str, Any]
+    ) -> CachedResponse | None:
+        """Most recent observation, success or failure -- full history for audit/forensics.
+
+        Provider fetch paths deciding whether to skip the network should use
+        `latest_success()` instead: a failed observation is real evidence
+        worth keeping, but it must never become a permanently-reusable
+        "successful" response that blocks every future retry.
+        """
+        records = self._load_observations(provider, sport, endpoint, parameters)
+        if not records:
+            return None
+        raw, manifest_path = max(records, key=lambda item: item[0]["retrieved_at_utc"])
+        return self._reconstruct(raw, manifest_path)
+
+    def latest_success(
+        self,
+        provider: str,
+        sport: str,
+        endpoint: str,
+        parameters: dict[str, Any],
+        *,
+        accepted_statuses: frozenset[int] = frozenset({200}),
+    ) -> CachedResponse | None:
+        """Most recent observation that actually succeeded, ignoring cached failures.
+
+        A cached 429/500/502/503/504 (or any other non-2xx) is real evidence
+        (kept by `latest()`), but it is not reusable content -- returning
+        `None` here when only failures are on record means the caller falls
+        through to a fresh network attempt instead of treating a transient
+        upstream outage as a sticky, permanent one.
+        """
+        records = self._load_observations(provider, sport, endpoint, parameters)
+        successful = [item for item in records if item[0].get("http_status") in accepted_statuses]
+        if not successful:
+            return None
+        raw, manifest_path = max(successful, key=lambda item: item[0]["retrieved_at_utc"])
+        return self._reconstruct(raw, manifest_path)

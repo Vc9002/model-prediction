@@ -60,7 +60,7 @@ class MLBStatsProvider:
         source_event_id: str | None = None,
         force: bool = False,
     ) -> ProviderResult:
-        cached = self.cache.latest(self.provider_id, "mlb", endpoint_family, parameters)
+        cached = self.cache.latest_success(self.provider_id, "mlb", endpoint_family, parameters)
         if cached is not None and not force:
             if cached.metadata.http_status != 200:
                 return ProviderResult.unavailable(

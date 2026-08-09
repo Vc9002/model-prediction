@@ -70,6 +70,31 @@ def test_schedule_is_raw_first_cached_and_rights_gated(tmp_path):
     assert calls == 1
 
 
+def test_a_cached_server_error_does_not_block_a_later_real_retry(tmp_path):
+    """Negative-cache-poisoning regression: a cached 500 must not stick forever."""
+    from datetime import date
+
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(500, content=b"server error", request=request)
+        return httpx.Response(200, content=json.dumps(SCHEDULE_PAYLOAD).encode(), request=request)
+
+    provider = MLBStatsProvider(_http(handler), ProviderRawCache(tmp_path))
+    first = provider.schedule(date(2026, 8, 10), date(2026, 8, 10))
+    assert first.status is ProviderStatus.UNAVAILABLE
+    assert calls == 1
+
+    # A second call must retry the network (not silently reuse the cached
+    # 500 forever) and succeed once the upstream recovers.
+    second = provider.schedule(date(2026, 8, 10), date(2026, 8, 10))
+    assert second.status is ProviderStatus.AVAILABLE
+    assert calls == 2
+
+
 def test_malformed_schedule_payload_is_degraded_but_raw_retained(tmp_path):
     from datetime import date
 
