@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Local operations dashboard server for the model-prediction system.
 
+HACK(DD-5): 5,121-line monolithic file with ~35 routes dispatched via manual
+if/elif path chains. Should be split into dashboard/routes.py, views.py,
+orders.py, etc. Every new feature lands here. See MASTER.md §DD-5.
+
 Serves dashboard.html plus a small JSON API computed from the project's data
 files. View clearing and order status use local dashboard state. Real order
 submission remains behind the model-prediction CLI's hard gate and a separate,

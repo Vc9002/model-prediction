@@ -1,3 +1,9 @@
+"""Position sizing: edge-scaled Kelly units.
+
+TODO(DD-8): Hardcoded thresholds (min_edge=0.02, unit_increment=0.25) should
+move to a single config source. See MASTER.md §DD-8.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
