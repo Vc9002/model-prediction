@@ -5,10 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from .base import ProviderResult
+from .soccer_rights import STATSBOMB_OPEN_RIGHTS
 
 POLICY_REASON = (
-    "POLICY_BLOCKED: StatsBomb Open Data is not enabled because its terms prohibit "
-    "commercial exploitation; no network request was made"
+    "POLICY_BLOCKED: StatsBomb Open Data is not enabled because its agreement "
+    "prohibits commercial exploitation of the data and derived analysis; "
+    "no network request was made"
 )
 
 
@@ -16,6 +18,7 @@ class StatsBombOpenDataProvider:
     """Intentionally non-networking until counsel/owner records compatible permission."""
 
     provider_id = "statsbomb_open_data"
+    rights = STATSBOMB_OPEN_RIGHTS
 
     def events(self, *, sport: str, **_kwargs: Any) -> ProviderResult:
         if sport != "soccer":

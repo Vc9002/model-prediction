@@ -12,9 +12,15 @@ from model_prediction.rebuild.providers.base import SourceGrade, SourceResponseM
 from model_prediction.rebuild.providers.cache import ProviderRawCache
 from model_prediction.rebuild.providers.http import HttpProviderClient, RetryPolicy
 from model_prediction.rebuild.providers.soccer_espn import ESPNSoccerProvider
+from model_prediction.rebuild.providers.soccer_rights import FOOTBALL_DATA_RIGHTS
+from model_prediction.rebuild.soccer.audit import audit_soccer_data
 from model_prediction.rebuild.soccer.foundation import SoccerFoundation
 from model_prediction.rebuild.soccer.normalize import normalize_soccer_matches
 from model_prediction.rebuild.soccer.pit import eligible_matches_as_of, prior_team_matches_as_of
+from model_prediction.rebuild.soccer.rights import (
+    assert_economic_use_allowed,
+    assert_research_shadow_allowed,
+)
 from model_prediction.rebuild.soccer.store import SoccerNormalizedStore
 
 FIXTURE = Path(__file__).parent / "fixtures/providers/soccer/football_data_matches.json"
@@ -35,6 +41,7 @@ def _metadata(observed: str) -> SourceResponseMetadata:
         schema_hash="b" * 64,
         source_version="v4",
         source_grade=SourceGrade.A,
+        **FOOTBALL_DATA_RIGHTS.metadata_kwargs(),
     )
 
 
@@ -71,6 +78,16 @@ def test_normalization_preserves_draw_and_uses_capture_time_availability():
     assert frame["observed_at_utc"][0] == frame["available_at_utc"][0]
     assert frame["provider_updated_at_utc"][0] == "2026-08-09T17:05:00+00:00"
     assert frame["availability_basis"][0] == "capture_time_only"
+    assert frame["source_asset"][0] == "football-data.org API v4 competition matches"
+    assert frame["subscription_required"][0] is True
+    assert frame["subscription_scope"][0] == "single_application"
+    assert frame["attribution_text"][0] == "Data provided by football-data.org"
+    assert frame["commercial_use_status"][0] == "unresolved"
+    assert frame["production_allowed"][0] is False
+    assert frame["schema_version"][0] == "2"
+    assert_research_shadow_allowed(frame)
+    with pytest.raises(PermissionError, match="not cleared"):
+        assert_economic_use_allowed(frame)
 
 
 def test_backfilled_result_is_not_available_to_earlier_decision():
@@ -129,5 +146,56 @@ def test_foundation_persists_espn_and_reports_statsbomb_policy_block(tmp_path):
     report = foundation.collect_date(date(2026, 8, 10))
 
     assert report["sources"][0]["rows_written"] == 1
+    assert report["sources"][0]["commercial_use_status"] == "unresolved"
+    assert report["sources"][0]["production_allowed"] is False
     assert report["sources"][-1]["status"] == "POLICY_BLOCKED"
+    assert report["sources"][-1]["commercial_use_status"] == "prohibited"
+    assert report["sources"][-1]["production_allowed"] is False
+    assert report["use_scope"] == "research_shadow_only"
+    assert report["economic_use_allowed"] is False
+    manifest = json.loads(Path(report["manifest"]).read_text())
+    assert manifest["production_allowed"] is False
+    assert manifest["sources"][0]["source_asset"] == "ESPN Site v2 soccer scoreboard"
+    assert manifest["sources"][-1]["use_scope"] == "policy_blocked"
     assert foundation.store.read_matches().height == 1
+
+    audit = foundation.audit()
+    assert audit["status"] == "DEGRADED"
+    assert audit["rights_policy_valid"] is True
+    assert audit["economic_use_allowed"] is False
+    assert audit["production_allowed"] is False
+    assert audit["source_assets"][0]["commercial_use_status"] == "unresolved"
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "error"),
+    [
+        ("commercial_use_status", None, ValueError),
+        ("commercial_use_status", "unknown", ValueError),
+        ("upstream_rights_status", None, ValueError),
+        ("upstream_rights_status", "unknown", ValueError),
+        ("use_scope", None, ValueError),
+        ("use_scope", "unknown", ValueError),
+        ("production_allowed", None, ValueError),
+        ("production_allowed", True, PermissionError),
+    ],
+)
+def test_normalized_rights_reject_null_unknown_or_production_claim(column, value, error):
+    frame = normalize_soccer_matches(
+        _source_frame(), _metadata("2026-08-10T00:00:00+00:00")
+    ).with_columns(pl.lit(value).alias(column))
+    with pytest.raises(error):
+        eligible_matches_as_of(frame, datetime(2026, 8, 10, 12, tzinfo=UTC))
+
+
+def test_audit_fails_closed_when_normalized_rights_are_tampered(tmp_path):
+    frame = normalize_soccer_matches(_source_frame(), _metadata("2026-08-10T00:00:00+00:00"))
+    store = SoccerNormalizedStore(tmp_path)
+    store.write_matches(frame)
+    parquet = next(tmp_path.rglob("part-*.parquet"))
+    frame.with_columns(pl.lit("unknown").alias("commercial_use_status")).write_parquet(parquet)
+
+    report = audit_soccer_data(store)
+    assert report["status"] == "ERROR"
+    assert report["rights_policy_valid"] is False
+    assert report["economic_use_allowed"] is False

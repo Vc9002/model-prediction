@@ -13,6 +13,7 @@ import polars as pl
 from .base import ProviderResult, ProviderStatus, SourceGrade, SourceResponseMetadata, dataframe_schema_hash
 from .cache import ProviderRawCache
 from .http import HttpProviderClient
+from .soccer_rights import ESPN_SOCCER_RIGHTS
 
 ESPN_SOCCER_LEAGUES: Final[dict[str, str]] = {
     "epl": "eng.1",
@@ -34,6 +35,7 @@ class ESPNSoccerProvider:
     """Capture exact ESPN JSON before applying a small, strict parser."""
 
     provider_id = "espn_site_v2"
+    rights = ESPN_SOCCER_RIGHTS
 
     def __init__(self, http: HttpProviderClient, cache: ProviderRawCache) -> None:
         self.http = http
@@ -74,6 +76,7 @@ class ESPNSoccerProvider:
             content_type=fetched.headers.get("content-type"),
             source_version="espn-site-v2",
             source_grade=SourceGrade.C,
+            **self.rights.metadata_kwargs(),
         )
         # Raw bytes are durable even when HTTP status or parsing is bad.
         self.cache.store(metadata, fetched.body)

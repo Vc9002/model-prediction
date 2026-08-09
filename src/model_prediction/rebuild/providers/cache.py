@@ -108,5 +108,17 @@ class ProviderRawCache:
             source_version=raw.get("source_version"),
             source_grade=SourceGrade(raw["source_grade"]),
             from_cache=True,
+            source_asset=raw.get("source_asset"),
+            provider_chain=raw.get("provider_chain"),
+            license_id=raw.get("license_id"),
+            license_url=raw.get("license_url"),
+            attribution_required=bool(raw.get("attribution_required", False)),
+            attribution_text=raw.get("attribution_text"),
+            subscription_required=bool(raw.get("subscription_required", False)),
+            subscription_scope=raw.get("subscription_scope", "none"),
+            upstream_rights_status=raw.get("upstream_rights_status", "unresolved"),
+            commercial_use_status=raw.get("commercial_use_status", "unresolved"),
+            use_scope=raw.get("use_scope", "research_shadow_only"),
+            production_allowed=bool(raw.get("production_allowed", False)),
         )
         return CachedResponse(metadata, self.root / raw["body_path"], manifest_path)

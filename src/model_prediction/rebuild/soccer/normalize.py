@@ -50,6 +50,15 @@ def normalize_soccer_matches(
     """
     if metadata.sport != "soccer":
         raise ValueError(f"soccer normalizer received metadata for {metadata.sport}")
+    required_rights = {
+        "source_asset": metadata.source_asset,
+        "provider_chain": metadata.provider_chain,
+        "license_id": metadata.license_id,
+        "license_url": metadata.license_url,
+    }
+    missing_rights = sorted(name for name, value in required_rights.items() if not value)
+    if missing_rights:
+        raise ValueError(f"soccer source metadata is missing rights provenance: {missing_rights}")
     observed = _utc_iso(metadata.observed_at_utc, "observed_at_utc")
     rows: list[dict[str, Any]] = []
     for row in frame.iter_rows(named=True):
@@ -87,7 +96,19 @@ def normalize_soccer_matches(
                 "availability_basis": "capture_time_only",
                 "timestamp_valid": True,
                 "pit_eligible": True,
-                "schema_version": "1",
+                "source_asset": metadata.source_asset,
+                "provider_chain": metadata.provider_chain,
+                "license_id": metadata.license_id,
+                "license_url": metadata.license_url,
+                "attribution_required": metadata.attribution_required,
+                "attribution_text": metadata.attribution_text,
+                "subscription_required": metadata.subscription_required,
+                "subscription_scope": metadata.subscription_scope,
+                "upstream_rights_status": metadata.upstream_rights_status,
+                "commercial_use_status": metadata.commercial_use_status,
+                "use_scope": metadata.use_scope,
+                "production_allowed": metadata.production_allowed,
+                "schema_version": "2",
             }
         )
     normalized = (
@@ -119,6 +140,18 @@ def normalize_soccer_matches(
                 "availability_basis": pl.String,
                 "timestamp_valid": pl.Boolean,
                 "pit_eligible": pl.Boolean,
+                "source_asset": pl.String,
+                "provider_chain": pl.String,
+                "license_id": pl.String,
+                "license_url": pl.String,
+                "attribution_required": pl.Boolean,
+                "attribution_text": pl.String,
+                "subscription_required": pl.Boolean,
+                "subscription_scope": pl.String,
+                "upstream_rights_status": pl.String,
+                "commercial_use_status": pl.String,
+                "use_scope": pl.String,
+                "production_allowed": pl.Boolean,
                 "schema_version": pl.String,
             }
         )

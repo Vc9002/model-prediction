@@ -14,6 +14,7 @@ import polars as pl
 from .base import ProviderResult, ProviderStatus, SourceGrade, SourceResponseMetadata, dataframe_schema_hash
 from .cache import ProviderRawCache
 from .http import HttpProviderClient
+from .soccer_rights import FOOTBALL_DATA_RIGHTS
 
 FOOTBALL_DATA_MIN_INTERVAL_SECONDS: Final = 6.5
 FOOTBALL_DATA_COMPETITIONS: Final = frozenset({"PL", "PD", "BL1", "SA", "FL1", "CL", "DED", "PPL"})
@@ -21,6 +22,7 @@ FOOTBALL_DATA_COMPETITIONS: Final = frozenset({"PL", "PD", "BL1", "SA", "FL1", "
 
 class FootballDataProvider:
     provider_id = "football_data_v4"
+    rights = FOOTBALL_DATA_RIGHTS
 
     def __init__(
         self,
@@ -77,6 +79,7 @@ class FootballDataProvider:
             content_type=fetched.headers.get("content-type"),
             source_version="v4",
             source_grade=SourceGrade.A,
+            **self.rights.metadata_kwargs(),
         )
         self.cache.store(metadata, fetched.body)
         if fetched.status_code != 200:

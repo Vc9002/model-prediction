@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 
 import polars as pl
 
+from .rights import assert_research_shadow_allowed
+
 
 def eligible_matches_as_of(
     matches: pl.DataFrame,
@@ -13,6 +15,9 @@ def eligible_matches_as_of(
     *,
     completed_only: bool = False,
 ) -> pl.DataFrame:
+    # Rights/provenance validation intentionally happens before row filtering;
+    # a malformed future row cannot disappear and make the dataset look safe.
+    assert_research_shadow_allowed(matches)
     if decision_time_utc.tzinfo is None:
         raise ValueError("decision_time_utc must be timezone-aware")
     required = {

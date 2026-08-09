@@ -30,6 +30,10 @@ class SourceGrade(StrEnum):
     D = "D"  # derived or imputed
 
 
+RIGHTS_STATUSES = frozenset({"cleared", "unresolved", "prohibited"})
+USE_SCOPES = frozenset({"research_shadow_only", "production_economic", "policy_blocked"})
+
+
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
@@ -56,11 +60,73 @@ class SourceResponseMetadata:
     source_version: str | None = None
     source_grade: SourceGrade = SourceGrade.B
     from_cache: bool = False
+    source_asset: str | None = None
+    provider_chain: str | None = None
+    license_id: str | None = None
+    license_url: str | None = None
+    attribution_required: bool = False
+    attribution_text: str | None = None
+    subscription_required: bool = False
+    subscription_scope: str = "none"
+    upstream_rights_status: str = "unresolved"
+    commercial_use_status: str = "unresolved"
+    use_scope: str = "research_shadow_only"
+    production_allowed: bool = False
+
+    def __post_init__(self) -> None:
+        for field_name, value in (
+            ("attribution_required", self.attribution_required),
+            ("subscription_required", self.subscription_required),
+            ("production_allowed", self.production_allowed),
+        ):
+            if not isinstance(value, bool):
+                raise TypeError(f"{field_name} must be an explicit boolean")
+        if not isinstance(self.subscription_scope, str) or not self.subscription_scope.strip():
+            raise ValueError("subscription_scope must be explicit")
+        if self.upstream_rights_status not in RIGHTS_STATUSES:
+            raise ValueError("upstream_rights_status must be explicit and recognized")
+        if self.commercial_use_status not in RIGHTS_STATUSES:
+            raise ValueError("commercial_use_status must be explicit and recognized")
+        if self.use_scope not in USE_SCOPES:
+            raise ValueError("use_scope must be explicit and recognized")
+        if self.attribution_required and not (self.attribution_text or "").strip():
+            raise ValueError("attribution_text is required when attribution is required")
+        if self.subscription_required and self.subscription_scope == "none":
+            raise ValueError("subscription_scope is required when a subscription is required")
+        if (
+            "prohibited" in {self.commercial_use_status, self.upstream_rights_status}
+            and self.use_scope != "policy_blocked"
+        ):
+            raise ValueError("prohibited rights require policy_blocked use scope")
+        if self.production_allowed and (
+            self.commercial_use_status != "cleared"
+            or self.upstream_rights_status != "cleared"
+            or self.use_scope != "production_economic"
+        ):
+            raise ValueError(
+                "production_allowed requires cleared commercial and upstream rights"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["source_grade"] = self.source_grade.value
         return value
+
+
+def assert_economic_use_allowed(metadata: SourceResponseMetadata) -> None:
+    """Reject production/economic use unless every rights gate is cleared."""
+
+    if (
+        not metadata.production_allowed
+        or metadata.commercial_use_status != "cleared"
+        or metadata.upstream_rights_status != "cleared"
+        or metadata.use_scope != "production_economic"
+    ):
+        raise PermissionError(
+            f"provider {metadata.provider} is not cleared for production/economic use: "
+            f"commercial={metadata.commercial_use_status}; "
+            f"upstream={metadata.upstream_rights_status}; scope={metadata.use_scope}"
+        )
 
 
 @dataclass(frozen=True)
