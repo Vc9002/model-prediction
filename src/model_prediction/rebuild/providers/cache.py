@@ -108,5 +108,7 @@ class ProviderRawCache:
             source_version=raw.get("source_version"),
             source_grade=SourceGrade(raw["source_grade"]),
             from_cache=True,
+            commercial_use_status=raw.get("commercial_use_status", "unresolved"),
+            production_allowed=bool(raw.get("production_allowed", False)),
         )
         return CachedResponse(metadata, self.root / raw["body_path"], manifest_path)

@@ -133,6 +133,8 @@ class SportsDataverseProvider:
             content_type=fetched.headers.get("content-type"),
             source_version=self.installed_version() or SPORTSDATAVERSE_PIN,
             source_grade=SourceGrade.B,
+            commercial_use_status="unresolved_external_asset_terms",
+            production_allowed=False,
         )
         if fetched.status_code != 200:
             self.cache.store(metadata, fetched.body)
@@ -187,6 +189,8 @@ class SportsDataverseProvider:
             content_type=fetched.headers.get("content-type"),
             source_version=self.installed_version() or SPORTSDATAVERSE_PIN,
             source_grade=SourceGrade.A,
+            commercial_use_status="unresolved_espn_endpoint_terms",
+            production_allowed=False,
         )
         if fetched.status_code != 200:
             self.cache.store(metadata, fetched.body)

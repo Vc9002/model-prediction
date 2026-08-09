@@ -55,11 +55,22 @@ class SourceResponseMetadata:
     source_version: str | None = None
     source_grade: SourceGrade = SourceGrade.B
     from_cache: bool = False
+    commercial_use_status: str = "unresolved"
+    production_allowed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["source_grade"] = self.source_grade.value
         return value
+
+
+def assert_production_use_allowed(metadata: SourceResponseMetadata) -> None:
+    """Reject economic/production use unless the source was explicitly cleared."""
+    if not metadata.production_allowed:
+        raise PermissionError(
+            f"provider {metadata.provider} is not production-cleared: "
+            f"{metadata.commercial_use_status}"
+        )
 
 
 @dataclass(frozen=True)

@@ -6,6 +6,7 @@ from .base import (
     SourceGrade,
     SourceResponseMetadata,
     SportsDataProvider,
+    assert_production_use_allowed,
 )
 from .cache import ProviderRawCache
 from .config import ProviderPolicy, RebuildSourcesConfig, load_rebuild_sources_config
@@ -23,5 +24,6 @@ __all__ = [
     "SourceGrade",
     "SourceResponseMetadata",
     "SportsDataProvider",
+    "assert_production_use_allowed",
     "load_rebuild_sources_config",
 ]

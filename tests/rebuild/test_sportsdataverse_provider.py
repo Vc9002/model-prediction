@@ -45,6 +45,9 @@ def test_historical_asset_is_raw_first_and_cached(tmp_path):
     second = provider.schedule(sport="wnba", season=2024)
 
     assert first.status is ProviderStatus.AVAILABLE
+    assert first.metadata is not None
+    assert first.metadata.production_allowed is False
+    assert first.metadata.commercial_use_status == "unresolved_external_asset_terms"
     assert second.status is ProviderStatus.AVAILABLE
     assert second.metadata is not None and second.metadata.from_cache
     assert calls == 1
@@ -101,6 +104,9 @@ def test_current_scoreboard_is_captured_before_parsing(tmp_path):
     )
     result = provider.current_schedule(date(2026, 8, 10))
     assert result.status is ProviderStatus.AVAILABLE
+    assert result.metadata is not None
+    assert result.metadata.production_allowed is False
+    assert result.metadata.commercial_use_status == "unresolved_espn_endpoint_terms"
     assert result.frame is not None
     assert result.frame["game_id"].to_list() == [401000002]
     assert len(list(tmp_path.rglob("*.bin"))) == 1

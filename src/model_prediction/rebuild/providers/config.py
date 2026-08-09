@@ -21,6 +21,8 @@ class RebuildSourcesConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     sportsdataverse: ProviderPolicy
+    mlb_stats: ProviderPolicy
+    statcast: ProviderPolicy
     football_data: ProviderPolicy
     open_meteo: ProviderPolicy
     polymarket: ProviderPolicy
