@@ -8,10 +8,16 @@ import polars as pl
 import pytest
 
 from model_prediction.rebuild.nfl.audit import audit_nfl_season
+from model_prediction.rebuild.nfl.foundation import NFLFoundation
 from model_prediction.rebuild.nfl.normalize import normalize_nfl_table
 from model_prediction.rebuild.nfl.pit import eligible_prior_team_plays, eligible_weekly_roster
 from model_prediction.rebuild.nfl.store import NFLNormalizedStore
-from model_prediction.rebuild.providers.base import SourceGrade, SourceResponseMetadata
+from model_prediction.rebuild.providers.base import (
+    ProviderResult,
+    ProviderStatus,
+    SourceGrade,
+    SourceResponseMetadata,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures/providers/nflverse"
 
@@ -30,6 +36,13 @@ def _metadata(observed: str = "2026-08-09T00:00:00+00:00", content: str = "a") -
         schema_hash="b" * 64,
         source_version="nflverse-data:fixture",
         source_grade=SourceGrade.B,
+        license_id="CC-BY-4.0",
+        license_url="https://creativecommons.org/licenses/by/4.0/",
+        attribution_required=True,
+        attribution_text="nflverse project data; attribution required under CC BY 4.0",
+        upstream_rights_status="unresolved",
+        commercial_use_status="unresolved",
+        production_allowed=False,
     )
 
 
@@ -45,6 +58,11 @@ def test_normalizers_preserve_capture_time_and_mutable_release_warning():
         assert frame["observed_at_utc"][0] == "2026-08-09T00:00:00+00:00"
         assert frame["effective_at_utc"][0] == "2026-08-09T00:00:00+00:00"
         assert frame["availability_basis"][0] == "capture_time_only_mutable_release"
+        assert frame["license_id"][0] == "CC-BY-4.0"
+        assert frame["attribution_required"][0] is True
+        assert frame["upstream_rights_status"][0] == "unresolved"
+        assert frame["commercial_use_status"][0] == "unresolved"
+        assert frame["production_allowed"][0] is False
     assert games.filter(pl.col("season") == 2024)["event_start_utc"][0] == "2024-09-10T00:15:00+00:00"
     assert plays["game_complete"].all()
 
@@ -151,3 +169,31 @@ def test_audit_keeps_capture_only_limitation_explicit(tmp_path):
     report = audit_nfl_season(store, 2024)
     assert report["status"] == "HEALTHY"
     assert "not retrospective PIT evidence" in report["qualification_note"]
+    assert report["license_id"] == "CC-BY-4.0"
+    assert report["attribution_required"] is True
+    assert report["upstream_rights_status"] == "unresolved"
+    assert report["production_allowed"] is False
+
+
+def test_dataset_manifest_preserves_asset_rights_metadata(tmp_path):
+    class FixtureNFLVerseProvider:
+        def season_table(self, table: str, season: int, *, force: bool = False) -> ProviderResult:
+            assert table == "schedule"
+            assert season == 2024
+            assert force is False
+            return ProviderResult(
+                ProviderStatus.AVAILABLE,
+                _metadata(),
+                _fixture("nfl_schedule_rows.json").filter(pl.col("season") == season),
+            )
+
+    foundation = NFLFoundation(FixtureNFLVerseProvider(), tmp_path)  # type: ignore[arg-type]
+    report = foundation.backfill([2024], tables=("schedule",))
+    season = report["seasons"][0]
+    asset = season["source_assets"]["schedule"]
+    assert asset["license_id"] == "CC-BY-4.0"
+    assert asset["attribution_required"] is True
+    assert asset["upstream_rights_status"] == "unresolved"
+    assert asset["commercial_use_status"] == "unresolved"
+    assert asset["production_allowed"] is False
+    assert season["production_allowed"] is False

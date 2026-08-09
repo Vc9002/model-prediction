@@ -6,7 +6,11 @@ from datetime import UTC, datetime
 import httpx
 import pytest
 
-from model_prediction.rebuild.providers.base import SourceGrade, SourceResponseMetadata
+from model_prediction.rebuild.providers.base import (
+    SourceGrade,
+    SourceResponseMetadata,
+    assert_economic_use_allowed,
+)
 from model_prediction.rebuild.providers.cache import ProviderRawCache
 from model_prediction.rebuild.providers.http import HttpProviderClient, RetryPolicy
 
@@ -86,3 +90,42 @@ def test_http_does_not_retry_403():
     )
     assert client.get("https://example.invalid/forbidden").status_code == 403
     assert calls == 1
+
+
+def test_unresolved_rights_cannot_be_marked_production_allowed():
+    with pytest.raises(ValueError, match="cleared commercial and upstream rights"):
+        SourceResponseMetadata(
+            provider="unsafe",
+            sport="nfl",
+            endpoint_family="asset",
+            requested_parameters={},
+            request_time_utc="2026-01-01T00:00:00+00:00",
+            retrieved_at_utc="2026-01-01T00:00:00+00:00",
+            observed_at_utc="2026-01-01T00:00:00+00:00",
+            http_status=200,
+            content_hash="a" * 64,
+            schema_hash=None,
+            commercial_use_status="unresolved",
+            production_allowed=True,
+        )
+
+    with pytest.raises(ValueError, match="cleared commercial and upstream rights"):
+        SourceResponseMetadata(
+            provider="unsafe-upstream",
+            sport="nfl",
+            endpoint_family="asset",
+            requested_parameters={},
+            request_time_utc="2026-01-01T00:00:00+00:00",
+            retrieved_at_utc="2026-01-01T00:00:00+00:00",
+            observed_at_utc="2026-01-01T00:00:00+00:00",
+            http_status=200,
+            content_hash="a" * 64,
+            schema_hash=None,
+            upstream_rights_status="unresolved",
+            commercial_use_status="cleared",
+            production_allowed=True,
+        )
+
+    unresolved = _metadata(b"asset", datetime(2026, 1, 1, tzinfo=UTC))
+    with pytest.raises(PermissionError, match="not cleared for production/economic use"):
+        assert_economic_use_allowed(unresolved)

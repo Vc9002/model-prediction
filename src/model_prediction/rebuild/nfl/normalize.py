@@ -101,6 +101,13 @@ def _provenance(metadata: SourceResponseMetadata, record_id: str) -> dict[str, A
         "source_grade": metadata.source_grade.value,
         "availability_basis": "capture_time_only_mutable_release",
         "pit_eligible": True,
+        "license_id": metadata.license_id,
+        "license_url": metadata.license_url,
+        "attribution_required": metadata.attribution_required,
+        "attribution_text": metadata.attribution_text,
+        "upstream_rights_status": metadata.upstream_rights_status,
+        "commercial_use_status": metadata.commercial_use_status,
+        "production_allowed": metadata.production_allowed,
     }
 
 

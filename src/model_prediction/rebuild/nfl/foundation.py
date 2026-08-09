@@ -49,6 +49,7 @@ class NFLFoundation:
             source_hashes: dict[str, str] = {}
             schema_hashes: dict[str, str | None] = {}
             row_counts: dict[str, int] = {}
+            source_assets: dict[str, dict[str, Any]] = {}
             errors: dict[str, str] = {}
             for source_table in tables:
                 if source_table not in NORMALIZERS:
@@ -67,6 +68,16 @@ class NFLFoundation:
                 source_hashes[source_table] = result.metadata.content_hash
                 schema_hashes[source_table] = result.metadata.schema_hash
                 row_counts[target] = normalized.height
+                source_assets[source_table] = {
+                    "source_version": result.metadata.source_version,
+                    "license_id": result.metadata.license_id,
+                    "license_url": result.metadata.license_url,
+                    "attribution_required": result.metadata.attribution_required,
+                    "attribution_text": result.metadata.attribution_text,
+                    "upstream_rights_status": result.metadata.upstream_rights_status,
+                    "commercial_use_status": result.metadata.commercial_use_status,
+                    "production_allowed": result.metadata.production_allowed,
+                }
 
             material = {
                 "sport": "nfl",
@@ -74,6 +85,7 @@ class NFLFoundation:
                 "source_hashes": source_hashes,
                 "schema_hashes": schema_hashes,
                 "row_counts": row_counts,
+                "source_assets": source_assets,
             }
             dataset_hash = hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
             manifest = {
@@ -83,6 +95,7 @@ class NFLFoundation:
                 "dataset_hash": dataset_hash,
                 "availability_basis": "capture_time_only_mutable_release",
                 "retrospective_pit_qualified": False,
+                "production_allowed": False,
                 "errors": errors,
             }
             manifest_path = (

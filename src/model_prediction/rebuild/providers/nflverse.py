@@ -33,6 +33,13 @@ class NFLVerseAsset:
     minimum_season: int
     required_columns: frozenset[str]
     season_partitioned: bool = True
+    project_license_id: str = "CC-BY-4.0"
+    project_license_url: str = "https://creativecommons.org/licenses/by/4.0/"
+    attribution_required: bool = True
+    attribution_text: str = "nflverse project data; attribution required under CC BY 4.0"
+    upstream_rights_status: str = "unresolved"
+    commercial_use_status: str = "unresolved"
+    production_allowed: bool = False
 
     def filename(self, season: int) -> str:
         return self.filename_pattern.format(season=season)
@@ -165,6 +172,13 @@ class NFLVerseProvider:
             content_type=fetched.headers.get("content-type"),
             source_version=f"nflverse-data:{asset.release_tag}/{asset.filename(season)}",
             source_grade=SourceGrade.B,
+            license_id=asset.project_license_id,
+            license_url=asset.project_license_url,
+            attribution_required=asset.attribution_required,
+            attribution_text=asset.attribution_text,
+            upstream_rights_status=asset.upstream_rights_status,
+            commercial_use_status=asset.commercial_use_status,
+            production_allowed=asset.production_allowed,
         )
         if fetched.status_code != 200:
             self.cache.store(metadata, fetched.body)

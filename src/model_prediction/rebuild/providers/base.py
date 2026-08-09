@@ -55,11 +55,41 @@ class SourceResponseMetadata:
     source_version: str | None = None
     source_grade: SourceGrade = SourceGrade.B
     from_cache: bool = False
+    license_id: str | None = None
+    license_url: str | None = None
+    attribution_required: bool = False
+    attribution_text: str | None = None
+    upstream_rights_status: str = "unresolved"
+    commercial_use_status: str = "unresolved"
+    production_allowed: bool = False
+
+    def __post_init__(self) -> None:
+        if self.production_allowed and (
+            self.commercial_use_status != "cleared"
+            or self.upstream_rights_status != "cleared"
+        ):
+            raise ValueError(
+                "production_allowed requires cleared commercial and upstream rights"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["source_grade"] = self.source_grade.value
         return value
+
+
+def assert_economic_use_allowed(metadata: SourceResponseMetadata) -> None:
+    """Reject production/economic use unless data rights were explicitly cleared."""
+    if (
+        not metadata.production_allowed
+        or metadata.commercial_use_status != "cleared"
+        or metadata.upstream_rights_status != "cleared"
+    ):
+        raise PermissionError(
+            f"provider {metadata.provider} is not cleared for production/economic use: "
+            f"{metadata.commercial_use_status}; upstream rights "
+            f"{metadata.upstream_rights_status}"
+        )
 
 
 @dataclass(frozen=True)

@@ -43,6 +43,11 @@ def audit_nfl_season(store: NFLNormalizedStore, season: int) -> dict[str, Any]:
         "duplicate_plays": _duplicates(plays, ["event_id", "play_id", "observed_at_utc"]),
         "missing_complete_pbp_games": len(completed_ids - complete_pbp_ids),
         "timestamp_violations": timestamp_violations,
+        "license_id": "CC-BY-4.0",
+        "attribution_required": True,
+        "upstream_rights_status": "unresolved",
+        "commercial_use_status": "unresolved",
+        "production_allowed": False,
     }
     hard_fail = any(report[key] for key in ("duplicate_games", "duplicate_plays", "timestamp_violations"))
     degraded = (
@@ -51,6 +56,7 @@ def audit_nfl_season(store: NFLNormalizedStore, season: int) -> dict[str, Any]:
     report["status"] = "ERROR" if hard_fail else ("DEGRADED" if degraded else "HEALTHY")
     report["qualification_note"] = (
         "Mutable nflverse releases captured now are not retrospective PIT evidence; "
-        "only vintages observed by a decision time are eligible."
+        "only vintages observed by a decision time are eligible. Project-layer "
+        "CC BY 4.0 attribution does not resolve upstream or trading rights."
     )
     return report

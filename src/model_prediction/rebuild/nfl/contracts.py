@@ -4,6 +4,16 @@ from __future__ import annotations
 
 from model_prediction.rebuild.schemas import ColumnSpec, TableContract
 
+NFLVERSE_RIGHTS_COLUMNS = [
+    ColumnSpec("license_id", str, False),
+    ColumnSpec("license_url", str, False),
+    ColumnSpec("attribution_required", bool, False),
+    ColumnSpec("attribution_text", str, False),
+    ColumnSpec("upstream_rights_status", str, False),
+    ColumnSpec("commercial_use_status", str, False),
+    ColumnSpec("production_allowed", bool, False),
+]
+
 NFL_CONTRACTS: dict[str, TableContract] = {
     "games": TableContract(
         name="nfl_games_v1",
@@ -24,6 +34,7 @@ NFL_CONTRACTS: dict[str, TableContract] = {
             ColumnSpec("raw_snapshot_hash", str, False),
             ColumnSpec("pit_eligible", bool, False),
             ColumnSpec("availability_basis", str, False),
+            *NFLVERSE_RIGHTS_COLUMNS,
         ],
     ),
     "plays": TableContract(
@@ -43,6 +54,7 @@ NFL_CONTRACTS: dict[str, TableContract] = {
             ColumnSpec("raw_snapshot_hash", str, False),
             ColumnSpec("pit_eligible", bool, False),
             ColumnSpec("availability_basis", str, False),
+            *NFLVERSE_RIGHTS_COLUMNS,
         ],
     ),
     "weekly_rosters": TableContract(
@@ -68,6 +80,7 @@ NFL_CONTRACTS: dict[str, TableContract] = {
             ColumnSpec("raw_snapshot_hash", str, False),
             ColumnSpec("pit_eligible", bool, False),
             ColumnSpec("availability_basis", str, False),
+            *NFLVERSE_RIGHTS_COLUMNS,
         ],
     ),
 }
