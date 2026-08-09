@@ -15,6 +15,7 @@ from model_prediction.rebuild.providers.base import (
     SourceGrade,
     SourceResponseMetadata,
 )
+from model_prediction.rebuild.tennis.audit import audit_tennis_rights
 from model_prediction.rebuild.tennis.live import (
     LiveRejectReason,
     TennisLivePolicy,
@@ -29,7 +30,10 @@ from model_prediction.rebuild.tennis.normalize import (
 from model_prediction.rebuild.tennis.pit import eligible_prior_matches, ranking_as_of
 from model_prediction.rebuild.tennis.policy import (
     HISTORICAL_SOURCE_POLICY,
+    CommercialUseStatus,
     HistoricalSourcePolicy,
+    PrimarySourceStatus,
+    TennisDataUse,
     TennisSourcePolicyError,
 )
 from model_prediction.rebuild.tennis.snapshot import (
@@ -71,6 +75,11 @@ def _manifest(**updates: object) -> TennisSnapshotManifest:
         "retrieved_at_utc": "2026-08-09T00:00:00+00:00",
         "license_id": "CC-BY-NC-SA-4.0",
         "attribution": "Synthetic contract fixture; source shape attributed to Jeff Sackmann / Tennis Abstract",
+        "commercial_use_status": "prohibited",
+        "production_allowed": False,
+        "primary_source_status": "unavailable",
+        "attribution_required": True,
+        "share_alike_required": True,
         "availability_basis": "capture_time_only",
         "history_complete": False,
         "files": (SnapshotFile("synthetic.csv", "a" * 64, 1),),
@@ -106,6 +115,24 @@ def test_manifest_rejects_a_mirror_and_every_unverified_history_claim():
         _manifest(history_complete=True)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("commercial_use_status", None),
+        ("commercial_use_status", "unknown"),
+        ("production_allowed", None),
+        ("production_allowed", True),
+        ("primary_source_status", None),
+        ("primary_source_status", "available"),
+        ("attribution_required", False),
+        ("share_alike_required", False),
+    ],
+)
+def test_manifest_rejects_null_unknown_or_permissive_rights(field: str, value: object):
+    with pytest.raises(ValueError, match="rights metadata|explicit boolean"):
+        _manifest(**{field: value})
+
+
 def test_disabled_policy_cannot_be_turned_on_by_a_manifest(tmp_path):
     with pytest.raises(TennisSourcePolicyError, match="disabled"):
         verify_local_snapshot(tmp_path, _manifest())
@@ -122,6 +149,11 @@ def test_explicitly_approved_local_snapshot_is_hash_verified_without_network(tmp
         enabled=True,
         network_download_allowed=False,
         approved_for_commercial_use=False,
+        commercial_use_status=CommercialUseStatus.PROHIBITED,
+        production_allowed=False,
+        primary_source_status=PrimarySourceStatus.UNAVAILABLE,
+        attribution_required=True,
+        share_alike_required=True,
         license_id="CC-BY-NC-SA-4.0",
         availability_basis="capture_time_only",
         former_primary_urls=HISTORICAL_SOURCE_POLICY.former_primary_urls,
@@ -131,6 +163,41 @@ def test_explicitly_approved_local_snapshot_is_hash_verified_without_network(tmp
     (tmp_path / "synthetic.csv").write_bytes(b"tampered")
     with pytest.raises(ValueError, match="size mismatch|hash mismatch"):
         verify_local_snapshot(tmp_path.resolve(), manifest, policy=approved)
+
+
+@pytest.mark.parametrize("intended_use", [TennisDataUse.ECONOMIC, TennisDataUse.PRODUCTION])
+def test_noncommercial_snapshot_hard_fails_economic_and_production_use(
+    tmp_path: Path,
+    intended_use: TennisDataUse,
+):
+    approved_for_research = HistoricalSourcePolicy(
+        provider="jeff_sackmann",
+        enabled=True,
+        network_download_allowed=False,
+        approved_for_commercial_use=False,
+        commercial_use_status=CommercialUseStatus.PROHIBITED,
+        production_allowed=False,
+        primary_source_status=PrimarySourceStatus.UNAVAILABLE,
+        attribution_required=True,
+        share_alike_required=True,
+        license_id="CC-BY-NC-SA-4.0",
+        availability_basis="capture_time_only",
+        former_primary_urls=HISTORICAL_SOURCE_POLICY.former_primary_urls,
+        reason="unit-test-only research snapshot",
+    )
+    with pytest.raises(TennisSourcePolicyError, match="use is prohibited"):
+        verify_local_snapshot(
+            tmp_path.resolve(),
+            _manifest(),
+            policy=approved_for_research,
+            intended_use=intended_use,
+        )
+
+
+@pytest.mark.parametrize("intended_use", [None, "", "unknown"])
+def test_null_or_unknown_intended_use_cannot_bypass_policy(intended_use: object):
+    with pytest.raises(TennisSourcePolicyError, match="explicit and recognized"):
+        HISTORICAL_SOURCE_POLICY.assert_use_allowed(intended_use)  # type: ignore[arg-type]
 
 
 def test_strict_normalizers_preserve_capture_time_and_date_granularity():
@@ -146,6 +213,33 @@ def test_strict_normalizers_preserve_capture_time_and_date_granularity():
     assert matches["actual_start_utc"].null_count() == matches.height
     assert not any(matches["historical_observation_verified"])
     assert set(matches["observed_at_utc"]) == {"2026-08-09T00:00:00+00:00"}
+    for frame in (players, rankings, matches):
+        assert set(frame["commercial_use_status"]) == {"prohibited"}
+        assert set(frame["production_allowed"]) == {False}
+        assert set(frame["primary_source_status"]) == {"unavailable"}
+        assert set(frame["attribution_required"]) == {True}
+        assert set(frame["share_alike_required"]) == {True}
+
+    audit = audit_tennis_rights({"players": players, "rankings": rankings, "matches": matches})
+    assert audit.audit_status == "BLOCKED_NONCOMMERCIAL_SOURCE"
+    assert audit.commercial_use_status == "prohibited"
+    assert audit.production_allowed is False
+    assert audit.primary_source_status == "unavailable"
+    assert audit.normalized_rows_checked == players.height + rankings.height + matches.height
+    assert not audit.violations
+
+
+def test_rights_audit_rejects_missing_null_or_permissive_normalized_metadata():
+    players = normalize_players(_frame("synthetic_players.json"), _context())
+    cases = {
+        "missing": players.drop("commercial_use_status"),
+        "null": players.with_columns(pl.lit(None).alias("production_allowed")),
+        "permissive": players.with_columns(pl.lit(True).alias("production_allowed")),
+    }
+    for name, frame in cases.items():
+        audit = audit_tennis_rights({name: frame})
+        assert audit.audit_status == "INVALID"
+        assert audit.violations
 
 
 def test_atp_and_wta_same_numeric_player_id_remain_separate_namespaces():

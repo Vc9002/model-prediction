@@ -10,7 +10,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .policy import HISTORICAL_SOURCE_POLICY, HistoricalSourcePolicy, TennisSourcePolicyError
+from .policy import (
+    HISTORICAL_SOURCE_POLICY,
+    CommercialUseStatus,
+    HistoricalSourcePolicy,
+    PrimarySourceStatus,
+    TennisDataUse,
+    TennisSourcePolicyError,
+)
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -49,6 +56,11 @@ class TennisSnapshotManifest:
     retrieved_at_utc: str
     license_id: str
     attribution: str
+    commercial_use_status: str
+    production_allowed: bool
+    primary_source_status: str
+    attribution_required: bool
+    share_alike_required: bool
     availability_basis: str
     history_complete: bool
     files: tuple[SnapshotFile, ...]
@@ -57,13 +69,19 @@ class TennisSnapshotManifest:
     def from_dict(cls, payload: dict[str, Any]) -> TennisSnapshotManifest:
         expected = {
             "provider", "tour", "source_repository_url", "source_revision",
-            "retrieved_at_utc", "license_id", "attribution", "availability_basis",
-            "history_complete", "files",
+            "retrieved_at_utc", "license_id", "attribution", "commercial_use_status",
+            "production_allowed", "primary_source_status", "attribution_required",
+            "share_alike_required", "availability_basis", "history_complete", "files",
         }
         unknown = set(payload) - expected
         missing = expected - set(payload)
         if unknown or missing:
             raise ValueError(f"invalid tennis manifest fields: missing={sorted(missing)} unknown={sorted(unknown)}")
+        for field in (
+            "production_allowed", "attribution_required", "share_alike_required", "history_complete",
+        ):
+            if type(payload[field]) is not bool:
+                raise ValueError(f"{field} must be an explicit boolean")
         manifest = cls(
             provider=str(payload["provider"]),
             tour=str(payload["tour"]).upper(),
@@ -72,6 +90,11 @@ class TennisSnapshotManifest:
             retrieved_at_utc=str(payload["retrieved_at_utc"]),
             license_id=str(payload["license_id"]),
             attribution=str(payload["attribution"]),
+            commercial_use_status=str(payload["commercial_use_status"]),
+            production_allowed=payload["production_allowed"],
+            primary_source_status=str(payload["primary_source_status"]),
+            attribution_required=payload["attribution_required"],
+            share_alike_required=payload["share_alike_required"],
             availability_basis=str(payload["availability_basis"]),
             history_complete=bool(payload["history_complete"]),
             files=tuple(SnapshotFile.from_dict(item) for item in payload["files"]),
@@ -93,6 +116,23 @@ class TennisSnapshotManifest:
             raise ValueError("retrieved_at_utc must be timezone-aware")
         if self.license_id != HISTORICAL_SOURCE_POLICY.license_id:
             raise ValueError("manifest license does not match the documented source policy")
+        expected_rights = HISTORICAL_SOURCE_POLICY.rights_metadata()
+        actual_rights = {
+            "commercial_use_status": self.commercial_use_status,
+            "production_allowed": self.production_allowed,
+            "primary_source_status": self.primary_source_status,
+            "attribution_required": self.attribution_required,
+            "share_alike_required": self.share_alike_required,
+            "license_id": self.license_id,
+        }
+        if actual_rights != expected_rights:
+            raise ValueError("manifest rights metadata does not match the fail-closed source policy")
+        if self.commercial_use_status != CommercialUseStatus.PROHIBITED.value:
+            raise ValueError("historical tennis commercial use must remain prohibited")
+        if self.production_allowed:
+            raise ValueError("historical tennis data is not allowed in production")
+        if self.primary_source_status != PrimarySourceStatus.UNAVAILABLE.value:
+            raise ValueError("former primary source must remain explicitly unavailable")
         if not self.attribution.strip():
             raise ValueError("source attribution is required")
         if self.availability_basis != "capture_time_only":
@@ -125,9 +165,10 @@ def verify_local_snapshot(
     manifest: TennisSnapshotManifest,
     *,
     policy: HistoricalSourcePolicy = HISTORICAL_SOURCE_POLICY,
+    intended_use: TennisDataUse | str | None = TennisDataUse.RESEARCH,
 ) -> None:
     """Verify an approved local snapshot without ever performing network I/O."""
-    approved_root = policy.require_approved_local_root(root)
+    approved_root = policy.require_approved_local_root(root, intended_use=intended_use)
     if policy.provider != manifest.provider or policy.license_id != manifest.license_id:
         raise TennisSourcePolicyError("snapshot manifest does not match the approved source policy")
     for item in manifest.files:

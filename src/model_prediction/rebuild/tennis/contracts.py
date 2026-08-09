@@ -13,6 +13,12 @@ _COMMON = [
     ColumnSpec("raw_snapshot_hash", str, False),
     ColumnSpec("availability_basis", str, False),
     ColumnSpec("historical_observation_verified", bool, False),
+    ColumnSpec("commercial_use_status", str, False),
+    ColumnSpec("production_allowed", bool, False),
+    ColumnSpec("primary_source_status", str, False),
+    ColumnSpec("attribution_required", bool, False),
+    ColumnSpec("share_alike_required", bool, False),
+    ColumnSpec("license_id", str, False),
 ]
 
 TENNIS_CONTRACTS: dict[str, TableContract] = {

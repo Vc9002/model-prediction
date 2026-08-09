@@ -113,11 +113,19 @@ class TestCollectionOnlyAdapterFailsClosedNotCrashed:
     """
 
     def test_tennis_fails_closed_while_historical_source_is_unavailable(self, tmp_path):
+        from model_prediction.rebuild.sport_adapter import _BasicEloAdapter
+
         adapter = build_adapter("tennis", str(tmp_path))
+        assert not isinstance(adapter, _BasicEloAdapter)
         result = adapter.collect("2026-08-06")
         assert result.status == STAGE_NO_DATA
         assert result.detail["source_policy"] == "BLOCKED"
         assert result.detail["historical_pit_verified"] is False
+        assert result.detail["commercial_use_status"] == "prohibited"
+        assert result.detail["production_allowed"] is False
+        assert result.detail["primary_source_status"] == "unavailable"
+        assert result.detail["attribution_required"] is True
+        assert result.detail["share_alike_required"] is True
         assert "SOURCE_UNAVAILABLE" in result.detail["reason"]
 
         feature_result = adapter.build_features("2026-08-06", "late")

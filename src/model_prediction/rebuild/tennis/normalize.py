@@ -40,6 +40,7 @@ class TennisNormalizationContext:
     metadata: SourceResponseMetadata
 
     def validate(self) -> None:
+        self.manifest.validate()
         if self.metadata.provider != self.manifest.provider:
             raise ValueError("manifest/provider metadata mismatch")
         if self.metadata.sport != "tennis":
@@ -152,6 +153,12 @@ def _provenance(context: TennisNormalizationContext, record_id: str) -> dict[str
         # A manifest assertion is not proof that each row existed before a
         # historical decision. No source-history verifier exists yet.
         "historical_observation_verified": False,
+        "commercial_use_status": manifest.commercial_use_status,
+        "production_allowed": manifest.production_allowed,
+        "primary_source_status": manifest.primary_source_status,
+        "attribution_required": manifest.attribution_required,
+        "share_alike_required": manifest.share_alike_required,
+        "license_id": manifest.license_id,
     }
 
 

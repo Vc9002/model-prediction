@@ -420,6 +420,7 @@ class _TennisFoundationUnavailableAdapter(_NotImplementedStagesMixin):
             "source_policy": "BLOCKED",
             "qualification_status": "DATA_FOUNDATION",
             "historical_pit_verified": False,
+            **HISTORICAL_SOURCE_POLICY.rights_metadata(),
         }
 
     def collect(self, date: str, run_id: str | None = None) -> StageResult:
