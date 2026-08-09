@@ -1,0 +1,20 @@
+{
+  "events": [
+    {
+      "id": "700001",
+      "date": "2026-08-10T19:00:00Z",
+      "season": {"year": 2026, "type": 1},
+      "league": {"slug": "eng.1", "name": "English Premier League"},
+      "competitions": [
+        {
+          "status": {"type": {"name": "STATUS_SCHEDULED", "completed": false}},
+          "venue": {"id": "55", "fullName": "Synthetic Ground"},
+          "competitors": [
+            {"homeAway": "home", "team": {"id": "10", "displayName": "Alpha FC"}, "score": null},
+            {"homeAway": "away", "team": {"id": "20", "displayName": "Beta FC"}, "score": null}
+          ]
+        }
+      ]
+    }
+  ]
+}

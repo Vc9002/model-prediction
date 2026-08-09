@@ -13,9 +13,9 @@ Honest scope, not fabricated:
   OpenDota network integration yet), so collect() reports
   NOT_IMPLEMENTED rather than SUCCESS. KBO/NPB have no collector at all
   and correctly raise from build_adapter().
-- `build_features()`: real for MLB only (horizon_builder.py, itself real
-  and live-verified). Every other sport correctly reports NOT_IMPLEMENTED
-  rather than fabricating a feature row.
+- Soccer is collection-only until a draw-aware three-way model is built.
+  The generic binary Elo path is explicitly disabled for soccer because
+  forcing home/draw/away into two outcomes can create false decisions.
 - `predict()` / `match_markets()` / `decide()`: real for MLB, via
   mlb_shadow_pipeline.py's predict_stage/match_markets_stage/decide_stage
   -- the exact same functions (train_through, build_forecast,
@@ -263,6 +263,24 @@ class _CollectionOnlyAdapter(_NotImplementedStagesMixin):
         return StageResult("collect", status_map.get(result.get("status"), STAGE_ERROR), result)
 
 
+class _SoccerCollectionOnlyAdapter(_CollectionOnlyAdapter):
+    """Reject the legacy binary soccer path; collection remains available."""
+
+    _reason = "soccer prediction disabled: a draw-aware three-way model is required; binary Elo is unsafe"
+
+    def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return StageResult("build_features", STAGE_NOT_IMPLEMENTED, {"reason": self._reason})
+
+    def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return StageResult("predict", STAGE_NOT_IMPLEMENTED, {"reason": self._reason})
+
+    def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return StageResult("match_markets", STAGE_NOT_IMPLEMENTED, {"reason": self._reason})
+
+    def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
+        return StageResult("decide", STAGE_NOT_IMPLEMENTED, {"reason": self._reason})
+
+
 class _BasicEloAdapter(_CollectionOnlyAdapter):
     """Real basic foundation pipeline for NBA/WNBA/NFL/Soccer/Tennis:
     collect -> build_features -> predict -> match_markets -> decide -> the
@@ -442,7 +460,7 @@ def build_adapter(
         return _BasicEloAdapter(sport, data_root, nfl_collector, nfl_collector.collect_date)
     if sport == "soccer":
         soccer_collector = SoccerCollector(data_root, meta)
-        return _BasicEloAdapter(sport, data_root, soccer_collector, soccer_collector.collect_date)
+        return _SoccerCollectionOnlyAdapter(sport, soccer_collector)
     if sport == "tennis":
         tennis_collector = TennisCollector(data_root, meta)
         return _BasicEloAdapter(sport, data_root, tennis_collector, tennis_collector.collect_date)

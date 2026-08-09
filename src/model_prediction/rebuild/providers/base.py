@@ -20,6 +20,7 @@ class ProviderStatus(StrEnum):
     DEGRADED = "DEGRADED"
     STALE = "STALE"
     UNAVAILABLE = "UNAVAILABLE"
+    POLICY_BLOCKED = "POLICY_BLOCKED"
 
 
 class SourceGrade(StrEnum):
@@ -76,6 +77,10 @@ class ProviderResult:
     @classmethod
     def unavailable(cls, reason: str, metadata: SourceResponseMetadata | None = None) -> ProviderResult:
         return cls(ProviderStatus.UNAVAILABLE, metadata, None, reason)
+
+    @classmethod
+    def policy_blocked(cls, reason: str) -> ProviderResult:
+        return cls(ProviderStatus.POLICY_BLOCKED, None, None, reason)
 
 
 class SportsDataProvider(Protocol):

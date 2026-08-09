@@ -67,7 +67,13 @@ class HttpProviderClient:
         if remaining > 0:
             self._sleep(remaining)
 
-    def get(self, url: str, *, params: dict[str, Any] | None = None) -> HttpFetch:
+    def get(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> HttpFetch:
         request_time = datetime.now(UTC).isoformat()
         started = self._monotonic()
         last_error: httpx.RequestError | None = None
@@ -75,7 +81,7 @@ class HttpProviderClient:
             self._throttle()
             self._last_request_at = self._monotonic()
             try:
-                response = self.client.get(url, params=params)
+                response = self.client.get(url, params=params, headers=headers)
             except httpx.RequestError as exc:
                 last_error = exc
                 if attempt == self.retry.attempts:

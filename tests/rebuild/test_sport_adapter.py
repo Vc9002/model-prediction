@@ -81,6 +81,17 @@ class TestHonestNotImplementedStages:
         result = adapter.build_features("2026-08-06", "late")
         assert result.status == STAGE_NOT_IMPLEMENTED
 
+    def test_soccer_binary_elo_path_is_disabled_for_three_way_outcomes(self, tmp_path):
+        adapter = build_adapter("soccer", str(tmp_path))
+        for result in (
+            adapter.build_features("2026-08-06", "late"),
+            adapter.predict("2026-08-06", "late"),
+            adapter.match_markets("2026-08-06", "late"),
+            adapter.decide("2026-08-06", "late"),
+        ):
+            assert result.status == STAGE_NOT_IMPLEMENTED
+            assert "three-way" in result.detail["reason"]
+
     def test_mlb_predict_on_a_cold_empty_data_root_is_honest_no_data_not_a_crash(self, tmp_path):
         # MLB predict/match_markets/decide are now real (mlb_shadow_pipeline.py)
         # -- against a genuinely empty data_root (no scoreboard ever
