@@ -245,11 +245,23 @@ def _read_json(path: Path):
         return None
 
 
+_runtime_paths_cache: list = []
+
+
+def _runtime_paths():
+    """Resolve RuntimePaths once and cache it -- never per-request."""
+    if not _runtime_paths_cache:
+        from model_prediction.runtime_paths import RuntimePaths
+
+        _runtime_paths_cache.append(RuntimePaths.resolve(repo_root=ROOT))
+    return _runtime_paths_cache[0]
+
+
 def rebuild_view(name: str) -> dict:
     """Return one isolated rebuild projection without importing writer classes."""
     from dashboard.rebuild_status import read_rebuild_view
 
-    return read_rebuild_view(name, ROOT)
+    return read_rebuild_view(name, ROOT, paths=_runtime_paths())
 
 
 def _unit_value_usd() -> float:
