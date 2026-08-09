@@ -9,6 +9,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .config import default_repo_root, load_rebuild_config
+from .identity import IdentityRegistry
+from .metadata import MetadataDB
 from .providers.cache import ProviderRawCache
 from .providers.config import load_rebuild_sources_config
 from .providers.http import HttpProviderClient, RetryPolicy
@@ -44,7 +46,8 @@ def _foundation(data_root: Path) -> tuple[WNBAFoundation, HttpProviderClient]:
     )
     cache = ProviderRawCache(data_root / "raw")
     provider = SportsDataverseProvider(http, cache)
-    return WNBAFoundation(provider, data_root / "normalized"), http
+    identity = IdentityRegistry(MetadataDB(data_root / "metadata.db"))
+    return WNBAFoundation(provider, data_root / "normalized", identity), http
 
 
 def main(argv: Sequence[str] | None = None) -> None:

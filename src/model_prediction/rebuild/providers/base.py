@@ -54,12 +54,20 @@ class SourceResponseMetadata:
     content_type: str | None = None
     source_version: str | None = None
     source_grade: SourceGrade = SourceGrade.B
+    commercial_use_status: str = "unresolved"
+    production_allowed: bool = False
     from_cache: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["source_grade"] = self.source_grade.value
         return value
+
+    def assert_production_allowed(self) -> None:
+        if not self.production_allowed or self.commercial_use_status != "cleared":
+            raise RuntimeError(
+                "source data rights are not cleared for production/economic use"
+            )
 
 
 @dataclass(frozen=True)

@@ -29,32 +29,49 @@ from .cache import ProviderRawCache
 from .http import HttpProviderClient
 
 SPORTSDATAVERSE_PIN: Final = "0.0.72"
+# The package license covers its code, not necessarily the upstream ESPN data.
+# Until data rights are affirmatively reviewed, these assets are research/shadow
+# inputs only and cannot support economic or production operation.
+SPORTSDATAVERSE_COMMERCIAL_USE_STATUS: Final = "unresolved"
+SPORTSDATAVERSE_PRODUCTION_ALLOWED: Final = False
 
 WNBA_RELEASE_ASSETS: Final[dict[str, tuple[str, str, frozenset[str]]]] = {
     "schedule": (
         "espn_wnba_schedules",
         "wnba_schedule_{season}.parquet",
-        frozenset({"game_id", "season", "game_date_time", "home_id", "away_id"}),
+        frozenset({
+            "game_id", "season", "game_date_time", "home_id", "away_id",
+            "home_display_name", "away_display_name",
+        }),
     ),
     "team_box": (
         "espn_wnba_team_boxscores",
         "team_box_{season}.parquet",
-        frozenset({"game_id", "season", "team_id", "team_home_away"}),
+        frozenset({
+            "game_id", "season", "game_date_time", "team_id", "team_display_name",
+            "opponent_team_id", "team_home_away", "team_score", "field_goals_made",
+            "field_goals_attempted", "three_point_field_goals_made",
+            "three_point_field_goals_attempted", "free_throws_made", "free_throws_attempted",
+            "offensive_rebounds", "defensive_rebounds", "turnovers",
+        }),
     ),
     "player_box": (
         "espn_wnba_player_boxscores",
         "player_box_{season}.parquet",
-        frozenset({"game_id", "season", "team_id", "athlete_id"}),
+        frozenset({
+            "game_id", "season", "game_date_time", "team_id", "athlete_id",
+            "athlete_display_name",
+        }),
     ),
     "rosters": (
         "espn_wnba_rosters",
         "rosters_{season}.parquet",
-        frozenset({"season", "team_id", "athlete_id"}),
+        frozenset({"season", "team_id", "team_display_name", "athlete_id", "display_name"}),
     ),
     "pbp": (
         "espn_wnba_pbp",
         "play_by_play_{season}.parquet",
-        frozenset({"game_id", "season", "id", "period_number"}),
+        frozenset({"game_id", "season", "game_date_time", "id", "period_number"}),
     ),
     "standings": (
         "espn_wnba_standings",
@@ -133,7 +150,10 @@ class SportsDataverseProvider:
             content_type=fetched.headers.get("content-type"),
             source_version=self.installed_version() or SPORTSDATAVERSE_PIN,
             source_grade=SourceGrade.B,
+            commercial_use_status=SPORTSDATAVERSE_COMMERCIAL_USE_STATUS,
+            production_allowed=SPORTSDATAVERSE_PRODUCTION_ALLOWED,
         )
+        self.cache.store_blob(metadata, fetched.body)
         if fetched.status_code != 200:
             self.cache.store(metadata, fetched.body)
             return ProviderResult.unavailable(
@@ -187,7 +207,10 @@ class SportsDataverseProvider:
             content_type=fetched.headers.get("content-type"),
             source_version=self.installed_version() or SPORTSDATAVERSE_PIN,
             source_grade=SourceGrade.A,
+            commercial_use_status=SPORTSDATAVERSE_COMMERCIAL_USE_STATUS,
+            production_allowed=SPORTSDATAVERSE_PRODUCTION_ALLOWED,
         )
+        self.cache.store_blob(metadata, fetched.body)
         if fetched.status_code != 200:
             self.cache.store(metadata, fetched.body)
             return ProviderResult.unavailable(f"WNBA scoreboard returned HTTP {fetched.status_code}", metadata)

@@ -106,3 +106,39 @@ def test_persisted_and_in_memory_paths_use_same_transform(tmp_path):
         decision_time_utc=decision,
     )
     assert persisted == in_memory
+
+
+def test_latest_asof_game_state_is_selected_before_completed_filter():
+    games = pl.concat([
+        _games().head(1).with_columns(
+            pl.lit("2026-08-09T00:00:00+00:00").alias("observed_at_utc"),
+            pl.lit(True).alias("completed"),
+        ),
+        _games().head(1).with_columns(
+            pl.lit("2026-08-09T01:00:00+00:00").alias("observed_at_utc"),
+            pl.lit(False).alias("completed"),
+        ),
+    ])
+    result = build_team_form_snapshot(
+        games,
+        _boxes().filter(pl.col("event_id") == "g1"),
+        team_id="A",
+        decision_time_utc=datetime(2026, 8, 10, tzinfo=UTC),
+    )
+    assert result["status"] == "UNAVAILABLE"
+    assert result["sample_size"] == 0
+
+
+def test_offset_decision_does_not_admit_box_observed_after_same_instant():
+    # 2026-08-10 05:00 +05:00 is exactly 2026-08-10 00:00 UTC. The box
+    # observed at 01:00 UTC is one hour in the future and must be excluded.
+    boxes = _boxes().with_columns(pl.lit("2026-08-10T01:00:00+00:00").alias("observed_at_utc"))
+    decision = datetime.fromisoformat("2026-08-10T05:00:00+05:00")
+    result = build_team_form_snapshot(
+        _games(),
+        boxes,
+        team_id="A",
+        decision_time_utc=decision,
+    )
+    assert result["status"] == "UNAVAILABLE"
+    assert result["as_of_utc"] == "2026-08-10T00:00:00+00:00"

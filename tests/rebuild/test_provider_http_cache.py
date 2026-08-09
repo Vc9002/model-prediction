@@ -49,6 +49,27 @@ def test_cached_hash_mismatch_fails_closed(tmp_path):
         cached.read_bytes()
 
 
+def test_store_refuses_to_overwrite_corrupted_content_addressed_blob(tmp_path):
+    cache = ProviderRawCache(tmp_path)
+    metadata = _metadata(b"good", datetime(2026, 1, 1, tzinfo=UTC))
+    cached = cache.store(metadata, b"good")
+    cached.body_path.write_bytes(b"bad")
+    with pytest.raises(ValueError, match="conflicting immutable provider blob"):
+        cache.store(metadata, b"good")
+
+
+def test_same_observation_id_with_conflicting_manifest_fails_closed(tmp_path):
+    cache = ProviderRawCache(tmp_path)
+    body = b"same"
+    metadata = _metadata(body, datetime(2026, 1, 1, tzinfo=UTC))
+    cache.store(metadata, body)
+    conflicting = SourceResponseMetadata(
+        **{**metadata.__dict__, "schema_hash": "changed"},
+    )
+    with pytest.raises(ValueError, match="conflicting immutable provider observation manifest"):
+        cache.store(conflicting, body)
+
+
 def test_http_retries_only_bounded_retryable_statuses():
     calls = 0
 

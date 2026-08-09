@@ -16,32 +16,41 @@ def eligible_prior_team_games(
 ) -> pl.DataFrame:
     if decision_time_utc.tzinfo is None:
         raise ValueError("decision_time_utc must be timezone-aware")
-    decision = decision_time_utc.astimezone(UTC).isoformat()
+    decision = decision_time_utc.astimezone(UTC)
+    event_cutoff = decision
     required_games = {"event_id", "event_start_utc", "observed_at_utc", "completed", "pit_eligible"}
     required_box = {"event_id", "team_id", "observed_at_utc", "pit_eligible"}
     if not required_games.issubset(games.columns) or not required_box.issubset(team_box.columns):
         raise ValueError("WNBA PIT input is missing required provenance columns")
     prior_games = (
-        games.filter(
-            pl.col("completed")
-            & pl.col("pit_eligible")
-            & (pl.col("event_start_utc") < decision)
-            & (pl.col("observed_at_utc") <= decision)
+        games.with_columns(
+            pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=True).alias("_observed"),
+            pl.col("event_start_utc").str.to_datetime(time_zone="UTC", strict=True).alias("_event_start"),
         )
-        .sort("observed_at_utc")
+        .filter(pl.col("_observed") <= decision)
+        .sort("_observed")
         .group_by("event_id", maintain_order=True)
         .last()
+        # Latest-as-of state must be selected before checking completed or
+        # PIT eligibility. Otherwise an older FINAL survives a later
+        # correction to postponed/not-completed.
+        .filter(
+            pl.col("completed")
+            & pl.col("pit_eligible")
+            & (pl.col("_event_start") < event_cutoff)
+        )
         .select(["event_id", "event_start_utc"])
     )
     eligible_boxes = (
-        team_box.filter(
-            (pl.col("team_id") == team_id)
-            & pl.col("pit_eligible")
-            & (pl.col("observed_at_utc") <= decision)
+        team_box.with_columns(
+            pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=True).alias("_observed")
         )
-        .sort("observed_at_utc")
+        .filter(pl.col("_observed") <= decision)
+        .sort("_observed")
         .group_by(["event_id", "team_id"], maintain_order=True)
         .last()
+        .filter((pl.col("team_id") == team_id) & pl.col("pit_eligible"))
+        .drop("_observed")
     )
     return (
         eligible_boxes

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import polars as pl
@@ -23,12 +23,17 @@ def _ratio(numerator: float | None, denominator: float | None) -> float | None:
     return float(numerator) / float(denominator)
 
 
-def _latest_eligible_boxes(team_box: pl.DataFrame, decision_iso: str) -> pl.DataFrame:
+def _latest_eligible_boxes(team_box: pl.DataFrame, decision_time_utc: datetime) -> pl.DataFrame:
     return (
-        team_box.filter(pl.col("pit_eligible") & (pl.col("observed_at_utc") <= decision_iso))
-        .sort("observed_at_utc")
+        team_box.with_columns(
+            pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=True).alias("_observed")
+        )
+        .filter(pl.col("_observed") <= decision_time_utc)
+        .sort("_observed")
         .group_by(["event_id", "team_id"], maintain_order=True)
         .last()
+        .filter(pl.col("pit_eligible"))
+        .drop("_observed")
     )
 
 
@@ -87,11 +92,16 @@ def build_team_form_snapshot(
     decision_time_utc: datetime,
 ) -> dict[str, Any]:
     """Build prior-only rolling form for either a historical or live target."""
+    if decision_time_utc.tzinfo is None:
+        raise ValueError("decision_time_utc must be timezone-aware")
+    knowledge_time = decision_time_utc.astimezone(UTC)
     eligible = eligible_prior_team_games(
-        games, team_box, team_id=team_id, decision_time_utc=decision_time_utc
+        games,
+        team_box,
+        team_id=team_id,
+        decision_time_utc=knowledge_time,
     )
-    decision_iso = decision_time_utc.isoformat()
-    all_boxes = _latest_eligible_boxes(team_box, decision_iso)
+    all_boxes = _latest_eligible_boxes(team_box, knowledge_time)
     by_event_team = {
         (str(row["event_id"]), str(row["team_id"])): row
         for row in all_boxes.iter_rows(named=True)
@@ -111,7 +121,7 @@ def build_team_form_snapshot(
 
     result: dict[str, Any] = {
         "team_id": team_id,
-        "as_of_utc": decision_time_utc.isoformat(),
+        "as_of_utc": knowledge_time.isoformat(),
         "status": "AVAILABLE" if game_rows else "UNAVAILABLE",
         "sample_size": len(game_rows),
         "source_watermark_utc": max((row["observed_at_utc"] for row in game_rows), default=None),

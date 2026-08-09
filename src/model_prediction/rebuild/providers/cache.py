@@ -56,15 +56,34 @@ class ProviderRawCache:
         finally:
             tmp.unlink(missing_ok=True)
 
-    def store(self, metadata: SourceResponseMetadata, body: bytes) -> CachedResponse:
+    @classmethod
+    def _write_once(cls, path: Path, body: bytes, *, label: str) -> None:
+        if path.exists():
+            existing = path.read_bytes()
+            if existing != body:
+                raise ValueError(f"conflicting immutable provider {label}: {path}")
+            return
+        cls._atomic_write(path, body)
+
+    def store_blob(self, metadata: SourceResponseMetadata, body: bytes) -> Path:
+        """Persist and verify exact response bytes before any parser runs."""
         actual_hash = hashlib.sha256(body).hexdigest()
         if actual_hash != metadata.content_hash:
             raise ValueError("provider content hash does not match raw response bytes")
         key = cache_key(metadata.endpoint_family, metadata.requested_parameters)
         root = self._request_root(metadata.provider, metadata.sport, metadata.endpoint_family, key)
         body_path = root / "blobs" / f"{actual_hash}.bin"
-        if not body_path.exists():
-            self._atomic_write(body_path, body)
+        self._write_once(body_path, body, label="blob")
+        # A same-name blob is content-addressed; verify the existing bytes as
+        # well instead of trusting mere path existence.
+        if hashlib.sha256(body_path.read_bytes()).hexdigest() != actual_hash:
+            raise ValueError(f"cached provider body failed SHA256 verification: {body_path}")
+        return body_path
+
+    def store(self, metadata: SourceResponseMetadata, body: bytes) -> CachedResponse:
+        key = cache_key(metadata.endpoint_family, metadata.requested_parameters)
+        root = self._request_root(metadata.provider, metadata.sport, metadata.endpoint_family, key)
+        body_path = self.store_blob(metadata, body)
 
         observation_id = hashlib.sha256(
             canonical_json({
@@ -79,7 +98,8 @@ class ProviderRawCache:
             "cache_key": key,
             "body_path": str(body_path.relative_to(self.root)),
         }
-        self._atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"))
+        manifest_bytes = json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8")
+        self._write_once(manifest_path, manifest_bytes, label="observation manifest")
         return CachedResponse(metadata, body_path, manifest_path)
 
     def latest(
@@ -107,6 +127,8 @@ class ProviderRawCache:
             content_type=raw.get("content_type"),
             source_version=raw.get("source_version"),
             source_grade=SourceGrade(raw["source_grade"]),
+            commercial_use_status=raw.get("commercial_use_status", "unresolved"),
+            production_allowed=bool(raw.get("production_allowed", False)),
             from_cache=True,
         )
         return CachedResponse(metadata, self.root / raw["body_path"], manifest_path)

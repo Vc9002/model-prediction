@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 import polars as pl
+import pytest
 
 from model_prediction.rebuild.providers.base import ProviderStatus
 from model_prediction.rebuild.providers.cache import ProviderRawCache
@@ -21,6 +22,33 @@ def _parquet_bytes(*, remove: str | None = None) -> bytes:
     frame = pl.DataFrame(json.loads(FIXTURE.read_text())).with_columns(
         pl.col("game_date_time").str.to_datetime(time_zone="UTC")
     )
+    if remove:
+        frame = frame.drop(remove)
+    buffer = io.BytesIO()
+    frame.write_parquet(buffer)
+    return buffer.getvalue()
+
+
+def _team_box_parquet_bytes(*, remove: str | None = None) -> bytes:
+    frame = pl.DataFrame([{
+        "game_id": "1",
+        "season": 2024,
+        "game_date_time": "2024-05-15T23:00:00+00:00",
+        "team_id": "1",
+        "team_display_name": "A",
+        "opponent_team_id": "2",
+        "team_home_away": "home",
+        "team_score": 80,
+        "field_goals_made": 30,
+        "field_goals_attempted": 70,
+        "three_point_field_goals_made": 7,
+        "three_point_field_goals_attempted": 20,
+        "free_throws_made": 13,
+        "free_throws_attempted": 18,
+        "offensive_rebounds": 8,
+        "defensive_rebounds": 28,
+        "turnovers": 10,
+    }])
     if remove:
         frame = frame.drop(remove)
     buffer = io.BytesIO()
@@ -49,6 +77,11 @@ def test_historical_asset_is_raw_first_and_cached(tmp_path):
     assert second.metadata is not None and second.metadata.from_cache
     assert calls == 1
     assert len(list(tmp_path.rglob("*.bin"))) == 1
+    assert first.metadata is not None
+    assert first.metadata.commercial_use_status == "unresolved"
+    assert first.metadata.production_allowed is False
+    with pytest.raises(RuntimeError, match="not cleared"):
+        first.metadata.assert_production_allowed()
 
 
 def test_missing_required_column_is_degraded_not_fake_empty(tmp_path):
@@ -64,6 +97,22 @@ def test_missing_required_column_is_degraded_not_fake_empty(tmp_path):
     assert result.frame is None
     assert "home_id" in (result.reason or "")
     assert len(list(tmp_path.rglob("*.bin"))) == 1
+
+
+def test_missing_required_team_box_feature_metric_is_degraded(tmp_path):
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(
+            200,
+            content=_team_box_parquet_bytes(remove="turnovers"),
+        )
+    )
+    provider = SportsDataverseProvider(
+        HttpProviderClient(client=httpx.Client(transport=transport), retry=RetryPolicy(attempts=1)),
+        ProviderRawCache(tmp_path),
+    )
+    result = provider.season_table("team_box", 2024)
+    assert result.status is ProviderStatus.DEGRADED
+    assert "turnovers" in (result.reason or "")
 
 
 def test_404_is_unavailable_and_not_retried(tmp_path):
