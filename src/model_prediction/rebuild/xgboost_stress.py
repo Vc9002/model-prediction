@@ -88,7 +88,7 @@ class XGBoostChallenger:
 
     def save(self, path: str | Path) -> None:
         """Persist the exact fitted disagreement model with byte hashes."""
-        import joblib
+        import joblib  # type: ignore[import-untyped]  # same accepted gap as models/__init__.py: no published stubs
 
         if not self._fitted or self.model is None:
             raise RuntimeError("cannot save an unfitted XGBoost challenger")

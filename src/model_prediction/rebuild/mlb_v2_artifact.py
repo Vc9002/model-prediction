@@ -111,7 +111,7 @@ def verified_source_tree_hash(repo_root: str | Path | None = None) -> str:
             ["git", "status", "--porcelain=v1", "--untracked-files=all", "--", *SOURCE_FINGERPRINT_PATHS],
             cwd=root, check=True, capture_output=True, text=True,
         ).stdout.strip()
-        tracked_raw = subprocess.run(
+        tracked_raw: bytes = subprocess.run(
             ["git", "ls-files", "-z", "--", *SOURCE_FINGERPRINT_PATHS],
             cwd=root, check=True, capture_output=True,
         ).stdout
@@ -119,9 +119,12 @@ def verified_source_tree_hash(repo_root: str | Path | None = None) -> str:
         raise ValueError("cannot verify frozen MLB v2 source tree") from exc
     if dirty:
         raise ValueError("frozen MLB v2 inference source tree is dirty")
-    if isinstance(tracked_raw, bytes):
-        tracked_raw = tracked_raw.decode()
-    paths = sorted(item for item in tracked_raw.split("\0") if item)
+    # No text=True here (unlike the status check above): -z output is
+    # NUL-delimited machine output, not human text, and universal-newline
+    # translation on decode is exactly the kind of transformation an exact
+    # fingerprint hash can't tolerate silently.
+    tracked = tracked_raw.decode()
+    paths = sorted(item for item in tracked.split("\0") if item)
     if not paths:
         raise ValueError("frozen MLB v2 source fingerprint has no tracked files")
     digest = hashlib.sha256()

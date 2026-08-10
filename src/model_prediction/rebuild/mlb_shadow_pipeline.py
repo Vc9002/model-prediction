@@ -608,9 +608,14 @@ def load_resume_state(
         if contract != actual_contract:
             raise ValueError(f"resume scheduled event contract changed: {event_id}")
         observed_raw = observed_by_event.get(event_id)
+        if not isinstance(observed_raw, str):
+            # Validating untrusted resume-state JSON, matching every other
+            # ValueError-on-bad-shape raise in this function -- TypeError
+            # would be inconsistent with the sibling checks around it.
+            raise ValueError(f"resume prediction observation time is invalid: {event_id}")  # noqa: TRY004
         try:
             observed = datetime.fromisoformat(observed_raw)
-        except (TypeError, ValueError) as exc:
+        except ValueError as exc:
             raise ValueError(f"resume prediction observation time is invalid: {event_id}") from exc
         decision_time = state.decision_times[event_id]
         if observed.tzinfo is None or observed.utcoffset() != timedelta(0):
