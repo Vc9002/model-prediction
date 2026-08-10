@@ -1,10 +1,10 @@
 """Tests for the `rebuild-data` CLI scaffold.
 
-`mlb` (MLB v3, research-only), `wnba`, and `nfl` are wired to real backends;
-every other sport is NOT_IMPLEMENTED (see data_foundation.py's module
-docstring). These tests cover the harness itself: argument parsing, the
-forbidden-live-flags guard, that stub sports report honestly, and that the
-real backends are actually reachable end-to-end without a network call
+`mlb` (MLB v3, research-only), `wnba`, `nfl`, and `soccer` are wired to real
+backends; every other sport is NOT_IMPLEMENTED (see data_foundation.py's
+module docstring). These tests cover the harness itself: argument parsing,
+the forbidden-live-flags guard, that stub sports report honestly, and that
+the real backends are actually reachable end-to-end without a network call
 (audit on an empty data_root).
 """
 
@@ -22,7 +22,7 @@ from model_prediction.rebuild.data_cli import _parser, main, run
 from model_prediction.rebuild.data_foundation import SUPPORTED_DATA_SPORTS
 from model_prediction.runtime_paths import RuntimePaths
 
-REAL_SPORTS = ("mlb", "wnba", "nfl")
+REAL_SPORTS = ("mlb", "wnba", "nfl", "soccer")
 STUB_SPORTS = tuple(sport for sport in SUPPORTED_DATA_SPORTS if sport not in REAL_SPORTS)
 
 
@@ -169,6 +169,48 @@ def test_nfl_backfill_rejects_start_end(capsys):
         main(["backfill", "--sport", "nfl", "--start", "2026-08-01", "--end", "2026-08-01"])
     assert exc.value.code == 2
     assert "not meaningful for nfl" in capsys.readouterr().err
+
+
+def _soccer_data_root(tmp_path: Path) -> str:
+    return str(RuntimePaths.resolve(repo_root=tmp_path).rebuild_root)
+
+
+def test_soccer_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
+    report = run(
+        "audit", "soccer", _soccer_data_root(tmp_path), status="data_foundation",
+        repo_root=str(tmp_path),
+    )
+    assert report["status"] == "UNAVAILABLE"
+
+
+def test_soccer_backfill_requires_date(tmp_path):
+    with pytest.raises(ValueError, match="requires --date"):
+        run(
+            "backfill", "soccer", _soccer_data_root(tmp_path), status="data_foundation",
+            repo_root=str(tmp_path), game_date=None, espn_leagues=None,
+            football_data_competitions=None, force=False,
+        )
+
+
+def test_soccer_backfill_requires_date_flag(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "soccer"])
+    assert exc.value.code == 2
+    assert "requires --date" in capsys.readouterr().err
+
+
+def test_soccer_backfill_rejects_season(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "soccer", "--date", "2026-08-01", "--season", "2026"])
+    assert exc.value.code == 2
+    assert "not meaningful for soccer" in capsys.readouterr().err
+
+
+def test_non_soccer_date_flag_is_rejected(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "nba", "--date", "2026-08-01"])
+    assert exc.value.code == 2
+    assert "not meaningful" in capsys.readouterr().err
 
 
 def test_non_mlb_version_flag_is_rejected(capsys):
