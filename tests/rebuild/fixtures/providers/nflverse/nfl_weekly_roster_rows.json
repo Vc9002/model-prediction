@@ -1,0 +1,24 @@
+[
+  {
+    "season": 2024,
+    "week": 1,
+    "team": "NYJ",
+    "gsis_id": "00-0037013",
+    "full_name": "Synthetic Quarterback",
+    "position": "QB",
+    "depth_chart_position": "QB",
+    "jersey_number": 8,
+    "status": "ACT"
+  },
+  {
+    "season": 2024,
+    "week": 1,
+    "team": "NYJ",
+    "gsis_id": "00-0039999",
+    "full_name": "Synthetic Receiver",
+    "position": "WR",
+    "depth_chart_position": "WR",
+    "jersey_number": 17,
+    "status": "ACT"
+  }
+]

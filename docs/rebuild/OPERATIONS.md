@@ -17,6 +17,9 @@ rebuild-data audit --sport mlb --version v3 --season YYYY
 rebuild-data backfill --sport wnba --season YYYY --table schedule
 rebuild-data audit --sport wnba --season YYYY
 
+rebuild-data backfill --sport nfl --season YYYY --table schedule
+rebuild-data audit --sport nfl --season YYYY
+
 rebuild-model --help
 rebuild-model train --sport mlb
 rebuild-model compare --sport mlb
@@ -33,9 +36,9 @@ remains the decision-pipeline CLI (collect through decide). The shared
 harness (argument parsing, the forbidden-live-flags guard, `RuntimePaths`-
 aware `data_root` resolution, the safety wiring) landed on
 `rebuild/research-cli-v1` ahead of any per-sport backend. `rebuild-data
---sport mlb --version v3` (see `docs/rebuild/MLB_V3_DATA.md`) and
-`rebuild-data --sport wnba` are now real; every other sport on
-`rebuild-data`, and every sport on `rebuild-model`, still reports
+--sport mlb --version v3` (see `docs/rebuild/MLB_V3_DATA.md`), `rebuild-data
+--sport wnba`, and `rebuild-data --sport nfl` are now real; every other
+sport on `rebuild-data`, and every sport on `rebuild-model`, still reports
 `{"status": "NOT_IMPLEMENTED", ...}`, matching how `sport_adapter.py`
 already carries honest stubs for sports without a real adapter. A real
 `backfill`/`audit` implementation previously existed per sport on
