@@ -1,0 +1,13 @@
+{
+  "transactions": [
+    {
+      "id": 70001,
+      "person": {"id": 501, "fullName": "Away Starter"},
+      "fromTeam": {"id": 111},
+      "toTeam": {"id": 333},
+      "date": "2026-08-09",
+      "effectiveDate": "2026-08-09",
+      "typeCode": "TR"
+    }
+  ]
+}
