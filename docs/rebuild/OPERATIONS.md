@@ -20,6 +20,9 @@ rebuild-data audit --sport wnba --season YYYY
 rebuild-data backfill --sport nfl --season YYYY --table schedule
 rebuild-data audit --sport nfl --season YYYY
 
+rebuild-data backfill --sport soccer --date YYYY-MM-DD --espn-league eng.1
+rebuild-data audit --sport soccer
+
 rebuild-model --help
 rebuild-model train --sport mlb
 rebuild-model compare --sport mlb
@@ -37,8 +40,9 @@ harness (argument parsing, the forbidden-live-flags guard, `RuntimePaths`-
 aware `data_root` resolution, the safety wiring) landed on
 `rebuild/research-cli-v1` ahead of any per-sport backend. `rebuild-data
 --sport mlb --version v3` (see `docs/rebuild/MLB_V3_DATA.md`), `rebuild-data
---sport wnba`, and `rebuild-data --sport nfl` are now real; every other
-sport on `rebuild-data`, and every sport on `rebuild-model`, still reports
+--sport wnba`, `rebuild-data --sport nfl`, and `rebuild-data --sport soccer`
+are now real; every other sport on `rebuild-data`, and every sport on
+`rebuild-model`, still reports
 `{"status": "NOT_IMPLEMENTED", ...}`, matching how `sport_adapter.py`
 already carries honest stubs for sports without a real adapter. A real
 `backfill`/`audit` implementation previously existed per sport on
@@ -50,6 +54,17 @@ those branches fills in. WNBA's transplant deliberately excludes the
 source branch's feature-engineering/model-baseline modules
 (`features.py`/`horizon_builder.py`/`baselines.py`) -- data ingestion and
 model work are separate decisions.
+
+Soccer collects from ESPN (always) and, if `--football-data-competition` is
+passed, football-data.org (requires a `FOOTBALL_DATA_TOKEN` env var; fails
+closed to `UNAVAILABLE`/`TOKEN_NOT_CONFIGURED` per source, never a hard
+error, when absent). StatsBomb Open Data is always reported as
+`POLICY_BLOCKED` -- its license prohibits commercial exploitation, so the
+provider makes no network request at all. Canonical event identity is
+`source_match_id` scoped by `competition_id`/`season_id`, never
+`home+away+date` alone; normalized rows keep raw `home_score`/`away_score`
+(never binarized into a win/loss target), preserving the HOME/DRAW/AWAY
+3-way outcome for any future model to compute.
 
 ## Runtime behavior
 

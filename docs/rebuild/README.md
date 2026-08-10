@@ -9,11 +9,12 @@ below `config/models/challengers`, and exposes three separate CLIs:
 `rebuild-data` (per-sport backfill/audit), and `rebuild-model` (per-sport
 train/compare). `rebuild-data --sport mlb --version v3` is real (MLB v3, a
 separate research lane from the frozen `mlb_moneyline_v2` candidate -- see
-`MLB_V3_DATA.md`); `rebuild-data --sport wnba` and `rebuild-data --sport
-nfl` are also real (data ingestion only -- feature-engineering/model-
-baseline work is a separate, not-yet-made decision for both). Every other
-sport on `rebuild-data`, and every sport on `rebuild-model`, currently
-reports `NOT_IMPLEMENTED` -- see `OPERATIONS.md`.
+`MLB_V3_DATA.md`); `rebuild-data --sport wnba`, `rebuild-data --sport nfl`,
+and `rebuild-data --sport soccer` are also real (data ingestion only --
+feature-engineering/model-baseline work is a separate, not-yet-made
+decision for all three). Every other sport on `rebuild-data`, and every
+sport on `rebuild-model`, currently reports `NOT_IMPLEMENTED` -- see
+`OPERATIONS.md`.
 
 Its permanent safety state is:
 

@@ -3,8 +3,8 @@
 This module owns argument parsing and safety wiring only. Sport-specific
 ingestion logic lives behind the `data_foundation.build_data_foundation`
 registration seam (see that module's docstring). `mlb` (MLB v3,
-research-only), `wnba`, and `nfl` are wired to real backends; every other
-sport reports `NOT_IMPLEMENTED`.
+research-only), `wnba`, `nfl`, and `soccer` are wired to real backends;
+every other sport reports `NOT_IMPLEMENTED`.
 """
 
 from __future__ import annotations
@@ -58,6 +58,15 @@ def _parser() -> argparse.ArgumentParser:
             "team_box", "player_box", "rosters", "pbp", "weekly_rosters",
         ),
     )
+    backfill.add_argument("--date", help="Soccer-only: one calendar date, YYYY-MM-DD")
+    backfill.add_argument(
+        "--espn-league", action="append", dest="espn_leagues",
+        help="Soccer-only, repeatable (e.g. eng.1); defaults to eng.1",
+    )
+    backfill.add_argument(
+        "--football-data-competition", action="append", dest="football_data_competitions",
+        help="Soccer-only, repeatable; requires FOOTBALL_DATA_TOKEN env var",
+    )
     backfill.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
 
     audit = sub.add_parser("audit", help="Audit already-backfilled coverage for one sport")
@@ -88,6 +97,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         parser.error(f"--start/--end are not meaningful for {args.sport} (season-based backfill only)")
     if args.command == "backfill" and args.sport not in SEASON_BASED_SPORTS and getattr(args, "season", None):
         parser.error(f"--season is not meaningful for {args.sport}")
+    if args.command == "backfill" and args.sport != "soccer" and getattr(args, "date", None):
+        parser.error(f"--date is not meaningful for {args.sport}")
+    if args.command == "backfill" and args.sport == "soccer" and not args.date:
+        parser.error("soccer backfill requires --date")
 
     config = load_rebuild_config()
     assert_shadow_only(config)
@@ -103,6 +116,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             provider=args.provider, start=args.start, end=args.end,
             seasons=tuple(args.season) if args.season else None,
             tables=tuple(args.tables) if args.tables else None, force=not args.resume,
+            game_date=args.date,
+            espn_leagues=tuple(args.espn_leagues) if args.espn_leagues else None,
+            football_data_competitions=(
+                tuple(args.football_data_competitions) if args.football_data_competitions else None
+            ),
         )
     else:
         report = run(

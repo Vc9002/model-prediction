@@ -10,8 +10,9 @@ A real, working `backfill`/`audit` implementation existed per-sport (mlb_v3,
 wnba, nfl, soccer) on now-archived branches (`origin/rebuild/<sport>-v1` /
 `archive/pre-runtime-cutover/<sport>-*`) -- PR #5 already promoted their
 shared *provider client* dependencies (`providers/`) onto `main`. `mlb`,
-`wnba`, and `nfl` are now registered for real (see `mlb_v3/cli_adapter.py`,
-`wnba/cli_adapter.py`, `nfl/cli_adapter.py`); every other sport remains a
+`wnba`, `nfl`, and `soccer` are now registered for real (see
+`mlb_v3/cli_adapter.py`, `wnba/cli_adapter.py`, `nfl/cli_adapter.py`,
+`soccer/cli_adapter.py`); every other sport remains a
 `_NotImplementedFoundation` pending its own dedicated, carefully-reviewed
 transplant rather than a rushed bulk import here. Note: WNBA's transplant
 deliberately excludes the source branch's feature-engineering/model-baseline
@@ -96,4 +97,8 @@ def build_data_foundation(sport: str, data_root: str | Path, *, status: str, rep
         from .nfl.cli_adapter import NFLDataFoundation
 
         return NFLDataFoundation(Path(data_root), repo_root=Path(repo_root))
+    if sport == "soccer":
+        from .soccer.cli_adapter import SoccerDataFoundation
+
+        return SoccerDataFoundation(Path(data_root), repo_root=Path(repo_root))
     return _NotImplementedFoundation(sport=sport, status=status)
