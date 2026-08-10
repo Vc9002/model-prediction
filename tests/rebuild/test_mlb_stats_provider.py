@@ -109,6 +109,55 @@ def test_malformed_schedule_payload_is_degraded_but_raw_retained(tmp_path):
     assert len(list(tmp_path.rglob("*.bin"))) == 1
 
 
+def test_schedule_with_sparse_late_reschedule_values_does_not_crash(tmp_path):
+    # Real bug, live-caught: a full real season's schedule has
+    # reschedule_date/resume_date null for the overwhelming majority of
+    # games, with a real ISO datetime string only for the rare suspended/
+    # postponed game. Polars' list-of-dicts schema inference reads an early
+    # row prefix; an all-null prefix infers a Null-typed column that then
+    # crashes the instant it hits a real string value later in the same
+    # batch (verified against a real 2023 full-season response: 2500+ games
+    # with reschedule_date=None, then a real string value on game 718700).
+    # This test mirrors that exact shape rather than a single-game fixture.
+    games = [
+        {
+            "gamePk": 700000 + i,
+            "gameDate": f"2026-04-{(i % 28) + 1:02d}T23:10:00Z",
+            "officialDate": f"2026-04-{(i % 28) + 1:02d}",
+            "season": "2026",
+            "gameType": "R",
+            "gameNumber": 1,
+            "doubleHeader": "N",
+            "scheduledInnings": 9,
+            "status": {"abstractGameState": "Final", "detailedState": "Final", "statusCode": "F"},
+            "teams": {
+                "home": {"team": {"id": 111}, "probablePitcher": {"id": 55}},
+                "away": {"team": {"id": 121}, "probablePitcher": {"id": 66}},
+            },
+            "venue": {"id": 3},
+        }
+        for i in range(500)
+    ]
+    games[499]["rescheduleDate"] = "2026-09-01T17:10:00Z"
+    games[499]["gamePk"] = 718700
+    payload = {"dates": [{"games": games}]}
+    body = json.dumps(payload).encode()
+    cache = ProviderRawCache(tmp_path)
+    provider = MLBStatsProvider(
+        _http(lambda request: httpx.Response(200, content=body, request=request)), cache
+    )
+    from datetime import date
+
+    result = provider.schedule(date(2026, 4, 1), date(2026, 4, 28))
+    assert result.status is ProviderStatus.AVAILABLE
+    assert result.frame is not None
+    assert result.frame.height == 500
+    rescheduled = result.frame.filter(result.frame["reschedule_date"].is_not_null())
+    assert rescheduled.height == 1
+    assert rescheduled["game_pk"].item() == 718700
+    assert rescheduled["reschedule_date"].item() == "2026-09-01T17:10:00Z"
+
+
 def test_game_feed_identity_mismatch_fails_closed(tmp_path):
     payload = {
         "gameData": {"game": {"pk": 999}, "teams": {}, "probablePitchers": {}, "players": {}},
