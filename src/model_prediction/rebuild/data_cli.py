@@ -3,8 +3,8 @@
 This module owns argument parsing and safety wiring only. Sport-specific
 ingestion logic lives behind the `data_foundation.build_data_foundation`
 registration seam (see that module's docstring). `mlb` (MLB v3,
-research-only), `wnba`, `nfl`, and `soccer` are wired to real backends;
-every other sport reports `NOT_IMPLEMENTED`.
+research-only), `wnba`, `nfl`, `soccer`, and `tennis` are wired to real
+backends; every other sport reports `NOT_IMPLEMENTED`.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from .safety import RebuildPathPolicy, assert_shadow_only
 FORBIDDEN_LIVE_FLAGS = frozenset({"--execute", "--live", "--real-order", "--promote"})
 # Sports whose backfill is keyed by --season (repeatable) rather than
 # MLB v3's --start/--end date range.
-SEASON_BASED_SPORTS = frozenset({"wnba", "nfl"})
+SEASON_BASED_SPORTS = frozenset({"wnba", "nfl", "tennis"})
 
 
 def run(command: str, sport: str, data_root: str, *, status: str, repo_root: str, **kwargs: Any) -> dict[str, Any]:
@@ -67,12 +67,24 @@ def _parser() -> argparse.ArgumentParser:
         "--football-data-competition", action="append", dest="football_data_competitions",
         help="Soccer-only, repeatable; requires FOOTBALL_DATA_TOKEN env var",
     )
+    backfill.add_argument(
+        "--tour", choices=("atp", "wta", "challenger"), help="Tennis-only: required",
+    )
+    backfill.add_argument(
+        "--kind", dest="match_kind", choices=("main", "challenger", "qualifying"), default="main",
+        help="Tennis-only: TennisMyLife match kind",
+    )
+    backfill.add_argument(
+        "--current", action="store_true",
+        help="Tennis-only: collect today's ESPN scoreboard instead of a TennisMyLife historical season",
+    )
     backfill.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
 
     audit = sub.add_parser("audit", help="Audit already-backfilled coverage for one sport")
     audit.add_argument("--sport", required=True, choices=SUPPORTED_DATA_SPORTS)
     audit.add_argument("--version", choices=("v3",), help="MLB-only: research lane version")
     audit.add_argument("--season", type=int)
+    audit.add_argument("--tour", choices=("atp", "wta", "challenger"), help="Tennis-only")
     return parser
 
 
@@ -101,6 +113,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         parser.error(f"--date is not meaningful for {args.sport}")
     if args.command == "backfill" and args.sport == "soccer" and not args.date:
         parser.error("soccer backfill requires --date")
+    if getattr(args, "tour", None) and args.sport != "tennis":
+        parser.error(f"--tour is not meaningful for {args.sport}")
+    if args.command == "backfill" and args.sport == "tennis" and not args.tour:
+        parser.error("tennis backfill requires --tour")
+    if args.command == "backfill" and args.sport == "tennis" and not args.season and not args.current:
+        parser.error("tennis backfill requires --season (repeatable) unless --current is passed")
+    if args.command == "backfill" and args.sport != "tennis" and getattr(args, "current", False):
+        parser.error(f"--current is not meaningful for {args.sport}")
 
     config = load_rebuild_config()
     assert_shadow_only(config)
@@ -121,11 +141,12 @@ def main(argv: Sequence[str] | None = None) -> None:
             football_data_competitions=(
                 tuple(args.football_data_competitions) if args.football_data_competitions else None
             ),
+            tour=args.tour, match_kind=args.match_kind, current=args.current,
         )
     else:
         report = run(
             "audit", args.sport, str(config.paths.data_root),
-            status=status, repo_root=str(config.repo_root), season=args.season,
+            status=status, repo_root=str(config.repo_root), season=args.season, tour=args.tour,
         )
     print(json.dumps(report, indent=2, default=str))
 
