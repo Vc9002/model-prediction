@@ -1,11 +1,11 @@
 """Tests for the `rebuild-data` CLI scaffold.
 
-Only `mlb` (MLB v3, research-only) is wired to a real backend; every other
-sport is NOT_IMPLEMENTED (see data_foundation.py's module docstring). These
-tests cover the harness itself: argument parsing, the forbidden-live-flags
-guard, that stub sports report honestly, and that the real `mlb` backend is
-actually reachable end-to-end without a network call (audit on an empty
-data_root).
+`mlb` (MLB v3, research-only) and `wnba` are wired to real backends; every
+other sport is NOT_IMPLEMENTED (see data_foundation.py's module docstring).
+These tests cover the harness itself: argument parsing, the
+forbidden-live-flags guard, that stub sports report honestly, and that the
+real `mlb`/`wnba` backends are actually reachable end-to-end without a
+network call (audit on an empty data_root).
 """
 
 from __future__ import annotations
@@ -22,7 +22,8 @@ from model_prediction.rebuild.data_cli import _parser, main, run
 from model_prediction.rebuild.data_foundation import SUPPORTED_DATA_SPORTS
 from model_prediction.runtime_paths import RuntimePaths
 
-STUB_SPORTS = tuple(sport for sport in SUPPORTED_DATA_SPORTS if sport != "mlb")
+REAL_SPORTS = ("mlb", "wnba")
+STUB_SPORTS = tuple(sport for sport in SUPPORTED_DATA_SPORTS if sport not in REAL_SPORTS)
 
 
 @pytest.mark.parametrize("flag", ["--execute", "--live", "--real-order", "--promote"])
@@ -80,6 +81,48 @@ def test_mlb_v3_audit_requires_season(tmp_path):
             "audit", "mlb", _mlb_v3_data_root(tmp_path), status="prospective_validation",
             repo_root=str(tmp_path), season=None,
         )
+
+
+def _wnba_data_root(tmp_path: Path) -> str:
+    return str(RuntimePaths.resolve(repo_root=tmp_path).rebuild_root)
+
+
+def test_wnba_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
+    report = run(
+        "audit", "wnba", _wnba_data_root(tmp_path), status="data_foundation",
+        repo_root=str(tmp_path), season=2026,
+    )
+    assert report["status"] == "UNAVAILABLE"
+
+
+def test_wnba_backfill_requires_season(tmp_path):
+    with pytest.raises(ValueError, match="requires --season"):
+        run(
+            "backfill", "wnba", _wnba_data_root(tmp_path), status="data_foundation",
+            repo_root=str(tmp_path), seasons=None, tables=None, force=False,
+        )
+
+
+def test_wnba_audit_requires_season(tmp_path):
+    with pytest.raises(ValueError, match="requires --season"):
+        run(
+            "audit", "wnba", _wnba_data_root(tmp_path), status="data_foundation",
+            repo_root=str(tmp_path), season=None,
+        )
+
+
+def test_wnba_backfill_rejects_start_end(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "wnba", "--start", "2026-08-01", "--end", "2026-08-01"])
+    assert exc.value.code == 2
+    assert "not meaningful for WNBA" in capsys.readouterr().err
+
+
+def test_non_wnba_season_flag_is_rejected(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "nba", "--season", "2026"])
+    assert exc.value.code == 2
+    assert "not meaningful" in capsys.readouterr().err
 
 
 def test_mlb_backfill_without_version_v3_is_rejected(capsys):

@@ -9,10 +9,15 @@ register it here -- not touch `data_cli.py` itself.
 A real, working `backfill`/`audit` implementation existed per-sport (mlb_v3,
 wnba, nfl, soccer) on now-archived branches (`origin/rebuild/<sport>-v1` /
 `archive/pre-runtime-cutover/<sport>-*`) -- PR #5 already promoted their
-shared *provider client* dependencies (`providers/`) onto `main`. `mlb` is
-now registered for real (see `mlb_v3/cli_adapter.py`); every other sport
-remains a `_NotImplementedFoundation` pending its own dedicated,
-carefully-reviewed transplant rather than a rushed bulk import here.
+shared *provider client* dependencies (`providers/`) onto `main`. `mlb` and
+`wnba` are now registered for real (see `mlb_v3/cli_adapter.py` and
+`wnba/cli_adapter.py`); every other sport remains a
+`_NotImplementedFoundation` pending its own dedicated, carefully-reviewed
+transplant rather than a rushed bulk import here. Note: WNBA's transplant
+deliberately excludes the source branch's feature-engineering/model-baseline
+modules (features.py/horizon_builder.py/baselines.py) -- those are a
+different concern from backfill/audit data ingestion and are left for a
+separate rebuild-model decision.
 """
 
 from __future__ import annotations
@@ -83,4 +88,8 @@ def build_data_foundation(sport: str, data_root: str | Path, *, status: str, rep
         from .mlb_v3.cli_adapter import MLBV3DataFoundation
 
         return MLBV3DataFoundation(Path(data_root), repo_root=Path(repo_root))
+    if sport == "wnba":
+        from .wnba.cli_adapter import WNBADataFoundation
+
+        return WNBADataFoundation(Path(data_root), repo_root=Path(repo_root))
     return _NotImplementedFoundation(sport=sport, status=status)
