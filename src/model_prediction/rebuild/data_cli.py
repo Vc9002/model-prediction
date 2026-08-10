@@ -2,9 +2,9 @@
 
 This module owns argument parsing and safety wiring only. Sport-specific
 ingestion logic lives behind the `data_foundation.build_data_foundation`
-registration seam (see that module's docstring). Only `mlb` (MLB v3,
-research-only) is wired to a real backend; every other sport reports
-`NOT_IMPLEMENTED`.
+registration seam (see that module's docstring). `mlb` (MLB v3,
+research-only) and `wnba` are wired to real backends; every other sport
+reports `NOT_IMPLEMENTED`.
 """
 
 from __future__ import annotations
@@ -42,12 +42,13 @@ def _parser() -> argparse.ArgumentParser:
     backfill = sub.add_parser("backfill", help="Backfill raw/normalized data for one sport")
     backfill.add_argument("--sport", required=True, choices=SUPPORTED_DATA_SPORTS)
     backfill.add_argument("--version", choices=("v3",), help="MLB-only: research lane version")
-    backfill.add_argument("--provider", choices=("mlb_stats", "statcast"), default="mlb_stats")
-    backfill.add_argument("--start")
-    backfill.add_argument("--end")
+    backfill.add_argument("--provider", choices=("mlb_stats", "statcast"), default="mlb_stats", help="MLB-only")
+    backfill.add_argument("--start", help="MLB-only")
+    backfill.add_argument("--end", help="MLB-only")
+    backfill.add_argument("--season", type=int, action="append", help="WNBA-only, repeatable")
     backfill.add_argument(
         "--table", action="append", dest="tables",
-        choices=("schedule", "game_feed", "transactions"),
+        choices=("schedule", "game_feed", "transactions", "team_box", "player_box", "rosters", "pbp"),
     )
     backfill.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
 
@@ -75,6 +76,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         parser.error("MLB data commands require --version v3 (the only MLB research lane wired up so far)")
     if args.sport != "mlb" and args.version is not None:
         parser.error(f"--version is not meaningful for {args.sport}")
+    if args.command == "backfill" and args.sport == "wnba" and (args.start or args.end):
+        parser.error("--start/--end are not meaningful for WNBA (season-based backfill only)")
+    if args.command == "backfill" and args.sport != "wnba" and getattr(args, "season", None):
+        parser.error(f"--season is not meaningful for {args.sport}")
 
     config = load_rebuild_config()
     assert_shadow_only(config)
@@ -88,6 +93,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "backfill", args.sport, str(config.paths.data_root),
             status=status, repo_root=str(config.repo_root),
             provider=args.provider, start=args.start, end=args.end,
+            seasons=tuple(args.season) if args.season else None,
             tables=tuple(args.tables) if args.tables else None, force=not args.resume,
         )
     else:
