@@ -1,11 +1,11 @@
 """Tests for the `rebuild-data` CLI scaffold.
 
-`mlb` (MLB v3, research-only), `wnba`, `nfl`, and `soccer` are wired to real
-backends; every other sport is NOT_IMPLEMENTED (see data_foundation.py's
-module docstring). These tests cover the harness itself: argument parsing,
-the forbidden-live-flags guard, that stub sports report honestly, and that
-the real backends are actually reachable end-to-end without a network call
-(audit on an empty data_root).
+`mlb` (MLB v3, research-only), `wnba`, `nfl`, `soccer`, and `tennis` are
+wired to real backends; every other sport is NOT_IMPLEMENTED (see
+data_foundation.py's module docstring). These tests cover the harness
+itself: argument parsing, the forbidden-live-flags guard, that stub sports
+report honestly, and that the real backends are actually reachable
+end-to-end without a network call (audit on an empty data_root).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from model_prediction.rebuild.data_cli import _parser, main, run
 from model_prediction.rebuild.data_foundation import SUPPORTED_DATA_SPORTS
 from model_prediction.runtime_paths import RuntimePaths
 
-REAL_SPORTS = ("mlb", "wnba", "nfl", "soccer")
+REAL_SPORTS = ("mlb", "wnba", "nfl", "soccer", "tennis")
 STUB_SPORTS = tuple(sport for sport in SUPPORTED_DATA_SPORTS if sport not in REAL_SPORTS)
 
 
@@ -218,6 +218,64 @@ def test_non_mlb_version_flag_is_rejected(capsys):
         main(["backfill", "--sport", "nba", "--version", "v3"])
     assert exc.value.code == 2
     assert "not meaningful" in capsys.readouterr().err
+
+
+def _tennis_data_root(tmp_path: Path) -> str:
+    return str(RuntimePaths.resolve(repo_root=tmp_path).rebuild_root)
+
+
+def test_tennis_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
+    report = run(
+        "audit", "tennis", _tennis_data_root(tmp_path), status="data_foundation",
+        repo_root=str(tmp_path), season=None, tour="atp",
+    )
+    assert report["status"] == "UNAVAILABLE"
+
+
+def test_tennis_backfill_requires_tour(tmp_path):
+    with pytest.raises(ValueError, match="requires --tour"):
+        run(
+            "backfill", "tennis", _tennis_data_root(tmp_path), status="data_foundation",
+            repo_root=str(tmp_path), tour=None, seasons=(2023,), match_kind="main",
+            current=False, force=False,
+        )
+
+
+def test_tennis_backfill_requires_season_unless_current(tmp_path):
+    with pytest.raises(ValueError, match="requires --season"):
+        run(
+            "backfill", "tennis", _tennis_data_root(tmp_path), status="data_foundation",
+            repo_root=str(tmp_path), tour="atp", seasons=None, match_kind="main",
+            current=False, force=False,
+        )
+
+
+def test_tennis_backfill_requires_tour_flag(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "tennis", "--season", "2023"])
+    assert exc.value.code == 2
+    assert "requires --tour" in capsys.readouterr().err
+
+
+def test_tennis_backfill_requires_season_or_current_flag(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "tennis", "--tour", "atp"])
+    assert exc.value.code == 2
+    assert "requires --season" in capsys.readouterr().err
+
+
+def test_non_tennis_tour_flag_is_rejected(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "nba", "--tour", "atp"])
+    assert exc.value.code == 2
+    assert "not meaningful for nba" in capsys.readouterr().err
+
+
+def test_non_tennis_current_flag_is_rejected(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "nba", "--current"])
+    assert exc.value.code == 2
+    assert "not meaningful for nba" in capsys.readouterr().err
 
 
 def test_unsupported_sport_is_rejected_by_argparse():

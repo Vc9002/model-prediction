@@ -10,15 +10,20 @@ A real, working `backfill`/`audit` implementation existed per-sport (mlb_v3,
 wnba, nfl, soccer) on now-archived branches (`origin/rebuild/<sport>-v1` /
 `archive/pre-runtime-cutover/<sport>-*`) -- PR #5 already promoted their
 shared *provider client* dependencies (`providers/`) onto `main`. `mlb`,
-`wnba`, `nfl`, and `soccer` are now registered for real (see
+`wnba`, `nfl`, `soccer`, and `tennis` are now registered for real (see
 `mlb_v3/cli_adapter.py`, `wnba/cli_adapter.py`, `nfl/cli_adapter.py`,
-`soccer/cli_adapter.py`); every other sport remains a
-`_NotImplementedFoundation` pending its own dedicated, carefully-reviewed
-transplant rather than a rushed bulk import here. Note: WNBA's transplant
-deliberately excludes the source branch's feature-engineering/model-baseline
-modules (features.py/horizon_builder.py/baselines.py) -- those are a
-different concern from backfill/audit data ingestion and are left for a
-separate rebuild-model decision.
+`soccer/cli_adapter.py`, `tennis/cli_adapter.py`); every other sport
+remains a `_NotImplementedFoundation` pending its own dedicated,
+carefully-reviewed transplant rather than a rushed bulk import here. Note:
+WNBA's transplant deliberately excludes the source branch's
+feature-engineering/model-baseline modules
+(features.py/horizon_builder.py/baselines.py) -- those are a different
+concern from backfill/audit data ingestion and are left for a separate
+rebuild-model decision. Tennis is the one exception to "transplant": the
+archived `origin/rebuild/tennis-v1` branch predates the TennisMyLife/ESPN
+provider replacement and is a fail-closed policy stub, not real ingestion
+code, so `tennis/` is new authorship built directly against the real
+providers already on `main`, not a port.
 """
 
 from __future__ import annotations
@@ -101,4 +106,8 @@ def build_data_foundation(sport: str, data_root: str | Path, *, status: str, rep
         from .soccer.cli_adapter import SoccerDataFoundation
 
         return SoccerDataFoundation(Path(data_root), repo_root=Path(repo_root))
+    if sport == "tennis":
+        from .tennis.cli_adapter import TennisDataFoundation
+
+        return TennisDataFoundation(Path(data_root), repo_root=Path(repo_root))
     return _NotImplementedFoundation(sport=sport, status=status)

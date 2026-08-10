@@ -23,6 +23,10 @@ rebuild-data audit --sport nfl --season YYYY
 rebuild-data backfill --sport soccer --date YYYY-MM-DD --espn-league eng.1
 rebuild-data audit --sport soccer
 
+rebuild-data backfill --sport tennis --tour atp --season YYYY
+rebuild-data backfill --sport tennis --tour wta --current
+rebuild-data audit --sport tennis --tour atp
+
 rebuild-model --help
 rebuild-model train --sport mlb
 rebuild-model compare --sport mlb
@@ -40,9 +44,9 @@ harness (argument parsing, the forbidden-live-flags guard, `RuntimePaths`-
 aware `data_root` resolution, the safety wiring) landed on
 `rebuild/research-cli-v1` ahead of any per-sport backend. `rebuild-data
 --sport mlb --version v3` (see `docs/rebuild/MLB_V3_DATA.md`), `rebuild-data
---sport wnba`, `rebuild-data --sport nfl`, and `rebuild-data --sport soccer`
-are now real; every other sport on `rebuild-data`, and every sport on
-`rebuild-model`, still reports
+--sport wnba`, `rebuild-data --sport nfl`, `rebuild-data --sport soccer`,
+and `rebuild-data --sport tennis` are now real; every other sport on
+`rebuild-data`, and every sport on `rebuild-model`, still reports
 `{"status": "NOT_IMPLEMENTED", ...}`, matching how `sport_adapter.py`
 already carries honest stubs for sports without a real adapter. A real
 `backfill`/`audit` implementation previously existed per sport on
@@ -65,6 +69,23 @@ provider makes no network request at all. Canonical event identity is
 `home+away+date` alone; normalized rows keep raw `home_score`/`away_score`
 (never binarized into a win/loss target), preserving the HOME/DRAW/AWAY
 3-way outcome for any future model to compute.
+
+Tennis is the one sport here that is not a curated transplant --
+`origin/rebuild/tennis-v1` predates the TennisMyLife/ESPN provider
+replacement and is a fail-closed policy stub, so `tennis/` was built new
+against the real providers. `--tour {atp,wta}` + `--season` (repeatable)
+backfills historical TennisMyLife match files; `--current` collects
+today's ESPN scoreboard instead (singles only -- ESPN's response omits
+per-player names for doubles pairs, a composite-team identity problem
+that's separate, not-yet-built work). Every normalized match/event carries
+an explicit `result_type` (`completed`/`retirement`/`walkover`/`default`/
+`unfinished`/`unknown_irregular`), derived from TennisMyLife's raw score
+string (`RET`/`W/O`/`DEF` tokens) or ESPN's `status_name`
+(`STATUS_RETIRED`/`STATUS_WALKOVER`) -- an irregular ending is never
+silently treated as an ordinary win/loss. Player identity
+(`tennis_player_id`) is provider-scoped (`f"{provider}:{provider_player_id}"`);
+resolving TennisMyLife and ESPN rows to one shared cross-provider player
+identity is real, separate, not-yet-built work.
 
 ## Runtime behavior
 
