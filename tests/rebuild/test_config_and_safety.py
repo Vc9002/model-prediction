@@ -68,3 +68,35 @@ def test_production_order_adapter_is_rejected():
     ProductionOrderAdapter = type("ProductionOrderAdapter", (), {})
     with pytest.raises(RebuildSafetyError):
         reject_production_adapter(ProductionOrderAdapter())
+
+
+def test_data_root_follows_runtime_root_env_var(tmp_path, monkeypatch):
+    external_runtime = tmp_path / "external-runtime"
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(external_runtime))
+    config = load_rebuild_config(_config(tmp_path))
+    assert config.paths.data_root == (external_runtime / "rebuild").resolve()
+    # output_root/challenger_root are versioned evidence and stay repo-relative
+    # regardless of the runtime root override.
+    assert config.paths.output_root == (tmp_path / "outputs" / "rebuild").resolve()
+
+
+def test_data_root_defaults_repo_local_without_runtime_root_env_var(tmp_path, monkeypatch):
+    monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
+    config = load_rebuild_config(_config(tmp_path))
+    assert config.paths.data_root == (tmp_path / "data" / "rebuild").resolve()
+
+
+def test_customized_data_root_sentinel_is_rejected(tmp_path):
+    text = VALID_CONFIG.replace("data_root: data/rebuild", "data_root: somewhere/else")
+    with pytest.raises(RebuildConfigError):
+        load_rebuild_config(_config(tmp_path, text))
+
+
+def test_isolated_roots_follow_external_runtime_root(tmp_path, monkeypatch):
+    external_runtime = tmp_path / "external-runtime"
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(external_runtime))
+    config = load_rebuild_config(_config(tmp_path))
+    policy = RebuildPathPolicy.from_config(config)
+    assert policy.assert_runtime_write(external_runtime / "rebuild" / "shadow.db")
+    with pytest.raises(RebuildSafetyError):
+        policy.assert_runtime_write(tmp_path / "data" / "rebuild" / "shadow.db")

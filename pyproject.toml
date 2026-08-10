@@ -41,6 +41,8 @@ dev = [
 [project.scripts]
 model-prediction = "model_prediction.cli:main"
 rebuild-shadow = "model_prediction.rebuild.cli:main"
+rebuild-data = "model_prediction.rebuild.data_cli:main"
+rebuild-model = "model_prediction.rebuild.model_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/model_prediction"]

@@ -8,11 +8,35 @@ Install the repository and inspect the dedicated interface:
 pip install -e ".[dev]"
 rebuild-shadow --help
 rebuild-shadow --sport mlb --date YYYY-MM-DD --horizon late
+
+rebuild-data --help
+rebuild-data backfill --sport mlb
+rebuild-data audit --sport mlb
+
+rebuild-model --help
+rebuild-model train --sport mlb
+rebuild-model compare --sport mlb
 ```
 
-There is no `--execute`, `--live`, or `--real-order` mode. Supplying one must
-fail explicitly. Never route rebuild work through `model-prediction`, and never
-point its data, output, or challenger roots at incumbent paths.
+There is no `--execute`, `--live`, or `--real-order` mode on any of the three
+CLIs. Supplying one must fail explicitly. Never route rebuild work through
+`model-prediction`, and never point its data, output, or challenger roots at
+incumbent paths.
+
+`rebuild-data` (backfill/audit, per sport) and `rebuild-model` (train/compare,
+per sport) are the data-ingestion and model-lifecycle CLIs; `rebuild-shadow`
+remains the decision-pipeline CLI (collect through decide). As of
+`rebuild/research-cli-v1`, every sport on `rebuild-data`/`rebuild-model`
+reports `{"status": "NOT_IMPLEMENTED", ...}` rather than doing real work --
+this landed the shared harness (argument parsing, the forbidden-live-flags
+guard, `RuntimePaths`-aware `data_root` resolution, the safety wiring) ahead
+of any per-sport backend, matching how `sport_adapter.py` already carries
+honest `NOT_IMPLEMENTED` stubs for sports without a real adapter. A real
+`backfill`/`audit` implementation previously existed per sport on now-archived
+branches (`origin/rebuild/<sport>-v1` / `-research`) and is slated for a
+curated, individually-reviewed transplant on its own `rebuild/<sport>-v1-next`
+branch -- see `data_foundation.py`'s and `model_lifecycle.py`'s module
+docstrings for the registration seam each of those branches fills in.
 
 ## Runtime behavior
 
