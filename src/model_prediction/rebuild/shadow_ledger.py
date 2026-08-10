@@ -239,7 +239,12 @@ class ShadowLedger:
                 code_revision TEXT,
                 dependency_lock_hash TEXT,
                 artifact_hash TEXT NOT NULL,
-                artifact_path TEXT
+                artifact_path TEXT,
+                manifest_sha256 TEXT,
+                primary_content_sha256 TEXT,
+                primary_artifact_sha256 TEXT,
+                calibrator_artifact_sha256 TEXT,
+                source_tree_sha256 TEXT
             );
 
             -- TODO: schema only -- no insert/query methods implemented yet.
@@ -268,6 +273,9 @@ class ShadowLedger:
                 schema_version TEXT NOT NULL,
                 supersedes_id INTEGER REFERENCES predictions(id),
                 decision_time_utc TEXT NOT NULL,
+                prediction_observed_at_utc TEXT,
+                test_id TEXT,
+                candidate_version TEXT,
                 predicted_winner TEXT,
                 raw_probabilities_json TEXT,
                 calibrated_probabilities_json TEXT,
@@ -503,6 +511,8 @@ class ShadowLedger:
             );
         """)
         self._migrate_predictions_uncertainty_columns()
+        self._migrate_predictions_prospective_columns()
+        self._migrate_model_artifact_anchor_columns()
         self._migrate_closing_prices_taxonomy_columns()
         self._migrate_run_health_columns()
         self.conn.execute(
@@ -531,6 +541,24 @@ class ShadowLedger:
             "model_disagreement": "REAL", "calibration_uncertainty": "REAL",
             "missingness_penalty": "REAL", "missing_flags_json": "TEXT",
             "lineup_uncertainty": "REAL", "conservative_probabilities_json": "TEXT",
+        })
+
+    def _migrate_predictions_prospective_columns(self) -> None:
+        """Add stable experiment identity and actual observation time."""
+        self._migrate_columns("predictions", {
+            "prediction_observed_at_utc": "TEXT",
+            "test_id": "TEXT",
+            "candidate_version": "TEXT",
+        })
+
+    def _migrate_model_artifact_anchor_columns(self) -> None:
+        """Add externally anchored MLB v2 component identities."""
+        self._migrate_columns("model_artifacts", {
+            "manifest_sha256": "TEXT",
+            "primary_content_sha256": "TEXT",
+            "primary_artifact_sha256": "TEXT",
+            "calibrator_artifact_sha256": "TEXT",
+            "source_tree_sha256": "TEXT",
         })
 
     def _migrate_closing_prices_taxonomy_columns(self) -> None:
@@ -666,6 +694,9 @@ class ShadowLedger:
         event_id: str,
         horizon: str,
         decision_time_utc: str,
+        prediction_observed_at_utc: str | None = None,
+        test_id: str | None = None,
+        candidate_version: str | None = None,
         forecast: Any,
         supersedes_id: int | None = None,
         schema_version: str = SCHEMA_VERSION,
@@ -677,8 +708,50 @@ class ShadowLedger:
         appended (either the first time, or an explicit correction via
         `supersedes_id`)."""
         f = _as_dict(forecast)
+        observed_at = prediction_observed_at_utc or utc_now()
+        created_at = utc_now()
+        if test_id is not None:
+            if prediction_observed_at_utc is None or not candidate_version:
+                raise ValueError(
+                    "prospective predictions require observation time and candidate version"
+                )
+            try:
+                observed_dt = datetime.fromisoformat(observed_at)
+                created_dt = datetime.fromisoformat(created_at)
+                cutoff_dt = datetime.fromisoformat(decision_time_utc)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("prediction timestamps must be valid ISO-8601 values") from exc
+            if observed_dt.tzinfo is None or created_dt.tzinfo is None or cutoff_dt.tzinfo is None:
+                raise ValueError("prospective prediction timestamps must include a UTC offset")
+            if any(value.utcoffset() != datetime.now(UTC).utcoffset() for value in (observed_dt, created_dt, cutoff_dt)):
+                raise ValueError("prospective prediction timestamps must be UTC")
+            if observed_dt > created_dt:
+                raise ValueError("prediction observation cannot be later than prediction creation")
+            if observed_dt > cutoff_dt:
+                raise ValueError("prediction observation is after its declared decision cutoff")
+            if created_dt > cutoff_dt:
+                raise ValueError("prediction creation is after its declared decision cutoff")
+            if test_id == "mlb_moneyline_v2" and (
+                sport != "mlb" or horizon != "late" or candidate_version != "mlb_moneyline_v2_frozen_v1"
+            ):
+                raise ValueError("mlb_moneyline_v2 requires the exact MLB late-horizon frozen cohort")
         model_artifact_hash = f["model_artifact_hash"]
         calibration_artifact_hash = f["calibration_artifact_hash"]
+
+        if supersedes_id is not None:
+            prior = self.conn.execute(
+                """SELECT sport, event_id, horizon, test_id, candidate_version
+                   FROM predictions WHERE id=?""",
+                (supersedes_id,),
+            ).fetchone()
+            if prior is None:
+                raise ValueError("superseded prediction does not exist")
+            logical_identity = (sport, event_id, horizon, test_id, candidate_version)
+            prior_identity = tuple(prior[key] for key in (
+                "sport", "event_id", "horizon", "test_id", "candidate_version",
+            ))
+            if logical_identity != prior_identity:
+                raise ValueError("prediction correction cannot change sealed cohort identity")
 
         if supersedes_id is None:
             existing = self.conn.execute(
@@ -694,28 +767,32 @@ class ShadowLedger:
 
         cur = self._insert_prediction_row(
             run_id, sport, event_id, horizon, schema_version, supersedes_id,
-            decision_time_utc, f, model_artifact_hash, calibration_artifact_hash,
+            created_at, decision_time_utc, observed_at, test_id, candidate_version,
+            f, model_artifact_hash, calibration_artifact_hash,
         )
         return cur, True
 
     def _insert_prediction_row(
         self, run_id, sport, event_id, horizon, schema_version, supersedes_id,
-        decision_time_utc, f, model_artifact_hash, calibration_artifact_hash,
+        created_at, decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
+        f, model_artifact_hash, calibration_artifact_hash,
     ) -> int:
         try:
             cur = self.conn.execute(
                 """INSERT INTO predictions(
                     created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
-                    decision_time_utc, predicted_winner, raw_probabilities_json,
+                    decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
+                    predicted_winner, raw_probabilities_json,
                     calibrated_probabilities_json, probability_lower_json, probability_upper_json,
                     expected_home_score, expected_away_score, model_artifact_hash,
                     calibration_artifact_hash, totals_probabilities_json, spread_probabilities_json,
                     model_disagreement, calibration_uncertainty, missingness_penalty,
                     missing_flags_json, lineup_uncertainty, conservative_probabilities_json
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    utc_now(), run_id, sport, event_id, horizon, schema_version, supersedes_id,
-                    decision_time_utc, f.get("predicted_winner"),
+                    created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
+                    decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
+                    f.get("predicted_winner"),
                     json.dumps(f.get("raw_probabilities", {})),
                     json.dumps(f.get("calibrated_probabilities", {})),
                     json.dumps(f.get("probability_lower", {})),
@@ -1225,24 +1302,54 @@ class ShadowLedger:
         dataset_hash: str | None = None, split_manifest_hash: str | None = None,
         code_revision: str | None = None, dependency_lock_hash: str | None = None,
         artifact_path: str | None = None, schema_version: str = SCHEMA_VERSION,
+        manifest_sha256: str | None = None, primary_content_sha256: str | None = None,
+        primary_artifact_sha256: str | None = None, calibrator_artifact_sha256: str | None = None,
+        source_tree_sha256: str | None = None,
     ) -> tuple[int, bool]:
         existing = self.conn.execute(
-            "SELECT id FROM model_artifacts WHERE sport=? AND artifact_hash=?",
+            """SELECT id, model_name, model_version, dataset_hash, code_revision,
+                      dependency_lock_hash, artifact_path, manifest_sha256,
+                      primary_content_sha256, primary_artifact_sha256,
+                      calibrator_artifact_sha256, source_tree_sha256
+               FROM model_artifacts WHERE sport=? AND artifact_hash=?""",
             (sport, artifact_hash),
         ).fetchone()
         if existing is not None:
+            expected = {
+                "model_name": model_name,
+                "model_version": model_version,
+                "dataset_hash": dataset_hash,
+                "code_revision": code_revision,
+                "dependency_lock_hash": dependency_lock_hash,
+                "artifact_path": artifact_path,
+                "manifest_sha256": manifest_sha256,
+                "primary_content_sha256": primary_content_sha256,
+                "primary_artifact_sha256": primary_artifact_sha256,
+                "calibrator_artifact_sha256": calibrator_artifact_sha256,
+                "source_tree_sha256": source_tree_sha256,
+            }
+            conflicts = [key for key, value in expected.items() if existing[key] != value]
+            if conflicts:
+                raise ValueError(
+                    "conflicting model artifact metadata for an existing artifact hash: "
+                    + ", ".join(conflicts)
+                )
             return int(existing["id"]), False
         cur = self.conn.execute(
             """INSERT INTO model_artifacts(
                 created_at, run_id, sport, schema_version, supersedes_id,
                 model_name, model_version, market_family, horizon,
                 training_start, training_end, dataset_hash, split_manifest_hash,
-                code_revision, dependency_lock_hash, artifact_hash, artifact_path
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                code_revision, dependency_lock_hash, artifact_hash, artifact_path,
+                manifest_sha256, primary_content_sha256, primary_artifact_sha256,
+                calibrator_artifact_sha256, source_tree_sha256
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (utc_now(), run_id, sport, schema_version, None,
              model_name, model_version, market_family, horizon,
              training_start, training_end, dataset_hash, split_manifest_hash,
-             code_revision, dependency_lock_hash, artifact_hash, artifact_path),
+             code_revision, dependency_lock_hash, artifact_hash, artifact_path,
+             manifest_sha256, primary_content_sha256, primary_artifact_sha256,
+             calibrator_artifact_sha256, source_tree_sha256),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
@@ -1265,11 +1372,13 @@ class ShadowLedger:
         schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
         existing = self.conn.execute(
-            """SELECT id FROM calibration_artifacts
+            """SELECT id, method, fitted_on_hash FROM calibration_artifacts
                WHERE sport=? AND model_artifact_hash=? AND calibration_hash=?""",
             (sport, model_artifact_hash, calibration_hash),
         ).fetchone()
         if existing is not None:
+            if existing["method"] != method or existing["fitted_on_hash"] != fitted_on_hash:
+                raise ValueError("conflicting calibration metadata for an existing calibration hash")
             return int(existing["id"]), False
         cur = self.conn.execute(
             """INSERT INTO calibration_artifacts(

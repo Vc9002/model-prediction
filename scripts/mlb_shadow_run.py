@@ -60,14 +60,10 @@ def main() -> None:
     print(f"1. {state.tonight.height} real scheduled MLB games for {target_date}")
 
     predict_result = predict_stage(state, DATA_ROOT, ledger=ledger, run_id=run_id)
-    if predict_result["status"] == "insufficient_history":
-        print(f"3. {predict_result['historical_games']} historical games with real matched features")
-        print("Not enough historical games to train. Stopping honestly.")
-        ledger.close()
-        sys.exit(0)
-    print(f"3-4. Model retrained on {predict_result['train_games']} real games (walk-forward, strictly before "
-          f"{target_date}); {predict_result['games_predicted']} of {predict_result['games_total']} real "
-          f"scheduled games have a real resolved feature row")
+    print(f"3-4. Frozen candidate {predict_result['candidate_version']} loaded "
+          f"(bundle {predict_result['frozen_bundle_hash'][:12]}); "
+          f"{predict_result['games_predicted']} of {predict_result['games_total']} real "
+          f"scheduled games committed a feature row before the decision cutoff")
 
     meta = MetadataDB(f"{DATA_ROOT}/metadata.db")
     collector = MLBCollector(DATA_ROOT, meta)

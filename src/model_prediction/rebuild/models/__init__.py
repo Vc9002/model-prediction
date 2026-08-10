@@ -905,3 +905,70 @@ class BootstrapMLBEnsemble:
         lower = float(np.quantile(probs_arr, lower_quantile))
         upper = float(np.quantile(probs_arr, 1.0 - lower_quantile))
         return lower, upper
+
+    def save(self, path: str | Path) -> None:
+        """Persist every fitted bootstrap replicate as one hash-bound bundle.
+
+        The frozen prospective candidate must restore the exact uncertainty
+        distribution in a new process.  Persisting only the primary model (the
+        former resume behavior) changes lower bounds and is therefore not an
+        equivalent resume.
+        """
+        import joblib
+
+        if not self.fitted:
+            raise RuntimeError("cannot save an unfitted bootstrap ensemble")
+        out = Path(path)
+        out.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "replicates": self._replicates,
+            "n_bootstrap": self.n_bootstrap,
+            "seed": self.seed,
+            "head_family": self.head_family,
+            "intensity_features": self._intensity_features,
+            "differential_features": self._differential_features,
+        }
+        bundle_path = out / "bootstrap.joblib"
+        joblib.dump(payload, bundle_path)
+        metadata = {
+            "n_bootstrap": self.n_bootstrap,
+            "seed": self.seed,
+            "head_family": self.head_family,
+            "intensity_features": self._intensity_features,
+            "differential_features": self._differential_features,
+            "bundle_sha256": hashlib.sha256(bundle_path.read_bytes()).hexdigest(),
+        }
+        identity = {key: value for key, value in metadata.items() if key != "metadata_sha256"}
+        metadata["metadata_sha256"] = hashlib.sha256(
+            json.dumps(identity, sort_keys=True).encode()
+        ).hexdigest()
+        (out / "metadata.json").write_text(json.dumps(metadata, indent=2))
+
+    @classmethod
+    def load(cls, path: str | Path) -> BootstrapMLBEnsemble:
+        """Load a bundle written by :meth:`save`, verifying bytes first."""
+        import joblib
+
+        src = Path(path)
+        metadata = json.loads((src / "metadata.json").read_text())
+        expected_metadata_hash = metadata.get("metadata_sha256")
+        identity = {key: value for key, value in metadata.items() if key != "metadata_sha256"}
+        actual_metadata_hash = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+        if not expected_metadata_hash or expected_metadata_hash != actual_metadata_hash:
+            raise ValueError("bootstrap metadata hash mismatch")
+        bundle_path = src / "bootstrap.joblib"
+        bundle_hash = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+        if not metadata.get("bundle_sha256") or metadata["bundle_sha256"] != bundle_hash:
+            raise ValueError("bootstrap bundle hash mismatch")
+        payload = joblib.load(bundle_path)
+        model = cls(
+            n_bootstrap=int(payload["n_bootstrap"]),
+            seed=int(payload["seed"]),
+            head_family=str(payload["head_family"]),
+        )
+        model._replicates = payload["replicates"]
+        model._intensity_features = list(payload["intensity_features"])
+        model._differential_features = list(payload["differential_features"])
+        if not model.fitted:
+            raise ValueError("bootstrap bundle contains no fitted replicates")
+        return model

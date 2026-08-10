@@ -22,14 +22,14 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
 import polars as pl
 
-from .calibration import Calibrator, IdentityCalibrator, load_calibrator
+from .calibration import Calibrator, IdentityCalibrator
 from .decision import SportsForecast, evaluate_game
 from .economic import SizeLimits
 from .identity import resolve_or_link_polymarket_event_id
@@ -52,6 +52,18 @@ from .mlb_market_matching import (
     real_total_lines,
     resolve_polymarket_event_id,
 )
+from .mlb_v2_artifact import (
+    FROZEN_CALIBRATOR_ARTIFACT_NAME,  # noqa: F401 -- compatibility re-export
+    FROZEN_DISTRIBUTION_METHOD,
+    FROZEN_HEAD_FAMILY,
+    MLB_V2_CANDIDATE_VERSION,
+    MLB_V2_TEST_ID,
+    FrozenCalibratorBundle,
+    FrozenMLBV2Anchor,
+    FrozenMLBV2Bundle,
+    load_frozen_calibrator,  # noqa: F401 -- compatibility re-export
+    load_frozen_mlb_v2_bundle,
+)
 from .models import BootstrapMLBEnsemble, MLBTwoHeadModel, XGBoostTwoHeadModel
 from .uncertainty import (
     calibration_uncertainty,
@@ -64,77 +76,9 @@ from .xgboost_stress import XGBoostChallenger
 HORIZON_LATE = "late"
 DECISION_POLICY_VERSION = "winner_first_v1"
 
-# Multi-sport execution spec MLB-1: the frozen mlb_moneyline_v2 research
-# candidate (outputs/rebuild/test_consumption_registry.json's own
-# frozen_choices) -- XGBoost intensity + differential heads reconciled via
-# a negative-binomial joint score distribution. The live pipeline
-# previously used MLBTwoHeadModel (sklearn heads, default Poisson
-# distribution) -- a materially different, never-frozen combination.
-FROZEN_HEAD_FAMILY = "xgboost"
-FROZEN_DISTRIBUTION_METHOD = "negative_binomial"
-
-# MLB-2: the real, cross-fit-validated calibrator for the exact frozen
-# combination above (see outputs/rebuild/mlb_head_distribution_cartesian.json).
-# Relative to the repo root, matching every other real path convention in
-# this codebase (config/models/challengers/, outputs/rebuild/, etc. are
-# never resolved relative to data_root).
-FROZEN_CALIBRATOR_ARTIFACT_PATH = "config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
-FROZEN_CALIBRATOR_ARTIFACT_NAME = "mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
-
-
-@dataclass
-class FrozenCalibratorBundle:
-    """Everything MLB-2/MLB-5 need from the persisted calibrator artifact:
-    the reconstructed calibrator itself, its real hash, and the real OOF
-    probabilities/labels it was fit on (MLB-5's real
-    calibration_uncertainty bootstrap resamples this exact data -- there is
-    no other real source for it live)."""
-    calibrator: Calibrator
-    calibrator_hash: str
-    oof_probs: list[float] = field(default_factory=list)
-    oof_labels: list[int] = field(default_factory=list)
-
-
-def load_frozen_calibrator(
-    artifact_path: str | Path | None = None, *, challenger_root: str | Path | None = None,
-) -> FrozenCalibratorBundle:
-    """Real, no-refit load of the frozen calibrator artifact.
-    `calibrator_hash` is the artifact's own persisted value, not
-    recomputed, so it always matches exactly what
-    train_mlb_head_distribution_cartesian.py wrote.
-
-    Missing, malformed, or hash-invalid artifacts raise before any forecast
-    or decision is emitted. Identity calibration is never an implicit live
-    fallback for the frozen candidate."""
-    from .config import default_repo_root
-    from .safety import assert_challenger_artifact_path
-
-    root = Path(challenger_root).resolve() if challenger_root is not None else (
-        default_repo_root() / "config" / "models" / "challengers"
-    ).resolve()
-    path = Path(artifact_path).resolve() if artifact_path is not None else root / FROZEN_CALIBRATOR_ARTIFACT_NAME
-    path = assert_challenger_artifact_path(path, root)
-    artifact = json.loads(path.read_text())
-    required = {"method", "parameters", "base_model_hash", "dataset_hash", "calibrator_hash"}
-    missing = sorted(required - artifact.keys())
-    if missing:
-        raise ValueError(f"calibrator artifact missing fields: {', '.join(missing)}")
-    identity_payload = {
-        key: value for key, value in artifact.items()
-        if key not in {"calibrator_hash", "oof_probs", "oof_labels"}
-    }
-    actual_hash = hashlib.sha256(json.dumps(identity_payload, sort_keys=True, default=str).encode()).hexdigest()
-    if actual_hash != artifact["calibrator_hash"]:
-        raise ValueError("calibrator artifact hash mismatch")
-    if len(artifact.get("oof_probs", [])) != len(artifact.get("oof_labels", [])):
-        raise ValueError("calibrator artifact OOF arrays are misaligned")
-    calibrator = load_calibrator(artifact["method"], artifact["parameters"])
-    return FrozenCalibratorBundle(
-        calibrator=calibrator,
-        calibrator_hash=artifact.get("calibrator_hash", ""),
-        oof_probs=artifact.get("oof_probs", []),
-        oof_labels=artifact.get("oof_labels", []),
-    )
+FROZEN_CALIBRATOR_ARTIFACT_PATH = (
+    "config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
+)
 
 
 # Task 5: the one shared feature-list definition (mlb_features.py), also
@@ -146,6 +90,11 @@ DIFFERENTIAL_FEATURES = MLB_DIFFERENTIAL_FEATURES
 
 
 XGB_DIRECT_FEATURES = list(dict.fromkeys(INTENSITY_FEATURES + DIFFERENTIAL_FEATURES))
+
+
+def _utc_now_dt() -> datetime:
+    """One non-overridable runtime clock seam; tests patch this private helper."""
+    return datetime.now(UTC)
 
 
 @dataclass
@@ -239,6 +188,7 @@ def build_forecast(
     xgb_direct: XGBoostChallenger | None = None,
     calibration_oof_probs: list[float] | None = None,
     calibration_oof_labels: list[int] | None = None,
+    model_artifact_hash: str | None = None,
 ) -> SportsForecast:
     """`calibrator`/`calibrator_hash` (multi-sport execution spec MLB-2):
     real, cross-fit-validated calibration applied to the moneyline
@@ -406,7 +356,7 @@ def build_forecast(
         raw_probabilities=raw, calibrated_probabilities=calibrated,
         probability_lower=lower, probability_upper=upper,
         expected_home_score=pred.home_expected_runs, expected_away_score=pred.away_expected_runs,
-        model_artifact_hash=model.to_artifact().get("artifact_hash", ""),
+        model_artifact_hash=model_artifact_hash or model.to_artifact().get("artifact_hash", ""),
         calibration_artifact_hash=calibrator_hash or f"uncalibrated_{calibrator.method}",
         totals_probabilities=totals_probabilities,
         spread_probabilities=spread_probabilities,
@@ -443,8 +393,23 @@ class MLBRunState:
     # model_disagreement measurement -- never spread/total.
     sklearn_baseline: MLBTwoHeadModel | None = None
     xgb_direct: XGBoostChallenger | None = None
+    calibrator_bundle: FrozenCalibratorBundle | None = None
+    frozen_bundle_hash: str = ""
+    dataset_hash: str = ""
+    training_cutoff_utc: str = ""
+    code_revision: str = ""
+    dependency_hash: str = ""
+    source_tree_sha256: str = ""
+    manifest_sha256: str = ""
+    primary_content_sha256: str = ""
+    primary_artifact_sha256: str = ""
+    calibrator_artifact_sha256: str = ""
+    artifact_path: str = ""
+    test_id: str = MLB_V2_TEST_ID
+    candidate_version: str = MLB_V2_CANDIDATE_VERSION
     train_n: int = 0
     decision_times: dict[str, datetime] = field(default_factory=dict)
+    prediction_observed_at_by_event: dict[str, str] = field(default_factory=dict)
     rows_by_event: dict[str, dict] = field(default_factory=dict)  # real feature row per game
     forecasts: dict[str, SportsForecast] = field(default_factory=dict)  # rebuilt in decide() with real market lines
     market_rows: pl.DataFrame = field(default_factory=pl.DataFrame)
@@ -453,6 +418,29 @@ class MLBRunState:
     spread_pairs_by_event: dict[str, list[tuple[float, str]]] = field(default_factory=dict)
     event_canonical_id_by_event: dict[str, str | None] = field(default_factory=dict)  # linked Polymarket <-> ESPN canonical event
     skipped: dict[str, str] = field(default_factory=dict)  # event_id -> real skip reason
+
+
+def _apply_frozen_bundle(state: MLBRunState, frozen: FrozenMLBV2Bundle) -> None:
+    """Bind one run state to every exact component of the sealed candidate."""
+    state.model = frozen.primary
+    state.bootstrap = frozen.bootstrap
+    state.sklearn_baseline = frozen.sklearn_baseline
+    state.xgb_direct = frozen.xgb_direct
+    state.calibrator_bundle = frozen.calibrator
+    state.frozen_bundle_hash = frozen.bundle_hash
+    state.dataset_hash = frozen.dataset_hash
+    state.training_cutoff_utc = frozen.training_cutoff_utc
+    state.code_revision = frozen.code_revision
+    state.dependency_hash = frozen.dependency_hash
+    state.source_tree_sha256 = frozen.source_tree_sha256
+    state.manifest_sha256 = frozen.manifest_sha256
+    state.primary_content_sha256 = frozen.primary_content_sha256
+    state.primary_artifact_sha256 = frozen.primary_artifact_sha256
+    state.calibrator_artifact_sha256 = frozen.calibrator.artifact_sha256
+    state.artifact_path = str(frozen.bundle_path)
+    state.test_id = frozen.test_id
+    state.candidate_version = frozen.candidate_version
+    state.train_n = frozen.training_rows
 
 
 # ── MLB-4 (multi-sport execution spec): real cross-process resume ─────────
@@ -467,12 +455,9 @@ class MLBRunState:
 # expensive-to-recompute real artifacts) once predict_stage() succeeds,
 # and reload them on a resumed invocation instead of retraining.
 #
-# Real, disclosed scope: `state.bootstrap` is NOT persisted here --
-# BootstrapMLBEnsemble has no save()/load() yet (a separate real gap, not
-# silently worked around). A resumed run's forecasts fall back to
-# build_forecast()'s existing flat-haircut uncertainty path (bootstrap=None)
-# rather than the full bootstrap bound -- an accepted, disclosed
-# degradation, not a crash or a fabricated bound.
+# Resume stores only run-specific feature rows. Every fitted component is
+# reloaded from the same exact frozen candidate bundle, so a resumed process
+# restores identical uncertainty rather than silently substituting a haircut.
 
 
 def _resume_state_dir(data_root: str, run_id: str) -> Path:
@@ -480,16 +465,11 @@ def _resume_state_dir(data_root: str, run_id: str) -> Path:
 
 
 def save_resume_state(state: MLBRunState, data_root: str, run_id: str) -> None:
-    """Persist the real, expensive-to-recompute parts of a successful
-    predict_stage() run: the trained model (via XGBoostTwoHeadModel.save())
-    and the resolved per-game feature rows/decision times/skip reasons
-    (JSON). Requires state.model to be fitted (predict_stage() always sets
-    it before returning "status": "ok")."""
-    if state.model is None:
-        raise ValueError("cannot save resume state before predict_stage() has trained a model")
+    """Persist run-specific rows bound to the immutable candidate hash."""
+    if state.model is None or not state.frozen_bundle_hash:
+        raise ValueError("cannot save resume state before the frozen candidate is loaded")
     out = _resume_state_dir(data_root, run_id)
     out.mkdir(parents=True, exist_ok=True)
-    state.model.save(out / "model")
     # rows_by_event's real feature values can be numpy scalars (e.g. from
     # pandas/numpy-backed feature computation upstream) -- plain
     # json.dumps(default=str) would silently stringify those into text
@@ -502,16 +482,55 @@ def save_resume_state(state: MLBRunState, data_root: str, run_id: str) -> None:
             return o.item()
         return str(o)
 
-    (out / "state.json").write_text(json.dumps({
+    event_contracts: dict[str, dict[str, Any]] = {}
+    tonight_by_event = {str(row["event_id"]): row for row in state.tonight.iter_rows(named=True)}
+    for event_id in state.rows_by_event:
+        game = tonight_by_event.get(event_id)
+        if game is None:
+            raise ValueError(f"resume feature row has no scheduled event contract: {event_id}")
+        required = ("event_start_utc", "home_team", "away_team")
+        if any(not game.get(key) for key in required):
+            raise ValueError(f"resume scheduled event contract is incomplete: {event_id}")
+        event_contracts[event_id] = {
+            "event_start_utc": game["event_start_utc"],
+            "home_team": game["home_team"],
+            "away_team": game["away_team"],
+            "decision_time_utc": state.decision_times[event_id].isoformat(),
+        }
+    payload = {
         "target_date": state.target_date,
         "train_n": state.train_n,
+        "frozen_bundle_hash": state.frozen_bundle_hash,
+        "manifest_sha256": state.manifest_sha256,
+        "primary_content_sha256": state.primary_content_sha256,
+        "primary_artifact_sha256": state.primary_artifact_sha256,
+        "calibrator_artifact_sha256": state.calibrator_artifact_sha256,
+        "source_tree_sha256": state.source_tree_sha256,
+        "test_id": state.test_id,
+        "candidate_version": state.candidate_version,
         "rows_by_event": state.rows_by_event,
+        "event_contracts": event_contracts,
         "decision_times": {k: v.isoformat() for k, v in state.decision_times.items()},
+        "prediction_observed_at_by_event": state.prediction_observed_at_by_event,
         "skipped": state.skipped,
-    }, indent=2, default=_json_default))
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default)
+    envelope = {**payload, "resume_state_sha256": hashlib.sha256(canonical.encode()).hexdigest()}
+    temporary = out / "state.json.tmp"
+    temporary.write_text(json.dumps(envelope, indent=2, default=_json_default))
+    temporary.replace(out / "state.json")
 
 
-def load_resume_state(data_root: str, run_id: str, target_date: str) -> MLBRunState | None:
+def load_resume_state(
+    data_root: str,
+    run_id: str,
+    target_date: str,
+    *,
+    challenger_root: str | Path | None = None,
+    repo_root: str | Path | None = None,
+    expected_anchor: FrozenMLBV2Anchor | None = None,
+    _test_expected_source_tree_sha256: str | None = None,
+) -> MLBRunState | None:
     """Real reload of a prior predict_stage() success for this exact
     run_id/date. Returns None (honest, not an error) if no resume state was
     ever saved for this run_id, or it belongs to a different date -- the
@@ -525,23 +544,90 @@ def load_resume_state(data_root: str, run_id: str, target_date: str) -> MLBRunSt
     rows) are actually reloaded from disk instead of recomputed."""
     resume_dir = _resume_state_dir(data_root, run_id)
     state_path = resume_dir / "state.json"
-    model_path = resume_dir / "model"
-    if not state_path.exists() and not model_path.exists():
+    if not state_path.exists():
         return None
-    if not state_path.exists() or not model_path.exists():
-        raise ValueError("resume model bundle is incomplete")
     saved = json.loads(state_path.read_text())
-    if saved["target_date"] != target_date:
+    if not isinstance(saved, dict):
+        # ValueError, not TypeError: this validates untrusted on-disk JSON
+        # content, consistent with every sibling malformed-resume-state
+        # check in this function (state_hash mismatch, candidate binding
+        # mismatch, etc.), not a Python argument-type contract.
+        raise ValueError("resume state must be a JSON object")  # noqa: TRY004
+    state_hash = saved.get("resume_state_sha256")
+    identity = {key: value for key, value in saved.items() if key != "resume_state_sha256"}
+    actual_state_hash = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if not state_hash or state_hash != actual_state_hash:
+        raise ValueError("resume state content hash mismatch")
+    if saved.get("target_date") != target_date:
         return None
 
     state = load_state(data_root, target_date)
     if state is None:
         return None
-    state.model = XGBoostTwoHeadModel.load(model_path)
-    state.bootstrap = None  # real, disclosed gap -- see this section's module comment
-    state.train_n = saved["train_n"]
-    state.rows_by_event = saved["rows_by_event"]
-    state.skipped = saved["skipped"]
+    frozen = load_frozen_mlb_v2_bundle(
+        challenger_root,
+        repo_root=repo_root,
+        expected_anchor=expected_anchor,
+        _test_expected_source_tree_sha256=_test_expected_source_tree_sha256,
+    )
+    if saved.get("frozen_bundle_hash") != frozen.bundle_hash:
+        raise ValueError("resume state is bound to a different frozen MLB v2 candidate")
+    expected_bindings = {
+        "manifest_sha256": frozen.manifest_sha256,
+        "primary_content_sha256": frozen.primary_content_sha256,
+        "primary_artifact_sha256": frozen.primary_artifact_sha256,
+        "calibrator_artifact_sha256": frozen.calibrator.artifact_sha256,
+        "source_tree_sha256": frozen.source_tree_sha256,
+        "test_id": frozen.test_id,
+        "candidate_version": frozen.candidate_version,
+    }
+    mismatches = [key for key, value in expected_bindings.items() if saved.get(key) != value]
+    if mismatches:
+        raise ValueError("resume state candidate binding mismatch: " + ", ".join(mismatches))
+    rows = saved.get("rows_by_event")
+    observed_by_event = saved.get("prediction_observed_at_by_event")
+    event_contracts = saved.get("event_contracts")
+    if not isinstance(rows, dict) or not isinstance(observed_by_event, dict) or not isinstance(event_contracts, dict):
+        raise ValueError("resume state event payload is malformed")  # noqa: TRY004 -- untrusted JSON, see note above
+    tonight_by_event = {str(row["event_id"]): row for row in state.tonight.iter_rows(named=True)}
+    for event_id, row in rows.items():
+        game = tonight_by_event.get(event_id)
+        contract = event_contracts.get(event_id)
+        if not isinstance(row, dict) or row.get("event_id") != event_id:
+            raise ValueError(f"resume feature row identity mismatch: {event_id}")
+        if game is None or not isinstance(contract, dict):
+            raise ValueError(f"resume event is no longer in the scheduled slate: {event_id}")
+        actual_contract = {
+            "event_start_utc": game.get("event_start_utc"),
+            "home_team": game.get("home_team"),
+            "away_team": game.get("away_team"),
+            "decision_time_utc": state.decision_times[event_id].isoformat(),
+        }
+        if contract != actual_contract:
+            raise ValueError(f"resume scheduled event contract changed: {event_id}")
+        observed_raw = observed_by_event.get(event_id)
+        if not isinstance(observed_raw, str):
+            # Validating untrusted resume-state JSON, matching every other
+            # ValueError-on-bad-shape raise in this function -- TypeError
+            # would be inconsistent with the sibling checks around it.
+            raise ValueError(f"resume prediction observation time is invalid: {event_id}")  # noqa: TRY004
+        try:
+            observed = datetime.fromisoformat(observed_raw)
+        except ValueError as exc:
+            raise ValueError(f"resume prediction observation time is invalid: {event_id}") from exc
+        decision_time = state.decision_times[event_id]
+        if observed.tzinfo is None or observed.utcoffset() != timedelta(0):
+            raise ValueError(f"resume prediction observation time must be UTC: {event_id}")
+        if observed > decision_time:
+            raise ValueError(f"resume prediction observation is after cutoff: {event_id}")
+        if _utc_now_dt() > decision_time:
+            raise ValueError(f"resume prediction cutoff has passed: {event_id}")
+    _apply_frozen_bundle(state, frozen)
+    state.rows_by_event = rows
+    state.prediction_observed_at_by_event = observed_by_event
+    state.skipped = saved.get("skipped", {})
     return state
 
 
@@ -579,59 +665,60 @@ def load_state(data_root: str, target_date: str) -> MLBRunState | None:
 
 
 def predict_stage(
-    state: MLBRunState, data_root: str, *, ledger: Any | None = None, run_id: str | None = None,
+    state: MLBRunState,
+    data_root: str,
+    *,
+    ledger: Any | None = None,
+    run_id: str | None = None,
+    challenger_root: str | Path | None = None,
+    repo_root: str | Path | None = None,
 ) -> dict:
-    """Real training + a preliminary, market-blind moneyline forecast per
-    game -- matches mlb_shadow_run.py's steps 2-4 (train_through) plus the
-    per-game forecast, computed with no market lines yet
-    (total_lines=[]/spread_pairs=[]) so predicted_winner is genuinely frozen
-    before any market data is inspected, per CLAUDE.md's winner-first
-    requirement. decide_stage() rebuilds the full forecast once real market
-    lines are known (Phase 10-required market data, not sports probability)."""
-    # Deferred: heavy pybaseball import path.
-    from .mlb_features import build_game_feature_row, load_probable_starter_records
+    """Load the sealed candidate and commit point-in-time feature rows.
 
-    # Loaded once, up front, and reused below for both the historical
-    # retraining rows and tonight's live probables_by_event lookup -- the
-    # same real archive, read once, not two independent reads of the same
-    # file. Train-serving parity fix (see outputs/rebuild/takeover_status.md):
-    # the walk-forward retraining below used to call build_game_feature_row()
-    # with no starter-horizon awareness at all, which internally used
-    # identify_starters() on each completed game's own final Statcast
-    # pitches -- the actual pitcher, not what was knowable at this horizon's
-    # decision time. That is the identical leak already fixed in the
-    # training scripts; this is the live pipeline's own copy of it.
+    No model fitting is permitted in this runtime path.  Each feature row is
+    stamped with its real completion time and rejected if that time is later
+    than the predeclared decision cutoff.
+    """
+    from .mlb_features import load_probable_starter_records
+
+    frozen = load_frozen_mlb_v2_bundle(
+        challenger_root,
+        repo_root=repo_root,
+    )
+    _apply_frozen_bundle(state, frozen)
+
     probable_records = load_probable_starter_records(
         Path(data_root) / "raw" / "mlb" / "probable_starters.jsonl"
     )
 
-    sb = dedupe_scoreboard(pl.read_parquet(f"{data_root}/normalized/mlb/scoreboard.parquet"))
-    completed = sb.filter(pl.col("status") == "STATUS_FINAL").sort("event_start_utc")
-    rows = [
-        build_game_feature_row(g, state.pitches, state.starters, data_root, HORIZON_LATE, probable_records)
-        for g in completed.iter_rows(named=True)
-    ]
-    rows = [r for r in rows if r is not None]
-    features = pl.DataFrame(rows).sort("game_date") if rows else pl.DataFrame()
-
-    if features.height < 30:
-        return {"status": "insufficient_history", "historical_games": features.height}
-
-    trained = train_through(features, state.target_date)
-    state.model, state.bootstrap, state.train_n = trained.model, trained.bootstrap, trained.train_n
-    state.sklearn_baseline, state.xgb_direct = trained.sklearn_baseline, trained.xgb_direct
-
     if ledger is not None and run_id is not None:
-        # Real lineage: the trained model artifact this run's predictions
-        # are bound to (idempotent on artifact_hash -- retraining on
-        # identical data produces the identical hash, real no-op per
-        # record_model_artifact()'s own contract).
-        artifact = state.model.to_artifact()
         ledger.record_model_artifact(
-            run_id=run_id, sport="mlb", model_name=artifact.get("model_id", "mlb-two-head-v1"),
-            model_version=artifact.get("model_id", "unknown"),
-            artifact_hash=artifact.get("artifact_hash", ""), horizon=HORIZON_LATE,
-            training_end=state.target_date,
+            run_id=run_id,
+            sport="mlb",
+            model_name=state.test_id,
+            model_version=state.candidate_version,
+            artifact_hash=state.frozen_bundle_hash,
+            market_family="moneyline",
+            horizon=HORIZON_LATE,
+            training_end=state.training_cutoff_utc,
+            dataset_hash=state.dataset_hash,
+            code_revision=state.code_revision,
+            dependency_lock_hash=state.dependency_hash,
+            artifact_path=state.artifact_path,
+            manifest_sha256=state.manifest_sha256,
+            primary_content_sha256=state.primary_content_sha256,
+            primary_artifact_sha256=state.primary_artifact_sha256,
+            calibrator_artifact_sha256=state.calibrator_artifact_sha256,
+            source_tree_sha256=state.source_tree_sha256,
+        )
+        assert state.calibrator_bundle is not None
+        ledger.record_calibration_artifact(
+            run_id=run_id,
+            sport="mlb",
+            model_artifact_hash=state.frozen_bundle_hash,
+            calibration_hash=state.calibrator_bundle.calibrator_hash,
+            method=state.calibrator_bundle.calibrator.method,
+            fitted_on_hash=state.calibrator_bundle.dataset_hash,
         )
 
     probables_by_event: dict[str, dict] = {}
@@ -650,6 +737,11 @@ def predict_stage(
     n_predicted = 0
     for g in state.tonight.iter_rows(named=True):
         event_id = g["event_id"]
+        decision_time = state.decision_times[event_id]
+        observed = _utc_now_dt()
+        if observed > decision_time:
+            state.skipped[event_id] = "prediction_cutoff_passed"
+            continue
         home_abbrev = ESPN_TO_STATCAST_ABBREV.get(g["home_team"])
         away_abbrev = ESPN_TO_STATCAST_ABBREV.get(g["away_team"])
         if home_abbrev is None or away_abbrev is None:
@@ -667,6 +759,11 @@ def predict_stage(
         )
         if row is None:
             state.skipped[event_id] = "starter_name_not_resolved_to_real_statcast_id"
+            continue
+
+        committed_at = _utc_now_dt()
+        if committed_at > decision_time:
+            state.skipped[event_id] = "prediction_cutoff_passed"
             continue
 
         # Real bug found and fixed via live diff against
@@ -690,18 +787,17 @@ def predict_stage(
         # decide_stage(), matching the proven script's call pattern
         # exactly (single call per game).
         state.rows_by_event[event_id] = row
+        state.prediction_observed_at_by_event[event_id] = committed_at.isoformat()
         n_predicted += 1
 
     if run_id is not None:
-        # MLB-4: persist the real, expensive-to-recompute artifacts
-        # (trained model + resolved feature rows) so a later, resumed
-        # invocation of this same run_id can skip real retraining --
-        # see save_resume_state()'s own docstring for exactly what is and
-        # isn't persisted.
         save_resume_state(state, data_root, run_id)
 
     return {
         "status": "ok", "train_games": state.train_n,
+        "frozen_bundle_hash": state.frozen_bundle_hash,
+        "test_id": state.test_id,
+        "candidate_version": state.candidate_version,
         "games_predicted": n_predicted, "games_total": state.tonight.height,
         "skipped": dict(state.skipped),
     }
@@ -784,11 +880,9 @@ def decide_stage(
     if state.model is None:
         raise ValueError("decide_stage requires predict_stage to have run first (state.model is None)")
 
-    # MLB-2/MLB-5: loaded once per decide_stage() call, not once per game --
-    # "the calibrator" is one frozen artifact for the whole run, never
-    # refit or reselected per prediction. Its real OOF probs/labels feed
-    # MLB-5's calibration_uncertainty bootstrap below.
-    calibrator_bundle = load_frozen_calibrator(challenger_root=challenger_root)
+    if not state.frozen_bundle_hash or state.calibrator_bundle is None:
+        raise ValueError("decide_stage requires the exact frozen MLB v2 bundle loaded by predict_stage")
+    calibrator_bundle = state.calibrator_bundle
 
     limits = limits if limits is not None else SizeLimits()
     games_report = []
@@ -803,6 +897,10 @@ def decide_stage(
     team_names = {r["event_id"]: (r["home_team"], r["away_team"]) for r in state.tonight.iter_rows(named=True)}
 
     for event_id, row in state.rows_by_event.items():
+        prediction_created_at = _utc_now_dt()
+        if prediction_created_at > state.decision_times[event_id]:
+            state.skipped[event_id] = "prediction_cutoff_passed_before_commit"
+            continue
         candidates = state.candidates_by_event.get(event_id, [])
         total_lines = state.total_lines_by_event.get(event_id, [])
         spread_pairs = state.spread_pairs_by_event.get(event_id, [])
@@ -815,6 +913,7 @@ def decide_stage(
             calibrator=calibrator_bundle.calibrator, calibrator_hash=calibrator_bundle.calibrator_hash,
             sklearn_baseline=state.sklearn_baseline, xgb_direct=state.xgb_direct,
             calibration_oof_probs=calibrator_bundle.oof_probs, calibration_oof_labels=calibrator_bundle.oof_labels,
+            model_artifact_hash=state.frozen_bundle_hash,
         )
         state.forecasts[event_id] = forecast
 
@@ -827,7 +926,11 @@ def decide_stage(
         if ledger is not None and run_id is not None:
             _, pred_created = ledger.record_prediction(
                 run_id=run_id, sport="mlb", event_id=event_id, horizon=HORIZON_LATE,
-                decision_time_utc=decision_time_utc, forecast=forecast,
+                decision_time_utc=decision_time_utc,
+                prediction_observed_at_utc=state.prediction_observed_at_by_event[event_id],
+                test_id=state.test_id,
+                candidate_version=state.candidate_version,
+                forecast=forecast,
             )
             n_predictions_recorded += 1 if pred_created else 0
             market_eval_ids: dict[tuple, int] = {}
