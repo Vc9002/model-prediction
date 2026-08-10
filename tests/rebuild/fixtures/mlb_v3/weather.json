@@ -1,0 +1,9 @@
+{
+  "hourly": {
+    "time": ["2026-08-09T17:00:00+00:00", "2026-08-09T18:00:00+00:00"],
+    "temperature_2m": [28.0, 27.5],
+    "wind_speed_10m": [12.0, 11.0],
+    "wind_direction_10m": [180, 190],
+    "precipitation_probability": [10, 20]
+  }
+}

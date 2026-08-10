@@ -1,0 +1,57 @@
+{
+  "dates": [
+    {
+      "date": "2026-08-09",
+      "games": [
+        {
+          "gamePk": 900001,
+          "gameDate": "2026-08-09T17:05:00Z",
+          "officialDate": "2026-08-09",
+          "season": "2026",
+          "gameType": "R",
+          "gameNumber": 1,
+          "doubleHeader": "Y",
+          "scheduledInnings": 9,
+          "status": {"abstractGameState": "Preview", "detailedState": "Scheduled", "statusCode": "S"},
+          "teams": {
+            "away": {"team": {"id": 111}, "probablePitcher": {"id": 501}},
+            "home": {"team": {"id": 222}, "probablePitcher": {"id": 601}}
+          },
+          "venue": {"id": 10}
+        },
+        {
+          "gamePk": 900002,
+          "gameDate": "2026-08-09T23:05:00Z",
+          "officialDate": "2026-08-09",
+          "season": "2026",
+          "gameType": "R",
+          "gameNumber": 2,
+          "doubleHeader": "Y",
+          "scheduledInnings": 9,
+          "status": {"abstractGameState": "Preview", "detailedState": "Scheduled", "statusCode": "S"},
+          "teams": {
+            "away": {"team": {"id": 111}, "probablePitcher": {"id": 502}},
+            "home": {"team": {"id": 222}, "probablePitcher": {"id": 602}}
+          },
+          "venue": {"id": 10}
+        },
+        {
+          "gamePk": 900003,
+          "gameDate": "2026-08-10T00:10:00Z",
+          "officialDate": "2026-08-09",
+          "season": "2026",
+          "gameType": "R",
+          "gameNumber": 1,
+          "doubleHeader": "N",
+          "scheduledInnings": 9,
+          "status": {"abstractGameState": "Preview", "detailedState": "Postponed", "statusCode": "D"},
+          "teams": {"away": {"team": {"id": 333}}, "home": {"team": {"id": 444}}},
+          "venue": {"id": 20},
+          "rescheduleDate": "2026-08-12T00:10:00Z",
+          "rescheduledFromDate": "2026-08-09T00:10:00Z",
+          "originalDate": "2026-08-09"
+        }
+      ]
+    }
+  ]
+}

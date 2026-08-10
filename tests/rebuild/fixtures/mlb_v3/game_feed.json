@@ -1,0 +1,22 @@
+{
+  "gameData": {
+    "game": {"pk": 900001},
+    "teams": {"away": {"id": 111}, "home": {"id": 222}},
+    "probablePitchers": {
+      "away": {"id": 501, "fullName": "Away Starter"},
+      "home": {"id": 601, "fullName": "Home Starter"}
+    },
+    "players": {
+      "ID1001": {"id": 1001, "fullName": "Away Hitter"},
+      "ID2001": {"id": 2001, "fullName": "Home Hitter"}
+    }
+  },
+  "liveData": {
+    "boxscore": {
+      "teams": {
+        "away": {"battingOrder": [1001], "players": {"ID1001": {}}},
+        "home": {"battingOrder": [2001], "players": {"ID2001": {}}}
+      }
+    }
+  }
+}

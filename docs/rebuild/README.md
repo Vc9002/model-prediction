@@ -7,8 +7,10 @@ The rebuild is an isolated research and shadow system. It lives under
 below `config/models/challengers`, and exposes three separate CLIs:
 `rebuild-shadow` (the decision pipeline: collect through decide),
 `rebuild-data` (per-sport backfill/audit), and `rebuild-model` (per-sport
-train/compare). `rebuild-data`/`rebuild-model` currently report
-`NOT_IMPLEMENTED` for every sport -- see `OPERATIONS.md`.
+train/compare). `rebuild-data --sport mlb --version v3` is real (MLB v3, a
+separate research lane from the frozen `mlb_moneyline_v2` candidate -- see
+`MLB_V3_DATA.md`); every other sport on `rebuild-data`, and every sport on
+`rebuild-model`, currently reports `NOT_IMPLEMENTED` -- see `OPERATIONS.md`.
 
 Its permanent safety state is:
 
@@ -28,3 +30,5 @@ Read the remaining documents in this directory before changing rebuild code:
 - `OPERATIONS.md` defines safe CLI and runtime operation.
 - `VALIDATION.md` defines evidence, sealed-test, and acceptance rules.
 - `MARKETS.md` defines exact contract and economic semantics.
+- `MLB_V3_DATA.md` defines the MLB v3 data foundation's source, licensing,
+  and point-in-time boundary.
