@@ -281,6 +281,154 @@ class RebuildStatusReader:
             "clv": None,
         }
 
+    def shadow_picks(self, limit: int = 200) -> dict[str, Any]:
+        """Real trade_decisions rows in a picks-like shape, for a read-only
+        dashboard display. Deliberately NOT the same code path as the
+        incumbent Main-ledger read_picks()/dashboard_picks(): that pipeline
+        feeds real BUY/SELL order placement (preview_order()), and shadow
+        rows must never become order-eligible just by rendering next to
+        them. This method returns data only -- no order/pick_id mutation
+        surface, no _decorate_pick, no buy/sell affordance.
+
+        Team names aren't columns on trade_decisions/predictions; the only
+        place they're recorded is each run's `decide`-stage detail_json
+        (see cli.py's per-game report). Looked up here by event_id, not
+        fabricated when absent -- some real events genuinely have no name
+        recorded (verified live: ESPN-collected scoreboards without team
+        names populate empty strings, not missing rows)."""
+        required = ("trade_decisions", "predictions", "run_stages")
+        missing = [table for table in required if not self._table_exists(self.shadow_db, table)]
+        if missing:
+            return _unavailable(
+                "shadow database is absent or missing required tables: " + ", ".join(missing), picks=[]
+            )
+
+        decisions, error = self._query(
+            self.shadow_db,
+            "SELECT id, created_at, run_id, sport, event_id, horizon, decision_time_utc, "
+            "model_artifact_hash, action, predicted_winner, market_type, units, reason_code, "
+            "cost_adjusted_edge, evaluated_market_id, evaluated_team_or_side, evaluated_line "
+            "FROM trade_decisions ORDER BY created_at DESC LIMIT ?",
+            (max(1, min(int(limit), 1000)),),
+        )
+        if error:
+            return _unavailable(error, picks=[])
+        if not decisions:
+            return {"status": "ok", "picks": []}
+
+        run_ids = sorted({row["run_id"] for row in decisions})
+        placeholders = ",".join("?" for _ in run_ids)
+
+        prediction_rows, _ = self._query(
+            self.shadow_db,
+            "SELECT run_id, event_id, horizon, decision_time_utc, predicted_winner, "
+            "probability_lower_json, probability_upper_json, calibration_uncertainty, "
+            "model_disagreement FROM predictions WHERE run_id IN (" + placeholders + ")",
+            tuple(run_ids),
+        )
+        predictions_by_key = {
+            (row["run_id"], row["event_id"], row["horizon"], row["decision_time_utc"]): row
+            for row in prediction_rows
+        }
+
+        settlement_columns = self._columns(self.shadow_db, "settlements")
+        settlements_by_decision: dict[int, dict] = {}
+        if "trade_decision_id" in settlement_columns:
+            settlement_rows, _ = self._query(
+                self.shadow_db,
+                "SELECT trade_decision_id, outcome, settled_price, pnl, settled_at_utc "
+                "FROM settlements WHERE trade_decision_id IS NOT NULL",
+            )
+            settlements_by_decision = {int(row["trade_decision_id"]): row for row in settlement_rows}
+
+        stage_rows, _ = self._query(
+            self.shadow_db,
+            "SELECT run_id, detail_json FROM run_stages "
+            "WHERE stage='decide' AND run_id IN (" + placeholders + ")",
+            tuple(run_ids),
+        )
+        teams_by_run_event: dict[tuple[str, str], dict[str, str]] = {}
+        for stage in stage_rows:
+            try:
+                detail = json.loads(stage.get("detail_json") or "{}")
+            except json.JSONDecodeError:
+                continue
+            for game in detail.get("games") or []:
+                event_id = game.get("event_id")
+                if event_id is None:
+                    continue
+                teams_by_run_event[(stage["run_id"], str(event_id))] = {
+                    "home_team": game.get("home_team") or "",
+                    "away_team": game.get("away_team") or "",
+                }
+
+        picks: list[dict[str, Any]] = []
+        for row in decisions:
+            key = (row["run_id"], row["event_id"], row["horizon"], row["decision_time_utc"])
+            prediction = predictions_by_key.get(key) or {}
+            teams = teams_by_run_event.get((row["run_id"], str(row["event_id"]))) or {}
+            settlement = settlements_by_decision.get(int(row["id"])) or {}
+
+            side = str(row.get("evaluated_team_or_side") or "") or None
+            model_probability = None
+            for source in ("probability_lower_json", "probability_upper_json"):
+                raw = prediction.get(source)
+                if not raw or side not in ("home", "away"):
+                    continue
+                try:
+                    parsed = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if side in parsed:
+                    model_probability = parsed[side]
+                    break
+
+            side_team = {"home": teams.get("home_team"), "away": teams.get("away_team")}.get(side or "")
+            selection_label = side_team or side or ""
+            if row.get("market_type") == "moneyline":
+                selection_label = f"{selection_label} ML".strip()
+            elif row.get("evaluated_line") is not None:
+                selection_label = f"{selection_label} {row.get('evaluated_line')}".strip()
+
+            picks.append(
+                {
+                    "pick_id": f"shadow:{row['id']}",
+                    "record_type": "shadow_research",
+                    "created_at_utc": row.get("created_at"),
+                    "event_start_utc": None,  # not tracked at this layer; decision_time_utc is the freeze point, not kickoff
+                    "decision_time_utc": row.get("decision_time_utc"),
+                    "event_id": row.get("event_id"),
+                    "league": str(row.get("sport") or "").upper(),
+                    "home_team": teams.get("home_team") or "",
+                    "away_team": teams.get("away_team") or "",
+                    "market_type": row.get("market_type"),
+                    "selection": selection_label,
+                    "line": row.get("evaluated_line"),
+                    "american_odds": None,  # shadow ledger has no American-odds field; only decimal executable prices
+                    "market_implied_probability": None,
+                    "model_probability": model_probability,
+                    "model_uncertainty": prediction.get("calibration_uncertainty"),
+                    "edge": row.get("cost_adjusted_edge"),
+                    "trade_candidate": row.get("action") == "BET",
+                    "confidence_score": None,
+                    "units": row.get("units"),
+                    "model_version": row.get("model_artifact_hash"),
+                    "status": "settled" if settlement else "open",
+                    "result": settlement.get("outcome"),
+                    "away_score": None,
+                    "home_score": None,
+                    "probability_clv": None,
+                    "pnl_units": settlement.get("pnl"),
+                    "settled_at_utc": settlement.get("settled_at_utc"),
+                    "decision": row.get("action"),
+                    "reason_code": row.get("reason_code"),
+                    "sportsbook": "polymarket",
+                    "horizon": row.get("horizon"),
+                    "run_id": row.get("run_id"),
+                }
+            )
+        return {"status": "ok", "picks": picks}
+
     def runs(self, limit: int = 50) -> dict[str, Any]:
         if not self._table_exists(self.shadow_db, "runs"):
             return _unavailable("shadow.db does not exist or has no runs table", runs=[])
@@ -528,6 +676,7 @@ _READERS: dict[str, Callable[[RebuildStatusReader], dict[str, Any]]] = {
     "economics": RebuildStatusReader.economics,
     "runs": RebuildStatusReader.runs,
     "health": RebuildStatusReader.health,
+    "shadow-picks": RebuildStatusReader.shadow_picks,
 }
 
 
