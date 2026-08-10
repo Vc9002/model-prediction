@@ -1,9 +1,14 @@
 # Clean-Slate Rebuild
 
 The rebuild is an isolated research and shadow system. It lives under
-`src/model_prediction/rebuild`, writes runtime state only below `data/rebuild`,
-stores challenger artifacts only below `config/models/challengers`, and exposes
-the separate `rebuild-shadow` CLI.
+`src/model_prediction/rebuild`, writes mutable runtime state below
+`RuntimePaths.rebuild_root` (repo-local `data/rebuild` unless
+`MODEL_PREDICTION_RUNTIME_ROOT` is set), stores challenger artifacts only
+below `config/models/challengers`, and exposes three separate CLIs:
+`rebuild-shadow` (the decision pipeline: collect through decide),
+`rebuild-data` (per-sport backfill/audit), and `rebuild-model` (per-sport
+train/compare). `rebuild-data`/`rebuild-model` currently report
+`NOT_IMPLEMENTED` for every sport -- see `OPERATIONS.md`.
 
 Its permanent safety state is:
 

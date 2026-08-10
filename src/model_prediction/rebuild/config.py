@@ -8,6 +8,8 @@ from typing import Any
 
 import yaml
 
+from ..runtime_paths import RuntimePaths
+
 SHADOW_ONLY = True
 EXECUTION_ENABLED = False
 PRODUCTION_PROMOTION = False
@@ -119,11 +121,29 @@ def load_rebuild_config(path: str | Path | None = None) -> RebuildConfig:
             raise RebuildConfigError(f"sports.{sport}.status must be a non-empty string")
         sports[str(sport)] = SportConfig(enabled=_bool(section, "enabled"), status=status)
 
+    # data_root is mutable runtime state (raw cache, normalized parquet,
+    # shadow.db) -- it now resolves through RuntimePaths, the same
+    # repo_root/runtime_root split the dashboard reader already uses
+    # (MODEL_PREDICTION_RUNTIME_ROOT), rather than always living inside
+    # this Git checkout. output_root/challenger_root stay repo-relative:
+    # they hold versioned evidence (audit reports, challenger model
+    # configs) meant to be committed, matching RuntimePaths' own
+    # rebuild_output_root split. The paths.data_root key is kept only as a
+    # fail-closed sentinel -- changing it no longer changes where data
+    # actually goes, so a stale/edited value must not silently be ignored.
+    if paths_raw.get("data_root") != "data/rebuild":
+        raise RebuildConfigError(
+            "paths.data_root must remain the literal 'data/rebuild' sentinel; "
+            "the real runtime location now resolves via RuntimePaths "
+            "(MODEL_PREDICTION_RUNTIME_ROOT), not this config file"
+        )
+    data_root = RuntimePaths.resolve(repo_root=repo_root).rebuild_root
+
     return RebuildConfig(
         repo_root=repo_root,
         rebuild=mode,
         paths=RebuildPaths(
-            data_root=_resolve(repo_root, paths_raw.get("data_root"), "data_root"),
+            data_root=data_root,
             output_root=_resolve(repo_root, paths_raw.get("output_root"), "output_root"),
             challenger_root=_resolve(repo_root, paths_raw.get("challenger_root"), "challenger_root"),
         ),

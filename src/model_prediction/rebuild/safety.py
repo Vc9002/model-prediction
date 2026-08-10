@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..runtime_paths import RuntimePaths
 from .config import EXECUTION_ENABLED, PRODUCTION_PROMOTION, SHADOW_ONLY, RebuildConfig
 
 
@@ -39,11 +40,15 @@ class RebuildPathPolicy:
         return policy
 
     def assert_isolated_roots(self) -> None:
-        expected_data = self.repo_root / "data" / "rebuild"
+        # expected_data mirrors config.py's own resolution (RuntimePaths,
+        # honoring MODEL_PREDICTION_RUNTIME_ROOT) rather than hardcoding
+        # repo_root/data/rebuild -- config.py is the only other caller that
+        # resolves this, and both must agree on where "isolated" means.
+        expected_data = RuntimePaths.resolve(repo_root=self.repo_root).rebuild_root
         expected_output = self.repo_root / "outputs" / "rebuild"
         expected_challengers = self.repo_root / "config" / "models" / "challengers"
         if not _within(self.data_root, expected_data):
-            raise RebuildSafetyError("rebuild data_root must be inside data/rebuild")
+            raise RebuildSafetyError("rebuild data_root must be inside the resolved runtime root's rebuild/ directory")
         if not _within(self.output_root, expected_output):
             raise RebuildSafetyError("rebuild output_root must be inside outputs/rebuild")
         if not _within(self.challenger_root, expected_challengers):
