@@ -3,8 +3,8 @@
 This module owns argument parsing and safety wiring only. Sport-specific
 ingestion logic lives behind the `data_foundation.build_data_foundation`
 registration seam (see that module's docstring). `mlb` (MLB v3,
-research-only) and `wnba` are wired to real backends; every other sport
-reports `NOT_IMPLEMENTED`.
+research-only), `wnba`, and `nfl` are wired to real backends; every other
+sport reports `NOT_IMPLEMENTED`.
 """
 
 from __future__ import annotations
@@ -20,6 +20,9 @@ from .data_foundation import SUPPORTED_DATA_SPORTS, build_data_foundation
 from .safety import RebuildPathPolicy, assert_shadow_only
 
 FORBIDDEN_LIVE_FLAGS = frozenset({"--execute", "--live", "--real-order", "--promote"})
+# Sports whose backfill is keyed by --season (repeatable) rather than
+# MLB v3's --start/--end date range.
+SEASON_BASED_SPORTS = frozenset({"wnba", "nfl"})
 
 
 def run(command: str, sport: str, data_root: str, *, status: str, repo_root: str, **kwargs: Any) -> dict[str, Any]:
@@ -45,10 +48,15 @@ def _parser() -> argparse.ArgumentParser:
     backfill.add_argument("--provider", choices=("mlb_stats", "statcast"), default="mlb_stats", help="MLB-only")
     backfill.add_argument("--start", help="MLB-only")
     backfill.add_argument("--end", help="MLB-only")
-    backfill.add_argument("--season", type=int, action="append", help="WNBA-only, repeatable")
+    backfill.add_argument(
+        "--season", type=int, action="append", help="WNBA/NFL-only, repeatable",
+    )
     backfill.add_argument(
         "--table", action="append", dest="tables",
-        choices=("schedule", "game_feed", "transactions", "team_box", "player_box", "rosters", "pbp"),
+        choices=(
+            "schedule", "game_feed", "transactions",
+            "team_box", "player_box", "rosters", "pbp", "weekly_rosters",
+        ),
     )
     backfill.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
 
@@ -76,9 +84,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         parser.error("MLB data commands require --version v3 (the only MLB research lane wired up so far)")
     if args.sport != "mlb" and args.version is not None:
         parser.error(f"--version is not meaningful for {args.sport}")
-    if args.command == "backfill" and args.sport == "wnba" and (args.start or args.end):
-        parser.error("--start/--end are not meaningful for WNBA (season-based backfill only)")
-    if args.command == "backfill" and args.sport != "wnba" and getattr(args, "season", None):
+    if args.command == "backfill" and args.sport in SEASON_BASED_SPORTS and (args.start or args.end):
+        parser.error(f"--start/--end are not meaningful for {args.sport} (season-based backfill only)")
+    if args.command == "backfill" and args.sport not in SEASON_BASED_SPORTS and getattr(args, "season", None):
         parser.error(f"--season is not meaningful for {args.sport}")
 
     config = load_rebuild_config()

@@ -1,11 +1,11 @@
 """Tests for the `rebuild-data` CLI scaffold.
 
-`mlb` (MLB v3, research-only) and `wnba` are wired to real backends; every
-other sport is NOT_IMPLEMENTED (see data_foundation.py's module docstring).
-These tests cover the harness itself: argument parsing, the
+`mlb` (MLB v3, research-only), `wnba`, and `nfl` are wired to real backends;
+every other sport is NOT_IMPLEMENTED (see data_foundation.py's module
+docstring). These tests cover the harness itself: argument parsing, the
 forbidden-live-flags guard, that stub sports report honestly, and that the
-real `mlb`/`wnba` backends are actually reachable end-to-end without a
-network call (audit on an empty data_root).
+real backends are actually reachable end-to-end without a network call
+(audit on an empty data_root).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from model_prediction.rebuild.data_cli import _parser, main, run
 from model_prediction.rebuild.data_foundation import SUPPORTED_DATA_SPORTS
 from model_prediction.runtime_paths import RuntimePaths
 
-REAL_SPORTS = ("mlb", "wnba")
+REAL_SPORTS = ("mlb", "wnba", "nfl")
 STUB_SPORTS = tuple(sport for sport in SUPPORTED_DATA_SPORTS if sport not in REAL_SPORTS)
 
 
@@ -115,7 +115,7 @@ def test_wnba_backfill_rejects_start_end(capsys):
     with pytest.raises(SystemExit) as exc:
         main(["backfill", "--sport", "wnba", "--start", "2026-08-01", "--end", "2026-08-01"])
     assert exc.value.code == 2
-    assert "not meaningful for WNBA" in capsys.readouterr().err
+    assert "not meaningful for wnba" in capsys.readouterr().err
 
 
 def test_non_wnba_season_flag_is_rejected(capsys):
@@ -130,6 +130,45 @@ def test_mlb_backfill_without_version_v3_is_rejected(capsys):
         main(["backfill", "--sport", "mlb", "--start", "2026-08-01", "--end", "2026-08-01"])
     assert exc.value.code == 2
     assert "--version v3" in capsys.readouterr().err
+
+
+def _nfl_data_root(tmp_path: Path) -> str:
+    return str(RuntimePaths.resolve(repo_root=tmp_path).rebuild_root)
+
+
+def test_nfl_audit_against_empty_data_root_is_honest_degraded(tmp_path):
+    # No hard-fail conditions trip on empty data (no duplicates, no
+    # timestamp violations) but zero games/roster rows still makes this
+    # DEGRADED rather than a fabricated HEALTHY -- see nfl/audit.py.
+    report = run(
+        "audit", "nfl", _nfl_data_root(tmp_path), status="data_foundation",
+        repo_root=str(tmp_path), season=2026,
+    )
+    assert report["status"] == "DEGRADED"
+    assert report["games"] == 0
+
+
+def test_nfl_backfill_requires_season(tmp_path):
+    with pytest.raises(ValueError, match="requires --season"):
+        run(
+            "backfill", "nfl", _nfl_data_root(tmp_path), status="data_foundation",
+            repo_root=str(tmp_path), seasons=None, tables=None, force=False,
+        )
+
+
+def test_nfl_audit_requires_season(tmp_path):
+    with pytest.raises(ValueError, match="requires --season"):
+        run(
+            "audit", "nfl", _nfl_data_root(tmp_path), status="data_foundation",
+            repo_root=str(tmp_path), season=None,
+        )
+
+
+def test_nfl_backfill_rejects_start_end(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["backfill", "--sport", "nfl", "--start", "2026-08-01", "--end", "2026-08-01"])
+    assert exc.value.code == 2
+    assert "not meaningful for nfl" in capsys.readouterr().err
 
 
 def test_non_mlb_version_flag_is_rejected(capsys):
