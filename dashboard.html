@@ -309,7 +309,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <nav id="tabs">
     <div class="rail-group">
       <div class="rail-label">Monitor</div>
-      <button data-tab="matrix" class="on">Matrix</button>
+      <button data-tab="matrix">Matrix</button>
       <button data-tab="health">Health</button>
       <button data-tab="today">Today</button>
       <button data-tab="market">Market</button>
@@ -335,14 +335,14 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
-      <button data-tab="rebuild">Rebuild Shadow</button>
+      <button data-tab="rebuild" class="on">Rebuild Shadow</button>
       <button data-tab="evidence">Evidence</button>
       <button data-tab="settings">Settings</button>
     </div>
   </nav>
 
   <div class="wrap">
-  <section id="tab-matrix">
+  <section id="tab-matrix" style="display:none">
     <div class="card">
       <h2>Model Wiring Matrix</h2>
       <div class="small dim" id="matrixGate" style="margin-bottom:8px"></div>
@@ -393,10 +393,15 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
   </section>
 
-  <section id="tab-rebuild" style="display:none">
+  <section id="tab-rebuild">
     <div class="rebuild-banner" role="status">
       <h2>CLEAN-SLATE REBUILD — SHADOW ONLY</h2>
       <div>No rebuild output can submit a live order. <b>NO LIVE EXECUTION</b></div>
+    </div>
+    <div class="card">
+      <h2>Shadow Picks</h2>
+      <div class="small dim">Real predictions/decisions from the shadow ledger. Research only &mdash; no order execution is wired to this table.</div>
+      <div id="shadowPicks" style="margin-top:12px"></div>
     </div>
     <div class="card">
       <h2>Rebuild Overview</h2>
@@ -733,6 +738,31 @@ function rebuildStateClass(value){
   if(state.includes("QUALIFIED")&&!state.includes("NOT_"))return "available";
   return "";
 }
+function renderShadowPicks(shadowPicks){
+  const picks=shadowPicks.picks||[];
+  if(!picks.length){
+    $("#shadowPicks").innerHTML=`<div class="dim small">${esc(shadowPicks.reason||"No shadow picks recorded yet.")}</div>`;
+    return;
+  }
+  $("#shadowPicks").innerHTML=`<div style="overflow-x:auto"><table class="data">
+    <tr><th>Decision time</th><th>League</th><th>Market</th><th>Matchup</th><th>Selection</th>
+    <th>Model prob.</th><th>Edge</th><th>Decision</th><th>Reason</th><th>Units</th><th>State</th><th>P&amp;L</th></tr>
+    ${picks.map(pick=>`<tr>
+      <td>${esc(rebuildValue(pick.decision_time_utc))}</td>
+      <td>${esc(rebuildValue(pick.league))}</td>
+      <td>${esc(rebuildValue(pick.market_type))}</td>
+      <td>${esc((pick.away_team||"")+" @ "+(pick.home_team||""))}</td>
+      <td>${esc(rebuildValue(pick.selection))}</td>
+      <td>${pick.model_probability==null?"—":`${(Number(pick.model_probability)*100).toFixed(1)}%`}</td>
+      <td>${pick.edge==null?"—":`${(Number(pick.edge)*100).toFixed(1)}pp`}</td>
+      <td><span class="rebuild-state ${pick.decision==="BET"?"available":""}">${esc(rebuildValue(pick.decision))}</span></td>
+      <td class="small dim">${esc(rebuildValue(pick.reason_code))}</td>
+      <td>${esc(rebuildValue(pick.units))}</td>
+      <td><span class="rebuild-state ${pick.status==="settled"?"available":""}">${esc(rebuildValue(pick.status))}</span></td>
+      <td>${pick.pnl_units==null?"—":Number(pick.pnl_units).toFixed(2)}</td>
+    </tr>`).join("")}
+  </table></div>`;
+}
 function renderRebuild(status,sports,benchmark,economics,runs,health){
   const reason=[status.reason,sports.reason,benchmark.reason,economics.reason,runs.reason,health.reason].filter(Boolean).join(" · ");
   $("#rebuildMeta").textContent=`Revision ${status.code_revision||"unavailable"} · ${status.status||"unavailable"}${reason?` · ${reason}`:""}`;
@@ -798,8 +828,9 @@ async function loadRebuild(force=false){
   $("#rebuildMeta").textContent="Loading read-only rebuild evidence…";
   rebuildLoading=Promise.all([
     api("/api/rebuild/status"),api("/api/rebuild/sports"),api("/api/rebuild/benchmark"),
-    api("/api/rebuild/economics"),api("/api/rebuild/runs"),api("/api/rebuild/health")
-  ]).then(payloads=>{renderRebuild(...payloads);rebuildLoaded=true;}).catch(error=>{
+    api("/api/rebuild/economics"),api("/api/rebuild/runs"),api("/api/rebuild/health"),
+    api("/api/rebuild/shadow-picks")
+  ]).then(payloads=>{renderRebuild(...payloads.slice(0,6));renderShadowPicks(payloads[6]);rebuildLoaded=true;}).catch(error=>{
     $("#rebuildMeta").textContent=`Rebuild evidence unavailable: ${error.message}`;
   }).finally(()=>{rebuildLoading=null;});
   return rebuildLoading;
@@ -2926,6 +2957,7 @@ setControlFromUrl("folioType","folio_type");setControlFromUrl("folioAttribution"
 setControlFromUrl("folioPageSize","folio_rows");
 const requestedTab=initialUrlState.get("tab");
 if(requestedTab&&$("#tab-"+requestedTab))gotoTab(requestedTab);
+else loadRebuild();
 refreshAll();resetTimer();
 </script>
 </body>

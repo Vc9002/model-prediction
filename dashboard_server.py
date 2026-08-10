@@ -3941,7 +3941,7 @@ def _latest_persisted_action(action: str) -> dict | None:
 # HTTP
 # ---------------------------------------------------------------------------
 
-_REBUILD_VIEWS = {"status", "sports", "benchmark", "economics", "runs", "health"}
+_REBUILD_VIEWS = {"status", "sports", "benchmark", "economics", "runs", "health", "shadow-picks"}
 
 
 class Handler(BaseHTTPRequestHandler):
