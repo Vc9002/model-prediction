@@ -43,6 +43,32 @@ MLB_STATS_RIGHTS = SourceRightsProfile(
 )
 
 
+# Every column real: matches _schedule_rows' row-dict shape exactly. See the
+# comment at that call site for why this must be explicit, not inferred.
+_SCHEDULE_SCHEMA: dict[str, Any] = {
+    "game_pk": pl.Int64,
+    "game_date": pl.String,
+    "official_date": pl.String,
+    "season": pl.Int64,
+    "game_type": pl.String,
+    "game_number": pl.Int64,
+    "double_header": pl.String,
+    "scheduled_innings": pl.Int64,
+    "status_abstract": pl.String,
+    "status_detailed": pl.String,
+    "status_code": pl.String,
+    "home_team_id": pl.Int64,
+    "away_team_id": pl.Int64,
+    "home_probable_pitcher_id": pl.Int64,
+    "away_probable_pitcher_id": pl.Int64,
+    "venue_id": pl.Int64,
+    "reschedule_date": pl.String,
+    "rescheduled_from_date": pl.String,
+    "resume_date": pl.String,
+    "original_date": pl.String,
+}
+
+
 class MLBStatsProvider:
     provider_id = "mlb_stats"
 
@@ -161,7 +187,15 @@ class MLBStatsProvider:
                     "resume_date": game.get("resumeDate"),
                     "original_date": game.get("originalDate"),
                 })
-        frame = pl.DataFrame(rows) if rows else pl.DataFrame(schema={"game_pk": pl.Int64})
+        # Explicit schema, not inference: reschedule_date/rescheduled_from_date/
+        # resume_date are almost always null across a real season batch but
+        # carry a real ISO datetime string for the rare suspended/postponed
+        # game (verified live: 2023's full-season schedule has 7 resumeDate
+        # values and 1 rescheduleDate value out of ~2500 games). Polars'
+        # list-of-dicts inference builds a column's dtype from an early
+        # prefix of rows; an all-null prefix infers Null, then crashes the
+        # instant a real string shows up later in the same request.
+        frame = pl.DataFrame(rows, schema=_SCHEDULE_SCHEMA) if rows else pl.DataFrame(schema=_SCHEDULE_SCHEMA)
         enriched = replace(metadata, schema_hash=dataframe_schema_hash(frame))
         return ProviderResult(ProviderStatus.AVAILABLE, enriched, frame, "NO_GAMES" if frame.is_empty() else None)
 
