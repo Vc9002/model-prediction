@@ -1,0 +1,108 @@
+{
+  "artifact_hash": "08ddf9393e249b70a83cc73a2aa36e1016b8ed59b52ae997d6df026ac0e715c9",
+  "data_summary": {
+    "n_total_games": 1424,
+    "n_walk_forward_rows": 1360,
+    "seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "skipped_bootstrap": 64,
+    "skipped_cold_start": 0
+  },
+  "family": "elo_trend_logistic_regression",
+  "generated_at_utc": "2026-08-11T15:10:38.167779+00:00",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        3.1103518241642334,
+        0.5602240627094295
+      ],
+      "elo_config": {
+        "home_advantage": 55.0,
+        "k": 20.0,
+        "offseason_gap_days": 180,
+        "offseason_regression": 0.5
+      },
+      "feature_names": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "intercept": -1.595788372142377,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "nfl-elo-trend-lr-rebuild-v1",
+  "provenance": {
+    "availability_basis": "capture_time_only_mutable_release",
+    "data_source": "nflverse schedules via NFLNormalizedStore",
+    "note": "Trained on nflverse schedule data (2021-2025, 1,424 games). 2-feature model only (elo_probability + trend_gap) \u2014 EPA/CPOE/pressure/QB state features remain BLOCKED pending calendar-time daily capture, per the audit's explicit PIT restriction. Calibration-first approach chosen because the incumbent's ECE is historically poor (0.1009).",
+    "production_allowed": false,
+    "seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "sibling_of_incumbent": "nfl-elo-trend-lr-v4 \u2014 same family, never loaded as artifact"
+  },
+  "qualification": {
+    "calibration_comparison": {
+      "identity": {
+        "brier": 0.21045632094067698,
+        "calibration_intercept": -0.18942062820207672,
+        "calibration_slope": 2.716251933692499,
+        "ece": 0.12117501029493091,
+        "log_loss": 0.611691722515098
+      },
+      "isotonic": {
+        "brier": 0.19778233038631893,
+        "calibration_intercept": 0.2202734380911566,
+        "calibration_slope": 0.30783259925750556,
+        "ece": 0.059479788135909276,
+        "log_loss": 0.6840983935425249
+      },
+      "platt": {
+        "brier": 0.19591159940027247,
+        "calibration_intercept": 0.2455719282112885,
+        "calibration_slope": 0.9423491887194969,
+        "ece": 0.07053674656411017,
+        "log_loss": 0.5844891343257482
+      },
+      "temperature": {
+        "brier": 0.19720013961441724,
+        "calibration_intercept": -0.16296323992340042,
+        "calibration_slope": 1.2244574407237296,
+        "ece": 0.08457682815119699,
+        "log_loss": 0.5824347141857684
+      }
+    },
+    "calibration_method": "isotonic",
+    "framework": "locked_complete_date_60_20_20",
+    "holdout_calibration_diagnostics": {
+      "calibration_intercept": null,
+      "calibration_slope": null
+    },
+    "holdout_metrics_calibrated": {
+      "accuracy": 0.5291828793774319,
+      "brier": 0.2471084476910865,
+      "ece": 0.01973609042540292,
+      "log_loss": 0.6873209362830119,
+      "n": 257
+    },
+    "holdout_metrics_raw": {
+      "accuracy": 0.6303501945525292,
+      "brier": 0.22676243298212817,
+      "ece": 0.05700918662017056,
+      "log_loss": 0.6449955169717239,
+      "n": 257
+    },
+    "qualified": false
+  },
+  "sport": "nfl"
+}

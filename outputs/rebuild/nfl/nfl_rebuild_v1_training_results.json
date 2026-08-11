@@ -1,0 +1,69 @@
+{
+  "train_metrics": {
+    "n": 837,
+    "log_loss": 0.6663012203021296,
+    "brier": 0.23688043617757393,
+    "ece": 0.05287513109919286,
+    "accuracy": 0.5722819593787336
+  },
+  "validation_metrics": {
+    "n": 266,
+    "log_loss": 0.6250805194696741,
+    "brier": 0.21697781866895843,
+    "ece": 0.10455033370967297,
+    "accuracy": 0.6616541353383458
+  },
+  "holdout_metrics_raw": {
+    "n": 257,
+    "log_loss": 0.6449955169717239,
+    "brier": 0.22676243298212817,
+    "ece": 0.05700918662017056,
+    "accuracy": 0.6303501945525292
+  },
+  "holdout_metrics_calibrated": {
+    "n": 257,
+    "log_loss": 0.6873209362830119,
+    "brier": 0.2471084476910865,
+    "ece": 0.01973609042540292,
+    "accuracy": 0.5291828793774319
+  },
+  "calibration_comparison": {
+    "identity": {
+      "log_loss": 0.611691722515098,
+      "brier": 0.21045632094067698,
+      "ece": 0.12117501029493091,
+      "calibration_slope": 2.716251933692499,
+      "calibration_intercept": -0.18942062820207672
+    },
+    "platt": {
+      "log_loss": 0.5844891343257482,
+      "brier": 0.19591159940027247,
+      "ece": 0.07053674656411017,
+      "calibration_slope": 0.9423491887194969,
+      "calibration_intercept": 0.2455719282112885
+    },
+    "temperature": {
+      "log_loss": 0.5824347141857684,
+      "brier": 0.19720013961441724,
+      "ece": 0.08457682815119699,
+      "calibration_slope": 1.2244574407237296,
+      "calibration_intercept": -0.16296323992340042
+    },
+    "isotonic": {
+      "log_loss": 0.6840983935425249,
+      "brier": 0.19778233038631893,
+      "ece": 0.059479788135909276,
+      "calibration_slope": 0.30783259925750556,
+      "calibration_intercept": 0.2202734380911566
+    }
+  },
+  "winning_calibration_method": "isotonic",
+  "coefficients": {
+    "elo_probability": 3.1103518241642334,
+    "trend_gap": 0.5602240627094295
+  },
+  "intercept": -1.595788372142377,
+  "artifact_hash": "08ddf9393e249b70a83cc73a2aa36e1016b8ed59b52ae997d6df026ac0e715c9",
+  "calibrator_hash": "9e2d189a1caf8b211bf5c55d68e3e524138f67b75eccadbdd959aa410957dd0f",
+  "n_rows_total": 1360
+}
