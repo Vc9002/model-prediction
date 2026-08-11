@@ -1,0 +1,36 @@
+schema_version: "1"
+
+prediction_service:
+  enabled: true
+  mode: canary
+
+  primary:
+    sport: WNBA
+    market: moneyline
+    model_id: wnba-elo-trend-lr-v4
+    artifact: config/models/wnba-elo-trend-lr-v4.json
+
+  allowed_models:
+    - wnba-elo-trend-lr-v4
+
+  fallback_action: no_prediction
+
+execution:
+  automated_orders: false
+  manual_orders_only: true
+
+dashboard:
+  production_card_enabled: true
+
+scheduler:
+  production:
+    label: com.modelprediction.production
+    interval_seconds: 10800
+  rebuild:
+    label: com.modelprediction.rebuild-shadow
+    interval_seconds: 10800
+
+health:
+  max_data_age_minutes: 120
+  require_finite_probabilities: true
+  require_probability_normalization: true
