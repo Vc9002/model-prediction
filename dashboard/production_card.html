@@ -1,0 +1,45 @@
+<!-- Production Canary Card — embed in the model-prediction dashboard.
+     Populated by dashboard/production.py::get_production_status() via the
+     dashboard server. The card shows live production model health, last run
+     timestamps, and today's prediction counts. -->
+<div id="production-card" class="dashboard-card production-canary">
+  <div class="card-header">
+    <h2>Production Canary</h2>
+    <span id="production-status-badge" class="status-badge">—</span>
+  </div>
+  <div class="card-body">
+    <table class="card-table">
+      <tr>
+        <td class="key">Model</td>
+        <td class="value" id="production-model-id">—</td>
+      </tr>
+      <tr>
+        <td class="key">Artifact</td>
+        <td class="value mono" id="production-artifact-hash">—</td>
+      </tr>
+      <tr>
+        <td class="key">Last Prediction</td>
+        <td class="value" id="production-last-prediction">never</td>
+      </tr>
+      <tr>
+        <td class="key">Last Scheduler</td>
+        <td class="value" id="production-last-scheduler">never</td>
+      </tr>
+      <tr>
+        <td class="key">Today Events</td>
+        <td class="value" id="production-today-events">0</td>
+      </tr>
+      <tr>
+        <td class="key">Today Predictions</td>
+        <td class="value" id="production-today-predictions">0</td>
+      </tr>
+      <tr>
+        <td class="key">Auto Orders</td>
+        <td class="value" id="production-auto-orders">disabled</td>
+      </tr>
+    </table>
+  </div>
+  <div class="card-footer">
+    <span class="check-time" id="production-checked-at">—</span>
+  </div>
+</div>
