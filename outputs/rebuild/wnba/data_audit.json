@@ -1,0 +1,181 @@
+{
+  "audit_date_utc": "2026-08-11T13:36:37Z",
+  "sport": "wnba",
+  "purpose": "Phase-1 data audit and archived-feature-recovery groundwork for a future rebuild-native wnba-elo-trend-lr-rebuild-v1 sibling model. Not a model-training run.",
+  "commands_run": [
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli backfill --sport wnba --season 2022 --season 2023 --season 2024 --season 2025 --table schedule",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli backfill --sport wnba --season 2022 --season 2023 --season 2024 --season 2025 --table team_box",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli backfill --sport wnba --season 2022 --season 2023 --season 2024 --season 2025 --table rosters",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli backfill --sport wnba --season 2022 --season 2023 --season 2024 --season 2025 --table player_box",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli backfill --sport wnba --season 2022 --season 2023 --season 2024 --season 2025 --table pbp",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli audit --sport wnba --season 2022",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli audit --sport wnba --season 2023",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli audit --sport wnba --season 2024",
+    "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli audit --sport wnba --season 2025"
+  ],
+  "provider": "sportsdataverse (via model_prediction.rebuild.providers.sportsdataverse.SportsDataverseProvider)",
+  "commercial_use_status": "unresolved",
+  "production_allowed": false,
+  "availability_basis": "capture_time_only",
+  "note_on_data_vintage": "Every normalized row's observed_at_utc is this backfill run's real capture timestamp (2026-08-11), not a per-game historical vintage. SportsDataverse serves one current release per season, not dated historical snapshots, so this data supports 'team form as of today, ordered by real historical event_start_utc' feature construction, but NOT genuine prospective walk-forward replay where decision_time_utc is set inside the season -- doing that yields zero eligible prior games every time, verified directly in tests/rebuild/test_wnba_features.py's real-data test. This matches docs/model_audit/models/WNBA_ARCHIVED_BASELINES.md's pre-existing 'capture-time-only is not retrospective PIT evidence' finding; this audit independently reproduced the concrete mechanism.",
+  "seasons_covered": [2022, 2023, 2024, 2025],
+  "tables_attempted": ["schedule", "team_box", "rosters", "player_box", "pbp"],
+  "backfill_wall_time_seconds_approx": {
+    "schedule_all_4_seasons": 8.1,
+    "team_box_all_4_seasons": 7.7,
+    "rosters_all_4_seasons": 7.1,
+    "player_box_all_4_seasons": 12.0,
+    "pbp_all_4_seasons": 17.8,
+    "total_approx": 53
+  },
+  "coverage_by_season": {
+    "2022": {
+      "games_scheduled": 241,
+      "games_completed": 241,
+      "team_box_rows": 482,
+      "team_box_games_covered": 241,
+      "team_box_status": "COMPLETE (both sides present for every completed game)",
+      "player_box_rows": 0,
+      "player_box_status": "BLOCKED -- normalization error, see known_bugs.player_box_2022_dash_value",
+      "roster_rows": 0,
+      "roster_status": "PROVIDER_UNAVAILABLE (HTTP 404 from SportsDataverse for this season's roster asset)",
+      "pbp_rows": 0,
+      "pbp_status": "BLOCKED -- normalization error, see known_bugs.pbp_all_seasons_unresolved_identity",
+      "distinct_teams": 14,
+      "duplicate_events": 0,
+      "duplicate_observations": {"games": 0, "team_box": 0, "player_box": 0, "rosters": 0},
+      "timestamp_violations": 0,
+      "missing_canonical_team_ids": 0,
+      "missing_canonical_player_ids": 0,
+      "audit_status": "DEGRADED",
+      "audit_qualification_note": "Capture-time-only historical releases are not retrospective PIT evidence; model qualification remains blocked until replay-safe vintages exist."
+    },
+    "2023": {
+      "games_scheduled": 263,
+      "games_completed": 262,
+      "games_completed_note": "1 scheduled game never resolved to completed=true in the SportsDataverse schedule release; not investigated further in this pass (out of scope), flagged for whoever consumes 2023 for training.",
+      "team_box_rows": 524,
+      "team_box_games_covered": 262,
+      "team_box_status": "COMPLETE for all completed games",
+      "player_box_rows": 5796,
+      "player_box_status": "COMPLETE",
+      "roster_rows": 0,
+      "roster_status": "PROVIDER_UNAVAILABLE (HTTP 404)",
+      "pbp_rows": 0,
+      "pbp_status": "BLOCKED -- normalization error, see known_bugs.pbp_all_seasons_unresolved_identity",
+      "distinct_teams": 14,
+      "duplicate_events": 0,
+      "duplicate_observations": {"games": 0, "team_box": 0, "player_box": 0, "rosters": 0},
+      "timestamp_violations": 0,
+      "missing_canonical_team_ids": 0,
+      "missing_canonical_player_ids": 0,
+      "audit_status": "DEGRADED",
+      "audit_qualification_note": "Capture-time-only historical releases are not retrospective PIT evidence; model qualification remains blocked until replay-safe vintages exist."
+    },
+    "2024": {
+      "games_scheduled": 264,
+      "games_completed": 264,
+      "team_box_rows": 528,
+      "team_box_games_covered": 264,
+      "team_box_status": "COMPLETE",
+      "player_box_rows": 5929,
+      "player_box_status": "COMPLETE",
+      "roster_rows": 166,
+      "roster_status": "COMPLETE",
+      "pbp_rows": 0,
+      "pbp_status": "BLOCKED -- normalization error, see known_bugs.pbp_all_seasons_unresolved_identity",
+      "distinct_teams": 14,
+      "duplicate_events": 0,
+      "duplicate_observations": {"games": 0, "team_box": 0, "player_box": 0, "rosters": 0},
+      "timestamp_violations": 0,
+      "missing_canonical_team_ids": 0,
+      "missing_canonical_player_ids": 0,
+      "audit_status": "DEGRADED",
+      "audit_qualification_note": "Capture-time-only historical releases are not retrospective PIT evidence; model qualification remains blocked until replay-safe vintages exist."
+    },
+    "2025": {
+      "games_scheduled": 312,
+      "games_completed": 312,
+      "team_box_rows": 624,
+      "team_box_games_covered": 312,
+      "team_box_status": "COMPLETE",
+      "player_box_rows": 7140,
+      "player_box_status": "COMPLETE",
+      "roster_rows": 181,
+      "roster_status": "COMPLETE",
+      "pbp_rows": 0,
+      "pbp_status": "BLOCKED -- normalization error, see known_bugs.pbp_all_seasons_unresolved_identity",
+      "distinct_teams": 15,
+      "distinct_teams_note": "15, not 14 -- real WNBA expansion team (Golden State Valkyries) added for the 2025 season, not a data-quality issue.",
+      "duplicate_events": 0,
+      "duplicate_observations": {"games": 0, "team_box": 0, "player_box": 0, "rosters": 0},
+      "timestamp_violations": 0,
+      "missing_canonical_team_ids": 0,
+      "missing_canonical_player_ids": 0,
+      "audit_status": "DEGRADED",
+      "audit_qualification_note": "Capture-time-only historical releases are not retrospective PIT evidence; model qualification remains blocked until replay-safe vintages exist."
+    }
+  },
+  "totals": {
+    "games": 1080,
+    "games_completed": 1079,
+    "team_box_rows": 2158,
+    "player_box_rows": 18865,
+    "roster_rows": 347,
+    "pbp_rows": 0
+  },
+  "identity_resolution": {
+    "missing_canonical_team_ids": 0,
+    "missing_canonical_player_ids": 0,
+    "unresolved_espn_ids_found": "pbp normalization only -- see known_bugs.pbp_all_seasons_unresolved_identity; games/team_box/player_box/rosters identity resolution had zero failures across all 4 seasons"
+  },
+  "pit_violations_found": 0,
+  "pit_violations_note": "rebuild-data audit --sport wnba --season {2022..2025} reports timestamp_violations: 0 for every season. Separately, this audit's own test suite (tests/rebuild/test_wnba_features.py::test_real_backfilled_2024_data_produces_a_real_available_snapshot) confirmed the real, structural consequence of single-vintage capture-time data noted above -- not a violation of the PIT gate itself (the gate correctly excludes everything when asked for a historical decision time), but a real constraint on what this exact data can support for genuine walk-forward replay.",
+  "duplicates_found": 0,
+  "known_bugs": {
+    "player_box_2022_dash_value": {
+      "severity": "P2 -- blocks one season/table combination, does not affect games/team_box (which is what the recovered features.py/horizon_builder.py actually consume)",
+      "description": "2022 WNBA player_box normalization fails for the entire season with 'normalization error: invalid WNBA number: --'. Root cause traced directly: exactly one row (athlete Kianna Smith, a 2022 game) has plus_minus == '--' (ESPN's own placeholder for a not-applicable/unavailable stat) in the raw SportsDataverse release. normalize.py's _as_float() raises ValueError on any non-numeric string rather than treating '--' as null, and _team_box/_player_box normalize the whole season's frame as one unit, so one bad value blocks all 5307 rows of 2022 player_box.",
+      "reproduction": "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli backfill --sport wnba --season 2022 --table player_box",
+      "scope_decision": "Not fixed in this pass. normalize.py is shared, already-tested infrastructure outside this task's RECOVER scope (features.py/horizon_builder.py only); a fix belongs to whoever owns normalize.py's contract next, not silently patched as a side effect of feature-recovery work.",
+      "does_not_block": "The recovered Four-Factors feature path (features.py/horizon_builder.py) does not consume player_box at all -- only games and team_box, both COMPLETE for 2022."
+    },
+    "pbp_all_seasons_unresolved_identity": {
+      "severity": "P1 for anyone wanting WNBA play-by-play data specifically; does not affect this task's RECOVER scope",
+      "description": "PBP normalization failed for all 4 backfilled seasons (2022-2025), every time with 'unresolved WNBA player identity for ESPN ID <N>' (ESPN IDs 695, 14 seen directly). Root cause traced directly: the raw PBP feed references athlete IDs (athlete_id_1) that have athlete_name_1 == null and never appear in any team_box/player_box/roster row for that season, so they were never registered in the IdentityRegistry. normalize.py's _pbp() normalizer's _existing_identity() call raises hard on the very first unresolvable ID, blocking the entire season's frame (93,166 rows for 2022 alone) rather than dropping just the unresolvable play.",
+      "reproduction": "PYTHONPATH=src:. .venv/bin/python -m model_prediction.rebuild.data_cli backfill --sport wnba --season 2022 --table pbp",
+      "scope_decision": "Not fixed in this pass, same reasoning as above -- normalize.py is out of this task's RECOVER scope. Recorded as a real, currently-total gap: 0/4 seasons of WNBA pbp are usable via rebuild-data today.",
+      "does_not_block": "The recovered Four-Factors feature path does not consume pbp."
+    },
+    "empty_team_box_crash_in_archived_features_py": {
+      "severity": "P2 -- found and fixed in this pass, part of the RECOVER port",
+      "description": "The archived build_team_form_snapshot() (features.py) called eligible_prior_team_games() unconditionally, which raises ValueError on a fully empty (zero-row, zero-column) team_box or games frame -- the real shape WNBANormalizedStore.read_observations() returns when a season's table was never backfilled at all (not just zero matching rows). This would crash an entire horizon-builder run for one never-backfilled season instead of degrading to the same UNAVAILABLE/zero-sample result the function already returns for zero eligible rows.",
+      "fix": "Added an explicit empty-frame guard in build_team_form_snapshot() (src/model_prediction/rebuild/wnba/features.py) that returns the same UNAVAILABLE/zero-sample shape directly when games or team_box is empty, before calling eligible_prior_team_games(). Covered by tests/rebuild/test_wnba_horizon_builder.py::TestMissingnessIsHonest::test_target_with_no_prior_team_history_is_recorded_not_dropped_silently.",
+      "found_via": "Writing a real end-to-end test for the recovered horizon_builder.py against a season with a scheduled target game but zero backfilled team_box history."
+    }
+  },
+  "recovered_code": {
+    "features.py": {
+      "verdict": "RECOVER -- ported",
+      "path": "src/model_prediction/rebuild/wnba/features.py",
+      "adaptation": "Ported near-verbatim from origin/rebuild/wnba-v1 (all dependencies verified byte-identical to current main). One real fix applied: empty-team_box/games guard (see known_bugs.empty_team_box_crash_in_archived_features_py)."
+    },
+    "horizon_builder.py": {
+      "verdict": "RECOVER -- ported",
+      "path": "src/model_prediction/rebuild/wnba/horizon_builder.py",
+      "adaptation": "Ported near-verbatim from origin/rebuild/wnba-v1 (all dependencies verified byte-identical to current main). No functional changes; one lint-only noqa removal (ruff no longer needed it)."
+    },
+    "baselines.py": {
+      "verdict": "AUDIT_ONLY -- NOT recovered, per docs/model_audit/models/WNBA_ARCHIVED_BASELINES.md",
+      "reason": "Comparison/evaluation harness, not a deployable artifact by its own docstring; hard-gated production_allowed: False and commercial_use_status: unresolved; recovering it verbatim would still leave it correctly self-blocked, but this pass does not copy any of its code into anything that runs, per the task's explicit instruction.",
+      "note": "Not read or copied in this pass beyond what the prior audit doc already documented; cited as research material only."
+    }
+  },
+  "sufficiency_for_training_next_phase": {
+    "games_and_team_box": "SUFFICIENT for the recovered Four-Factors feature path across all 4 seasons (2022-2025) -- 1080 games, complete team_box coverage for every completed game, zero PIT violations, zero duplicates, zero identity-resolution failures.",
+    "player_box": "Usable for 3 of 4 seasons (2023-2025, 18865 rows); 2022 blocked by known_bugs.player_box_2022_dash_value. Not consumed by the recovered feature path, so this does not block Phase 1's deliverable, but would need the normalize.py fix before a future phase that wants 2022 player-level data.",
+    "rosters": "Usable for 2 of 4 seasons (2024-2025, 347 rows); 2022-2023 unavailable from the provider (HTTP 404, not a bug). Not consumed by the recovered feature path.",
+    "pbp": "Unusable for all 4 seasons pending the normalize.py identity-resolution fix. Not consumed by the recovered feature path.",
+    "structural_caveat": "All of the above is capture-time-only (single vintage per season, captured 2026-08-11), not per-game prospective observation. This is sufficient to build historically-ordered rolling-form features for research/backtest purposes (event_start_utc ordering is real, immutable historical fact), but is NOT sufficient, by itself, to claim genuine walk-forward point-in-time evidence the way docs/ARCHITECTURE.md's validation contract requires for production qualification -- matches the pre-existing, already-documented blocker in WNBA_ARCHIVED_BASELINES.md, independently reproduced here."
+  }
+}
