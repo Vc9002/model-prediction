@@ -125,13 +125,13 @@ class TestSurfaceEloBookCore:
         assert book.surface_rating("A", "Clay") == 1600.0
         assert book.surface_rating("A", "Hard") == 1500.0  # default
 
-    def test_surface_boost_applied_on_update(self):
-        book = SurfaceEloBook(k=32.0, surface_k_boost=8.0)
+    def test_surface_elo_uses_same_k_as_overall(self):
+        book = SurfaceEloBook(k=32.0)
         before_surface = book.surface_rating("A", "Clay")
         book.update("A", "B", "Clay")
         delta_surface = book.surface_rating("A", "Clay") - before_surface
-        # Surface delta uses (K + surface_k_boost) = 40, so delta ≈ 20
-        assert delta_surface == pytest.approx(20.0)
+        # Surface delta uses K=32 (no surface boost), so delta ≈ 16 at equal ratings
+        assert delta_surface == pytest.approx(16.0)
 
     def test_match_counts_increment(self):
         book = SurfaceEloBook()
@@ -168,52 +168,44 @@ class TestSurfaceEloBookCore:
 # ── Surface weight & blended rating ──────────────────────────────────────
 
 class TestSurfaceWeight:
-    def test_zero_surface_matches_yields_min_weight(self):
+    def test_fixed_blend_with_no_surface_history(self):
+        """Fixed 0.6 blend: blended = 0.6 * surface_default + 0.4 * overall."""
         book = SurfaceEloBook()
-        w = 0.6  # fixed blend in faithful baseline
-        assert w == pytest.approx(0.1)
+        book.overall["A"] = 1600.0
+        # No surface history → surface defaults to 1500.0
+        # blended = 0.6 * 1500.0 + 0.4 * 1600.0 = 900 + 640 = 1540.0
+        blended = book.blended_rating("A", "Grass")
+        assert blended == pytest.approx(1540.0)
 
-    def test_weight_increases_with_matches(self):
+    def test_blend_is_always_fixed_0_6(self):
+        """The blend is fixed at 0.6 regardless of surface match count."""
         book = SurfaceEloBook()
+        book.overall["A"] = 1600.0
         book.surface_count["A"]["Hard"] = 10
         book.surface_count["B"]["Hard"] = 10
-        # min(10, 10) = 10, weight = min(0.6, 0.1 + 0.025 * 10) = min(0.6, 0.35) = 0.35
-        w = 0.6  # fixed blend in faithful baseline
-        assert w == pytest.approx(0.35)
+        book.surface["A"]["Hard"] = 1800.0
+        # Fixed 0.6 blend: 0.6 * 1800 + 0.4 * 1600 = 1080 + 640 = 1720
+        blended = book.blended_rating("A", "Hard")
+        assert blended == pytest.approx(1720.0)
 
-    def test_weight_capped_at_0_6(self):
+    def test_blend_is_independent_of_match_count(self):
+        """Even with very high match counts, the blend stays at 0.6."""
         book = SurfaceEloBook()
+        book.overall["A"] = 1600.0
+        book.surface["A"]["Hard"] = 1800.0
         book.surface_count["A"]["Hard"] = 100
         book.surface_count["B"]["Hard"] = 100
-        w = 0.6  # fixed blend in faithful baseline
-        assert w == pytest.approx(0.6)
-
-    def test_weight_uses_minimum_of_two_players(self):
-        book = SurfaceEloBook()
-        book.surface_count["A"]["Clay"] = 50
-        book.surface_count["B"]["Clay"] = 2
-        w = 0.6  # fixed blend("A", "B", "Clay")
-        # min(50, 2) = 2, weight = min(0.6, 0.1 + 0.025 * 2) = 0.15
-        assert w == pytest.approx(0.15)
+        # Fixed 0.6 blend even with 100 matches: 0.6 * 1800 + 0.4 * 1600 = 1720
+        blended = book.blended_rating("A", "Hard")
+        assert blended == pytest.approx(1720.0)
 
     def test_blended_rating_reverts_to_overall_when_no_surface_history(self):
         book = SurfaceEloBook()
         book.overall["A"] = 1550.0
-        # No surface history → weight ≈ 0.1 → blended ≈ 0.1*1500 + 0.9*1550 = 1545
+        # No surface history → fixed 0.6 blend: 0.6*1500 + 0.4*1550 = 900 + 620 = 1520.0
         blended = book.blended_rating("A", "Grass")
-        expected = 0.1 * 1500.0 + 0.9 * 1550.0
+        expected = 0.6 * 1500.0 + 0.4 * 1550.0
         assert blended == pytest.approx(expected)
-
-    def test_blended_rating_leans_toward_surface_when_experienced(self):
-        book = SurfaceEloBook()
-        book.overall["A"] = 1500.0
-        book.surface["A"]["Hard"] = 1700.0
-        book.surface_count["A"]["Hard"] = 20
-        book.surface_count["B"]["Hard"] = 20
-        # weight = min(0.6, 0.1 + 0.025*20) = 0.6
-        # blended = 0.6*1700 + 0.4*1500 = 1620
-        blended = book.blended_rating("A", "Hard")
-        assert blended == pytest.approx(1620.0)
 
 
 # ── _clean_surface ───────────────────────────────────────────────────────
@@ -303,7 +295,8 @@ class TestWalkForwardPIT:
         assert row_m2 is not None, "m2 should produce a row"
 
         # Both predictions must use the same Elo for player A (before any day's update)
-        assert row_m1.player_one_overall_elo== row_m2.overall_elo_loser  # A is winner in m1, loser in m2
+        # In m1: A is player_one (A<B), in m2: A is player_one (A<C)
+        assert row_m1.player_one_overall_elo == row_m2.player_one_overall_elo
 
     def test_elo_probability_is_between_0_and_1(self):
         # Include X and Y in history so they pass cold-start
@@ -361,8 +354,9 @@ class TestWalkForwardPIT:
         result = build_walk_forward_rows(matches, minimum_history_matches=100, minimum_player_matches=3)
         # DOM should have elevated Elo by the end
         assert len(result.rows) >= 1
-        last = result.rows[-1]
-        assert last.overall_elo_winner > 1550.0  # substantially above 1500
+        # DOM is always player_one (lexicographically before "victim{i}")
+        last = next(r for r in reversed(result.rows) if r.player_one_id == "DOM")
+        assert last.player_one_overall_elo > 1550.0  # substantially above 1500
 
     def test_rows_to_frame_preserves_all_fields(self):
         # Include A and B in history so they pass cold-start
@@ -377,7 +371,6 @@ class TestWalkForwardPIT:
         frame = rows_to_frame(result.rows)
         assert frame.height == len(result.rows)
         assert "elo_probability_player_one" in frame.columns
-        assert "surface_weight" in frame.columns
 
 
 # ── irregular result handling ────────────────────────────────────────────

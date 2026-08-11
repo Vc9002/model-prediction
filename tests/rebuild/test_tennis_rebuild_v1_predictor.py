@@ -35,21 +35,20 @@ def _make_row(
         tourney_date="2025-06-15",
         tour="ATP",
         surface=surface,
-        winner_id="player_A",
-        loser_id="player_B",
-        winner_name="Player A",
-        loser_name="Player B",
+        player_one_id="player_A",
+        player_two_id="player_B",
+        player_one_name="Player A",
+        player_two_name="Player B",
         player_one_win=1,
         player_one_overall_elo=1600.0,
         player_two_overall_elo=1500.0,
-        surface_elo_winner=1620.0,
-        surface_elo_loser=1480.0,
-        blended_elo_winner=1610.0,
-        blended_elo_loser=1490.0,
+        player_one_surface_elo=1620.0,
+        player_two_surface_elo=1480.0,
+        player_one_blended_elo=1610.0,
+        player_two_blended_elo=1490.0,
         elo_probability_player_one=elo_prob,
-        surface_weight=0.35,
-        winner_surface_matches=12,
-        loser_surface_matches=8,
+        player_one_surface_matches=12,
+        player_two_surface_matches=8,
     )
 
 
@@ -61,7 +60,7 @@ def _minimal_artifact(overrides: dict | None = None) -> dict:
         "family": "surface_elo",
         "market_models": {
             "moneyline": {
-                "feature_names": ["elo_probability_winner"],
+                "feature_names": ["elo_probability_player_one"],
                 "coefficients": [1.0],
                 "intercept": 0.0,
                 "positive_class": "winner",
@@ -134,7 +133,7 @@ class TestArtifactLoading:
         art["market_models"]["moneyline"]["feature_names"] = ["trend_gap"]
         art_path.write_text(json.dumps(art))
         cal_path.write_text(json.dumps(_minimal_calibrator()))
-        with pytest.raises(ValueError, match="elo_probability_winner"):
+        with pytest.raises(ValueError, match="elo_probability_player_one"):
             TennisSurfaceEloRebuildV1Predictor.from_paths(art_path, cal_path)
 
 
@@ -154,7 +153,7 @@ class TestPredictionDeterminism:
 
         assert pred1.winner_prob == pred2.winner_prob
         assert pred1.loser_prob == pred2.loser_prob
-        assert pred1.predicted_winner_id == pred2.predicted_winner_id
+        assert pred1.predicted_player_one_id == pred2.predicted_player_one_id
 
     def test_probabilities_sum_to_one(self, tmp_path: Path):
         art_path = tmp_path / "model.json"
@@ -178,7 +177,7 @@ class TestPredictionDeterminism:
         row = _make_row(elo_prob=0.85)
         pred = predictor.predict(row)
         assert pred.winner_prob > 0.5
-        assert pred.predicted_winner_id == "player_A"
+        assert pred.predicted_player_one_id == "player_A"
 
     def test_low_elo_favors_loser(self, tmp_path: Path):
         art_path = tmp_path / "model.json"
@@ -190,7 +189,7 @@ class TestPredictionDeterminism:
         row = _make_row(elo_prob=0.35)
         pred = predictor.predict(row)
         assert pred.winner_prob < 0.5
-        assert pred.predicted_winner_id == "player_B"
+        assert pred.predicted_player_one_id == "player_B"
 
     def test_force_edge_overrides_predicted_winner(self, tmp_path: Path):
         art_path = tmp_path / "model.json"
@@ -202,11 +201,11 @@ class TestPredictionDeterminism:
         row = _make_row(elo_prob=0.85)  # strongly favors winner
         # Force loser
         pred_forced = predictor.predict(row, force_edge="loser")
-        assert pred_forced.predicted_winner_id == "player_B"
+        assert pred_forced.predicted_player_one_id == "player_B"
 
         # Force winner
         pred_normal = predictor.predict(row, force_edge="winner")
-        assert pred_normal.predicted_winner_id == "player_A"
+        assert pred_normal.predicted_player_one_id == "player_A"
 
     def test_prediction_includes_model_metadata(self, tmp_path: Path):
         art_path = tmp_path / "model.json"
@@ -219,7 +218,7 @@ class TestPredictionDeterminism:
         pred = predictor.predict(row)
         assert pred.model_name == "tennis-surface-elo-rebuild-v1"
         assert pred.method == "surface_elo"
-        assert "elo_probability_winner" in pred.feature_names
+        assert "elo_probability_player_one" in pred.feature_names
         assert pred.coefficients == [1.0]
         assert pred.intercept == 0.0
 
@@ -351,4 +350,4 @@ class TestRealArtifactIntegration:
         p1 = predictor.predict(row)
         p2 = predictor.predict(row)
         assert p1.winner_prob == p2.winner_prob
-        assert p1.predicted_winner_id == p2.predicted_winner_id
+        assert p1.predicted_player_one_id == p2.predicted_player_one_id
