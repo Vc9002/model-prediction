@@ -7,7 +7,7 @@ dict.  No refit — the artifact and calibrator are loaded once as immutable
 JSON blobs and reused for every call.
 
 This is raw Surface Elo (no LR on top): the model's probability is the
-`elo_probability_winner` field on the row itself, optionally calibrated.
+`elo_probability_player_one` field on the row itself, optionally calibrated.
 """
 
 from __future__ import annotations
@@ -30,8 +30,8 @@ class TennisSurfaceEloRebuildV1Prediction:
     """Structured prediction from the rebuild-native Surface Elo model."""
     winner_prob: float
     loser_prob: float
-    predicted_winner_id: str
-    predicted_winner_name: str
+    predicted_player_one_id: str
+    predicted_player_one_name: str
     model_name: str
     method: str
     feature_names: list[str]
@@ -123,9 +123,9 @@ class TennisSurfaceEloRebuildV1Predictor:
             )
         moneyline = self._artifact.get("market_models", {}).get("moneyline", {})
         feature_names = moneyline.get("feature_names", [])
-        if "elo_probability_winner" not in feature_names:
+        if "elo_probability_player_one" not in feature_names:
             raise ValueError(
-                f"Artifact missing 'elo_probability_winner' in moneyline feature_names: {feature_names}"
+                f"Artifact missing 'elo_probability_player_one' in moneyline feature_names: {feature_names}"
             )
 
     # ── predict ──────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ class TennisSurfaceEloRebuildV1Predictor:
 
         Args:
             row: A populated ``WalkForwardRow`` (the Elo snapshot before the
-                match outcome, with ``elo_probability_winner`` already
+                match outcome, with ``elo_probability_player_one`` already
                 computed by the Surface Elo formula).
             force_edge: If ``"winner"`` or ``"loser"``, override the predicted
                 winner to that side (for scenario analysis).  Default
@@ -150,7 +150,7 @@ class TennisSurfaceEloRebuildV1Predictor:
             ``TennisSurfaceEloRebuildV1Prediction`` with winner/loser probs
             and metadata.
         """
-        raw_prob = float(row.elo_probability_winner)
+        raw_prob = float(row.elo_probability_player_one)
         cal_prob = self._calibrator.transform(raw_prob)
 
         winner_prob = cal_prob
@@ -158,17 +158,17 @@ class TennisSurfaceEloRebuildV1Predictor:
 
         # Determine predicted winner
         if force_edge == "winner":
-            predicted_id = row.winner_id
-            predicted_name = row.winner_name
+            predicted_id = row.player_one_id
+            predicted_name = row.player_one_name
         elif force_edge == "loser":
-            predicted_id = row.loser_id
-            predicted_name = row.loser_name
+            predicted_id = row.player_two_id
+            predicted_name = row.player_two_name
         elif winner_prob >= loser_prob:
-            predicted_id = row.winner_id
-            predicted_name = row.winner_name
+            predicted_id = row.player_one_id
+            predicted_name = row.player_one_name
         else:
-            predicted_id = row.loser_id
-            predicted_name = row.loser_name
+            predicted_id = row.player_two_id
+            predicted_name = row.player_two_name
 
         moneyline = self._artifact.get("market_models", {}).get("moneyline", {})
 
@@ -181,8 +181,8 @@ class TennisSurfaceEloRebuildV1Predictor:
         return TennisSurfaceEloRebuildV1Prediction(
             winner_prob=winner_prob,
             loser_prob=loser_prob,
-            predicted_winner_id=predicted_id,
-            predicted_winner_name=predicted_name,
+            predicted_player_one_id=predicted_id,
+            predicted_player_one_name=predicted_name,
             model_name=self._artifact.get("model_version", "unknown"),
             method=self._artifact.get("method", "unknown"),
             feature_names=list(moneyline.get("feature_names", [])),

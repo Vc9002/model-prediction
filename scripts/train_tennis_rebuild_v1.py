@@ -47,13 +47,11 @@ from model_prediction.rebuild.calibration import (
 from model_prediction.rebuild.tennis.elo import (
     DEFAULT_ELO,
     K_FACTOR,
-    WalkForwardRow,
     build_dataset,
     rows_to_frame,
 )
 from model_prediction.rebuild.validation import (
     brier_score,
-    calibration_curve,
     date_cluster_split,
     directional_accuracy,
     ece,
@@ -90,8 +88,8 @@ def main() -> None:
           f"{result.skipped_cold_start} cold-start, {result.skipped_irregular} irregular")
     print(f"   Walk-forward rows: {frame.height}")
 
-    labels = frame["winner_win"].to_numpy().astype(np.float64)
-    probs = frame["elo_probability_winner"].to_numpy().astype(np.float64)
+    labels = frame["player_one_win"].to_numpy().astype(np.float64)
+    probs = frame["elo_probability_player_one"].to_numpy().astype(np.float64)
 
     # ── 2. Chronological split ──
     print("\n2. Chronological 60/20/20 date-cluster split...")
@@ -124,29 +122,71 @@ def main() -> None:
     for surface in ["Hard", "Clay", "Grass"]:
         sf = val_df.filter(pl.col("surface") == surface)
         if sf.height > 0:
-            sl = sf["winner_win"].to_numpy().astype(np.float64)
-            sp = sf["elo_probability_winner"].to_numpy().astype(np.float64)
+            sl = sf["player_one_win"].to_numpy().astype(np.float64)
+            sp = sf["elo_probability_player_one"].to_numpy().astype(np.float64)
             sm = _metrics(sl, sp)
             print(f"   {surface} (n={sm['n']}): LogLoss={sm['log_loss']:.5f} "
                   f"Brier={sm['brier']:.5f} Acc={sm['accuracy']:.4f}")
 
     # ── 4. Calibration ──
-    # All walk-forward labels are 1 (we always predict the winner), so
-    # cross-fit calibration (which requires both label classes for LR fits)
-    # is structurally inapplicable. Raw Elo probabilities serve directly.
-    print("\n4. Calibration: identity only (all labels=1, cross-fit inapplicable)")
-    winning_method = "identity"
-    calibrator: Calibrator = IdentityCalibrator()
-    calibration_results = {
-        "identity": val_metrics,
-        "note": "identity only — cross-fit skipped (single-class labels)",
-    }
+    print("\n4. Calibration cross-fit comparison...")
+    methods = ["identity", "platt", "temperature", "isotonic"]
+    calibration_results: dict[str, Any] = {}
+    for method in methods:
+        try:
+            result = cross_fit_calibration_eval(
+                val_probs.tolist(), val_labels.astype(int).tolist(), method, n_blocks=4
+            )
+            calibration_results[method] = {
+                "log_loss": result.log_loss,
+                "brier": result.brier,
+                "ece": result.ece,
+                "calibration_slope": result.calibration_slope,
+                "calibration_intercept": result.calibration_intercept,
+            }
+        except ValueError as e:
+            calibration_results[method] = {"error": str(e)}
 
-    # ── 5. Holdout evaluation ──
+    def _cal_score(method: str) -> float:
+        m = calibration_results[method]
+        return m.get("ece", 99) + m.get("brier", 99)
+
+    valid_methods = [m for m in methods if "error" not in calibration_results.get(m, {})]
+    winning_method = min(valid_methods, key=_cal_score) if valid_methods else "identity"
+    print(f"   Winning calibration: {winning_method}")
+
+    for method in methods:
+        m = calibration_results.get(method, {})
+        if "error" in m:
+            print(f"   {method}: SKIPPED ({m['error']})")
+        else:
+            marker = " <<<" if method == winning_method else ""
+            print(f"   {method}: LogLoss={m['log_loss']:.5f} Brier={m['brier']:.5f} "
+                  f"ECE={m['ece']:.5f} slope={m.get('calibration_slope','n/a')}{marker}")
+
+    if winning_method == "identity":
+        calibrator: Calibrator = IdentityCalibrator()
+    else:
+        calibrator = fit_calibrator(winning_method, val_labels, val_probs)
+
+    # ── 5. Holdout evaluation + calibration validity check ──
     print("\n5. Locked holdout evaluation...")
     holdout_metrics_raw = _metrics(holdout_labels, holdout_probs)
     holdout_calibrated = np.array([calibrator.transform(float(p)) for p in holdout_probs])
     holdout_metrics_cal = _metrics(holdout_labels, holdout_calibrated)
+
+    # If calibration worsens holdout ECE+Brier, fall back to identity.
+    # This guards against overfitting the calibrator to the validation fold.
+    if winning_method != "identity":
+        raw_score = holdout_metrics_raw["ece"] + holdout_metrics_raw["brier"]
+        cal_score = holdout_metrics_cal["ece"] + holdout_metrics_cal["brier"]
+        if cal_score > raw_score:
+            print(f"   WARNING: {winning_method} calibration worsens holdout "
+                  f"(ECE+Brier: {raw_score:.4f} → {cal_score:.4f}). "
+                  f"Falling back to identity.")
+            calibrator = IdentityCalibrator()
+            winning_method = "identity"
+            holdout_metrics_cal = holdout_metrics_raw
 
     try:
         cal_diag_raw = calibration_intercept_slope(holdout_labels, holdout_probs)
@@ -173,9 +213,9 @@ def main() -> None:
     for tour in TOURS:
         tf = hf.filter(pl.col("tour") == tour)
         if tf.height > 0:
-            tl = tf["winner_win"].to_numpy().astype(np.float64)
+            tl = tf["player_one_win"].to_numpy().astype(np.float64)
             tp = np.array([calibrator.transform(float(p))
-                          for p in tf["elo_probability_winner"].to_numpy().astype(np.float64)])
+                          for p in tf["elo_probability_player_one"].to_numpy().astype(np.float64)])
             tm = _metrics(tl, tp)
             print(f"   {tour} (n={tm['n']}): LogLoss={tm['log_loss']:.5f} "
                   f"Brier={tm['brier']:.5f} Acc={tm['accuracy']:.4f}")
@@ -198,7 +238,7 @@ def main() -> None:
                     "max_surface_weight": 0.6,
                     "surface_weight_per_match": 0.025,
                 },
-                "feature_names": ["elo_probability_winner"],
+                "feature_names": ["elo_probability_player_one"],
                 "coefficients": [1.0],
                 "intercept": 0.0,
             }

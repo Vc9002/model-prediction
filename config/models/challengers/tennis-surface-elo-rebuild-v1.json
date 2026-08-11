@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "86154276781dfb7cdeeb2a0818145afbdd3073c853e1563353bc06443ab3c2a2",
+  "artifact_hash": "83b967abadd7059d020c24e409a5c0286bc1c5fbe773053383af646b020e2708",
   "data_summary": {
     "n_total_matches": 27949,
     "n_walk_forward_rows": 23559,
@@ -12,7 +12,7 @@
     ]
   },
   "family": "surface_elo",
-  "generated_at_utc": "2026-08-11T14:51:05.946658+00:00",
+  "generated_at_utc": "2026-08-11T15:27:28.345048+00:00",
   "market_models": {
     "moneyline": {
       "coefficients": [
@@ -27,7 +27,7 @@
         "surface_weight_per_match": 0.025
       },
       "feature_names": [
-        "elo_probability_winner"
+        "elo_probability_player_one"
       ],
       "intercept": 0.0,
       "positive_class": "winner"
@@ -51,10 +51,10 @@
     "calibration_method": "identity",
     "calibration_results": {
       "identity": {
-        "accuracy": 0.6442027578170518,
-        "brier": 0.21717095472720374,
-        "ece": 0.42555922866874396,
-        "log_loss": 0.6218380531015728,
+        "accuracy": 0.6432316954748495,
+        "brier": 0.21643456957054408,
+        "ece": 0.029022524178070615,
+        "log_loss": 0.6201618036840992,
         "n": 5149
       },
       "note": "identity only \u2014 cross-fit skipped (single-class labels)"
@@ -69,17 +69,17 @@
       "calibration_slope": null
     },
     "holdout_metrics_calibrated": {
-      "accuracy": 0.6390795316915624,
-      "brier": 0.219469241464976,
-      "ece": 0.42534015306260675,
-      "log_loss": 0.6279690904885453,
+      "accuracy": 0.6423092450545014,
+      "brier": 0.21855910455979588,
+      "ece": 0.026418167277583542,
+      "log_loss": 0.6254727878283928,
       "n": 4954
     },
     "holdout_metrics_raw": {
-      "accuracy": 0.6390795316915624,
-      "brier": 0.219469241464976,
-      "ece": 0.42534015306260675,
-      "log_loss": 0.6279690904885453,
+      "accuracy": 0.6423092450545014,
+      "brier": 0.21855910455979588,
+      "ece": 0.026418167277583542,
+      "log_loss": 0.6254727878283928,
       "n": 4954
     },
     "qualified": false

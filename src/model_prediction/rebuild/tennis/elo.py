@@ -22,9 +22,8 @@ Key differences from incumbent:
 
 from __future__ import annotations
 
-import math
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import polars as pl
@@ -55,28 +54,32 @@ class TennisMatchRow:
 
 @dataclass
 class WalkForwardRow:
-    """One walk-forward prediction row: Elo snapshot BEFORE match outcome."""
+    """One walk-forward prediction row: Elo snapshot BEFORE match outcome.
+
+    Orientation: player_one is deterministically chosen (lower player_id)
+    independent of the match outcome. This means player_one_win is 0 or 1
+    (not always 1), enabling proper calibration with both label classes.
+    """
     match_id: str
     tourney_date: str
     tour: str
     surface: str
-    winner_id: str
-    loser_id: str
-    winner_name: str
-    loser_name: str
-    winner_win: int  # 1 if winner won (always 1 for completed)
-    overall_elo_winner: float
-    overall_elo_loser: float
-    surface_elo_winner: float
-    surface_elo_loser: float
-    blended_elo_winner: float
-    blended_elo_loser: float
-    elo_probability_winner: float  # P(winner wins) from blended Elo
-    surface_weight: float
-    winner_surface_matches: int
-    loser_surface_matches: int
-    winner_rank: int | None = None
-    loser_rank: int | None = None
+    player_one_id: str
+    player_two_id: str
+    player_one_name: str
+    player_two_name: str
+    player_one_win: int  # 1 if player_one won, 0 if player_two won
+    elo_probability_player_one: float  # P(player_one beats player_two)
+    player_one_overall_elo: float
+    player_two_overall_elo: float
+    player_one_surface_elo: float
+    player_two_surface_elo: float
+    player_one_blended_elo: float
+    player_two_blended_elo: float
+    player_one_surface_matches: int
+    player_two_surface_matches: int
+    player_one_rank: int | None = None
+    player_two_rank: int | None = None
 
 
 @dataclass
@@ -89,12 +92,14 @@ class WalkForwardResult:
 
 
 class SurfaceEloBook:
-    """Surface-aware Elo rating book with overall and per-surface tracks.
+    """Surface-aware Elo rating book — faithful to the incumbent lineage.
 
-    Mirrors the incumbent's architecture:
+    Mirrors `tennis-surface-elo-v1`'s documented mechanics exactly:
     - Default Elo: 1500
-    - K-factor: 32 (with surface K boost of 8.0 for surface-specific updates)
-    - Surface weight: dynamic, min(0.6, 0.1 + 0.025 * min(n_a, n_b))
+    - K-factor: 32 for BOTH overall and surface Elo (no surface K boost)
+    - Surface weight: FIXED 0.6 (not dynamic)
+    - Overall weight: 0.4
+    - Elo formula: P(A wins) = 1 / (1 + 10^((R_B - R_A) / 400))
 
     All updates are chronological — caller must ensure matches are sorted
     by date before calling update().
@@ -103,11 +108,9 @@ class SurfaceEloBook:
     def __init__(
         self,
         k: float = K_FACTOR,
-        surface_k_boost: float = 8.0,
         default_elo: float = DEFAULT_ELO,
     ) -> None:
         self.k = k
-        self.surface_k_boost = surface_k_boost
         self.default_elo = default_elo
         self.overall: dict[str, float] = defaultdict(lambda: default_elo)
         self.surface: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(lambda: default_elo))
@@ -123,37 +126,31 @@ class SurfaceEloBook:
     def surface_matches(self, player: str, surface: str) -> int:
         return self.surface_count[player].get(surface, 0)
 
-    def _surface_weight(self, player_a: str, player_b: str, surface: str) -> float:
-        n_a = self.surface_count[player_a].get(surface, 0)
-        n_b = self.surface_count[player_b].get(surface, 0)
-        return min(0.6, 0.1 + 0.025 * min(n_a, n_b))
-
-    def blended_rating(self, player: str, surface: str, opponent: str) -> float:
-        w = self._surface_weight(player, opponent, surface)
+    def blended_rating(self, player: str, surface: str) -> float:
+        """Fixed 0.6 surface / 0.4 overall blend per incumbent lineage."""
         s = self.surface_rating(player, surface)
         o = self.rating(player)
-        return w * s + (1 - w) * o
+        return 0.6 * s + 0.4 * o
 
     def expected_win(self, player_a: str, player_b: str, surface: str) -> float:
-        r_a = self.blended_rating(player_a, surface, player_b)
-        r_b = self.blended_rating(player_b, surface, player_a)
+        r_a = self.blended_rating(player_a, surface)
+        r_b = self.blended_rating(player_b, surface)
         return 1.0 / (1.0 + 10 ** ((r_b - r_a) / 400.0))
 
     def update(self, winner: str, loser: str, surface: str) -> None:
-        """Update Elo ratings after a completed match."""
+        """Update Elo after a completed match. K=32 for both overall and surface."""
         exp_win = self.expected_win(winner, loser, surface)
         delta = self.k * (1.0 - exp_win)
 
-        # Overall Elo
+        # Overall Elo (K=32)
         self.overall[winner] += delta
         self.overall[loser] -= delta
 
-        # Surface-specific Elo (boosted K)
-        surface_delta = (self.k + self.surface_k_boost) * (1.0 - exp_win)
-        self.surface[winner][surface] += surface_delta
-        self.surface[loser][surface] -= surface_delta
+        # Surface-specific Elo (same K=32, no boost)
+        self.surface[winner][surface] += delta
+        self.surface[loser][surface] -= delta
 
-        # Surface match counts
+        # Match counts
         self.surface_count[winner][surface] += 1
         self.surface_count[loser][surface] += 1
         self.total_matches[winner] += 1
@@ -270,42 +267,50 @@ def build_walk_forward_rows(
                 skipped_cold_start += 1
             else:
                 surface = m.surface or DEFAULT_SURFACE
-                w_elo = book.blended_rating(m.winner_id, surface, m.loser_id)
-                l_elo = book.blended_rating(m.loser_id, surface, m.winner_id)
-                prob = 1.0 / (1.0 + 10 ** ((l_elo - w_elo) / 400.0))
+
+                # Player ordering: lower player_id = player_one (deterministic,
+                # pre-outcome orientation independent of who won)
+                ids = sorted([m.winner_id, m.loser_id])
+                p1_id, p2_id = ids[0], ids[1]
+                p1_is_winner = m.winner_id == p1_id
+                p1_win = 1 if p1_is_winner else 0
+                p1_name = m.winner_name if p1_is_winner else m.loser_name
+                p2_name = m.loser_name if p1_is_winner else m.winner_name
+                p1_rank = m.winner_rank if p1_is_winner else m.loser_rank
+                p2_rank = m.loser_rank if p1_is_winner else m.winner_rank
+
+                prob_p1 = book.expected_win(p1_id, p2_id, surface)
 
                 rows.append(WalkForwardRow(
                     match_id=m.canonical_match_id,
                     tourney_date=m.tourney_date,
                     tour=m.tour,
                     surface=surface,
-                    winner_id=m.winner_id,
-                    loser_id=m.loser_id,
-                    winner_name=m.winner_name,
-                    loser_name=m.loser_name,
-                    winner_win=1,
-                    overall_elo_winner=book.rating(m.winner_id),
-                    overall_elo_loser=book.rating(m.loser_id),
-                    surface_elo_winner=book.surface_rating(m.winner_id, surface),
-                    surface_elo_loser=book.surface_rating(m.loser_id, surface),
-                    blended_elo_winner=w_elo,
-                    blended_elo_loser=l_elo,
-                    elo_probability_winner=prob,
-                    surface_weight=book._surface_weight(m.winner_id, m.loser_id, surface),
-                    winner_surface_matches=book.surface_matches(m.winner_id, surface),
-                    loser_surface_matches=book.surface_matches(m.loser_id, surface),
-                    winner_rank=m.winner_rank,
-                    loser_rank=m.loser_rank,
+                    player_one_id=p1_id,
+                    player_two_id=p2_id,
+                    player_one_name=p1_name,
+                    player_two_name=p2_name,
+                    player_one_win=p1_win,
+                    elo_probability_player_one=prob_p1,
+                    player_one_overall_elo=book.rating(p1_id),
+                    player_two_overall_elo=book.rating(p2_id),
+                    player_one_surface_elo=book.surface_rating(p1_id, surface),
+                    player_two_surface_elo=book.surface_rating(p2_id, surface),
+                    player_one_blended_elo=book.blended_rating(p1_id, surface),
+                    player_two_blended_elo=book.blended_rating(p2_id, surface),
+                    player_one_surface_matches=book.surface_matches(p1_id, surface),
+                    player_two_surface_matches=book.surface_matches(p2_id, surface),
+                    player_one_rank=p1_rank,
+                    player_two_rank=p2_rank,
                 ))
 
         # Now update Elo with today's results
         # Completed matches: full update
-        # Irregular matches: winner still gets credit, but reduced
+        # Irregular matches: half-K update — winner still gets credit
         for m in day_matches:
             if m.result_type == "completed":
                 book.update(m.winner_id, m.loser_id, m.surface or DEFAULT_SURFACE)
             elif m.result_type in ("retirement", "walkover", "default"):
-                # Half-K update for irregular wins — still informative but less so
                 surface = m.surface or DEFAULT_SURFACE
                 exp_win = book.expected_win(m.winner_id, m.loser_id, surface)
                 delta = (book.k * 0.5) * (1.0 - exp_win)

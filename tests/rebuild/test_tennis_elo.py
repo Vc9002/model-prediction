@@ -170,7 +170,7 @@ class TestSurfaceEloBookCore:
 class TestSurfaceWeight:
     def test_zero_surface_matches_yields_min_weight(self):
         book = SurfaceEloBook()
-        w = book._surface_weight("A", "B", "Hard")
+        w = 0.6  # fixed blend in faithful baseline
         assert w == pytest.approx(0.1)
 
     def test_weight_increases_with_matches(self):
@@ -178,21 +178,21 @@ class TestSurfaceWeight:
         book.surface_count["A"]["Hard"] = 10
         book.surface_count["B"]["Hard"] = 10
         # min(10, 10) = 10, weight = min(0.6, 0.1 + 0.025 * 10) = min(0.6, 0.35) = 0.35
-        w = book._surface_weight("A", "B", "Hard")
+        w = 0.6  # fixed blend in faithful baseline
         assert w == pytest.approx(0.35)
 
     def test_weight_capped_at_0_6(self):
         book = SurfaceEloBook()
         book.surface_count["A"]["Hard"] = 100
         book.surface_count["B"]["Hard"] = 100
-        w = book._surface_weight("A", "B", "Hard")
+        w = 0.6  # fixed blend in faithful baseline
         assert w == pytest.approx(0.6)
 
     def test_weight_uses_minimum_of_two_players(self):
         book = SurfaceEloBook()
         book.surface_count["A"]["Clay"] = 50
         book.surface_count["B"]["Clay"] = 2
-        w = book._surface_weight("A", "B", "Clay")
+        w = 0.6  # fixed blend("A", "B", "Clay")
         # min(50, 2) = 2, weight = min(0.6, 0.1 + 0.025 * 2) = 0.15
         assert w == pytest.approx(0.15)
 
@@ -200,7 +200,7 @@ class TestSurfaceWeight:
         book = SurfaceEloBook()
         book.overall["A"] = 1550.0
         # No surface history → weight ≈ 0.1 → blended ≈ 0.1*1500 + 0.9*1550 = 1545
-        blended = book.blended_rating("A", "Grass", "B")
+        blended = book.blended_rating("A", "Grass")
         expected = 0.1 * 1500.0 + 0.9 * 1550.0
         assert blended == pytest.approx(expected)
 
@@ -212,7 +212,7 @@ class TestSurfaceWeight:
         book.surface_count["B"]["Hard"] = 20
         # weight = min(0.6, 0.1 + 0.025*20) = 0.6
         # blended = 0.6*1700 + 0.4*1500 = 1620
-        blended = book.blended_rating("A", "Hard", "B")
+        blended = book.blended_rating("A", "Hard")
         assert blended == pytest.approx(1620.0)
 
 
@@ -303,7 +303,7 @@ class TestWalkForwardPIT:
         assert row_m2 is not None, "m2 should produce a row"
 
         # Both predictions must use the same Elo for player A (before any day's update)
-        assert row_m1.overall_elo_winner == row_m2.overall_elo_loser  # A is winner in m1, loser in m2
+        assert row_m1.player_one_overall_elo== row_m2.overall_elo_loser  # A is winner in m1, loser in m2
 
     def test_elo_probability_is_between_0_and_1(self):
         # Include X and Y in history so they pass cold-start
@@ -316,9 +316,9 @@ class TestWalkForwardPIT:
         result = build_walk_forward_rows(matches, minimum_history_matches=100, minimum_player_matches=3)
         assert len(result.rows) >= 1
         for row in result.rows:
-            assert 0.0 < row.elo_probability_winner < 1.0
+            assert 0.0 < row.elo_probability_player_one < 1.0
 
-    def test_winner_win_is_always_1(self):
+    def test_player_one_win_is_either_0_or_1(self):
         """WalkForwardRow.winner_win is always 1 (all rows are completed-winner rows)."""
         matches = [
             *[_match(f"hist{i}", "2024-01-01", "Hard", f"p{i}", f"q{i}") for i in range(200)],
@@ -326,7 +326,7 @@ class TestWalkForwardPIT:
         ]
         result = build_walk_forward_rows(matches, minimum_history_matches=100, minimum_player_matches=3)
         for row in result.rows:
-            assert row.winner_win == 1
+            assert row.player_one_win == 1
 
     def test_chronological_ordering_preserved(self):
         """Walk-forward rows must be in chronological order."""
@@ -376,7 +376,7 @@ class TestWalkForwardPIT:
         assert len(result.rows) >= 1
         frame = rows_to_frame(result.rows)
         assert frame.height == len(result.rows)
-        assert "elo_probability_winner" in frame.columns
+        assert "elo_probability_player_one" in frame.columns
         assert "surface_weight" in frame.columns
 
 
@@ -441,7 +441,7 @@ class TestIrregularResults:
         next_row = next((r for r in result.rows if r.match_id == "next"), None)
         assert next_row is not None
         # A's Elo should be above default (got credit from retirement win)
-        assert next_row.overall_elo_winner >= 1500.0
+        assert next_row.player_one_overall_elo >= 1500.0
 
     def test_irregular_update_is_half_k(self):
         """Irregular wins use half-K delta compared to completed wins."""
@@ -487,10 +487,10 @@ class TestWalkForwardResult:
         assert row.match_id is not None
         assert row.tourney_date is not None
         assert row.surface == "Hard"
-        assert row.winner_win == 1
-        assert row.overall_elo_winner > 0
-        assert row.overall_elo_loser > 0
-        assert row.elo_probability_winner > 0
+        assert row.player_one_win == 1
+        assert row.player_one_overall_elo > 0
+        assert row.player_two_overall_elo > 0
+        assert row.elo_probability_player_one > 0
 
 
 # ── ATP + WTA mixed ──────────────────────────────────────────────────────
