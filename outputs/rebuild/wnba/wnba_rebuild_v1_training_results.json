@@ -1,0 +1,179 @@
+{
+  "feature_set_results": {
+    "full_3_feature": {
+      "n": 218,
+      "log_loss": 0.5962212497288295,
+      "brier": 0.20396889957578418,
+      "ece": 0.04728230166235151,
+      "accuracy": 0.6788990825688074
+    },
+    "reduced_2_feature": {
+      "n": 218,
+      "log_loss": 0.5966786183192294,
+      "brier": 0.2041564576598935,
+      "ece": 0.05393075048522272,
+      "accuracy": 0.6788990825688074
+    }
+  },
+  "feature_set_decision": "defensive_trend_gap does not provide clear Brier improvement (-0.00019 > -0.002); fold-wise audit (1/5 folds won, sign-unstable) independently confirms -> DROP, ship the 2-feature model.",
+  "final_feature_set": "reduced_2_feature",
+  "final_features": [
+    "elo_probability",
+    "trend_gap"
+  ],
+  "coefficients": {
+    "elo_probability": 4.188958647943432,
+    "trend_gap": 0.029370479660333338
+  },
+  "intercept": -2.223880770525129,
+  "train_metrics": {
+    "n": 608,
+    "log_loss": 0.6121299822493061,
+    "brier": 0.21211347350241674,
+    "ece": 0.046864468634776585,
+    "accuracy": 0.6513157894736842
+  },
+  "validation_metrics": {
+    "n": 218,
+    "log_loss": 0.5966786183192294,
+    "brier": 0.2041564576598935,
+    "ece": 0.05393075048522272,
+    "accuracy": 0.6788990825688074
+  },
+  "holdout_metrics_raw": {
+    "n": 216,
+    "log_loss": 0.6183314702796321,
+    "brier": 0.2136061462481199,
+    "ece": 0.08333784869767098,
+    "accuracy": 0.6898148148148148
+  },
+  "holdout_metrics_calibrated": {
+    "n": 216,
+    "log_loss": 0.6183314702796321,
+    "brier": 0.2136061462481199,
+    "ece": 0.08333784869767098,
+    "accuracy": 0.6898148148148148
+  },
+  "holdout_calibration_diagnostics_raw": {
+    "calibration_intercept": 0.08639437683146033,
+    "calibration_slope": 0.8991895050894898,
+    "reliability_buckets": [
+      {
+        "lower": 0.0,
+        "upper": 0.2,
+        "mean_p": 0.1,
+        "hit_rate": 0.4286,
+        "count": 7
+      },
+      {
+        "lower": 0.2,
+        "upper": 0.4,
+        "mean_p": 0.3,
+        "hit_rate": 0.2807,
+        "count": 57
+      },
+      {
+        "lower": 0.4,
+        "upper": 0.6,
+        "mean_p": 0.5,
+        "hit_rate": 0.5517,
+        "count": 58
+      },
+      {
+        "lower": 0.6,
+        "upper": 0.8,
+        "mean_p": 0.7,
+        "hit_rate": 0.6923,
+        "count": 78
+      },
+      {
+        "lower": 0.8,
+        "upper": 1.0,
+        "mean_p": 0.9,
+        "hit_rate": 0.9375,
+        "count": 16
+      }
+    ]
+  },
+  "holdout_calibration_diagnostics_calibrated": {
+    "calibration_intercept": 0.08639437683146033,
+    "calibration_slope": 0.8991895050894898,
+    "reliability_buckets": [
+      {
+        "lower": 0.0,
+        "upper": 0.2,
+        "mean_p": 0.1,
+        "hit_rate": 0.4286,
+        "count": 7
+      },
+      {
+        "lower": 0.2,
+        "upper": 0.4,
+        "mean_p": 0.3,
+        "hit_rate": 0.2807,
+        "count": 57
+      },
+      {
+        "lower": 0.4,
+        "upper": 0.6,
+        "mean_p": 0.5,
+        "hit_rate": 0.5517,
+        "count": 58
+      },
+      {
+        "lower": 0.6,
+        "upper": 0.8,
+        "mean_p": 0.7,
+        "hit_rate": 0.6923,
+        "count": 78
+      },
+      {
+        "lower": 0.8,
+        "upper": 1.0,
+        "mean_p": 0.9,
+        "hit_rate": 0.9375,
+        "count": 16
+      }
+    ]
+  },
+  "calibration_comparison": {
+    "identity": {
+      "n_eval_total": 164,
+      "log_loss": 0.582156762359557,
+      "brier": 0.19850149039752804,
+      "ece": 0.06704775292616263,
+      "calibration_intercept": -0.06913270609031785,
+      "calibration_slope": 1.2495979267696133
+    },
+    "platt": {
+      "n_eval_total": 164,
+      "log_loss": 0.604125223952537,
+      "brier": 0.20786525769093953,
+      "ece": 0.06671102980362821,
+      "calibration_intercept": 0.07231353092343425,
+      "calibration_slope": 1.0595355728246405
+    },
+    "temperature": {
+      "n_eval_total": 164,
+      "log_loss": 0.5911811790080082,
+      "brier": 0.2021946726275679,
+      "ece": 0.07553292379510099,
+      "calibration_intercept": -0.048754339054549796,
+      "calibration_slope": 1.2022690724923482
+    },
+    "isotonic": {
+      "n_eval_total": 164,
+      "log_loss": 0.6228895209205186,
+      "brier": 0.21610105621874887,
+      "ece": 0.08734906370004282,
+      "calibration_intercept": 0.14200279406826302,
+      "calibration_slope": 0.7127070323974966
+    }
+  },
+  "winning_calibration_method": "identity",
+  "artifact_hash": "cae08349e16aa5b375c4cf8f5551d555dc108f0a1d43a77078d4f9396d469ec4",
+  "calibrator_hash": "e116430ef68d5895f074079afc43162236a89c4563caeeff34432413e4cc2731",
+  "n_rows_total": 1042,
+  "skipped_bootstrap": 30,
+  "skipped_cold_start_team": 7
+}

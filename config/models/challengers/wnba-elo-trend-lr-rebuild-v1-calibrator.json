@@ -1,0 +1,53 @@
+{
+  "base_model_hash": "cae08349e16aa5b375c4cf8f5551d555dc108f0a1d43a77078d4f9396d469ec4",
+  "calibration_comparison": {
+    "identity": {
+      "brier": 0.19850149039752804,
+      "calibration_intercept": -0.06913270609031785,
+      "calibration_slope": 1.2495979267696133,
+      "ece": 0.06704775292616263,
+      "log_loss": 0.582156762359557,
+      "n_eval_total": 164
+    },
+    "isotonic": {
+      "brier": 0.21610105621874887,
+      "calibration_intercept": 0.14200279406826302,
+      "calibration_slope": 0.7127070323974966,
+      "ece": 0.08734906370004282,
+      "log_loss": 0.6228895209205186,
+      "n_eval_total": 164
+    },
+    "platt": {
+      "brier": 0.20786525769093953,
+      "calibration_intercept": 0.07231353092343425,
+      "calibration_slope": 1.0595355728246405,
+      "ece": 0.06671102980362821,
+      "log_loss": 0.604125223952537,
+      "n_eval_total": 164
+    },
+    "temperature": {
+      "brier": 0.2021946726275679,
+      "calibration_intercept": -0.048754339054549796,
+      "calibration_slope": 1.2022690724923482,
+      "ece": 0.07553292379510099,
+      "log_loss": 0.5911811790080082,
+      "n_eval_total": 164
+    }
+  },
+  "calibrator_hash": "e116430ef68d5895f074079afc43162236a89c4563caeeff34432413e4cc2731",
+  "generated_at_utc": "2026-08-11T15:21:33.880317+00:00",
+  "method": "identity",
+  "model_name": "wnba-elo-trend-lr-rebuild-v1",
+  "n_training_oof": 218,
+  "parameters": {},
+  "provenance": {
+    "availability_basis": "capture_time_only",
+    "commercial_use_status": "unresolved",
+    "note": "Fitted on the validation split only (disjoint from both train and the locked holdout). Same capture-time-only / unresolved-commercial-rights caveats as the base model artifact apply.",
+    "production_allowed": false
+  },
+  "training_range": {
+    "end": "2025-06-25",
+    "start": "2024-07-13"
+  }
+}
