@@ -1,0 +1,250 @@
+{
+  "artifact_hash": "f6cc4cab714cb9699469f5270a6273bb688f4d132f568453db6b090e3cfd791c",
+  "elo_config": {
+    "home_advantage": 60.0,
+    "k": 20.0,
+    "offseason_gap_days": 90,
+    "offseason_regression": 0.4
+  },
+  "elo_default_rating": 1500.0,
+  "feature_set_comparison": {
+    "full_3_feature": {
+      "accuracy": 0.6788990825688074,
+      "brier": 0.20396889957578418,
+      "ece": 0.04728230166235151,
+      "log_loss": 0.5962212497288295,
+      "n": 218
+    },
+    "reduced_2_feature": {
+      "accuracy": 0.6788990825688074,
+      "brier": 0.2041564576598935,
+      "ece": 0.05393075048522272,
+      "log_loss": 0.5966786183192294,
+      "n": 218
+    }
+  },
+  "feature_set_decision": "Removing defensive_trend_gap worsens validation Brier (0.20416 > 0.20397) -> KEEP defensive_trend_gap, ship the 3-feature model.",
+  "generated_at_utc": "2026-08-11T14:18:49.757170+00:00",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        4.179960622735977,
+        0.029668999555789694,
+        0.0023811230920272103
+      ],
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap"
+      ],
+      "intercept": -2.2184404915886318,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "wnba-elo-trend-lr-rebuild-v1",
+  "provenance": {
+    "availability_basis": "capture_time_only",
+    "commercial_use_status": "unresolved",
+    "data_root": "data/rebuild/normalized/wnba",
+    "dropped_incomplete_games": "see docs/model_audit/models/WNBA_ELO_TREND_LR_REBUILD_V1.md",
+    "note": "Trained entirely on real, backfilled SportsDataverse WNBA schedule/team_box data (2022-2025). Every source row's observed_at_utc is this repo's real backfill capture time (2026-08), not a genuine historical observation time -- the chronological 60/20/20 split above is real, non-fabricated DESCRIPTIVE BACKTESTING over real historical game order and real final scores, NOT genuine prospective point-in-time evidence. The underlying SportsDataverse data additionally has an UNRESOLVED commercial-use-rights status -- this model is research/shadow-only regardless of how well it performs and must never be routed toward anything claiming production clearance. See docs/model_audit/models/WNBA_ELO_TREND_LR_REBUILD_V1.md.",
+    "production_allowed": false,
+    "seasons": [
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "sibling_of_incumbent": "wnba-elo-trend-lr-v4 (config/models/wnba-elo-trend-lr-v4.json) -- same family, never loaded as candidate, referenced only as a design guide"
+  },
+  "qualification": {
+    "calibration_comparison": {
+      "identity": {
+        "brier": 0.1981609834186628,
+        "calibration_intercept": -0.0682029557799106,
+        "calibration_slope": 1.2506596147893911,
+        "ece": 0.05795809405953933,
+        "log_loss": 0.5813177162394774,
+        "n_eval_total": 164
+      },
+      "isotonic": {
+        "brier": 0.21337378181820293,
+        "calibration_intercept": 0.14515180154790744,
+        "calibration_slope": 0.7246738823256547,
+        "ece": 0.07920560992765739,
+        "log_loss": 0.618575765845392,
+        "n_eval_total": 164
+      },
+      "platt": {
+        "brier": 0.20763227217043317,
+        "calibration_intercept": 0.07305919021771128,
+        "calibration_slope": 1.0645366644012364,
+        "ece": 0.07958599156711008,
+        "log_loss": 0.6035136659067859,
+        "n_eval_total": 164
+      },
+      "temperature": {
+        "brier": 0.2018887520681312,
+        "calibration_intercept": -0.04770843428634768,
+        "calibration_slope": 1.2032728775315868,
+        "ece": 0.07527316333433985,
+        "log_loss": 0.590387616989613,
+        "n_eval_total": 164
+      }
+    },
+    "calibration_method": "identity",
+    "framework": "locked_complete_date_60_20_20",
+    "holdout_calibration_diagnostics_calibrated": {
+      "calibration_intercept": 0.08636010623571755,
+      "calibration_slope": 0.8957483841026842,
+      "reliability_buckets": [
+        {
+          "count": 7,
+          "hit_rate": 0.4286,
+          "lower": 0.0,
+          "mean_p": 0.1,
+          "upper": 0.2
+        },
+        {
+          "count": 57,
+          "hit_rate": 0.2807,
+          "lower": 0.2,
+          "mean_p": 0.3,
+          "upper": 0.4
+        },
+        {
+          "count": 58,
+          "hit_rate": 0.5517,
+          "lower": 0.4,
+          "mean_p": 0.5,
+          "upper": 0.6
+        },
+        {
+          "count": 76,
+          "hit_rate": 0.6842,
+          "lower": 0.6,
+          "mean_p": 0.7,
+          "upper": 0.8
+        },
+        {
+          "count": 18,
+          "hit_rate": 0.9444,
+          "lower": 0.8,
+          "mean_p": 0.9,
+          "upper": 1.0
+        }
+      ]
+    },
+    "holdout_calibration_diagnostics_raw": {
+      "calibration_intercept": 0.08636010623571755,
+      "calibration_slope": 0.8957483841026842,
+      "reliability_buckets": [
+        {
+          "count": 7,
+          "hit_rate": 0.4286,
+          "lower": 0.0,
+          "mean_p": 0.1,
+          "upper": 0.2
+        },
+        {
+          "count": 57,
+          "hit_rate": 0.2807,
+          "lower": 0.2,
+          "mean_p": 0.3,
+          "upper": 0.4
+        },
+        {
+          "count": 58,
+          "hit_rate": 0.5517,
+          "lower": 0.4,
+          "mean_p": 0.5,
+          "upper": 0.6
+        },
+        {
+          "count": 76,
+          "hit_rate": 0.6842,
+          "lower": 0.6,
+          "mean_p": 0.7,
+          "upper": 0.8
+        },
+        {
+          "count": 18,
+          "hit_rate": 0.9444,
+          "lower": 0.8,
+          "mean_p": 0.9,
+          "upper": 1.0
+        }
+      ]
+    },
+    "holdout_metrics_calibrated": {
+      "accuracy": 0.6944444444444444,
+      "brier": 0.21370789902393575,
+      "ece": 0.09197513589538829,
+      "log_loss": 0.6186144877642415,
+      "n": 216
+    },
+    "holdout_metrics_raw": {
+      "accuracy": 0.6944444444444444,
+      "brier": 0.21370789902393575,
+      "ece": 0.09197513589538829,
+      "log_loss": 0.6186144877642415,
+      "n": 216
+    },
+    "locked_holdout": true,
+    "overall_home_win_rate": 0.5489443378119002,
+    "qualified": false,
+    "status": "research_shadow_only",
+    "train_metrics_in_sample": {
+      "accuracy": 0.6513157894736842,
+      "brier": 0.21211797108308983,
+      "ece": 0.047110492759430474,
+      "log_loss": 0.6121226836575013,
+      "n": 608
+    },
+    "validation_metrics": {
+      "accuracy": 0.6788990825688074,
+      "brier": 0.20396889957578418,
+      "ece": 0.04728230166235151,
+      "log_loss": 0.5962212497288295,
+      "n": 218
+    }
+  },
+  "sport": "wnba",
+  "training": {
+    "framework": "chronological_60_20_20_date_cluster_split",
+    "locked_holdout": true,
+    "locked_holdout_range": {
+      "end": "2025-10-10",
+      "observations": 216,
+      "start": "2025-06-26",
+      "unique_dates": 81
+    },
+    "market_inputs_used": false,
+    "minimum_history_games": 30,
+    "minimum_team_games": 3,
+    "seasons": [
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "train": {
+      "end": "2024-07-12",
+      "observations": 608,
+      "start": "2022-05-20",
+      "unique_dates": 242
+    },
+    "validation": {
+      "end": "2025-06-25",
+      "observations": 218,
+      "start": "2024-07-13",
+      "unique_dates": 81
+    },
+    "walk_forward_features": true
+  },
+  "trend_half_lives": [
+    3.0,
+    25.0
+  ]
+}
