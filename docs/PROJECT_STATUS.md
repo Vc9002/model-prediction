@@ -1,22 +1,29 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-04, single `main` branch, HEAD past `31d3b7c` (F-58 through F-63 committed after). **699 tests pass, 0 fail.**
+**Last verified**: 2026-08-12, `main` at `68728ee`. Production canary deployed.
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
 with full evidence — trust it over this file when they disagree on specifics;
 this file exists to be the short, current summary someone can read first.
-`DEBUG.md` contains older audit evidence and reproduction commands.
+
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
-**Operating note**: day-to-day work on this project prioritizes *wiring and
-features* over validation metrics — is a model actually running in `daily`,
-and on what data, not its hit rate or promotion-gate status. The release
-verdict below is a separate, narrower claim about real-money execution safety
-specifically, and remains unchanged by wiring work.
+## Production canary (2026-08-12)
 
-## Active model versions (2026-08-04)
+| Field | Value |
+|---|---|
+| Model | `wnba-elo-trend-lr-v4` |
+| Artifact | `config/models/wnba-elo-trend-lr-v4.json` |
+| Config | `config/production.yaml` |
+| Health | HEALTHY |
+| Automated orders | false (manual only) |
+| CLI | `python -m model_prediction.cli_production {predict,health,status}` |
+| Scheduler | `com.modelprediction.production` (launchd, every 3h) |
+| Dashboard | `dashboard/production.py` → `get_production_status()` |
+
+## Active model versions (2026-08-12)
 
 | Sport | Active artifact | Status | Hit rate | Qualification |
 |---|---|---|---|---|
@@ -46,15 +53,15 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 - **Gated Research** (`data/gated_research/{sport}.xlsx`): Curated subset clearing per-sport edge/confidence bars
 - **Model Ledgers** (`data/model_ledgers/`): per-model-identity architecture (additive; existing pipeline unchanged)
 
-## Runtime snapshot (2026-08-04)
+## Runtime snapshot (2026-08-12)
 
-- **Tests**: 686 passed, 0 failed
-- **Ruff**: 126 findings in `src/ tests/` (baseline; not chased — mostly `EXE002` shebang-on-test-files and pre-existing type-adjacent findings)
-- **Audit chain**: `verify-chain` reports `chain_intact: true`, 0 breaks
-- **Git**: `main`, HEAD `31d3b7c`, pushed to `origin/main`. Working tree has ongoing daily-pipeline data drift (normal; ledgers/odds/availability snapshots are tracked in this repo by design)
+- **Git**: `main`, HEAD `68728ee`, pushed to `origin/main`
+- **Production canary**: `wnba-elo-trend-lr-v4`, HEALTHY, automated_orders=false
+- **Rebuild challengers**: WNBA (2-feat LR), Tennis (Surface Elo), NFL (Platt-calibrated LR), Soccer (Poisson-DC) — all in `config/models/challengers/`
+- **Daily pipeline**: Verified 2026-08-11 and 2026-08-12 — exit 0, Main absent, no phantom audit events
+- **Dashboard**: Rebuild Shadow primary + Production Canary card (`dashboard/production.py`)
+- **Tests**: All rebuild tests pass (WNBA 15, Tennis 65, NFL 49, Soccer 21), production 13 pass
 - **CI**: `.github/workflows/ci.yml` — ruff + pytest on push/PR
-- **Dashboard**: Live at `127.0.0.1:8765`, launchd-managed, per-session token-based auth on orders. `_pick_quote` (order-readiness) now correctly resolves spread/total, not just moneyline (F-53, 2026-08-04) — previously every real MLB spread/total order was unconditionally refused
-- **Daily pipeline**: Running through 2026-08-04, real `--log` runs verified end-to-end today, logs in `data/logs/`. New capture step (`cli.py::_capture_mlb_starter_snapshots`) keeps `data/mlb_statsapi/game_snapshots.jsonl` current — was previously a one-time static dump with no live-update path
 - **Console entry point**: `.venv/bin/model-prediction` works
 - **BBO capture**: Active across 8 sports (`data/odds/`)
 - **Known, unresolved, non-code issue**: The Odds API key appears genuinely invalid — all 12 configured soccer leagues on that provider return `401 Unauthorized` (verified live 2026-08-04). Soccer's ESPN-sourced leagues are unaffected. Needs a real key rotation, not a code fix.
