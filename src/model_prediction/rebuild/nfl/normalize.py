@@ -140,7 +140,12 @@ def _schedule(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataF
                 "away_rest_days": _as_int(row.get("away_rest")),
             }
         )
-    return pl.DataFrame(rows)
+    # infer_schema_length=None scans every row before fixing a column's dtype.
+    # The default (100) has crashed real backfills here: nullable columns like
+    # temperature_f/wind_mph are None for every dome game, and a season whose
+    # first ~100 scheduled games happen to be all-dome (e.g. 2022) hits a real
+    # float only after polars already committed to a Null dtype.
+    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 def _pbp(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataFrame:
@@ -184,7 +189,10 @@ def _pbp(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataFrame:
                 "game_complete": event_id in complete_events,
             }
         )
-    return pl.DataFrame(rows)
+    # See the matching comment in _schedule: sparse nullable play columns
+    # (down/yards_to_go on kickoffs, epa/success on no-plays) can leave the
+    # first 100 rows all-None and crash schema inference on a later real value.
+    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 def _weekly_rosters(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl.DataFrame:
@@ -208,7 +216,9 @@ def _weekly_rosters(frame: pl.DataFrame, metadata: SourceResponseMetadata) -> pl
                 "roster_status": str(row.get("status") or "") or None,
             }
         )
-    return pl.DataFrame(rows)
+    # See the matching comment in _schedule: jersey_number/depth_chart_position
+    # are None for enough early rows in some seasons to trip the same crash.
+    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 NORMALIZERS: dict[str, tuple[str, Callable[[pl.DataFrame, SourceResponseMetadata], pl.DataFrame]]] = {

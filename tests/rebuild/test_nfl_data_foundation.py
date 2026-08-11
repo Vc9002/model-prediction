@@ -143,6 +143,68 @@ def test_store_preserves_corrected_vintage_and_is_content_idempotent(tmp_path):
     assert sorted(stored["home_score"].to_list()) == [32, 33]
 
 
+def test_schedule_normalizer_survives_all_null_prefix_longer_than_inference_window():
+    # Real bug found backfilling nflverse 2022 schedule data: pl.DataFrame(rows)
+    # defaults to infer_schema_length=100, so a nullable column (temp/wind are
+    # None for every dome game) that stays None for the first 100+ rows gets
+    # locked to a Null dtype, then crashes ("could not append value... f64")
+    # the moment a real float shows up later -- entirely row-order dependent,
+    # not a data-content bug. Repro here: 120 all-null-weather rows followed
+    # by one real outdoor game.
+    rows = []
+    for i in range(120):
+        rows.append(
+            {
+                "game_id": f"2024_{i:02d}_AAA_BBB",
+                "season": 2024,
+                "game_type": "REG",
+                "week": (i % 18) + 1,
+                "gameday": "2024-09-09",
+                "gametime": "20:15",
+                "away_team": "AAA",
+                "home_team": "BBB",
+                "away_score": 10,
+                "home_score": 20,
+                "overtime": 0,
+                "stadium": "Dome Stadium",
+                "roof": "dome",
+                "surface": "turf",
+                "temp": None,
+                "wind": None,
+                "away_rest": 7,
+                "home_rest": 7,
+            }
+        )
+    rows.append(
+        {
+            "game_id": "2024_99_CCC_DDD",
+            "season": 2024,
+            "game_type": "REG",
+            "week": 9,
+            "gameday": "2024-11-01",
+            "gametime": "13:00",
+            "away_team": "CCC",
+            "home_team": "DDD",
+            "away_score": 13,
+            "home_score": 32,
+            "overtime": 0,
+            "stadium": "Outdoor Stadium",
+            "roof": "outdoors",
+            "surface": "grass",
+            "temp": 66.0,
+            "wind": 9.0,
+            "away_rest": 8,
+            "home_rest": 8,
+        }
+    )
+    source = pl.DataFrame(rows, infer_schema_length=None)
+    _, games = normalize_nfl_table("schedule", source, _metadata())
+    assert games.height == 121
+    last = games.filter(pl.col("event_id") == "2024_99_CCC_DDD")
+    assert last["temperature_f"][0] == 66.0
+    assert last["wind_mph"][0] == 9.0
+
+
 def test_kickoff_timezone_uses_eastern_dst_and_missing_time_fails_closed():
     source = (
         _fixture("nfl_schedule_rows.json")
