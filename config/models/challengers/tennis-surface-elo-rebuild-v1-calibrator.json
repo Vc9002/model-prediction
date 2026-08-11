@@ -1,0 +1,13 @@
+{
+  "base_model_hash": "83b967abadd7059d020c24e409a5c0286bc1c5fbe773053383af646b020e2708",
+  "calibrator_hash": "604ef029a75dbd4c532f69ba14a4fc387d84262b1b85970f153d4c12209a9d42",
+  "generated_at_utc": "2026-08-11T15:27:28.345167+00:00",
+  "method": "identity",
+  "model_name": "tennis-surface-elo-rebuild-v1",
+  "parameters": {},
+  "provenance": {
+    "availability_basis": "capture_time_only",
+    "note": "Fitted on validation split only. Same capture-time-only caveats as base model.",
+    "production_allowed": false
+  }
+}
