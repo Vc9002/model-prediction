@@ -59,23 +59,32 @@ Every rating is recomputed from scratch against the rebuild data store.
 
 | Feature | Coefficient | Sign | Description |
 |---|---|---|---|
-| `elo_probability` | 4.1800 | + | Home win probability from day-bucketed Elo ratings (home advantage = 60) |
-| `trend_gap` | 0.0297 | + | Offensive momentum gap (10-game rolling NetRtg delta, home − away) |
-| `defensive_trend_gap` | 0.0024 | + | Defensive momentum gap (10-game rolling opponent NetRtg suppression, home − away) |
-| intercept | −2.2184 | — | — |
+| `elo_probability` | 4.1890 | + | Home win probability from day-bucketed Elo ratings (home advantage = 60) |
+| `trend_gap` | 0.0294 | + | Offensive momentum gap (10-game rolling NetRtg delta, home − away) |
+| intercept | −2.2239 | — | — |
 
-### Feature ablation result
+### Feature ablation: `defensive_trend_gap` removed
 
-| Set | N (validation) | LogLoss | Brier | ECE | Accuracy |
-|---|---|---|---|---|---|
-| Full 3-feature | 218 | 0.5962 | 0.2040 | 0.0473 | 0.6789 |
-| Reduced 2-feature (no `defensive_trend_gap`) | 218 | 0.5967 | 0.2042 | 0.0539 | 0.6789 |
+The original v1 training tested 3-feature (elo_probability + trend_gap +
+defensive_trend_gap) against 2-feature (elo_probability + trend_gap). On
+a single 60/20/20 validation split, the 3-feature model showed a tiny
+Brier improvement of ~0.00019.
 
-**Decision:** KEEP `defensive_trend_gap`. Removal worsens validation Brier
-(0.20416 → 0.20416 is tiny, but ECE degrades 0.0473 → 0.0539). The incumbent
-audit flagged it as unstable/noisy — here, on rebuild-owned data, it shows
-a small but directionally correct coefficient and removing it makes
-calibration slightly worse. Ship the 3-feature model.
+A subsequent **fold-wise stability audit** (`scripts/audit_wnba_defensive_trend.py`),
+running 5 expanding chronological folds, found:
+
+| Metric | Result |
+|---|---|
+| Folds where 3-feature won | 1/5 |
+| Folds where 2-feature won | 4/5 |
+| Coefficient sign | Fold 0: −0.098, folds 1-4: +0.013 to +0.034 (sign-unstable) |
+| Mean Brier Δ | +0.0035 (3-feature WORSE on average) |
+
+**Decision: DROP `defensive_trend_gap`.** A single-split Brier improvement of
+~0.00019 does not survive fold-wise scrutiny. Across 5 chronological folds the
+3-feature model is worse on 4/5 folds with an unstable coefficient sign. This
+confirms the incumbent audit's prior sign-instability warning. The simpler
+2-feature model (elo_probability + trend_gap) is the production v1 model.
 
 ### Feature availability
 
@@ -83,9 +92,15 @@ calibration slightly worse. Ship the 3-feature model.
 |---|---|---|---|---|
 | `elo_probability` | RETROSPECTIVE_RESEARCH | 2022-2025 (all completed games) | Requires live schedule/box captures | 0% |
 | `trend_gap` | RETROSPECTIVE_RESEARCH | 2022-2025 (requires 10-game rolling window) | Requires live box captures for rolling window | Cold-start: 7 rows (<1%) |
-| `defensive_trend_gap` | RETROSPECTIVE_RESEARCH | 2022-2025 (requires 10-game rolling window) | Same as trend_gap | Cold-start: 7 rows (<1%) |
 
-All three features are labeled `RETROSPECTIVE_RESEARCH` — the training data is
+### Feature availability
+
+| Feature | PIT status | Historical availability | Live availability | Missingness |
+|---|---|---|---|---|
+| `elo_probability` | RETROSPECTIVE_RESEARCH | 2022-2025 (all completed games) | Requires live schedule/box captures | 0% |
+| `trend_gap` | RETROSPECTIVE_RESEARCH | 2022-2025 (requires 10-game rolling window) | Requires live box captures for rolling window | Cold-start: 7 rows (<1%) |
+
+Both features are labeled `RETROSPECTIVE_RESEARCH` — the training data is
 single-vintage capture-time-only, so despite chronologically correct event
 ordering, these are not genuinely prospective point-in-time features. Live
 serving would require a separate live-collection pipeline.

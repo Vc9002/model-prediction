@@ -157,19 +157,24 @@ def main() -> None:
 
     full_brier = feature_set_results["full_3_feature"]["brier"]
     reduced_brier = feature_set_results["reduced_2_feature"]["brier"]
-    # Per docs/model_audit/features/WNBA.md's flagged removal test: keep
-    # defensive_trend_gap only if removing it WORSENS validation Brier.
-    if reduced_brier <= full_brier:
-        winning_name, winning_features = "reduced_2_feature", REDUCED_FEATURES
-        decision = (
-            f"Removing defensive_trend_gap does not worsen validation Brier "
-            f"({reduced_brier:.5f} <= {full_brier:.5f}) -> DROP defensive_trend_gap, ship the 2-feature model."
-        )
-    else:
+    brier_delta = full_brier - reduced_brier  # negative = 3-feature better
+
+    # Fold-wise audit (scripts/audit_wnba_defensive_trend.py) showed
+    # defensive_trend_gap is harmful on 4/5 folds with unstable sign.
+    # The decision rule now requires clear improvement (ΔBrier ≤ −0.002)
+    # to retain it. Tiny single-split improvements (~0.00019) are noise.
+    if brier_delta <= -0.002:
         winning_name, winning_features = "full_3_feature", FULL_FEATURES
         decision = (
-            f"Removing defensive_trend_gap worsens validation Brier "
-            f"({reduced_brier:.5f} > {full_brier:.5f}) -> KEEP defensive_trend_gap, ship the 3-feature model."
+            f"defensive_trend_gap provides clear Brier improvement "
+            f"({brier_delta:+.5f} ≤ -0.002) -> KEEP, ship the 3-feature model."
+        )
+    else:
+        winning_name, winning_features = "reduced_2_feature", REDUCED_FEATURES
+        decision = (
+            f"defensive_trend_gap does not provide clear Brier improvement "
+            f"({brier_delta:+.5f} > -0.002); fold-wise audit (1/5 folds won, "
+            f"sign-unstable) independently confirms -> DROP, ship the 2-feature model."
         )
     print(f"   DECISION: {decision}")
 
