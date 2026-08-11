@@ -1,0 +1,10 @@
+{
+  "sport": "mlb",
+  "horizon": "mid",
+  "date": "2026-08-06",
+  "generated_from_code": true,
+  "missing_games": 10,
+  "missing_reasons": {
+    "no_point_in_time_probable_starters": 10
+  }
+}

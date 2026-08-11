@@ -1,9 +1,16 @@
 # Feature registry — what has been tested, and what must not be re-tested
 
-**Last updated**: 2026-08-02 (esports v3→v5 reality, soccer override status)
+**Last updated**: 2026-08-11 (model/feature reconciliation audit corrections — tennis_surface,
+bullpen, defensive_trend_gap, player_availability, NBA Elo leakage question resolved)
 
 Machine-readable source of truth: `config/tested_features.json`. This document is the
 human summary. When they disagree, the JSON wins.
+
+**2026-08-11 audit**: a full model/feature reconciliation audit ran against this registry
+and the models that consume it — see `docs/model_audit/MODEL_INVENTORY.md`,
+`docs/model_audit/FEATURE_RETENTION_MATRIX.md`, and the per-sport files under
+`docs/model_audit/models/` and `docs/model_audit/features/` for full evidence and citations
+behind every correction below.
 
 ## The rule
 
@@ -19,7 +26,7 @@ amount. The registry also preserves the stricter multiplicity-adjusted decision.
 `KEEP` with blocked point-in-time provenance means research retention only; it does not
 make the feature production-safe or establish profitability.
 
-## Current state: 24 features tracked, 5 keep, 3 remove candidates, 3 reject, 1 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
+## Current state: 25 features tracked, 6 keep, 3 remove candidates, 3 reject, 1 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
 
 ### Production features (active in current models)
 
@@ -52,7 +59,7 @@ make the feature production-safe or establish profitability.
 | `starting_pitcher_fip` | MLB | **reject** | 84% coverage, zero effect. Collinear with `pitcher_era_gap`. |
 | `head_to_head` | all 5 | **reject** | +0.11pp to +0.61pp, all inside 1 SE. |
 | `lineup_strength` | NBA/WNBA | **reject** | +0.05pp / 0.00pp. Noise. |
-| `tennis_surface` | TENNIS | **exclude** | No active tennis model consuming it. |
+| `tennis_surface` | TENNIS | **exclude** | Only this specific registered feature *function* is dead (different file/PIT mechanism, never called). **CORRECTED 2026-08-11**: the old reason ("no active tennis model") was false — `tennis-surface-elo-v1` is active, shadow_qualified, and blends per-surface Elo at 60% weight into every match probability. Surface signal is very much live; this one artifact just isn't how it gets there. |
 
 ### Untested or blocked
 
@@ -60,7 +67,7 @@ make the feature production-safe or establish profitability.
 |---|---|---|---|
 | `neutral_elo_rating_difference` | LOL/CS2/Dota2/Valorant/RainbowSix | **untested** | v5 artifacts are now hash-valid (2026-07-31 rebuild); omission study still not run. |
 | `tie_aware_elo_rating_difference` | KBO/NPB | **untested** | Locked backfills exist but no omission study. |
-| `bullpen` | MLB | **untested** | Code exists (`features/bullpen.py`) but data source passes None. |
+| `bullpen` (as `bullpen_weakness_gap`) | MLB | **keep** | **CORRECTED 2026-08-11**: this row was stale. `data_sources/espn.py` does pass real values (not None); the feature is live-wired in `learned_forward.py` with fitted, non-zero coefficients in both `mlb-elo-trend-lr-v7` (0.0729) and current `mlb-elo-trend-lr-v8` (0.1520). Formal with/without ablation on v8 is still open. |
 | `team_runs` | MLB | **untested** | Run differential outputs computed but never reach feature vector. |
 | `trailing_home_win_rate_30d` | MLB | **untested** | Adaptive-HFA variant; researched but not formally ablated. |
 | `player_availability` | WNBA | **keep** | Grade-B post-hoc research evidence; not in current exact-artifact ablation. |
@@ -101,10 +108,21 @@ make the feature production-safe or establish profitability.
 5. **"`soccer_form.py`, `rest_travel.py`, `data_sources/pitchers.py` are dead code."** Those
    files do not exist. (Other orphaned modules do exist — see `ENGINEERING_ROADMAP.md` §2).
 
-## The unresolved question that outranks all feature work
+## The question that used to outrank all feature work — now resolved
 
-NBA v4 hits **73.66%** while calling **88.2%** of games, from a model whose only meaningful
-coefficient is `elo_probability` at 3.564. That is above the NBA favorite base rate. Either
-the Elo ratings leak the game being predicted, the holdout window was unusually chalky, or
-it is real. Until this is answered, do not build on top of Elo — a leak here would
-invalidate the largest model in the project and everything stacked on it.
+**RESOLVED 2026-08-11** (audit, `docs/model_audit/models/NBA_ELO_TREND_LR_V4.md`):
+**ELO INTEGRITY CONFIRMED — no leakage.** NBA v4 hits **73.66%** while calling **88.2%** of
+games, from a model whose only meaningful coefficient is `elo_probability` at 3.564 — above
+the NBA favorite base rate, which is exactly what made this an open question worth closing
+before building anything else on top of Elo. The audit traced 67 real historical games
+across 11 game-days (2024-01-09 through 2026-02-01, covering regular season, playoffs, and
+season openers) and found every sampled event's rating-update timestamps strictly precede
+its own event start — zero invariant violations. The same snapshot-then-append ordering was
+independently confirmed in both the training walk-forward loop and the live serving path,
+and a calibration slope of 1.785 (under-confident) is the opposite signature of what a leak
+typically produces. The strong result is best explained by a genuinely well-separated Elo
+signal combined with an 88%-selective confidence gate — the model still hits 70.2% fully
+unselective. Two lower-severity, non-leakage data-quality items surfaced for a future v5:
+NBA preseason/All-Star games aren't excluded from Elo history the way MLB excludes its own,
+and there's no true neutral-site override. Feature work on top of `nba-elo-trend-lr-v4` may
+now proceed.

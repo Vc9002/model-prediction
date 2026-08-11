@@ -1,0 +1,75 @@
+{
+  "groups_tested": 8,
+  "rejected_groups": [
+    "bullpen"
+  ],
+  "warned_groups": [],
+  "results": [
+    {
+      "group": "starter_pitching",
+      "delta_log_loss": -0.004947238085770911,
+      "delta_brier": -0.002199886445286847,
+      "coverage_impact": 1.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "bullpen",
+      "delta_log_loss": -0.06346950709336874,
+      "delta_brier": -0.025106580438792603,
+      "coverage_impact": 1.0,
+      "fold_stability": 0.0,
+      "verdict": "REJECT"
+    },
+    {
+      "group": "clean_rates",
+      "delta_log_loss": -0.0006802998996700005,
+      "delta_brier": -0.0005012897481466161,
+      "coverage_impact": 1.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "park_weather",
+      "delta_log_loss": 0.0029693769240228818,
+      "delta_brier": 0.0016225586819128002,
+      "coverage_impact": 1.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "cumulative_park_weather",
+      "delta_log_loss": 0.007678040088391014,
+      "delta_brier": 0.003816456078189978,
+      "coverage_impact": 0.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "cumulative_clean_rates",
+      "delta_log_loss": 0.007247815724196416,
+      "delta_brier": 0.003606022576403578,
+      "coverage_impact": 0.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "cumulative_starter_pitching",
+      "delta_log_loss": 0.007729244128198309,
+      "delta_brier": 0.0038415033487489425,
+      "coverage_impact": 0.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    },
+    {
+      "group": "cumulative_bullpen",
+      "delta_log_loss": 0.07038371436741231,
+      "delta_brier": 0.028572596576212195,
+      "coverage_impact": 0.0,
+      "fold_stability": 0.0,
+      "verdict": "PASS"
+    }
+  ],
+  "n_games": 363,
+  "final_test_excluded": 72
+}

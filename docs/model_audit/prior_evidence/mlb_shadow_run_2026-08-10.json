@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-10",
+  "model_train_games": 450,
+  "no_real_order_submitted": true,
+  "shadow_ledger_run_id": "mlb_shadow_38ad715c5c18",
+  "shadow_ledger_db": "data/rebuild/shadow.db",
+  "predictions_recorded": 0,
+  "trade_decisions_recorded": 0,
+  "trade_decisions_deduped": 0,
+  "games": [
+    {
+      "event_id": "401816466",
+      "home_team": "San Diego Padres",
+      "away_team": "Houston Astros",
+      "status": "no_probable_starters_available",
+      "decision": null
+    }
+  ]
+}
