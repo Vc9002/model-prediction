@@ -1,6 +1,15 @@
 # MASTER.md — Unified Project Reference (In-Depth)
 
-**Generated**: 2026-08-02 | **Last verified against live code**: 2026-08-05 |
+**Generated**: 2026-08-02 | **Last verified**: 2026-08-12 |
+**Session 2026-08-12 — production canary deployed, all rebuild models converged onto main**: 
+WNBA, Tennis, NFL, and Soccer rebuild challengers independently trained, tested, and merged 
+into  (). Production canary () configured 
+with health checks, CLI, dashboard card, and launchd scheduler. All rebuild challengers 
+in  — , research/shadow only. 
+Automated order execution remains disabled ( in ). 
+Daily pipeline verified 2026-08-11 and 2026-08-12 — Main absent, exit 0, no phantom events.
+Worktree cleanup: 4 removed, 18 retained as historical references. 
+See  for canary details,  for current state.
 **Session 2026-08-05 — worked the full remaining open-item backlog (operator directive: "tackle all of them and reconcile the inconsistency as well")**: Reconciled the P1-17 doc inconsistency (Part 1's "needs follow-up" table still listed it open after Part 2's checklist had already marked it done). Fixed DD-1 (narrowed `international_baseball.py`'s `suppress(Exception)` to real expected failures — two existing tests were accidentally relying on the old broad catch as a mocking shortcut, fixed to use a realistic client double). Fixed DD-2 (F-66) — all 14 silent `suppress(DuplicatePickError)` sites across every per-sport forecast function in `cli.py`, plus 4 structurally identical bare `except DuplicatePickError: continue` sites; a shared helper now makes every secondary-ledger duplicate traceable to the exact existing pick that blocked it, with 6 new regression tests (one per function), each verified to fail against the pre-fix code. Remaining items from this backlog (P1-11/12/13, DD-3/4/8/9/10, the `cli.py`/`dashboard_server.py` package split) continue in later entries below as they're worked.
 **Session 2026-08-04 (P1 cleanup)**: All 15 open P1 items worked — 10 code fixes applied (P1-1 through P1-9, P1-14, P1-16), 1 confirmed already-resolved (P1-9), 4 investigated and documented with findings (P1-11, P1-12, P1-13, P1-17). 675 tests pass, 0 fail. See Part 1 for per-item detail.
 **Session 2026-08-04 (deep debug)**: Comprehensive codebase audit — found 1 critical `suppress(Exception)`, 14 silent `DuplicatePickError` drops, 8 orphaned feature modules (469 lines), 2 files above 4k lines and growing, zero TODO markers, multiple hardcoded thresholds, no pre-commit lint hook. Full findings in "Deep Debug Audit" section below.
