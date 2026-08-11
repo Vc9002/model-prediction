@@ -142,7 +142,7 @@
         "WNBA": -0.003
       },
       "name": "defensive_trend_gap",
-      "notes": "CORRECTION OF A PRIOR CLAIM: this feature does NOT explain NBA/WNBA performance. Its fitted coefficients are near zero, and strict leave-one-out evidence is INCONCLUSIVE in both leagues. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+defensive_trend_gap), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence.",
+      "notes": "CORRECTION OF A PRIOR CLAIM: this feature does NOT explain NBA/WNBA performance. Its fitted coefficients are near zero, and strict leave-one-out evidence is INCONCLUSIVE in both leagues. SOCCER (2026-07-25): tested via paired holdout ablation (elo_trend baseline vs elo_trend+defensive_trend_gap), date-clustered bootstrap + sign-flip randomization test matching production_feature_ablation methodology. Not significant: Holm-corrected p >= 0.37 across all combinations tested (defensive_trend_gap, schedule features, consistency_gap+hot_cold_gap combined). Current 2-feature elo_trend model (elo_probability + trend_gap) is not shown to be under-featured; do not promote a richer soccer artifact on this evidence. ADDENDUM 2026-08-11 (audit, docs/model_audit/features/WNBA.md): the WNBA coefficient doesn't just sit near zero, it flips sign between artifact versions -- wnba-elo-trend-lr-v3 had +0.0090, current v4 has -0.0029 (matches this entry). A flipping sign is stronger evidence of fitting noise than a stable near-zero one; strengthens the case for dropping it in a future v5, though v4 itself stays immutable per operator retention policy.",
       "production_ablation": {
         "NBA": "INCONCLUSIVE",
         "SOCCER": "INCONCLUSIVE",
@@ -237,7 +237,7 @@
       "file": "src/model_prediction/features/starting_pitcher.py",
       "measured_effect": "84% data coverage, zero measurable effect on locked holdout",
       "name": "starting_pitcher_fip",
-      "notes": "Collinear with the existing pitcher_era_gap. Rejected on evidence, not neglect.",
+      "notes": "Collinear with the existing pitcher_era_gap. Rejected on evidence, not neglect. Do not confuse with starter_fip_gap below -- different feature, different mechanism, different verdict.",
       "retest_when": "Only if pitcher_era_gap is removed from the model, which would break the collinearity.",
       "sports": [
         "MLB"
@@ -245,6 +245,19 @@
       "status": "orphan",
       "tested_on": "2026-07-21",
       "verdict": "reject"
+    },
+    {
+      "evidence_grade": "C",
+      "file": "src/model_prediction/features/starter_history.py",
+      "name": "starter_fip_gap",
+      "notes": "ADDED 2026-08-11 (model/feature reconciliation audit, see docs/model_audit/features/MLB.md). Distinct from starting_pitcher_fip above: this is a newer, PIT-safe per-starter prior-starts history provider (added 2026-08-05 alongside starter_era_gap_live), architecturally live-servable. A performance claim ('+1pp hit rate, -39% ECE, +11 units') exists in a learned_forward.py code comment and in MASTER.md, but the audit found NO committed evaluation artifact anywhere in the repo backing that claim -- it is unverified, not evidence-based. Dormant scaffolding only; not in any promoted model's feature_names.",
+      "retest_when": "Before promotion into any model, run the real chronological ablation and commit the resulting artifact -- the code-comment claim alone is not sufficient evidence per this project's own promotion contract (docs/MODEL_IMPROVEMENTS.md section 2).",
+      "sports": [
+        "MLB"
+      ],
+      "status": "unverified_claim_no_artifact",
+      "tested_on": null,
+      "verdict": "retest_required"
     },
     {
       "evidence_grade": "B",
@@ -287,6 +300,7 @@
       "measured_effect": "142-game WNBA cohort May 14 - Jul 20: accuracy 71.8% -> 73.2% (+1.4pp), Brier 0.21278 -> 0.20799 (-2.3%), units at -110 +52.73 -> +56.55, zero harmful selection flips",
       "name": "player_availability",
       "notes": "Applied as a post-hoc probit adjustment gated at a 5pp threshold, not as a regression feature. Evidence is grade B and was not part of the current exact-artifact strict ablation, so it remains a research KEEP rather than proof of production profitability.",
+      "known_contradiction": "FLAGGED 2026-08-11 (audit, docs/model_audit/features/WNBA.md): docs/MODEL_IMPROVEMENTS.md reports different accuracy/flip-direction numbers than this entry for the same nominal 142-game cohort (May 14 - Jul 20) -- both agree Brier improves, but disagree on accuracy direction and flip count. Not yet reconciled; whoever next touches this feature should re-derive both numbers from the same underlying data before trusting either document.",
       "open_question": "Whether the same availability mechanism transfers to NBA. Untested.",
       "sports": [
         "WNBA"
@@ -299,12 +313,12 @@
       "evidence_grade": "A",
       "file": "src/model_prediction/features/tennis_surface.py",
       "name": "tennis_surface",
-      "notes": "No active tennis model exists. Tennis is deferred per docs/PROJECT_STATUS.md. Untestable, not rejected.",
-      "retest_when": "If and only if a tennis model is revived.",
+      "notes": "CORRECTED 2026-08-11 (model/feature reconciliation audit, see docs/model_audit/features/TENNIS.md): the stated reason was false. tennis-surface-elo-v1 IS an active, shadow_qualified model (config/model.yaml:318-345, 65.5% hit rate over 4,269 locked-holdout calls) and it blends per-surface Elo into every match probability at 60% weight (models/tennis.py:59-97, surface_weight=0.6) -- surface signal is very much in production. What genuinely is dead/orphaned is only this specific registered feature *function*, features/tennis_surface.py's win-rate-by-surface snapshot: it reads a different data file, uses a different PIT mechanism, and is never called by TennisModel or the generic ML feature pipeline. The 'exclude' verdict on this specific artifact is still defensible; the old justification is not and must not be read as 'tennis has no surface signal.'",
+      "retest_when": "If this specific win-rate-by-surface snapshot function is ever proposed as an additional signal alongside (not instead of) the live surface-Elo blend already in tennis-surface-elo-v1.",
       "sports": [
         "TENNIS"
       ],
-      "status": "registered_orphan",
+      "status": "registered_orphan_superseded_by_live_surface_elo",
       "tested_on": "n/a",
       "verdict": "exclude"
     },
@@ -312,13 +326,13 @@
       "evidence_grade": "A",
       "file": "src/model_prediction/features/bullpen.py",
       "name": "bullpen",
-      "notes": "One import, never reaches a feature vector. Feature code in features/bullpen.py computes bullpen_era, bullpen_weakness_index, and fatigue_innings_last3 from StatsAPI data. The data source (espn.py:233) passes None because StatsAPI game snapshots are not yet cached. Returns neutral defaults (1.0). Blocked on: StatsAPI integration for bullpen usage snapshots with observed_at_utc timestamps.",
+      "notes": "CORRECTED 2026-08-11 (model/feature reconciliation audit, see docs/model_audit/features/MLB.md): this entry was stale. bullpen_weakness_index (this file) is consumed by data_sources/espn.py:398-399 with real values (not None) and live-wired into the bullpen_weakness_gap feature in learned_forward.py:123-136, which has real fitted, non-zero coefficients in both mlb-elo-trend-lr-v7 (0.0729) and the current mlb-elo-trend-lr-v8 (0.1520) artifacts. It is not blocked and does reach a feature vector in production. Formal ablation (v8 with vs. without bullpen_weakness_gap, same rows) is still open per the audit's retest priorities -- richer clean-slate bullpen features (pitches 1d/2d/3d, back-to-back, available bullpen quality/velocity/K%/BB%/CSW%) remain untested candidates to compare against this simple index.",
       "sports": [
         "MLB"
       ],
-      "status": "half_wired",
+      "status": "live_wired_ablation_pending",
       "tested_on": null,
-      "verdict": "untested"
+      "verdict": "keep"
     },
     {
       "evidence_grade": "A",

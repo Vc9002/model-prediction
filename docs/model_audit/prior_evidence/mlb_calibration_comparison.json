@@ -1,0 +1,584 @@
+{
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "oof_split_manifest_hash": "1c51e275a03424ad6bcda655826eae54b2374d01ae9bcd096d03922cb289db21",
+  "matched_games": 435,
+  "calibration_methods": [
+    "identity",
+    "platt",
+    "temperature",
+    "isotonic"
+  ],
+  "n_calibration_blocks": 4,
+  "models": {
+    "two_head": {
+      "n_oof": 203,
+      "cross_fit_results": {
+        "identity": {
+          "n_eval_total": 153,
+          "log_loss": 0.8678744427042651,
+          "brier": 0.2937293784640523,
+          "ece": 0.17432745098039215,
+          "calibration_intercept": -0.026814242354841082,
+          "calibration_slope": -0.14385909933708949,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.8216542881362998,
+              "brier": 0.30086743284999995
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.6834463512523169,
+              "brier": 0.24709666865000002
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 1.0854671276287111,
+              "brier": 0.3309884873584907
+            }
+          ]
+        },
+        "platt": {
+          "n_eval_total": 153,
+          "log_loss": 0.7440728126219827,
+          "brier": 0.27253899737531884,
+          "ece": 0.11036702798772428,
+          "calibration_intercept": 0.0525419222212021,
+          "calibration_slope": -0.675059047785496,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.8058919744569001,
+              "brier": 0.29832443978429857
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.7107699164246309,
+              "brier": 0.25861459409801735
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.7171706752280536,
+              "brier": 0.2613493378171316
+            }
+          ]
+        },
+        "temperature": {
+          "n_eval_total": 153,
+          "log_loss": 0.7228486723872442,
+          "brier": 0.2633493624552739,
+          "ece": 0.08228790772273648,
+          "calibration_intercept": -0.012076411033506873,
+          "calibration_slope": -0.6872534008885053,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.7663182952405745,
+              "brier": 0.28256175314266974
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.686354407002952,
+              "brier": 0.24662314638404248
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.716268146473058,
+              "brier": 0.26100391470417533
+            }
+          ]
+        },
+        "isotonic": {
+          "n_eval_total": 153,
+          "log_loss": 0.9169440613708794,
+          "brier": 0.2816931829545847,
+          "ece": 0.12213652640052391,
+          "calibration_intercept": -0.028256173216200473,
+          "calibration_slope": -0.3158871466865707,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.8216542881362998,
+              "brier": 0.30086743284999995
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.6894868476834123,
+              "brier": 0.24810365476593255
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 1.2214223509199824,
+              "brier": 0.29529250209914776
+            }
+          ]
+        }
+      },
+      "best_method": "temperature",
+      "reliability_curve_raw": {
+        "bin_centers": [
+          0.05,
+          0.15000000000000002,
+          0.25,
+          0.35000000000000003,
+          0.45,
+          0.55,
+          0.6500000000000001,
+          0.75,
+          0.8500000000000001,
+          0.95
+        ],
+        "actual_fraction": [
+          0.4,
+          0.5,
+          0.6,
+          0.5294117647058824,
+          0.5056179775280899,
+          0.48936170212765956,
+          0.5,
+          1.0,
+          0.5,
+          0.0
+        ],
+        "counts": [
+          5,
+          12,
+          15,
+          17,
+          89,
+          47,
+          8,
+          1,
+          8,
+          1
+        ]
+      },
+      "cohort_calibration": {
+        "starters": {
+          "one_or_both_missing": {
+            "n": 138,
+            "log_loss": 0.7414851250689234,
+            "brier": 0.2688776258695652
+          },
+          "both_available": {
+            "n": 65,
+            "log_loss": 0.9967022915416655,
+            "brier": 0.3094994111538461
+          }
+        },
+        "weather": {
+          "unavailable": {
+            "n": 203,
+            "log_loss": 0.8232049074370429,
+            "brier": 0.281884601453202
+          }
+        }
+      },
+      "calibrator_artifact_path": "config/models/challengers/mlb-two_head-calibrator-v1.json"
+    },
+    "xgb_two_head": {
+      "n_oof": 203,
+      "cross_fit_results": {
+        "identity": {
+          "n_eval_total": 153,
+          "log_loss": 0.7840179672841268,
+          "brier": 0.28315639787581703,
+          "ece": 0.16595294117647058,
+          "calibration_intercept": 0.017421634545128798,
+          "calibration_slope": 0.07861746573972318,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.8696579660789794,
+              "brier": 0.30973099130000004
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.6645443922226196,
+              "brier": 0.23771589154999997
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.815936435460215,
+              "brier": 0.3009544289150944
+            }
+          ]
+        },
+        "platt": {
+          "n_eval_total": 153,
+          "log_loss": 0.6968128464888463,
+          "brier": 0.25178125147175784,
+          "ece": 0.037098299003083514,
+          "calibration_intercept": 0.011899849431409705,
+          "calibration_slope": 0.026983013649253554,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.7017672467233942,
+              "brier": 0.25421165363749965
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.6824873955342532,
+              "brier": 0.24468336462070098
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.7056534603756814,
+              "brier": 0.2561845389107342
+            }
+          ]
+        },
+        "temperature": {
+          "n_eval_total": 153,
+          "log_loss": 0.696355250101579,
+          "brier": 0.25154160297974976,
+          "ece": 0.0164861353992676,
+          "calibration_intercept": 0.013746557129714588,
+          "calibration_slope": 0.06398999918522846,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.7013524277835792,
+              "brier": 0.2539527534049499
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.6813865663548626,
+              "brier": 0.2441362150445913
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.7057623312947063,
+              "brier": 0.25625314780046515
+            }
+          ]
+        },
+        "isotonic": {
+          "n_eval_total": 153,
+          "log_loss": 0.7559732481369552,
+          "brier": 0.2719982155836775,
+          "ece": 0.08731301161266342,
+          "calibration_intercept": 0.01261698377282272,
+          "calibration_slope": -0.017526507760698955,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.8696579660789794,
+              "brier": 0.30973099130000004
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.6865504287482735,
+              "brier": 0.24670347225029426
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.7142167400677633,
+              "brier": 0.2602642227695838
+            }
+          ]
+        }
+      },
+      "best_method": "temperature",
+      "reliability_curve_raw": {
+        "bin_centers": [
+          0.05,
+          0.15000000000000002,
+          0.25,
+          0.35000000000000003,
+          0.45,
+          0.55,
+          0.6500000000000001,
+          0.75,
+          0.8500000000000001,
+          0.95
+        ],
+        "actual_fraction": [
+          0.5,
+          0.35714285714285715,
+          0.4166666666666667,
+          0.6071428571428571,
+          0.4772727272727273,
+          0.5769230769230769,
+          0.5217391304347826,
+          0.5,
+          0.6,
+          0.3333333333333333
+        ],
+        "counts": [
+          4,
+          14,
+          24,
+          28,
+          44,
+          26,
+          23,
+          22,
+          15,
+          3
+        ]
+      },
+      "cohort_calibration": {
+        "starters": {
+          "one_or_both_missing": {
+            "n": 138,
+            "log_loss": 0.7897294054774474,
+            "brier": 0.2796406302355073
+          },
+          "both_available": {
+            "n": 65,
+            "log_loss": 0.7807522965738457,
+            "brier": 0.2857377683846154
+          }
+        },
+        "weather": {
+          "unavailable": {
+            "n": 203,
+            "log_loss": 0.7868549617398415,
+            "brier": 0.2815929158497537
+          }
+        }
+      },
+      "calibrator_artifact_path": "config/models/challengers/mlb-xgb_two_head-calibrator-v1.json"
+    },
+    "xgb_direct": {
+      "n_oof": 203,
+      "cross_fit_results": {
+        "identity": {
+          "n_eval_total": 153,
+          "log_loss": 0.7273018317078846,
+          "brier": 0.26660816612209226,
+          "ece": 0.11385561204424091,
+          "calibration_intercept": 0.028368620258250998,
+          "calibration_slope": -0.2628912016217746,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.6810004052364317,
+              "brier": 0.244523260476101
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.7614388143217087,
+              "brier": 0.2824056904938803
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.7387777221396106,
+              "brier": 0.27253965789020856
+            }
+          ]
+        },
+        "platt": {
+          "n_eval_total": 153,
+          "log_loss": 0.7918106073534503,
+          "brier": 0.2837391845452535,
+          "ece": 0.11648102808666327,
+          "calibration_intercept": -0.011409432335892433,
+          "calibration_slope": -0.28955563398403206,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.9728839113672372,
+              "brier": 0.34226200221095643
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.7186899881590734,
+              "brier": 0.26266448988555235
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.6899684518634397,
+              "brier": 0.2484107666150631
+            }
+          ]
+        },
+        "temperature": {
+          "n_eval_total": 153,
+          "log_loss": 0.7016138691889474,
+          "brier": 0.2541888706567712,
+          "ece": 0.04411558724461966,
+          "calibration_intercept": 0.01845805972849562,
+          "calibration_slope": -1.1638728510840801,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.689741773095804,
+              "brier": 0.2482987787746803
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 0.7188527875759858,
+              "brier": 0.2627153929986549
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.6965508292890467,
+              "brier": 0.25170167210979694
+            }
+          ]
+        },
+        "isotonic": {
+          "n_eval_total": 153,
+          "log_loss": 1.0253094845908555,
+          "brier": 0.2656361505930886,
+          "ece": 0.0906748199086221,
+          "calibration_intercept": -0.0015407077914451677,
+          "calibration_slope": -0.04349660799397245,
+          "per_block": [
+            {
+              "eval_block": 1,
+              "fit_n": 50,
+              "eval_n": 50,
+              "log_loss": 0.6810004052364317,
+              "brier": 0.244523260476101
+            },
+            {
+              "eval_block": 2,
+              "fit_n": 100,
+              "eval_n": 50,
+              "log_loss": 1.7201685019123298,
+              "brier": 0.302552437508669
+            },
+            {
+              "eval_block": 3,
+              "fit_n": 150,
+              "eval_n": 53,
+              "log_loss": 0.6946019959426937,
+              "brier": 0.2507272856887558
+            }
+          ]
+        }
+      },
+      "best_method": "temperature",
+      "reliability_curve_raw": {
+        "bin_centers": [
+          0.05,
+          0.15000000000000002,
+          0.25,
+          0.35000000000000003,
+          0.45,
+          0.55,
+          0.6500000000000001,
+          0.75,
+          0.8500000000000001,
+          0.95
+        ],
+        "actual_fraction": [
+          NaN,
+          NaN,
+          0.5,
+          0.6428571428571429,
+          0.5352112676056338,
+          0.4457831325301205,
+          0.5185185185185185,
+          1.0,
+          NaN,
+          NaN
+        ],
+        "counts": [
+          0,
+          0,
+          6,
+          14,
+          71,
+          83,
+          27,
+          2,
+          0,
+          0
+        ]
+      },
+      "cohort_calibration": {
+        "starters": {
+          "one_or_both_missing": {
+            "n": 138,
+            "log_loss": 0.7128909426971716,
+            "brier": 0.25945158689493114
+          },
+          "both_available": {
+            "n": 65,
+            "log_loss": 0.741601393042618,
+            "brier": 0.27400668461278677
+          }
+        },
+        "weather": {
+          "unavailable": {
+            "n": 203,
+            "log_loss": 0.7220839440393096,
+            "brier": 0.2641120861641953
+          }
+        }
+      },
+      "calibrator_artifact_path": "config/models/challengers/mlb-xgb_direct-calibrator-v1.json"
+    }
+  }
+}
