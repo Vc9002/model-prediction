@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-08-11T13:45:00+00:00",
+  "code_revision": "6af38bea597a87645ab4eb83a8c17b199f45b871-dirty",
+  "sport": "nfl",
+  "purpose": "Data-foundation audit for a rebuild-native nfl-elo-trend-lr candidate. Does NOT fit or evaluate any model; scoped to real backfilled coverage, missingness, PIT status, and servability of the incumbent's exact feature set (elo_probability, trend_gap) from real data only.",
+  "commands_run": [
+    "rebuild-data backfill --sport nfl --season 2021 --season 2022 --season 2023 --season 2024 --season 2025 --table schedule",
+    "rebuild-data backfill --sport nfl --season 2024 --table pbp",
+    "rebuild-data backfill --sport nfl --season 2021 --table weekly_rosters  (FAILED, see roster_backfill_status)",
+    "rebuild-data audit --sport nfl --season {2021..2025}"
+  ],
+  "provider": {
+    "name": "nflverse",
+    "source": "github.com/nflverse/nflverse-data releases (schedules, pbp, weekly_rosters)",
+    "source_grade": "B",
+    "license_id": "CC-BY-4.0",
+    "upstream_rights_status": "unresolved",
+    "commercial_use_status": "unresolved",
+    "production_allowed": false
+  },
+  "real_bug_found_and_fixed": {
+    "location": "src/model_prediction/rebuild/nfl/normalize.py (_schedule, _pbp, _weekly_rosters)",
+    "symptom": "polars.exceptions.ComputeError: could not append value: 66.0 of type: f64 to the builder -- reproduced deterministically backfilling real 2022 schedule data.",
+    "root_cause": "pl.DataFrame(rows) defaults to infer_schema_length=100. Nullable columns (temperature_f/wind_mph are None for every dome game; similar for pbp's down/yards_to_go/epa/success on non-play rows, and weekly_rosters' jersey_number/depth_chart_position) can stay None for the first 100+ rows of a real season purely due to row order (e.g. 2022's schedule happens to list >100 dome games before the first outdoor game with a real temperature reading). Polars locks the column to a Null dtype from that 100-row sample, then crashes the instant a real typed value appears later. This is entirely row-order dependent, not a data-content bug -- 2021/2023/2024/2025 schedules happened not to trigger it; 2022 did.",
+    "fix": "Pass infer_schema_length=None (scan every row before fixing a dtype) in all three NFL normalizers.",
+    "regression_test": "tests/rebuild/test_nfl_data_foundation.py::test_schedule_normalizer_survives_all_null_prefix_longer_than_inference_window -- verified to fail on the pre-fix code (reverted fix, confirmed same ComputeError) and pass after.",
+    "verified_against_real_data": "All 5 seasons (2021-2025) schedule backfill succeeds after the fix; 2024 pbp backfill (49,492 real plays) also succeeds."
+  },
+  "schedule_coverage": {
+    "seasons_backfilled": [2021, 2022, 2023, 2024, 2025],
+    "per_season": {
+      "2021": {"games": 285, "completed": 285, "incomplete": 0, "weeks": "1-22", "season_types": ["REG", "WC", "DIV", "CON", "SB"], "teams": 32, "start": "2021-09-10T00:20:00+00:00", "end": "2022-02-13T23:30:00+00:00"},
+      "2022": {"games": 284, "completed": 284, "incomplete": 0, "weeks": "1-22", "season_types": ["REG", "WC", "DIV", "CON", "SB"], "teams": 32, "start": "2022-09-09T00:20:00+00:00", "end": "2023-02-12T23:30:00+00:00"},
+      "2023": {"games": 285, "completed": 285, "incomplete": 0, "weeks": "1-22", "season_types": ["REG", "WC", "DIV", "CON", "SB"], "teams": 32, "start": "2023-09-08T00:20:00+00:00", "end": "2024-02-11T23:30:00+00:00"},
+      "2024": {"games": 285, "completed": 285, "incomplete": 0, "weeks": "1-22", "season_types": ["REG", "WC", "DIV", "CON", "SB"], "teams": 32, "start": "2024-09-06T00:20:00+00:00", "end": "2025-02-09T23:30:00+00:00"},
+      "2025": {"games": 285, "completed": 285, "incomplete": 0, "weeks": "1-22", "season_types": ["REG", "WC", "DIV", "CON", "SB"], "teams": 32, "start": "2025-09-05T00:20:00+00:00", "end": "2026-02-08T23:30:00+00:00"}
+    },
+    "total_games": 1424,
+    "total_completed": 1424,
+    "duplicate_games": 0,
+    "timestamp_violations": 0,
+    "note_2022_count": "284 vs 285 in other seasons is a real nflverse count (one fewer scheduled game record in that release), not a symptom of the schema bug -- confirmed by rerunning post-fix and cross-checking week range/team count are otherwise identical."
+  },
+  "pbp_spot_check": {
+    "season": 2024,
+    "plays": 49492,
+    "unique_games": 285,
+    "missing_complete_pbp_games": 0,
+    "duplicate_plays": 0,
+    "epa_coverage": 0.9885,
+    "success_coverage": 0.9885,
+    "epa_null_count": 570,
+    "note": "epa/success are null only on non-play rows (timeouts, two-minute warnings, etc.) -- expected, not a missingness defect."
+  },
+  "roster_backfill_status": {
+    "attempted_seasons": [2021, 2022, 2023, 2024, 2025],
+    "cli_backfill_result": "FAILS for every one of the 5 tested seasons via the wired rebuild-data CLI path",
+    "error": "ValueError: missing NFL gsis_id, raised from normalize.py::_weekly_rosters -> _required_id",
+    "root_condition": "A small, real, permanent fraction of weekly roster rows are 'DEV' (practice/development squad) players who have not yet been issued a permanent GSIS ID by the league. The normalizer's identity check is fail-closed by design (never fabricate a player identity) -- this is the same convention used verbatim in the WNBA rebuild normalizer's _player_canonical_id (raises rather than guesses), not a one-off NFL defect.",
+    "classification": "NOT PATCHED in this pass. This is a real, current, always-reproducible blocker for weekly_rosters specifically, but it is a design decision (how should unidentified practice-squad rows be handled: skip-and-flag vs. hard-fail-the-season) rather than a mechanical bug -- changing it needs an explicit provenance-preserving decision (e.g. a documented synthetic/fallback identity key with its own audit trail), which is out of scope for a data-foundation-only pass per this task's own instructions.",
+    "diagnostic_only_missingness_by_season_not_committed_to_pipeline": {
+      "2021": {"total_rows": 46696, "missing_gsis_id": 26, "missing_pct": 0.0557},
+      "2022": {"total_rows": 46163, "missing_gsis_id": 27, "missing_pct": 0.0585},
+      "2023": {"total_rows": 45655, "missing_gsis_id": 5, "missing_pct": 0.0110},
+      "2024": {"total_rows": 46579, "missing_gsis_id": 7, "missing_pct": 0.0150},
+      "2025": {"total_rows": 46849, "missing_gsis_id": 29, "missing_pct": 0.0619}
+    },
+    "diagnostic_method": "Computed directly from the cached NFLVerseProvider raw response (already fetched during the failed backfill attempts), filtering for null/empty gsis_id -- read-only, bypasses the fail-closed normalizer, never written to data/rebuild/normalized. Confirms the blocking condition affects <0.1% of rows every season, i.e. is not a broad data-quality problem, just an edge case the current identity gate does not yet have a policy for.",
+    "impact_on_elo_trend_servability": "NONE. elo_probability and trend_gap are both derived purely from schedule/game results (features/elo_ratings.py, features/trends.py), never from rosters. Roster data only matters for future QB-identity/injury-state features, which docs/model_audit/features/NFL.md already marks BLOCKED_PIT for a separate, more fundamental reason (see pit_status below)."
+  },
+  "pit_status": {
+    "retrospective_pit_qualified": false,
+    "production_allowed": false,
+    "source": "NFLFoundation.backfill manifest (foundation.py:97-98), unconditional for every season captured this way",
+    "reason": "nflverse releases are mutable snapshots, not historical observation logs. A season/week label never proves a row was observable at an earlier decision time. This applies uniformly to schedule, pbp, and weekly_rosters -- confirmed unchanged in this pass, not re-derived here (see docs/model_audit/models/NFL_ELO_TREND_LR_V4.md section 6 and docs/model_audit/features/NFL.md).",
+    "scope_of_blocker": "Blocks any walk-forward BACKTEST built on today's bulk download from claiming retrospective PIT validity for EPA/CPOE/pressure/QB-state features specifically. Does NOT block basic Elo/trend feature computation, because Elo/trend only need final game outcomes (home/away score, kickoff time), which are themselves not mutable in any meaningful way after a game completes (score corrections essentially never happen), and because the incumbent nfl-elo-trend-lr-v4's live serving path is PIT-safe by construction (games_before(decision_date) + event-not-started gate) independent of this nflverse pipeline entirely."
+  },
+  "basic_elo_trend_servability": {
+    "verdict": "SERVABLE from what is backfilled today, with a caveat",
+    "reasoning": [
+      "elo_probability and trend_gap require only: event_id, event_start_utc, home_team_id, away_team_id, home_score, away_score, completed -- all present, 100% populated, 0 duplicates, 0 timestamp violations across all 5 backfilled seasons (1,424/1,424 games completed).",
+      "The rebuild's own build_elo/TrendEngine code (features/elo_ratings.py, features/trends.py) is sport-generic and already exercised in production for the incumbent nfl-elo-trend-lr-v4 -- reusable without modification for a rebuild-native candidate.",
+      "The nflverse schedule data is a genuinely independent source from the incumbent's ESPN-sourced data/processed/nfl/games.jsonl (see NFL_ELO_TREND_LR_V4.md section 7), which is the correct posture for an 'independently trained sibling' per docs/model_audit/ARCHITECTURE_CORRECTION.md -- not a copy of the incumbent's training data."
+    ],
+    "caveat": "The retrospective_pit_qualified: false flag is manifest-level and technically applies to schedule too (mutable-release caveat), even though completed-game scores are practically immutable once a game ends. Any future walk-forward validation on this data should still explicitly document this manifest-level caveat rather than silently assuming schedule is exempt -- the audit's recommendation is to note it, not to treat schedule as pre-cleared."
+  },
+  "epa_based_feature_status": {
+    "verdict": "BLOCKED_PIT -- unchanged, confirmed, NOT to be worked around",
+    "detail": "epa/success are already captured at 98.85% coverage in the pbp normalizer (confirmed via the 2024 spot-check above), but per foundation.py's unconditional retrospective_pit_qualified: False and docs/model_audit/features/NFL.md's epa_per_dropback/success_rate rows, a single bulk download today cannot serve as honest walk-forward backtest evidence for EPA-based features. The documented fix is calendar time (daily observed_at_utc-stamped capture accumulation going forward), not a code or validation change. This audit does not attempt or recommend any workaround."
+  },
+  "tests_and_lint": {
+    "pytest_rebuild": "743 passed",
+    "ruff_touched_files": "All checks passed (src/model_prediction/rebuild/nfl/normalize.py, tests/rebuild/test_nfl_data_foundation.py)"
+  }
+}
