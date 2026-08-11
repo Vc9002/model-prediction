@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-08-11T13:34:35.078888+00:00",
+  "sport": "soccer",
+  "data_root": "data/rebuild/normalized",
+  "backfill_windows_collected_this_session": [
+    {
+      "start": "2026-04-20",
+      "end": "2026-05-24",
+      "note": "season-tail of 2025-26 top-5-European-league season + MLS in-season"
+    },
+    {
+      "start": "2026-07-21",
+      "end": "2026-08-10",
+      "note": "recent/current window; MLS in-season, top-5 European leagues in summer break/preseason"
+    }
+  ],
+  "espn_leagues_requested": [
+    "eng.1",
+    "esp.1",
+    "ger.1",
+    "ita.1",
+    "fra.1",
+    "usa.1"
+  ],
+  "football_data_org": {
+    "requested": false,
+    "reason": "FOOTBALL_DATA_TOKEN not set in this environment; not attempted per task scope (documented policy: fails closed to UNAVAILABLE/TOKEN_NOT_CONFIGURED when absent, not a hard error)"
+  },
+  "statsbomb_open_data": {
+    "status": "POLICY_BLOCKED",
+    "reason": "license prohibits commercial exploitation; provider makes no network request by design (confirmed in every backfill call's source report)"
+  },
+  "totals": {
+    "rows_written_this_session": 395,
+    "distinct_matches": 395,
+    "distinct_teams": 128,
+    "date_range_event_start_utc": {
+      "min": "2026-04-20T18:45:00+00:00",
+      "max": "2026-08-08T20:30:00+00:00"
+    },
+    "status_breakdown": [
+      {
+        "status": "STATUS_ABANDONED",
+        "len": 1
+      },
+      {
+        "status": "STATUS_FULL_TIME",
+        "len": 394
+      }
+    ],
+    "completed_true_count": 394,
+    "completed_false_rows": [
+      {
+        "source_match_id": "746714",
+        "competition_id": "fra.1",
+        "event_start_utc": "2026-05-17T19:00:00+00:00",
+        "home_team_name": "Nantes",
+        "away_team_name": "Toulouse",
+        "home_score": 0,
+        "away_score": 0,
+        "status": "STATUS_ABANDONED"
+      }
+    ]
+  },
+  "coverage_by_competition": [
+    {
+      "competition_id": "eng.1",
+      "rows": 52,
+      "min_event_start_utc": "2026-04-20T19:00:00+00:00",
+      "max_event_start_utc": "2026-05-24T15:00:00+00:00",
+      "season_ids": [
+        "2025"
+      ],
+      "completed_count": 52
+    },
+    {
+      "competition_id": "esp.1",
+      "rows": 70,
+      "min_event_start_utc": "2026-04-21T17:00:00+00:00",
+      "max_event_start_utc": "2026-05-24T19:00:00+00:00",
+      "season_ids": [
+        "2025"
+      ],
+      "completed_count": 70
+    },
+    {
+      "competition_id": "fra.1",
+      "rows": 39,
+      "min_event_start_utc": "2026-04-22T17:00:00+00:00",
+      "max_event_start_utc": "2026-05-17T19:00:00+00:00",
+      "season_ids": [
+        "2025"
+      ],
+      "completed_count": 38
+    },
+    {
+      "competition_id": "ger.1",
+      "rows": 36,
+      "min_event_start_utc": "2026-04-24T18:30:00+00:00",
+      "max_event_start_utc": "2026-05-16T13:30:00+00:00",
+      "season_ids": [
+        "2025"
+      ],
+      "completed_count": 36
+    },
+    {
+      "competition_id": "ita.1",
+      "rows": 51,
+      "min_event_start_utc": "2026-04-20T18:45:00+00:00",
+      "max_event_start_utc": "2026-05-24T19:45:00+00:00",
+      "season_ids": [
+        "2025"
+      ],
+      "completed_count": 51
+    },
+    {
+      "competition_id": "usa.1",
+      "rows": 147,
+      "min_event_start_utc": "2026-04-22T23:30:00+00:00",
+      "max_event_start_utc": "2026-08-08T20:30:00+00:00",
+      "season_ids": [
+        "2026"
+      ],
+      "completed_count": 147
+    }
+  ],
+  "team_game_counts_by_competition": [
+    {
+      "competition_id": "eng.1",
+      "distinct_teams": 20,
+      "avg_games_per_team": 5.2,
+      "min_games_per_team": 5,
+      "max_games_per_team": 7,
+      "teams_meeting_incumbent_min_team_games_10": 0
+    },
+    {
+      "competition_id": "esp.1",
+      "distinct_teams": 20,
+      "avg_games_per_team": 7.0,
+      "min_games_per_team": 7,
+      "max_games_per_team": 7,
+      "teams_meeting_incumbent_min_team_games_10": 0
+    },
+    {
+      "competition_id": "fra.1",
+      "distinct_teams": 18,
+      "avg_games_per_team": 4.333333333333333,
+      "min_games_per_team": 4,
+      "max_games_per_team": 6,
+      "teams_meeting_incumbent_min_team_games_10": 0
+    },
+    {
+      "competition_id": "ger.1",
+      "distinct_teams": 18,
+      "avg_games_per_team": 4.0,
+      "min_games_per_team": 4,
+      "max_games_per_team": 4,
+      "teams_meeting_incumbent_min_team_games_10": 0
+    },
+    {
+      "competition_id": "ita.1",
+      "distinct_teams": 20,
+      "avg_games_per_team": 5.1,
+      "min_games_per_team": 5,
+      "max_games_per_team": 6,
+      "teams_meeting_incumbent_min_team_games_10": 0
+    },
+    {
+      "competition_id": "usa.1",
+      "distinct_teams": 32,
+      "avg_games_per_team": 9.1875,
+      "min_games_per_team": 1,
+      "max_games_per_team": 11,
+      "teams_meeting_incumbent_min_team_games_10": 20
+    }
+  ],
+  "incumbent_league_coverage_gap": {
+    "incumbent_configured_leagues": [
+      "EPL",
+      "LA_LIGA",
+      "BUNDESLIGA",
+      "SERIE_A",
+      "MLS",
+      "UCL",
+      "BRASILEIRAO",
+      "BRAZIL_SERIE_B",
+      "ARGENTINA",
+      "ARGENTINA_2",
+      "COLOMBIA",
+      "CHILE",
+      "URUGUAY",
+      "ECUADOR",
+      "PERU",
+      "SUDAMERICANA",
+      "FRIENDLIES",
+      "CLUB_FRIENDLIES"
+    ],
+    "incumbent_league_espn_codes": {
+      "EPL": "eng.1",
+      "LA_LIGA": "esp.1",
+      "BUNDESLIGA": "ger.1",
+      "SERIE_A": "ita.1",
+      "MLS": "usa.1",
+      "UCL": "uefa.champions",
+      "BRASILEIRAO": "bra.1",
+      "BRAZIL_SERIE_B": "bra.2",
+      "ARGENTINA": "arg.1",
+      "ARGENTINA_2": "arg.2",
+      "COLOMBIA": "col.1",
+      "CHILE": "chi.1",
+      "URUGUAY": "uru.1",
+      "ECUADOR": "ecu.1",
+      "PERU": "per.1",
+      "SUDAMERICANA": "conmebol.sudamericana",
+      "FRIENDLIES": "fifa.friendly",
+      "CLUB_FRIENDLIES": "club.friendly"
+    },
+    "rebuild_espn_provider_supported_codes": [
+      "eng.1",
+      "esp.1",
+      "fra.1",
+      "ger.1",
+      "ita.1",
+      "usa.1"
+    ],
+    "incumbent_leagues_reachable_via_rebuild_today": [
+      "BUNDESLIGA",
+      "EPL",
+      "LA_LIGA",
+      "MLS",
+      "SERIE_A"
+    ],
+    "incumbent_leagues_NOT_reachable_via_rebuild_espn_provider": [
+      "ARGENTINA",
+      "ARGENTINA_2",
+      "BRASILEIRAO",
+      "BRAZIL_SERIE_B",
+      "CHILE",
+      "CLUB_FRIENDLIES",
+      "COLOMBIA",
+      "ECUADOR",
+      "FRIENDLIES",
+      "PERU",
+      "SUDAMERICANA",
+      "UCL",
+      "URUGUAY"
+    ],
+    "finding": "src/model_prediction/rebuild/providers/soccer_espn.py's ESPN_SOCCER_LEAGUES dict hardcodes only 6 league codes (eng.1/esp.1/ger.1/ita.1/fra.1/usa.1). The incumbent's own src/model_prediction/data_sources/espn.py LEAGUE_PATHS dict supports all of the incumbent's 19 configured leagues (including UCL, BRASILEIRAO, ARGENTINA, SUDAMERICANA, FRIENDLIES, etc via distinct ESPN codes like uefa.champions/bra.1/arg.1/conmebol.sudamericana/fifa.friendly), but that dict is not reused by the rebuild's soccer_espn.py provider. Passing an unsupported code (e.g. --espn-league uefa.champions) to rebuild-data returns UNAVAILABLE ('unsupported ESPN soccer league') rather than reaching ESPN, confirmed by code inspection of ESPNSoccerProvider._league(). 13 of the incumbent's 19 configured leagues (all of South America, UCL, and both friendly buckets) are currently unreachable through the rebuild's soccer data foundation. This is a real, scoped gap worth closing in a future pass (extend ESPN_SOCCER_LEAGUES to mirror data_sources/espn.py's LEAGUE_PATHS) -- not fixed in this pass per the 'no model-fitting code, pure data-foundation groundwork' scope."
+  },
+  "team_identity_and_collision_check": {
+    "identity_key": "ESPN numeric team_id (home_team_id/away_team_id), not name string",
+    "ids_with_multiple_distinct_names": [],
+    "names_with_multiple_distinct_ids": [],
+    "match_ids_spanning_multiple_competitions": [],
+    "self_match_rows_home_id_eq_away_id": 0,
+    "finding": "Zero collisions found in the collected sample (128 distinct team_ids, 128 distinct team_id/name pairs, no id mapping to >1 name and no name mapping to >1 id). This is a structurally different identity scheme from the incumbent's known bug (docs DEBUG.md 2026-07-31: soccer_forward.py's _team_matches_title fuzzy word-matching collided 'Manchester United' with 'Manchester City' via generic-word stripping) -- that bug lives entirely in the incumbent's Polymarket market-title-matching layer (name-string fuzzy matching against market titles), which the rebuild has not built yet (match_markets stage is STAGE_NOT_IMPLEMENTED for soccer, see sport_adapter.py/_BasicEloAdapter routing). The rebuild's own normalized match data keys team identity by ESPN's numeric team_id, which cannot reproduce that specific string-collision bug class. However, this does NOT mean the risk is retired project-wide: once a real rebuild match_markets stage is eventually built (matching normalized matches to Polymarket contract titles by name), the same class of fuzzy-name-collision risk reappears at that seam and would need its own explicit guard -- this backfill only confirms the rebuild's *storage/identity* layer is collision-free today, not that the eventual market-matching layer will be."
+  },
+  "pit_and_provenance_checks": {
+    "official_rebuild_data_cli_audit": {
+      "sport": "soccer",
+      "status": "DEGRADED",
+      "rows": 395,
+      "matches": 395,
+      "missing_provenance_columns": [],
+      "null_provenance_rows": 0,
+      "malformed_raw_snapshot_hash_rows": 0,
+      "timestamp_violations": 0,
+      "duplicate_observations": 0,
+      "rights_policy_valid": true,
+      "rights_policy_error": null,
+      "source_assets": [
+        {
+          "source": "espn_site_v2",
+          "source_asset": "ESPN Site v2 soccer scoreboard",
+          "provider_chain": "SportsDataverse catalog -> ESPN Site v2",
+          "license_id": "ESPN-data-rights-unresolved",
+          "license_url": "https://disneytermsofuse.com/",
+          "attribution_required": false,
+          "attribution_text": null,
+          "subscription_required": false,
+          "subscription_scope": "none",
+          "upstream_rights_status": "unresolved",
+          "commercial_use_status": "unresolved",
+          "use_scope": "research_shadow_only",
+          "production_allowed": false
+        }
+      ],
+      "configured_source_policies": {
+        "espn_site_v2": {
+          "source_asset": "ESPN Site v2 soccer scoreboard",
+          "provider_chain": "SportsDataverse catalog -> ESPN Site v2",
+          "license_id": "ESPN-data-rights-unresolved",
+          "license_url": "https://disneytermsofuse.com/",
+          "attribution_required": false,
+          "attribution_text": null,
+          "subscription_required": false,
+          "subscription_scope": "none",
+          "upstream_rights_status": "unresolved",
+          "commercial_use_status": "unresolved",
+          "use_scope": "research_shadow_only",
+          "production_allowed": false,
+          "policy_note": "SportsDataverse code/package availability does not grant commercial rights to ESPN-derived data."
+        },
+        "football_data_v4": {
+          "source_asset": "football-data.org API v4 competition matches",
+          "provider_chain": "football-data.org API v4",
+          "license_id": "football-data.org-subscription-terms",
+          "license_url": "https://www.football-data.org/terms",
+          "attribution_required": true,
+          "attribution_text": "Data provided by football-data.org",
+          "subscription_required": true,
+          "subscription_scope": "single_application",
+          "upstream_rights_status": "unresolved",
+          "commercial_use_status": "unresolved",
+          "use_scope": "research_shadow_only",
+          "production_allowed": false,
+          "policy_note": "Use requires an active subscription, is scoped to one application, and requires visible attribution; economic rights remain unresolved."
+        },
+        "statsbomb_open_data": {
+          "source_asset": "StatsBomb Open Data",
+          "provider_chain": "StatsBomb Open Data repository",
+          "license_id": "StatsBomb-Open-Data-User-Agreement",
+          "license_url": "https://github.com/statsbomb/open-data/blob/master/LICENSE.pdf",
+          "attribution_required": true,
+          "attribution_text": "StatsBomb Open Data",
+          "subscription_required": false,
+          "subscription_scope": "none",
+          "upstream_rights_status": "prohibited",
+          "commercial_use_status": "prohibited",
+          "use_scope": "policy_blocked",
+          "production_allowed": false,
+          "policy_note": "The agreement expressly prohibits commercial exploitation of the data and derived analysis; collection is disabled in this repository."
+        }
+      },
+      "research_shadow_allowed": true,
+      "economic_use_allowed": false,
+      "production_allowed": false,
+      "production_allowed_rows": 0,
+      "qualification_note": "Captured soccer rows are research/shadow-only. ESPN-derived and football-data.org commercial rights remain unresolved; StatsBomb Open Data is policy-blocked. Capture time is not retrospective PIT proof."
+    },
+    "capture_time_only_caveat": "Every normalized row carries availability_basis='capture_time_only' -- observed_at_utc/available_at_utc reflect when THIS backfill run captured the row (2026-08-11), not the real historical game date (event_start_utc). This matches the project-wide pattern already documented for mlb_v3 ('no claim that capture-time historical snapshots are retrospective PIT data', docs/rebuild/MLB_V3_DATA.md) and wnba/nfl/tennis foundations. Consequence: eligible_matches_as_of()/prior_team_matches_as_of() (pit.py), which gate on observed_at_utc<=decision_time, would treat this entire backfilled corpus as unavailable for any decision_time before the capture run -- i.e. this data is NOT yet walk-forward-simulation-safe under the live-serving PIT contract. A future model-fitting phase must explicitly decide whether to (a) train on event_start_utc as the real-world PIT boundary for completed/immutable final scores (score doesn't change after completed=True, so this is defensible for training even though it isn't 'proof of live availability'), or (b) commit to ongoing day-by-day prospective collection to build genuine per-day capture provenance. Neither is decided anywhere in this repo -- rebuild-model reports NOT_IMPLEMENTED for every sport, so there is no existing precedent to follow.",
+    "malformed_abandoned_match_flagged": {
+      "note": "One STATUS_ABANDONED match (Nantes vs. opponent, fra.1, 2026-05-17) has completed=false but home_score/away_score=0/0 (not null). Any future consumer must filter on completed==True (which correctly excludes this row today) rather than assuming a non-null score implies a real result -- flagged because it is real observed data, not a hypothetical edge case."
+    }
+  },
+  "walk_forward_readiness_for_incumbent_style_gates": {
+    "incumbent_minimum_team_games_gate": 10,
+    "teams_in_sample_meeting_gate": 20,
+    "teams_in_sample_total": 128,
+    "note": "108 of 128 team/competition rows fall below the incumbent's own MINIMUM_TEAM_GAMES=10 gate (avg 4-9 games/team across the 5-week season-tail window). This volume supports structural/distributional research (goal-rate sanity checks, EWMA prior shape) but is far short of what qualify_soccer_* -style walk-forward validation would need -- that requires either a much wider historical backfill (multiple seasons, once the capture-time-only PIT question above is resolved) or sustained prospective day-by-day collection."
+  }
+}
