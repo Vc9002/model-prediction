@@ -263,3 +263,38 @@ def test_recompute_research_sizing_is_idempotent(tmp_path) -> None:
     ledger.recompute_research_sizing()
     changed_again = ledger.recompute_research_sizing()
     assert changed_again == 0
+
+
+def test_a_retired_ledger_never_touches_disk(tmp_path) -> None:
+    """2026-08-11: data/main was archived and its automated daily job
+    paused specifically because a fresh PickLedger.initialize() would have
+    silently recreated data/main/*.xlsx on the very next run. retired=True
+    is the fix -- every read still works (an honest empty ledger, same
+    contract the dashboard's picks reader already relies on post-archival),
+    every write silently no-ops instead of touching the filesystem at all:
+    no workbook, no parent directory, no .lock marker."""
+    path = tmp_path / "main" / "mlb.xlsx"
+    ledger = PickLedger(path, tmp_path / "events.jsonl", retired=True)
+
+    ledger.initialize()
+    assert not path.exists()
+    assert not path.parent.exists()
+
+    assert ledger.rows() == []
+    assert not path.exists()
+    assert not path.parent.exists()
+
+    row = ledger.append_evaluated(request(), _qualified_call(1.5))
+    assert row["pick_id"]  # real business logic still ran -- callers get a well-formed row
+    assert row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value
+    assert not path.exists()  # ...but nothing was ever persisted
+    assert not path.parent.exists()
+    assert not path.with_suffix(".xlsx.lock").exists()
+
+    # Control: the exact same path, not retired, does create the workbook --
+    # proves the assertions above are actually exercising retired's guard,
+    # not some unrelated reason nothing got written.
+    live = PickLedger(path, tmp_path / "events.jsonl")
+    live.append_evaluated(replace(request(), event_id="event-live"), _qualified_call(1.5))
+    assert path.exists()
+    assert len(live.rows()) == 1

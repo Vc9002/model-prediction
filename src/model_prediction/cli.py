@@ -2974,6 +2974,7 @@ def main(argv: list[str] | None = None) -> None:
         research_score_units=research_score_units,
         research_scoring_mode=str(research_scoring.get("sizing", "fixed")),
         research_scoring_note=research_scoring.get("note", "fixed-stake hypothetical research scoring"),
+        retired=not config["project"].get("main_ledger_enabled", True),
     )
     try:
         if args.command == "init-ledger":

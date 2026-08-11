@@ -3,6 +3,17 @@ project:
   execution_mode: live_manual
   timezone: UTC
   ledger_path: data/picks.xlsx
+  # Set false 2026-08-11: data/main was archived (data/archive/2026-08-10-
+  # main-ledger-archived-shadow-primary/), the dashboard's primary display
+  # is now the rebuild shadow ledger. With this false, cli.py constructs the
+  # incumbent Main PickLedger with retired=True (see ledger.py's PickLedger
+  # docstring) -- it stays fully readable (an honest empty list, same
+  # contract the dashboard's picks reader already relies on) but every
+  # write silently no-ops instead of recreating data/main/*.xlsx. Flat,
+  # research, gated-research, model ledgers, settlement, and every capture
+  # step are unaffected. Flip back to true only alongside an explicit
+  # decision to bring Main back.
+  main_ledger_enabled: false
   audit_path: data/events.jsonl
   polymarket_snapshot_path: data/polymarket_us_snapshots.jsonl
   market_odds_snapshot_path: data/market_odds_snapshots.jsonl

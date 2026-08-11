@@ -294,6 +294,7 @@ class PickLedger:
         research_score_units: float | None = None,
         research_scoring_mode: str = "fixed",
         research_scoring_note: str = "fixed-stake hypothetical research scoring",
+        retired: bool = False,
     ) -> None:
         self.path = Path(path)
         if self.path.suffix.casefold() != ".xlsx":
@@ -307,6 +308,14 @@ class PickLedger:
         self.research_score_units = research_score_units
         self.research_scoring_mode = research_scoring_mode
         self.research_scoring_note = research_scoring_note
+        # A retired ledger (e.g. data/main after the 2026-08-10 archival --
+        # see main_ledgers.py's module docstring) must never touch disk: not
+        # a fresh empty workbook, not the parent directory, not a .lock
+        # marker. initialize() and _write_rows() both short-circuit before
+        # any filesystem call. rows()/_read_unlocked() already treat a
+        # missing path as an empty ledger, which is exactly the behavior a
+        # retired ledger needs -- no separate read-side branch required.
+        self.retired = retired
 
     @contextmanager
     def lock_exclusive(self) -> Iterator[None]:
@@ -322,6 +331,16 @@ class PickLedger:
 
     @contextmanager
     def _lock(self) -> Iterator[None]:
+        if self.retired:
+            # No parent directory, no .lock marker -- a retired ledger has
+            # no real concurrent writers to serialize against, since
+            # _write_rows() below never lets anything reach disk. Every
+            # mutating method (initialize, _append_record, settle, void,
+            # update_closing, review_loss, score_research, _set_legacy_units)
+            # goes through this one context manager, so this single guard
+            # covers all of them without touching their bodies.
+            yield
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+") as lock:
             _acquire_exclusive_lock(lock.fileno(), self.lock_path)
@@ -357,6 +376,13 @@ class PickLedger:
 
     def rows(self, filters: dict[str, str] | None = None) -> list[dict[str, str]]:
         self.initialize()
+        if self.retired and not self.path.exists():
+            # initialize() is a no-op for a retired ledger, so the workbook
+            # genuinely does not exist -- read_xlsx_rows() would raise
+            # FileNotFoundError via openpyxl. Same "missing means empty"
+            # contract _read_unlocked() already uses, and the same one the
+            # dashboard's picks reader already relies on post-archival.
+            return self._filter_rows([], filters or {})
         _, rows = read_xlsx_rows(self.path)
         return self._filter_rows(rows, filters or {})
 
@@ -599,14 +625,22 @@ class PickLedger:
         # write, never instead of it. Must never let a failure here (e.g. an
         # unmapped league/market, a lock timeout on the new file) take down
         # the primary ledger append that already succeeded above.
-        try:
-            record_from_pick_request(self.path.parent / "model_ledgers", request, eligibility, created)
-        except Exception:
-            logging.getLogger(__name__).warning(
-                "model_ledger write failed for pick %s (primary ledger write already succeeded)",
-                pick_id,
-                exc_info=True,
-            )
+        #
+        # Guarded by self.retired too: this writes to self.path.parent /
+        # "model_ledgers", which for a retired ledger is data/main/
+        # model_ledgers -- unguarded, this alone would recreate data/main/
+        # even with the primary _write_rows() above a no-op. A real, non-
+        # vacuous test (test_a_retired_ledger_never_touches_disk) caught
+        # this exact gap the first time this fix was written.
+        if not self.retired:
+            try:
+                record_from_pick_request(self.path.parent / "model_ledgers", request, eligibility, created)
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "model_ledger write failed for pick %s (primary ledger write already succeeded)",
+                    pick_id,
+                    exc_info=True,
+                )
         return row
 
     def settle(
@@ -790,15 +824,19 @@ class PickLedger:
         # Operator directive, 2026-08-02: settlement also mirrors into the
         # per-model ledger, alongside this real, working write, never
         # instead of it -- same fail-soft contract as _append_record's own
-        # model_ledger hook (see model_ledger.settle_from_pick_row).
-        try:
-            settle_from_pick_row(self.path.parent / "model_ledgers", row)
-        except Exception:
-            logging.getLogger(__name__).warning(
-                "model_ledger settle failed for pick %s (primary ledger settle already succeeded)",
-                pick_id,
-                exc_info=True,
-            )
+        # model_ledger hook (see model_ledger.settle_from_pick_row). Guarded
+        # by self.retired for the same reason as that hook: unreachable in
+        # practice (a retired ledger has no pick_id to settle), kept as
+        # defense-in-depth for consistency.
+        if not self.retired:
+            try:
+                settle_from_pick_row(self.path.parent / "model_ledgers", row)
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "model_ledger settle failed for pick %s (primary ledger settle already succeeded)",
+                    pick_id,
+                    exc_info=True,
+                )
         return row
 
     def recompute_research_sizing(self, policy=None) -> int:
@@ -1348,6 +1386,16 @@ class PickLedger:
         return migrated
 
     def _write_rows(self, rows: list[dict[str, str]]) -> None:
+        if self.retired:
+            # Silent no-op, not an error: every real caller (initialize's
+            # empty-workbook bootstrap, a fresh pick append, settle/void/etc.
+            # on a real existing pick) is legitimate, ordinary control flow
+            # for the sports that still forecast through a retired Main
+            # ledger -- raising here would crash the daily command's
+            # per-sport loop, which has no per-sport exception boundary. A
+            # retired ledger enforces "no writes" by never persisting
+            # anything, not by refusing to be called.
+            return
         unknown = sorted({key for row in rows for key in row} - set(FIELDNAMES))
         if unknown:
             raise ValueError(f"cannot write picks.xlsx with unknown fields: {unknown}")
