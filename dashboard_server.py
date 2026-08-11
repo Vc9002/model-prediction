@@ -1684,6 +1684,15 @@ def record_model_ledger_decision(payload: dict) -> dict:
     return {"status": "ok", "row": row}
 
 
+def _production_canary_status() -> dict:
+    """Production canary dashboard card — model health, timestamps, prediction counts."""
+    try:
+        from dashboard.production import get_production_status
+        return get_production_status()
+    except Exception as e:
+        return {"status": "DOWN", "error": str(e)}
+
+
 def production_evidence() -> dict:
     """Read-only, fail-closed evidence for every configured production artifact."""
     config = _config_payload()
@@ -3985,6 +3994,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("matrix", 60, matrix))
             elif route == "/api/production-evidence":
                 self._send(_cached("production-evidence", 30, production_evidence))
+            elif route == "/api/production-canary":
+                self._send(_cached("production-canary", 15, _production_canary_status))
             elif route == "/api/model-ledgers":
                 self._send(_cached("model-ledgers", 30, model_ledger_comparison))
             elif route == "/api/picks":
