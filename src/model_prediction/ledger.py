@@ -38,6 +38,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from .audit import AuditLog
 from .calibration import calibration_metrics
@@ -286,6 +287,26 @@ class DuplicatePickError(ValueError):
         super().__init__(f"duplicate call already logged as {pick_id}")
 
 
+class _NullAuditLog:
+    """Swapped in for a retired PickLedger's ``self.audit``.
+
+    This module's own docstring documents audit-before-write as deliberate:
+    a crash between the two calls leaves "an audit event describing a
+    mutation that never actually landed in the ledger, detectable by
+    comparing the two." That's the right tradeoff for a real ledger, where
+    the missing row is a transient, retriable crash artifact. It is the
+    wrong tradeoff for a retired ledger, where _write_rows() is a permanent,
+    intentional no-op -- the row will never land, on any retry, ever. Found
+    2026-08-11 during the first live run after PR #18: real audit events
+    accumulated for MLB/WNBA picks that never persisted to disk, growing
+    verify-chain's created_but_absent_without_removal_event count every day
+    Main stays retired rather than describing a bounded, one-time gap.
+    """
+
+    def append(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return {}
+
+
 class PickLedger:
     def __init__(
         self,
@@ -304,7 +325,9 @@ class PickLedger:
         if research_scoring_mode not in {"fixed", "model_recommended"}:
             raise ValueError("research scoring mode must be fixed or model_recommended")
         self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
-        self.audit = AuditLog(audit_path or self.path.with_name("events.jsonl"))
+        self.audit = (
+            _NullAuditLog() if retired else AuditLog(audit_path or self.path.with_name("events.jsonl"))
+        )
         self.research_score_units = research_score_units
         self.research_scoring_mode = research_scoring_mode
         self.research_scoring_note = research_scoring_note

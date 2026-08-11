@@ -291,10 +291,23 @@ def test_a_retired_ledger_never_touches_disk(tmp_path) -> None:
     assert not path.parent.exists()
     assert not path.with_suffix(".xlsx.lock").exists()
 
-    # Control: the exact same path, not retired, does create the workbook --
-    # proves the assertions above are actually exercising retired's guard,
-    # not some unrelated reason nothing got written.
+    # 2026-08-11 addendum: found during the first real live run after this
+    # fix landed -- self.audit.append() isn't guarded by _write_rows() at
+    # all, so a retired ledger still wrote real, permanent audit events for
+    # picks that never persisted anywhere. Growing verify-chain's
+    # created_but_absent_without_removal_event count every day, not a
+    # bounded crash artifact like the module docstring's atomicity note
+    # describes. _NullAuditLog closes this.
+    events_path = tmp_path / "events.jsonl"
+    assert not events_path.exists()
+
+    # Control: the exact same path, not retired, does create the workbook
+    # AND write real audit events -- proves the assertions above are
+    # actually exercising retired's guard, not some unrelated reason
+    # nothing got written.
     live = PickLedger(path, tmp_path / "events.jsonl")
     live.append_evaluated(replace(request(), event_id="event-live"), _qualified_call(1.5))
     assert path.exists()
     assert len(live.rows()) == 1
+    assert events_path.exists()
+    assert events_path.read_text(encoding="utf-8").strip()
