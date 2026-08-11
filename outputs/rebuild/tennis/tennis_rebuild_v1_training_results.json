@@ -1,0 +1,56 @@
+{
+  "train_metrics": {
+    "n": 13456,
+    "log_loss": 0.6298455936229024,
+    "brier": 0.22038824492147396,
+    "ece": 0.4409883334560358,
+    "accuracy": 0.6380053507728894
+  },
+  "validation_metrics": {
+    "n": 5149,
+    "log_loss": 0.6218380531015728,
+    "brier": 0.21717095472720374,
+    "ece": 0.42555922866874396,
+    "accuracy": 0.6442027578170518
+  },
+  "holdout_metrics_raw": {
+    "n": 4954,
+    "log_loss": 0.6279690904885453,
+    "brier": 0.219469241464976,
+    "ece": 0.42534015306260675,
+    "accuracy": 0.6390795316915624
+  },
+  "holdout_metrics_calibrated": {
+    "n": 4954,
+    "log_loss": 0.6279690904885453,
+    "brier": 0.219469241464976,
+    "ece": 0.42534015306260675,
+    "accuracy": 0.6390795316915624
+  },
+  "holdout_calibration_diagnostics_raw": {
+    "calibration_intercept": null,
+    "calibration_slope": null
+  },
+  "holdout_calibration_diagnostics_calibrated": {
+    "calibration_intercept": null,
+    "calibration_slope": null
+  },
+  "calibration_results": {
+    "identity": {
+      "n": 5149,
+      "log_loss": 0.6218380531015728,
+      "brier": 0.21717095472720374,
+      "ece": 0.42555922866874396,
+      "accuracy": 0.6442027578170518
+    },
+    "note": "identity only \u2014 cross-fit skipped (single-class labels)"
+  },
+  "winning_calibration_method": "identity",
+  "artifact_hash": "86154276781dfb7cdeeb2a0818145afbdd3073c853e1563353bc06443ab3c2a2",
+  "calibrator_hash": "9efb53207ed09499bf2b811f9fb9b20cd200946584803a8d72282088f4d2e439",
+  "n_rows_total": 23559,
+  "n_total_matches": 27949,
+  "skipped_bootstrap": 121,
+  "skipped_cold_start": 3228,
+  "skipped_irregular": 1041
+}
