@@ -31,7 +31,7 @@ Every rating is recomputed from scratch against the rebuild data store.
 | Sibling of | `wnba-elo-trend-lr-v4` (incumbent) |
 | Method | `logistic_regression` (scikit-learn `LogisticRegression`, `C=1.0`, `lbfgs`) |
 | Positive class | `home` |
-| Features | 3: `elo_probability`, `trend_gap`, `defensive_trend_gap` |
+| Features | 2: `elo_probability`, `trend_gap` |
 
 ## Source lineage
 
@@ -85,13 +85,6 @@ running 5 expanding chronological folds, found:
 3-feature model is worse on 4/5 folds with an unstable coefficient sign. This
 confirms the incumbent audit's prior sign-instability warning. The simpler
 2-feature model (elo_probability + trend_gap) is the production v1 model.
-
-### Feature availability
-
-| Feature | PIT status | Historical availability | Live availability | Missingness |
-|---|---|---|---|---|
-| `elo_probability` | RETROSPECTIVE_RESEARCH | 2022-2025 (all completed games) | Requires live schedule/box captures | 0% |
-| `trend_gap` | RETROSPECTIVE_RESEARCH | 2022-2025 (requires 10-game rolling window) | Requires live box captures for rolling window | Cold-start: 7 rows (<1%) |
 
 ### Feature availability
 
