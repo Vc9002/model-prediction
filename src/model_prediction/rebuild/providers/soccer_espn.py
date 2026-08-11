@@ -16,6 +16,7 @@ from .http import HttpProviderClient
 from .rights import SourceRightsProfile
 
 ESPN_SOCCER_LEAGUES: Final[dict[str, str]] = {
+    # Big Five European leagues
     "epl": "eng.1",
     "eng.1": "eng.1",
     "laliga": "esp.1",
@@ -26,8 +27,44 @@ ESPN_SOCCER_LEAGUES: Final[dict[str, str]] = {
     "ita.1": "ita.1",
     "ligue_1": "fra.1",
     "fra.1": "fra.1",
+    # Additional top European leagues
+    "eredivisie": "ned.1",
+    "ned.1": "ned.1",
+    "primeira_liga": "por.1",
+    "por.1": "por.1",
+    # North America
     "mls": "usa.1",
     "usa.1": "usa.1",
+    # UEFA competitions
+    "ucl": "uefa.champions",
+    "uefa.champions": "uefa.champions",
+    # South American leagues
+    "brasileirao": "bra.1",
+    "bra.1": "bra.1",
+    "brazil_serie_b": "bra.2",
+    "bra.2": "bra.2",
+    "argentina": "arg.1",
+    "arg.1": "arg.1",
+    "argentina_2": "arg.2",
+    "arg.2": "arg.2",
+    "colombia": "col.1",
+    "col.1": "col.1",
+    "chile": "chi.1",
+    "chi.1": "chi.1",
+    "uruguay": "uru.1",
+    "uru.1": "uru.1",
+    "ecuador": "ecu.1",
+    "ecu.1": "ecu.1",
+    "peru": "per.1",
+    "per.1": "per.1",
+    # CONMEBOL competitions
+    "sudamericana": "conmebol.sudamericana",
+    "conmebol.sudamericana": "conmebol.sudamericana",
+    # Friendlies
+    "friendlies": "fifa.friendly",
+    "fifa.friendly": "fifa.friendly",
+    "club_friendlies": "club.friendly",
+    "club.friendly": "club.friendly",
 }
 
 ESPN_SOCCER_RIGHTS = SourceRightsProfile(

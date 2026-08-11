@@ -21,7 +21,7 @@ from model_prediction.rebuild.providers.soccer_espn import ESPNSoccerProvider
 
 from .foundation import SoccerFoundation
 
-DEFAULT_ESPN_LEAGUES = ("eng.1",)
+DEFAULT_ESPN_LEAGUES = ("eng.1", "esp.1", "ger.1", "ita.1", "fra.1")
 
 
 class SoccerDataFoundation:
