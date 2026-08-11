@@ -1,0 +1,113 @@
+{
+  "generated_at_utc": "2026-08-11T13:30:00Z",
+  "generated_by": "docs/model_audit/models/TENNIS_REBUILD_DATA_FOUNDATION.md groundwork pass",
+  "scope": "Rebuild-native data-foundation audit only. No model fitting performed. Data lives under data/rebuild/normalized/tennis (gitignored runtime state, not committed) and was produced via `rebuild-data backfill --sport tennis`.",
+  "commands_used": [
+    "rebuild-data backfill --sport tennis --tour {atp,wta} --season {2021..2025} --kind main",
+    "rebuild-data backfill --sport tennis --tour {atp,wta} --current",
+    "rebuild-data audit --sport tennis --tour {atp,wta}"
+  ],
+  "sources": {
+    "tennis_mylife": {
+      "role": "historical/season match backfill (matches table)",
+      "provider_id": "tennis_mylife",
+      "rights": {
+        "upstream_rights_status": "unresolved",
+        "commercial_use_status": "unresolved",
+        "use_scope": "research_shadow_only",
+        "production_allowed": false,
+        "note": "Site claims free/MIT use but this is unverified from any live terms document; conservatively treated as unresolved, not cleared. Ingestion of historical match RESULTS for research/shadow-track backfill is consistent with docs/rebuild/OPERATIONS.md, which documents this as the real, working replacement for the dead Sackmann source. No indication found that TennisMyLife match-result ingestion itself is rights-blocked -- only that PRODUCTION serving from it is gated (production_allowed=False) pending licensing, same posture as when this backfill started."
+      }
+    },
+    "espn_tennis": {
+      "role": "current/near-term scoreboard capture (current_events table); singles only, doubles composite-team rows filtered out at normalize time",
+      "provider_id": "espn_tennis",
+      "rights": {
+        "upstream_rights_status": "unresolved",
+        "commercial_use_status": "unresolved",
+        "use_scope": "research_shadow_only",
+        "production_allowed": false
+      }
+    }
+  },
+  "coverage": {
+    "tours": ["atp", "wta"],
+    "match_kind_backfilled": "main",
+    "seasons_backfilled": [2021, 2022, 2023, 2024, 2025],
+    "seasons_not_backfilled": "2026 (current partial season) attempted via --season 2026 and rejected -- see known_issues.tennismylife_2026_null_loser_id below; --current (ESPN) used instead for near-term coverage",
+    "per_season_match_counts": {
+      "atp": {"2021": 2735, "2022": 2918, "2023": 2995, "2024": 3159, "2025": 2861},
+      "wta": {"2021": 2597, "2022": 2612, "2023": 2801, "2024": 2752, "2025": 2519}
+    },
+    "total_matches": {"atp": 14668, "wta": 13281, "combined": 27949},
+    "current_events_captured": {
+      "atp": 548,
+      "wta": 548,
+      "captured_at_utc": "2026-08-11T13:29:01Z / 2026-08-11T13:29:06Z",
+      "note": "ESPN's scoreboard endpoint returns a rolling ~3-week window (observed 2026-08-01 through 2026-08-23 for this capture), not literally 'today only'. Includes STATUS_SCHEDULED (future, not-yet-played) rows -- these live in the separate current_events table and must never be fed into matches-table history/training; the foundation module keeps the two tables physically separate for this reason."
+    },
+    "date_range_matches": {"min_tourney_date": "20210104", "max_tourney_date": "20251222"}
+  },
+  "surface_breakdown": {
+    "atp": {"Hard": 8710, "Clay": 4318, "Grass": 1587, "null_missing": 53},
+    "wta": {"Hard": 8154, "Clay": 3528, "Grass": 1542, "null_missing": 57},
+    "note": "Surface label comes from TennisMyLife's own 'surface' CSV column (not the ESPN tournament-name keyword heuristic that data_sources/espn.py uses for the incumbent model) -- a real, structural improvement path for a rebuild-native surface Elo, since it removes the incumbent's documented fail-open default-to-Hard behavior. No 'Carpet' rows in this 2021-2025 window (consistent with the tour having phased Carpet out well before this range). null/missing rate is low: 0.39% (ATP) / 0.43% (WTA)."
+  },
+  "missingness": {
+    "surface": {"atp_pct": 0.39, "wta_pct": 0.43},
+    "tourney_level": {"pct": 0.0},
+    "winner_rank": {"pct": 0.42},
+    "loser_rank": {"pct": 1.09},
+    "winner_seed": {"pct": 58.89, "note": "expected -- most draw entrants are unseeded"},
+    "loser_seed": {"pct": 75.37, "note": "expected -- unseeded players lose more often, and most entrants are unseeded"},
+    "minutes": {"pct": 7.84},
+    "round": {"pct": 0.0},
+    "best_of": {"pct": 0.0},
+    "match_num": {"pct": 1.75, "count": 489, "note": "see known_issues.match_num_null_id_collision -- this was the root cause of a real data-loss bug, now fixed; residual nulls are a genuine upstream gap (TennisMyLife not yet backfilling match_num for some 2025 marquee events) that no longer causes row loss because canonical_match_id now falls back to round+winner+loser instead of colliding all of them into 'na'."}
+  },
+  "result_type_breakdown": {
+    "completed_true": 26903,
+    "retirement_false": 830,
+    "walkover_false": 211,
+    "default_false": 5,
+    "note": "result_type/completed cross-check is fully consistent -- no row has completed=true with a non-'completed' result_type or vice versa. Irregular endings (retirement/walkover/default) are never silently counted as an ordinary win/loss."
+  },
+  "player_identity_resolution": {
+    "scope_caveat": "Provider-scoped identity only (tennis_mylife:<provider_player_id>), per docs/rebuild/OPERATIONS.md: cross-provider (TennisMyLife <-> ESPN) identity resolution is real, separate, not-yet-built work and is out of scope here.",
+    "unique_provider_scoped_player_ids": {"atp": 823, "wta": 722, "combined": 1545},
+    "empty_provider_player_id_rows": 0,
+    "player_names_mapping_to_more_than_one_provider_id": 0,
+    "note": "Zero ambiguous name-to-id collisions found in this 27,949-match window -- a reasonable, though not exhaustive, signal that provider_player_id is a stable within-provider key over this range. Not evidence of resolution against ESPN's separate id space."
+  },
+  "pit_check": {
+    "matches_table_future_dated_rows": 0,
+    "method": "checked tourney_date against the capture-time observed_at_utc date for every row; zero rows have a tourney_date after the day the data was captured",
+    "verdict": "No PIT violation found in the matches table for this window.",
+    "structural_caveat": "TableContract-level: matches carry availability_basis='capture_time_only' (see tennis/contracts.py docstring) because TennisMyLife's tourney_date is date-only, one row per tournament, not per individual match -- there is no real match-start timestamp in this source at all. A future rebuild model built on this data cannot use these rows as a replayable historical vintage finer than tournament-start-date; it can only assert 'this match's tournament started on this date,' not 'this match itself started at this instant.' current_events (ESPN) does carry a real event_start_utc, but only for the ~3-week window a capture happens to be run in, and only going forward from when a capture starts being taken -- it is not a source of historical vintage either. This is a real data-vintage limitation, not a bug found in this audit; it should be treated as a bounding assumption before eventually training/qualifying an actual model."
+  },
+  "known_issues": {
+    "polars_schema_infer_hard_failure": {
+      "status": "FIXED_THIS_SESSION",
+      "description": "normalize_tennismylife_matches/normalize_espn_scoreboard called pl.DataFrame(rows) with Polars' default 100-row schema-sniff. winner_seed/loser_seed are null for most of a season's first 100 rows (unseeded early-round players sort first in TennisMyLife's file order), so Polars inferred those columns as all-null/Null-typed, then hard-crashed the instant a later row supplied a real seed string ('could not append value \"4\" of type: str to the builder'). This made EVERY tennis backfill call in this repo fail deterministically before this fix -- confirmed by reproducing on ATP 2025 pre-fix.",
+      "fix": "src/model_prediction/rebuild/tennis/normalize.py: pass infer_schema_length=None (full scan) to both pl.DataFrame(rows) call sites.",
+      "verification": "Re-ran all 10 season backfills (ATP/WTA x 2021-2025) plus both --current captures after the fix; all succeeded."
+    },
+    "match_num_null_id_collision": {
+      "status": "FIXED_THIS_SESSION",
+      "severity": "high -- silent data loss, not a crash",
+      "description": "canonical_match_id was built as f'tennis_mylife:{tourney_id}:{match_num or \"na\"}'. TennisMyLife leaves match_num null for some marquee events -- confirmed for the entire ATP 2025 US Open singles draw (127 matches, tourney_level='G'), plus Shanghai/Cincinnati Masters, Winston-Salem/Beijing/Tokyo/Hangzhou/Chengdu, and the Laver Cup (489 rows total across the 10 backfilled season-files, concentrated entirely in the ATP 2025 file -- no other season/tour combination in this range had any null match_num). Every match within one such tournament collapsed onto the SAME canonical_match_id ('tennis_mylife:2025-560:na' for all 127 US Open matches), and TennisNormalizedStore.read_matches()'s primary-key dedup (keep last) then silently kept only 1 of every 127 -- e.g. the 2025 US Open effectively vanished from the normalized store except for one arbitrary match, with no error or warning anywhere.",
+      "fix": "src/model_prediction/rebuild/tennis/normalize.py: when match_num is null, canonical_match_id now falls back to f'na-{round}-{winner_id}-{loser_id}' instead of a bare 'na'. Verified collision-free (round+winner+loser is unique per tournament in practice -- a pairing plays at most once per round) against all 10 real backfilled season-files.",
+      "impact_recovered": "ATP 2025 matches count went from 2381 (post-dedup, silently missing 480 real matches) to the correct 2861 after the fix -- confirmed the fixed total exactly equals the raw TennisMyLife file's own row count for 2025-dated matches (2861 of the file's 2944 rows; the other 83 are Dec-2024-dated matches published in the 2025 file, correctly partitioned into the year=2024 store partition instead)."
+    },
+    "tennismylife_2026_null_loser_id": {
+      "status": "DOCUMENTED_NOT_FIXED -- genuine upstream data-quality gap, correctly fail-closed",
+      "description": "rebuild-data backfill --sport tennis --tour atp --season 2026 --kind main raises ValueError('missing tennis loser_id') and aborts the whole season. Root cause verified in the raw TennisMyLife 2026.csv: 3 of 1895 rows (Miami Masters R64, Bastad R16, Kitzbuhel R32) have a real loser_name and score but a null loser_id -- an upstream identity-lookup gap on TennisMyLife's side for the still-in-progress current season, not a bug in this repo's parsing.",
+      "why_not_fixed": "normalize.py's _required() fail-closed behavior (raise rather than fabricate a player id) is the correct, deliberate posture per this project's stated philosophy (missing data means the feature/row declines to answer, never guesses) -- consistent with CLAUDE.md's shadow-feature pattern. The open design question is scope, not correctness: whether a future change should let one dirty row fail closed without aborting its entire season file (skip-row-and-continue with a logged count) versus the current all-or-nothing behavior. That is a policy decision for the next phase, not a bug fix appropriate to make silently in a data-foundation-only pass.",
+      "consequence_for_this_audit": "2026 (current partial season) is excluded from seasons_backfilled above. Near-term/current coverage instead comes from the ESPN --current capture, which is a different source with its own limitations (see coverage.current_events_captured note)."
+    }
+  },
+  "test_and_lint": {
+    "pytest_rebuild": "tests/rebuild/ -q run after the two normalize.py fixes -- see report text for pass/fail result",
+    "ruff": "ruff check src/model_prediction/rebuild/tennis/normalize.py -- all checks passed"
+  }
+}

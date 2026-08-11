@@ -197,3 +197,62 @@ def test_foundation_backfill_without_configured_provider_fails_closed(tmp_path):
         foundation.backfill_matches("atp", [2024])
     with pytest.raises(RuntimeError, match="ESPN tennis provider is not configured"):
         foundation.collect_current("wta")
+
+
+def _mylife_row(**overrides) -> dict:
+    row = {
+        "tourney_id": "2025-560",
+        "tourney_name": "US Open",
+        "surface": "Hard",
+        "tourney_level": "G",
+        "tourney_date": "20250825",
+        "match_num": 1,
+        "winner_id": "104925",
+        "winner_seed": "",
+        "winner_name": "Player A",
+        "winner_rank": 1,
+        "loser_id": "111815",
+        "loser_seed": "",
+        "loser_name": "Player B",
+        "loser_rank": 25,
+        "score": "6-4 6-3",
+        "best_of": 3,
+        "round": "R128",
+        "minutes": 78,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_tennismylife_null_match_num_does_not_collapse_matches_across_a_tournament():
+    """Real bug, found 2026-08-11 backfilling real TennisMyLife data: 489
+    rows across 10 real season-files (the entire 2025 ATP US Open draw,
+    several Masters/500/250s, Laver Cup) have a null match_num. The old
+    fallback ("na") collided every match in one tournament onto the same
+    canonical_match_id, and the store's keep-last dedup then silently
+    discarded all but one -- 127 real US Open matches collapsed to 1."""
+    rows = [
+        _mylife_row(match_num=None, round="R128", winner_id="1", loser_id="2"),
+        _mylife_row(match_num=None, round="R128", winner_id="3", loser_id="4"),
+        _mylife_row(match_num=None, round="R64", winner_id="1", loser_id="5"),
+    ]
+    matches = normalize_tennismylife_matches(pl.DataFrame(rows), _metadata("tennis_mylife"), tour="atp")
+    ids = matches["canonical_match_id"].to_list()
+    assert len(ids) == len(set(ids)), f"collided canonical_match_ids: {ids}"
+
+
+def test_tennismylife_schema_inference_does_not_crash_on_a_late_real_seed():
+    """Real bug, found 2026-08-11: Polars' default 100-row schema sniff
+    infers winner_seed/loser_seed as all-null whenever a season's first 100
+    rows happen to be unseeded players (TennisMyLife orders rows by
+    tournament, not by seed) -- then hard-crashes the moment a later row
+    has a real seed string. This blocked every real tennis backfill in the
+    repo outright, not a synthetic edge case."""
+    unseeded = [_mylife_row(match_num=i, winner_seed="", loser_seed="") for i in range(1, 150)]
+    seeded = _mylife_row(match_num=150, winner_seed="1", loser_seed="8")
+    matches = normalize_tennismylife_matches(
+        pl.DataFrame(unseeded + [seeded]), _metadata("tennis_mylife"), tour="atp"
+    )
+    assert matches.height == 150
+    seeded_row = matches.filter(pl.col("match_num") == 150).row(0, named=True)
+    assert seeded_row["winner_seed"] == "1"

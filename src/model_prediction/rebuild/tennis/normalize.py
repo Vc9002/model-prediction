@@ -110,9 +110,25 @@ def normalize_tennismylife_matches(
     for row in frame.iter_rows(named=True):
         tourney_id = _required(row.get("tourney_id"), "tourney_id")
         match_num = _as_int(row.get("match_num"))
-        canonical_match_id = f"tennis_mylife:{tourney_id}:{match_num if match_num is not None else 'na'}"
         winner_id = _required(row.get("winner_id"), "winner_id")
         loser_id = _required(row.get("loser_id"), "loser_id")
+        if match_num is not None:
+            match_component = str(match_num)
+        else:
+            # Real, confirmed upstream gap: TennisMyLife leaves `match_num`
+            # null for some marquee tournaments (verified: the entire 2025
+            # ATP US Open draw, plus several Masters/500/250 events -- 489
+            # rows across the 10 backfilled season-files, all in one
+            # season). A bare "na" placeholder collided every match in the
+            # same tournament into one canonical_match_id, and the store's
+            # keep-last primary-key dedup then silently discarded all but
+            # one of them (127 US Open matches collapsed to 1). round +
+            # winner + loser is unique per tournament in practice -- a
+            # given pairing plays at most once per round -- and confirmed
+            # collision-free against all 10 real backfilled files.
+            round_token = str(row.get("round") or "unknown_round")
+            match_component = f"na-{round_token}-{winner_id}-{loser_id}"
+        canonical_match_id = f"tennis_mylife:{tourney_id}:{match_component}"
         score_raw = str(row.get("score") or "")
         result_type, completed = _classify_tennismylife_result(score_raw)
         rows.append(
@@ -145,7 +161,13 @@ def normalize_tennismylife_matches(
                 "completed": completed,
             }
         )
-    normalized = pl.DataFrame(rows)
+    # infer_schema_length=None: a real production bug otherwise -- Polars'
+    # default (100-row) schema sniff infers `winner_seed`/`loser_seed` as
+    # all-null from the first 100 rows whenever a season's early matches
+    # happen to be unseeded players (common; TennisMyLife orders rows by
+    # tournament, not by seed), then hard-fails the moment a later row has
+    # a real seed string. Full-scan is cheap at one-season-per-call size.
+    normalized = pl.DataFrame(rows, infer_schema_length=None)
     if normalized.height:
         validate_or_raise(normalized, TENNIS_CONTRACTS["matches"])
     return normalized
@@ -202,7 +224,10 @@ def normalize_espn_scoreboard(frame: pl.DataFrame, metadata: SourceResponseMetad
                 "completed": completed,
             }
         )
-    normalized = pl.DataFrame(rows)
+    # See the matching infer_schema_length=None note in
+    # normalize_tennismylife_matches above -- same schema-sniff hazard
+    # applies to any nullable/mixed-type ESPN field.
+    normalized = pl.DataFrame(rows, infer_schema_length=None)
     if normalized.height:
         validate_or_raise(normalized, TENNIS_CONTRACTS["current_events"])
     return normalized
