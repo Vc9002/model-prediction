@@ -1,0 +1,8 @@
+{
+  "calibration_method": "identity",
+  "model_id": "soccer-poisson-dc-rebuild-v1-calibrator",
+  "note": "3-way probabilities need different calibration methods than binary. Identity calibration is a placeholder \u2014 isotonic or Platt scaling on the full 3-way simplex would require multivariate calibration that is not yet implemented for soccer.",
+  "parent_artifact_hash": "ca63f600d400e271a12f8a2e0fa31404635ac263c1c1ff660ad986eea00ec617",
+  "production_allowed": false,
+  "sport": "soccer"
+}
