@@ -26,7 +26,7 @@ amount. The registry also preserves the stricter multiplicity-adjusted decision.
 `KEEP` with blocked point-in-time provenance means research retention only; it does not
 make the feature production-safe or establish profitability.
 
-## Current state: 24 features tracked, 5 keep, 3 remove candidates, 3 reject, 1 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
+## Current state: 25 features tracked, 6 keep, 3 remove candidates, 3 reject, 1 exclude, 5 tested (borderline), 2 tested (marginal), 5 untested
 
 ### Production features (active in current models)
 

@@ -257,7 +257,7 @@
       ],
       "status": "unverified_claim_no_artifact",
       "tested_on": null,
-      "verdict": "retest_required"
+      "verdict": "untested"
     },
     {
       "evidence_grade": "B",
