@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-12, `main` at `68728ee`. Production canary deployed.
+**Last verified**: 2026-08-13, `main` at `b26d6f8`. Production canary deployed; champion/challenger gating added.
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -9,6 +9,22 @@ this file exists to be the short, current summary someone can read first.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-13 session changes (champion/challenger + settlement + distribution)
+
+- **Champion/challenger gating** (`src/model_prediction/champion_challenger.py`):
+  production freeze (`freeze-production`), paired comparison
+  (`compare-champion`), settled-picks loader. 13 champions frozen to
+  `data/production/frozen_champions.json`. See `docs/CHAMPION_CHALLENGER.md`.
+- **WNBA spread fixed**: `wnba-spread-baseline-v1` predicted moneyline, not
+  spread (no line used) — replaced by `wnba-spread-margin-v1`.
+- **MLB distribution methods**: `simulate_game` now supports
+  `gamma_poisson` (incumbent) / `negative_binomial` / `independent_poisson`;
+  ML/spread/total derived from one joint draw. NB is runnable but not promoted.
+- **Settlement routing fixed**: model-ledger mirror writes canonical
+  `data/model_ledgers/` again (was per-tier after the split, freezing the
+  dashboard/loader's read on 2026-08-03). See `docs/SETTLEMENT_GAP.md`.
+
 
 ## Production canary (2026-08-12)
 

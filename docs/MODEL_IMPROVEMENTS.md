@@ -329,6 +329,16 @@ pretending the sample is NBA-sized.
 | 5 | Overseas/offseason workload | Days since overseas season, games in prior 30/60 days, late arrival to camp | Could explain early-season fatigue and role uncertainty | Data collection is difficult and licensing-sensitive; P2 research |
 | 6 | Shot-profile and matchup | Rim/three frequency, assisted-shot rate, transition share, paint touches, opponent allowed profile | Adds matchup context to team efficiency | Public tracking coverage may be incomplete; report coverage explicitly |
 
+### WNBA spread baseline fixed — 2026-08-13
+
+`wnba-spread-baseline-v1` was grading a moneyline predictor (`P(home_cover) =
+sigmoid(elo_margin)`, no spread line) as a spread model, producing the
+misleading 32.9% hit rate. Replaced with `wnba-spread-margin-v1`
+(`P(away_cover) = Φ(spread_away_line; expected_margin, 10.5)`), matching the
+`BasketballModel` normal-CDF convention. `config/model.yaml` spread/total
+research-artifact refs corrected (total had been mispointed at the spread
+file). Not yet qualified — backtest pending.
+
 ### WNBA first ablations
 
 1. Elo/trend control.
@@ -412,6 +422,32 @@ Reconcile both into one away/home run distribution, such as a hierarchical
 Poisson/negative-binomial or simulation model with correlated scoring where
 supported. Moneyline, run line, and total probabilities must be derived from
 that same distribution.
+
+### Joint score-distribution methods — implemented 2026-08-13
+
+`simulate_game` now takes a `method` argument and `compare_distribution_methods`
+prices moneyline/spread/total from ONE coherent joint draw per method:
+
+- `gamma_poisson` (incumbent) — shared + team-specific gamma multipliers around
+  a Poisson mean (correlated overdispersion).
+- `negative_binomial` (first serious challenger) — independent NB per team,
+  overdispersion via `spec.simulation.negative_binomial_phi` (default 1.2).
+- `independent_poisson` (no-overdispersion null).
+
+Wired through `MeasuredEdgeMarginModel` / `MeasuredEdgeTotalsModel` so the NB
+challenger is runnable against the incumbent totals head. The rebuild
+comparison already showed NB wins OOF log-loss on 203 games, but a paired
+champion-vs-challenger run against `measured-edge-totals-v3` on the same
+backfilled events is the remaining step before any promotion. Tests:
+`tests/test_mlb_distribution_methods.py`.
+
+### MLB v9 Phase 1/2 — feature work implemented 2026-08-13
+
+Phase 1 (ablated, `scripts/mlb_v9_ablation.py`): `starter_kbb_gap`,
+`residual_trend_gap`, `bullpen_fatigue_gap` wired into `validation.py` /
+`learned_forward.py` / `features/starter_history.py`. Residual-trend variant
+wins (+56.4u vs +43.1u raw trend). Phase 2: `park_factor_at()` PIT-correct
+park factors (`features/park_factors.py`) wired into walk-forward.
 
 ### MLB first ablations
 
