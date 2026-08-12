@@ -29,7 +29,7 @@ from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
 from .features.bullpen import bullpen_profile
 from .features.elo_ratings import build_elo
-from .features.park_factors import park_factor
+from .features.park_factors import park_factor, park_factor_at
 from .features.schedule_load import matchup_schedule_load
 from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
@@ -80,10 +80,12 @@ class ValidationRow:
     elo_neutral_probability: float = 0.5
     trailing_home_win_rate_30d: float = 0.5
     trailing_home_games_30d: int = 0
+    residual_trend_gap: float = 0.0
     defensive_trend_gap: float = 0.0
     pitcher_era_gap: float = 0.0
     starter_era_gap: float = 0.0
     starter_fip_gap: float = 0.0
+    starter_kbb_gap: float = 0.0
     probable_starter_era_gap: float = 0.0
     probable_starter_available: bool = False
     bullpen_weakness_gap: float = 0.0
@@ -217,6 +219,43 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "back_to_back_gap",
         "games_last_7_gap",
     ),
+    # ── v9 ablation: K-BB% replaces ERA ──────────────────────────────────
+    "elo_trend_park_weather_starter_kbb_bullpen": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_kbb_gap",
+        "bullpen_weakness_gap",
+    ),
+    # ── v9 ablation: ERA + K-BB% together ────────────────────────────────
+    "elo_trend_park_weather_starter_era_kbb_bullpen": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "starter_kbb_gap",
+        "bullpen_weakness_gap",
+    ),
+    # ── v9 ablation: Elo-residualized trend (trailing win% - Elo expect) ─
+    "elo_residual_trend_park_weather_starter_era_bullpen": (
+        "elo_probability",
+        "residual_trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    # ── v9 ablation: bullpen fatigue (recent workload) instead of quality ─
+    "elo_trend_park_weather_starter_era_bullpen_fatigue": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_fatigue_gap",
+    ),
 }
 
 
@@ -263,6 +302,8 @@ def build_walk_forward_rows(
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
                 # Real starter FIP gap (same methodology, FIP instead of ERA)
                 starter_fip_gap = _starter_fip_gap(game.event_id) if sport.lower() == "mlb" else 0.0
+                # Real starter K-BB% gap (same methodology, (K-BB)/IP instead of ERA/FIP)
+                starter_kbb_gap = _starter_kbb_gap(game.event_id) if sport.lower() == "mlb" else 0.0
 
                 # Real bullpen weakness gap from MLB Stats API snapshots (point-in-time)
                 bullpen_gap, bullpen_ok = (
@@ -306,7 +347,7 @@ def build_walk_forward_rows(
                 weather = _lookup_weather(game.home_team, game.start.astimezone(EASTERN).date().isoformat())
                 
                 park: dict[str, Any] = (
-                    park_factor(game.home_team)
+                    park_factor_at(game.home_team, day, games_data=history)
                     if sport.lower() == "mlb"
                     else {"park_factor": 1.0, "status": "not_applicable"}
                 )
@@ -320,12 +361,21 @@ def build_walk_forward_rows(
                         outcome_3way = 0
                 else:
                     outcome_3way = 0
+                # Elo-residualized trend: how much the home team's recent
+                # actual win rate diverges from Elo's expectation for this
+                # game. Positive = home is over-performing vs Elo's prior.
+                elo_prob = elo.expected_home_win(game.home_team, game.away_team)
+                residual_trend_gap = (
+                    home_win_rate_30d - elo_prob
+                    if home_games_30d >= 10
+                    else 0.0
+                )
                 rows.append(
                     ValidationRow(
                         date=day,
                         event_id=game.event_id,
                         outcome=int(game.home_score > game.away_score),
-                        elo_probability=elo.expected_home_win(game.home_team, game.away_team),
+                        elo_probability=elo_prob,
                         trend_gap=home_trend.offensive_momentum - away_trend.offensive_momentum,
                         defensive_trend_gap=home_trend.defensive_momentum - away_trend.defensive_momentum,
                         consistency_gap=home_trend.consistency - away_trend.consistency,
@@ -339,6 +389,8 @@ def build_walk_forward_rows(
                         pitcher_era_gap=pitcher_gap,
                         starter_era_gap=starter_gap,
                         starter_fip_gap=starter_fip_gap,
+                        starter_kbb_gap=starter_kbb_gap,
+                        residual_trend_gap=residual_trend_gap,
                         probable_starter_era_gap=probable_gap,
                         probable_starter_available=probable_available,
                         bullpen_weakness_gap=bullpen_gap,
@@ -2244,6 +2296,93 @@ def _load_starter_fip_map() -> dict[str, float]:
 def _starter_fip_gap(event_id: str) -> float:
     """Get the real starter FIP gap for a given event, or 0.0 if unavailable."""
     return _load_starter_fip_map().get(event_id, 0.0)
+
+
+# ── Starter K-BB% gap (same methodology, (K-BB)/IP instead of ERA/FIP) ───
+
+_STARTER_KBB_MAP: dict[str, float] | None = None
+
+
+def _load_starter_kbb_map() -> dict[str, float]:
+    """Build point-in-time starter K-BB% gap map from mlb_statsapi snapshots.
+
+    Mirrors ``_load_starter_fip_map`` exactly — same chronological point-in-time
+    logic, same rolling 5-start window, same >=2 prior starts minimum, same
+    crosswalk — but computes (K-BB)/IP instead of FIP."""
+    global _STARTER_KBB_MAP
+    if _STARTER_KBB_MAP is not None:
+        return _STARTER_KBB_MAP
+
+    import json as _json
+
+    snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
+    crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
+    if not snap_path.exists() or not crosswalk_path.exists():
+        _STARTER_KBB_MAP = {}
+        return _STARTER_KBB_MAP
+
+    def _ip_float(v):
+        w, _, f = v.partition(".")
+        return int(w) + {"0": 0.0, "1": 1 / 3, "2": 2 / 3}.get(f, 0.0)
+
+    crosswalk = {}
+    with crosswalk_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            g = _json.loads(line)
+            crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
+
+    with snap_path.open(encoding="utf-8") as f:
+        snaps = [_json.loads(line) for line in f if line.strip()]
+    snaps.sort(key=lambda r: r["game_start_utc"])
+
+    history: dict[int, list[dict]] = {}
+    result: dict[str, float] = {}
+
+    for snap in snaps:
+        key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
+        eid = crosswalk.get(key)
+        if not eid:
+            continue
+
+        home_kbb = away_kbb = None
+        for side_key, side_data in [("home", snap["home"]), ("away", snap["away"])]:
+            order = side_data.get("pitcher_order") or []
+            if not order:
+                continue
+            pid = order[0]
+            player = next((p for p in side_data["players"] if p["player_id"] == pid), None)
+            if not player or "inningsPitched" not in player.get("pitching", {}):
+                continue
+            stats = player["pitching"]
+            ip = _ip_float(stats["inningsPitched"])
+            so = int(stats.get("strikeOuts", 0) or 0)
+            bb = int(stats.get("baseOnBalls", 0) or 0)
+
+            prior = history.get(pid, [])
+            if len(prior) >= 2:
+                recent = prior[-5:]
+                pip = sum(g["ip"] for g in recent)
+                if pip > 0:
+                    kbb = (sum(g["so"] for g in recent) - sum(g["bb"] for g in recent)) / pip
+                    if side_key == "home":
+                        home_kbb = kbb
+                    else:
+                        away_kbb = kbb
+
+            history.setdefault(pid, []).append({"ip": ip, "so": so, "bb": bb})
+
+        if home_kbb is not None and away_kbb is not None:
+            result[eid] = round(home_kbb - away_kbb, 6)
+
+    _STARTER_KBB_MAP = result
+    return result
+
+
+def _starter_kbb_gap(event_id: str) -> float:
+    """Get the real starter K-BB% gap for a given event, or 0.0 if unavailable."""
+    return _load_starter_kbb_map().get(event_id, 0.0)
 
 
 # ── Bullpen weakness gap from MLB Stats API snapshots ────────────────────

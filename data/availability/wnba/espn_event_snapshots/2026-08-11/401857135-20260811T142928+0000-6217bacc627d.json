@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4281190",
+      "current_status": "Out",
+      "player_name": "Dana Evans",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-11T00:26:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "2529458",
+      "current_status": "Out",
+      "player_name": "Cheyenne Parker-Tyus",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-11T00:24:00+00:00",
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "event_id": "401857135",
+  "observed_at_utc": "2026-08-11T14:29:28.732341+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "6217bacc627d7b7e660bc48f8a93f9a25512e88599baa4197ea1d6ed2909ebb1",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

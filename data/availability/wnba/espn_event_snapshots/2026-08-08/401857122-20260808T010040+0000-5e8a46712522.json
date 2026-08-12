@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5106232",
+      "current_status": "Out",
+      "player_name": "Ashlon Jackson",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-07T22:58:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "5105732",
+      "current_status": "Out",
+      "player_name": "Raegan Beers",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-06T20:55:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4329370",
+      "current_status": "Out",
+      "player_name": "Maria Kliundikova",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-31T17:11:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4688629",
+      "current_status": "Out",
+      "player_name": "Shay Ciezki",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-07T23:08:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "4698730",
+      "current_status": "Out",
+      "player_name": "Kara Dunn",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-07T23:03:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "event_id": "401857122",
+  "observed_at_utc": "2026-08-08T01:00:40.326076+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "5e8a467125227b3482c36a085bfbf12aa7db78ab74a578cdb1c479256a84d7af",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

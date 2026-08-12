@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4594786",
+      "current_status": "Questionable",
+      "player_name": "Sydney Taylor",
+      "raw_status": "Day-To-Day",
+      "reason": "Groin",
+      "return_date": "2026-08-05",
+      "status_at_utc": "2026-08-04T22:11:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "3142010",
+      "current_status": "Out",
+      "player_name": "Azura Stevens",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-04T22:07:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-02T21:51:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    }
+  ],
+  "event_id": "401857118",
+  "observed_at_utc": "2026-08-05T17:01:49.118156+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "49e3cc8db24a182b9cde3d30c09bba90ef17ce7c9f5d30c68b378c0c47a38cd0",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

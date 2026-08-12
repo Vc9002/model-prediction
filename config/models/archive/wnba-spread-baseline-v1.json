@@ -1,0 +1,56 @@
+{
+  "artifact_hash": "e1874457960b7bbc124a8f4709722d756866da821846a4f93b12d532245f857f",
+  "market_models": {
+    "spread": {
+      "coefficients": [
+        1.0
+      ],
+      "confidence_threshold": 0.55,
+      "feature_names": [
+        "elo_margin"
+      ],
+      "intercept": 0.0,
+      "positive_class": "home_cover"
+    },
+    "total": {
+      "coefficients": [
+        1.0
+      ],
+      "confidence_threshold": 0.55,
+      "feature_names": [
+        "league_avg_total"
+      ],
+      "intercept": 0.0,
+      "positive_class": "over"
+    }
+  },
+  "method": "baseline_heuristic",
+  "model_version": "wnba-spread-baseline-v1",
+  "qualification": {
+    "calls": 727,
+    "framework": "baseline_research",
+    "hit_rate": 0.570839,
+    "hits": 415,
+    "market_type": "spread_and_total",
+    "note": "Baseline spread/total model. Spread = Elo expected margin. Total = league average. Will improve as Polymarket snapshots accumulate.",
+    "qualified": false,
+    "spread": {
+      "calls": 340,
+      "hit_rate": 0.329412,
+      "hits": 112,
+      "units": -126.181818
+    },
+    "status": "active_research",
+    "total": {
+      "calls": 387,
+      "hit_rate": 0.782946,
+      "hits": 303,
+      "units": 191.454545
+    }
+  },
+  "schema_version": "1",
+  "sport": "wnba",
+  "_retired": true,
+  "_retired_date": "2026-08-11",
+  "_retirement_reason": "Fundamentally broken — this model predicted moneyline outcomes (who wins), not spread outcomes (who covers). It used baseline_heuristic with coefficients [1.0] on elo_margin, never conditioning on the spread line. The spread sub-model achieved only 32.9% hit rate on 340 calls (-126.2 units), consistent with a moneyline model being scored against spread outcomes. Replaced by wnba-spread-margin-v1.json which uses BasketballModel's normal CDF approach: P(away_cover) = normal_cdf(spread_away_line, expected_margin, margin_sd=10.5). The total sub-model (78.3% hit rate on 387 calls, +191.5 units) was always separate — total_research_artifact in model.yaml was incorrectly pointing here instead of wnba-total-score-ridge-v1.json, fixed simultaneously."
+}

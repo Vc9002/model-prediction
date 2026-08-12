@@ -9268,7 +9268,7 @@
     "team_id": "bo3:1:24570"
   },
   "bo3:1:24574": {
-    "acronym": null,
+    "acronym": "RUSH",
     "name": "RUSH",
     "slug": "rush-gaming",
     "source_team_id": 24574,
@@ -9353,7 +9353,7 @@
   },
   "bo3:1:24681": {
     "acronym": null,
-    "name": "maybe",
+    "name": "MAYBE",
     "slug": "maybe-ukr",
     "source_team_id": 24681,
     "team_id": "bo3:1:24681"
@@ -9514,7 +9514,7 @@
   },
   "bo3:1:24956": {
     "acronym": null,
-    "name": "DENDELE CS",
+    "name": "DENDELE",
     "slug": "dendele-cs",
     "source_team_id": 24956,
     "team_id": "bo3:1:24956"
@@ -9547,6 +9547,13 @@
     "source_team_id": 24977,
     "team_id": "bo3:1:24977"
   },
+  "bo3:1:24978": {
+    "acronym": "DE.P",
+    "name": "Dynamo Eclot Phoenix",
+    "slug": "dynamo-eclot-phoenix",
+    "source_team_id": 24978,
+    "team_id": "bo3:1:24978"
+  },
   "bo3:1:2498": {
     "acronym": "SAGA",
     "name": "SAGA Esports",
@@ -9568,6 +9575,20 @@
     "source_team_id": 25002,
     "team_id": "bo3:1:25002"
   },
+  "bo3:1:25008": {
+    "acronym": "EACE",
+    "name": "EAC Extra",
+    "slug": "eac-extra",
+    "source_team_id": 25008,
+    "team_id": "bo3:1:25008"
+  },
+  "bo3:1:25011": {
+    "acronym": null,
+    "name": "MEIA NOITE",
+    "slug": "meia-noite",
+    "source_team_id": 25011,
+    "team_id": "bo3:1:25011"
+  },
   "bo3:1:25014": {
     "acronym": null,
     "name": "Finishers",
@@ -9582,12 +9603,215 @@
     "source_team_id": 25026,
     "team_id": "bo3:1:25026"
   },
+  "bo3:1:25031": {
+    "acronym": null,
+    "name": "Jam",
+    "slug": "jam",
+    "source_team_id": 25031,
+    "team_id": "bo3:1:25031"
+  },
+  "bo3:1:25032": {
+    "acronym": null,
+    "name": "GamersLab",
+    "slug": "gamerslab-esports",
+    "source_team_id": 25032,
+    "team_id": "bo3:1:25032"
+  },
+  "bo3:1:25052": {
+    "acronym": "KRE",
+    "name": "Kreazion",
+    "slug": "kreazion",
+    "source_team_id": 25052,
+    "team_id": "bo3:1:25052"
+  },
+  "bo3:1:25053": {
+    "acronym": "NIO",
+    "name": "NIO",
+    "slug": "nio-",
+    "source_team_id": 25053,
+    "team_id": "bo3:1:25053"
+  },
+  "bo3:1:25054": {
+    "acronym": "ZES",
+    "name": "Zeste",
+    "slug": "zeste",
+    "source_team_id": 25054,
+    "team_id": "bo3:1:25054"
+  },
+  "bo3:1:25055": {
+    "acronym": "DT",
+    "name": "Dark Tigre",
+    "slug": "dark-tigre",
+    "source_team_id": 25055,
+    "team_id": "bo3:1:25055"
+  },
+  "bo3:1:25056": {
+    "acronym": "MGN",
+    "name": "MANGANESE",
+    "slug": "manganese",
+    "source_team_id": 25056,
+    "team_id": "bo3:1:25056"
+  },
+  "bo3:1:25057": {
+    "acronym": "SHU",
+    "name": "Spirit HU",
+    "slug": "spirit-hu",
+    "source_team_id": 25057,
+    "team_id": "bo3:1:25057"
+  },
+  "bo3:1:25058": {
+    "acronym": "VAN",
+    "name": "Vandulken",
+    "slug": "vandulken",
+    "source_team_id": 25058,
+    "team_id": "bo3:1:25058"
+  },
+  "bo3:1:25059": {
+    "acronym": "OW",
+    "name": "Orion Wanderers",
+    "slug": "orion-wanderers",
+    "source_team_id": 25059,
+    "team_id": "bo3:1:25059"
+  },
   "bo3:1:2506": {
     "acronym": null,
     "name": "Rare Atom",
     "slug": "rare-atom",
     "source_team_id": 2506,
     "team_id": "bo3:1:2506"
+  },
+  "bo3:1:25060": {
+    "acronym": "DHA",
+    "name": "Dhala",
+    "slug": "dhala",
+    "source_team_id": 25060,
+    "team_id": "bo3:1:25060"
+  },
+  "bo3:1:25061": {
+    "acronym": "NADE",
+    "name": "NADE",
+    "slug": "nade",
+    "source_team_id": 25061,
+    "team_id": "bo3:1:25061"
+  },
+  "bo3:1:25062": {
+    "acronym": "SF",
+    "name": "SadFamous",
+    "slug": "sadfamous",
+    "source_team_id": 25062,
+    "team_id": "bo3:1:25062"
+  },
+  "bo3:1:25063": {
+    "acronym": "REV",
+    "name": "REVENIX",
+    "slug": "revenix",
+    "source_team_id": 25063,
+    "team_id": "bo3:1:25063"
+  },
+  "bo3:1:25064": {
+    "acronym": "LONE",
+    "name": "levelONE",
+    "slug": "levelone",
+    "source_team_id": 25064,
+    "team_id": "bo3:1:25064"
+  },
+  "bo3:1:25065": {
+    "acronym": "VAEL",
+    "name": "Vael",
+    "slug": "vael",
+    "source_team_id": 25065,
+    "team_id": "bo3:1:25065"
+  },
+  "bo3:1:25066": {
+    "acronym": "PC",
+    "name": "Passion Chicha",
+    "slug": "passion-chicha",
+    "source_team_id": 25066,
+    "team_id": "bo3:1:25066"
+  },
+  "bo3:1:25067": {
+    "acronym": "FKO",
+    "name": "FKOMAR",
+    "slug": "fkomar",
+    "source_team_id": 25067,
+    "team_id": "bo3:1:25067"
+  },
+  "bo3:1:25068": {
+    "acronym": null,
+    "name": "REM",
+    "slug": "rem",
+    "source_team_id": 25068,
+    "team_id": "bo3:1:25068"
+  },
+  "bo3:1:25069": {
+    "acronym": "CIT",
+    "name": "Citron",
+    "slug": "citron",
+    "source_team_id": 25069,
+    "team_id": "bo3:1:25069"
+  },
+  "bo3:1:25070": {
+    "acronym": "GPN",
+    "name": "Giant Pandas",
+    "slug": "giant-pandas",
+    "source_team_id": 25070,
+    "team_id": "bo3:1:25070"
+  },
+  "bo3:1:25071": {
+    "acronym": "AOG",
+    "name": "Aogiri",
+    "slug": "aogiri-cs",
+    "source_team_id": 25071,
+    "team_id": "bo3:1:25071"
+  },
+  "bo3:1:25072": {
+    "acronym": "GR",
+    "name": "Galactik rebels",
+    "slug": "galactik-rebels",
+    "source_team_id": 25072,
+    "team_id": "bo3:1:25072"
+  },
+  "bo3:1:25073": {
+    "acronym": "LFX",
+    "name": "lafox",
+    "slug": "lafox",
+    "source_team_id": 25073,
+    "team_id": "bo3:1:25073"
+  },
+  "bo3:1:25074": {
+    "acronym": "QC",
+    "name": "QueenConso",
+    "slug": "queenconso",
+    "source_team_id": 25074,
+    "team_id": "bo3:1:25074"
+  },
+  "bo3:1:25075": {
+    "acronym": "ZTF",
+    "name": "z to forward",
+    "slug": "z-to-forward",
+    "source_team_id": 25075,
+    "team_id": "bo3:1:25075"
+  },
+  "bo3:1:25082": {
+    "acronym": null,
+    "name": "NoTime",
+    "slug": "notime",
+    "source_team_id": 25082,
+    "team_id": "bo3:1:25082"
+  },
+  "bo3:1:25087": {
+    "acronym": "CBL",
+    "name": "cobblemon",
+    "slug": "cobblemon",
+    "source_team_id": 25087,
+    "team_id": "bo3:1:25087"
+  },
+  "bo3:1:25088": {
+    "acronym": "TDC",
+    "name": "TROPA DO CAPS",
+    "slug": "tropa-do-caps",
+    "source_team_id": 25088,
+    "team_id": "bo3:1:25088"
   },
   "bo3:1:2509": {
     "acronym": "CG",

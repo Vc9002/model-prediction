@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5105740",
+      "current_status": "Out",
+      "player_name": "Indya Nivar",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-07T22:21:00+00:00",
+      "team": "Atlanta Dream"
+    },
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-28T21:27:00+00:00",
+      "team": "Atlanta Dream"
+    }
+  ],
+  "event_id": "401857123",
+  "observed_at_utc": "2026-08-08T01:00:42.360098+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "cee23ce293ea7cba764a7e5325a586a82a4b54c76f8bd1bd9bab1e5aabd6ac00",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -254,8 +254,8 @@ models:
     - wnba-elo-trend-lr-v3
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
-    spread_research_artifact: config/models/wnba-spread-baseline-v1.json
-    total_research_artifact: config/models/wnba-spread-baseline-v1.json
+    spread_research_artifact: config/models/wnba-spread-margin-v1.json
+    total_research_artifact: config/models/wnba-total-score-ridge-v1.json
     sizing_recommendation: flat_1.5_to_2.0u
     sizing_recommendation_reason: '2026-07-22 analysis: Kelly/edge-scaled sizing underperforms
       flat betting for WNBA due to thin edges. Flat 2.0u produced +2.64u on 13 settled

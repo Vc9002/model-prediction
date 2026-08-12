@@ -1,0 +1,109 @@
+{
+  "champions": {
+    "cs2-tiered-elo-v6": {
+      "artifact_hash": "d80de5716d7ba7642ef45702005b7ebc53e7998fc799e1bd7e8d885b5c01cc64",
+      "artifact_path": "config/models/cs2-tiered-elo-v6.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.839636Z",
+      "market_type": "moneyline",
+      "model_id": "cs2-tiered-elo-v6",
+      "sport": "cs2"
+    },
+    "dota2-tiered-elo-v6": {
+      "artifact_hash": "4806051748ca0e0e71f7a78cdec3088c19d0b8147cff09cd9e9a8b19e8dc6791",
+      "artifact_path": "config/models/dota2-tiered-elo-v6.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.840736Z",
+      "market_type": "moneyline",
+      "model_id": "dota2-tiered-elo-v6",
+      "sport": "dota2"
+    },
+    "kbo-tie-aware-elo-v2": {
+      "artifact_hash": "CODE_BACKED",
+      "artifact_path": "config/models/kbo-tie-aware-elo-v2.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.843659Z",
+      "market_type": "moneyline",
+      "model_id": "kbo-tie-aware-elo-v2",
+      "sport": "kbo"
+    },
+    "lol-tiered-elo-v6": {
+      "artifact_hash": "0fdc4ef6e480db7cffb6651a7b02dca90ed7f8f9ea71a40df3acbef431bd8491",
+      "artifact_path": "config/models/lol-tiered-elo-v6.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.841563Z",
+      "market_type": "moneyline",
+      "model_id": "lol-tiered-elo-v6",
+      "sport": "lol"
+    },
+    "mlb-elo-trend-lr-v8": {
+      "artifact_hash": "3b345499bd6bad9bcf65367a07fe0c668fb5817d4f016a0a865c01d9212fdeb8",
+      "artifact_path": "config/models/mlb-elo-trend-lr-v8.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.837193Z",
+      "market_type": "moneyline",
+      "model_id": "mlb-elo-trend-lr-v8",
+      "sport": "mlb"
+    },
+    "nba-elo-trend-lr-v4": {
+      "artifact_hash": "79618accee5a07fd472001ea010870f3cd86bf77869ddceb10d1d633eb834c0c",
+      "artifact_path": "config/models/nba-elo-trend-lr-v4.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.837408Z",
+      "market_type": "moneyline",
+      "model_id": "nba-elo-trend-lr-v4",
+      "sport": "nba"
+    },
+    "nfl-elo-trend-lr-v4": {
+      "artifact_hash": "5cb5857519c32e04c895a3220afdc208e3d717ba0793e8d4a6946b1332f11654",
+      "artifact_path": "config/models/nfl-elo-trend-lr-v4.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.837605Z",
+      "market_type": "moneyline",
+      "model_id": "nfl-elo-trend-lr-v4",
+      "sport": "nfl"
+    },
+    "npb-tie-aware-elo-v2": {
+      "artifact_hash": "CODE_BACKED",
+      "artifact_path": "config/models/npb-tie-aware-elo-v2.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.843683Z",
+      "market_type": "moneyline",
+      "model_id": "npb-tie-aware-elo-v2",
+      "sport": "npb"
+    },
+    "rainbow_six-tiered-elo-v6": {
+      "artifact_hash": "6f58fd90e08e64d0a58042eeb19a26a1debe889dbb200a082a99f51d84977c3b",
+      "artifact_path": "config/models/rainbow_six-tiered-elo-v6.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.843625Z",
+      "market_type": "moneyline",
+      "model_id": "rainbow_six-tiered-elo-v6",
+      "sport": "rainbow_six"
+    },
+    "soccer-poisson-dc-v1": {
+      "artifact_hash": "CODE_BACKED",
+      "artifact_path": "config/models/soccer-poisson-dc-v1.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.837672Z",
+      "market_type": "moneyline",
+      "model_id": "soccer-poisson-dc-v1",
+      "sport": "soccer"
+    },
+    "tennis-surface-elo-v1": {
+      "artifact_hash": "CODE_BACKED",
+      "artifact_path": "config/models/tennis-surface-elo-v1.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.837706Z",
+      "market_type": "moneyline",
+      "model_id": "tennis-surface-elo-v1",
+      "sport": "tennis"
+    },
+    "valorant-tiered-elo-v6": {
+      "artifact_hash": "af3d00b935358b29757b887763afd672c7c8a6d4157c0044d3888bfce55ec3d6",
+      "artifact_path": "config/models/valorant-tiered-elo-v6.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.843155Z",
+      "market_type": "moneyline",
+      "model_id": "valorant-tiered-elo-v6",
+      "sport": "valorant"
+    },
+    "wnba-elo-trend-lr-v4": {
+      "artifact_hash": "7afd5274214b58b7efd7f7febc7be3ab33b92351cda5cc6403c0a39faea0cc8c",
+      "artifact_path": "config/models/wnba-elo-trend-lr-v4.json",
+      "frozen_at_utc": "2026-08-12T09:34:19.836980Z",
+      "market_type": "moneyline",
+      "model_id": "wnba-elo-trend-lr-v4",
+      "sport": "wnba"
+    }
+  },
+  "frozen_at_utc": "2026-08-12T09:34:19.843685Z"
+}

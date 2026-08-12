@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-16",
+      "status_at_utc": "2026-08-09T21:11:00+00:00",
+      "team": "Atlanta Dream"
+    },
+    {
+      "athlete_id": "2988756",
+      "current_status": "Out",
+      "player_name": "Brittney Sykes",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-18",
+      "status_at_utc": "2026-08-09T21:08:00+00:00",
+      "team": "Toronto Tempo"
+    },
+    {
+      "athlete_id": "3904576",
+      "current_status": "Questionable",
+      "player_name": "Marina Mabrey",
+      "raw_status": "Day-To-Day",
+      "reason": "Neck",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-09T21:05:00+00:00",
+      "team": "Toronto Tempo"
+    }
+  ],
+  "event_id": "401857132",
+  "observed_at_utc": "2026-08-10T05:38:57.736883+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "94843f60437536ff372c47db31aa758da4b248075bbefd526692ec93ac77d844",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

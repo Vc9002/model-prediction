@@ -1,0 +1,20 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-28T21:27:00+00:00",
+      "team": "Atlanta Dream"
+    }
+  ],
+  "event_id": "401857123",
+  "observed_at_utc": "2026-08-07T21:55:53.903009+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "eb4f665579a72d1eb6cf9155be653748d66a8bd79b26f4d90693b4516cc477fc",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

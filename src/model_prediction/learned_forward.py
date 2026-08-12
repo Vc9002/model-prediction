@@ -33,7 +33,7 @@ from .features.mlb_player_availability import (
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
 from .features.schedule_load import matchup_schedule_load
-from .features.starter_history import starter_era_gap_live, starter_fip_gap_live
+from .features.starter_history import starter_era_gap_live, starter_fip_gap_live, starter_kbb_gap_live
 from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
 from .models.learned_market import LearnedMarketArtifact
@@ -120,6 +120,19 @@ def _compute_features(
             features["starter_fip_gap"] = 0.0
             unavailable.append(str(error).split(":", 1)[0].strip() or "starter_fip_gap_unavailable")
             logger.warning("starter_fip_gap unavailable for %s: %s", event_id, error)
+    if "starter_kbb_gap" in wanted:
+        # Same point-in-time contract as starter_era_gap/starter_fip_gap but
+        # computes (K-BB)/IP per starter from the same snapshot data.
+        try:
+            if not home_starter_name or not away_starter_name:
+                raise ValueError("NO_CALL_STARTER_KBB_GAP_NO_CONFIRMED_STARTER")
+            features["starter_kbb_gap"] = starter_kbb_gap_live(
+                home_starter_name, away_starter_name, event_start
+            )
+        except ValueError as error:
+            features["starter_kbb_gap"] = 0.0
+            unavailable.append(str(error).split(":", 1)[0].strip() or "starter_kbb_gap_unavailable")
+            logger.warning("starter_kbb_gap unavailable for %s: %s", event_id, error)
     if "bullpen_weakness_gap" in wanted:
         # Real per-team relief-appearance history (mlb_statsapi.py's boxscore
         # snapshots), same functions Measured Edge already serves live with
@@ -134,6 +147,36 @@ def _compute_features(
             team_recent_relief_lines(away_team, event_start)
         )["bullpen_weakness_index"]
         features["bullpen_weakness_gap"] = round(home_weakness - away_weakness, 6)
+    if "bullpen_fatigue_gap" in wanted:
+        # Bullpen fatigue = total recent relief innings per team.
+        # home-minus-away: positive = home bullpen has thrown more innings
+        # recently (more fatigued), negative = away bullpen more fatigued.
+        # Uses the same relief-appearance index as bullpen_weakness_gap
+        # but sums innings rather than computing ERA/weakness-index.
+        home_relief = team_recent_relief_lines(home_team, event_start)
+        away_relief = team_recent_relief_lines(away_team, event_start)
+        home_fatigue = sum(float(line.get("innings", 0)) for line in home_relief)
+        away_fatigue = sum(float(line.get("innings", 0)) for line in away_relief)
+        features["bullpen_fatigue_gap"] = round(home_fatigue - away_fatigue, 6)
+    if "residual_trend_gap" in wanted:
+        # Elo-residualized trend: how much the home team's recent actual
+        # win rate diverges from Elo's expectation. Matches the training
+        # definition in validation.py's build_walk_forward_rows.
+        from datetime import timedelta as _td2
+        from .domain import EASTERN as _EASTERN2
+        cutoff = event_start.astimezone(_EASTERN2).date() - _td2(days=30)
+        game_date_dt = event_start.astimezone(_EASTERN2).date()
+        recent_home = [
+            g for g in history
+            if cutoff <= g.start.astimezone(_EASTERN2).date() < game_date_dt
+            and g.home_score != g.away_score
+            and g.home_team == home_team
+        ]
+        if len(recent_home) >= 10:
+            home_win_pct = sum(g.home_score > g.away_score for g in recent_home) / len(recent_home)
+            features["residual_trend_gap"] = round(home_win_pct - features.get("elo_probability", 0.5), 6)
+        else:
+            features["residual_trend_gap"] = 0.0
     if wanted & AVAILABILITY_FEATURE_NAMES:
         if sport != "wnba":
             raise ValueError(

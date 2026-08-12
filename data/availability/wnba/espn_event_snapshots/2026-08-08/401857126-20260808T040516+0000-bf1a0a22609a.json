@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4594786",
+      "current_status": "Out",
+      "player_name": "Sydney Taylor",
+      "raw_status": "Out",
+      "reason": "Groin",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-07T21:59:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-02T21:51:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4432831",
+      "current_status": "Questionable",
+      "player_name": "Aliyah Boston",
+      "raw_status": "Day-To-Day",
+      "reason": "Lower Leg",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-07T22:08:00+00:00",
+      "team": "Indiana Fever"
+    },
+    {
+      "athlete_id": "4433403",
+      "current_status": "Questionable",
+      "player_name": "Caitlin Clark",
+      "raw_status": "Day-To-Day",
+      "reason": "Back",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-07T22:07:00+00:00",
+      "team": "Indiana Fever"
+    },
+    {
+      "athlete_id": "2955898",
+      "current_status": "Out",
+      "player_name": "Damiris Dantas",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-08-04T14:36:00+00:00",
+      "team": "Indiana Fever"
+    }
+  ],
+  "event_id": "401857126",
+  "observed_at_utc": "2026-08-08T04:05:16.880611+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "bf1a0a22609aaf7de19ac637b5b0dd47d720452c065ffc4e48383b0cccc00f44",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

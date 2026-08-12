@@ -1,0 +1,189 @@
+{
+  "entries": [
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-12",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "TOR@DAL",
+      "player_name": "Allemand, Julie",
+      "reason": "Injury/Illness - Left Thigh; Injury",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-12",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "TOR@DAL",
+      "player_name": "Conde, Maria",
+      "reason": "Injury/Illness - Left Calf; Injury",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-12",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "TOR@DAL",
+      "player_name": "Sykes, Brittney",
+      "reason": "Injury/Illness - Left Foot; Injury",
+      "team": "Toronto Tempo"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-12",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "TOR@DAL",
+      "player_name": "Clark, Alysha",
+      "reason": "Injury/Illness - Back; n/a",
+      "team": "Dallas Wings"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-12",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "TOR@DAL",
+      "player_name": "Fudd, Azzi",
+      "reason": "Injury/Illness - Right Knee; n/a",
+      "team": "Dallas Wings"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-12",
+      "game_time_et": "08:00 (ET)",
+      "matchup": "TOR@DAL",
+      "player_name": "Shepard, Jessica",
+      "reason": "Injury/Illness - Right Ankle; n/a",
+      "team": "Dallas Wings"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "CHI@GSV",
+      "player_name": "Diggins, Skylar",
+      "reason": "Injury/Illness - Right Knee; Right Knee",
+      "team": "Chicago Sky"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "CHI@GSV",
+      "player_name": "Taylor, Sydney",
+      "reason": "Injury/Illness - Left Groin; Left Groin",
+      "team": "Chicago Sky"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "CHI@GSV",
+      "player_name": "Salaun, Janelle",
+      "reason": "Injury/Illness - Right knee; Soreness",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "CHI@GSV",
+      "player_name": "Stokes, Kiah",
+      "reason": "Injury/Illness - Head; Concussion protocol",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "current_status": "Doubtful",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@PDX",
+      "player_name": "Bibby, Chloe",
+      "reason": "Personal Reasons",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@PDX",
+      "player_name": "Feagin, Sania",
+      "reason": "Injury/Illness - Left Knee; Injury",
+      "team": "Portland Fire"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@PDX",
+      "player_name": "Leite, Carla",
+      "reason": "Injury/Illness - Left Knee; Soreness",
+      "team": "Portland Fire"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@PDX",
+      "player_name": "Oblak, Teja",
+      "reason": "Injury/Illness - Left Knee; Injury",
+      "team": "Portland Fire"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-12",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "MIN@PDX",
+      "player_name": "Okonkwo, Amy",
+      "reason": "Rest",
+      "team": "Portland Fire"
+    }
+  ],
+  "observed_at_utc": "2026-08-12T17:41:18.291468+00:00",
+  "report_at_utc": "2026-08-12T17:30:00+00:00",
+  "schema_version": "1",
+  "source": "official_wnba_injury_report",
+  "source_index_url": "https://www.wnba.com/api/injury-reports",
+  "source_pdf_sha256": "6e20e20413332a385703207fbfe945e1f628c45669112bd11d7da2af8cb81e6f",
+  "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-08-12_01_30PM.pdf",
+  "sport": "wnba",
+  "team_matchups": {
+    "Atlanta Dream": "ATL@CON",
+    "Chicago Sky": "CHI@GSV",
+    "Connecticut Sun": "MIN@PDX",
+    "Dallas Wings": "TOR@DAL",
+    "Golden State Valkyries": "CHI@GSV",
+    "Las Vegas Aces": "WAS@LVA",
+    "Los Angeles Sparks": "LAS@NYL",
+    "Minnesota Lynx": "MIN@PDX",
+    "New York Liberty": "LAS@NYL",
+    "Portland Fire": "MIN@PDX",
+    "Toronto Tempo": "TOR@DAL",
+    "Washington Mystics": "WAS@LVA"
+  },
+  "team_report_status": {
+    "Atlanta Dream": "not_yet_submitted",
+    "Chicago Sky": "submitted",
+    "Connecticut Sun": "not_yet_submitted",
+    "Dallas Wings": "submitted",
+    "Golden State Valkyries": "submitted",
+    "Las Vegas Aces": "not_yet_submitted",
+    "Los Angeles Sparks": "not_yet_submitted",
+    "Minnesota Lynx": "submitted",
+    "New York Liberty": "not_yet_submitted",
+    "Portland Fire": "submitted",
+    "Toronto Tempo": "submitted",
+    "Washington Mystics": "not_yet_submitted"
+  },
+  "teams_listed": [
+    "Atlanta Dream",
+    "Chicago Sky",
+    "Connecticut Sun",
+    "Dallas Wings",
+    "Golden State Valkyries",
+    "Las Vegas Aces",
+    "Los Angeles Sparks",
+    "Minnesota Lynx",
+    "New York Liberty",
+    "Portland Fire",
+    "Toronto Tempo",
+    "Washington Mystics"
+  ]
+}

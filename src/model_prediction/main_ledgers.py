@@ -48,6 +48,7 @@ def main_ledger(data_root: str | Path, sport: str) -> PickLedger:
     return PickLedger(
         main_ledger_path(root, sport),
         audit_path=root / "events.jsonl",
+        model_ledgers_dir=root / "model_ledgers",
     )
 
 
@@ -56,7 +57,11 @@ def existing_main_ledgers(data_root: str | Path) -> list[PickLedger]:
     if not directory.exists():
         return []
     return [
-        PickLedger(path, audit_path=Path(data_root) / "events.jsonl")
+        PickLedger(
+            path,
+            audit_path=Path(data_root) / "events.jsonl",
+            model_ledgers_dir=Path(data_root) / "model_ledgers",
+        )
         for path in sorted(directory.glob("*.xlsx"))
         if path.stem.casefold() in MAIN_LEDGER_SPORTS
     ]
@@ -72,6 +77,7 @@ def flat_ledger(data_root: str | Path, sport: str) -> PickLedger:
     return PickLedger(
         flat_ledger_path(root, sport),
         audit_path=root / "events.jsonl",
+        model_ledgers_dir=root / "model_ledgers",
     )
 
 
@@ -80,7 +86,11 @@ def existing_flat_ledgers(data_root: str | Path) -> list[PickLedger]:
     if not directory.exists():
         return []
     return [
-        PickLedger(path, audit_path=Path(data_root) / "events.jsonl")
+        PickLedger(
+            path,
+            audit_path=Path(data_root) / "events.jsonl",
+            model_ledgers_dir=Path(data_root) / "model_ledgers",
+        )
         for path in sorted(directory.glob("*.xlsx"))
         if path.stem.casefold() in MAIN_LEDGER_SPORTS
     ]
@@ -118,6 +128,7 @@ class MultiSportPickLedger:
             sport: PickLedger(
                 (flat_ledger_path if flat else main_ledger_path)(self.data_root, sport),
                 audit_path=self.data_root / "events.jsonl",
+                model_ledgers_dir=self.data_root / "model_ledgers",
                 **ledger_kwargs,
             )
             for sport in MAIN_LEDGER_SPORTS

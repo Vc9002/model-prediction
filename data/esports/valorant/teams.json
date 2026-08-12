@@ -3821,6 +3821,13 @@
     "source_team_id": 20930,
     "team_id": "bo3:2:20930"
   },
+  "bo3:2:20939": {
+    "acronym": null,
+    "name": "FALKE VENOM",
+    "slug": "falke-venom",
+    "source_team_id": 20939,
+    "team_id": "bo3:2:20939"
+  },
   "bo3:2:20941": {
     "acronym": "OWO",
     "name": "Legiowon",
@@ -5150,6 +5157,69 @@
     "slug": "revenge-us",
     "source_team_id": 24921,
     "team_id": "bo3:2:24921"
+  },
+  "bo3:2:24972": {
+    "acronym": null,
+    "name": "NPC Team",
+    "slug": "npc-team",
+    "source_team_id": 24972,
+    "team_id": "bo3:2:24972"
+  },
+  "bo3:2:25012": {
+    "acronym": "AT",
+    "name": "A Team",
+    "slug": "a-team-vlr",
+    "source_team_id": 25012,
+    "team_id": "bo3:2:25012"
+  },
+  "bo3:2:25036": {
+    "acronym": "GP",
+    "name": "GATO PENSANTE",
+    "slug": "gato-pensante",
+    "source_team_id": 25036,
+    "team_id": "bo3:2:25036"
+  },
+  "bo3:2:25040": {
+    "acronym": "EoD",
+    "name": "Evils of Delusion",
+    "slug": "evils-of-delusion",
+    "source_team_id": 25040,
+    "team_id": "bo3:2:25040"
+  },
+  "bo3:2:25083": {
+    "acronym": null,
+    "name": "Mom Said No",
+    "slug": "mom-said-no",
+    "source_team_id": 25083,
+    "team_id": "bo3:2:25083"
+  },
+  "bo3:2:25084": {
+    "acronym": null,
+    "name": "Lost Puppies GC",
+    "slug": "lost-puppies-gc",
+    "source_team_id": 25084,
+    "team_id": "bo3:2:25084"
+  },
+  "bo3:2:25091": {
+    "acronym": "ARS",
+    "name": "Arashi GC",
+    "slug": "arashi-gc",
+    "source_team_id": 25091,
+    "team_id": "bo3:2:25091"
+  },
+  "bo3:2:25095": {
+    "acronym": "7VEN",
+    "name": "7VEN STARS",
+    "slug": "7ven-stars",
+    "source_team_id": 25095,
+    "team_id": "bo3:2:25095"
+  },
+  "bo3:2:25113": {
+    "acronym": "USHI",
+    "name": "Ushiras",
+    "slug": "ushiras",
+    "source_team_id": 25113,
+    "team_id": "bo3:2:25113"
   },
   "bo3:2:6328": {
     "acronym": "NOVO",

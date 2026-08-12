@@ -1,0 +1,15 @@
+{
+  "decision_date": "2026-08-05",
+  "summary": "MLB model trained on 53 real completed games with chronological validation. 3 expanding folds, calibrated Brier 0.243, ECE 0.02. Research quality — needs more data and real pybaseball features.",
+  "promotions": [
+    {"model": "mlb-two-head-v1", "status": "RESEARCH_ONLY", "reason": "53 games insufficient for qualification. Brier 0.243 promising for simple rolling features."}
+  ],
+  "current_status": {"mlb_two_head": "RESEARCH_ONLY"},
+  "next_steps": [
+    "Backfill 2024-2025 MLB seasons via pybaseball Statcast for 1000+ game training set",
+    "Integrate real features: starter ERA, bullpen availability, park factors, weather",
+    "Re-run validation with sufficient sample for qualification (50+ called picks on holdout)",
+    "Capture Polymarket order books for economic evaluation",
+    "Repeat pipeline for NBA, NFL, soccer models when collector stubs are completed"
+  ]
+}

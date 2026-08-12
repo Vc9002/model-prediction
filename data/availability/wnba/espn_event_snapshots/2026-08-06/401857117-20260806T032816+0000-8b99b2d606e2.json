@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5106145",
+      "current_status": "Questionable",
+      "player_name": "Darianna Littlepage-Buggs",
+      "raw_status": "Day-To-Day",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-07",
+      "status_at_utc": "2026-08-06T02:04:00+00:00",
+      "team": "Washington Mystics"
+    },
+    {
+      "athlete_id": "924",
+      "current_status": "Questionable",
+      "player_name": "Alysha Clark",
+      "raw_status": "Day-To-Day",
+      "reason": "Back",
+      "return_date": "2026-08-07",
+      "status_at_utc": "2026-08-06T02:04:00+00:00",
+      "team": "Dallas Wings"
+    }
+  ],
+  "event_id": "401857117",
+  "observed_at_utc": "2026-08-06T03:28:16.807484+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "8b99b2d606e2b30d31815cf61bb4ee2c0ced127aaa1b24059407ff7bb2bf969b",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

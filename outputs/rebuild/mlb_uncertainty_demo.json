@@ -1,0 +1,1334 @@
+{
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "best_calibration_method_per_model": {
+    "two_head": "temperature",
+    "xgb_two_head": "temperature",
+    "xgb_direct": "temperature"
+  },
+  "n_games": 76,
+  "mean_model_disagreement": 0.22379473684210524,
+  "mean_calibration_uncertainty": 0.01064372428736516,
+  "mean_missingness_penalty": 0.027105263157894736,
+  "mean_total_haircut_from_raw": 0.2992696619685086,
+  "games": [
+    {
+      "event_id": "401816304",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.27015,
+      "xgb_two_head_prob": 0.4235,
+      "model_disagreement": 0.15335,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0125173157140112,
+      "bootstrap_lower": 0.06049000000000001,
+      "bootstrap_upper": 0.6386500000000003,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.7153250000000002
+    },
+    {
+      "event_id": "401816302",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.6934,
+      "xgb_two_head_prob": 0.6622,
+      "model_disagreement": 0.031200000000000006,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.010328880881465238,
+      "bootstrap_lower": 0.07588,
+      "bootstrap_upper": 0.8082300000000001,
+      "conservative_probability": 0.02995111911853476,
+      "probability_lower": 0.02995111911853476,
+      "probability_upper": 0.8238300000000001
+    },
+    {
+      "event_id": "401816303",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.56625,
+      "xgb_two_head_prob": 0.5992,
+      "model_disagreement": 0.032949999999999924,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0034050847713295454,
+      "bootstrap_lower": 0.46867000000000003,
+      "bootstrap_upper": 0.640915,
+      "conservative_probability": 0.3887899152286705,
+      "probability_lower": 0.3887899152286705,
+      "probability_upper": 0.6573899999999999
+    },
+    {
+      "event_id": "401816305",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.65,
+      "xgb_two_head_prob": 0.415,
+      "model_disagreement": 0.23500000000000004,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.007869376429308149,
+      "bootstrap_lower": 0.41993,
+      "bootstrap_upper": 0.7348100000000001,
+      "conservative_probability": 0.27456062357069183,
+      "probability_lower": 0.27456062357069183,
+      "probability_upper": 0.8523100000000001
+    },
+    {
+      "event_id": "401816306",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.32455,
+      "xgb_two_head_prob": 0.67515,
+      "model_disagreement": 0.3506,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.009295196033926298,
+      "bootstrap_lower": 0.087965,
+      "bootstrap_upper": 0.7356250000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.9109250000000001
+    },
+    {
+      "event_id": "401816311",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.4881,
+      "xgb_two_head_prob": 0.36865,
+      "model_disagreement": 0.11945,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0006087988527580839,
+      "bootstrap_lower": 0.46182999999999996,
+      "bootstrap_upper": 0.55792,
+      "conservative_probability": 0.34149620114724183,
+      "probability_lower": 0.34149620114724183,
+      "probability_upper": 0.617645
+    },
+    {
+      "event_id": "401816307",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.51305,
+      "xgb_two_head_prob": 0.48555,
+      "model_disagreement": 0.027500000000000024,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0006676531455651582,
+      "bootstrap_lower": 0.48030500000000004,
+      "bootstrap_upper": 0.585845,
+      "conservative_probability": 0.4058873468544349,
+      "probability_lower": 0.4058873468544349,
+      "probability_upper": 0.599595
+    },
+    {
+      "event_id": "401816313",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.03295,
+      "xgb_two_head_prob": 0.183,
+      "model_disagreement": 0.15005,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.03668480544523752,
+      "bootstrap_lower": 0.007215000000000001,
+      "bootstrap_upper": 0.4489250000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.52395
+    },
+    {
+      "event_id": "401816308",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.40475,
+      "xgb_two_head_prob": 0.63925,
+      "model_disagreement": 0.2345,
+      "missingness_penalty": 0.04,
+      "missing_flags": [
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.004921081373195161,
+      "bootstrap_lower": 0.2393,
+      "bootstrap_upper": 0.5768450000000002,
+      "conservative_probability": 0.07712891862680485,
+      "probability_lower": 0.07712891862680485,
+      "probability_upper": 0.6940950000000001
+    },
+    {
+      "event_id": "401816309",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.44135,
+      "xgb_two_head_prob": 0.14345,
+      "model_disagreement": 0.29790000000000005,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0030113232430899824,
+      "bootstrap_lower": 0.14809000000000003,
+      "bootstrap_upper": 0.8663850000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 1.0
+    },
+    {
+      "event_id": "401816320",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.4355,
+      "xgb_two_head_prob": 0.43,
+      "model_disagreement": 0.005500000000000005,
+      "missingness_penalty": 0.04,
+      "missing_flags": [
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0033143053496113985,
+      "bootstrap_lower": 0.26333500000000004,
+      "bootstrap_upper": 0.57653,
+      "conservative_probability": 0.21727069465038865,
+      "probability_lower": 0.21727069465038865,
+      "probability_upper": 0.57928
+    },
+    {
+      "event_id": "401816318",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.24745,
+      "xgb_two_head_prob": 0.58615,
+      "model_disagreement": 0.33869999999999995,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.01395521863174115,
+      "bootstrap_lower": 0.03202,
+      "bootstrap_upper": 0.6227050000000003,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.7920550000000003
+    },
+    {
+      "event_id": "401816312",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.39575,
+      "xgb_two_head_prob": 0.3878,
+      "model_disagreement": 0.007950000000000013,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0053969018140416995,
+      "bootstrap_lower": 0.120175,
+      "bootstrap_upper": 0.532525,
+      "conservative_probability": 0.09080309818595829,
+      "probability_lower": 0.09080309818595829,
+      "probability_upper": 0.5365
+    },
+    {
+      "event_id": "401816310",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.12305,
+      "xgb_two_head_prob": 0.4142,
+      "model_disagreement": 0.29115,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.023692954315785292,
+      "bootstrap_lower": 0.07076500000000001,
+      "bootstrap_upper": 0.653915,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.79949
+    },
+    {
+      "event_id": "401902545",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.5331,
+      "xgb_two_head_prob": 0.62735,
+      "model_disagreement": 0.09424999999999994,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.001695138385276443,
+      "bootstrap_lower": 0.215255,
+      "bootstrap_upper": 0.8097,
+      "conservative_probability": 0.1464348616147236,
+      "probability_lower": 0.1464348616147236,
+      "probability_upper": 0.856825
+    },
+    {
+      "event_id": "401816315",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.158,
+      "xgb_two_head_prob": 0.5539,
+      "model_disagreement": 0.3958999999999999,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.02050429804610226,
+      "bootstrap_lower": 0.000845,
+      "bootstrap_upper": 0.5311050000000002,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.7290550000000001
+    },
+    {
+      "event_id": "401816316",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.4467,
+      "xgb_two_head_prob": 0.4005,
+      "model_disagreement": 0.04619999999999996,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0027348381823678026,
+      "bootstrap_lower": 0.32399,
+      "bootstrap_upper": 0.6658050000000001,
+      "conservative_probability": 0.27815516181763217,
+      "probability_lower": 0.27815516181763217,
+      "probability_upper": 0.6889050000000001
+    },
+    {
+      "event_id": "401816314",
+      "game_date": "2026-07-29",
+      "two_head_prob": 0.47385,
+      "xgb_two_head_prob": 0.50235,
+      "model_disagreement": 0.02849999999999997,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0013386108016701754,
+      "bootstrap_lower": 0.436365,
+      "bootstrap_upper": 0.5412399999999999,
+      "conservative_probability": 0.3607763891983298,
+      "probability_lower": 0.3607763891983298,
+      "probability_upper": 0.5554899999999999
+    },
+    {
+      "event_id": "401816319",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.15605,
+      "xgb_two_head_prob": 0.79255,
+      "model_disagreement": 0.6365,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.02066957598662989,
+      "bootstrap_lower": 0.050745000000000005,
+      "bootstrap_upper": 0.38544000000000006,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.70369
+    },
+    {
+      "event_id": "401816317",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.4227,
+      "xgb_two_head_prob": 0.60355,
+      "model_disagreement": 0.18085,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.003979981248198059,
+      "bootstrap_lower": 0.11567,
+      "bootstrap_upper": 0.6427849999999999,
+      "conservative_probability": 0.0012650187518019294,
+      "probability_lower": 0.0012650187518019294,
+      "probability_upper": 0.7332099999999999
+    },
+    {
+      "event_id": "401816321",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.48065,
+      "xgb_two_head_prob": 0.7593,
+      "model_disagreement": 0.27864999999999995,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0009901878682112679,
+      "bootstrap_lower": 0.292505,
+      "bootstrap_upper": 0.710975,
+      "conservative_probability": 0.1321898121317888,
+      "probability_lower": 0.1321898121317888,
+      "probability_upper": 0.8503000000000001
+    },
+    {
+      "event_id": "401816324",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.7694,
+      "xgb_two_head_prob": 0.42155,
+      "model_disagreement": 0.34785,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.015068549077315526,
+      "bootstrap_lower": 0.34166,
+      "bootstrap_upper": 0.912765,
+      "conservative_probability": 0.1326664509226845,
+      "probability_lower": 0.1326664509226845,
+      "probability_upper": 1.0
+    },
+    {
+      "event_id": "401816327",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.1769,
+      "xgb_two_head_prob": 0.46015,
+      "model_disagreement": 0.28325,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.018964578172254366,
+      "bootstrap_lower": 0.019045000000000003,
+      "bootstrap_upper": 0.5446900000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.6863150000000001
+    },
+    {
+      "event_id": "401816328",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.4367,
+      "xgb_two_head_prob": 0.45025,
+      "model_disagreement": 0.013550000000000006,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.003252095856665224,
+      "bootstrap_lower": 0.1217,
+      "bootstrap_upper": 0.8516050000000002,
+      "conservative_probability": 0.09167290414333477,
+      "probability_lower": 0.09167290414333477,
+      "probability_upper": 0.8583800000000001
+    },
+    {
+      "event_id": "401816326",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.59405,
+      "xgb_two_head_prob": 0.5958,
+      "model_disagreement": 0.0017500000000000293,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.004857852061114617,
+      "bootstrap_lower": 0.29081500000000005,
+      "bootstrap_upper": 0.76683,
+      "conservative_probability": 0.2650821479388854,
+      "probability_lower": 0.2650821479388854,
+      "probability_upper": 0.7677050000000001
+    },
+    {
+      "event_id": "401816325",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.37615,
+      "xgb_two_head_prob": 0.48465,
+      "model_disagreement": 0.10850000000000004,
+      "missingness_penalty": 0.04,
+      "missing_flags": [
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0064440678353784924,
+      "bootstrap_lower": 0.194915,
+      "bootstrap_upper": 0.5313500000000001,
+      "conservative_probability": 0.09422093216462149,
+      "probability_lower": 0.09422093216462149,
+      "probability_upper": 0.5856000000000001
+    },
+    {
+      "event_id": "401816322",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.50515,
+      "xgb_two_head_prob": 0.35855,
+      "model_disagreement": 0.1466,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.00026343887321992953,
+      "bootstrap_lower": 0.43304,
+      "bootstrap_upper": 0.582185,
+      "conservative_probability": 0.29947656112678,
+      "probability_lower": 0.29947656112678,
+      "probability_upper": 0.655485
+    },
+    {
+      "event_id": "401816323",
+      "game_date": "2026-07-30",
+      "two_head_prob": 0.4779,
+      "xgb_two_head_prob": 0.65645,
+      "model_disagreement": 0.17855,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0011310522752479642,
+      "bootstrap_lower": 0.4491,
+      "bootstrap_upper": 0.55214,
+      "conservative_probability": 0.29869394772475205,
+      "probability_lower": 0.29869394772475205,
+      "probability_upper": 0.641415
+    },
+    {
+      "event_id": "401816329",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.28585,
+      "xgb_two_head_prob": 0.55695,
+      "model_disagreement": 0.27109999999999995,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.011558392981083345,
+      "bootstrap_lower": 0.05837,
+      "bootstrap_upper": 0.5542150000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.6897650000000001
+    },
+    {
+      "event_id": "401816331",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.3196,
+      "xgb_two_head_prob": 0.8863,
+      "model_disagreement": 0.5667,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.009577732162968894,
+      "bootstrap_lower": 0.130165,
+      "bootstrap_upper": 0.66192,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.9452699999999999
+    },
+    {
+      "event_id": "401816330",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.36455,
+      "xgb_two_head_prob": 0.6876,
+      "model_disagreement": 0.32305,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0070719387916964565,
+      "bootstrap_lower": 0.115315,
+      "bootstrap_upper": 0.6510650000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.8125900000000001
+    },
+    {
+      "event_id": "401816339",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.11205,
+      "xgb_two_head_prob": 0.4202,
+      "model_disagreement": 0.30815000000000003,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.024817144783820244,
+      "bootstrap_lower": 0.0018000000000000002,
+      "bootstrap_upper": 0.4744200000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.6284950000000001
+    },
+    {
+      "event_id": "401816336",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.2926,
+      "xgb_two_head_prob": 0.7929,
+      "model_disagreement": 0.5003,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.011153991733476712,
+      "bootstrap_lower": 0.108095,
+      "bootstrap_upper": 0.7418250000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.991975
+    },
+    {
+      "event_id": "401816335",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.3245,
+      "xgb_two_head_prob": 0.548,
+      "model_disagreement": 0.22350000000000003,
+      "missingness_penalty": 0.04,
+      "missing_flags": [
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.00929804081701711,
+      "bootstrap_lower": 0.217415,
+      "bootstrap_upper": 0.647835,
+      "conservative_probability": 0.056366959182982866,
+      "probability_lower": 0.056366959182982866,
+      "probability_upper": 0.7595850000000001
+    },
+    {
+      "event_id": "401816337",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.63385,
+      "xgb_two_head_prob": 0.49845,
+      "model_disagreement": 0.13540000000000002,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.006984940819214584,
+      "bootstrap_lower": 0.13276500000000002,
+      "bootstrap_upper": 0.8559900000000001,
+      "conservative_probability": 0.03808005918078543,
+      "probability_lower": 0.03808005918078543,
+      "probability_upper": 0.9236900000000001
+    },
+    {
+      "event_id": "401816332",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.06895,
+      "xgb_two_head_prob": 0.3087,
+      "model_disagreement": 0.23974999999999996,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.030111552436686666,
+      "bootstrap_lower": 0.000995,
+      "bootstrap_upper": 0.4180950000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.5379700000000001
+    },
+    {
+      "event_id": "401816333",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.5064,
+      "xgb_two_head_prob": 0.6402,
+      "model_disagreement": 0.13380000000000003,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.00032738547509501804,
+      "bootstrap_lower": 0.483555,
+      "bootstrap_upper": 0.5615,
+      "conservative_probability": 0.35632761452490497,
+      "probability_lower": 0.35632761452490497,
+      "probability_upper": 0.6284000000000001
+    },
+    {
+      "event_id": "401816334",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.5469,
+      "xgb_two_head_prob": 0.17625,
+      "model_disagreement": 0.37065000000000003,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.002404765755999608,
+      "bootstrap_lower": 0.000515,
+      "bootstrap_upper": 0.7916050000000002,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.9769300000000003
+    },
+    {
+      "event_id": "401816338",
+      "game_date": "2026-07-31",
+      "two_head_prob": 0.6755,
+      "xgb_two_head_prob": 0.2412,
+      "model_disagreement": 0.4343,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.009298040817017126,
+      "bootstrap_lower": 0.18397000000000002,
+      "bootstrap_upper": 0.7977700000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 1.0
+    },
+    {
+      "event_id": "401816340",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.47855,
+      "xgb_two_head_prob": 0.49355,
+      "model_disagreement": 0.015000000000000013,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0010977522730129877,
+      "bootstrap_lower": 0.19520500000000002,
+      "bootstrap_upper": 0.5099200000000002,
+      "conservative_probability": 0.16660724772698704,
+      "probability_lower": 0.16660724772698704,
+      "probability_upper": 0.5174200000000002
+    },
+    {
+      "event_id": "401816341",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.3636,
+      "xgb_two_head_prob": 0.52545,
+      "model_disagreement": 0.16185,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.007123656071320842,
+      "bootstrap_lower": 0.1527,
+      "bootstrap_upper": 0.8352600000000001,
+      "conservative_probability": 0.04465134392867916,
+      "probability_lower": 0.04465134392867916,
+      "probability_upper": 0.9161850000000001
+    },
+    {
+      "event_id": "401816344",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.5051,
+      "xgb_two_head_prob": 0.89455,
+      "model_disagreement": 0.38944999999999996,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0002608810692095586,
+      "bootstrap_lower": 0.2226,
+      "bootstrap_upper": 0.5341450000000001,
+      "conservative_probability": 0.007614118930790451,
+      "probability_lower": 0.007614118930790451,
+      "probability_upper": 0.7288700000000001
+    },
+    {
+      "event_id": "401816343",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.0564,
+      "xgb_two_head_prob": 0.2743,
+      "model_disagreement": 0.21789999999999998,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.03206508378563652,
+      "bootstrap_lower": 0.00015,
+      "bootstrap_upper": 0.40707000000000015,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.5160200000000001
+    },
+    {
+      "event_id": "401816346",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.01915,
+      "xgb_two_head_prob": 0.3535,
+      "model_disagreement": 0.33435,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.040531626300386266,
+      "bootstrap_lower": 0.0008750000000000001,
+      "bootstrap_upper": 0.3700600000000003,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.5372350000000002
+    },
+    {
+      "event_id": "401816342",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.48065,
+      "xgb_two_head_prob": 0.50595,
+      "model_disagreement": 0.02529999999999999,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0009901878682112679,
+      "bootstrap_lower": 0.11028,
+      "bootstrap_upper": 0.7436900000000001,
+      "conservative_probability": 0.07663981213178873,
+      "probability_lower": 0.07663981213178873,
+      "probability_upper": 0.75634
+    },
+    {
+      "event_id": "401816345",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.20435,
+      "xgb_two_head_prob": 0.67835,
+      "model_disagreement": 0.474,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.016897721340646127,
+      "bootstrap_lower": 0.07788,
+      "bootstrap_upper": 0.4721950000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.709195
+    },
+    {
+      "event_id": "401816352",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.4069,
+      "xgb_two_head_prob": 0.2999,
+      "model_disagreement": 0.10699999999999998,
+      "missingness_penalty": 0.04,
+      "missing_flags": [
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.004807829602163322,
+      "bootstrap_lower": 0.202515,
+      "bootstrap_upper": 0.5604450000000001,
+      "conservative_probability": 0.10420717039783667,
+      "probability_lower": 0.10420717039783667,
+      "probability_upper": 0.6139450000000001
+    },
+    {
+      "event_id": "401816348",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.0027,
+      "xgb_two_head_prob": 0.5349,
+      "model_disagreement": 0.5322,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.04872676413423826,
+      "bootstrap_lower": 0.00022500000000000005,
+      "bootstrap_upper": 0.4139600000000003,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.6800600000000003
+    },
+    {
+      "event_id": "401816349",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.21635,
+      "xgb_two_head_prob": 0.48085,
+      "model_disagreement": 0.2645,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.016045828466303154,
+      "bootstrap_lower": 0.017740000000000002,
+      "bootstrap_upper": 0.52158,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.65383
+    },
+    {
+      "event_id": "401816360",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.3642,
+      "xgb_two_head_prob": 0.6748,
+      "model_disagreement": 0.31059999999999993,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.00709098709838404,
+      "bootstrap_lower": 0.12459999999999999,
+      "bootstrap_upper": 0.7028550000000002,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.8581550000000002
+    },
+    {
+      "event_id": "401816351",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.45145,
+      "xgb_two_head_prob": 0.3915,
+      "model_disagreement": 0.05995,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.00248979673893182,
+      "bootstrap_lower": 0.125365,
+      "bootstrap_upper": 0.579215,
+      "conservative_probability": 0.07290020326106818,
+      "probability_lower": 0.07290020326106818,
+      "probability_upper": 0.60919
+    },
+    {
+      "event_id": "401816350",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.51455,
+      "xgb_two_head_prob": 0.53685,
+      "model_disagreement": 0.022300000000000098,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.000744428337301099,
+      "bootstrap_lower": 0.496285,
+      "bootstrap_upper": 0.58532,
+      "conservative_probability": 0.42439057166269883,
+      "probability_lower": 0.42439057166269883,
+      "probability_upper": 0.5964700000000001
+    },
+    {
+      "event_id": "401816355",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.55165,
+      "xgb_two_head_prob": 0.4937,
+      "model_disagreement": 0.057949999999999946,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0026496741499326226,
+      "bootstrap_lower": 0.10866500000000001,
+      "bootstrap_upper": 0.6575850000000001,
+      "conservative_probability": 0.05704032585006741,
+      "probability_lower": 0.05704032585006741,
+      "probability_upper": 0.6865600000000001
+    },
+    {
+      "event_id": "401816347",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.1616,
+      "xgb_two_head_prob": 0.7615,
+      "model_disagreement": 0.5999,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.02020250663846203,
+      "bootstrap_lower": 0.004965000000000001,
+      "bootstrap_upper": 0.4619000000000002,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.7618500000000001
+    },
+    {
+      "event_id": "401816353",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.4751,
+      "xgb_two_head_prob": 0.3352,
+      "model_disagreement": 0.13990000000000002,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0012745352625905227,
+      "bootstrap_lower": 0.421715,
+      "bootstrap_upper": 0.576245,
+      "conservative_probability": 0.29049046473740947,
+      "probability_lower": 0.29049046473740947,
+      "probability_upper": 0.6461950000000001
+    },
+    {
+      "event_id": "401816354",
+      "game_date": "2026-08-01",
+      "two_head_prob": 0.2933,
+      "xgb_two_head_prob": 0.69895,
+      "model_disagreement": 0.40564999999999996,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.01111230784737779,
+      "bootstrap_lower": 0.08957,
+      "bootstrap_upper": 0.5038050000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.7066300000000001
+    },
+    {
+      "event_id": "401816356",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.15775,
+      "xgb_two_head_prob": 0.35785,
+      "model_disagreement": 0.2001,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.02052541548303215,
+      "bootstrap_lower": 0.013695000000000002,
+      "bootstrap_upper": 0.41830000000000017,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.5183500000000002
+    },
+    {
+      "event_id": "401816361",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.54745,
+      "xgb_two_head_prob": 0.78205,
+      "model_disagreement": 0.23460000000000003,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.002433104543041828,
+      "bootstrap_lower": 0.06439,
+      "bootstrap_upper": 0.7043900000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.82169
+    },
+    {
+      "event_id": "401816357",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.4076,
+      "xgb_two_head_prob": 0.7462,
+      "model_disagreement": 0.33859999999999996,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.004770990000774299,
+      "bootstrap_lower": 0.27010999999999996,
+      "bootstrap_upper": 0.714755,
+      "conservative_probability": 0.07603900999922568,
+      "probability_lower": 0.07603900999922568,
+      "probability_upper": 0.884055
+    },
+    {
+      "event_id": "401816359",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.6759,
+      "xgb_two_head_prob": 0.38385,
+      "model_disagreement": 0.2920499999999999,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.009320805695372057,
+      "bootstrap_lower": 0.14068,
+      "bootstrap_upper": 0.882815,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 1.0
+    },
+    {
+      "event_id": "401816358",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.1585,
+      "xgb_two_head_prob": 0.4522,
+      "model_disagreement": 0.29369999999999996,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.02046212613735345,
+      "bootstrap_lower": 0.014890000000000002,
+      "bootstrap_upper": 0.5213300000000002,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.6681800000000002
+    },
+    {
+      "event_id": "401816365",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.46375,
+      "xgb_two_head_prob": 0.66285,
+      "model_disagreement": 0.19910000000000005,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0018568998265892965,
+      "bootstrap_lower": 0.30213,
+      "bootstrap_upper": 0.7635350000000001,
+      "conservative_probability": 0.1807231001734107,
+      "probability_lower": 0.1807231001734107,
+      "probability_upper": 0.8630850000000001
+    },
+    {
+      "event_id": "401816368",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.4134,
+      "xgb_two_head_prob": 0.47745,
+      "model_disagreement": 0.06405,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.004466350946306855,
+      "bootstrap_lower": 0.10991000000000001,
+      "bootstrap_upper": 0.5903250000000001,
+      "conservative_probability": 0.053418649053693146,
+      "probability_lower": 0.053418649053693146,
+      "probability_upper": 0.6223500000000001
+    },
+    {
+      "event_id": "401816367",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.99975,
+      "xgb_two_head_prob": 0.6987,
+      "model_disagreement": 0.30105000000000004,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.050173120593527125,
+      "bootstrap_lower": 0.07096,
+      "bootstrap_upper": 1.0,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 1.0
+    },
+    {
+      "event_id": "401816362",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.27115,
+      "xgb_two_head_prob": 0.52805,
+      "model_disagreement": 0.2569,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.012455427451737349,
+      "bootstrap_lower": 0.10160500000000001,
+      "bootstrap_upper": 0.8980750000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 1.0
+    },
+    {
+      "event_id": "401816363",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.2797,
+      "xgb_two_head_prob": 0.36765,
+      "model_disagreement": 0.08794999999999997,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.011930860334966844,
+      "bootstrap_lower": 0.046615000000000004,
+      "bootstrap_upper": 0.5845350000000002,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.6285100000000002
+    },
+    {
+      "event_id": "401816364",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.4844,
+      "xgb_two_head_prob": 0.4742,
+      "model_disagreement": 0.010199999999999987,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0007981773989925667,
+      "bootstrap_lower": 0.45164499999999996,
+      "bootstrap_upper": 0.53705,
+      "conservative_probability": 0.3857468226010074,
+      "probability_lower": 0.3857468226010074,
+      "probability_upper": 0.54215
+    },
+    {
+      "event_id": "401816366",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.4471,
+      "xgb_two_head_prob": 0.36315,
+      "model_disagreement": 0.08395000000000002,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.002714187891206399,
+      "bootstrap_lower": 0.054685,
+      "bootstrap_upper": 0.6148750000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.65685
+    },
+    {
+      "event_id": "401816370",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.2402,
+      "xgb_two_head_prob": 0.25335,
+      "model_disagreement": 0.013150000000000023,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.014429023063694311,
+      "bootstrap_lower": 0.041045000000000005,
+      "bootstrap_upper": 0.4892450000000004,
+      "conservative_probability": 4.097693630568042e-05,
+      "probability_lower": 4.097693630568042e-05,
+      "probability_upper": 0.49582000000000037
+    },
+    {
+      "event_id": "401816369",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.49505,
+      "xgb_two_head_prob": 0.53155,
+      "model_disagreement": 0.03649999999999998,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0002532076824854137,
+      "bootstrap_lower": 0.31537,
+      "bootstrap_upper": 0.71323,
+      "conservative_probability": 0.27686679231751454,
+      "probability_lower": 0.27686679231751454,
+      "probability_upper": 0.73148
+    },
+    {
+      "event_id": "401816371",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.23115,
+      "xgb_two_head_prob": 0.35405,
+      "model_disagreement": 0.12289999999999998,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.01503151772750354,
+      "bootstrap_lower": 0.027645,
+      "bootstrap_upper": 0.579385,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.640835
+    },
+    {
+      "event_id": "401816374",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.5386,
+      "xgb_two_head_prob": 0.39365,
+      "model_disagreement": 0.14494999999999997,
+      "missingness_penalty": 0.06,
+      "missing_flags": [
+        "home_sp_availability",
+        "away_sp_availability",
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0019776571218702525,
+      "bootstrap_lower": 0.492835,
+      "bootstrap_upper": 0.615125,
+      "conservative_probability": 0.3583823428781298,
+      "probability_lower": 0.3583823428781298,
+      "probability_upper": 0.6876
+    },
+    {
+      "event_id": "401816373",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.8266,
+      "xgb_two_head_prob": 0.45855,
+      "model_disagreement": 0.36805,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.019241737910789727,
+      "bootstrap_lower": 0.12200000000000001,
+      "bootstrap_upper": 0.92947,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 1.0
+    },
+    {
+      "event_id": "401816375",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.12615,
+      "xgb_two_head_prob": 0.5882,
+      "model_disagreement": 0.46204999999999996,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.02338811174321206,
+      "bootstrap_lower": 0.049400000000000006,
+      "bootstrap_upper": 0.6550050000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.8860300000000001
+    },
+    {
+      "event_id": "401816376",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.23785,
+      "xgb_two_head_prob": 0.7731,
+      "model_disagreement": 0.53525,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.014584258705760064,
+      "bootstrap_lower": 0.02416,
+      "bootstrap_upper": 0.6126650000000001,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.8802900000000001
+    },
+    {
+      "event_id": "401816372",
+      "game_date": "2026-08-02",
+      "two_head_prob": 0.42555,
+      "xgb_two_head_prob": 0.74765,
+      "model_disagreement": 0.32210000000000005,
+      "missingness_penalty": 0.02,
+      "missing_flags": [
+        "weather_availability"
+      ],
+      "calibration_uncertainty": 0.0038314113526346856,
+      "bootstrap_lower": 0.13957,
+      "bootstrap_upper": 0.73622,
+      "conservative_probability": 0.0,
+      "probability_lower": 0.0,
+      "probability_upper": 0.89727
+    }
+  ]
+}

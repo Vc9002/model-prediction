@@ -316,8 +316,18 @@ class PickLedger:
         research_scoring_mode: str = "fixed",
         research_scoring_note: str = "fixed-stake hypothetical research scoring",
         retired: bool = False,
+        model_ledgers_dir: str | Path | None = None,
     ) -> None:
         self.path = Path(path)
+        # Canonical per-model evidence directory. Defaults to the legacy
+        # tier-relative location (path.parent / "model_ledgers"), but callers
+        # pass the canonical data/model_ledgers so every tier mirrors into ONE
+        # per-model ledger — the dedupe key already assumes Main/Flat/Research/
+        # Gated collapse into a single row for one real decision.
+        self.model_ledgers_dir = (
+            Path(model_ledgers_dir) if model_ledgers_dir is not None
+            else self.path.parent / "model_ledgers"
+        )
         if self.path.suffix.casefold() != ".xlsx":
             raise ValueError("the active picks ledger must be an .xlsx workbook")
         if research_score_units is not None and research_score_units <= 0:
@@ -657,7 +667,7 @@ class PickLedger:
         # this exact gap the first time this fix was written.
         if not self.retired:
             try:
-                record_from_pick_request(self.path.parent / "model_ledgers", request, eligibility, created)
+                record_from_pick_request(self.model_ledgers_dir, request, eligibility, created)
             except Exception:
                 logging.getLogger(__name__).warning(
                     "model_ledger write failed for pick %s (primary ledger write already succeeded)",
@@ -853,7 +863,7 @@ class PickLedger:
         # defense-in-depth for consistency.
         if not self.retired:
             try:
-                settle_from_pick_row(self.path.parent / "model_ledgers", row)
+                settle_from_pick_row(self.model_ledgers_dir, row)
             except Exception:
                 logging.getLogger(__name__).warning(
                     "model_ledger settle failed for pick %s (primary ledger settle already succeeded)",

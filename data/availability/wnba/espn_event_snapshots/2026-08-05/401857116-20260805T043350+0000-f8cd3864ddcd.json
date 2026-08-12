@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-18",
+      "status_at_utc": "2026-08-05T04:00:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-04T21:18:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "5106222",
+      "current_status": "Out",
+      "player_name": "Taina Mair",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-04T21:58:00+00:00",
+      "team": "Seattle Storm"
+    }
+  ],
+  "event_id": "401857116",
+  "observed_at_utc": "2026-08-05T04:33:50.637045+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "f8cd3864ddcd9de430fd8458040b7055748c3fb243657c5ce47fc204bb3b4920",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -123,6 +123,11 @@ from .tennis_forward import TENNIS_TOURS, build_tennis_slate
 from .total_score import validate_all_total_score_models
 from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
+from .champion_challenger import (
+    FrozenProductionStore,
+    ProductionRegistry,
+    compare_champion_vs_challenger,
+)
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
@@ -634,6 +639,36 @@ def parser() -> argparse.ArgumentParser:
         "verify-chain",
         help="verify audit-chain link/hash integrity and ledger<->audit reconciliation",
     )
+
+    freeze = commands.add_parser(
+        "freeze-production",
+        help="snapshot current production champions as an immutable frozen registry",
+    )
+    freeze.add_argument(
+        "--output",
+        default=None,
+        help="override the default frozen champions path",
+    )
+
+    compare = commands.add_parser(
+        "compare-champion",
+        help="run a paired champion-vs-challenger evaluation",
+    )
+    compare.add_argument(
+        "--challenger-predictions",
+        required=True,
+        help="path to JSON/JSONL file with challenger predictions",
+    )
+    compare.add_argument(
+        "--champion-predictions",
+        required=True,
+        help="path to JSON/JSONL file with champion predictions",
+    )
+    compare.add_argument("--sport", required=True, help="sport key (mlb, wnba, etc.)")
+    compare.add_argument(
+        "--market", default="moneyline", help="market type (default: moneyline)"
+    )
+
     return root
 
 
@@ -4295,6 +4330,43 @@ def main(argv: list[str] | None = None) -> None:
             output = ledger.void(args.pick_id, args.reason)
         elif args.command == "review-loss":
             output = ledger.review_loss(args.pick_id, args.classification, args.cause, args.action)
+        elif args.command == "freeze-production":
+            registry = ProductionRegistry()
+            snapshots = registry.freeze()
+            store = FrozenProductionStore()
+            store.write(registry)
+            output = {
+                "status": "frozen",
+                "frozen_at_utc": snapshots[0].frozen_at_utc if snapshots else "",
+                "champions": [s.to_dict() for s in snapshots],
+            }
+        elif args.command == "compare-champion":
+            import json as _json
+
+            def _load_predictions(pth):
+                raw = Path(pth).read_text(encoding="utf-8")
+                if raw.strip().startswith("["):
+                    return _json.loads(raw)
+                return [_json.loads(line) for line in raw.strip().splitlines() if line.strip()]
+
+            champion_preds = _load_predictions(args.champion_predictions)
+            challenger_preds = _load_predictions(args.challenger_predictions)
+            verdict = compare_champion_vs_challenger(
+                challenger_predictions=challenger_preds,
+                champion_predictions=champion_preds,
+                sport=args.sport,
+                market=args.market,
+            )
+            output = {
+                "status": verdict.status,
+                "paired_metrics": verdict.paired_metrics,
+                "bootstrap_ci": {
+                    k: {"lower": v[0], "upper": v[1]} if v else None
+                    for k, v in (verdict.bootstrap_ci or {}).items()
+                },
+                "failures": verdict.failures,
+                "recommendation": verdict.recommendation,
+            }
         else:
             raise ValueError(f"unknown command: {args.command}")
         print(json.dumps(output, indent=2, sort_keys=True, default=str))

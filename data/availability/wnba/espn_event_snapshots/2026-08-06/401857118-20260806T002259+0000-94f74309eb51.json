@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4594786",
+      "current_status": "Questionable",
+      "player_name": "Sydney Taylor",
+      "raw_status": "Day-To-Day",
+      "reason": "Groin",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-04T22:11:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "3142010",
+      "current_status": "Out",
+      "player_name": "Azura Stevens",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-04T22:07:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-02T21:51:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "5105752",
+      "current_status": "Out",
+      "player_name": "Alissa Pili",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-06T00:03:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4565515",
+      "current_status": "Out",
+      "player_name": "Tonie Morgan",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-05T23:57:00+00:00",
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "event_id": "401857118",
+  "observed_at_utc": "2026-08-06T00:22:59.174724+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "94f74309eb513972fe0ba6f0199462d54c2a1788cac65c42676ca9df56c9610d",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

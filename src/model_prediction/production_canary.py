@@ -93,11 +93,11 @@ def validate_production_config(
     if not isinstance(svc, dict):
         raise ValueError("prediction_service section missing or not a mapping")  # noqa: TRY004
 
-    # ── exactly one allowed model ──
+    # ── allowed models must be non-empty ──
     allowed = svc.get("allowed_models")
-    if not isinstance(allowed, list) or len(allowed) != 1:
+    if not isinstance(allowed, list) or len(allowed) == 0:
         raise ValueError(
-            "prediction_service.allowed_models must be a list with exactly one entry"
+            "prediction_service.allowed_models must be a non-empty list"
         )
 
     primary = svc.get("primary")

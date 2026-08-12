@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4280877",
+      "current_status": "Out",
+      "player_name": "Chloe Bibby",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-05T22:06:00+00:00",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "athlete_id": "5345322",
+      "current_status": "Out",
+      "player_name": "Emma Cechova",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-15T23:36:00+00:00",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "athlete_id": "3146151",
+      "current_status": "Questionable",
+      "player_name": "Ariel Atkins",
+      "raw_status": "Day-To-Day",
+      "reason": "Ribs",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-06T18:41:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4565515",
+      "current_status": "Out",
+      "player_name": "Tonie Morgan",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-06T14:21:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "5105752",
+      "current_status": "Out",
+      "player_name": "Alissa Pili",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-06",
+      "status_at_utc": "2026-08-06T00:03:00+00:00",
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "event_id": "401857120",
+  "observed_at_utc": "2026-08-06T18:57:54.318055+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "deafbf24ed7c81147749643a17296855d0a56fb9b5f41b313fc7b248dce18089",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

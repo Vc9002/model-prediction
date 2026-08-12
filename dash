@@ -1,6 +1,6 @@
 #!/bin/bash
 # dash — start dashboard
-cd "$HOME/model prediction" || exit 1
+cd "$HOME/model-prediction" || exit 1
 PYTHONPATH=src .venv/bin/python dashboard_server.py --port 8765 &
 for _ in $(seq 1 20); do
     curl -sf http://localhost:8765/api/status >/dev/null 2>&1 && echo "Dashboard: http://localhost:8765/" && exit 0

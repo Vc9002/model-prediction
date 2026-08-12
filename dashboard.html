@@ -306,25 +306,29 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 </div>
 
 <div class="shell">
-  <nav id="tabs">
-    <div class="rail-group">
-      <div class="rail-label">Monitor</div>
-      <button data-tab="matrix">Matrix</button>
-      <button data-tab="health">Health</button>
-      <button data-tab="today">Today</button>
-      <button data-tab="market">Market</button>
-    </div>
-    <div class="rail-group">
-      <div class="rail-label">Ledger</div>
-      <button data-tab="picks">Ledger</button>
-      <button data-tab="flat">Flat</button>
-      <button data-tab="research">Flat Research</button>
-      <button data-tab="gated-research">Gated Research</button>
-    </div>
-    <div class="rail-group">
-      <div class="rail-label">Performance</div>
-      <button data-tab="perf">Performance</button>
-    </div>
+   <nav id="tabs">
+     <div class="rail-group">
+       <div class="rail-label">Production</div>
+       <button data-tab="production" class="on">Production</button>
+     </div>
+     <div class="rail-group">
+       <div class="rail-label">Monitor</div>
+       <button data-tab="matrix">Matrix</button>
+       <button data-tab="health">Health</button>
+       <button data-tab="today">Today</button>
+       <button data-tab="market">Market</button>
+     </div>
+     <div class="rail-group">
+       <div class="rail-label">Ledger</div>
+       <button data-tab="picks">Ledger</button>
+       <button data-tab="flat">Flat</button>
+       <button data-tab="research">Flat Research</button>
+       <button data-tab="gated-research">Gated Research</button>
+     </div>
+     <div class="rail-group">
+       <div class="rail-label">Performance</div>
+       <button data-tab="perf">Performance</button>
+     </div>
     <div class="rail-group">
       <div class="rail-label">Models</div>
       <button data-tab="models">Models</button>
@@ -335,7 +339,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
-      <button data-tab="rebuild" class="on">Rebuild Shadow</button>
+      <button data-tab="rebuild">Rebuild Shadow</button>
       <button data-tab="evidence">Evidence</button>
       <button data-tab="settings">Settings</button>
     </div>
@@ -691,6 +695,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.cl
   if(b.dataset.tab==="market")loadMarket();
   if(b.dataset.tab==="today")renderToday();
   if(b.dataset.tab==="folio"&&state.livePortfolio)renderFolioHistory();
+  if(b.dataset.tab==="production")loadProduction();
   if(b.dataset.tab==="rebuild")loadRebuild();
 });
 
@@ -762,6 +767,23 @@ function renderShadowPicks(shadowPicks){
       <td>${pick.pnl_units==null?"—":Number(pick.pnl_units).toFixed(2)}</td>
     </tr>`).join("")}
   </table></div>`;
+async function loadProduction(){
+  try{
+    let d=await api("/api/production-canary");
+    renderProduction(d);
+  }catch(e){E("production",e.message||"load failed")}
+}
+function renderProduction(d){
+  let m=d.models||{},status=d.status||"?",health=d.health||d;
+  let rows=Object.entries(m).map(([sport,info])=>{
+    let mkts=info.markets||{},allHealthy=Object.values(mkts).every(x=>x.status==="HEALTHY");
+    let marketList=Object.entries(mkts).map(([mkt,md])=>`<span class="${md.status==="HEALTHY"?"ok":"bad"}">${mkt}:${md.model_id||"?"}</span>`).join(" ");
+    return `<tr><td><b>${sport}</b></td><td>${info.enabled?"✅":"❌"}</td><td>${allHealthy?"🟢":"🔴"}</td><td>${marketList}</td></tr>`
+  }).join("");
+  let h=`<div class=card><h3>Production Models</h3><p>Status: <b>${status}</b> | ${Object.keys(m).length} sports</p><table><tr><th>Sport</th><th>Enabled</th><th>Health</th><th>Markets</th></tr>${rows}</table></div>`;
+  E("production",h)
+}
+
 }
 function renderRebuild(status,sports,benchmark,economics,runs,health){
   const reason=[status.reason,sports.reason,benchmark.reason,economics.reason,runs.reason,health.reason].filter(Boolean).join(" · ");
@@ -2928,7 +2950,7 @@ async function refreshAll(){
   const panels=await Promise.allSettled([renderToday(),renderFolio(),loadMarket()]);
   // populateFilters() reads every cache, so it must run after the ledger
   // requests settle. One failed source no longer blanks every other panel.
-  await Promise.allSettled([renderResearch(true),renderFlat(true),renderGatedResearch(true)]);
+  await Promise.allSettled([renderResearch(false),renderFlat(false),renderGatedResearch(false)]);
   populateFilters();renderIntegrity();
   const failures=[...core,...panels].filter(result=>result.status==="rejected").length;
   $("#updatedTxt").innerHTML=failures
@@ -2957,7 +2979,7 @@ setControlFromUrl("folioType","folio_type");setControlFromUrl("folioAttribution"
 setControlFromUrl("folioPageSize","folio_rows");
 const requestedTab=initialUrlState.get("tab");
 if(requestedTab&&$("#tab-"+requestedTab))gotoTab(requestedTab);
-else loadRebuild();
+else loadProduction();
 refreshAll();resetTimer();
 </script>
 </body>

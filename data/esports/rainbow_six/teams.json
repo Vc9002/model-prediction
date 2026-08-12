@@ -1247,8 +1247,8 @@
   },
   "bo3:7:22019": {
     "acronym": null,
-    "name": "KingZone",
-    "slug": "kingzone",
+    "name": "KINGZERO eSports",
+    "slug": "kingzero-esports",
     "source_team_id": 22019,
     "team_id": "bo3:7:22019"
   },
@@ -1965,5 +1965,12 @@
     "slug": "cag-by-varrel",
     "source_team_id": 24672,
     "team_id": "bo3:7:24672"
+  },
+  "bo3:7:24958": {
+    "acronym": "AIU",
+    "name": "Al-Ula Club",
+    "slug": "al-ula-club",
+    "source_team_id": 24958,
+    "team_id": "bo3:7:24958"
   }
 }

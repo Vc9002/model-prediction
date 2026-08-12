@@ -1,0 +1,20 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "event_id": "401857129",
+  "observed_at_utc": "2026-08-09T05:15:09.070653+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "198c52434b39c28b073f842caaf63ecd76169817d816ae2ede2ca601708db370",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -170,3 +170,44 @@ Comments explain *why*, not *what* — a hidden constraint, a workaround for
 a specific real bug, a non-obvious invariant. Don't write comments that
 just restate the code. This project's own code is written this way
 throughout; match it.
+
+## 2026-08-13 — Champion/challenger + settled-picks + cleanup (this session)
+
+**New module `src/model_prediction/champion_challenger.py`** — production
+freeze + paired comparison harness. CLI: `freeze-production`,
+`compare-champion`. Docs: `docs/CHAMPION_CHALLENGER.md`.
+
+**MLB v9 Phase 1 features wired** — `starter_kbb_gap`, `residual_trend_gap`,
+`bullpen_fatigue_gap` added to `validation.py` / `learned_forward.py` /
+`features/starter_history.py`. Runner: `scripts/mlb_v9_ablation.py`.
+Ablation result: residual-trend variant wins (+56.4u vs +43.1u raw trend).
+
+**MLB v9 Phase 2** — `park_factor_at()` PIT-correct park factors added
+(`features/park_factors.py`), wired into `validation.py` walk-forward.
+
+**WNBA spread fix** — `wnba-spread-baseline-v1` was predicting moneyline not
+spread (never used the line). Replaced with `wnba-spread-margin-v1`
+(margin_normal, `P(away_cover)=Φ(line; margin, 10.5)`). Broken artifact
+archived. `config/model.yaml` spread/total refs corrected.
+
+**Cleanup** — 38 files removed (12 `*.previous.json`, 22 obsolete configs, 4
+dead rebuild models). Config root 63 → 27 files.
+
+**Known gap** — canonical `data/model_ledgers/` froze 2026-08-03 (retired main
+ledger was its only writer). Dashboard + settled-picks loader read stale data.
+See `docs/SETTLEMENT_GAP.md`. Do NOT silently re-route production data paths
+without an explicit decision.
+
+**Settlement routing fix** — model-ledger mirror now writes to canonical
+`data/model_ledgers/` (threaded `model_ledgers_dir` through `PickLedger`,
+`main_ledgers.py`, `research_ledgers.py`). Previously each tier mirrored to
+its own subdir (`data/flat/model_ledgers/`, …) while the dashboard + loader
+read only canonical — that froze on 2026-08-03. See `docs/SETTLEMENT_GAP.md`.
+
+**MLB distribution methods** — `simulate_game` now takes a `method` argument
+(`gamma_poisson` default / `negative_binomial` / `independent_poisson`);
+`compare_distribution_methods()` prices moneyline/spread/total from one
+coherent joint draw per method. Wired through `MeasuredEdgeMarginModel` /
+`MeasuredEdgeTotalsModel.predict(..., method=...)`. NB is the first serious
+challenger to the incumbent gamma-Poisson; it is runnable but not yet
+promoted. Tests: `tests/test_mlb_distribution_methods.py`.

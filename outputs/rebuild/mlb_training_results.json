@@ -1,0 +1,41 @@
+{
+  "model_version": "mlb-two-head-v1",
+  "games_used": 190,
+  "folds": 3,
+  "fold_metrics": [
+    {
+      "fold": 0,
+      "train_n": 37,
+      "val_n": 12,
+      "log_loss": 1.032788004711563,
+      "brier": 0.387271844375,
+      "ece": 0.3904625
+    },
+    {
+      "fold": 1,
+      "train_n": 64,
+      "val_n": 13,
+      "log_loss": 0.6963442634959329,
+      "brier": 0.2515280809615385,
+      "ece": 0.05629615384615391
+    },
+    {
+      "fold": 2,
+      "train_n": 108,
+      "val_n": 28,
+      "log_loss": 0.7171762824206844,
+      "brier": 0.26194902339285714,
+      "ece": 0.13155357142857144
+    }
+  ],
+  "calibration": {
+    "intercept": 3.460567992030334,
+    "slope": -13.55002076800994
+  },
+  "final_metrics": {
+    "log_loss": 0.6809020408867578,
+    "brier": 0.24402054532343162,
+    "ece": 0.012403063468850364
+  },
+  "artifact_hash": "738f41a89f6207cafe2ac27ee052474a63b4a14e871d0d608920bb604c617cf8"
+}

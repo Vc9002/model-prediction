@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4398966",
+      "current_status": "Questionable",
+      "player_name": "Olivia Nelson-Ododa",
+      "raw_status": "Day-To-Day",
+      "reason": "Illness",
+      "return_date": "2026-08-07",
+      "status_at_utc": "2026-08-07T19:16:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "5105732",
+      "current_status": "Out",
+      "player_name": "Raegan Beers",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-06T20:55:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "2490553",
+      "current_status": "Out",
+      "player_name": "Brittney Griner",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-07",
+      "status_at_utc": "2026-08-06T20:49:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4329370",
+      "current_status": "Out",
+      "player_name": "Maria Kliundikova",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-31T17:11:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "event_id": "401857122",
+  "observed_at_utc": "2026-08-07T21:55:52.876614+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "281d0ef0d663b1611ad5d054283c2effd714dc0706a9d68bb0e2d70ab2528054",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

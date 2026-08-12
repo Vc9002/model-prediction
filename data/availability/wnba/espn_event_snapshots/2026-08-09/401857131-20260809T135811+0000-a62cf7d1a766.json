@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5274110",
+      "current_status": "Questionable",
+      "player_name": "Monique Akoa Makani",
+      "raw_status": "Day-To-Day",
+      "reason": "Ankle",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-09T00:24:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4398764",
+      "current_status": "Questionable",
+      "player_name": "Rae Burrell",
+      "raw_status": "Day-To-Day",
+      "reason": "Leg",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-09T00:18:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4257500",
+      "current_status": "Questionable",
+      "player_name": "Cecilia Zandalasini",
+      "raw_status": "Day-To-Day",
+      "reason": "Quadriceps",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-09T00:10:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "4790263",
+      "current_status": "Out",
+      "player_name": "Iliana Rupert",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-07T15:18:00+00:00",
+      "team": "Golden State Valkyries"
+    }
+  ],
+  "event_id": "401857131",
+  "observed_at_utc": "2026-08-09T13:58:11.465761+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "a62cf7d1a766e1cb4d88033c11e6e79332d67a4eaaf16ee19c032456f1818711",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

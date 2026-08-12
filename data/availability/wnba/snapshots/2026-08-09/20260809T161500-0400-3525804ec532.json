@@ -1,0 +1,225 @@
+{
+  "entries": [
+    {
+      "current_status": "Available",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "PHX@WAS",
+      "player_name": "Bonner, DeWanna",
+      "reason": "Injury/Illness - - ; Illness",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "PHX@WAS",
+      "player_name": "Ciezki, Shay",
+      "reason": "Coach's Decision - Developmental Player",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "PHX@WAS",
+      "player_name": "Dunn, Kara",
+      "reason": "Coach's Decision - Developmental Player",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "PHX@WAS",
+      "player_name": "Laney- Hamilton, Betnijah",
+      "reason": "Personal Reasons",
+      "team": "Washington Mystics"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:00 (ET)",
+      "matchup": "PHX@WAS",
+      "player_name": "Littlepage- Buggs, Darianna",
+      "reason": "Coach's Decision",
+      "team": "Washington Mystics"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:30 (ET)",
+      "matchup": "DAL@MIN",
+      "player_name": "Clark, Alysha",
+      "reason": "Injury/Illness - Back; n/a",
+      "team": "Dallas Wings"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:30 (ET)",
+      "matchup": "DAL@MIN",
+      "player_name": "Fudd, Azzi",
+      "reason": "Injury/Illness - Right Knee; n/a",
+      "team": "Dallas Wings"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:30 (ET)",
+      "matchup": "DAL@MIN",
+      "player_name": "Shepard, Jessica",
+      "reason": "Injury/Illness - Right Ankle; n/a",
+      "team": "Dallas Wings"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:30 (ET)",
+      "matchup": "DAL@MIN",
+      "player_name": "Bibby, Chloe",
+      "reason": "Personal Reasons",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "03:30 (ET)",
+      "matchup": "DAL@MIN",
+      "player_name": "King, Liatu",
+      "reason": "Coach's Decision",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-09",
+      "game_time_et": "07:00 (ET)",
+      "matchup": "GSV@LAS",
+      "player_name": "Zandalasini, Cecilia",
+      "reason": "Injury/Illness - Left Quad; Soreness",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-09",
+      "game_time_et": "07:00 (ET)",
+      "matchup": "GSV@LAS",
+      "player_name": "Akoa Makani, Monique",
+      "reason": "Injury/Illness - Right Ankle; R Ankle",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-08-09",
+      "game_time_et": "07:00 (ET)",
+      "matchup": "GSV@LAS",
+      "player_name": "Burrell, Rae",
+      "reason": "Injury/Illness - Right Leg; R Leg",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "12:30 (ET)",
+      "matchup": "LVA@NYL",
+      "player_name": "Gray, Chelsea",
+      "reason": "Rest",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "12:30 (ET)",
+      "matchup": "LVA@NYL",
+      "player_name": "Parker- Tyus, Cheyenne",
+      "reason": "Not With Team",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "12:30 (ET)",
+      "matchup": "LVA@NYL",
+      "player_name": "Wilson, A'ja",
+      "reason": "Rest",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "12:30 (ET)",
+      "matchup": "LVA@NYL",
+      "player_name": "Young, Jackie",
+      "reason": "Rest",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "12:30 (ET)",
+      "matchup": "LVA@NYL",
+      "player_name": "Fiebich, Leonie",
+      "reason": "Injury/Illness - Left Foot; L. Foot",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-09",
+      "game_time_et": "12:30 (ET)",
+      "matchup": "LVA@NYL",
+      "player_name": "Sabally, Satou",
+      "reason": "Concussion Protocol",
+      "team": "New York Liberty"
+    }
+  ],
+  "observed_at_utc": "2026-08-09T20:26:36.758489+00:00",
+  "report_at_utc": "2026-08-09T20:15:00+00:00",
+  "schema_version": "1",
+  "source": "official_wnba_injury_report",
+  "source_index_url": "https://www.wnba.com/api/injury-reports",
+  "source_pdf_sha256": "3525804ec532344849da2849191ce8e77f0db97a29ed8cf1bbb028db07148450",
+  "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-08-09_04_15PM.pdf",
+  "sport": "wnba",
+  "team_matchups": {
+    "Atlanta Dream": "TOR@ATL",
+    "Chicago Sky": "CHI@SEA",
+    "Dallas Wings": "DAL@MIN",
+    "Golden State Valkyries": "GSV@LAS",
+    "Las Vegas Aces": "LVA@NYL",
+    "Los Angeles Sparks": "GSV@LAS",
+    "Minnesota Lynx": "DAL@MIN",
+    "New York Liberty": "LVA@NYL",
+    "Phoenix Mercury": "PHX@WAS",
+    "Seattle Storm": "CHI@SEA",
+    "Toronto Tempo": "TOR@ATL",
+    "Washington Mystics": "PHX@WAS"
+  },
+  "team_report_status": {
+    "Atlanta Dream": "not_yet_submitted",
+    "Chicago Sky": "not_yet_submitted",
+    "Dallas Wings": "submitted",
+    "Golden State Valkyries": "submitted",
+    "Las Vegas Aces": "submitted",
+    "Los Angeles Sparks": "submitted",
+    "Minnesota Lynx": "submitted",
+    "New York Liberty": "submitted",
+    "Phoenix Mercury": "submitted",
+    "Seattle Storm": "not_yet_submitted",
+    "Toronto Tempo": "not_yet_submitted",
+    "Washington Mystics": "submitted"
+  },
+  "teams_listed": [
+    "Atlanta Dream",
+    "Chicago Sky",
+    "Dallas Wings",
+    "Golden State Valkyries",
+    "Las Vegas Aces",
+    "Los Angeles Sparks",
+    "Minnesota Lynx",
+    "New York Liberty",
+    "Phoenix Mercury",
+    "Seattle Storm",
+    "Toronto Tempo",
+    "Washington Mystics"
+  ]
+}

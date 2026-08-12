@@ -385,6 +385,9 @@ def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
 
 _PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
 _FLAT_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+# SQLite-backed cache: mirrors Excel ledger data for ~100x faster dashboard reads.
+# Falls back to Excel parsing if the SQLite cache hasn't been built yet.
+_DASHBOARD_CACHE: object | None = None
 # ── SECTION: Picks & Performance ────────────────────────────────────
 
 
@@ -401,7 +404,45 @@ def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]
     keyed on the combined mtime of every file that actually exists so any
     single sport's file changing invalidates the cache -- same "only
     re-parse on change" principle read_picks() always used, just extended
-    to N files instead of one."""
+    to N files instead of one.
+
+    When the SQLite dashboard cache is available, reads from it instead of
+    parsing Excel files (~100x faster).  Falls back to Excel parsing if the
+    cache hasn't been built yet.
+    """
+    global _DASHBOARD_CACHE
+    if _DASHBOARD_CACHE is None:
+        try:
+            from model_prediction.dashboard_cache import get_cache as _get_dc
+            _DASHBOARD_CACHE = _get_dc(DATA)
+        except Exception:
+            pass
+
+    # Try SQLite cache first
+    if _DASHBOARD_CACHE is not None and paths:
+        first_path = str(paths[0])
+        if "/flat/" in first_path or "\\flat\\" in first_path:
+            tier = "flat"
+        elif "/research/" in first_path or "\\research\\" in first_path:
+            tier = "research"
+        elif "/gated_research/" in first_path:
+            tier = "gated_research"
+        else:
+            tier = "main"
+
+        try:
+            dc = _DASHBOARD_CACHE
+            dc.refresh()  # no-op if mtimes unchanged, fast SQLite otherwise
+            if tier in ("flat", "main", "research", "gated_research"):
+                rows = dc.read_picks(tier)
+            else:
+                rows = dc.read_picks(tier)
+            if rows:
+                return rows
+        except Exception:
+            pass
+
+    # Fallback to Excel parsing (original path)
     if load_workbook is None:
         return []
     existing = [path for path in paths if path.exists()]
@@ -4047,23 +4088,18 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 )
             elif route == "/api/research-picks":
-                research = _parse_research_picks()
-                decorated = [_decorate_pick(r) for r in research]
-                self._send(_cached("research-picks", 30, lambda: decorated))
+                self._send(_cached("research-picks", 60, lambda: [_decorate_pick(r) for r in _parse_research_picks()]))
             elif route == "/api/gated-research-performance":
                 sport = str(query.get("sport") or "").strip()
-                gated = _parse_research_picks(gated=True)
                 self._send(
                     _cached(
                         f"gated-research-performance:{sport.casefold() or 'all'}",
-                        30,
-                        lambda: performance_for_sport(gated, sport),
+                        60,
+                        lambda: performance_for_sport(_parse_research_picks(gated=True), sport),
                     )
                 )
             elif route == "/api/gated-research-picks":
-                gated = _parse_research_picks(gated=True)
-                decorated = [_decorate_pick(r) for r in gated]
-                self._send(_cached("gated-research-picks", 30, lambda: decorated))
+                self._send(_cached("gated-research-picks", 60, lambda: [_decorate_pick(r) for r in _parse_research_picks(gated=True)]))
             elif route == "/api/backtests":
                 self._send(_cached("backtests", 60, backtests))
             elif route == "/api/backtest":

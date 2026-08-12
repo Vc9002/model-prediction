@@ -4884,5 +4884,12 @@
     "slug": "dia-ozarox-esports",
     "source_team_id": 25006,
     "team_id": "bo3:3:25006"
+  },
+  "bo3:3:25041": {
+    "acronym": null,
+    "name": "UP2UMEDIA Cebulaki",
+    "slug": "up2umedia-cebulaki",
+    "source_team_id": 25041,
+    "team_id": "bo3:3:25041"
   }
 }

@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "3906972",
+      "current_status": "Questionable",
+      "player_name": "Bridget Carleton",
+      "raw_status": "Day-To-Day",
+      "reason": "Foot",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-07T23:52:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "5346554",
+      "current_status": "Questionable",
+      "player_name": "Teja Oblak",
+      "raw_status": "Day-To-Day",
+      "reason": "Knee",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-07T23:49:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4703794",
+      "current_status": "Out",
+      "player_name": "Sarah Ashlee Barker",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-24T15:18:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "4433795",
+      "current_status": "Out",
+      "player_name": "Sania Feagin",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-09T23:15:00+00:00",
+      "team": "Portland Fire"
+    },
+    {
+      "athlete_id": "3917453",
+      "current_status": "Questionable",
+      "player_name": "Katie Lou Samuelson",
+      "raw_status": "Day-To-Day",
+      "reason": "Knee",
+      "return_date": "2026-08-08",
+      "status_at_utc": "2026-08-08T00:10:00+00:00",
+      "team": "Seattle Storm"
+    },
+    {
+      "athlete_id": "5106222",
+      "current_status": "Out",
+      "player_name": "Taina Mair",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-08-08T00:03:00+00:00",
+      "team": "Seattle Storm"
+    }
+  ],
+  "event_id": "401857127",
+  "observed_at_utc": "2026-08-08T04:05:18.021543+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "68353aa50fe53588eb945f88baaaa8a252c2b9d9cb522df133c217009030c37b",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

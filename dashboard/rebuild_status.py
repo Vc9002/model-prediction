@@ -322,7 +322,10 @@ class RebuildStatusReader:
         prediction_rows, _ = self._query(
             self.shadow_db,
             "SELECT run_id, event_id, horizon, decision_time_utc, predicted_winner, "
-            "probability_lower_json, probability_upper_json, calibration_uncertainty, "
+            "calibrated_probabilities_json, raw_probabilities_json, "
+            "probability_lower_json, probability_upper_json, "
+            "conservative_probabilities_json, "
+            "candidate_version, model_artifact_hash, calibration_uncertainty, "
             "model_disagreement FROM predictions WHERE run_id IN (" + placeholders + ")",
             tuple(run_ids),
         )
@@ -340,6 +343,24 @@ class RebuildStatusReader:
                 "FROM settlements WHERE trade_decision_id IS NOT NULL",
             )
             settlements_by_decision = {int(row["trade_decision_id"]): row for row in settlement_rows}
+
+        # Market evaluations: real executable prices that produced the edge
+        market_eval_ids = [
+            row["evaluated_market_id"] for row in decisions
+            if row.get("evaluated_market_id") is not None
+        ]
+        market_evals_by_id: dict[int, dict] = {}
+        if market_eval_ids:
+            mev_placeholders = ",".join("?" for _ in market_eval_ids)
+            mev_rows, _ = self._query(
+                self.shadow_db,
+                "SELECT id, market_id, market_type, team_or_side, line, "
+                "executable_ask, depth_adjusted_price, quote_age_seconds, "
+                "available_depth FROM market_evaluations WHERE id IN ("
+                + mev_placeholders + ")",
+                tuple(market_eval_ids),
+            )
+            market_evals_by_id = {int(row["id"]): row for row in mev_rows}
 
         stage_rows, _ = self._query(
             self.shadow_db,
@@ -368,20 +389,56 @@ class RebuildStatusReader:
             prediction = predictions_by_key.get(key) or {}
             teams = teams_by_run_event.get((row["run_id"], str(row["event_id"]))) or {}
             settlement = settlements_by_decision.get(int(row["id"])) or {}
+            evaluated_market_id = row.get("evaluated_market_id")
+            market_eval = (
+                market_evals_by_id.get(int(evaluated_market_id))
+                if evaluated_market_id is not None else None
+            ) or {}
 
             side = str(row.get("evaluated_team_or_side") or "") or None
             model_probability = None
-            for source in ("probability_lower_json", "probability_upper_json"):
+            conservative_probability = None
+            probability_lower = None
+            probability_upper = None
+
+            # Primary: use calibrated probabilities. Fall back to raw, then lower/upper.
+            for source in ("calibrated_probabilities_json", "raw_probabilities_json",
+                           "probability_lower_json", "probability_upper_json"):
                 raw = prediction.get(source)
-                if not raw or side not in ("home", "away"):
+                if not raw:
+                    continue
+                if not side:
                     continue
                 try:
                     parsed = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
+                # Support home/away/draw/over/under/yes/no sides
                 if side in parsed:
                     model_probability = parsed[side]
                     break
+                # Also try lowercased match
+                side_lower = side.lower()
+                if side_lower in parsed:
+                    model_probability = parsed[side_lower]
+                    break
+
+            # Extract bounds and conservative probability separately
+            for field, target in [
+                ("conservative_probabilities_json", "conservative_probability"),
+                ("probability_lower_json", "probability_lower"),
+                ("probability_upper_json", "probability_upper"),
+            ]:
+                raw = prediction.get(field)
+                if raw and side:
+                    try:
+                        parsed = json.loads(raw)
+                        if side in parsed:
+                            locals()[target] = parsed[side]
+                        elif side.lower() in parsed:
+                            locals()[target] = parsed[side.lower()]
+                    except json.JSONDecodeError:
+                        pass
 
             side_team = {"home": teams.get("home_team"), "away": teams.get("away_team")}.get(side or "")
             selection_label = side_team or side or ""
@@ -405,14 +462,21 @@ class RebuildStatusReader:
                     "selection": selection_label,
                     "line": row.get("evaluated_line"),
                     "american_odds": None,  # shadow ledger has no American-odds field; only decimal executable prices
-                    "market_implied_probability": None,
+                    "market_implied_probability": market_eval.get("executable_ask"),
+                    "depth_adjusted_price": market_eval.get("depth_adjusted_price"),
+                    "quote_age_seconds": market_eval.get("quote_age_seconds"),
+                    "available_depth": market_eval.get("available_depth"),
                     "model_probability": model_probability,
+                    "conservative_probability": conservative_probability,
+                    "probability_lower": probability_lower,
+                    "probability_upper": probability_upper,
                     "model_uncertainty": prediction.get("calibration_uncertainty"),
                     "edge": row.get("cost_adjusted_edge"),
                     "trade_candidate": row.get("action") == "BET",
                     "confidence_score": None,
                     "units": row.get("units"),
-                    "model_version": row.get("model_artifact_hash"),
+                    "model_version": prediction.get("candidate_version") or row.get("model_artifact_hash"),
+                    "model_artifact_hash": row.get("model_artifact_hash"),
                     "status": "settled" if settlement else "open",
                     "result": settlement.get("outcome"),
                     "away_score": None,

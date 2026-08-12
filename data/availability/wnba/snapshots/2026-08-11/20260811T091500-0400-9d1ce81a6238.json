@@ -1,0 +1,126 @@
+{
+  "entries": [
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-11",
+      "game_time_et": "07:30 (ET)",
+      "matchup": "NYL@IND",
+      "player_name": "Fiebich, Leonie",
+      "reason": "Injury/Illness - Left Foot; L. Foot",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-11",
+      "game_time_et": "07:30 (ET)",
+      "matchup": "NYL@IND",
+      "player_name": "Sabally, Satou",
+      "reason": "Concussion Protocol",
+      "team": "New York Liberty"
+    },
+    {
+      "current_status": "Probable",
+      "game_date": "2026-08-11",
+      "game_time_et": "07:30 (ET)",
+      "matchup": "NYL@IND",
+      "player_name": "Clark, Caitlin",
+      "reason": "Injury/Illness - Back; Back",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-11",
+      "game_time_et": "07:30 (ET)",
+      "matchup": "NYL@IND",
+      "player_name": "VanSlooten, Grace",
+      "reason": "Injury/Illness - Illness; Illness",
+      "team": "Indiana Fever"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-11",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "PHX@LAS",
+      "player_name": "Plum, Kelsey",
+      "reason": "Injury/Illness - Left Lower Leg; -",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "current_status": "Questionable",
+      "game_date": "2026-08-11",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "PHX@LAS",
+      "player_name": "Akoa Makani, Monique",
+      "reason": "Injury/Illness - Right Ankle; R Ankle",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-11",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "WAS@LVA",
+      "player_name": "Evans, Dana",
+      "reason": "Injury/Illness - Left Leg; L. Leg",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "current_status": "Out",
+      "game_date": "2026-08-11",
+      "game_time_et": "10:00 (ET)",
+      "matchup": "WAS@LVA",
+      "player_name": "Parker- Tyus, Cheyenne",
+      "reason": "Concussion Protocol",
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "observed_at_utc": "2026-08-11T13:25:58.190890+00:00",
+  "report_at_utc": "2026-08-11T13:15:00+00:00",
+  "schema_version": "1",
+  "source": "official_wnba_injury_report",
+  "source_index_url": "https://www.wnba.com/api/injury-reports",
+  "source_pdf_sha256": "9d1ce81a6238ce833f1bde2c7216bdd0e279f5107935756ffd3f689f6300c304",
+  "source_pdf_url": "https://ak-static.cms.nba.com/referee/wnba_injury/Injury-Report_2026-08-11_09_15AM.pdf",
+  "sport": "wnba",
+  "team_matchups": {
+    "Chicago Sky": "CHI@GSV",
+    "Dallas Wings": "TOR@DAL",
+    "Golden State Valkyries": "CHI@GSV",
+    "Indiana Fever": "NYL@IND",
+    "Las Vegas Aces": "WAS@LVA",
+    "Los Angeles Sparks": "PHX@LAS",
+    "Minnesota Lynx": "MIN@PDX",
+    "New York Liberty": "NYL@IND",
+    "Phoenix Mercury": "PHX@LAS",
+    "Portland Fire": "MIN@PDX",
+    "Toronto Tempo": "TOR@DAL",
+    "Washington Mystics": "WAS@LVA"
+  },
+  "team_report_status": {
+    "Chicago Sky": "not_yet_submitted",
+    "Dallas Wings": "not_yet_submitted",
+    "Golden State Valkyries": "not_yet_submitted",
+    "Indiana Fever": "submitted",
+    "Las Vegas Aces": "submitted",
+    "Los Angeles Sparks": "submitted",
+    "Minnesota Lynx": "not_yet_submitted",
+    "New York Liberty": "submitted",
+    "Phoenix Mercury": "submitted",
+    "Portland Fire": "not_yet_submitted",
+    "Toronto Tempo": "not_yet_submitted",
+    "Washington Mystics": "submitted_no_entries"
+  },
+  "teams_listed": [
+    "Chicago Sky",
+    "Dallas Wings",
+    "Golden State Valkyries",
+    "Indiana Fever",
+    "Las Vegas Aces",
+    "Los Angeles Sparks",
+    "Minnesota Lynx",
+    "New York Liberty",
+    "Phoenix Mercury",
+    "Portland Fire",
+    "Toronto Tempo",
+    "Washington Mystics"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-10",
+      "status_at_utc": "2026-07-28T21:27:00+00:00",
+      "team": "Atlanta Dream"
+    },
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "event_id": "401857115",
+  "observed_at_utc": "2026-08-05T17:01:44.782669+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "6fbf0260712b466aae035c3ebe46578695da520b065554156d0b51912f79c636",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "5105752",
+      "current_status": "Out",
+      "player_name": "Alissa Pili",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-12T01:06:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "5274110",
+      "current_status": "Out",
+      "player_name": "Monique Akoa Makani",
+      "raw_status": "Out",
+      "reason": "Ankle",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-12T01:05:00+00:00",
+      "team": "Los Angeles Sparks"
+    },
+    {
+      "athlete_id": "4698730",
+      "current_status": "Out",
+      "player_name": "Kara Dunn",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-16",
+      "status_at_utc": "2026-08-12T01:04:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "3065570",
+      "current_status": "Out",
+      "player_name": "Kelsey Plum",
+      "raw_status": "Out",
+      "reason": "Calf",
+      "return_date": "2026-08-16",
+      "status_at_utc": "2026-08-11T00:18:00+00:00",
+      "team": "Phoenix Mercury"
+    },
+    {
+      "athlete_id": "3906769",
+      "current_status": "Out",
+      "player_name": "Jovana Nogic",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-06-28T00:25:00+00:00",
+      "team": "Phoenix Mercury"
+    }
+  ],
+  "event_id": "401857136",
+  "observed_at_utc": "2026-08-12T02:07:07.337391+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "cc38925f8ecf35fa7e176c2cc3aecea637e69f6d2b3476672c294dffb12250b8",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

@@ -37,3 +37,9 @@ data/rebuild/*.sqlite-*
 outputs/rebuild/runtime/
 outputs/rebuild/verification.json
 outputs/rebuild/main_integration_verification.md
+
+# virtualenv symlink (local env pointer, never commit)
+.venv
+
+# graphify knowledge-graph skill cache (generated, not project source)
+graphify-out/

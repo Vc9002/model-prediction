@@ -10,9 +10,12 @@ games played. Unknown parks return neutral with an explicit status.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 PARK_FACTORS_VERSION = "2026-07-29-empirical"
+_PIT_PARK_FACTORS_VERSION = "point-in-time"
+_DEFAULT_PRIOR_STRENGTH = 30
 
 # Home team display name -> run factor. See module docstring for source.
 PARK_RUN_FACTORS: dict[str, float] = {
@@ -54,3 +57,90 @@ def park_factor(home_team: str) -> dict[str, Any]:
     if factor is None:
         return {"park_factor": 1.0, "status": "unavailable_from_source", "version": PARK_FACTORS_VERSION}
     return {"park_factor": factor, "status": "available", "version": PARK_FACTORS_VERSION}
+
+
+def compute_park_factors_from_games(
+    games: Sequence[Any],
+    *,
+    prior_strength: int = _DEFAULT_PRIOR_STRENGTH,
+) -> dict[str, float]:
+    """Compute credibility-shrunk park factors from a list of completed games.
+
+    Each game must have: ``home_team``, ``home_score``, ``away_score``,
+    and either ``event_start_utc`` (str, ISO 8601) or ``start`` (datetime).
+
+    Park factor = (total runs scored per game at this park)
+                  / (league-average total runs per game across all
+                     parks). Normalized so league average = 1.0.
+
+    Credibility shrinkage toward 1.0 by games played:
+    ``PF = (n / (n + k)) * PF_observed + (k / (n + k)) * 1.0``
+    where *n* = games at that park and *k* = ``prior_strength``.
+    """
+    if not games:
+        return {}
+    by_park: dict[str, list[int]] = {}
+    for game in games:
+        home = game.home_team
+        by_park.setdefault(home, []).append(int(game.home_score) + int(game.away_score))
+    if not by_park:
+        return {}
+    all_totals = [total for totals in by_park.values() for total in totals]
+    league_avg_total = sum(all_totals) / len(all_totals)
+    factors: dict[str, float] = {}
+    for team, totals in by_park.items():
+        n = len(totals)
+        if n == 0:
+            # Credibility shrinkage with zero games → pure prior (1.0)
+            factors[team] = 1.0
+            continue
+        empirical = (sum(totals) / n) / league_avg_total
+        credibility = n / (n + prior_strength)
+        shrunk = credibility * empirical + (1.0 - credibility) * 1.0
+        factors[team] = round(shrunk, 3)
+    return factors
+
+
+def park_factor_at(
+    home_team: str,
+    game_date: str,
+    games_data: Sequence[Any] | None = None,
+    *,
+    prior_strength: int = _DEFAULT_PRIOR_STRENGTH,
+) -> dict[str, Any]:
+    """Point-in-time park factor using only games completed before *game_date*.
+
+    Falls back to the static :func:`park_factor` table when *games_data* is
+    ``None``.  When *games_data* is provided only games whose date is
+    strictly before *game_date* are used; the resulting park factor is
+    credibility-shrunk toward 1.0 (see :func:`compute_park_factors_from_games`).
+
+    Each game must have ``home_team``, ``home_score``, ``away_score``, and
+    either ``event_start_utc`` (str, ISO 8601) or ``start`` (datetime).
+    """
+    if games_data is None:
+        return park_factor(home_team)
+
+    # Filter to games strictly before game_date.
+    prior_games = [
+        g for g in games_data
+        if (_game_date_str(g) or "") < game_date
+    ]
+
+    factors = compute_park_factors_from_games(prior_games, prior_strength=prior_strength)
+    factor = factors.get(home_team)
+    if factor is None:
+        return {"park_factor": 1.0, "status": "unavailable_from_source", "version": _PIT_PARK_FACTORS_VERSION}
+    return {"park_factor": factor, "status": "available", "version": _PIT_PARK_FACTORS_VERSION}
+
+
+def _game_date_str(game: Any) -> str:
+    """Extract ISO date string (``YYYY-MM-DD``) from a game object."""
+    if hasattr(game, "event_start_utc"):
+        return str(game.event_start_utc)[:10]
+    if hasattr(game, "start"):
+        start = game.start
+        if callable(start):
+            start = start()
+        return start.strftime("%Y-%m-%d") if hasattr(start, "strftime") else str(start)[:10]
+    return getattr(game, "date", "")[:10]

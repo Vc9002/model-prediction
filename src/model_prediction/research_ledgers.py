@@ -43,6 +43,7 @@ def research_ledger(
     return PickLedger(
         research_ledger_path(root, sport, gated=gated),
         audit_path=root / "events.jsonl",
+        model_ledgers_dir=root / "model_ledgers",
     )
 
 
@@ -55,7 +56,11 @@ def existing_research_ledgers(
     if not directory.exists():
         return []
     return [
-        PickLedger(path, audit_path=Path(data_root) / "events.jsonl")
+        PickLedger(
+            path,
+            audit_path=Path(data_root) / "events.jsonl",
+            model_ledgers_dir=Path(data_root) / "model_ledgers",
+        )
         for path in sorted(directory.glob("*.xlsx"))
         if path.stem.casefold() in RESEARCH_LEDGER_SPORTS
     ]

@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4596309",
+      "current_status": "Out",
+      "player_name": "Liatu King",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-08T15:55:00+00:00",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "athlete_id": "4280877",
+      "current_status": "Out",
+      "player_name": "Chloe Bibby",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-07T22:12:00+00:00",
+      "team": "Minnesota Lynx"
+    },
+    {
+      "athlete_id": "4433790",
+      "current_status": "Questionable",
+      "player_name": "Azzi Fudd",
+      "raw_status": "Day-To-Day",
+      "reason": "Knee",
+      "return_date": "2026-08-09",
+      "status_at_utc": "2026-08-08T22:49:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "924",
+      "current_status": "Out",
+      "player_name": "Alysha Clark",
+      "raw_status": "Out",
+      "reason": "Back",
+      "return_date": "2026-08-12",
+      "status_at_utc": "2026-08-08T22:31:00+00:00",
+      "team": "Dallas Wings"
+    },
+    {
+      "athlete_id": "5345473",
+      "current_status": "Out",
+      "player_name": "Costanza Verona",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-09-17",
+      "status_at_utc": "2026-08-08T19:59:00+00:00",
+      "team": "Dallas Wings"
+    }
+  ],
+  "event_id": "401857130",
+  "observed_at_utc": "2026-08-09T17:05:37.779244+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "f8bc549cb936b7d439f61f7922bbc3390e49a822af54cbbabb7127692e046348",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}
