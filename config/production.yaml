@@ -37,6 +37,10 @@ prediction_service:
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json
     valorant-tiered-elo-v6: config/models/valorant-tiered-elo-v6.json
     rainbow_six-tiered-elo-v6: config/models/rainbow_six-tiered-elo-v6.json
+    # Artifact files renamed to match the embedded model_version
+    # ({league}-tie-aware-elo-v2); they were previously written as
+    # ...-v1.json, so these paths never existed and freeze() mislabeled
+    # kbo/npb as code-backed (audit 2026-08-13).
     kbo-tie-aware-elo-v2: config/models/kbo-tie-aware-elo-v2.json
     npb-tie-aware-elo-v2: config/models/npb-tie-aware-elo-v2.json
 

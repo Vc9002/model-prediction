@@ -6,7 +6,8 @@ health-checked path. It is the first real model whose outputs may eventually
 drive live decisions; every other model remains research/shadow only.
 
 The canary is deliberately narrow:
-  - exactly one allowed model (wnba-elo-trend-lr-v4)
+  - an explicit allowlist of models (primary must be allowlisted; the
+    list is non-empty — currently 13 models, primary wnba-elo-trend-lr-v4)
   - manual orders only (automated_orders is locked false)
   - fail-closed: any validation or health failure returns DOWN, never a
     silent fallback
@@ -78,8 +79,8 @@ def validate_production_config(
     """Validate the production canary config.
 
     Rules (fail-closed — any failure raises ``ValueError``):
-      1. ``prediction_service.allowed_models`` must be a list with **exactly
-         one** entry.
+      1. ``prediction_service.allowed_models`` must be a **non-empty**
+         list; the primary model must be one of the allowed entries.
       2. The artifact file referenced by
          ``prediction_service.primary.artifact`` must exist.
       3. The embedded ``artifact_hash`` in the JSON must match a
@@ -108,11 +109,14 @@ def validate_production_config(
     if not isinstance(primary_model_id, str) or not primary_model_id.strip():
         raise ValueError("prediction_service.primary.model_id is missing or empty")
 
-    # Must match the single allowed entry
-    if primary_model_id != allowed[0]:
+    # Primary must be allowlisted. Membership (not position) is the real
+    # constraint now that the allowlist holds every production model — a
+    # positional check against allowed_models[0] would reject a valid
+    # primary that merely isn't first.
+    if primary_model_id not in allowed:
         raise ValueError(
-            f"primary.model_id '{primary_model_id}' does not match "
-            f"allowed_models[0] '{allowed[0]}'"
+            f"primary.model_id '{primary_model_id}' is not in "
+            f"allowed_models {allowed}"
         )
 
     artifact_rel = primary.get("artifact")
@@ -184,8 +188,10 @@ def health_check(
       2. Verify the artifact file exists.
       3. Parse the artifact JSON and re-validate its embedded hash.
       4. Verify every probability value in the artifact is finite.
-      5. (Stub) Data-freshness check — not yet wired to a real data source;
-         always passes unless the artifact itself carries a stale timestamp.
+      5. Data-freshness check: the canary's last prediction run (recorded
+         in ``production_state.json`` under the runtime root) must be
+         younger than ``health.max_data_age_minutes``; a missing, stale, or
+         unreadable state file degrades the check.
 
     *runtime_root* is accepted for forward compatibility but is not yet used
     beyond the data-freshness check. When ``MODEL_PREDICTION_RUNTIME_ROOT``
@@ -261,8 +267,8 @@ def health_check(
                 "details": details,
             }
 
-    # 5. Data freshness (stub — real implementation would check
-    #    the youngest data file under runtime_root)
+    # 5. Data freshness — the canary's last recorded prediction run under
+    #    runtime_root must be younger than max_data_age_minutes.
     max_age_minutes = config.get("health", {}).get("max_data_age_minutes", 120)
     stale = _check_data_freshness(rt, max_age_minutes)
     if stale:
@@ -318,11 +324,40 @@ def _check_data_freshness(
 ) -> str | None:
     """Return a human-readable staleness description, or *None* if fresh.
 
-    This is a stub: the real implementation will walk the runtime data
-    directory. For now it always returns *None* (fresh) because the
-    artifact itself contains no live-data timestamp.
+    Freshness is judged on the canary's own last prediction run, recorded
+    by ``cli_production._record_prediction_run`` in ``production_state.json``
+    under the runtime root. A state file that is missing, unreadable, or
+    whose ``last_prediction_utc`` is older than *max_age_minutes* means the
+    model has not produced predictions recently enough to be trusted —
+    fail-closed, never a silent pass.
     """
-    _ = runtime_root, max_age_minutes
+    state_path = runtime_root / "production_state.json"
+    if not state_path.is_file():
+        return (
+            f"no production state file at {state_path} "
+            f"(never recorded a prediction run)"
+        )
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return f"production state unreadable: {exc}"
+    last_prediction = state.get("last_prediction_utc")
+    if not last_prediction:
+        return "production state has no last_prediction_utc"
+    try:
+        last_dt = datetime.fromisoformat(str(last_prediction))
+    except ValueError:
+        return f"production state has unparseable last_prediction_utc {last_prediction!r}"
+    # The canary writes tz-aware ISO timestamps, but be tolerant of a naive
+    # value — treating it as UTC rather than guessing a local zone.
+    if last_dt.tzinfo is None:
+        last_dt = last_dt.replace(tzinfo=UTC)
+    age_minutes = (datetime.now(UTC) - last_dt).total_seconds() / 60
+    if age_minutes > max_age_minutes:
+        return (
+            f"last prediction {age_minutes:.0f} minutes ago "
+            f"(max_data_age_minutes={max_age_minutes})"
+        )
     return None
 
 

@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from model_prediction.features.park_factors import (
     PARK_FACTORS_VERSION,
+    compute_park_factors_from_games,
     park_factor,
     park_factor_at,
-    compute_park_factors_from_games,
 )
 
 
@@ -194,6 +194,25 @@ def test_date_filtering_is_strictly_before():
     # Target date is April 16 — April 15 game is before → included
     result2 = park_factor_at("Team A", "2025-04-16", games_data=games)
     assert result2["status"] == "available"
+
+
+def test_undated_game_is_excluded_not_treated_as_prior():
+    """An unresolvable (empty) date string must NOT be treated as "before"
+    every ISO date. The empty string sorts before any real date, so an
+    undated game used to leak its scores into every PIT window (real bug
+    found 2026-08-13); it must be excluded from the prior set entirely."""
+    games = [
+        _FakeGame("Team A", 10, 0, "2025-04-01T19:00:00Z"),
+        # Undated -- if treated as prior, its 100-run total would pull
+        # Team A's factor far above 1.0.
+        _FakeGame("Team A", 100, 0, ""),
+        _FakeGame("Team X", 4, 4, "2025-04-01T19:00:00Z"),
+    ]
+    result = park_factor_at("Team A", "2025-05-01", games_data=games)
+    expected = park_factor_at(
+        "Team A", "2025-05-01", games_data=[games[0], games[2]]
+    )
+    assert result == expected
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

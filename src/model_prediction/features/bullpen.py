@@ -20,6 +20,12 @@ LEAGUE_RELIEF_ERA = 4.0593
 BULLPEN_PRIOR_INNINGS = 30.0
 DEFAULT_SNAPSHOT_PATH = Path("data/mlb_statsapi/game_snapshots.jsonl")
 DEFAULT_LOOKBACK_GAMES = 10
+# Calendar-day window for bullpen_fatigue_gap, the single source of truth for
+# both validation.py's training-time map and learned_forward.py's live
+# serving. 2026-08-13 audit: serving used the last-N-games lookback with no
+# calendar cap while training summed the trailing 3 calendar days -- a real
+# train/serve definition skew.
+FATIGUE_WINDOW_DAYS = 3
 
 _RELIEF_INDEX_CACHE: dict[Path, dict[str, list[tuple[datetime, list[dict[str, float]]]]]] = {}
 
@@ -97,10 +103,19 @@ def team_recent_relief_lines(
     *,
     snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
     lookback_games: int = DEFAULT_LOOKBACK_GAMES,
+    lookback_days: int | None = None,
 ) -> list[dict[str, float]]:
-    """Real relief appearances from this team's last N completed games before decision."""
+    """Real relief appearances from this team's last N completed games before
+    decision -- or, when *lookback_days* is set, only the games within that
+    trailing calendar-day window (``0 <= days_before_decision <= lookback_days``,
+    UTC dates, matching validation.py's fatigue-map window exactly)."""
     index = load_relief_appearance_index(snapshot_path)
     games = [game for game in index.get(team_name, []) if game[0] < decision]
+    if lookback_days is not None:
+        games = [
+            game for game in games
+            if 0 <= (decision.date() - game[0].date()).days <= lookback_days
+        ]
     recent = games[-lookback_games:]
     return [line for _, lines in recent for line in lines]
 

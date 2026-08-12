@@ -351,8 +351,8 @@ def refresh_recent_international_baseball_matches(
     Found 2026-07-31: unlike esports (`refresh_recent_matches`, wired into
     `daily`), nothing kept KBO/NPB Elo ratings current -- ratings only
     updated when someone manually ran `backfill_international_baseball`
-    then re-validated. Confirmed live: kbo-tie-aware-elo-v1.json was 6 days
-    stale, npb-tie-aware-elo-v1.json 14 days stale, and nothing in the
+    then re-validated. Confirmed live: kbo-tie-aware-elo-v2.json was 6 days
+    stale, npb-tie-aware-elo-v2.json 14 days stale, and nothing in the
     dashboard's status/alert logic surfaces artifact staleness at all (only
     a much looser 30-day raw-manifest-age check). `backfill_...` replaces
     games.jsonl entirely with whatever `from_date..to_date` returns --
@@ -932,7 +932,11 @@ def validate_international_baseball_baseline(
     artifact["artifact_hash"] = hashlib.sha256(_canonical_json(artifact).encode()).hexdigest()
     artifact_path = None
     if artifact_dir is not None:
-        artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v1.json"
+        # Filename must match the embedded model_version ({league}-tie-aware-elo-v2):
+        # the artifact was previously written as ...-v1.json while claiming v2,
+        # so production freeze/allowlist lookups for kbo/npb v2 could never find
+        # the file and were silently treated as code-backed (audit 2026-08-13).
+        artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v2.json"
         _backup_before_overwrite(artifact_path)
         _atomic_write(artifact_path, json.dumps(artifact, indent=2, sort_keys=True) + "\n")
     return {
@@ -1010,7 +1014,9 @@ def forecast_international_baseball_slate(
         raise ValueError(f"unsupported international baseball league: {league}")
     timezone_name = timezone_name or str(LEAGUE_SPECS[league]["timezone"])
     directory = Path(data_root) / "international_baseball" / league
-    artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v1.json"
+    # v2 filename: matches the artifact's own model_version (see the
+    # comment at the write site in validate_international_baseball_baseline).
+    artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v2.json"
     if not artifact_path.exists():
         raise FileNotFoundError(f"missing research artifact: {artifact_path}")
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))

@@ -41,6 +41,43 @@ def _safe_json(path: Path) -> tuple[Any | None, str | None]:
         return None, f"{path.name} is unreadable or malformed: {error}"
 
 
+def _as_int_or_none(value: Any) -> int | None:
+    """Coerce a DB cell to int, tolerating NULL and non-numeric text.
+
+    Defensive: the join key lives in an INTEGER FK column, but a malformed
+    row must degrade to "no match", never raise and 500 the whole view.
+    """
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _side_probability(prediction: dict[str, Any], field: str, side: str | None) -> Any | None:
+    """Extract one side's probability from a prediction JSON column.
+
+    Returns None when the field is absent, malformed, or the side is
+    missing -- never raises, so one bad row cannot take the view down.
+    """
+    if not side:
+        return None
+    raw = prediction.get(field)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if side in parsed:
+        return parsed[side]
+    side_lower = side.lower()
+    if side_lower in parsed:
+        return parsed[side_lower]
+    return None
+
+
 class RebuildStatusReader:
     """Build API payloads without creating or modifying rebuild state."""
 
@@ -307,7 +344,8 @@ class RebuildStatusReader:
             self.shadow_db,
             "SELECT id, created_at, run_id, sport, event_id, horizon, decision_time_utc, "
             "model_artifact_hash, action, predicted_winner, market_type, units, reason_code, "
-            "cost_adjusted_edge, evaluated_market_id, evaluated_team_or_side, evaluated_line "
+            "cost_adjusted_edge, evaluated_market_evaluation_id, evaluated_market_id, "
+            "evaluated_team_or_side, evaluated_line "
             "FROM trade_decisions ORDER BY created_at DESC LIMIT ?",
             (max(1, min(int(limit), 1000)),),
         )
@@ -344,10 +382,17 @@ class RebuildStatusReader:
             )
             settlements_by_decision = {int(row["trade_decision_id"]): row for row in settlement_rows}
 
-        # Market evaluations: real executable prices that produced the edge
+        # Market evaluations: real executable prices that produced the edge.
+        # The FK is evaluated_market_evaluation_id (autoincrement
+        # market_evaluations.id), NOT evaluated_market_id -- that holds the
+        # Polymarket market slug/market-id TEXT. Joining on the slug made
+        # SQLite INTEGER affinity coerce non-numeric slugs to 0, matching
+        # nothing, so executable prices shipped null in every live row.
         market_eval_ids = [
-            row["evaluated_market_id"] for row in decisions
-            if row.get("evaluated_market_id") is not None
+            value for value in (
+                _as_int_or_none(row.get("evaluated_market_evaluation_id"))
+                for row in decisions
+            ) if value is not None
         ]
         market_evals_by_id: dict[int, dict] = {}
         if market_eval_ids:
@@ -389,10 +434,11 @@ class RebuildStatusReader:
             prediction = predictions_by_key.get(key) or {}
             teams = teams_by_run_event.get((row["run_id"], str(row["event_id"]))) or {}
             settlement = settlements_by_decision.get(int(row["id"])) or {}
-            evaluated_market_id = row.get("evaluated_market_id")
+            # evaluated_market_evaluation_id is an INTEGER FK, so sqlite3
+            # already returns an int; _as_int_or_none keeps a malformed row
+            # from raising and 500ing the whole view.
             market_eval = (
-                market_evals_by_id.get(int(evaluated_market_id))
-                if evaluated_market_id is not None else None
+                market_evals_by_id.get(_as_int_or_none(row.get("evaluated_market_evaluation_id")))
             ) or {}
 
             side = str(row.get("evaluated_team_or_side") or "") or None
@@ -401,44 +447,31 @@ class RebuildStatusReader:
             probability_lower = None
             probability_upper = None
 
-            # Primary: use calibrated probabilities. Fall back to raw, then lower/upper.
-            for source in ("calibrated_probabilities_json", "raw_probabilities_json",
-                           "probability_lower_json", "probability_upper_json"):
-                raw = prediction.get(source)
-                if not raw:
-                    continue
-                if not side:
-                    continue
-                try:
-                    parsed = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                # Support home/away/draw/over/under/yes/no sides
-                if side in parsed:
-                    model_probability = parsed[side]
-                    break
-                # Also try lowercased match
-                side_lower = side.lower()
-                if side_lower in parsed:
-                    model_probability = parsed[side_lower]
-                    break
+            # Bounds and conservative probability first -- via real
+            # assignments: the earlier locals()[name]=... loop was a CPython
+            # no-op (locals() does not bind names), so all three fields
+            # shipped permanently None even when the JSON was populated.
+            conservative_probability = _side_probability(
+                prediction, "conservative_probabilities_json", side
+            )
+            probability_lower = _side_probability(prediction, "probability_lower_json", side)
+            probability_upper = _side_probability(prediction, "probability_upper_json", side)
 
-            # Extract bounds and conservative probability separately
-            for field, target in [
-                ("conservative_probabilities_json", "conservative_probability"),
-                ("probability_lower_json", "probability_lower"),
-                ("probability_upper_json", "probability_upper"),
-            ]:
-                raw = prediction.get(field)
-                if raw and side:
-                    try:
-                        parsed = json.loads(raw)
-                        if side in parsed:
-                            locals()[target] = parsed[side]
-                        elif side.lower() in parsed:
-                            locals()[target] = parsed[side.lower()]
-                    except json.JSONDecodeError:
-                        pass
+            # Conservative precedence: calibrated, then the real conservative
+            # value, then the uncertainty band, then raw. The regressed loop
+            # surfaced raw before lower/upper, so a forecast carrying only the
+            # band showed raw instead of the conservative lower bound (the
+            # reader test pins 0.56 = probability_lower.home here).
+            for source in (
+                _side_probability(prediction, "calibrated_probabilities_json", side),
+                conservative_probability,
+                probability_lower,
+                probability_upper,
+                _side_probability(prediction, "raw_probabilities_json", side),
+            ):
+                if source is not None:
+                    model_probability = source
+                    break
 
             side_team = {"home": teams.get("home_team"), "away": teams.get("away_team")}.get(side or "")
             selection_label = side_team or side or ""

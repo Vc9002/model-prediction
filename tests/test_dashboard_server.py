@@ -1035,11 +1035,14 @@ def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch)
     """Confirmed real gap (2026-07-31): read_picks() only ever parsed
     picks.xlsx (Main), so every open Flat/Research/Gated Research pick's
     price silently went stale forever, since nothing else ever refreshed
-    them. This pins that all four sources feed the price scan now."""
+    them. This pins that all four sources feed the price scan now.
+
+    read_picks()/read_flat_picks() are mocked whole (not _parse_picks):
+    _read_split_picks() now short-circuits to the SQLite dashboard cache
+    and never reaches Excel parsing, so mocking _parse_picks alone leaked
+    real cached rows into the scan."""
     monkeypatch.setattr(dashboard_server, "read_picks", lambda: [{"pick_id": "main-1"}])
-    monkeypatch.setattr(
-        dashboard_server, "_parse_picks", lambda path: [{"pick_id": "flat-1", "source": str(path)}]
-    )
+    monkeypatch.setattr(dashboard_server, "read_flat_picks", lambda: [{"pick_id": "flat-1"}])
     monkeypatch.setattr(
         dashboard_server,
         "_parse_research_picks",

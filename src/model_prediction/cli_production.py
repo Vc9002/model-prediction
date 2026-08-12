@@ -1,23 +1,41 @@
 """Production CLI entrypoint for the model-prediction canary.
 
-Serves the production model (wnba-elo-trend-lr-v4) with three subcommands:
+Serves the primary production model (wnba-elo-trend-lr-v4, allowlisted
+alongside the other production models in config/production.yaml):
 
     python -m model_prediction.cli_production predict
     python -m model_prediction.cli_production health
     python -m model_prediction.cli_production status
+    python -m model_prediction.cli_production ledger [LIMIT]
+    python -m model_prediction.cli_production settle <row_id> <won|lost|void> [--note TEXT]
+    python -m model_prediction.cli_production void <row_id> [--note TEXT]
+    python -m model_prediction.cli_production supersede <row_id> [--note TEXT]
+    python -m model_prediction.cli_production error <row_id> [--note TEXT]
 
 The production canary infrastructure (config/production.yaml,
 production_canary.py) is already built and tested. This module wires it
 into a runnable CLI and is the single entrypoint called by the launchd
 production scheduler.
+
+Every prediction the ``predict`` cycle reports is mirrored into the
+production ledger (SQLite, ``<runtime_root>/production/predictions.db``)
+with an idempotency key, and every cycle starts/completes a run row.  The
+mirror is fail-soft: a ledger failure logs and never fails the prediction
+command.  The lifecycle subcommands (``settle``/``void``/``supersede``/
+``error``) transition an open prediction to a terminal state — guarded so
+a terminal prediction can never be re-transitioned.  Unlike the scheduler
+path, the lifecycle commands are fail-LOUD: an operator action that
+silently no-ops is worse than an error.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
+import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,9 +51,13 @@ from .production_canary import (
     load_production_config,
     validate_production_config,
 )
+from .production_ledger import ProductionLedger
 from .runtime_paths import RuntimePaths
 
 _STATE_FILE_NAME = "production_state.json"
+_LEDGER_DB_REL = Path("production") / "predictions.db"
+
+_logger = logging.getLogger(__name__)
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
@@ -48,7 +70,7 @@ def _today_et() -> str:
 
 def _utc_now_iso() -> str:
     """Return current UTC time as an ISO-8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _resolve_runtime_root() -> Path:
@@ -100,6 +122,91 @@ def _record_prediction_run(
     _write_state(state)
 
 
+def _ledger_path(runtime_root: Path) -> Path:
+    """SQLite production ledger location under the runtime root."""
+    return runtime_root / _LEDGER_DB_REL
+
+
+def _git_sha() -> str:
+    """Best-effort HEAD SHA for ledger run rows; ``"unknown"`` when unavailable."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+            check=True, cwd=PROJECT_ROOT,
+        )
+        return out.stdout.strip() or "unknown"
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def _open_ledger(runtime_root: Path) -> ProductionLedger | None:
+    """Open the production ledger, or None if it is unavailable.
+
+    Scheduler-path ledger writes are fail-soft (same contract as the
+    model-ledger mirror: a mirror failure must never fail the primary
+    action), so an open failure degrades to no-op writes, not a failed
+    prediction cycle.
+    """
+    try:
+        return ProductionLedger(_ledger_path(runtime_root))
+    except Exception:  # ledger mirror must not fail the prediction cycle
+        _logger.warning(
+            "production ledger unavailable at %s; this cycle's predictions "
+            "will not be recorded",
+            _ledger_path(runtime_root),
+            exc_info=True,
+        )
+        return None
+
+
+def _soft_ledger_write(
+    ledger: ProductionLedger | None, name: str, *args: Any, **kwargs: Any
+) -> None:
+    """Call a ledger method fail-soft: log, never raise.
+
+    The prediction command must succeed even when the ledger is down —
+    the ledger mirrors the cycle's evidence, it does not gate it.
+    """
+    if ledger is None:
+        return
+    try:
+        getattr(ledger, name)(*args, **kwargs)
+    except Exception:  # ledger mirror write must not fail the cycle
+        _logger.warning(
+            "production ledger %s failed; prediction cycle continues",
+            name,
+            exc_info=True,
+        )
+
+
+def _split_note(args: list[str]) -> tuple[list[str], str | None]:
+    """Split a ``--note TEXT`` pair out of positional args."""
+    if "--note" not in args:
+        return args, None
+    idx = args.index("--note")
+    if idx == len(args) - 1:
+        raise ValueError("--note requires a value")
+    return args[:idx] + args[idx + 2 :], args[idx + 1]
+
+
+def _open_ledger_checked(runtime_root: Path) -> ProductionLedger:
+    """Open the ledger for an operator transition command.
+
+    Operator commands are fail-LOUD: an explicit human settlement that
+    silently no-ops is worse than an error the operator can see.
+    """
+    return ProductionLedger(_ledger_path(runtime_root))
+
+
+def _print_prediction_row(row: dict[str, Any]) -> None:
+    print(
+        f"prediction {row['id']}: {row['status']}"
+        + (f" outcome={row['resolved_outcome']}" if row.get("resolved_outcome") else "")
+        + (f" settled_at={row['settled_at_utc']}" if row.get("settled_at_utc") else "")
+        + (f" note={row['note']}" if row.get("note") else "")
+    )
+
+
 # ── subcommands ─────────────────────────────────────────────────────────────
 
 
@@ -115,7 +222,7 @@ def _cmd_predict() -> int:
     try:
         config = load_production_config(repo_root=repo_root)
         validate_production_config(config, repo_root=repo_root)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"CONFIG ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -130,9 +237,24 @@ def _cmd_predict() -> int:
         with open(artifact_path, "r", encoding="utf-8") as fh:
             artifact_payload: dict[str, Any] = json.load(fh)
         artifact_hash = _compute_artifact_hash(artifact_payload)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"ARTIFACT ERROR: {exc}", file=sys.stderr)
         return 1
+
+    # 3b. Open the production ledger and start the run row.  Fail-soft:
+    #     if the ledger is unavailable the cycle still runs — the state
+    #     file below remains the primary record and the ledger is a mirror.
+    run_git_sha = _git_sha()
+    ledger = _open_ledger(runtime_root)
+    run_id = None
+    if ledger is not None:
+        try:
+            run_id = ledger.start_run(git_sha=run_git_sha)
+        except Exception:  # ledger mirror must not fail the prediction cycle
+            _logger.warning(
+                "production ledger start_run failed; prediction cycle continues",
+                exc_info=True,
+            )
 
     # 4. Check if there are any WNBA games today
     today = _today_et()
@@ -140,18 +262,22 @@ def _cmd_predict() -> int:
     try:
         scoreboard = client.scoreboard("WNBA", today)
         events = scoreboard.get("events", [])
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"ESPN ERROR: {exc}", file=sys.stderr)
+        _soft_ledger_write(ledger, "complete_run", run_id, "failed",
+                           note=f"ESPN error: {exc}")
         return 1
 
     if not events:
         print(f"NO_EVENTS: no WNBA games scheduled for {today}")
         _record_prediction_run(model_id, artifact_hash, 0, 0)
+        _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+                           note="NO_EVENTS")
         return 0
 
     # 5. Run predictions
     store = FeatureStore(runtime_root)
-    observed_at = datetime.now(timezone.utc)
+    observed_at = datetime.now(UTC)
 
     try:
         candidates, skipped, scheduled = build_learned_moneyline_slate(
@@ -168,11 +294,17 @@ def _cmd_predict() -> int:
         if "requires" in msg and "cached games before" in msg:
             print(f"NO_EVENTS: insufficient history for {today} — {msg}")
             _record_prediction_run(model_id, artifact_hash, len(events), 0)
+            _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+                               note=f"insufficient history: {msg}")
             return 0
         print(f"PREDICTION ERROR: {exc}", file=sys.stderr)
+        _soft_ledger_write(ledger, "complete_run", run_id, "failed",
+                           note=f"ValueError: {exc}")
         return 1
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"PREDICTION ERROR: {exc}", file=sys.stderr)
+        _soft_ledger_write(ledger, "complete_run", run_id, "failed",
+                           note=f"{type(exc).__name__}: {exc}")
         return 1
 
     # 6. Report results
@@ -187,6 +319,8 @@ def _cmd_predict() -> int:
     if not candidates:
         print("NO_PREDICTIONS: all events skipped or filtered")
         _record_prediction_run(model_id, artifact_hash, scheduled, 0)
+        _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+                           note="NO_PREDICTIONS")
         return 0
 
     for c in candidates:
@@ -200,11 +334,36 @@ def _cmd_predict() -> int:
         if d.get("unavailable_features"):
             print(f"    warnings: {', '.join(d['unavailable_features'])}")
         print()
+        # Mirror this prediction into the production ledger (fail-soft).
+        # The idempotency key (run_id, event_id, sport, market, model_id)
+        # makes a re-fired cycle with identical inputs a no-op.
+        _soft_ledger_write(
+            ledger, "record_prediction", run_id,
+            prediction_id=f"{run_id}:{d['event_id']}",
+            event_id=d["event_id"],
+            sport=model["sport"],
+            market=model["market"],
+            model_id=model_id,
+            probabilities={
+                "home": d["home_probability"],
+                "away": round(1 - d["home_probability"], 6),
+            },
+            event_start_utc=d["event_start_utc"],
+            prediction_time_utc=observed_at.isoformat(),
+            model_artifact_hash=artifact_hash,
+            feature_schema_hash=d["feature_snapshot_hash"],
+            predicted_side=d["selection"],
+            rationale=d["reason"],
+            data_timestamp=observed_at.isoformat(),
+            git_sha=run_git_sha,
+        )
 
     for s in skipped:
         print(f"  SKIPPED: {s['event_id']} — {s['reason']}")
 
     _record_prediction_run(model_id, artifact_hash, scheduled, len(candidates))
+    _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+                       note=f"{len(candidates)} predictions")
     return 0
 
 
@@ -218,7 +377,7 @@ def _cmd_health() -> int:
 
     try:
         config = load_production_config(repo_root=repo_root)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"CONFIG ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -236,7 +395,7 @@ def _cmd_status() -> int:
 
     try:
         config = load_production_config(repo_root=repo_root)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"CONFIG ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -263,6 +422,122 @@ def _cmd_status() -> int:
     return 0
 
 
+def _cmd_ledger(args: list[str]) -> int:
+    """List recent predictions (newest first) with their row ids.
+
+    Row ids are the handle the lifecycle commands (``settle``, ``void``,
+    ``supersede``, ``error``) operate on.
+    """
+    limit = 20
+    if args and args[0].isdigit():
+        limit = int(args[0])
+    try:
+        ledger = _open_ledger_checked(_resolve_runtime_root())
+        try:
+            rows = ledger.get_predictions(limit=limit)
+        finally:
+            ledger.close()
+    except Exception as exc:  # noqa: BLE001
+        print(f"LEDGER ERROR: {exc}", file=sys.stderr)
+        return 1
+    if not rows:
+        print("no predictions recorded")
+        return 0
+    for r in rows:
+        print(
+            f"{r['id']:>4} {r['status']:<10} {r['event_id']:<20} "
+            f"{r['predicted_side'] or '?':<6} "
+            f"home={r['probabilities'].get('home'):.3f} {r['model_id']}"
+        )
+    return 0
+
+
+def _cmd_settle(args: list[str]) -> int:
+    """Resolve a prediction: ``settle <row_id> <won|lost|void> [--note TEXT]``."""
+    try:
+        rest, note = _split_note(args)
+        if len(rest) != 2 or not rest[0].isdigit():
+            raise ValueError(
+                "usage: settle <row_id> <won|lost|void> [--note TEXT]"
+            )
+        row_id = int(rest[0])
+        ledger = _open_ledger_checked(_resolve_runtime_root())
+        try:
+            row = ledger.settle_prediction(row_id, rest[1], note=note)
+        finally:
+            ledger.close()
+    except Exception as exc:  # noqa: BLE001
+        print(f"SETTLE ERROR: {exc}", file=sys.stderr)
+        return 1
+    _print_prediction_row(row)
+    return 0
+
+
+def _cmd_void(args: list[str]) -> int:
+    """Void a prediction: ``void <row_id> [--note TEXT]``."""
+    try:
+        rest, note = _split_note(args)
+        if len(rest) != 1 or not rest[0].isdigit():
+            raise ValueError("usage: void <row_id> [--note TEXT]")
+        row_id = int(rest[0])
+        ledger = _open_ledger_checked(_resolve_runtime_root())
+        try:
+            row = ledger.void_prediction(row_id, note=note)
+        finally:
+            ledger.close()
+    except Exception as exc:  # noqa: BLE001
+        print(f"VOID ERROR: {exc}", file=sys.stderr)
+        return 1
+    _print_prediction_row(row)
+    return 0
+
+
+def _cmd_supersede(args: list[str]) -> int:
+    """Mark a prediction superseded: ``supersede <row_id> [--note TEXT]``.
+
+    Append the replacement forecast separately via the predict cycle
+    (the superseded row's ``supersedes_id`` chain records the correction).
+    """
+    try:
+        rest, note = _split_note(args)
+        if len(rest) != 1 or not rest[0].isdigit():
+            raise ValueError("usage: supersede <row_id> [--note TEXT]")
+        row_id = int(rest[0])
+        ledger = _open_ledger_checked(_resolve_runtime_root())
+        try:
+            row = ledger.supersede_prediction(row_id, note=note)
+        finally:
+            ledger.close()
+    except Exception as exc:  # noqa: BLE001
+        print(f"SUPERSEDE ERROR: {exc}", file=sys.stderr)
+        return 1
+    _print_prediction_row(row)
+    return 0
+
+
+def _cmd_error(args: list[str]) -> int:
+    """Flag a prediction as errored: ``error <row_id> [--note TEXT]``.
+
+    *note* should record what went wrong — the row's status is terminal,
+    so the note is the only evidence of why it was invalidated.
+    """
+    try:
+        rest, note = _split_note(args)
+        if len(rest) != 1 or not rest[0].isdigit():
+            raise ValueError("usage: error <row_id> [--note TEXT]")
+        row_id = int(rest[0])
+        ledger = _open_ledger_checked(_resolve_runtime_root())
+        try:
+            row = ledger.mark_prediction_error(row_id, note=note)
+        finally:
+            ledger.close()
+    except Exception as exc:  # noqa: BLE001
+        print(f"MARK ERROR: {exc}", file=sys.stderr)
+        return 1
+    _print_prediction_row(row)
+    return 0
+
+
 # ── main ────────────────────────────────────────────────────────────────────
 
 
@@ -272,7 +547,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args:
         print(
-            "usage: python -m model_prediction.cli_production {predict|health|status}",
+            "usage: python -m model_prediction.cli_production "
+            "{predict|health|status|ledger|settle|void|supersede|error}",
             file=sys.stderr,
         )
         return 2
@@ -285,10 +561,21 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_health()
     elif cmd == "status":
         return _cmd_status()
+    elif cmd == "ledger":
+        return _cmd_ledger(args[1:])
+    elif cmd == "settle":
+        return _cmd_settle(args[1:])
+    elif cmd == "void":
+        return _cmd_void(args[1:])
+    elif cmd == "supersede":
+        return _cmd_supersede(args[1:])
+    elif cmd == "error":
+        return _cmd_error(args[1:])
     else:
         print(f"unknown command: {cmd}", file=sys.stderr)
         print(
-            "usage: python -m model_prediction.cli_production {predict|health|status}",
+            "usage: python -m model_prediction.cli_production "
+            "{predict|health|status|ledger|settle|void|supersede|error}",
             file=sys.stderr,
         )
         return 2

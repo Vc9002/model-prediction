@@ -165,7 +165,7 @@ def test_validation_is_locked_chronological_and_never_promotes(tmp_path) -> None
     assert report["chronological_split"]["validation"]["through_date"] < report["chronological_split"]["locked_test"]["from_date"]
     assert report["promotion_eligible"] is False
     assert report["units"] == 0
-    artifact = json.loads((tmp_path / "models/kbo-tie-aware-elo-v1.json").read_text())
+    artifact = json.loads((tmp_path / "models/kbo-tie-aware-elo-v2.json").read_text())
     assert artifact["qualified_for_betting"] is False
     assert artifact["target"] == "expected moneyline settlement where a tie pays 0.50"
 
@@ -213,10 +213,10 @@ def test_forecast_uses_home_away_and_current_asks_but_stays_zero_unit(tmp_path) 
     )
     models = tmp_path / "models"
     models.mkdir()
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(
             {
-                "model_version": "kbo-tie-aware-elo-v1",
+                "model_version": "kbo-tie-aware-elo-v2",
                 "artifact_hash": "abc",
                 "k": 20,
                 "home_advantage": 50,
@@ -272,7 +272,7 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
 
     def _artifact(prefix_hash: str) -> dict:
         return {
-            "model_version": "kbo-tie-aware-elo-v1",
+            "model_version": "kbo-tie-aware-elo-v2",
             "artifact_hash": "abc",
             "k": 20,
             "home_advantage": 50,
@@ -283,7 +283,7 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
         }
 
     # Wrong hash (as if the history was altered after this artifact trained) -> refused.
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(_artifact("0" * 64)), encoding="utf-8"
     )
     with pytest.raises(ValueError, match="training history has changed"):
@@ -292,7 +292,7 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
         )
 
     # Real matching hash -> forecast proceeds normally.
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(_artifact(real_prefix_hash)), encoding="utf-8"
     )
     output = forecast_international_baseball_slate(
@@ -344,10 +344,10 @@ def test_forecast_resolves_home_away_by_tag_not_by_raw_side_position(tmp_path) -
     )
     models = tmp_path / "models"
     models.mkdir()
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(
             {
-                "model_version": "kbo-tie-aware-elo-v1",
+                "model_version": "kbo-tie-aware-elo-v2",
                 "artifact_hash": "abc",
                 "k": 20,
                 "home_advantage": 50,
@@ -406,10 +406,10 @@ def test_forecast_no_calls_when_both_sides_resolve_to_same_team(tmp_path) -> Non
     )
     models = tmp_path / "models"
     models.mkdir()
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(
             {
-                "model_version": "kbo-tie-aware-elo-v1",
+                "model_version": "kbo-tie-aware-elo-v2",
                 "artifact_hash": "abc",
                 "k": 20,
                 "home_advantage": 50,

@@ -7,14 +7,14 @@ import json
 import logging
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from .data_sources.espn import _probable
-from .domain import parse_utc
+from .domain import EASTERN, parse_utc
 from .features.base import FeatureStore
-from .features.bullpen import bullpen_profile, team_recent_relief_lines
+from .features.bullpen import FATIGUE_WINDOW_DAYS, bullpen_profile, team_recent_relief_lines
 from .features.elo_ratings import build_elo
 from .features.mlb_player_availability import FEATURE_NAMES as MLB_AVAILABILITY_FEATURE_NAMES
 from .features.mlb_player_availability import (
@@ -30,6 +30,7 @@ from .features.mlb_player_availability import (
 from .features.mlb_player_availability import (
     matchup_player_availability as matchup_mlb_player_availability,
 )
+from .features.park_factors import park_factor_at
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
 from .features.schedule_load import matchup_schedule_load
@@ -152,23 +153,31 @@ def _compute_features(
         # home-minus-away: positive = home bullpen has thrown more innings
         # recently (more fatigued), negative = away bullpen more fatigued.
         # Uses the same relief-appearance index as bullpen_weakness_gap
-        # but sums innings rather than computing ERA/weakness-index.
-        home_relief = team_recent_relief_lines(home_team, event_start)
-        away_relief = team_recent_relief_lines(away_team, event_start)
+        # but sums innings rather than computing ERA/weakness-index. The
+        # trailing window is FATIGUE_WINDOW_DAYS calendar days, identical to
+        # validation.py's training-time map (2026-08-13 audit: this used to
+        # be a last-N-games lookback with no calendar cap -- real skew).
+        home_relief = team_recent_relief_lines(
+            home_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS
+        )
+        away_relief = team_recent_relief_lines(
+            away_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS
+        )
         home_fatigue = sum(float(line.get("innings", 0)) for line in home_relief)
         away_fatigue = sum(float(line.get("innings", 0)) for line in away_relief)
         features["bullpen_fatigue_gap"] = round(home_fatigue - away_fatigue, 6)
     if "residual_trend_gap" in wanted:
         # Elo-residualized trend: how much the home team's recent actual
-        # win rate diverges from Elo's expectation. Matches the training
-        # definition in validation.py's build_walk_forward_rows.
-        from datetime import timedelta as _td2
-        from .domain import EASTERN as _EASTERN2
-        cutoff = event_start.astimezone(_EASTERN2).date() - _td2(days=30)
-        game_date_dt = event_start.astimezone(_EASTERN2).date()
+        # win rate diverges from Elo's expectation. IDENTICAL to
+        # validation.py's _trailing_home_rate plus the >=10-team-game gate:
+        # same 30-day window, same home_team filter, same tie exclusion,
+        # same 0.0 fallback. (2026-08-13 audit: the training side used to be
+        # a league-wide rate -- a real train/serve skew; now team-specific.)
+        cutoff = event_start.astimezone(EASTERN).date() - timedelta(days=30)
+        game_date_dt = event_start.astimezone(EASTERN).date()
         recent_home = [
             g for g in history
-            if cutoff <= g.start.astimezone(_EASTERN2).date() < game_date_dt
+            if cutoff <= g.start.astimezone(EASTERN).date() < game_date_dt
             and g.home_score != g.away_score
             and g.home_team == home_team
         ]
@@ -283,6 +292,20 @@ def _compute_features(
                 or "mlb_position_players_unavailable"
             )
     _init_providers()
+    if "park_factor_pit" in wanted:
+        # PIT-correct empirical park factor from cached history -- exactly
+        # validation.py's training definition (park_factor_at(home_team,
+        # day, games_data=history)). Registered per-call because providers
+        # don't receive history; the loop below consumes it immediately, so
+        # the captured history is always this game's. Inert in production
+        # until an artifact's feature_names lists it (repo pattern).
+        _FEATURE_PROVIDERS["park_factor_pit"] = (
+            lambda h, a, eid, gd, es, _history=history: float(
+                park_factor_at(
+                    h, es.astimezone(EASTERN).date().isoformat(), games_data=_history
+                ).get("park_factor", 1.0)
+            )
+        )
     for name in wanted:
         if name in features:
             continue

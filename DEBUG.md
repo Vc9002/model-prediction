@@ -2897,6 +2897,12 @@ env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli verify-chain
 
 ### Canonical artifact hashes
 
+NOTE (2026-08-13): the codebase's real loader convention is
+`ensure_ascii=True` — this snippet previously used `ensure_ascii=False` and
+"mismatched" every artifact, including two historical "mismatch" reports that
+were artifacts of this snippet, never real bugs. If a run reports MISMATCH,
+check the artifact with `ensure_ascii=True` before treating it as a finding.
+
 ```bash
 .venv/bin/python - <<'PY'
 import hashlib
@@ -2912,7 +2918,7 @@ for path in sorted(Path("config/models").glob("*.json")):
             canonical,
             sort_keys=True,
             separators=(",", ":"),
-            ensure_ascii=False,
+            ensure_ascii=True,
         ).encode()
     ).hexdigest()
     print(path.name, "OK" if computed == raw.get(key) else "MISMATCH")

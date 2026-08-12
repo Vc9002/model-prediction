@@ -1,15 +1,27 @@
-"""Append-only SQLite production prediction ledger.
+"""SQLite production prediction ledger.
 
 Stored at ``<runtime_root>/production/predictions.db``.  Every production
-prediction, health check snapshot, and run record is stored here — append-only,
-with idempotency keys so re-running the same production cycle with identical
+prediction, health check snapshot, and run record is stored here, with
+idempotency keys so re-running the same production cycle with identical
 inputs is a no-op.
 
 Design contract (same as ``ShadowLedger``):
 
-- ``predictions`` and ``health_checks`` are append-only.  No UPDATE or DELETE.
-  A correction is a new INSERT whose ``supersedes_id`` points at the row it
-  replaces.
+- ``predictions`` and ``health_checks`` are append-only for *events*: no
+  DELETE anywhere, and a correction (new forecast) is a new INSERT whose
+  ``supersedes_id`` points at the row it replaces.
+- Lifecycle is an explicit, guarded state machine, not a raw write path.
+  A prediction moves ``predicted`` -> ``settled``/``voided``/``superseded``/
+  ``error`` only through the transition methods (``settle_prediction`` &
+  friends), which refuse to touch a row that is not still open and record
+  when the row reached its terminal state.  A settled row must stay the
+  canonical, visible row carrying its outcome, so settlement is an in-place
+  status update via the transition API — the append-only rule covers new
+  events and corrections, not lifecycle fields on the row itself.
+- ``runs`` keeps a mutable lifecycle status (``running`` -> ``completed``/
+  ``failed``) updated only through ``start_run``/``complete_run``; a run row
+  is an audit entry for a cycle, not a prediction event, so this is the
+  documented exception to the append-only rule for event rows.
 - Every row carries ``created_at``, ``run_id``, ``schema_version``.
 - ``predictions`` enforce a UNIQUE index on ``(run_id, event_id, sport,
   market, model_id) WHERE supersedes_id IS NULL`` — rerunning the same
@@ -19,15 +31,21 @@ Design contract (same as ``ShadowLedger``):
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 SCHEMA_VERSION = "1"
+
+# Lifecycle state machine for prediction rows: open until one of the
+# terminal transitions below is applied; terminal rows are immutable.
+OPEN_PREDICTION_STATUS = "predicted"
+TERMINAL_PREDICTION_STATUSES = frozenset({"settled", "voided", "superseded", "error"})
+RUN_TERMINAL_STATUSES = frozenset({"completed", "failed"})
+RESOLVED_OUTCOMES = frozenset({"won", "lost", "void"})
 
 
 def utc_now() -> str:
@@ -93,6 +111,9 @@ class ProductionLedger:
                 probabilities_json TEXT NOT NULL,
                 rationale TEXT,
 
+                -- lifecycle annotation (transition note, e.g. why voided)
+                note TEXT,
+
                 -- data provenance
                 data_timestamp TEXT,
                 data_age_seconds REAL,
@@ -103,7 +124,10 @@ class ProductionLedger:
                     CHECK(status IN (
                         'predicted', 'settled', 'voided',
                         'superseded', 'error'
-                    ))
+                    )),
+                resolved_outcome TEXT
+                    CHECK(resolved_outcome IN ('won', 'lost', 'void')),
+                settled_at_utc TEXT
             );
 
             -- Idempotency: same (run_id, event_id, sport, market, model_id)
@@ -133,7 +157,24 @@ class ProductionLedger:
             CREATE INDEX IF NOT EXISTS idx_health_checks_sport
                 ON health_checks(sport, market, checked_at_utc);
         """)
+        # Additive migration for databases created before the lifecycle
+        # columns existed (the live production DB predates them, and
+        # CREATE TABLE IF NOT EXISTS will not touch an existing table).
+        # A NULL resolved_outcome/settled_at_utc passes the CHECK, so this
+        # is safe for existing rows.
+        self._ensure_column(
+            "predictions", "resolved_outcome",
+            "resolved_outcome TEXT CHECK(resolved_outcome IN ('won', 'lost', 'void'))",
+        )
+        self._ensure_column("predictions", "settled_at_utc", "settled_at_utc TEXT")
+        self._ensure_column("predictions", "note", "note TEXT")
         self.conn.commit()
+
+    def _ensure_column(self, table: str, column: str, ddl: str) -> None:
+        """Add *column* to *table* if it is missing (idempotent)."""
+        cols = {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
 
     # ── runs ────────────────────────────────────────────────────────────
 
@@ -154,13 +195,39 @@ class ProductionLedger:
 
     def complete_run(self, run_id: str, status: str = "completed",
                      note: str | None = None) -> None:
-        """Mark a run as completed or failed."""
-        self.conn.execute(
+        """Transition a run to its terminal state (``completed`` or ``failed``).
+
+        Explicit run-lifecycle transition — the only UPDATE the runs table
+        ever takes.  Runs are audit entries for a whole cycle, so their
+        status is a mutable lifecycle field (documented exception to the
+        append-only rule for prediction/health *event* rows).  Guarded the
+        same way as prediction transitions: only ``running`` -> terminal,
+        and an already-terminal run is left untouched (idempotent no-op —
+        the scheduler re-fires every cycle and a completed run must not be
+        re-stamped).  Raises ``ValueError`` for an unknown run or an
+        invalid status value.
+        """
+        if status not in RUN_TERMINAL_STATUSES:
+            raise ValueError(
+                f"run status must be one of {sorted(RUN_TERMINAL_STATUSES)}; "
+                f"got {status!r}"
+            )
+        cursor = self.conn.execute(
             """UPDATE runs SET status=?, completed_at_utc=?, note=?
-               WHERE run_id=?""",
+               WHERE run_id=? AND status='running'""",
             (status, utc_now(), note, run_id),
         )
         self.conn.commit()
+        if cursor.rowcount == 0:
+            row = self.conn.execute(
+                "SELECT status FROM runs WHERE run_id=?", (run_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"no run with run_id={run_id!r}")
+            # Already terminal: idempotent no-op, see docstring. A
+            # running -> terminal retry (e.g. a cycle that completed then
+            # was re-reported) must not re-stamp completed_at_utc.
+            return
 
     # ── predictions ─────────────────────────────────────────────────────
 
@@ -234,8 +301,15 @@ class ProductionLedger:
         market: str | None = None, model_id: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        """Query predictions, optionally filtered."""
-        conditions = ["supersedes_id IS NULL"]
+        """Query the *current* predictions view, optionally filtered.
+
+        The current view is every row that is not itself ``superseded``:
+        a correction's replacement row (``supersedes_id`` set) is the
+        current record of that prediction and must show up, while the
+        superseded original drops out.  Terminal rows (settled/voided/
+        error) stay visible — they carry the resolved outcome.
+        """
+        conditions = ["status != 'superseded'"]
         params: list[Any] = []
         if run_id is not None:
             conditions.append("run_id = ?")
@@ -256,6 +330,133 @@ class ProductionLedger:
             params + [limit],
         ).fetchall()
         return [_prediction_row(r) for r in rows]
+
+    def get_prediction(self, row_id: int) -> dict[str, Any] | None:
+        """Return a single prediction row by its integer id (or None)."""
+        row = self.conn.execute(
+            "SELECT * FROM predictions WHERE id=?", (row_id,)
+        ).fetchone()
+        return _prediction_row(row) if row is not None else None
+
+    # ── lifecycle transitions ───────────────────────────────────────────
+
+    def transition_prediction(
+        self,
+        row_id: int,
+        to_status: str,
+        *,
+        outcome: str | None = None,
+        note: str | None = None,
+        at_utc: str | None = None,
+    ) -> dict[str, Any]:
+        """Transition an open prediction to a terminal status, atomically.
+
+        Guardrails (point-in-time sane — the row's decision is frozen once
+        the cycle reported it, and re-litigating a settled outcome is how
+        track records get corrupted):
+
+        - Only ``predicted`` (open) -> one of ``settled``/``voided``/
+          ``superseded``/``error``.  A terminal row can never be
+          re-transitioned; a second call raises ``ValueError``.
+        - ``settled`` requires *outcome* in ``{won, lost, void}``; the
+          outcome ``void`` maps to the terminal status ``voided`` (a
+          no-action result is a void, not a settlement), so the ``void``
+          outcome and the ``voided`` status stay in lockstep.
+        - *outcome* is rejected for any status other than ``settled``.
+        - The guard is enforced in the UPDATE predicate, so it holds under
+          concurrent writers, not just in this process.
+
+        Returns the updated row dict.  ``settled_at_utc`` records when the
+        row reached its terminal state (the name is kept because
+        settlement is the dominant case; it is set for every transition).
+        """
+        if to_status not in TERMINAL_PREDICTION_STATUSES:
+            raise ValueError(
+                f"transition target {to_status!r} is not a terminal status; "
+                f"use one of {sorted(TERMINAL_PREDICTION_STATUSES)}"
+            )
+        if to_status == "settled":
+            if outcome not in RESOLVED_OUTCOMES:
+                raise ValueError(
+                    f"settling requires outcome in {sorted(RESOLVED_OUTCOMES)}; "
+                    f"got {outcome!r}"
+                )
+            terminal_status = "voided" if outcome == "void" else "settled"
+        else:
+            if outcome is not None:
+                raise ValueError(
+                    f"outcome is only valid when settling; got {outcome!r} "
+                    f"for {to_status!r}"
+                )
+            terminal_status = to_status
+        now = at_utc or utc_now()
+        cursor = self.conn.execute(
+            """UPDATE predictions
+               SET status=?, resolved_outcome=?, settled_at_utc=?, note=?
+               WHERE id=? AND status=?""",
+            (terminal_status, outcome, now, note, row_id, OPEN_PREDICTION_STATUS),
+        )
+        self.conn.commit()
+        if cursor.rowcount == 0:
+            row = self.get_prediction(row_id)
+            if row is None:
+                raise ValueError(f"no prediction row with id={row_id}")
+            raise ValueError(
+                f"prediction {row_id} is already '{row['status']}'; "
+                f"only '{OPEN_PREDICTION_STATUS}' -> terminal transitions "
+                f"are allowed"
+            )
+        return self.get_prediction(row_id)
+
+    def settle_prediction(
+        self, row_id: int, outcome: str, *, note: str | None = None,
+        at_utc: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve a prediction with outcome ``won``/``lost``/``void``.
+
+        The ``void`` outcome produces the terminal status ``voided``.
+        """
+        return self.transition_prediction(
+            row_id, "settled", outcome=outcome, note=note, at_utc=at_utc
+        )
+
+    def void_prediction(
+        self, row_id: int, *, note: str | None = None,
+        at_utc: str | None = None,
+    ) -> dict[str, Any]:
+        """Void an open prediction (no-action result)."""
+        return self.transition_prediction(
+            row_id, "settled", outcome="void", note=note, at_utc=at_utc
+        )
+
+    def supersede_prediction(
+        self, row_id: int, *, note: str | None = None,
+        at_utc: str | None = None,
+    ) -> dict[str, Any]:
+        """Mark a prediction superseded; append its replacement separately.
+
+        The correction flow stays append-only: mark the old row
+        ``superseded`` here, then call ``record_prediction`` with
+        ``supersedes_id=row_id`` — a superseding row bypasses the
+        idempotency index and always appends, and ``get_predictions``
+        returns only the replacement.
+        """
+        return self.transition_prediction(
+            row_id, "superseded", note=note, at_utc=at_utc
+        )
+
+    def mark_prediction_error(
+        self, row_id: int, *, note: str | None = None,
+        at_utc: str | None = None,
+    ) -> dict[str, Any]:
+        """Flag an open prediction as errored (e.g. bad data surfaced late).
+
+        *note* should say what went wrong — it is the only record of why
+        the row was invalidated.
+        """
+        return self.transition_prediction(
+            row_id, "error", note=note, at_utc=at_utc
+        )
 
     # ── health checks ───────────────────────────────────────────────────
 
@@ -297,6 +498,12 @@ class ProductionLedger:
         """Return the most recent health check for each sport/market.
 
         Optionally filtered to a single sport.
+
+        One row per sport/market. The previous version joined on exact
+        ``created_at = MAX(created_at)``, so two checks recorded in the same
+        microsecond (utc_now() returns identical values for rapid back-to-
+        back writes) both matched and produced duplicate "latest" rows; a
+        deterministic tiebreak on id (later insert wins) fixes that.
         """
         where = "WHERE supersedes_id IS NULL"
         params: list[Any] = []
@@ -304,29 +511,29 @@ class ProductionLedger:
             where += " AND sport = ?"
             params.append(sport)
         rows = self.conn.execute(
-            f"""SELECT h.* FROM health_checks h
-                INNER JOIN (
-                    SELECT sport, market, MAX(created_at) AS max_created
-                    FROM health_checks {where}
-                    GROUP BY sport, market
-                ) latest
-                ON h.sport = latest.sport
-                AND (h.market = latest.market OR (h.market IS NULL AND latest.market IS NULL))
-                AND h.created_at = latest.max_created
-                ORDER BY h.sport, h.market""",
+            f"""SELECT * FROM (
+                    SELECT h.*, ROW_NUMBER() OVER (
+                        PARTITION BY sport, market
+                        ORDER BY created_at DESC, id DESC
+                    ) AS _rn
+                    FROM health_checks h {where}
+                ) ranked
+                WHERE _rn = 1
+                ORDER BY sport, market""",
             params,
         ).fetchall()
-        return [dict(r) for r in rows]
+        # Drop the ranking helper column from the public result shape.
+        return [{k: v for k, v in dict(r).items() if k != "_rn"} for r in rows]
 
     # ── lifecycle ───────────────────────────────────────────────────────
 
     def close(self) -> None:
         self.conn.close()
 
-    def __enter__(self) -> ProductionLedger:
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         self.close()
 
 

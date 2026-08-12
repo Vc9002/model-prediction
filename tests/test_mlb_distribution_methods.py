@@ -11,22 +11,29 @@ probabilities with the correct push handling.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import textwrap
 
+import numpy as np
 import pytest
 
-from model_prediction.models.mlb import DISTRIBUTION_METHODS, MLBGameFeatures as _Features
+from model_prediction.domain import MarketType
 from model_prediction.models.mlb import (
+    DISTRIBUTION_METHODS,
     PitcherForm,
     TeamForm,
+    _clip,
     compare_distribution_methods,
     derive_market_distribution,
     estimate_runs,
     load_formula_spec,
     simulate_game,
+    stable_seed,
 )
-
-from model_prediction.domain import MarketType
+from model_prediction.models.mlb import (
+    MLBGameFeatures as _Features,
+)
 
 _BASE_YAML = """
 away_field_run_factor: 1.0
@@ -133,6 +140,51 @@ def test_default_method_is_unchanged_and_deterministic(tmp_path):
     # Default method is gamma_poisson (the incumbent) — never silently changed.
     assert len(first.away_scores) == 2000
 
+    # Bit-for-bit pin against the PRE-refactor stream. The method refactor
+    # appended `method` to stable_seed's parts, silently changing every
+    # incumbent gamma_poisson simulated price. The default path's seed
+    # excludes method (restored 2026-08-13), so reproduce the old formula by
+    # hand -- stable_seed(event_id, formula_version, decision_timestamp,
+    # market_snapshot_hash, feature_snapshot_hash, seed_namespace="") -- and
+    # require EXACT equality with what simulate_game emits.
+    old_seed = stable_seed(
+        features.event_id,
+        spec.formula_version,
+        features.decision_timestamp_utc,
+        features.market_snapshot_hash,
+        features.feature_snapshot_hash,
+        "",
+    )
+    rng = np.random.default_rng(old_seed)
+    shared_variance = float(spec.simulation["shared_environment_variance"])
+    team_variance = float(spec.simulation["team_specific_variance"])
+    shared = rng.gamma(1 / shared_variance, shared_variance, 2000)
+    away_specific = rng.gamma(1 / team_variance, team_variance, 2000)
+    home_specific = rng.gamma(1 / team_variance, team_variance, 2000)
+    away = rng.poisson(estimate.away_expected_runs * shared * away_specific)
+    home = rng.poisson(estimate.home_expected_runs * shared * home_specific)
+    ties = away == home
+    if ties.any():
+        lower, upper = spec.simulation["extra_inning_home_probability_bounds"]
+        home_probability = _clip(
+            estimate.home_expected_runs / (estimate.home_expected_runs + estimate.away_expected_runs),
+            (float(lower), float(upper)),
+        )
+        home_wins = rng.random(int(ties.sum())) < home_probability
+        tie_indices = np.flatnonzero(ties)
+        home[tie_indices[home_wins]] += 1
+        away[tie_indices[~home_wins]] += 1
+    assert first.away_scores == away.tolist()
+    assert first.home_scores == home.tolist()
+
+    # And pin the digest so any future drift in the default seed formula
+    # fails loudly instead of silently shifting every price. Computed from
+    # the stream above -- MUST NEVER CHANGE.
+    digest = hashlib.sha256(
+        json.dumps([first.away_scores, first.home_scores], separators=(",", ":")).encode()
+    ).hexdigest()
+    assert digest == "17feb6c0ec0a030288e016466353ae8433ece0d8e66e692f50cf9e4d584c1310"
+
 
 def test_unknown_method_rejected(tmp_path):
     spec = _spec(tmp_path)
@@ -160,7 +212,6 @@ def test_negative_binomial_overdisperses_relative_to_poisson(tmp_path):
     estimate = estimate_runs(features, spec)
     poisson = simulate_game(features, estimate, spec, simulations=20000, method="independent_poisson")
     nb = simulate_game(features, estimate, spec, simulations=20000, method="negative_binomial")
-    import numpy as np
     poisson_total = np.asarray(poisson.away_scores) + np.asarray(poisson.home_scores)
     nb_total = np.asarray(nb.away_scores) + np.asarray(nb.home_scores)
     assert nb_total.std() > poisson_total.std()
@@ -174,7 +225,7 @@ def test_compare_derives_all_three_markets_from_one_draw_per_method(tmp_path):
         features, estimate, spec, simulations=2000, spread_line=-1.5, total_line=8.5
     )
     assert set(result) == set(DISTRIBUTION_METHODS)
-    for method, markets in result.items():
+    for markets in result.values():
         assert set(markets) == {"moneyline", "spread", "total"}
         for dist in markets.values():
             _assert_valid(dist)

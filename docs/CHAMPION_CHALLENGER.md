@@ -23,6 +23,10 @@ features, and artifacts stay isolated until the candidate proves better.
 
 - `ProductionRegistry` — immutable snapshot of production pointers; `freeze()`
   captures + hashes every artifact; `validate_no_tampering()` detects drift.
+  `freeze()` fails loudly when an artifact-backed model's file is missing:
+  only `soccer-poisson-dc-v1` and `tennis-surface-elo-v1` are genuinely
+  code-backed (no artifact file), and only they may be frozen with the
+  `CODE_BACKED` sentinel hash.
 - `FrozenProductionStore` — persists/loads `data/production/frozen_champions.json`.
 - `PairedComparison` — paired deltas (ΔLogLoss, ΔBrier, ΔECE, Δaccuracy) with
   date-cluster bootstrap CIs.
@@ -37,6 +41,14 @@ features, and artifacts stay isolated until the candidate proves better.
 Candidate must: beat or tie incumbent LogLoss AND Brier, not materially worsen
 ECE, not reduce coverage excessively, show improvement across multiple date
 blocks, and not rely on PIT-invalid data.
+
+LogLoss/Brier are judged on the bootstrap CI when one is available: a
+positive point delta still passes while the CI includes 0 (the challenger is
+not *confidently* worse); it fails only when the whole CI lies above 0.
+Without a CI, small positive deltas (≤ 0.001) are tolerated. The champion's
+own settled rows are filtered to the champion's `model_version` before the
+paired comparison — ledgers accumulate rows from every artifact version that
+ever wrote to them, and older rows must not count against the champion.
 
 ## Known limitation
 

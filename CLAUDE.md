@@ -23,6 +23,16 @@ reproduction commands in `DEBUG.md`, and per-sport feature roadmaps in
 `docs/MODEL_IMPROVEMENTS.md`. This file is about *how to work here*, not
 *what's currently true*.
 
+## Knowledge graph
+
+A graphify knowledge graph of this repo lives at `graphify-out/` (graph.json,
+GRAPH_REPORT.md, graph.html — built 2026-08-13, entire repo). For codebase
+questions (architecture, cross-file relations, "what calls X"), use `/graphify`
+first — the `graphify` MCP server (query_graph, get_node, get_neighbors,
+shortest_path) is also registered in Claude Code. Refresh with
+`/graphify . --update` (code changes, no LLM) or a full `/graphify .`
+(includes the expensive docs/papers semantic pass).
+
 ## What this project is
 
 A shadow-first, multi-sport prediction/research/ledger/dashboard system with
@@ -211,3 +221,43 @@ coherent joint draw per method. Wired through `MeasuredEdgeMarginModel` /
 `MeasuredEdgeTotalsModel.predict(..., method=...)`. NB is the first serious
 challenger to the incumbent gamma-Poisson; it is runnable but not yet
 promoted. Tests: `tests/test_mlb_distribution_methods.py`.
+
+## 2026-08-13 (later) — deep-audit fix pass (F-72 → F-84)
+
+Full audit run against this tree; every finding fixed with regression tests.
+Details in `MASTER.md`'s 2026-08-13 session entry and
+`docs/PROJECT_STATUS.md`'s "2026-08-13 deep-audit fix pass". Things that
+change how you should work here:
+
+- **Main ledger is un-retired** (operator directive): `main_ledger_enabled:
+  true`, workbooks restored to `data/main/`. Phase B's `retired` mechanism
+  still exists; don't re-flip without a directive.
+- **Train/serve parity is now a testable invariant** —
+  `tests/test_validation.py::test_train_serve_parity_for_v9_features` proves
+  `validation.py` (training) and `learned_forward.py` (serving) compute
+  identical values per feature. Any new feature must hold both sides in
+  literal sync — the 2026-08-13 audit found three v9 features where they
+  silently diverged (F-79). v9 variants use the new `park_factor_pit`
+  feature name; `park_factor` stays the static table for v8's trained
+  contract. **Prior v9 ablation numbers are void — re-run
+  `scripts/mlb_v9_ablation.py` before trusting them.**
+- **Stable seeds are load-bearing**: `simulate_game`'s default
+  `gamma_poisson` stream must stay bit-for-bit across refactors; the seed
+  pin test in `test_mlb_distribution_methods.py` must never be updated to
+  "match new output" — it pins history (F-80).
+- **ProductionLedger is live**: every `cli_production predict` writes
+  `data/production/predictions.db` fail-soft; lifecycle transitions are
+  guarded open→terminal only (settle/void/supersede/error). Operator
+  commands are fail-LOUD, scheduler path fail-soft.
+- **`pytest` runs WITHOUT the MODEL_PREDICTION_* env vars** (documented safe
+  form) — several tests pin the no-env repo-colocated default; setting the
+  launchd env vars makes ~12 of them red by retargeting them at the live
+  runtime root.
+- **Still open (explicit operator action needed)**: loading the
+  `com.modelprediction.production` and `com.modelprediction.rebuild-shadow`
+  launchd agents (plists installed, never loaded — canary predictions and
+  rebuild shadow.db frozen since 08-11); regenerating
+  `outputs/rebuild/verification.json` (gitignored CI evidence; rebuild
+  status shows degraded while absent); the v8 park-factor 2026-table leak
+  (needs a refit under v8's contract — v9 is clean via `park_factor_pit`).
+

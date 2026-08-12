@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -16,11 +14,10 @@ from model_prediction.champion_challenger import (
     ProductionFreezeViolation,
     ProductionRegistry,
     PromotionVerdict,
-    compare_champion_vs_challenger,
     _bootstrap_ci_on_deltas,
     _compute_artifact_hash,
+    compare_champion_vs_challenger,
 )
-
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
@@ -153,7 +150,10 @@ class TestChampionSnapshot:
             artifact_hash="abcd",
             frozen_at_utc="2026-08-12T00:00:00Z",
         )
-        with pytest.raises(Exception):
+        # Frozen dataclass assignment raises FrozenInstanceError, an
+        # AttributeError subclass — assert the specific failure, not a
+        # blind Exception (ruff B017).
+        with pytest.raises(AttributeError):
             snap.sport = "nba"  # type: ignore[misc]
 
     def test_roundtrip(self) -> None:
@@ -613,6 +613,58 @@ class TestCompareChampionVsChallenger:
         )
         assert isinstance(verdict, PromotionVerdict)
         assert verdict.status in ("promote", "reject", "needs_more_data")
+
+
+# ── load_settled_predictions tests ──────────────────────────────────────────
+
+
+class TestLoadSettledPredictions:
+    def test_filters_to_champion_model_version(self, tmp_path: Path) -> None:
+        """Ledgers accumulate rows from every artifact version that ever
+        wrote to them (the MLB ledger holds 244 v7 rows vs 14 v8 while the
+        frozen champion is v8). The loader must return only the champion's
+        own version, or the champion metrics would include predictions the
+        champion never made (audit 2026-08-13)."""
+        from model_prediction.champion_challenger import load_settled_predictions
+        from model_prediction.model_ledger import ModelLedger
+
+        ledger_dir = tmp_path / "data" / "model_ledgers"
+        ledger_dir.mkdir(parents=True)
+        ledger = ModelLedger(ledger_dir / "mlb-moneyline-elo-trend-lr.xlsx")
+        for version, n in (
+            ("mlb-elo-trend-lr-v7", 3),
+            ("mlb-elo-trend-lr-v8", 2),
+        ):
+            for i in range(n):
+                row = ledger.append_prediction(
+                    {
+                        "event_id": f"evt-{version}-{i}",
+                        "market_type": "moneyline",
+                        "model_id": "mlb-moneyline-elo-trend-lr",
+                        "model_version": version,
+                        "event_start_utc": f"2026-06-{i + 1:02d}T00:00:00Z",
+                        "model_probability": 0.6,
+                        "selection": "team",
+                        "line": "-110",
+                    }
+                )
+                ledger.settle(
+                    row["prediction_id"], result="win" if i % 2 == 0 else "loss"
+                )
+
+        all_rows = load_settled_predictions("mlb", "moneyline", repo_root=tmp_path)
+        assert len(all_rows) == 5
+        v8_rows = load_settled_predictions(
+            "mlb",
+            "moneyline",
+            repo_root=tmp_path,
+            model_version="mlb-elo-trend-lr-v8",
+        )
+        assert len(v8_rows) == 2
+        assert {r["event_id"] for r in v8_rows} == {
+            "evt-mlb-elo-trend-lr-v8-0",
+            "evt-mlb-elo-trend-lr-v8-1",
+        }
 
 
 # ── _bootstrap_ci_on_deltas tests ───────────────────────────────────────────

@@ -54,3 +54,16 @@ again. The 08-03→present stale window is not backfilled (settled rows already
 in per-tier mirrors are not merged back), and the fix is a production
 data-path change that should run under observation before it is trusted
 unattended.
+
+## Update 2026-08-13 (audit follow-up)
+
+Verified live post-fix: the 13:38 EDT daily run wrote fresh canonical mirrors
+for cs2/lol/valorant/rainbow-six/mlb/wnba/soccer/tennis (`data/model_ledgers/`
+mtime 01:42-01:46 local). Per-title gaps (e.g. dota2/kbo/npb lagging a run)
+are explained by per-run pick volume plus the no-backfill window above, not
+by the routing fix.
+
+Also: the main ledger was **un-retired** the same day (operator directive),
+which re-enables the Main settle hook — but the threading fix means canonical
+`data/model_ledgers/` is written by every tier regardless of Main's retired
+state, so the canonical freeze cannot recur through that path.

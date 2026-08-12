@@ -20,6 +20,7 @@ data/*.bak-*
 data/*.before-backtest-cleanup-*
 data/*.pre-fix-*
 data/logs/*.log
+dashboard/server.log
 data/events.jsonl
 data/mlb_statsapi/game_snapshots.jsonl
 

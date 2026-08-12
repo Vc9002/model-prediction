@@ -27,7 +27,7 @@ from .config import PROJECT_ROOT
 from .data_sources.espn_probables import point_in_time_pitcher_era_gap
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
-from .features.bullpen import bullpen_profile
+from .features.bullpen import FATIGUE_WINDOW_DAYS, bullpen_profile
 from .features.elo_ratings import build_elo
 from .features.park_factors import park_factor, park_factor_at
 from .features.schedule_load import matchup_schedule_load
@@ -77,6 +77,7 @@ class ValidationRow:
     weather_factor: float
     park_available: bool
     weather_available: bool
+    park_factor_pit: float = 1.0
     elo_neutral_probability: float = 0.5
     trailing_home_win_rate_30d: float = 0.5
     trailing_home_games_30d: int = 0
@@ -220,10 +221,14 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "games_last_7_gap",
     ),
     # ── v9 ablation: K-BB% replaces ERA ──────────────────────────────────
+    # v9 variants consume the empirical point-in-time park factor
+    # (park_factor_pit), NOT the static table the v8 variants use -- the
+    # static table contains 2026-season data and leaks for any walk-forward
+    # before season end (2026-08-13 audit).
     "elo_trend_park_weather_starter_kbb_bullpen": (
         "elo_probability",
         "trend_gap",
-        "park_factor",
+        "park_factor_pit",
         "weather_factor",
         "starter_kbb_gap",
         "bullpen_weakness_gap",
@@ -232,7 +237,7 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
     "elo_trend_park_weather_starter_era_kbb_bullpen": (
         "elo_probability",
         "trend_gap",
-        "park_factor",
+        "park_factor_pit",
         "weather_factor",
         "starter_era_gap",
         "starter_kbb_gap",
@@ -242,7 +247,7 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
     "elo_residual_trend_park_weather_starter_era_bullpen": (
         "elo_probability",
         "residual_trend_gap",
-        "park_factor",
+        "park_factor_pit",
         "weather_factor",
         "starter_era_gap",
         "bullpen_weakness_gap",
@@ -251,7 +256,7 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
     "elo_trend_park_weather_starter_era_bullpen_fatigue": (
         "elo_probability",
         "trend_gap",
-        "park_factor",
+        "park_factor_pit",
         "weather_factor",
         "starter_era_gap",
         "bullpen_fatigue_gap",
@@ -278,13 +283,20 @@ def build_walk_forward_rows(
         if len(history) >= minimum_history_games:
             elo = build_elo(history, sport)
             trends = TrendEngine(history)
-            home_win_rate_30d, home_games_30d = _trailing_home_rate(history, day)
             for game in day_games:
                 is_soccer = sport.lower() == "soccer"
                 if not is_soccer and game.home_score == game.away_score:
                     continue
                 home_trend = trends.team_trend(game.home_team)
                 away_trend = trends.team_trend(game.away_team)
+                # Team-specific (matches learned_forward.py's
+                # residual_trend_gap serving definition exactly -- the
+                # league-wide rate it used to be was a train/serve skew,
+                # fixed 2026-08-13; this also changes v9 ablation numbers,
+                # which were computed on the mismatched definition).
+                home_win_rate_30d, home_games_30d = _trailing_home_rate(
+                    history, day, game.home_team
+                )
                 schedule = matchup_schedule_load(
                     history,
                     game.home_team,
@@ -346,7 +358,17 @@ def build_walk_forward_rows(
                 # Historical weather from Open-Meteo DB
                 weather = _lookup_weather(game.home_team, game.start.astimezone(EASTERN).date().isoformat())
                 
-                park: dict[str, Any] = (
+                # Static table (v8-compatible: the active
+                # mlb-elo-trend-lr-v8 artifact trained on it) and empirical
+                # PIT factor, stored separately so each variant consumes the
+                # definition it was validated with (v8 variants: static;
+                # v9 variants: park_factor_pit -- 2026-08-13 audit).
+                park_static: dict[str, Any] = (
+                    park_factor(game.home_team)
+                    if sport.lower() == "mlb"
+                    else {"park_factor": 1.0, "status": "not_applicable"}
+                )
+                park_pit: dict[str, Any] = (
                     park_factor_at(game.home_team, day, games_data=history)
                     if sport.lower() == "mlb"
                     else {"park_factor": 1.0, "status": "not_applicable"}
@@ -384,7 +406,8 @@ def build_walk_forward_rows(
                         back_to_back_gap=schedule["back_to_back_gap"],
                         games_last_7_gap=schedule["games_last_7_gap"],
                         schedule_available=schedule["schedule_available"],
-                        park_factor=float(park["park_factor"]),
+                        park_factor=float(park_static["park_factor"]),
+                        park_factor_pit=float(park_pit["park_factor"]),
                         weather_factor=float(weather.get("run_factor", 1.0)),
                         pitcher_era_gap=pitcher_gap,
                         starter_era_gap=starter_gap,
@@ -397,7 +420,7 @@ def build_walk_forward_rows(
                         bullpen_available=bullpen_ok,
                         bullpen_fatigue_gap=bullpen_fatigue_gap,
                         bullpen_fatigue_available=bullpen_fatigue_ok,
-                        park_available=park["status"] == "available",
+                        park_available=park_pit["status"] == "available",
                         weather_available=weather.get("available", False),
                         elo_neutral_probability=elo.expected_neutral_win(
                             game.home_team, game.away_team
@@ -500,13 +523,24 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
     }
 
 
-def _trailing_home_rate(history: Sequence[GameRecord], day: str) -> tuple[float, int]:
+def _trailing_home_rate(
+    history: Sequence[GameRecord], day: str, home_team: str
+) -> tuple[float, int]:
+    """Trailing-30-day HOME-TEAM win rate (wins / non-tie home games).
+
+    Must match learned_forward.py's residual_trend_gap serving definition
+    exactly: same 30-day window, same ``home_team`` filter, same tie
+    exclusion; the caller applies the same >=10-team-game gate with the same
+    0.0 fallback. (It used to be a league-wide rate -- a train/serve skew,
+    fixed 2026-08-13.)
+    """
     cutoff = date.fromisoformat(day) - timedelta(days=30)
     recent = [
         game
         for game in history
         if cutoff <= game.start.astimezone(EASTERN).date() < date.fromisoformat(day)
         and game.home_score != game.away_score
+        and game.home_team == home_team
     ]
     if not recent:
         return 0.5, 0
@@ -2483,7 +2517,7 @@ def _bullpen_weakness_gap(event_id: str) -> tuple[float, bool]:
 
 # ── Bullpen recent-workload (fatigue) gap from MLB Stats API snapshots ───
 
-_FATIGUE_WINDOW_DAYS = 3
+_FATIGUE_WINDOW_DAYS = FATIGUE_WINDOW_DAYS  # single source: features/bullpen.py
 _BULLPEN_FATIGUE_MAP: dict[str, tuple[float, bool]] | None = None
 
 

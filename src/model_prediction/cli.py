@@ -29,6 +29,11 @@ import httpx
 from .audit import AuditLog
 from .backtester import walk_forward_backtest
 from .bans import TeamBanList
+from .champion_challenger import (
+    FrozenProductionStore,
+    ProductionRegistry,
+    compare_champion_vs_challenger,
+)
 from .config import (
     PROJECT_ROOT,
     audit_path,
@@ -123,11 +128,6 @@ from .tennis_forward import TENNIS_TOURS, build_tennis_slate
 from .total_score import validate_all_total_score_models
 from .units import edge_scaled_units
 from .validation import run_validation_audit, write_production_artifacts
-from .champion_challenger import (
-    FrozenProductionStore,
-    ProductionRegistry,
-    compare_champion_vs_challenger,
-)
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
@@ -4360,10 +4360,13 @@ def main(argv: list[str] | None = None) -> None:
             output = {
                 "status": verdict.status,
                 "paired_metrics": verdict.paired_metrics,
-                "bootstrap_ci": {
-                    k: {"lower": v[0], "upper": v[1]} if v else None
-                    for k, v in (verdict.bootstrap_ci or {}).items()
-                },
+                # Pass the CI dicts through as-is: each value is already a
+                # JSON-serializable dict (status/dates/point_estimate/
+                # ci_low/ci_high). The previous version indexed values with
+                # [0]/[1] -- that raised KeyError on dict values, which the
+                # outer except swallowed and reported as
+                # NO_CALL_INVALID_MARKET for a perfectly healthy comparison.
+                "bootstrap_ci": verdict.bootstrap_ci,
                 "failures": verdict.failures,
                 "recommendation": verdict.recommendation,
             }

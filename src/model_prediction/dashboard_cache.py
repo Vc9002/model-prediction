@@ -12,11 +12,11 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
 from pathlib import Path
 from typing import Any
+from zipfile import BadZipFile
 
 # ── column mapping ──────────────────────────────────────────────────────
 
@@ -244,7 +244,10 @@ class DashboardCache:
 
         try:
             wb = load_workbook(path, read_only=True, data_only=True)
-        except Exception:
+        # A corrupt/foreign xlsx fails in exactly these ways (bad zip, missing
+        # sheet internals, unreadable file) -- anything else is a real bug and
+        # should surface instead of being swallowed as "no rows".
+        except (OSError, ValueError, KeyError, BadZipFile):
             return []
 
         try:

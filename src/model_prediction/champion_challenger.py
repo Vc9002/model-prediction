@@ -65,6 +65,19 @@ class ProductionFreezeViolation(Exception):
     """Raised when a frozen production artifact has been modified since freeze."""
 
 
+# Only these champions are genuinely code-backed — their predictions come
+# straight from Python modules, with no JSON artifact on disk (soccer
+# poisson-dc-v1, tennis surface-elo-v1; see config/production.yaml). Every
+# other artifact_map entry must have a real artifact file. Before this
+# allowlist existed, ANY missing artifact was silently treated as
+# code-backed, which quietly dropped real artifact champions (kbo/npb v2
+# referenced files that were written under the wrong name) from both the
+# freeze and tamper protection (audit 2026-08-13).
+CODE_BACKED_MODEL_IDS: frozenset[str] = frozenset(
+    {"soccer-poisson-dc-v1", "tennis-surface-elo-v1"}
+)
+
+
 # ── ChampionSnapshot ────────────────────────────────────────────────────────
 
 
@@ -145,9 +158,17 @@ class ProductionRegistry:
             artifact_path = self._repo_root / artifact_rel
             sport = model_id.split("-")[0]
             if not artifact_path.is_file():
-                # Code-backed model (no JSON artifact file) — e.g. soccer-poisson-dc-v1,
-                # tennis-surface-elo-v1. Freeze with a sentinel hash; tampering checks
-                # will skip these since there's no file to validate.
+                # A missing artifact is only legitimate for the explicitly
+                # code-backed champions above; anything else is a real error
+                # (e.g. kbo/npb v2 referenced files that were written under
+                # the wrong filename) and must fail loudly instead of being
+                # silently frozen as if no artifact existed.
+                if model_id not in CODE_BACKED_MODEL_IDS:
+                    raise ValueError(
+                        f"freeze: artifact file missing for {model_id} "
+                        f"({artifact_rel}) — model is artifact-backed, not "
+                        f"code-backed; generate the artifact before freezing"
+                    )
                 logger.warning(
                     "freeze: artifact file missing for %s (%s) — "
                     "treating as code-backed champion",
@@ -206,6 +227,18 @@ class ProductionRegistry:
         violations: list[str] = []
         for model_id, snapshot in self._snapshots.items():
             if snapshot.artifact_hash == "CODE_BACKED":
+                # A CODE_BACKED entry is only legitimate for the explicitly
+                # code-backed champions. Snapshot files written before the
+                # freeze fix (audit 2026-08-13) recorded artifact-backed
+                # kbo/npb as CODE_BACKED because their (wrongly-named)
+                # artifact files were missing — those must be re-frozen, not
+                # silently skipped.
+                if model_id not in CODE_BACKED_MODEL_IDS:
+                    violations.append(
+                        f"{model_id}: frozen as CODE_BACKED but is "
+                        f"artifact-backed; re-run freeze-production"
+                    )
+                    continue
                 # Code-backed models (soccer, tennis) have no artifact file
                 # to validate — skip tampering check for these.
                 continue
@@ -607,8 +640,12 @@ class PairedComparison:
         """Check all promotion criteria and return a structured verdict.
 
         Criteria (from the champion/challenger specification):
-        1. Candidate ΔLogLoss ≤ 0 (or within CI)
-        2. Candidate ΔBrier ≤ 0
+        1. Candidate ΔLogLoss ≤ 0 — when the bootstrap CI is available, a
+           positive point delta still passes while the CI includes 0 (the
+           escape hatch: the challenger is not *confidently* worse); the
+           delta fails only when the whole CI is above 0. Without a CI, a
+           small positive delta (≤ 0.001) is tolerated.
+        2. Candidate ΔBrier ≤ 0 — same CI rule as criterion 1.
         3. Candidate ΔECE not materially worse (ΔECE ≤ 0.01)
         4. Coverage not reduced excessively (Δcoverage ≥ −0.05)
         5. Improvement across multiple date blocks (≥ 2 dates with
@@ -637,26 +674,33 @@ class PairedComparison:
                 ),
             )
 
-        # Criterion 1: ΔLogLoss ≤ 0
+        # Criterion 1: ΔLogLoss ≤ 0 (or within CI).
+        # With a CI available, fail only when the whole CI lies above 0 —
+        # a positive point estimate whose CI includes 0 means the challenger
+        # is not confidently worse, which is the "within CI" pass the
+        # docstring documents. (The previous check on ci_high > 0 AND
+        # delta > 0 was effectively always true for any positive delta,
+        # since the CI is resampled from those same deltas — the CI escape
+        # hatch could never pass anyone.)
         delta_ll = deltas["delta_log_loss"]
         ll_ci = cis.get("delta_log_loss", {})
         if ll_ci.get("status") == "ok" and ll_ci.get("ci_low") is not None:
-            if ll_ci["ci_high"] > 0 and delta_ll > 0:
+            if ll_ci["ci_low"] > 0:
                 failures.append(
                     f"DeltaLogLoss: challenger worse by {delta_ll:+.6f} "
-                    f"(CI [{ll_ci['ci_low']:+.6f}, {ll_ci['ci_high']:+.6f}])"
+                    f"(CI [{ll_ci['ci_low']:+.6f}, {ll_ci['ci_high']:+.6f}] entirely above 0)"
                 )
         elif delta_ll > 0.001:
             failures.append(f"DeltaLogLoss: challenger worse by {delta_ll:+.6f}")
 
-        # Criterion 2: ΔBrier ≤ 0
+        # Criterion 2: ΔBrier ≤ 0 (or within CI) — same rule as criterion 1.
         delta_brier = deltas["delta_brier"]
         brier_ci = cis.get("delta_brier", {})
         if brier_ci.get("status") == "ok" and brier_ci.get("ci_low") is not None:
-            if brier_ci["ci_high"] > 0 and delta_brier > 0:
+            if brier_ci["ci_low"] > 0:
                 failures.append(
                     f"DeltaBrier: challenger worse by {delta_brier:+.6f} "
-                    f"(CI [{brier_ci['ci_low']:+.6f}, {brier_ci['ci_high']:+.6f}])"
+                    f"(CI [{brier_ci['ci_low']:+.6f}, {brier_ci['ci_high']:+.6f}] entirely above 0)"
                 )
         elif delta_brier > 0.001:
             failures.append(f"DeltaBrier: challenger worse by {delta_brier:+.6f}")
@@ -715,10 +759,7 @@ class PairedComparison:
             recommendation = "; ".join(failures)
         else:
             status = "reject"
-            recommendation = (
-                f"Challenger does not meet promotion criteria: "
-                + "; ".join(failures)
-            )
+            recommendation = "Challenger does not meet promotion criteria: " + "; ".join(failures)
 
         return PromotionVerdict(
             status=status,
@@ -761,8 +802,19 @@ def compare_champion_vs_challenger(
         A :class:`PromotionVerdict` with the comparison outcome.
     """
     if champion_predictions is None:
+        if frozen_store is None:
+            frozen_store = FrozenProductionStore(repo_root=repo_root)
+        registry = frozen_store.load_no_validate()
+        champion = registry.champion(sport, market)
+        if champion is None:
+            raise ValueError(
+                f"no frozen champion for sport={sport!r}, market={market!r}"
+            )
         champion_predictions = load_settled_predictions(
-            sport, market, repo_root=repo_root
+            sport,
+            market,
+            model_version=champion.model_id,
+            repo_root=repo_root,
         )
 
     comparison = PairedComparison(champion_predictions, challenger_predictions)
@@ -777,6 +829,7 @@ def load_settled_predictions(
     market: str = "moneyline",
     *,
     repo_root: Path | str | None = None,
+    model_version: str | None = None,
 ) -> list[dict[str, Any]]:
     """Load a model's real settled picks from ``data/model_ledgers/<id>.xlsx``.
 
@@ -785,6 +838,13 @@ def load_settled_predictions(
     settled win/loss rows are returned (pushes excluded, matching the
     calibration convention elsewhere in the codebase). ``probability`` is the
     model's P(selection wins) and ``outcome`` is 1 for a win, 0 for a loss.
+
+    When *model_version* is given, only rows produced by that exact artifact
+    version are returned. Ledgers accumulate rows from every artifact version
+    that ever wrote to them (the MLB ledger holds 244 v7 rows vs 14 v8 while
+    the frozen champion is v8), and mixing older versions into the champion's
+    metrics would compare the challenger against rows the champion never
+    produced (audit 2026-08-13).
 
     This is the *settled-picks* half of the champion/challenger flow; the
     backfill half is produced by the experiment runner. The champion's own
@@ -811,6 +871,8 @@ def load_settled_predictions(
         if row.get("status") != "settled":
             continue
         if row.get("result") not in {"win", "loss"}:
+            continue
+        if model_version is not None and row.get("model_version") != model_version:
             continue
         prob = row.get("model_probability")
         if prob in (None, ""):
@@ -848,7 +910,16 @@ def settled_champion_calibration(
     paste references (e.g. MLB v8 ECE 0.023 n=55) — direct evidence from
     real-world settled outcomes rather than reconstructed backfill.
     """
-    predictions = load_settled_predictions(sport, market, repo_root=repo_root)
+    store = FrozenProductionStore(repo_root=repo_root)
+    registry = store.load_no_validate()
+    champion = registry.champion(sport, market)
+    if champion is None:
+        raise ValueError(
+            f"no frozen champion for sport={sport!r}, market={market!r}"
+        )
+    predictions = load_settled_predictions(
+        sport, market, repo_root=repo_root, model_version=champion.model_id
+    )
     if not predictions:
         return {"sport": sport, "market": market, "n": 0, "status": "no_settled_picks"}
     probs = [p["probability"] for p in predictions]

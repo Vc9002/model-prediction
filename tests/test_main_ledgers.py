@@ -51,12 +51,15 @@ def _qualified_call() -> EligibilityResult:
     )
 
 
-def test_real_config_has_main_ledger_disabled() -> None:
+def test_real_config_has_main_ledger_enabled() -> None:
     """The actual config/model.yaml this project ships, not a test fixture --
     proves the flag cli.py::main() reads is really set, not just that the
-    retired-mode mechanism works in isolation."""
+    retired-mode mechanism works in isolation. Un-retired 2026-08-13 by
+    operator directive ("unretire main ledger"): the archived per-sport
+    workbooks were restored to data/main/ and Main is back in the daily
+    write path, so the shipped config must now say enabled."""
     config = load_config()
-    assert config["project"]["main_ledger_enabled"] is False
+    assert config["project"]["main_ledger_enabled"] is True
 
 
 def test_multisport_pick_ledger_retired_never_creates_the_main_directory(tmp_path) -> None:
@@ -83,10 +86,12 @@ def test_cli_main_reads_the_retired_flag_the_same_way_it_constructs_the_ledger(t
     """Mirrors cli.py::main()'s exact expression
     (retired=not config["project"].get("main_ledger_enabled", True)) against
     the real loaded config, pointed at a throwaway data root -- proves the
-    wiring end to end without needing a full argv-parsing CLI invocation."""
+    wiring end to end without needing a full argv-parsing CLI invocation.
+    Main was un-retired 2026-08-13 by operator directive, so the real config
+    now yields retired=False and the ledger creates its directory."""
     config = load_config()
     retired = not config["project"].get("main_ledger_enabled", True)
-    assert retired is True
+    assert retired is False
     ledger = MultiSportPickLedger(tmp_path, retired=retired)
     ledger.append_evaluated(_request("event-mlb"), _qualified_call(), now=datetime.now(UTC))
-    assert not (tmp_path / "main").exists()
+    assert (tmp_path / "main").exists()

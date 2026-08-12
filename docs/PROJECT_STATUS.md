@@ -25,8 +25,46 @@ rollback artifacts are not current operational truth.
   `data/model_ledgers/` again (was per-tier after the split, freezing the
   dashboard/loader's read on 2026-08-03). See `docs/SETTLEMENT_GAP.md`.
 
+## 2026-08-13 deep-audit fix pass
 
-## Production canary (2026-08-12)
+Full audit + fixes; evidence and per-fix detail in `MASTER.md`'s 2026-08-13
+session entry (F-72 onward). Summary:
+
+- **compare-champion CLI** was completely broken (swallowed KeyError
+  mislabeled `NO_CALL_INVALID_MARKET`, exit 0) — fixed (F-72).
+- **freeze()** silently treated missing artifacts as code-backed; kbo/npb
+  artifacts were written as `-v1.json` while claiming v2 — files renamed,
+  config refs fixed, freeze now fails loudly for artifact-backed holes (F-73).
+- **load_settled_predictions** mixed artifact versions (MLB "champion"
+  metrics were 244 v7 rows vs 14 v8) — now filters by model_version (F-74).
+- **rebuild dashboard reader** (`dashboard/rebuild_status.py`): three bugs —
+  `locals()` assignment no-op leaving new probability fields permanently
+  None; market-evaluation join on the wrong key (market metrics always null
+  live, latent crash on non-numeric slugs); a probability-precedence
+  regression surfacing raw over the conservative lower bound. All fixed,
+  dashboard restarted with the fixes (F-76/F-77/F-78).
+- **MLB v9 train/serve skew ×3** (`residual_trend_gap`, `park_factor`,
+  `bullpen_fatigue_gap`): training and serving computed different quantities.
+  Training now matches serving literally; v9 variants use the new
+  `park_factor_pit` feature (PIT empirical; v8 stays on its trained static
+  contract). **Prior v9 ablation numbers are void** — re-run before trusting
+  them (F-79).
+- **Seed regression**: `stable_seed` inclusion of `method` shifted every
+  incumbent simulated price bit-for-bit — restored for the default path,
+  pinned by test (F-80).
+- **ProductionLedger** was 341 unwired lines with no lifecycle — now written
+  fail-soft by every predict cycle, with guarded settle/void/supersede/error
+  transitions and CLI commands (F-81).
+- **Canary freshness check** was a stub — HEALTHY despite predictions frozen
+  since 08-11; now real vs `max_data_age_minutes` (F-82).
+- **Main ledger un-retired** (operator directive 2026-08-13): config flag
+  back to `true`, archived per-sport workbooks restored to `data/main/`,
+  Phase B config-pinning tests updated.
+- Hygiene: NBA/NFL dangling spread/total config refs removed,
+  `dashboard/server.log` untracked, DEBUG.md's hash snippet corrected to the
+  loader's `ensure_ascii=True` convention, mypy/ruff CI delta gates clean.
+
+## Production canary (2026-08-13)
 
 | Field | Value |
 |---|---|
@@ -35,9 +73,14 @@ rollback artifacts are not current operational truth.
 | Config | `config/production.yaml` |
 | Health | HEALTHY |
 | Automated orders | false (manual only) |
-| CLI | `python -m model_prediction.cli_production {predict,health,status}` |
-| Scheduler | `com.modelprediction.production` (launchd, every 3h) |
+| CLI | `python -m model_prediction.cli_production {predict,health,status,ledger,settle,void,supersede,error}` |
+| Scheduler | `com.modelprediction.production` (plist installed; **not loaded** — pending explicit operator action, see Repair order #8) |
 | Dashboard | `dashboard/production.py` → `get_production_status()` |
+
+Canary hardening 2026-08-13: `_check_data_freshness` is real (stale
+predictions → DEGRADED); every predict cycle writes the ProductionLedger
+(`data/production/predictions.db`) fail-soft with guarded lifecycle
+transitions.
 
 ## Active model versions (2026-08-12)
 
@@ -63,21 +106,21 @@ rollback artifacts are not current operational truth.
 
 Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one shared workbook.
 
-- **Main** (`data/main/{sport}.xlsx`: mlb, wnba, soccer, tennis): MLB (moneyline/spread/total, no edge gate — trust/provenance only, separate confidence-threshold gate in `cli.py`), WNBA moneyline (same), soccer/tennis (real edge+confidence gate) — real-sized calls
+- **Main** (`data/main/{sport}.xlsx`: mlb, wnba, soccer, tennis): MLB (moneyline/spread/total, no edge gate — trust/provenance only, separate confidence-threshold gate in `cli.py`), WNBA moneyline (same), soccer/tennis (real edge+confidence gate) — real-sized calls. Retired 2026-08-11, **un-retired 2026-08-13** by operator directive (workbooks restored from `data/archive/2026-08-10-main-ledger-archived-shadow-primary/`; Aug 11–13 has no Main rows — a historical gap, not an error)
 - **Flat** (`data/flat/{sport}.xlsx`: mlb, nba, nfl, wnba, soccer, tennis): every candidate, every one of those sports, no gate at all
 - **Research** (`data/research/{sport}.xlsx`): Esports (5 titles), KBO, NPB — all candidates
 - **Gated Research** (`data/gated_research/{sport}.xlsx`): Curated subset clearing per-sport edge/confidence bars
 - **Model Ledgers** (`data/model_ledgers/`): per-model-identity architecture (additive; existing pipeline unchanged)
 
-## Runtime snapshot (2026-08-12)
+## Runtime snapshot (2026-08-13)
 
-- **Git**: `main`, HEAD `68728ee`, pushed to `origin/main`
-- **Production canary**: `wnba-elo-trend-lr-v4`, HEALTHY, automated_orders=false
-- **Rebuild challengers**: WNBA (2-feat LR), Tennis (Surface Elo), NFL (Platt-calibrated LR), Soccer (Poisson-DC) — all in `config/models/challengers/`
-- **Daily pipeline**: Verified 2026-08-11 and 2026-08-12 — exit 0, Main absent, no phantom audit events
-- **Dashboard**: Rebuild Shadow primary + Production Canary card (`dashboard/production.py`)
-- **Tests**: All rebuild tests pass (WNBA 15, Tennis 65, NFL 49, Soccer 21), production 13 pass
-- **CI**: `.github/workflows/ci.yml` — ruff + pytest on push/PR
+- **Git**: `main`, HEAD `5b5b78b` (2 ahead of origin/main pre-fix-commit)
+- **Production canary**: `wnba-elo-trend-lr-v4`, HEALTHY, automated_orders=false; scheduler plist not loaded (see Repair order #8)
+- **Rebuild challengers**: WNBA (2-feat LR), Tennis (Surface Elo), NFL (Platt-calibrated LR), Soccer (Poisson-DC) — all in `config/models/challengers/`; `com.modelprediction.rebuild-shadow` scheduler plist also not loaded (Repair order #8)
+- **Daily pipeline**: launchd `com.modelprediction.daily` running every 3h, exit 0, Main re-enabled 08-13
+- **Dashboard**: Rebuild Shadow primary + Production Canary card; restarted 2026-08-13 with the rebuild_status fixes (market metrics populate again)
+- **Tests**: full suite green after the audit-fix pass (`env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` — run WITHOUT the MODEL_PREDICTION_* env vars; several tests pin the no-env repo-colocated default)
+- **CI**: `.github/workflows/ci.yml` — ruff + pytest on push/PR; ruff delta gate clean vs origin/main (120 vs 128 baseline), mypy rebuild delta clean
 - **Console entry point**: `.venv/bin/model-prediction` works
 - **BBO capture**: Active across 8 sports (`data/odds/`)
 - **Known, unresolved, non-code issue**: The Odds API key appears genuinely invalid — all 12 configured soccer leagues on that provider return `401 Unauthorized` (verified live 2026-08-04). Soccer's ESPN-sourced leagues are unaffected. Needs a real key rotation, not a code fix.
@@ -131,3 +174,9 @@ state. They require separate authorization appropriate to the risk.
 5. ~~Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.~~ Done 2026-08-05, forward-only (see F-65).
 6. Split `cli.py` and `dashboard_server.py` into packages (both remain large, growing files).
 7. Migrate ledger storage to SQLite for ACID guarantees (long-standing item, unchanged).
+8. **Load the two installed-but-never-loaded launchd agents** — `com.modelprediction.production` and `com.modelprediction.rebuild-shadow` (plists in `~/Library/LaunchAgents/`). Needs explicit operator action (`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<name>.plist`); until loaded, canary predictions are frozen and the rebuild shadow.db stops advancing. Production plist targets `scripts/run_production.sh`; rebuild targets `scripts/run_rebuild.sh` (both repo-relative).
+9. **Re-run the MLB v9 ablation** (`scripts/mlb_v9_ablation.py`) after the 2026-08-13 train/serve definition fixes (F-79) — the prior "+56.4u residual-trend variant" numbers are void.
+10. **v8 park-factor leak (known, pre-existing)**: the static park-factor table served to v8 contains 2026-season data, so v8's own walk-forward had a PIT leak. Closed for v9 (`park_factor_pit`); closing it for v8 requires a refit under the v8 feature contract.
+11. Regenerate `outputs/rebuild/verification.json` (gitignored CI evidence; `/api/rebuild/status` reports degraded while absent) — CI regenerates on push, or run the `generate_rebuild_verification.py` recipe locally.
+12. ~~`dashboard/server.log` tracked in git~~ — untracked 2026-08-13, added to `.gitignore`.
+13. ~~NBA/NFL dangling `spread/total_research_artifact` config refs~~ — removed 2026-08-13 (archived artifacts, zero consumers).

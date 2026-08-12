@@ -117,15 +117,19 @@ def park_factor_at(
 
     Each game must have ``home_team``, ``home_score``, ``away_score``, and
     either ``event_start_utc`` (str, ISO 8601) or ``start`` (datetime).
+    Games whose date cannot be resolved are excluded, never treated as
+    "before" -- ``""`` sorts before every ISO date, so an undated game used
+    to leak into every PIT window (found 2026-08-13 train/serve audit).
     """
     if games_data is None:
         return park_factor(home_team)
 
     # Filter to games strictly before game_date.
-    prior_games = [
-        g for g in games_data
-        if (_game_date_str(g) or "") < game_date
-    ]
+    prior_games = []
+    for g in games_data:
+        game_date_str = _game_date_str(g)
+        if game_date_str and game_date_str < game_date:
+            prior_games.append(g)
 
     factors = compute_park_factors_from_games(prior_games, prior_strength=prior_strength)
     factor = factors.get(home_team)

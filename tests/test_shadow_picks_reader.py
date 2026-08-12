@@ -44,8 +44,10 @@ def _seed_one_decision(ledger: ShadowLedger, *, action: str, side: str, reason_c
         forecast={
             "event_id": "181721",
             "predicted_winner": "home",
+            # No calibrated probabilities here on purpose: this seeds the
+            # no-calibration path, where the conservative lower bound must
+            # surface instead of raw (assertion below pins 0.56, not 0.59).
             "raw_probabilities": {"home": 0.59, "away": 0.41},
-            "calibrated_probabilities": {"home": 0.59, "away": 0.41},
             "probability_lower": {"home": 0.56, "away": 0.41},
             "probability_upper": {"home": 0.62, "away": 0.41},
             "expected_home_score": 0.0,

@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -99,11 +100,45 @@ def test_reproduction_gate_requires_exact_calls_and_tight_coefficients() -> None
     assert result["passed"] is True
 
 
-def test_current_cs2_artifact_fails_closed_on_source_data_drift() -> None:
-    config = load_config()
-    artifact_path = config["models"]["CS2"]["production_artifact"]
-    artifact = json.loads(Path(artifact_path).read_text(encoding="utf-8"))
+def test_current_cs2_artifact_fails_closed_on_source_data_drift(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The current CS2 artifact fails closed when its source data drifts.
 
+    Current shipped state (2026-08-13): the live matches.jsonl is in sync
+    with the artifact's pinned matches_sha256, so the drift check passes.
+    The fail-closed behavior itself is then exercised on a drifted copy of
+    the source — the check must raise, not degrade silently.
+    """
+    config = load_config()
+    artifact_path = Path(config["models"]["CS2"]["production_artifact"])
+    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+
+    # Integrity of the shipped artifact itself.
     assert artifact["artifact_hash"] == artifact_hash(artifact)
+    # Shipped state: artifact and live source agree on the pinned hash.
+    live = Path("data") / "esports" / "cs2" / "matches.jsonl"
+    assert live.is_file()
+    assert hashlib.sha256(live.read_bytes()).hexdigest() == artifact["matches_sha256"]
+
+    # Fail-closed on drift: replay the real artifact in a tmp tree whose
+    # matches.jsonl differs from the pinned hash -> must raise.
+    (tmp_path / "config" / "models").mkdir(parents=True)
+    (tmp_path / "config" / "models" / "cs2-tiered-elo-v6.json").write_text(
+        artifact_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (tmp_path / "data" / "esports" / "cs2").mkdir(parents=True)
+    (tmp_path / "data" / "esports" / "cs2" / "matches.jsonl").write_text(
+        "drifted source data\n", encoding="utf-8"
+    )
+    test_config = {
+        "models": {
+            "CS2": {
+                **config["models"]["CS2"],
+                "production_artifact": "config/models/cs2-tiered-elo-v6.json",
+            }
+        }
+    }
+    monkeypatch.chdir(tmp_path)
     with pytest.raises(ValueError, match="cs2 match data drifted from production artifact"):
-        _esports_model(config, "cs2")
+        _esports_model(test_config, "cs2")

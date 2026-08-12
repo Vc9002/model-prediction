@@ -294,15 +294,22 @@ def simulate_game(
         raise ValueError("simulation count must be positive")
     if method not in DISTRIBUTION_METHODS:
         raise ValueError(f"unknown distribution method {method!r}; expected one of {DISTRIBUTION_METHODS}")
-    seed = stable_seed(
+    # The `method` part of the seed is deliberately EXCLUDED for the default
+    # gamma_poisson path: the method refactor appended it to every seed and
+    # silently changed every incumbent simulated price bit-for-bit versus the
+    # pre-refactor formula (found 2026-08-13). Non-default methods have no
+    # pre-existing stream to preserve, so they keep method in the seed.
+    seed_parts = [
         features.event_id,
         spec.formula_version,
         features.decision_timestamp_utc,
         features.market_snapshot_hash,
         features.feature_snapshot_hash,
         seed_namespace,
-        method,
-    )
+    ]
+    if method != "gamma_poisson":
+        seed_parts.append(method)
+    seed = stable_seed(*seed_parts)
     rng = np.random.default_rng(seed)
     away = home = None
     if method == "independent_poisson":
