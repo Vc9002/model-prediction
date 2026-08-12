@@ -1117,6 +1117,62 @@ def evaluate_reconstructed_mlb_moneyline(
     }
 
 
+# Features whose availability is tracked by a per-row flag on ValidationRow.
+# Everything else is always computed from history and counts as available.
+_FEATURE_AVAILABILITY_FLAGS: dict[str, str] = {
+    "park_factor": "park_available",
+    "weather_factor": "weather_available",
+    "probable_starter_era_gap": "probable_starter_available",
+    "bullpen_weakness_gap": "bullpen_available",
+    "bullpen_fatigue_gap": "bullpen_fatigue_available",
+}
+
+
+def _all_rows_calibration(
+    probabilities: Sequence[float], rows: Sequence[ValidationRow]
+) -> dict[str, object]:
+    """Model-quality metrics over EVERY row of a split (not just called
+    rows): log loss, Brier, ECE, and calibration slope/intercept. These are
+    threshold-independent, so they are the honest first-order comparison
+    between variants; units/P&L come after (operator directive 2026-08-13:
+    metrics-first reporting, units secondary)."""
+    metrics = calibration_metrics(
+        [min(1 - 1e-12, max(1e-12, float(p))) for p in probabilities],
+        [row.outcome for row in rows],
+    )
+    if metrics.get("status") != "ok":
+        return metrics
+    return {
+        "log_loss": round(float(metrics["log_loss"]), 6),
+        "brier_score": round(float(metrics["brier_score"]), 6),
+        "expected_calibration_error": round(float(metrics["expected_calibration_error"]), 6),
+        "calibration_slope": (
+            round(float(metrics["calibration_slope"]), 6)
+            if metrics["calibration_slope"] is not None else None
+        ),
+        "calibration_intercept": (
+            round(float(metrics["calibration_intercept"]), 6)
+            if metrics["calibration_intercept"] is not None else None
+        ),
+        "sample_size": metrics["sample_size"],
+    }
+
+
+def _variant_coverage(rows: Sequence[ValidationRow], feature_names: Sequence[str]) -> float:
+    """Fraction of rows where every availability-flagged feature is present."""
+    if not rows:
+        return 0.0
+    flagged = [name for name in feature_names if name in _FEATURE_AVAILABILITY_FLAGS]
+    if not flagged:
+        return 1.0
+    available = sum(
+        1
+        for row in rows
+        if all(bool(getattr(row, _FEATURE_AVAILABILITY_FLAGS[name])) for name in flagged)
+    )
+    return round(available / len(rows), 6)
+
+
 def evaluate_variant(
     train: Sequence[ValidationRow],
     validation: Sequence[ValidationRow],
@@ -1124,6 +1180,7 @@ def evaluate_variant(
     feature_names: Sequence[str],
 ) -> dict[str, Any]:
     model = _fit(train, feature_names)
+    train_probabilities = _predict(model, train, feature_names)
     validation_probabilities = _predict(model, validation, feature_names)
     holdout_probabilities = _predict(model, holdout, feature_names)
     primary = _learn_and_grade(
@@ -1149,6 +1206,19 @@ def evaluate_variant(
         "intercept": round(float(model.intercept_[0]), 10),
         "primary_65": primary,
         "diagnostic_60": diagnostic,
+        # Threshold-independent model-quality metrics over the full holdout
+        # (operator directive 2026-08-13: LogLoss/Brier/ECE/calibration lead;
+        # units are secondary evidence).
+        "holdout_all_rows": _all_rows_calibration(holdout_probabilities, holdout),
+        "coverage": _variant_coverage(holdout, feature_names),
+        # Same all-rows metrics per split so cross-fold stability is visible
+        # (a variant whose holdout beats its validation by a wide margin is
+        # overfit to the fold boundaries, not better).
+        "per_split": {
+            "train": _all_rows_calibration(train_probabilities, train),
+            "validation": _all_rows_calibration(validation_probabilities, validation),
+            "holdout": _all_rows_calibration(holdout_probabilities, holdout),
+        },
     }
 
 

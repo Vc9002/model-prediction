@@ -121,16 +121,35 @@ def main() -> None:
             hit_rate = locked.get("hit_rate", 0)
             units = locked.get("units_at_minus_110", 0)
             brier = locked.get("brier_score", None)
+            all_rows = result.get("holdout_all_rows", {})
+            per_split = result.get("per_split", {})
+            diag_locked = (result.get("diagnostic_60") or {}).get("locked_holdout", {})
             variants[name] = {
                 "variant": name,
                 "feature_names": features,
                 "status": status,
+                # Metrics-first fields (operator directive 2026-08-13): the
+                # threshold-independent holdout metrics lead; executable-EV
+                # calls/units are secondary evidence.
+                "holdout_all_rows": all_rows,
+                "coverage": result.get("coverage"),
+                "per_split": per_split,
                 "calls_at_executable_ev": calls,
                 "net_roi": round(units, 6),
                 "brier": brier,
                 "hit_rate": round(hit_rate, 6) if hit_rate else None,
+                "diagnostic_60_holdout": {
+                    "calls": diag_locked.get("calls"),
+                    "hit_rate": diag_locked.get("hit_rate"),
+                    "brier_score": diag_locked.get("brier_score"),
+                },
             }
-            print(f"calls={calls}, hit_rate={hit_rate:.3f}, units={units:.1f}")
+            ll = all_rows.get("log_loss")
+            ec = all_rows.get("expected_calibration_error")
+            print(
+                f"calls={calls}, hit_rate={hit_rate:.3f}, units={units:.1f}, "
+                f"logloss={ll}, ece={ec}"
+            )
         except Exception as exc:
             print(f"ERROR: {exc}")
             variants[name] = {"variant": name, "status": "error", "error": str(exc)}
@@ -149,17 +168,63 @@ def main() -> None:
         log.record(name, SPORT, metrics, notes="mlb_v9_phase1")
     print(f"\nExperiment log: {log_path} ({log.trial_count(SPORT)} trials)")
 
-    # 6. Summary
-    qualifying = [
+    # 6. Summary — metrics-first ordering (operator directive 2026-08-13).
+    # LogLoss/Brier/ECE/calibration/fold-stability/coverage lead; units last.
+    print("\n[6/6] Summary (sorted by holdout log loss; units listed last):")
+    header = (
+        f"  {'variant':55s} {'logloss':>8s} {'brier':>8s} {'ece':>7s} "
+        f"{'calSlope':>8s} {'calInt':>8s} {'cov':>6s} "
+        f"{'foldΔLL':>7s} {'calls':>5s} {'hit':>6s} {'units':>8s}"
+    )
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    rows = [
         (name, m) for name, m in variants.items()
-        if m.get("status") == "evaluated"
-        and m.get("calls_at_executable_ev", 0) >= 50
-        and (m.get("hit_rate") or 0) >= 0.60
+        if m.get("status") == "evaluated" and m.get("holdout_all_rows", {}).get("log_loss") is not None
     ]
-    print(f"\nQualifying variants: {len(qualifying)}/{len(variants)}")
-    for name, m in sorted(qualifying, key=lambda x: x[1].get("net_roi", 0), reverse=True):
-        print(f"  {name:55s}  calls={m['calls_at_executable_ev']:4d}  "
-              f"hit={m['hit_rate']:.3f}  units={m['net_roi']:+.1f}")
+    for name, m in sorted(rows, key=lambda x: x[1]["holdout_all_rows"]["log_loss"]):
+        ar = m["holdout_all_rows"]
+        ps = m.get("per_split", {})
+        folds = [ps.get(k, {}).get("log_loss") for k in ("train", "validation", "holdout")]
+        fold_delta = (
+            round(max(folds) - min(folds), 4)
+            if all(v is not None for v in folds) else None
+        )
+        print(
+            f"  {name:55s} {ar.get('log_loss'):>8.4f} {ar.get('brier_score'):>8.4f} "
+            f"{ar.get('expected_calibration_error'):>7.4f} "
+            f"{ar.get('calibration_slope'):>8.3f} {ar.get('calibration_intercept'):>8.3f} "
+            f"{m.get('coverage'):>6.3f} {fold_delta:>7.4f} "
+            f"{m['calls_at_executable_ev']:>5d} {m['hit_rate']:>6.3f} {m['net_roi']:>+8.1f}"
+        )
+
+    # 7. Incumbent (v8) reproduction gate. v8's shipped feature set is
+    # elo_trend_park_weather_starter_bullpen; its artifact qualification was
+    # produced at the 0.60 validation-target threshold (diagnostic_60).
+    # If this run cannot reproduce it closely, the ablation results must not
+    # be trusted for promotion decisions (operator directive 2026-08-13).
+    v8_name = "elo_trend_park_weather_starter_bullpen"
+    v8 = variants.get(v8_name)
+    if v8 and v8.get("status") == "evaluated":
+        v8_artifact = json.loads(
+            (PROJECT_ROOT / "config/models/mlb-elo-trend-lr-v8.json").read_text()
+        )
+        v8_qual = v8_artifact.get("qualification", {})
+        diag = v8.get("diagnostic_60_holdout", {})
+        print("\n[v8 reproduction gate]")
+        print(f"  harness {v8_name} @0.60-target: calls={diag.get('calls')}, "
+              f"hit={diag.get('hit_rate')}, brier={diag.get('brier_score')}")
+        print(f"  artifact mlb-elo-trend-lr-v8 qualification: calls={v8_qual.get('calls')}, "
+              f"hit={v8_qual.get('hit_rate')}, brier={v8_qual.get('brier_score')}")
+        if diag.get("calls") and v8_qual.get("calls"):
+            call_ratio = diag["calls"] / v8_qual["calls"]
+            hit_delta = abs(diag["hit_rate"] - v8_qual["hit_rate"])
+            reproduced = 0.7 <= call_ratio <= 1.3 and hit_delta <= 0.03
+            print(f"  reproduced_closely: {reproduced} "
+                  f"(call_ratio={call_ratio:.3f}, hit_delta={hit_delta:.4f})")
+    else:
+        print(f"\n[v8 reproduction gate] {v8_name} missing or failed — STOP: do not "
+              f"use these ablation results for promotion decisions.")
 
     return 0
 

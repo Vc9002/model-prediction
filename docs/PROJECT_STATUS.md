@@ -74,7 +74,7 @@ session entry (F-72 onward). Summary:
 | Health | HEALTHY |
 | Automated orders | false (manual only) |
 | CLI | `python -m model_prediction.cli_production {predict,health,status,ledger,settle,void,supersede,error}` |
-| Scheduler | `com.modelprediction.production` (plist installed; **not loaded** — pending explicit operator action, see Repair order #8) |
+| Scheduler | `com.modelprediction.production` (loaded 2026-08-13, verified: fresh prediction batch + ProductionLedger write on manual kickstart) |
 | Dashboard | `dashboard/production.py` → `get_production_status()` |
 
 Canary hardening 2026-08-13: `_check_data_freshness` is real (stale
@@ -115,8 +115,8 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 ## Runtime snapshot (2026-08-13)
 
 - **Git**: `main`, HEAD `5b5b78b` (2 ahead of origin/main pre-fix-commit)
-- **Production canary**: `wnba-elo-trend-lr-v4`, HEALTHY, automated_orders=false; scheduler plist not loaded (see Repair order #8)
-- **Rebuild challengers**: WNBA (2-feat LR), Tennis (Surface Elo), NFL (Platt-calibrated LR), Soccer (Poisson-DC) — all in `config/models/challengers/`; `com.modelprediction.rebuild-shadow` scheduler plist also not loaded (Repair order #8)
+- **Production canary**: `wnba-elo-trend-lr-v4`, HEALTHY, automated_orders=false; scheduler plist loaded and verified 2026-08-13 (predictions.db 623→626 rows on manual kickstart)
+- **Rebuild challengers**: WNBA (2-feat LR), Tennis (Surface Elo), NFL (Platt-calibrated LR), Soccer (Poisson-DC) — all in `config/models/challengers/`; `com.modelprediction.rebuild-shadow` scheduler plist loaded and verified 2026-08-13 (shadow.db 349→365 trade_decisions on manual kickstart, all 6 enabled sports ran with zero failures)
 - **Daily pipeline**: launchd `com.modelprediction.daily` running every 3h, exit 0, Main re-enabled 08-13
 - **Dashboard**: Rebuild Shadow primary + Production Canary card; restarted 2026-08-13 with the rebuild_status fixes (market metrics populate again)
 - **Tests**: full suite green after the audit-fix pass (`env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` — run WITHOUT the MODEL_PREDICTION_* env vars; several tests pin the no-env repo-colocated default)
@@ -174,8 +174,8 @@ state. They require separate authorization appropriate to the risk.
 5. ~~Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.~~ Done 2026-08-05, forward-only (see F-65).
 6. Split `cli.py` and `dashboard_server.py` into packages (both remain large, growing files).
 7. Migrate ledger storage to SQLite for ACID guarantees (long-standing item, unchanged).
-8. **Load the two installed-but-never-loaded launchd agents** — `com.modelprediction.production` and `com.modelprediction.rebuild-shadow` (plists in `~/Library/LaunchAgents/`). Needs explicit operator action (`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<name>.plist`); until loaded, canary predictions are frozen and the rebuild shadow.db stops advancing. Production plist targets `scripts/run_production.sh`; rebuild targets `scripts/run_rebuild.sh` (both repo-relative).
-9. **Re-run the MLB v9 ablation** (`scripts/mlb_v9_ablation.py`) after the 2026-08-13 train/serve definition fixes (F-79) — the prior "+56.4u residual-trend variant" numbers are void.
+8. ~~Load the two installed-but-never-loaded launchd agents~~ Done 2026-08-13: both bootstrapped and verified via manual `launchctl kickstart`. Also found and fixed a real bug while verifying: `run_rebuild.sh`'s sports-enablement filter read `cfg["rebuild"]["sports"]`, but `config/rebuild.yaml` has `sports:` as a top-level key — the nested path always resolved to `{}`, so the derivation silently fell through. Fixed to `cfg.get("sports", {})`; re-verified it now correctly runs only the 6 enabled sports (mlb, wnba, nba, nfl, soccer, tennis) and skips the 3 disabled ones (esports, kbo, npb).
+9. ~~Re-run the MLB v9 ablation~~ Done 2026-08-13 (post-F-79). **v8 reproduction gate still FAILS**: harness `elo_trend_park_weather_starter_bullpen` @0.60-target holdout = 536 calls / 58.8% hit / 0.2418 Brier vs. artifact `mlb-elo-trend-lr-v8`'s recorded qualification = 148 calls / 60.8% hit / 0.2464 Brier (`reproduced_closely=False`, call_ratio=3.622, hit_delta=0.0204). **Diagnosis, not yet a fix**: hit-rate/Brier agree within tolerance (0.0204 ≤ 0.03) — only call *volume* fails, and the harness today builds 6,452 total walk-forward rows vs. v8's artifact-recorded `sample_size: 1391` (~4.6x growth) from historical data collected since v8 froze on 2026-08-04. This looks like dataset growth, not a pipeline regression — but the gate's call-ratio check implicitly assumes a stable row-set, which no longer holds. Per operator directive: **no promotion evaluation of residual-trend/FIP/K-BB%/etc. until this reconciles** — either pin the gate to v8's original date-range/row-set for a true apples-to-apples replay, or replace the call-ratio check with a metric that's robust to dataset growth (e.g. hit-rate/Brier alone, already within tolerance). This is a methodology decision, not something to auto-resolve.
 10. **v8 park-factor leak (known, pre-existing)**: the static park-factor table served to v8 contains 2026-season data, so v8's own walk-forward had a PIT leak. Closed for v9 (`park_factor_pit`); closing it for v8 requires a refit under the v8 feature contract.
 11. Regenerate `outputs/rebuild/verification.json` (gitignored CI evidence; `/api/rebuild/status` reports degraded while absent) — CI regenerates on push, or run the `generate_rebuild_verification.py` recipe locally.
 12. ~~`dashboard/server.log` tracked in git~~ — untracked 2026-08-13, added to `.gitignore`.

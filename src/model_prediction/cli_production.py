@@ -18,7 +18,7 @@ into a runnable CLI and is the single entrypoint called by the launchd
 production scheduler.
 
 Every prediction the ``predict`` cycle reports is mirrored into the
-production ledger (SQLite, ``<runtime_root>/production/predictions.db``)
+production ledger (SQLite, ``<repo data>/production/predictions.db``)
 with an idempotency key, and every cycle starts/completes a run row.  The
 mirror is fail-soft: a ledger failure logs and never fails the prediction
 command.  The lifecycle subcommands (``settle``/``void``/``supersede``/
@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -52,7 +51,6 @@ from .production_canary import (
     validate_production_config,
 )
 from .production_ledger import ProductionLedger
-from .runtime_paths import RuntimePaths
 
 _STATE_FILE_NAME = "production_state.json"
 _LEDGER_DB_REL = Path("production") / "predictions.db"
@@ -73,18 +71,25 @@ def _utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _resolve_runtime_root() -> Path:
-    """Resolve the runtime root (mutable state outside the Git repo)."""
-    env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
-    if env:
-        return Path(env)
-    # Fall back to RuntimePaths default (repo_root/data)
-    return RuntimePaths.resolve().runtime_root
+def _resolve_data_root() -> Path:
+    """Incumbent-side production data root: always the repo's data/.
+
+    Deliberately NOT env-var-aware. MIGRATION_MANIFEST.json scoped the
+    runtime root (MODEL_PREDICTION_RUNTIME_ROOT) to rebuild/ mutable state
+    only; the production canary is incumbent-side, and its state file,
+    SQLite ledger, and FeatureStore game history all live under repo
+    ``data/`` and are maintained by the incumbent daily pipeline. Routing
+    them through the runtime root split them in two (a live split-brain
+    found 2026-08-13: the scheduled run wrote a second, empty state file
+    and ledger under the runtime root while the dashboard read the stale
+    repo ones).
+    """
+    return PROJECT_ROOT / "data"
 
 
 def _state_path() -> Path:
-    """Path to the production state file under the runtime root."""
-    rt = _resolve_runtime_root()
+    """Path to the production state file under the repo data root."""
+    rt = _resolve_data_root()
     rt.mkdir(parents=True, exist_ok=True)
     return rt / _STATE_FILE_NAME
 
@@ -216,7 +221,7 @@ def _cmd_predict() -> int:
     Returns exit code 0 on success (including NO_EVENTS), non-zero on error.
     """
     repo_root = PROJECT_ROOT
-    runtime_root = _resolve_runtime_root()
+    data_root = _resolve_data_root()
 
     # 1. Load and validate production config
     try:
@@ -245,7 +250,7 @@ def _cmd_predict() -> int:
     #     if the ledger is unavailable the cycle still runs — the state
     #     file below remains the primary record and the ledger is a mirror.
     run_git_sha = _git_sha()
-    ledger = _open_ledger(runtime_root)
+    ledger = _open_ledger(data_root)
     run_id = None
     if ledger is not None:
         try:
@@ -276,7 +281,7 @@ def _cmd_predict() -> int:
         return 0
 
     # 5. Run predictions
-    store = FeatureStore(runtime_root)
+    store = FeatureStore(data_root)
     observed_at = datetime.now(UTC)
 
     try:
@@ -373,7 +378,7 @@ def _cmd_health() -> int:
     Returns exit code 0 when HEALTHY, 1 otherwise.
     """
     repo_root = PROJECT_ROOT
-    rt = _resolve_runtime_root()
+    rt = _resolve_data_root()
 
     try:
         config = load_production_config(repo_root=repo_root)
@@ -432,7 +437,7 @@ def _cmd_ledger(args: list[str]) -> int:
     if args and args[0].isdigit():
         limit = int(args[0])
     try:
-        ledger = _open_ledger_checked(_resolve_runtime_root())
+        ledger = _open_ledger_checked(_resolve_data_root())
         try:
             rows = ledger.get_predictions(limit=limit)
         finally:
@@ -461,7 +466,7 @@ def _cmd_settle(args: list[str]) -> int:
                 "usage: settle <row_id> <won|lost|void> [--note TEXT]"
             )
         row_id = int(rest[0])
-        ledger = _open_ledger_checked(_resolve_runtime_root())
+        ledger = _open_ledger_checked(_resolve_data_root())
         try:
             row = ledger.settle_prediction(row_id, rest[1], note=note)
         finally:
@@ -480,7 +485,7 @@ def _cmd_void(args: list[str]) -> int:
         if len(rest) != 1 or not rest[0].isdigit():
             raise ValueError("usage: void <row_id> [--note TEXT]")
         row_id = int(rest[0])
-        ledger = _open_ledger_checked(_resolve_runtime_root())
+        ledger = _open_ledger_checked(_resolve_data_root())
         try:
             row = ledger.void_prediction(row_id, note=note)
         finally:
@@ -503,7 +508,7 @@ def _cmd_supersede(args: list[str]) -> int:
         if len(rest) != 1 or not rest[0].isdigit():
             raise ValueError("usage: supersede <row_id> [--note TEXT]")
         row_id = int(rest[0])
-        ledger = _open_ledger_checked(_resolve_runtime_root())
+        ledger = _open_ledger_checked(_resolve_data_root())
         try:
             row = ledger.supersede_prediction(row_id, note=note)
         finally:
@@ -526,7 +531,7 @@ def _cmd_error(args: list[str]) -> int:
         if len(rest) != 1 or not rest[0].isdigit():
             raise ValueError("usage: error <row_id> [--note TEXT]")
         row_id = int(rest[0])
-        ledger = _open_ledger_checked(_resolve_runtime_root())
+        ledger = _open_ledger_checked(_resolve_data_root())
         try:
             row = ledger.mark_prediction_error(row_id, note=note)
         finally:

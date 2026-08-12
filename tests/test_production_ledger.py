@@ -72,8 +72,14 @@ def _fake_slate(candidates: list[_FakeCandidate] | None = None):
 
 
 def _run_predict_with_fakes(tmp_path, monkeypatch) -> int:
-    """Run the predict CLI with fake ESPN data and slate, real config."""
-    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path))
+    """Run the predict CLI with fake ESPN data and slate, real config.
+
+    The data root is monkeypatched directly (not via the env var): since
+    2026-08-13 `_resolve_data_root` is deliberately NOT env-var-aware —
+    production state/ledger/history are incumbent-side repo data, and the
+    runtime-root env var is rebuild-scoped only (see MIGRATION_MANIFEST.json).
+    """
+    monkeypatch.setattr(cli_production, "_resolve_data_root", lambda: tmp_path)
     monkeypatch.setattr(cli_production.ESPNClient, "scoreboard", _fake_scoreboard())
     monkeypatch.setattr(cli_production, "build_learned_moneyline_slate", _fake_slate())
     return cli_production.main(["predict"])

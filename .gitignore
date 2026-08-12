@@ -24,6 +24,12 @@ dashboard/server.log
 data/events.jsonl
 data/mlb_statsapi/game_snapshots.jsonl
 
+# SQLite WAL/SHM journal side-files — transient, checkpoint into the main
+# .db before committing rather than tracking these (tracked .db files, e.g.
+# data/production/predictions.db, are the real audit-chain evidence).
+data/**/*.db-wal
+data/**/*.db-shm
+
 # Clean-slate rebuild runtime state
 data/rebuild/raw/
 data/rebuild/normalized/
