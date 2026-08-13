@@ -51,3 +51,9 @@ outputs/rebuild/main_integration_verification.md
 # graphify knowledge-graph skill cache (generated, not project source)
 graphify-out/
 .dashboard.pid
+
+# Run-supervisor operational state (run rows + per-run logs) — mutable
+# runtime state, not evidence; moves under MODEL_PREDICTION_RUNTIME_ROOT
+# in the data-plane consolidation phase.
+data/runs.db
+data/logs/supervisor/

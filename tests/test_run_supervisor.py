@@ -1,0 +1,123 @@
+"""Tests for the run supervisor (consolidation A-2)."""
+
+from __future__ import annotations
+
+import fcntl
+import sys
+import time
+
+from model_prediction.run_supervisor import RunSupervisor, WORKERS
+
+
+def _supervisor(tmp_path) -> RunSupervisor:
+    """Supervisor rooted at a tmp repo with a fast heartbeat for tests."""
+    repo = tmp_path / "repo"
+    (repo / "data").mkdir(parents=True)
+    return RunSupervisor(
+        repo_root=repo,
+        db_path=tmp_path / "runs.db",
+        heartbeat_interval_seconds=0.05,
+    )
+
+
+def test_successful_run_records_completed_row(tmp_path) -> None:
+    sup = _supervisor(tmp_path)
+    code = sup.run_worker(
+        "daily", command=[sys.executable, "-c", "print('hello from worker')"]
+    )
+
+    assert code == 0
+    rows = sup.latest_runs()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["worker"] == "daily"
+    assert row["status"] == "completed"
+    assert row["exit_code"] == 0
+    assert row["started_at_utc"] and row["finished_at_utc"]
+    assert row["heartbeat_at_utc"]
+    assert row["git_sha"] == "unknown"  # tmp repo is not a git checkout
+    log_text = (tmp_path / "repo" / "data" / "logs" / "supervisor" / f"{row['run_id']}.log").read_text()
+    assert "hello from worker" in log_text
+    sup.close()
+
+
+def test_failed_run_records_failure_and_returns_worker_exit_code(tmp_path) -> None:
+    sup = _supervisor(tmp_path)
+    code = sup.run_worker(
+        "production", command=[sys.executable, "-c", "import sys; sys.exit(3)"]
+    )
+
+    assert code == 3
+    row = sup.latest_runs()[0]
+    assert row["status"] == "failed"
+    assert row["exit_code"] == 3
+    sup.close()
+
+
+def test_lease_contention_skips_and_records_the_skip(tmp_path) -> None:
+    sup = _supervisor(tmp_path)
+
+    # Hold the worker's lease the way another supervisor process would.
+    lock_path = sup._lease_path("daily")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(lock_path, "w", encoding="utf-8")
+    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    code = sup.run_worker("daily", command=[sys.executable, "-c", "print('never')"])
+
+    assert code == 75  # daily_lock convention: LOCK_BUSY_EXIT
+    row = sup.latest_runs()[0]
+    assert row["status"] == "skipped"
+    assert "lease held" in row["note"]
+    assert row["exit_code"] is None
+    fcntl.flock(handle, fcntl.LOCK_UN)
+    handle.close()
+    sup.close()
+
+
+def test_heartbeat_advances_while_worker_runs(tmp_path) -> None:
+    sup = _supervisor(tmp_path)
+    code = sup.run_worker(
+        "daily", command=[sys.executable, "-c", "import time; time.sleep(0.4)"]
+    )
+
+    assert code == 0
+    row = sup.latest_runs()[0]
+    started = row["started_at_utc"]
+    heartbeat = row["heartbeat_at_utc"]
+    assert heartbeat >= started  # heartbeat thread wrote while running
+    sup.close()
+
+
+def test_latest_runs_lists_newest_first_and_filters_by_worker(tmp_path) -> None:
+    sup = _supervisor(tmp_path)
+    sup.run_worker("daily", command=[sys.executable, "-c", "pass"])
+    time.sleep(0.01)  # keep started_at_utc ordering deterministic
+    sup.run_worker("production", command=[sys.executable, "-c", "pass"])
+
+    all_rows = sup.latest_runs()
+    assert [r["worker"] for r in all_rows] == ["production", "daily"]
+    daily_rows = sup.latest_runs(worker="daily")
+    assert [r["worker"] for r in daily_rows] == ["daily"]
+    sup.close()
+
+
+def test_worker_registry_commands_exist_on_disk(tmp_path) -> None:
+    """The three real workers must map to commands that exist in the repo."""
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    for worker in ("daily", "production", "rebuild-shadow"):
+        assert worker in WORKERS
+        assert WORKERS[worker][0] in ("bash", ".venv/bin/python")
+
+
+def test_unknown_worker_rejected(tmp_path) -> None:
+    sup = _supervisor(tmp_path)
+    try:
+        sup.run_worker("does-not-exist")
+    except ValueError as exc:
+        assert "unknown worker" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for unknown worker")
+    finally:
+        sup.close()

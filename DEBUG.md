@@ -2,6 +2,23 @@
 
 **Last audited**: 2026-08-14 (see new section directly below)
 
+## 2026-08-14 (night) — run supervisor: launchd as a trigger, not the architecture (consolidation A-2)
+
+`src/model_prediction/run_supervisor.py` gives every scheduled run one
+protocol: unique `run_id`, per-worker fcntl lease (busy runs are recorded
+as `skipped`, exit 75 — `daily_lock.py`'s convention), heartbeat thread,
+subprocess execution with the output captured to
+`data/logs/supervisor/<run_id>.log`, and an outcome row in `data/runs.db`
+(SQLite, WAL). Worker→command mapping lives in `WORKERS` (daily /
+production / rebuild-shadow); the launchd plists can now just invoke
+`python -m model_prediction.run_supervisor run <worker>` instead of each
+script re-deciding what "run" means. The workers themselves are
+unchanged. `status [worker]` / `runs [LIMIT]` read the history — the
+foundation the truthful-health phase reads instead of file mtimes.
+
+7 tests in `tests/test_run_supervisor.py` (completed/failed/skipped rows,
+lease contention, heartbeat advancement, per-worker filtering).
+
 ## 2026-08-14 (even later) — one production model registry (consolidation A-1)
 
 The production stack had a split personality: `config/production.yaml` listed
