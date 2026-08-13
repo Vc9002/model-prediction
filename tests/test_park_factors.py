@@ -4,10 +4,9 @@ and date-aware filtering.
 
 from __future__ import annotations
 
-from model_prediction.features.park_factors import (
-    PARK_FACTORS_VERSION,
+from model_prediction.features.park_factors import PARK_FACTORS_VERSION, park_factor
+from model_prediction.features.park_factors_pit import (
     compute_park_factors_from_games,
-    park_factor,
     park_factor_at,
 )
 

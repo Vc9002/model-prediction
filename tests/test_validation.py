@@ -427,8 +427,12 @@ def test_train_serve_parity_for_v9_features(tmp_path, monkeypatch) -> None:
         # gate (16 Rockies home games here), 0.0 fallback -- identical.
         assert target_row.residual_trend_gap != 0.0  # gate passed
         assert served["residual_trend_gap"] == pytest.approx(target_row.residual_trend_gap, abs=1e-6)
-        # park_factor: static table on BOTH sides (v8 contract)...
-        assert served["park_factor"] == target_row.park_factor == 1.193
+        # park_factor: static table on BOTH sides (v8 contract). Compares
+        # against the live PARK_RUN_FACTORS entry rather than a hardcoded
+        # literal, since that table is auto-regenerated daily
+        # (mlb_baseline_refresh.refresh_park_factors) and its values drift.
+        from model_prediction.features.park_factors import PARK_RUN_FACTORS
+        assert served["park_factor"] == target_row.park_factor == PARK_RUN_FACTORS["Colorado Rockies"]
         # ...park_factor_pit: empirical PIT factor on BOTH sides, and it
         # must differ from the static value the v8 variants consume.
         assert served["park_factor_pit"] == target_row.park_factor_pit

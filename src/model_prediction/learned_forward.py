@@ -30,7 +30,7 @@ from .features.mlb_player_availability import (
 from .features.mlb_player_availability import (
     matchup_player_availability as matchup_mlb_player_availability,
 )
-from .features.park_factors import park_factor_at
+from .features.park_factors_pit import park_factor_at
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
 from .features.player_availability import matchup_player_availability
 from .features.schedule_load import matchup_schedule_load

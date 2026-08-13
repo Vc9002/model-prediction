@@ -29,7 +29,8 @@ from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
 from .features.bullpen import FATIGUE_WINDOW_DAYS, bullpen_profile
 from .features.elo_ratings import build_elo
-from .features.park_factors import park_factor, park_factor_at
+from .features.park_factors import park_factor
+from .features.park_factors_pit import park_factor_at
 from .features.schedule_load import matchup_schedule_load
 from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
