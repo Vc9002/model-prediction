@@ -1,22 +1,5 @@
 # CLAUDE.md — Working Guidelines for This Project
 
-## 2026-08-12 CONSOLIDATION — All rebuild models on main, production canary deployed
-
- () now contains ALL accepted code: WNBA rebuild v1 (2-feat LR), 
-Tennis rebuild v1 (surface Elo, faithful baseline), NFL rebuild v1 (Platt-calibrated LR), 
-Soccer rebuild v1 (Dixon-Coles Poisson, 19 leagues). All challenger artifacts in 
- — , RESEARCH_SHADOW only.
-
-**Production canary**:  via . 
-CLI: .
-Dashboard: . Scheduler: .
-Automated orders: . Manual only.
-
-Daily pipeline verified (exit 0, Main absent). 4 stale worktrees removed, 
-18 retained as historical references. See  and 
- for full details.
-
-
 This file is auto-loaded into every session. Keep it short and durable —
 volatile status belongs in `docs/PROJECT_STATUS.md`, full audit history and
 reproduction commands in `DEBUG.md`, and per-sport feature roadmaps in

@@ -1,11 +1,11 @@
 {
   "effective_window": {
     "from": "2022-03-25",
-    "to": "2026-08-12"
+    "to": "2026-08-13"
   },
-  "extracted_at_utc": "2026-08-12T17:43:20.564043Z",
-  "game_count": 3982,
-  "games_sha256": "d380deccf45de903fad6c1f9786d201fa43c201b72e85c6818347ded83b40818",
+  "extracted_at_utc": "2026-08-13T17:15:18.501361Z",
+  "game_count": 3988,
+  "games_sha256": "8c4a9309a9addb80a9782b8c8e6f1c03e10c193e04033a00ce8c672c41fe37c1",
   "league": "npb",
   "league_name": "Nippon Professional Baseball",
   "limitations": [
@@ -16,7 +16,7 @@
   "request_count": 6,
   "requested_window": {
     "from": "2022-03-25",
-    "to": "2026-08-12"
+    "to": "2026-08-13"
   },
   "requires_api_key": false,
   "requires_signup": false,

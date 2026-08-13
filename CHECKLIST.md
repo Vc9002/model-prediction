@@ -1,6 +1,6 @@
 # Project Maintenance Checklist
 
-**Last updated**: 2026-08-02
+**Last updated**: 2026-08-13
 
 Current status and blockers: `docs/PROJECT_STATUS.md`.
 
@@ -40,12 +40,12 @@ Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Debug (when things look wrong)
 
-- [ ] **Pre-flight** — `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` (expect 0 failures; current pass: 624)
+- [ ] **Pre-flight** — `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` (expect 0 failures; current pass: 1759, 3 skipped)
 - [ ] **Ruff lint** — `.venv/bin/ruff check src/ tests/` (expect ~118 findings; 79 are EXE002 shebang on test files)
 - [ ] **Full DEBUG.md audit** — see `DEBUG.md` for the full 12-step audit and reproduction commands
 - [ ] **Module imports** — every current package module imports cleanly (DEBUG.md check 3)
 - [ ] **Data integrity** — 0 no-score games, 0 duplicates (DEBUG.md check 4)
-- [ ] **Config consistency** — `config/model.yaml` maps to existing artifact files (known gap: `market-residual-v1.json` missing)
+- [ ] **Config consistency** — `config/model.yaml` maps to existing artifact files (the old `market-residual-v1.json` gap was resolved 2026-08-03, F-50: real artifact trained, wired as diagnostic-only)
 - [ ] **Dashboard server logs** — `data/logs/dashboard.err` and `dashboard/server.log` for runtime errors
 - [ ] **Polymarket API health** — `curl -s https://gateway.polymarket.us/health`
 - [ ] **CLI imports** — `PYTHONPATH=src:. .venv/bin/python -c "from model_prediction.cli import main"` should exit 0
@@ -57,10 +57,10 @@ Run these checks regularly. Pinned to the repo root for discovery.
 - [ ] NBA/NFL spread/total: 0 snapshots (offseason — will resolve when seasons start)
 - [ ] WNBA total baseline 78.3% suspiciously high — needs investigation with more data
 - [ ] Dashboard startup process uses `pkill -f` — replace with PID-file approach (`.codewhale/instructions.md` explicitly forbids `pkill`)
-- [ ] `config/model.yaml` references `market-residual-v1.json` which doesn't exist
+- [x] `config/model.yaml` referenced `market-residual-v1.json` which doesn't exist — resolved 2026-08-03 (F-50), real artifact now trained and wired as diagnostic-only
 - [ ] `mlb-spread-baseline-v1.json` is reused for both spread and total research (should be separate artifacts)
-- [ ] `nba-spread-baseline-v1.json` and `nfl-spread-baseline-v1.json` have mismatched canonical hashes
-- [ ] `/api/scan` dashboard route calls a nonexistent function — returns 500 on every request
+- [x] `nba-spread-baseline-v1.json` and `nfl-spread-baseline-v1.json` "mismatched canonical hashes" — confirmed never a real bug (verification script's own JSON convention), per `docs/PROJECT_STATUS.md` release verdict item 6
+- [x] `/api/scan` dashboard route called a nonexistent function — route no longer exists (removed; P1-9)
 - [ ] 12 orphaned source modules (~1,800 lines of dead code, never imported or tested)
 - [ ] `cli.py` (3,943 lines) has zero dedicated test file
 - [ ] `dashboard_server.py` (4,782 lines) is monolithic; recommended split into `dashboard/` package

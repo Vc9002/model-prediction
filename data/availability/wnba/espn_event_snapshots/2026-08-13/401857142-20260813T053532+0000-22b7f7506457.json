@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4682855",
+      "current_status": "Questionable",
+      "player_name": "Justine Pissott",
+      "raw_status": "Day-To-Day",
+      "reason": "Leg",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-13T00:14:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "2529458",
+      "current_status": "Out",
+      "player_name": "Cheyenne Parker-Tyus",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-15",
+      "status_at_utc": "2026-08-13T00:10:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4281190",
+      "current_status": "Out",
+      "player_name": "Dana Evans",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-15",
+      "status_at_utc": "2026-08-13T00:07:00+00:00",
+      "team": "Las Vegas Aces"
+    },
+    {
+      "athlete_id": "4433633",
+      "current_status": "Out",
+      "player_name": "Kierstan Bell",
+      "raw_status": "Out",
+      "reason": "Personal",
+      "return_date": "2026-08-15",
+      "status_at_utc": "2026-08-13T00:07:00+00:00",
+      "team": "Las Vegas Aces"
+    }
+  ],
+  "event_id": "401857142",
+  "observed_at_utc": "2026-08-13T05:35:32.561292+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "22b7f7506457df4c120a326fe83de1e43846e7b4ce49a59a9fa1e91652d25212",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

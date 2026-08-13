@@ -9827,6 +9827,13 @@
     "source_team_id": 2511,
     "team_id": "bo3:1:2511"
   },
+  "bo3:1:25128": {
+    "acronym": null,
+    "name": "Raccoons",
+    "slug": "raccoons",
+    "source_team_id": 25128,
+    "team_id": "bo3:1:25128"
+  },
   "bo3:1:2514": {
     "acronym": "GR",
     "name": "GR",

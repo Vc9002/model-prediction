@@ -38,7 +38,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Self
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 # Lifecycle state machine for prediction rows: open until one of the
 # terminal transitions below is applied; terminal rows are immutable.
@@ -131,11 +131,16 @@ class ProductionLedger:
             );
 
             -- Idempotency: same (run_id, event_id, sport, market, model_id)
-            -- with no supersedes_id is a duplicate insert that returns the
-            -- existing row rather than creating a new one.
+            -- for a LIVE (predicted) row is a duplicate insert that returns
+            -- the existing row rather than creating a new one. Only
+            -- status='predicted' rows hold the slot: a superseded row must
+            -- release it so its replacement (inserted with supersedes_id
+            -- set, status predicted) becomes the row a re-fired identical
+            -- cycle collides with -- before this predicate, the conflict
+            -- hit the old superseded row and returned its stale id.
             CREATE UNIQUE INDEX IF NOT EXISTS idx_predictions_idempotent
                 ON predictions(run_id, event_id, sport, market, model_id)
-                WHERE supersedes_id IS NULL;
+                WHERE status = 'predicted';
 
             CREATE TABLE IF NOT EXISTS health_checks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,7 +173,30 @@ class ProductionLedger:
         )
         self._ensure_column("predictions", "settled_at_utc", "settled_at_utc TEXT")
         self._ensure_column("predictions", "note", "note TEXT")
+        self._ensure_idempotency_index()
         self.conn.commit()
+
+    def _ensure_idempotency_index(self) -> None:
+        """Migrate databases whose idempotency index predates the
+        status='predicted' predicate (SCHEMA_VERSION 1).
+
+        ``CREATE UNIQUE INDEX IF NOT EXISTS`` never rewrites an existing
+        index, so the old ``WHERE supersedes_id IS NULL`` predicate would
+        survive in every live database and keep superseded rows occupying
+        the idempotency slot. Drop and recreate when the stored SQL doesn't
+        already carry the corrected predicate.
+        """
+        row = self.conn.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type='index' AND name='idx_predictions_idempotent'"
+        ).fetchone()
+        if row is not None and "status = 'predicted'" not in (row[0] or ""):
+            self.conn.execute("DROP INDEX idx_predictions_idempotent")
+            self.conn.execute(
+                """CREATE UNIQUE INDEX idx_predictions_idempotent
+                   ON predictions(run_id, event_id, sport, market, model_id)
+                   WHERE status = 'predicted'"""
+            )
 
     def _ensure_column(self, table: str, column: str, ddl: str) -> None:
         """Add *column* to *table* if it is missing (idempotent)."""
@@ -273,7 +301,7 @@ class ProductionLedger:
                     rationale, data_timestamp, data_age_seconds, git_sha, status
                 ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'predicted')
                 ON CONFLICT(run_id, event_id, sport, market, model_id)
-                WHERE supersedes_id IS NULL
+                WHERE status = 'predicted'
                 DO UPDATE SET id=id
                 RETURNING id""",
                 (

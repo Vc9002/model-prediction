@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "athlete_id": "4281929",
+      "current_status": "Out",
+      "player_name": "Satou Sabally",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-18",
+      "status_at_utc": "2026-08-13T17:00:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "4683006",
+      "current_status": "Out",
+      "player_name": "Leonie Fiebich",
+      "raw_status": "Out",
+      "reason": "Foot",
+      "return_date": "2026-08-18",
+      "status_at_utc": "2026-08-09T14:42:00+00:00",
+      "team": "New York Liberty"
+    },
+    {
+      "athlete_id": "5274110",
+      "current_status": "Out",
+      "player_name": "Monique Akoa Makani",
+      "raw_status": "Out",
+      "reason": "Ankle",
+      "return_date": "2026-08-15",
+      "status_at_utc": "2026-08-12T22:47:00+00:00",
+      "team": "Los Angeles Sparks"
+    }
+  ],
+  "event_id": "401857141",
+  "observed_at_utc": "2026-08-13T17:13:44.043424+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "040e32f545de467f133cc4ea59c90a7e046f7f8a46d8bf04179cb5a3a08395f1",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

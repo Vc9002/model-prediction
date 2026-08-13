@@ -102,6 +102,13 @@ TIE_MODEL_CANDIDATES = ("flat", "elo_gap")
 _TAG_RE = re.compile(r"<[^>]+>")
 _KBO_DATE_RE = re.compile(r"(?P<month>\d{2})\.(?P<day>\d{2})")
 _KBO_GAME_ID_RE = re.compile(r"gameId=(?P<id>[A-Za-z0-9]+)")
+# Pre-2026-08-13 parse_kbo_rows fabricated game ids ("kbo:YYYYMMDD:AWAY:HOME")
+# for rows with an empty relay cell (games not yet created on the official
+# page). Those phantom rows shadow the same game's real-scored row in
+# find_international_baseball_result — the fabricated id sorts first — so the
+# matcher must never treat them as a result. Real source ids carry no second
+# colon (`kbo:20250402LTHH0`).
+_FABRICATED_KBO_ID_RE = re.compile(r"^kbo:\d{8}:[A-Z0-9]+:[A-Z0-9]+$")
 _NPB_GAME_RE = re.compile(
     r'href="(?P<href>/bis/eng/(?P<year>\d{4})/games/s(?P<game_id>\d+)\.html)"[^>]*>'
     r"\s*(?P<away>[A-Z]+)\s+(?P<away_score>\d+|\*)\s+-\s+"
@@ -159,7 +166,19 @@ def parse_kbo_rows(payload: dict[str, Any], year: int) -> list[dict[str, Any]]:
             continue
         relay = next((str(cell.get("Text") or "") for cell in cells if cell.get("Class") == "relay"), "")
         game_match = _KBO_GAME_ID_RE.search(relay)
-        game_id = game_match.group("id") if game_match else f"{current_date:%Y%m%d}:{away_id}:{home_id}"
+        if game_match is None:
+            # The relay cell only carries gameId= once the official page has
+            # created the game's box — verified live 2026-08-13: unplayed
+            # games render an EMPTY relay with "0 vs 0" in the play cell.
+            # The old fallback of fabricating a game_id for these rows
+            # cached every not-yet-played game as a phantom 0-0 tie, which
+            # (a) settled real picks as scoreless ties and (b) inflated the
+            # tie-rate training stats (30 phantoms in ~2 weeks vs 2 genuine
+            # ties in 10 years of history). Skip them — the row reappears
+            # with a real gameId and real scores once the game completes.
+            # Matches parse_npb_calendar dropping unplayed "*" rows.
+            continue
+        game_id = game_match.group("id")
         time_cell = next((cell for cell in cells if cell.get("Class") == "time"), None)
         local_time = _plain_text(str(time_cell.get("Text") or "")) if time_cell else None
         output.append(
@@ -519,6 +538,8 @@ def find_international_baseball_result(
             return None
         for row in _load_games(games_path):
             if row["game_date"] != game_date:
+                continue
+            if _FABRICATED_KBO_ID_RE.match(str(row["game_id"])):
                 continue
             if row["home_team_id"] in home_ids and row["away_team_id"] in away_ids:
                 return int(row["away_score"]), int(row["home_score"])

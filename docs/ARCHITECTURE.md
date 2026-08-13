@@ -52,6 +52,8 @@ show exposure/disagreement as enforced eligibility gates are stale.
 ## Current model status
 
 Do not duplicate volatile metrics here. Use the table in
-`docs/PROJECT_STATUS.md`. The current operational blockers are execution-ticket
-binding, non-atomic ledger/audit writes, non-PIT MLB v6 starter data, WNBA
-fail-open behavior, artifact/report drift, and a non-green checkout.
+`docs/PROJECT_STATUS.md`. (Historical note: this section previously listed
+execution-ticket binding, non-atomic ledger/audit writes, non-PIT MLB v6
+starter data, WNBA fail-open behavior, artifact/report drift, and a
+non-green checkout as "current blockers" — all since resolved; see
+`docs/PROJECT_STATUS.md`'s release-verdict history for each.)

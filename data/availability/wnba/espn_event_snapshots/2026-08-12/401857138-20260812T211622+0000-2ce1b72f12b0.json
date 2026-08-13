@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "athlete_id": "2590093",
+      "current_status": "Out",
+      "player_name": "Kiah Stokes",
+      "raw_status": "Out",
+      "reason": "Concussion",
+      "return_date": "2026-08-17",
+      "status_at_utc": "2026-08-12T00:07:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "4790264",
+      "current_status": "Questionable",
+      "player_name": "Janelle Salaun",
+      "raw_status": "Day-To-Day",
+      "reason": "Knee",
+      "return_date": "2026-08-12",
+      "status_at_utc": "2026-08-12T00:06:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "4790263",
+      "current_status": "Out",
+      "player_name": "Iliana Rupert",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-07T15:18:00+00:00",
+      "team": "Golden State Valkyries"
+    },
+    {
+      "athlete_id": "4594786",
+      "current_status": "Out",
+      "player_name": "Sydney Taylor",
+      "raw_status": "Out",
+      "reason": "Groin",
+      "return_date": "2026-08-16",
+      "status_at_utc": "2026-08-11T23:52:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "2491205",
+      "current_status": "Out",
+      "player_name": "Skylar Diggins",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2026-08-16",
+      "status_at_utc": "2026-08-09T23:07:00+00:00",
+      "team": "Chicago Sky"
+    },
+    {
+      "athlete_id": "4433630",
+      "current_status": "Out",
+      "player_name": "Rickea Jackson",
+      "raw_status": "Out",
+      "reason": "Knee",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-05-19T13:54:00+00:00",
+      "team": "Chicago Sky"
+    }
+  ],
+  "event_id": "401857138",
+  "observed_at_utc": "2026-08-12T21:16:22.124052+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "2ce1b72f12b05e3f48e19e9c76a2e35d66279b695e81514974310946398e9ebf",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

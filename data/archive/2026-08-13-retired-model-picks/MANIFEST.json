@@ -1,0 +1,138 @@
+{
+  "created_utc": "2026-08-13T11:35:31.078041+00:00",
+  "reason": "operator directive 2026-08-13: archive settled picks logged under model versions superseded by the current active version, matching the 2026-07-31-retired-mlb-model-picks precedent.",
+  "results": [
+    {
+      "tier": "main",
+      "file": "data/main/mlb.xlsx",
+      "superseded_versions": [
+        "mlb-elo-trend-lr-v7",
+        "measured-edge-margin-v2",
+        "measured-edge-totals-v2"
+      ],
+      "current_version": "mixed (moneyline v8 / spread+total v3)",
+      "archived_count": 40,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/main_mlb_retired_mlb-elo-trend-lr-v7_measured-edge-margin-v2_measured-edge-totals-v2_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "flat",
+      "file": "data/flat/mlb.xlsx",
+      "superseded_versions": [
+        "mlb-elo-trend-lr-v7",
+        "measured-edge-margin-v1",
+        "measured-edge-margin-v2",
+        "measured-edge-totals-v1",
+        "measured-edge-totals-v2"
+      ],
+      "current_version": "mixed (moneyline v8 / spread+total v3)",
+      "archived_count": 178,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/flat_mlb_retired_mlb-elo-trend-lr-v7_measured-edge-margin-v1_measured-edge-margin-v2_measured-edge-totals-v1_measured-edge-totals-v2_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "research",
+      "file": "data/research/cs2.xlsx",
+      "superseded_versions": [
+        "cs2-tiered-elo-v5"
+      ],
+      "current_version": "cs2-tiered-elo-v6",
+      "archived_count": 69,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/research_cs2_retired_cs2-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "research",
+      "file": "data/research/dota2.xlsx",
+      "superseded_versions": [
+        "dota2-tiered-elo-v5"
+      ],
+      "current_version": "dota2-tiered-elo-v6",
+      "archived_count": 24,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/research_dota2_retired_dota2-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "research",
+      "file": "data/research/lol.xlsx",
+      "superseded_versions": [
+        "lol-tiered-elo-v5"
+      ],
+      "current_version": "lol-tiered-elo-v6",
+      "archived_count": 31,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/research_lol_retired_lol-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "research",
+      "file": "data/research/valorant.xlsx",
+      "superseded_versions": [
+        "valorant-tiered-elo-v5"
+      ],
+      "current_version": "valorant-tiered-elo-v6",
+      "archived_count": 19,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/research_valorant_retired_valorant-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "gated_research",
+      "file": "data/gated_research/cs2.xlsx",
+      "superseded_versions": [
+        "cs2-tiered-elo-v5"
+      ],
+      "current_version": "cs2-tiered-elo-v6",
+      "archived_count": 17,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/gated_research_cs2_retired_cs2-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "gated_research",
+      "file": "data/gated_research/dota2.xlsx",
+      "superseded_versions": [
+        "dota2-tiered-elo-v5"
+      ],
+      "current_version": "dota2-tiered-elo-v6",
+      "archived_count": 13,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/gated_research_dota2_retired_dota2-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "gated_research",
+      "file": "data/gated_research/lol.xlsx",
+      "superseded_versions": [
+        "lol-tiered-elo-v5"
+      ],
+      "current_version": "lol-tiered-elo-v6",
+      "archived_count": 10,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/gated_research_lol_retired_lol-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    },
+    {
+      "tier": "gated_research",
+      "file": "data/gated_research/valorant.xlsx",
+      "superseded_versions": [
+        "valorant-tiered-elo-v5"
+      ],
+      "current_version": "valorant-tiered-elo-v6",
+      "archived_count": 5,
+      "archive_path": "data/archive/2026-08-13-retired-model-picks/gated_research_valorant_retired_valorant-tiered-elo-v5_archive.xlsx",
+      "ok": true
+    }
+  ],
+  "explicitly_left_alone": [
+    {
+      "file": "data/research/cs2.xlsx",
+      "note": "1 OPEN row on cs2-tiered-elo-v5 -- archive_settled_rows only removes settled rows; open rows are left for the next re-forecast/settlement cycle, not force-removed."
+    },
+    {
+      "note": "data/main/{soccer,tennis,wnba}.xlsx, data/flat/{soccer,tennis,wnba}.xlsx: single model_version each (already current) -- nothing to archive."
+    },
+    {
+      "note": "data/research/{kbo,npb,rainbow_six}.xlsx, data/gated_research/{kbo,npb,rainbow_six}.xlsx: single model_version each (already current) -- nothing to archive."
+    },
+    {
+      "note": "NBA/NFL: no data/main or data/flat ledger file exists on disk for these sports despite config/model.yaml listing them as shadow_qualified -- out of scope, nothing to archive."
+    }
+  ],
+  "grand_total_archived": 406
+}

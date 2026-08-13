@@ -1,6 +1,9 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-13, `main` at `b26d6f8`. Production canary deployed; champion/challenger gating added.
+**Last verified**: 2026-08-14, local `main` at `e1f12bf` (8 commits ahead of
+`origin/main` at `0da4b81`, pushed to `origin/cleanup/final-debug-2026-08-14`
+for exact-head CI — not yet merged). Production canary deployed;
+champion/challenger gating added; KBO settlement bug fixed.
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -9,6 +12,55 @@ this file exists to be the short, current summary someone can read first.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-14 session changes (KBO settlement bug, ledger archival, doc corrections)
+
+- **KBO settlement bug fixed**: `parse_kbo_rows` (`international_baseball.py`)
+  fabricated a `game_id` for unplayed games (empty relay cell on the official
+  schedule page), which cached as a phantom scoreless-tie row and settled
+  real picks as 0-0 pushes — confirmed 16/16 settled KBO research-ledger rows
+  affected (0/37 NPB rows affected; NPB's parser already skipped unplayed
+  rows). Fixed to skip unplayed rows instead of fabricating an id, plus a
+  guard against already-cached phantom rows from before the fix. Two
+  regression tests added (`tests/test_international_baseball.py`). All 16
+  affected rows self-corrected via the ledger's audited
+  `pick_resettled_corrected` path on the next scheduled settlement run — real
+  scores, real win/loss results, real P&L now in `data/research/kbo.xlsx`.
+- **406 settled picks archived** for retired model versions (MLB
+  moneyline v7→v8, spread/total v1/v2→v3; esports LOL/CS2/Dota2/Valorant
+  v5→v6) across Main/Flat/Research/Gated Research, via the sanctioned
+  `PickLedger.archive_settled_rows` path, following the
+  `2026-07-31-retired-mlb-model-picks` precedent. Manifest and per-tier
+  archive files at `data/archive/2026-08-14-retired-model-picks/`. Row-count
+  reconciliation exact on all 10 touched files; `verify-chain` clean
+  (0 breaks).
+- **365 orphaned research-ledger rows repaired**: rows carrying reason_code
+  `NO_CALL_WINNER_OVERVALUED` (a value-gate check that only ever existed on
+  an unmerged rebuild branch, `archive/rebuild-clean-slate-v1-...` /
+  commit `ed580af` — never part of any mainline commit) had `units=0,
+  pnl_units=0`, violating this codebase's own "every logged pick carries a
+  real paper size" invariant. Backfilled via the live `edge_scaled_units()`
+  formula from each row's own recorded inputs; `pnl_units` recomputed from
+  the real result. `decision`/`record_type` left as `NO_CALL`/
+  `RESEARCH_OBSERVATION` (not retroactively promoted to CALL).
+- **`CLAUDE.md`**: removed a section with unrecoverable data loss (empty
+  template placeholders baked in at commit time, confirmed via git history —
+  no original content existed to restore).
+- **Verified against `origin/main`** (confirmed real, both already fixed in
+  local unpushed commits): `production.yaml` allowlists 13 models while
+  `production_canary.py` on `origin/main` requires exactly 1 (mechanically
+  incompatible there); `_check_data_freshness` on `origin/main` is a literal
+  stub (`return None` unconditionally). Both fixed locally; regression test
+  for the freshness fix (`test_health_check_degrades_on_stale_prediction`)
+  passes.
+- **Launchd jobs verified actually advancing**, not just loaded:
+  `com.modelprediction.production` and `com.modelprediction.rebuild-shadow`
+  both `state = active`, `last exit code = 0`; `data/production/
+  predictions.db` and `$MODEL_PREDICTION_RUNTIME_ROOT/rebuild/shadow.db`
+  both had writes within the current 3-hour scheduling interval.
+- Full suite: 1759 passed, 3 skipped (up from 1753 — 2 KBO regression tests
+  plus others accumulated this session). Ruff: same ~120-finding
+  pre-existing baseline, no new findings.
 
 ## 2026-08-13 session changes (champion/challenger + settlement + distribution)
 
@@ -95,9 +147,9 @@ transitions.
 | Soccer | `soccer-poisson-dc-v1` | shadow_qualified (operator override) | 62.5% locked-holdout | No walk-forward artifact exists; override not genuine promotion |
 | LOL | `lol-tiered-elo-v6` | shadow_qualified (override) | — | v6 Platt-scaled. **Fixed 2026-08-04 (F-63)**: added inactivity decay + thin-data confidence discount — real ~33% reduction in mean predicted edge for thin-data matchups on held-out data, at a disclosed locked-test accuracy cost (70.6%→69.2%) |
 | CS2 | `cs2-tiered-elo-v6` | shadow_qualified (override) | — | Same v6 fix as LOL (F-63); this title's locked-test accuracy improved slightly (65.8%→66.0%) |
-| Dota 2 | `dota2-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled |
-| Valorant | `valorant-tiered-elo-v5` | shadow_qualified (override) | — | v5 Platt-scaled |
-| Rainbow Six | `rainbow_six-tiered-elo-v5` | research | — | v5 Platt-scaled |
+| Dota 2 | `dota2-tiered-elo-v6` | shadow_qualified (override) | — | Same v6 fix as LOL/CS2 (F-63) |
+| Valorant | `valorant-tiered-elo-v6` | shadow_qualified (override) | — | Same v6 fix as LOL/CS2 (F-63) |
+| Rainbow Six | `rainbow_six-tiered-elo-v6` | research | — | Same v6 fix as LOL/CS2 (F-63) |
 | KBO | `kbo-tie-aware-elo-v2` | shadow_qualified (override) | — | Tie-aware, zero-unit research only |
 | NPB | `npb-tie-aware-elo-v2` | shadow_qualified (override) | — | Tie-aware, zero-unit research only |
 | Tennis | `tennis-surface-elo-v1` | research | — | WTA + ATP (ATP added 2026-08-03; ITF still unbuildable — no ESPN data source) |

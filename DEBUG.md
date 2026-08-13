@@ -1,6 +1,99 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-02 (see new section directly below)
+**Last audited**: 2026-08-13 (see new section directly below)
+
+## 2026-08-13 — KBO phantom 0-0 settlement: every pick settled as a scoreless tie, root-caused and fixed
+
+**Symptom**: all 16 settled KBO picks in `data/research/kbo.xlsx` showed
+`away_score=0, home_score=0`, `result=push`, with nonzero pnl — impossible
+for real baseball (16 different games, zero runs scored), while NPB (same
+settlement code path) had zero 0-0 rows.
+
+**Root cause** (two layers, both in `international_baseball.py`):
+
+1. `parse_kbo_rows` treated a game with an EMPTY relay cell (the official
+   KBO page renders unplayed games as "0 vs 0" with no `gameId=` link —
+   verified live against `KBO_RESULTS_ENDPOINT`) as a real row, fabricating
+   a fallback game_id (`kbo:YYYYMMDD:AWAY:HOME`) and caching it as a 0-0
+   `tie=true` row. Once the game actually completed, the source provided
+   the real gameId and real scores — a second row with a different id, so
+   the merge-by-game_id could never overwrite the phantom.
+2. `find_international_baseball_result._match` matched by date+teams and
+   returned the first row in sorted (date, game_id) order. The fabricated
+   id sorts before the real source id, so the phantom 0-0 row shadowed the
+   real-scored row for the same game, and settlement graded a fake tie.
+
+**Fix** (2026-08-13):
+- `parse_kbo_rows` now SKIPS rows with no `gameId=` in the relay (same
+  spirit as NPB's unplayed-`*` skip). The row reappears with real id and
+  scores once the game completes.
+- `_match` ignores any row whose game_id matches the fabricated fallback
+  pattern (`_FABRICATED_KBO_ID_RE`) — defense in depth for caches written
+  before the fix.
+- Purged the 30 phantom rows from `data/international_baseball/kbo/games.jsonl`
+  (only 2 genuine historical 0-0 rows remain, both with real source ids).
+  These phantoms had also contaminated the tie-rate training stats (30
+  phantom ties in ~2 weeks vs 2 genuine in 10 years); the daily
+  recalibration rebuilds ratings from the cleaned dataset.
+- Corrected the 11 ledger rows whose real scores were already in the cache
+  via `PickLedger.settle(..., correction_reason=...)`, and mirrored the
+  corrections into `data/model_ledgers/kbo-tie-aware-elo.xlsx`.
+- Regression tests: `test_parse_kbo_rows_skips_unplayed_games_with_empty_relay`
+  and `test_find_result_ignores_fabricated_id_phantom_rows`.
+
+**Remaining follow-up**: the 5 rows from 2026-08-13's own games were still
+in progress at fix time. `scripts/correct_phantom_tie_settlements.py`
+(idempotent) corrects any rows still carrying the phantom signature once
+real scores land — run it after the next daily refresh.
+
+## 2026-08-13 (later) — in-depth bug search: fixes applied
+
+Cross-ledger invariant scan + two parallel audit agents (grading logic;
+newest-code PIT/parity) produced these fixes:
+
+- **ProductionLedger idempotency index kept superseded rows in the slot**
+  (`production_ledger.py`): the unique index predicate was
+  `WHERE supersedes_id IS NULL`, so a superseded row (which keeps
+  `supersedes_id` NULL) still collided with a re-fired identical cycle,
+  returning the stale row's id instead of the correction's. Predicate is
+  now `WHERE status = 'predicted'` (SCHEMA_VERSION bumped to 2), with an
+  init-time migration that drops/recreates the index in pre-existing DBs
+  (the live `data/production/predictions.db` migrates on its next open).
+  Regression tests: `test_rerun_after_supersede_returns_correction_not_stale_row`,
+  `test_old_index_predicate_is_migrated`.
+- **run_rebuild.sh silently exited 0 with an empty sports list** (config
+  read failure → zero rebuilds "succeeding"): now exits non-zero when no
+  enabled sports derive from `config/rebuild.yaml`.
+- **Tennis ratings frozen since 2026-07-27**: the daily ingest loop covered
+  only mlb/nba/wnba/nfl while `models/tennis.py` rebuilds its surface Elo
+  from `data/processed/tennis/games.jsonl` every forecast — the file
+  stopped advancing when training work stopped and nothing on the schedule
+  wrote it. `scripts/run_daily.sh` Step 1b now ingests tennis too (verified
+  live: 287 games appended for 2026-08-12). Tennis predictions will shift
+  as ratings re-advance — expected, that's the data flow being restored.
+- **WNBA spread attribution mapped to the archived model**:
+  `model_ledger.py`'s `MODEL_ID_BY_LEAGUE_AND_MARKET` mapped
+  `("WNBA","spread")` to `wnba-spread-baseline` (the archived broken
+  model) — now `wnba-spread-margin`.
+- **frozen_champions.json re-frozen**: the pre-fix snapshot recorded
+  kbo/npb as CODE_BACKED even though their artifacts exist; `freeze-production`
+  re-run, both now carry real artifact hashes.
+- **Test hardening**: `tests/test_pricing.py` now pins all four spread
+  sign combinations, away-side integer pushes, and totals push-at-integer
+  behavior (the 2026-08-13 audit found only home-side combos were covered).
+
+**Investigated and deliberately left alone** (each needs an explicit
+decision, not a silent change): WNBA spread artifact `wnba-spread-margin-v1`
+has zero serving consumers (the "fix" is config-wired but nothing loads it —
+promotion/wiring decision); tennis walkovers/retirements settle and
+Elo-update as full-strength matches (docs/MODEL_IMPROVEMENTS.md demands
+walkover → no rating update; implementing it changes model behavior);
+soccer score collection is 401-broken (THE_ODDS_API_KEY rejected on all 12
+leagues) and the Celta Vigo @ Napoli friendly is outside the 12 configured
+leagues anyway; v9 `park_factor_pit` prior-strength drift vs v8's static
+table is challenger-only by design.
+
+
 
 ## 2026-08-02 (latest) — Live-run verification of the per-model ledger architecture: 3 real bugs found and fixed, soccer draw settlement corrected
 

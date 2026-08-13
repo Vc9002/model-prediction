@@ -150,7 +150,7 @@ MODEL_ID_BY_LEAGUE_AND_MARKET: dict[tuple[str, str], str] = {
     ("NBA", "spread"): "nba-spread-baseline",
     ("NBA", "total"): "nba-total-score-ridge",
     ("WNBA", "moneyline"): "wnba-moneyline-elo-trend-lr",
-    ("WNBA", "spread"): "wnba-spread-baseline",
+    ("WNBA", "spread"): "wnba-spread-margin",
     ("WNBA", "total"): "wnba-total-score-ridge",
     ("NFL", "moneyline"): "nfl-moneyline-elo-trend-lr",
     ("NFL", "spread"): "nfl-spread-baseline",

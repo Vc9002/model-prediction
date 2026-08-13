@@ -11,7 +11,7 @@ import sqlite3
 import pytest
 
 from model_prediction import cli_production
-from model_prediction.production_ledger import ProductionLedger
+from model_prediction.production_ledger import SCHEMA_VERSION, ProductionLedger
 
 # ── fixtures / helpers ──────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ def test_record_prediction_appends_and_round_trips(tmp_path) -> None:
     assert row["model_id"] == "wnba-elo-trend-lr-v4"
     assert row["predicted_side"] == "home"
     assert row["probabilities"] == {"home": 0.62, "away": 0.38}
-    assert row["schema_version"] == "1"
+    assert row["schema_version"] == SCHEMA_VERSION
     ledger.close()
 
 
@@ -130,6 +130,51 @@ def test_supersede_bypasses_idempotency_and_replaces_view(tmp_path) -> None:
     assert superseded["status"] == "superseded"
     assert superseded["settled_at_utc"] is not None
     ledger.close()
+
+
+def test_rerun_after_supersede_returns_correction_not_stale_row(tmp_path) -> None:
+    """Regression: with the SCHEMA_VERSION 1 index predicate, a superseded
+    row kept supersedes_id NULL and still occupied the idempotency slot, so
+    a re-fired identical cycle collided with the OLD row and returned its
+    stale id. After supersede + correction, the re-run must return the
+    correction row's id and append nothing."""
+    ledger = _make_ledger(tmp_path)
+    old_id = _record_sample(ledger)
+    ledger.supersede_prediction(old_id, note="line moved")
+    correction_id = ledger.record_prediction(
+        "run1", prediction_id="run1:evt1", event_id="evt1",
+        sport="WNBA", market="moneyline", model_id="wnba-elo-trend-lr-v4",
+        probabilities={"home": 0.71, "away": 0.29},
+        supersedes_id=old_id,
+    )
+    rerun_id = _record_sample(ledger)  # identical identity, no supersedes_id
+    assert rerun_id == correction_id
+    assert len(ledger.get_predictions()) == 1
+    assert ledger.get_predictions()[0]["id"] == correction_id
+    ledger.close()
+
+
+def test_old_index_predicate_is_migrated(tmp_path) -> None:
+    """Regression: databases created before the status='predicted' predicate
+    keep their old index through CREATE IF NOT EXISTS — the init migration
+    must drop and recreate it, or superseded rows stay stuck in the slot."""
+    ledger = _make_ledger(tmp_path)
+    # Rewrite the index to the legacy SCHEMA_VERSION 1 predicate.
+    ledger.conn.execute("DROP INDEX idx_predictions_idempotent")
+    ledger.conn.execute(
+        """CREATE UNIQUE INDEX idx_predictions_idempotent
+           ON predictions(run_id, event_id, sport, market, model_id)
+           WHERE supersedes_id IS NULL"""
+    )
+    ledger.conn.commit()
+    ledger.close()
+
+    reopened = _make_ledger(tmp_path)
+    index_sql = reopened.conn.execute(
+        "SELECT sql FROM sqlite_master WHERE name='idx_predictions_idempotent'"
+    ).fetchone()[0]
+    assert "status = 'predicted'" in index_sql
+    reopened.close()
 
 
 # ── lifecycle transitions ───────────────────────────────────────────────────

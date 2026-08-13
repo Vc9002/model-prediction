@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "athlete_id": "2490553",
+      "current_status": "Questionable",
+      "player_name": "Brittney Griner",
+      "raw_status": "Day-To-Day",
+      "reason": "Knee",
+      "return_date": "2026-08-13",
+      "status_at_utc": "2026-08-12T20:48:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4329370",
+      "current_status": "Out",
+      "player_name": "Maria Kliundikova",
+      "raw_status": "Out",
+      "reason": "Not Injury Related",
+      "return_date": "2027-05-01",
+      "status_at_utc": "2026-07-31T17:11:00+00:00",
+      "team": "Connecticut Sun"
+    },
+    {
+      "athlete_id": "4433431",
+      "current_status": "Out",
+      "player_name": "Te-Hina Paopao",
+      "raw_status": "Out",
+      "reason": "Leg",
+      "return_date": "2026-08-16",
+      "status_at_utc": "2026-08-12T21:29:00+00:00",
+      "team": "Atlanta Dream"
+    },
+    {
+      "athlete_id": "5105740",
+      "current_status": "Out",
+      "player_name": "Indya Nivar",
+      "raw_status": "Out",
+      "reason": "Coach's Decision",
+      "return_date": "2026-08-16",
+      "status_at_utc": "2026-08-12T21:08:00+00:00",
+      "team": "Atlanta Dream"
+    }
+  ],
+  "event_id": "401857140",
+  "observed_at_utc": "2026-08-13T05:35:30.630955+00:00",
+  "schema_version": "1",
+  "snapshot_sha256": "5a8c331c22c2a833e13e22a4579f490f4ccfa780ea4cfd417a9bbf6623a204d4",
+  "source": "espn_event_injuries",
+  "sport": "wnba"
+}

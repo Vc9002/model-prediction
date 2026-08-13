@@ -52,7 +52,11 @@ echo "Settlement exit code: $SETTLE_EXIT" >> "$LOG"
 echo "--- Step 1b: Historical game ingestion ---" >> "$LOG"
 YESTERDAY=$(TZ=America/New_York date -v-1d +%Y-%m-%d 2>/dev/null || TZ=America/New_York date -d yesterday +%Y-%m-%d)
 INGEST_EXIT=0
-for sport in mlb nba wnba nfl; do
+# Tennis included since 2026-08-13: its surface-Elo model rebuilds ratings
+# from data/processed/tennis/games.jsonl on every forecast, and nothing on
+# the schedule advanced that file — ratings had been frozen since 2026-07-27
+# while the daily pipeline kept forecasting tennis games against them.
+for sport in mlb nba wnba nfl tennis; do
     for d in "$YESTERDAY" "$RUN_DATE"; do
         PYTHONPATH=src .venv/bin/python -m model_prediction.cli ingest --sport "$sport" --date "$d" >> "$LOG" 2>&1
         code=$?

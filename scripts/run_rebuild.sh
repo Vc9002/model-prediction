@@ -46,6 +46,15 @@ print(" ".join(
 PY
 )
 
+# An empty SPORTS list is a config-read failure (or every sport disabled),
+# not a legitimate "nothing to do" — silently exiting 0 here would report
+# the whole rebuild-shadow pipeline healthy while it runs nothing.
+if [ -z "${SPORTS}" ]; then
+    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] rebuild-shadow: no enabled sports derived from config/rebuild.yaml — exiting non-zero" \
+        >> "${RUNTIME_ROOT}/logs/rebuild.log"
+    exit 1
+fi
+
 # One sport failing must not stop the others (same per-sport independence
 # convention as run_daily.sh); a non-zero exit at the end signals partial
 # failure to launchd.

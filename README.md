@@ -9,7 +9,7 @@ CLI and read [`docs/rebuild/README.md`](docs/rebuild/README.md) before operating
 it. Rebuild output cannot submit live orders, write incumbent ledgers, or
 promote a model into production.
 
-**Last updated**: 2026-08-03
+**Last updated**: 2026-08-13
 
 The current operational verdict and audit evidence live in
 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`DEBUG.md`](DEBUG.md).
@@ -21,9 +21,9 @@ defects are repaired.
 
 | Metric | Value |
 |--------|-------|
-| Tests | **654 pass** |
-| Ruff | 118 findings (79 EXE002 shebang, ~117 baseline) |
-| Git | single `main` branch (no other active branches, local or `origin`) |
+| Tests | **1762 collected** (1759 passed, 3 skipped — 2026-08-13) |
+| Ruff | ~120 baseline findings (no new findings vs baseline) |
+| Git | `main` + 20 other local / 7 other remote branches (drifts fast — run `git branch -a` for the current list) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
 | Release status | **Blocked** — see `docs/PROJECT_STATUS.md` for why |
 
