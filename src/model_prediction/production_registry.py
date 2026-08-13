@@ -98,6 +98,7 @@ class ProductionModelRegistry:
         automated_orders: bool,
         manual_orders_only: bool,
         health: dict[str, Any] | None = None,
+        champions: dict[str, dict[str, str]] | None = None,
     ) -> None:
         self.entries = entries
         self.primary = primary
@@ -106,6 +107,10 @@ class ProductionModelRegistry:
         self.automated_orders = automated_orders
         self.manual_orders_only = manual_orders_only
         self.health = health or {}
+        # sport -> market -> champion model_id. The champion is what
+        # SERVES a sport/market; the primary is what the canary predict
+        # cycle runs. They are separate notions on purpose.
+        self.champions = champions or {}
 
     # ------------------------------------------------------------- loading
 
@@ -147,6 +152,20 @@ class ProductionModelRegistry:
             )
 
         execution = config.get("execution") or {}
+
+        champions = svc.get("champions") or {}
+        if not isinstance(champions, dict):
+            raise ValueError("prediction_service.champions must be a mapping")  # noqa: TRY004
+        for sport, markets in champions.items():
+            if not isinstance(markets, dict):
+                raise ValueError(f"champions[{sport}] must be a mapping of market -> model_id")  # noqa: TRY004
+            for model_id in markets.values():
+                if model_id not in entries:
+                    raise ValueError(
+                        f"champions references unknown model '{model_id}' "
+                        f"for {sport}"
+                    )
+
         return cls(
             entries,
             primary,
@@ -155,6 +174,7 @@ class ProductionModelRegistry:
             automated_orders=bool(execution.get("automated_orders", False)),
             manual_orders_only=bool(execution.get("manual_orders_only", True)),
             health=config.get("health") or {},
+            champions={str(s): dict(m) for s, m in champions.items()},
         )
 
     @staticmethod
@@ -396,6 +416,22 @@ class ProductionModelRegistry:
             ):
                 return entry
         return None
+
+    def champion(self, sport: str, market: str) -> ProductionModelEntry | None:
+        """The model that SERVES a sport+market, or None.
+
+        Explicit ``champions`` pointers win; without one, falls back to
+        the unique registered entry (legacy configs). A champion whose
+        contract failed validation resolves to None — fail closed, never
+        silently serve a broken champion.
+        """
+        model_id = (self.champions.get(sport.upper()) or {}).get(market)
+        if model_id:
+            entry = self.entries.get(model_id)
+            if entry is not None and entry.available:
+                return entry
+            return None
+        return self.resolve(sport, market)
 
     def available_entries(self) -> list[ProductionModelEntry]:
         """Enabled entries whose contract resolved."""

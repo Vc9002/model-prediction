@@ -2,6 +2,35 @@
 
 **Last audited**: 2026-08-14 (see new section directly below)
 
+## 2026-08-14 (deep night) — truthful health + atomic promotion/rollback (consolidation A-3)
+
+**Evidence-based health** (`src/model_prediction/system_health.py`):
+status is derived from what the system produced — registry contracts,
+supervisor run rows, prediction records, and source capture — never a
+file mtime. DOWN: primary contract broken or a worker's latest run
+failed. DEGRADED: broken secondary models, skipped/never-run workers,
+stale predictions, or a sport's capture going quiet 7-28 days (offseason
+stays informational). Live check right now truthfully reports: production
++ rebuild-shadow never ran under the supervisor, canary prediction 122
+minutes old, soccer capture stale 11.2 days (The Odds API key). One
+real bug caught while wiring it: the historical JSONL files are ordered
+by INGEST time, not event time (the 07-19/21 reconciliation batch landed
+after the 08-13 games), so "newest event" is a max-scan, not the last
+line.
+
+**Atomic promotion/rollback** (`src/model_prediction/model_promotion.py`):
+`production.yaml` gained an explicit `champions:` map (sport → market →
+model_id) — the champion is what SERVES a sport/market; the `primary` is
+what the canary predict cycle runs. `promote --new … --approved-by …
+--evidence …` validates the candidate, freezes hashes, points the
+champion, preserves the old champion as the new entry's rollback model,
+writes the yaml atomically (tmp + os.replace), re-validates through the
+registry before marking the record active, and logs a promotions row
+(sport, market, old/new model ids + hashes, approved_by, evidence_id,
+git_sha) in `data/runs.db`. `rollback --sport --market` restores the
+previous champion in one command and closes the prior record.
+8 tests each for health and promotion.
+
 ## 2026-08-14 (night) — run supervisor: launchd as a trigger, not the architecture (consolidation A-2)
 
 `src/model_prediction/run_supervisor.py` gives every scheduled run one

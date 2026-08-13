@@ -107,6 +107,38 @@ prediction_service:
       enabled: true
       rollback_model: null
 
+  # sport -> market -> champion model_id. The champion is what SERVES a
+  # sport/market; the primary above is what the canary predict cycle runs.
+  # Promotion/rollback (model_promotion.py) mutate these pointers
+  # atomically and record every change.
+  champions:
+    WNBA:
+      moneyline: wnba-elo-trend-lr-v4
+    MLB:
+      moneyline: mlb-elo-trend-lr-v8
+    NBA:
+      moneyline: nba-elo-trend-lr-v4
+    NFL:
+      moneyline: nfl-elo-trend-lr-v4
+    SOCCER:
+      moneyline: soccer-poisson-dc-v1
+    TENNIS:
+      moneyline: tennis-surface-elo-v1
+    CS2:
+      moneyline: cs2-tiered-elo-v6
+    DOTA2:
+      moneyline: dota2-tiered-elo-v6
+    LOL:
+      moneyline: lol-tiered-elo-v6
+    VALORANT:
+      moneyline: valorant-tiered-elo-v6
+    RAINBOW_SIX:
+      moneyline: rainbow_six-tiered-elo-v6
+    KBO:
+      moneyline: kbo-tie-aware-elo-v2
+    NPB:
+      moneyline: npb-tie-aware-elo-v2
+
   # Kept alongside `models` for backward compatibility with the legacy
   # validator contract and champion_challenger.freeze(), which still reads
   # these two sections directly. The registry derives from `models` when
