@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+import pytest
+
 from model_prediction.rebuild.identity import (
     CanonicalIdentity,
     IdentityRegistry,
@@ -132,67 +134,105 @@ class TestProposeMatchFailsClosed:
         assert proposed is None
 
 
-class TestResolveOrRegisterTeam:
-    """The real function real collectors should call -- resolves a source's
-    team ID to a canonical identity, registering or reusing as needed."""
+def _register_team(registry, source_id, source_entity_id, name, effective_from_utc, sport="mlb"):
+    return resolve_or_register_team(
+        registry, sport=sport, source_id=source_id, source_team_id=source_entity_id,
+        team_name=name, effective_from_utc=effective_from_utc,
+    )
 
-    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path):
+
+def _register_venue(registry, source_id, source_entity_id, name, effective_from_utc, sport="mlb"):
+    return resolve_or_register_venue(
+        registry, sport=sport, source_id=source_id, source_venue_id=source_entity_id,
+        venue_name=name, effective_from_utc=effective_from_utc,
+    )
+
+
+def _register_event(registry, source_id, source_entity_id, name, effective_from_utc, sport="mlb"):
+    return resolve_or_register_event(
+        registry, sport=sport, source_id=source_id, source_event_id=source_entity_id,
+        canonical_name=name, effective_from_utc=effective_from_utc,
+    )
+
+
+def _register_player(registry, source_id, source_entity_id, name, effective_from_utc, sport="nba"):
+    return resolve_or_register_player(
+        registry, sport=sport, source_id=source_id, source_player_id=source_entity_id,
+        player_name=name, effective_from_utc=effective_from_utc,
+    )
+
+
+class TestResolveOrRegisterCommonShape:
+    """The four ``resolve_or_register_*`` entry points (team/event/venue/
+    player) all implement the same register-or-reuse contract: first
+    observation registers a new canonical identity, a repeated observation
+    of the same (source_id, source_entity_id) reuses it, and two genuinely
+    different real-world entities never collide. Parametrized across all
+    four rather than hand-duplicated per entity type -- team/event/venue/
+    player each still get their own dedicated class below for the behavior
+    that genuinely differs between them (fuzzy cross-source matching for
+    team/venue only; event's no-fuzzy-matching doubleheader safety; player's
+    duplicate-name handling)."""
+
+    _REGISTER: ClassVar = {
+        "team": (_register_team, "Seattle Mariners", "Detroit Tigers"),
+        "event": (_register_event, "Angels @ Orioles (game 1)", "Angels @ Orioles (game 2)"),
+        "venue": (_register_venue, "Citizens Bank Park", "Oriole Park at Camden Yards"),
+        "player": (_register_player, "Jayson Tatum", "LeBron James"),
+    }
+
+    @pytest.mark.parametrize("entity_type", sorted(_REGISTER))
+    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path, entity_type):
+        register, name, _ = self._REGISTER[entity_type]
         registry = _registry(tmp_path)
 
-        identity = resolve_or_register_team(
-            registry, sport="mlb", source_id="espn_public", source_team_id="12",
-            team_name="Seattle Mariners", effective_from_utc="2026-01-01",
-        )
+        identity = register(registry, "espn_public", "12", name, "2026-01-01")
 
-        assert identity.canonical_name == "Seattle Mariners"
-        assert identity.sport == "mlb"
+        assert identity.canonical_name == name
+        assert identity.entity_type == entity_type
 
-    def test_repeated_observation_of_the_same_source_id_reuses_the_identity(self, tmp_path):
+    @pytest.mark.parametrize("entity_type", sorted(_REGISTER))
+    def test_repeated_observation_of_the_same_source_id_reuses_the_identity(self, tmp_path, entity_type):
+        register, name, _ = self._REGISTER[entity_type]
         registry = _registry(tmp_path)
-        first = resolve_or_register_team(
-            registry, sport="mlb", source_id="espn_public", source_team_id="12",
-            team_name="Seattle Mariners", effective_from_utc="2026-01-01",
-        )
 
-        second = resolve_or_register_team(
-            registry, sport="mlb", source_id="espn_public", source_team_id="12",
-            team_name="Seattle Mariners", effective_from_utc="2026-06-01",
-        )
+        first = register(registry, "espn_public", "12", name, "2026-01-01")
+        second = register(registry, "espn_public", "12", name, "2026-06-01")
 
         assert second.entity_id == first.entity_id
 
-    def test_a_second_source_observing_the_same_real_team_maps_to_the_same_identity(self, tmp_path):
-        # Real cross-source identity resolution: two different sources
-        # (ESPN and, say, a future Statcast team-ID source) both refer to
-        # the real Seattle Mariners -- they must resolve to one canonical
-        # identity, not two duplicate ones, once the name is a confident
-        # match.
+    @pytest.mark.parametrize("entity_type", sorted(_REGISTER))
+    def test_two_genuinely_different_entities_get_different_identities(self, tmp_path, entity_type):
+        register, name_a, name_b = self._REGISTER[entity_type]
         registry = _registry(tmp_path)
-        espn_identity = resolve_or_register_team(
-            registry, sport="mlb", source_id="espn_public", source_team_id="12",
-            team_name="Seattle Mariners", effective_from_utc="2026-01-01",
-        )
 
-        other_source_identity = resolve_or_register_team(
-            registry, sport="mlb", source_id="some_other_source", source_team_id="SEA-99",
-            team_name="Seattle Mariners", effective_from_utc="2026-01-01",
-        )
+        first = register(registry, "espn_public", "12", name_a, "2026-01-01")
+        second = register(registry, "espn_public", "6", name_b, "2026-01-01")
 
-        assert other_source_identity.entity_id == espn_identity.entity_id
+        assert first.entity_id != second.entity_id
+
+
+class TestResolveOrRegisterFuzzyCrossSourceMatch:
+    """Team and venue (but NOT event or player -- see their own classes'
+    docstrings for why) support fuzzy cross-source name matching: two
+    different sources observing the same real-world team/venue under
+    slightly different name strings must resolve to one canonical
+    identity, not two duplicates."""
+
+    _REGISTER: ClassVar = {"team": _register_team, "venue": _register_venue}
+    _NAME: ClassVar = {"team": "Seattle Mariners", "venue": "Citizens Bank Park"}
+
+    @pytest.mark.parametrize("entity_type", sorted(_REGISTER))
+    def test_a_second_source_observing_the_same_real_entity_maps_to_the_same_identity(self, tmp_path, entity_type):
+        register, name = self._REGISTER[entity_type], self._NAME[entity_type]
+        registry = _registry(tmp_path)
+
+        primary = register(registry, "espn_public", "12", name, "2026-01-01")
+        other_source = register(registry, "some_other_source", "ALT-99", name, "2026-01-01")
+
+        assert other_source.entity_id == primary.entity_id
         # And the new source mapping is now real and independently resolvable.
-        assert registry.resolve("some_other_source", "SEA-99").entity_id == espn_identity.entity_id
-
-    def test_two_genuinely_different_teams_get_different_identities(self, tmp_path):
-        registry = _registry(tmp_path)
-        mariners = resolve_or_register_team(
-            registry, sport="mlb", source_id="espn_public", source_team_id="12",
-            team_name="Seattle Mariners", effective_from_utc="2026-01-01",
-        )
-        tigers = resolve_or_register_team(
-            registry, sport="mlb", source_id="espn_public", source_team_id="6",
-            team_name="Detroit Tigers", effective_from_utc="2026-01-01",
-        )
-        assert mariners.entity_id != tigers.entity_id
+        assert registry.resolve("some_other_source", "ALT-99").entity_id == primary.entity_id
 
 
 class TestResolveEspnScoreboardTeamIdsCrossSportCollision:
@@ -230,52 +270,6 @@ class TestResolveEspnScoreboardTeamIdsCrossSportCollision:
         # And the old, unnamespaced source_id is genuinely unused now --
         # nothing was ever registered directly under bare "espn_public".
         assert registry.resolve("espn_public", "20") is None
-
-
-class TestResolveOrRegisterEvent:
-    """The real entry point for canonical event identity -- mirrors
-    resolve_or_register_team()'s register-or-reuse shape, keyed on
-    (source_id, source_event_id) with no fuzzy name matching (two real
-    games can share both team names and date -- a doubleheader -- so
-    guessing from a name string would risk silently merging them)."""
-
-    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path):
-        registry = _registry(tmp_path)
-        identity = resolve_or_register_event(
-            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
-            canonical_name="Los Angeles Angels @ Baltimore Orioles",
-            effective_from_utc="2026-07-20T22:35Z",
-        )
-        assert identity.entity_type == "event"
-        assert identity.sport == "mlb"
-
-    def test_repeated_observation_of_the_same_source_id_reuses_the_identity(self, tmp_path):
-        registry = _registry(tmp_path)
-        first = resolve_or_register_event(
-            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
-            canonical_name="Los Angeles Angels @ Baltimore Orioles",
-            effective_from_utc="2026-07-20T22:35Z",
-        )
-        second = resolve_or_register_event(
-            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
-            canonical_name="Los Angeles Angels @ Baltimore Orioles",
-            effective_from_utc="2026-07-20T22:35Z",
-        )
-        assert second.entity_id == first.entity_id
-
-    def test_two_genuinely_different_events_get_different_identities(self, tmp_path):
-        registry = _registry(tmp_path)
-        first = resolve_or_register_event(
-            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816384",
-            canonical_name="Los Angeles Angels @ Baltimore Orioles",
-            effective_from_utc="2026-07-20T22:35Z",
-        )
-        second = resolve_or_register_event(
-            registry, sport="mlb", source_id="espn_public:mlb", source_event_id="401816999",
-            canonical_name="Los Angeles Angels @ Baltimore Orioles",
-            effective_from_utc="2026-07-20T22:35Z",
-        )
-        assert first.entity_id != second.entity_id
 
 
 class TestResolveEspnScoreboardEventId:
@@ -572,58 +566,6 @@ class TestResolveOrLinkStatcastGamePk:
         ) is None
 
 
-class TestResolveOrRegisterVenue:
-    """Real entry point for canonical venue identity -- same
-    register-or-reuse-or-fuzzy-match shape as resolve_or_register_team(),
-    since more than one source can observe the same physical venue under
-    slightly different name strings."""
-
-    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path):
-        registry = _registry(tmp_path)
-        identity = resolve_or_register_venue(
-            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
-            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
-        )
-        assert identity.entity_type == "venue"
-        assert identity.canonical_name == "Citizens Bank Park"
-
-    def test_repeated_observation_reuses_the_identity(self, tmp_path):
-        registry = _registry(tmp_path)
-        first = resolve_or_register_venue(
-            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
-            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
-        )
-        second = resolve_or_register_venue(
-            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
-            venue_name="Citizens Bank Park", effective_from_utc="2026-06-01",
-        )
-        assert second.entity_id == first.entity_id
-
-    def test_confident_fuzzy_match_reuses_the_identity_across_sources(self, tmp_path):
-        registry = _registry(tmp_path)
-        espn_venue = resolve_or_register_venue(
-            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
-            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
-        )
-        other_source_venue = resolve_or_register_venue(
-            registry, sport="mlb", source_id="some_other_source", source_venue_id="CBP-1",
-            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
-        )
-        assert other_source_venue.entity_id == espn_venue.entity_id
-
-    def test_two_genuinely_different_venues_get_different_identities(self, tmp_path):
-        registry = _registry(tmp_path)
-        park_1 = resolve_or_register_venue(
-            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="84",
-            venue_name="Citizens Bank Park", effective_from_utc="2026-01-01",
-        )
-        park_2 = resolve_or_register_venue(
-            registry, sport="mlb", source_id="espn_public:mlb", source_venue_id="1",
-            venue_name="Oriole Park at Camden Yards", effective_from_utc="2026-01-01",
-        )
-        assert park_1.entity_id != park_2.entity_id
-
-
 class TestResolveEspnScoreboardVenueId:
     """The real helper every ESPN-scoreboard-shaped collector calls for
     canonical venue identity. ESPN's real venue object (verified against
@@ -682,44 +624,13 @@ class TestResolveEspnScoreboardVenueId:
 
 
 class TestResolveOrRegisterPlayer:
-    """Real entry point for canonical player identity outside MLB (Task 3)
-    -- MLB uses resolve_mlbam_player_id() instead, keyed on pybaseball's
-    real collision-free numeric ID; no equivalent stable crosswalk exists
-    yet for NBA/NFL/soccer/tennis, so this uses the same
-    register-or-reuse-or-fuzzy-match shape as resolve_or_register_team()."""
-
-    def test_first_observation_registers_a_new_canonical_identity(self, tmp_path):
-        registry = _registry(tmp_path)
-        identity = resolve_or_register_player(
-            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
-            player_name="Jayson Tatum", effective_from_utc="2026-01-01",
-        )
-        assert identity.entity_type == "player"
-        assert identity.canonical_name == "Jayson Tatum"
-
-    def test_repeated_observation_reuses_the_identity(self, tmp_path):
-        registry = _registry(tmp_path)
-        first = resolve_or_register_player(
-            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
-            player_name="Jayson Tatum", effective_from_utc="2026-01-01",
-        )
-        second = resolve_or_register_player(
-            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
-            player_name="Jayson Tatum", effective_from_utc="2026-06-01",
-        )
-        assert second.entity_id == first.entity_id
-
-    def test_two_genuinely_different_players_get_different_identities(self, tmp_path):
-        registry = _registry(tmp_path)
-        p1 = resolve_or_register_player(
-            registry, sport="nba", source_id="espn_public:nba", source_player_id="4066261",
-            player_name="Jayson Tatum", effective_from_utc="2026-01-01",
-        )
-        p2 = resolve_or_register_player(
-            registry, sport="nba", source_id="espn_public:nba", source_player_id="3975",
-            player_name="LeBron James", effective_from_utc="2026-01-01",
-        )
-        assert p1.entity_id != p2.entity_id
+    """Player-specific coverage beyond the common register/reuse/differ
+    shape (see TestResolveOrRegisterCommonShape). Unlike team/venue, player
+    deliberately does NOT do fuzzy name matching -- two different real
+    players can share a full name, and guessing from a name string would
+    silently merge them (see resolve_or_register_player()'s own docstring).
+    This is the case that shape alone can't cover: same name, must still
+    resolve to different identities."""
 
     def test_duplicate_player_names_get_different_identities(self, tmp_path):
         # CLAUDE.md names "duplicate player names" as a required test case:
