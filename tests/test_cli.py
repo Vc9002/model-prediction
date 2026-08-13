@@ -1992,3 +1992,145 @@ def test_clear_today_open_ignores_a_different_date(tmp_path) -> None:
     removed = _clear_today_open(ledger, "2026-07-25")
     assert removed == []
     assert len(ledger.rows()) == 1
+
+
+# ── WNBA spread (wnba-spread-margin-v1 promotion, 2026-08-14) ──────────────
+
+
+def test_select_wnba_spread_market_picks_the_most_balanced_line() -> None:
+    """Among alternate lines, the main line is the one whose long-side ask
+    sits closest to a coin flip -- same rule mlb_market_odds._market_balance
+    uses for MLB's alternate lines."""
+    rows = [
+        {"line": 17.5, "long": {"ask": 0.99}, "short": {"ask": 0.02}},
+        {"line": 10.5, "long": {"ask": 0.51}, "short": {"ask": 0.50}},
+        {"line": -16.5, "long": {"ask": 0.03}, "short": {"ask": 0.98}},
+    ]
+    picked = cli._select_wnba_spread_market(rows)
+    assert picked["line"] == 10.5
+
+
+def test_select_wnba_spread_market_returns_none_for_no_candidates() -> None:
+    assert cli._select_wnba_spread_market([]) is None
+    assert cli._select_wnba_spread_market([{"line": 1.5, "long": {}}]) is None
+
+
+def _wnba_spread_forecast(*, selection: str, line: float) -> dict:
+    return {
+        "sport": "wnba_spread",
+        "model_version": "wnba-spread-margin-v1",
+        "priced_contracts": [
+            {
+                "event_id": "wnba-spread-1",
+                "event_start_utc": "2026-08-13T23:00:00Z",
+                "away_team": "Atlanta Dream",
+                "home_team": "Connecticut Sun",
+                "market_type": "spread",
+                "selection": selection,
+                "line": line,
+                "executable_ask": 0.51,
+                "model_probability": 0.6,
+                "model_uncertainty": 0.08,
+                "model_version": "wnba-spread-margin-v1",
+                "model_artifact_hash": "test-hash",
+                "rationale": "fixture",
+                "market_slug": "wnba-atl-con-2026-08-13-pos-10pt5",
+                "observed_at_utc": "2026-08-13T17:00:00Z",
+            }
+        ],
+        "unmatched": [],
+    }
+
+
+def _wnba_spread_config() -> dict:
+    return {
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+        },
+        "bankroll": {},
+    }
+
+
+def test_wnba_spread_flat_ledger_logs_every_contract_regardless_of_eligibility(
+    monkeypatch, registry, ban_list,
+) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
+    monkeypatch.setattr(
+        cli, "_forecast_wnba_spread_slate",
+        lambda *a, **k: _wnba_spread_forecast(selection="home", line=10.5),
+    )
+    flat_ledger = _CaptureLedger()
+
+    result = cli._forecast_wnba_spread_sport(
+        data_root="unused",
+        args_date="2026-08-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        main_ledger=None,
+        flat_ledger=flat_ledger,
+    )
+
+    assert result["logged"] == 1
+    assert len(flat_ledger.appended) == 1
+    request, eligibility = flat_ledger.appended[0]
+    assert request.market_type is MarketType.SPREAD
+    assert request.selection == "home"
+    assert request.line == 10.5
+    assert eligibility.reason_code == "QUALIFIED"
+
+
+def test_wnba_spread_main_ledger_only_gets_call_rows(monkeypatch, registry, ban_list) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
+    monkeypatch.setattr(
+        cli, "_forecast_wnba_spread_slate",
+        lambda *a, **k: _wnba_spread_forecast(selection="away", line=-10.5),
+    )
+    flat_ledger = _CaptureLedger()
+    main_ledger = _CaptureLedger()
+
+    cli._forecast_wnba_spread_sport(
+        data_root="unused",
+        args_date="2026-08-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+
+    assert len(flat_ledger.appended) == 1
+    # Trust-boundary-only eligibility (no min-edge gate, MLB's "show
+    # everything" philosophy) -- a fully-formed request clears CALL, so Main
+    # gets it too, mirroring flat exactly for this fixture.
+    _request, eligibility = flat_ledger.appended[0]
+    if eligibility.decision == "CALL":
+        assert len(main_ledger.appended) == 1
+    else:
+        assert len(main_ledger.appended) == 0
+
+
+def test_wnba_spread_main_ledger_duplicate_is_tracked_not_silently_dropped(
+    monkeypatch, registry, ban_list,
+) -> None:
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
+    monkeypatch.setattr(
+        cli, "_forecast_wnba_spread_slate",
+        lambda *a, **k: _wnba_spread_forecast(selection="away", line=-10.5),
+    )
+    flat_ledger = _CaptureLedger()
+    main_ledger = _DuplicateLedger("main-existing-wnba-spread-1")
+
+    result = cli._forecast_wnba_spread_sport(
+        data_root="unused",
+        args_date="2026-08-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+
+    assert len(flat_ledger.appended) == 1  # flat always logs, unaffected
+    assert result["main_ledger_duplicate_event_ids"] == ["wnba-spread-1"]

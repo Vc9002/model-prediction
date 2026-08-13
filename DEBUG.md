@@ -1,6 +1,50 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-13 (see new section directly below)
+**Last audited**: 2026-08-14 (see new section directly below)
+
+## 2026-08-14 — WNBA spread promoted to live serving (wnba-spread-margin-v1)
+
+The 2026-08-13 audit found `wnba-spread-margin-v1` (the fixed replacement
+for the broken moneyline-not-spread `wnba-spread-baseline-v1`) had **zero
+serving consumers** — config pointed at it, `models/basketball.py`
+implemented it, but nothing built a slate or logged a pick. Wired it up:
+
+- **`cli._forecast_wnba_spread_slate`**: builds `BasketballModel` spread
+  predictions from `data/processed/wnba/games.jsonl` history, matched
+  against the Polymarket WNBA spread snapshots
+  (`data/odds/wnba/{date}/polymarket_snapshots.jsonl`). Alternate lines per
+  game are resolved by `_select_wnba_spread_market` — same "most balanced
+  line wins" rule `mlb_market_odds._market_balance` uses for MLB, adapted
+  to this snapshot format's embedded long/short asks.
+- **Sign convention, verified against `PolymarketUSClient.snapshot`'s own
+  documented contract**: each spread snapshot row is anchored to one team
+  (`team`) with `line` always that team's own spread; empirically confirmed
+  live (2026-08-14) that Polymarket anchors WNBA rows to the *away* team,
+  so a row's `line` is directly `BasketballModel`'s `spread_away_line`
+  input. Selecting "away" logs that line as-is; selecting "home" logs its
+  negation (`grade_pick`'s selection-relative-line contract, confirmed
+  against the 2026-08-13 grading audit's spread-sign test coverage).
+- **Routing**: Main (CALL only) + Flat (every candidate) — same rule MLB
+  spread/total uses (operator directive 2026-08-03), trust-boundary-only
+  `evaluate_eligibility` (not the curated min-edge gate esports/soccer/
+  tennis use), since WNBA is a Main-ledger "show everything" sport like MLB.
+- **`model_ledger.py`**: `("WNBA", "spread")` already repointed from the
+  archived `wnba-spread-baseline` to `wnba-spread-margin` on 2026-08-13.
+- Wired into the `daily` command's concurrent research pool
+  (`_wnba_spread_task`, alongside `_mlb_totals_task`/`_soccer_task`/
+  `_tennis_task`) — independent of WNBA moneyline, which the learned-sports
+  pool already logs separately.
+- Live dry-run against 2026-08-13's real 3-game WNBA slate (isolated temp
+  ledgers, no writes to real data): 3/3 games matched a spread market,
+  3/3 logged CALL to both Main and Flat with real Kelly-scaled units
+  (1.5U–2.0U) and correctly-signed lines.
+- 5 new tests in `tests/test_cli.py` (line-selection, flat-always-logs,
+  main-CALL-only, duplicate-tracking). Full suite: 1764 passed, 3 skipped.
+  Ruff: same 120-finding baseline, 0 new.
+- **Not changed**: `config/model.yaml`'s WNBA `status`/`active_research_version`
+  fields — left as `active_research_version: spread-margin-v1`, matching
+  the precedent that MLB spread/total also serve to Main+Flat while still
+  configured as `active_research`, not a separate "promoted" status tier.
 
 ## 2026-08-13 — KBO phantom 0-0 settlement: every pick settled as a scoreless tie, root-caused and fixed
 

@@ -41,6 +41,7 @@ validated" — it's "is this model actually running, and on what data."
 | MLB totals & spread | Yes | `models/mlb.py` `MeasuredEdgeTotalsModel`/margin — Gamma-Poisson mixture Monte-Carlo, priced against real Polymarket lines | Main + Flat |
 | NBA moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Flat only (not promoted to Main) |
 | WNBA moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Main + Flat |
+| WNBA spread | Yes (since 2026-08-14) | `models/basketball.py` — margin-normal CDF (`wnba-spread-margin-v1`) | Main + Flat |
 | NFL moneyline | Yes (offseason) | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Flat only (not promoted to Main) |
 | Soccer | Yes | Poisson-Dixon-Coles (`soccer-poisson-dc-v1`) — moneyline, totals, BTTS | Main + Flat |
 | Tennis | Yes | WTA + ATP surface Elo (`tennis-surface-elo-v1`) | Main + Flat |
