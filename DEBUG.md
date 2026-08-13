@@ -2,6 +2,44 @@
 
 **Last audited**: 2026-08-14 (see new section directly below)
 
+## 2026-08-14 (later) — MLB ingest partial-completion cache bug: 5 games permanently missing, fixed + backfilled
+
+`ingest.py`'s staleness check only re-fetched a past-date raw cache when it
+contained **zero** completed events (the 2026-07-26 pregame-snapshot class).
+A cache written **mid-slate** — some events `STATUS_FINAL`, some still
+`STATUS_IN_PROGRESS` — passed the check forever, so the in-progress games
+never reached `data/processed/mlb/games.jsonl` or
+`data/historical/mlb_games_all.jsonl` (and the Elo/trend features that read
+it). Confirmed live:
+
+- `data/raw/mlb/2026-08-07/` was written 2026-08-08 04:04 UTC with 10 final
+  + 5 in-progress events. Events **401816426, 401816435, 401816436,
+  401816437, 401816438** were missing from processed/historical while ESPN
+  had final scores for all five.
+- The same partial-snapshot class also hit 2026-07-30 (2 games), 2026-08-01
+  (1), 2026-08-04 (1). Three more dates (2026-07-16, 07-21, 07-25) had full
+  slates frozen at `STATUS_SCHEDULED` — caches written by manual bootstraps
+  before the daily ingest loop existed (added ~07-25), never revisited.
+
+**Fix** (`src/model_prediction/ingest.py`): a past-date cache is stale when
+it holds any unfinished event — competition `status.type.state` in
+`{"in", "pre"}` — not just when zero events completed.
+Postponed/canceled events are terminal (`state: "post"`) and deliberately
+don't trigger refetch (a rainout-heavy date would otherwise re-fetch on
+every bootstrap). Skipped for tennis, whose payload events are tournaments,
+not per-game events (same sport-aware logic as the completion parser).
+
+**Backfill executed**: re-ingested all 7 affected dates from live ESPN; all
+15 events on 2026-08-07 now in processed + historical with real final
+scores. Also found 31 processed-only games from 2026-07-19/20/21 (ingested
+before the historical append path existed) and appended them to historical
+— processed/historical event-id parity is now exact (0/0).
+
+**Tests**: 2 new in `tests/test_ingest.py` — partial-completion refetch and
+postponed-is-terminal (verified the first FAILS on the old logic, per the
+fix-verification convention). Full suite: 1766 passed, 3 skipped; ruff at
+the same 120-finding baseline.
+
 ## 2026-08-14 — WNBA spread promoted to live serving (wnba-spread-margin-v1)
 
 The 2026-08-13 audit found `wnba-spread-margin-v1` (the fixed replacement
