@@ -270,8 +270,17 @@ def build_walk_forward_rows(
     sport: str,
     *,
     minimum_history_games: int = 50,
+    end_date: str | None = None,
 ) -> list[ValidationRow]:
-    """Construct pregame features using only prior completed dates."""
+    """Construct pregame features using only prior completed dates.
+
+    ``end_date`` (ISO ``YYYY-MM-DD``), when given, excludes any row whose
+    date is on/after that cutoff -- lets a replay pin the walk-forward
+    dataset to exactly what an artifact's own recorded ``training`` block
+    describes, instead of picking up games ``games.jsonl`` accumulated
+    afterward (it keeps growing daily). Default ``None`` preserves current
+    behavior exactly (all available history).
+    """
     games = store.load_games(sport)
     by_date: dict[str, list[GameRecord]] = defaultdict(list)
     for game in games:
@@ -280,6 +289,8 @@ def build_walk_forward_rows(
     history: list[GameRecord] = []
     rows: list[ValidationRow] = []
     for day in sorted(by_date):
+        if end_date is not None and day >= end_date:
+            break
         day_games = sorted(by_date[day], key=lambda item: (item.start, item.event_id))
         if len(history) >= minimum_history_games:
             elo = build_elo(history, sport)
@@ -440,10 +451,40 @@ def chronological_split(
     *,
     train_fraction: float = 0.60,
     validation_fraction: float = 0.20,
+    train_end_date: str | None = None,
+    validation_end_date: str | None = None,
 ) -> tuple[list[ValidationRow], list[ValidationRow], list[ValidationRow], dict[str, Any]]:
-    """Split on complete dates so games from one date never cross cohorts."""
+    """Split on complete dates so games from one date never cross cohorts.
+
+    By default splits by fraction-of-unique-dates in ``rows`` (unchanged
+    behavior). When both ``train_end_date`` and ``validation_end_date`` are
+    given (ISO ``YYYY-MM-DD``, inclusive upper bounds on each cohort), the
+    split instead reconstructs the three cohorts at those exact calendar
+    boundaries -- e.g. to replay a production artifact's own recorded
+    ``training`` block rather than recomputing fractions against however
+    many rows the caller happens to hand in today.
+    """
     if not rows:
         raise ValueError("cannot split an empty validation dataset")
+
+    if train_end_date is not None or validation_end_date is not None:
+        if train_end_date is None or validation_end_date is None:
+            raise ValueError("train_end_date and validation_end_date must be given together")
+        if train_end_date >= validation_end_date:
+            raise ValueError("train_end_date must precede validation_end_date")
+        train = [row for row in rows if row.date <= train_end_date]
+        validation = [row for row in rows if train_end_date < row.date <= validation_end_date]
+        holdout = [row for row in rows if row.date > validation_end_date]
+        if not train or not validation or not holdout:
+            raise ValueError("chronological split produced an empty cohort")
+        metadata = {
+            "method": "explicit_date_boundaries",
+            "train": _cohort_metadata(train),
+            "validation": _cohort_metadata(validation),
+            "locked_holdout": _cohort_metadata(holdout),
+        }
+        return train, validation, holdout, metadata
+
     if not 0 < train_fraction < 1 or not 0 < validation_fraction < 1:
         raise ValueError("split fractions must be between zero and one")
     if train_fraction + validation_fraction >= 1:
@@ -1179,7 +1220,17 @@ def evaluate_variant(
     validation: Sequence[ValidationRow],
     holdout: Sequence[ValidationRow],
     feature_names: Sequence[str],
+    *,
+    fixed_threshold: float | None = None,
 ) -> dict[str, Any]:
+    """Fit on train, learn (or reuse) a threshold, grade the locked holdout.
+
+    ``fixed_threshold``, when given, is passed through to the primary
+    (0.65-target) threshold step only -- a reproduction replay pins the
+    primary evaluation to a pre-supplied threshold; the diagnostic (0.60
+    target) view still learns its own threshold as before. Default ``None``
+    preserves current behavior exactly.
+    """
     model = _fit(train, feature_names)
     train_probabilities = _predict(model, train, feature_names)
     validation_probabilities = _predict(model, validation, feature_names)
@@ -1190,6 +1241,7 @@ def evaluate_variant(
         holdout_probabilities,
         holdout,
         target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+        fixed_threshold=fixed_threshold,
     )
     diagnostic = _learn_and_grade(
         validation_probabilities,
@@ -1848,21 +1900,38 @@ def _learn_and_grade(
     holdout: Sequence[ValidationRow],
     *,
     target_hit_rate: float,
+    fixed_threshold: float | None = None,
 ) -> dict[str, Any]:
-    try:
-        threshold, validation_stats = learn_confidence_threshold(
-            validation_probabilities,
-            [row.outcome for row in validation],
-            target_hit_rate=target_hit_rate,
-            minimum_calls=MINIMUM_CALLS,
-        )
-    except ValueError as error:
-        return {
-            "status": "no_validation_threshold",
+    """Learn a threshold from validation, or reuse one already pinned.
+
+    ``fixed_threshold``, when given, skips ``learn_confidence_threshold``
+    entirely and grades the locked holdout directly against that value --
+    lets a reproduction replay plug in a production artifact's own recorded
+    ``confidence_threshold`` instead of deriving a fresh one from today's
+    validation cohort. Default ``None`` preserves current behavior exactly.
+    """
+    if fixed_threshold is not None:
+        threshold = fixed_threshold
+        validation_stats: dict[str, Any] = {
             "target_hit_rate": target_hit_rate,
             "minimum_calls": MINIMUM_CALLS,
-            "reason": str(error),
+            "source": "fixed_threshold_replay",
         }
+    else:
+        try:
+            threshold, validation_stats = learn_confidence_threshold(
+                validation_probabilities,
+                [row.outcome for row in validation],
+                target_hit_rate=target_hit_rate,
+                minimum_calls=MINIMUM_CALLS,
+            )
+        except ValueError as error:
+            return {
+                "status": "no_validation_threshold",
+                "target_hit_rate": target_hit_rate,
+                "minimum_calls": MINIMUM_CALLS,
+                "reason": str(error),
+            }
     return {
         "status": "evaluated",
         "learned_threshold": threshold,
