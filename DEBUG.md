@@ -2,6 +2,40 @@
 
 **Last audited**: 2026-08-14 (see new section directly below)
 
+## 2026-08-14 (even later) — one production model registry (consolidation A-1)
+
+The production stack had a split personality: `config/production.yaml` listed
+13 models in `allowed_models`, but validation, health, and the predict cycle
+only ever saw the single WNBA `primary`. Twelve "production" models were
+never contract-checked, never resolved, never served.
+
+**`src/model_prediction/production_registry.py`** is now the single source of
+truth. Every entry carries `model_id`, `sport`, `market`, implementation
+type (`json_artifact` / `code_backed_model` / `rating_engine`), artifact
+path, verified hash, feature-schema version, enabled state, and rollback
+model. Loading validates **every enabled entry** and fails *that model*
+closed (`load_error` recorded, `resolve()` refuses it) — the primary's
+failure stays a hard `ValueError`. Legacy v1/v2 configs (`allowed_models` +
+`artifact_map`) still derive entries, with sport/market identity coming
+from each artifact's own fields.
+
+- `config/production.yaml` migrated to `schema_version: "3"` with explicit
+  `models:` (11 json_artifact + 2 code_backed: soccer/tennis, whose
+  artifact files never existed — their contracts are resolvable Python
+  entry points instead). `allowed_models`/`artifact_map` retained for
+  `champion_challenger.freeze()` compatibility.
+- `production_canary.py` now delegates validation to the registry and
+  `health_check` reports per-model contract status; a broken **secondary**
+  model degrades overall health to DEGRADED (truthful, not silently
+  "healthy") while the primary's deep checks (hash, finite probabilities,
+  data freshness) are unchanged.
+- `cli_production.py` predict/status are registry-driven — no hardcoded
+  WNBA identity; the primary entry is the served model, single-model
+  execution is now an explicit scheduling policy.
+- 11 new tests in `tests/test_production_registry.py`, including the CI
+  contract test that the **actual checked-in production.yaml resolves all
+  13 models**. Full suite: 1777 passed, 3 skipped; ruff at the 120 baseline.
+
 ## 2026-08-14 (later) — MLB ingest partial-completion cache bug: 5 games permanently missing, fixed + backfilled
 
 `ingest.py`'s staleness check only re-fetched a past-date raw cache when it

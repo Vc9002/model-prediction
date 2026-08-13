@@ -18,7 +18,6 @@ lives at ``config/models/wnba-elo-trend-lr-v4.json``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from datetime import UTC, datetime
@@ -27,20 +26,16 @@ from typing import Any
 
 import yaml
 
+from .production_registry import (
+    ProductionModelRegistry,
+)
+from .production_registry import (
+    # Re-exported so historical importers (tests, cli_production) keep a
+    # single hash convention without each defining their own copy.
+    compute_artifact_hash as _compute_artifact_hash,  # noqa: F401
+)
+
 # ── helpers ────────────────────────────────────────────────────────────────
-
-
-def _compute_artifact_hash(payload: dict[str, Any]) -> str:
-    """SHA-256 of the canonical JSON form, excluding the embedded hash field.
-
-    Matches the convention used in ``total_score._artifact_hash`` and
-    ``international_baseball``: sort keys, compact separators, and skip the
-    ``artifact_hash`` key so the hash isn't self-referential.
-    """
-    canonical = {k: v for k, v in payload.items() if k != "artifact_hash"}
-    return hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
 
 
 def _repo_root() -> Path:
@@ -76,78 +71,24 @@ def load_production_config(
 def validate_production_config(
     config: dict[str, Any], *, repo_root: Path | str | None = None
 ) -> None:
-    """Validate the production canary config.
+    """Validate the production config via the single production registry.
 
     Rules (fail-closed — any failure raises ``ValueError``):
-      1. ``prediction_service.allowed_models`` must be a **non-empty**
-         list; the primary model must be one of the allowed entries.
-      2. The artifact file referenced by
-         ``prediction_service.primary.artifact`` must exist.
+      1. ``prediction_service.allowed_models`` / ``models`` must be
+         non-empty; the primary model must be one of the entries.
+      2. The artifact file referenced by the primary must exist.
       3. The embedded ``artifact_hash`` in the JSON must match a
          re-computed hash of the rest of the artifact.
       4. ``model_id`` in ``prediction_service.primary`` must match
          ``model_version`` inside the artifact.
+
+    Additionally (the registry's startup contract), **every** enabled entry
+    is validated: a broken *secondary* model is failed closed inside the
+    registry (recorded ``load_error``, resolution refused) rather than
+    raising here — only the primary's failure propagates.
     """
     root = Path(repo_root) if repo_root is not None else _repo_root()
-
-    svc = config.get("prediction_service")
-    if not isinstance(svc, dict):
-        raise ValueError("prediction_service section missing or not a mapping")  # noqa: TRY004
-
-    # ── allowed models must be non-empty ──
-    allowed = svc.get("allowed_models")
-    if not isinstance(allowed, list) or len(allowed) == 0:
-        raise ValueError(
-            "prediction_service.allowed_models must be a non-empty list"
-        )
-
-    primary = svc.get("primary")
-    if not isinstance(primary, dict):
-        raise ValueError("prediction_service.primary missing or not a mapping")  # noqa: TRY004
-
-    primary_model_id = primary.get("model_id")
-    if not isinstance(primary_model_id, str) or not primary_model_id.strip():
-        raise ValueError("prediction_service.primary.model_id is missing or empty")
-
-    # Primary must be allowlisted. Membership (not position) is the real
-    # constraint now that the allowlist holds every production model — a
-    # positional check against allowed_models[0] would reject a valid
-    # primary that merely isn't first.
-    if primary_model_id not in allowed:
-        raise ValueError(
-            f"primary.model_id '{primary_model_id}' is not in "
-            f"allowed_models {allowed}"
-        )
-
-    artifact_rel = primary.get("artifact")
-    if not isinstance(artifact_rel, str) or not artifact_rel.strip():
-        raise ValueError("prediction_service.primary.artifact is missing or empty")
-
-    artifact_path = root / artifact_rel
-    if not artifact_path.is_file():
-        raise FileNotFoundError(f"production artifact not found at {artifact_path}")
-
-    # Load and validate hash + model_version
-    with open(artifact_path, "r", encoding="utf-8") as fh:
-        try:
-            artifact: dict[str, Any] = json.load(fh)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"production artifact is not valid JSON: {exc}") from exc
-
-    embedded_hash = artifact.get("artifact_hash")
-    computed_hash = _compute_artifact_hash(artifact)
-    if embedded_hash != computed_hash:
-        raise ValueError(
-            f"artifact_hash mismatch: embedded '{embedded_hash}' != "
-            f"computed '{computed_hash}'"
-        )
-
-    artifact_model_id = artifact.get("model_version")
-    if artifact_model_id != primary_model_id:
-        raise ValueError(
-            f"model_id mismatch: config says '{primary_model_id}', "
-            f"artifact says '{artifact_model_id}'"
-        )
+    ProductionModelRegistry.from_config(config, repo_root=root)
 
 
 # ── model access ────────────────────────────────────────────────────────────
@@ -221,9 +162,11 @@ def health_check(
                 "checked_at_utc": now_utc,
             }
 
-    # 2. Validate config (this also verifies artifact existence + hash)
+    # 2. Build + validate the production registry (this also verifies
+    #    artifact existence + hash for the primary AND resolves every other
+    #    enabled entry, failing them closed per model).
     try:
-        validate_production_config(config, repo_root=root)
+        registry = ProductionModelRegistry.from_config(config, repo_root=root)
     except Exception as exc:  # noqa: BLE001
         return {
             "status": "DOWN",
@@ -234,10 +177,34 @@ def health_check(
             "checked_at_utc": now_utc,
         }
 
-    primary = config["prediction_service"]["primary"]
-    model_id = primary["model_id"]
-    artifact_rel = primary["artifact"]
+    primary = registry.primary
+    model_id = primary.model_id
+    artifact_rel = primary.artifact or ""
     artifact_path = root / artifact_rel
+
+    # Per-model registry contract status — every entry, not just the
+    # primary. A broken secondary model degrades the overall status.
+    details["models"] = {
+        entry.model_id: (
+            "ok" if entry.available else f"failed: {entry.load_error}"
+        )
+        for entry in registry.entries.values()
+    }
+    if registry.problem_entries():
+        details["failed_models"] = [
+            entry.model_id for entry in registry.problem_entries()
+        ]
+        return {
+            "status": "DEGRADED",
+            "model_id": model_id,
+            "artifact_hash": primary.artifact_hash,
+            "reason": (
+                f"{len(registry.problem_entries())} production model(s) "
+                "failed contract validation"
+            ),
+            "checked_at_utc": now_utc,
+            "details": details,
+        }
 
     # 3. Parse the artifact
     try:
@@ -287,6 +254,7 @@ def health_check(
         "model_id": model_id,
         "artifact_hash": artifact_hash,
         "checked_at_utc": now_utc,
+        "details": details,
     }
 
 

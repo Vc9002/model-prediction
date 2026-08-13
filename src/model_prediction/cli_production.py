@@ -45,12 +45,11 @@ from .features.base import FeatureStore
 from .learned_forward import build_learned_moneyline_slate
 from .production_canary import (
     _compute_artifact_hash,
-    get_production_model,
     health_check,
     load_production_config,
-    validate_production_config,
 )
 from .production_ledger import ProductionLedger
+from .production_registry import ProductionModelRegistry
 
 _STATE_FILE_NAME = "production_state.json"
 _LEDGER_DB_REL = Path("production") / "predictions.db"
@@ -216,25 +215,32 @@ def _print_prediction_row(row: dict[str, Any]) -> None:
 
 
 def _cmd_predict() -> int:
-    """Run today's WNBA predictions using the production canary model.
+    """Run today's predictions for the registry's primary production model.
 
     Returns exit code 0 on success (including NO_EVENTS), non-zero on error.
     """
     repo_root = PROJECT_ROOT
     data_root = _resolve_data_root()
 
-    # 1. Load and validate production config
+    # 1. Load + validate the production registry. Every enabled entry is
+    #    contract-checked here; the primary's failure is a hard error.
     try:
-        config = load_production_config(repo_root=repo_root)
-        validate_production_config(config, repo_root=repo_root)
+        registry = ProductionModelRegistry.load(repo_root)
     except Exception as exc:  # noqa: BLE001
         print(f"CONFIG ERROR: {exc}", file=sys.stderr)
         return 1
 
-    # 2. Get production model info
-    model = get_production_model(config)
-    model_id = model["model_id"]
-    artifact_rel = model["artifact"]
+    # 2. The primary entry is the model this cycle serves (single-model
+    #    canary execution is a scheduling policy; identity and validation
+    #    come from the registry, never hardcoded strings).
+    entry = registry.primary
+    model_id = entry.model_id
+    artifact_rel = entry.artifact
+    if not artifact_rel:
+        print(
+            f"CONFIG ERROR: primary {model_id} has no artifact path", file=sys.stderr
+        )
+        return 1
     artifact_path = repo_root / artifact_rel
 
     # 3. Compute artifact hash for reporting
@@ -261,11 +267,11 @@ def _cmd_predict() -> int:
                 exc_info=True,
             )
 
-    # 4. Check if there are any WNBA games today
+    # 4. Check if there are any games today for the primary's sport
     today = _today_et()
     client = ESPNClient()
     try:
-        scoreboard = client.scoreboard("WNBA", today)
+        scoreboard = client.scoreboard(entry.sport, today)
         events = scoreboard.get("events", [])
     except Exception as exc:  # noqa: BLE001
         print(f"ESPN ERROR: {exc}", file=sys.stderr)
@@ -274,7 +280,7 @@ def _cmd_predict() -> int:
         return 1
 
     if not events:
-        print(f"NO_EVENTS: no WNBA games scheduled for {today}")
+        print(f"NO_EVENTS: no {entry.sport} games scheduled for {today}")
         _record_prediction_run(model_id, artifact_hash, 0, 0)
         _soft_ledger_write(ledger, "complete_run", run_id, "completed",
                            note="NO_EVENTS")
@@ -286,7 +292,7 @@ def _cmd_predict() -> int:
 
     try:
         candidates, skipped, scheduled = build_learned_moneyline_slate(
-            sport="wnba",
+            sport=entry.sport.lower(),
             game_date=today,
             store=store,
             client=client,
@@ -346,8 +352,8 @@ def _cmd_predict() -> int:
             ledger, "record_prediction", run_id,
             prediction_id=f"{run_id}:{d['event_id']}",
             event_id=d["event_id"],
-            sport=model["sport"],
-            market=model["market"],
+            sport=entry.sport,
+            market=entry.market,
             model_id=model_id,
             probabilities={
                 "home": d["home_probability"],
@@ -392,33 +398,33 @@ def _cmd_health() -> int:
 
 
 def _cmd_status() -> int:
-    """Print a human-readable production config summary.
+    """Print a registry-driven production status summary.
 
     Returns exit code 0.
     """
-    repo_root = PROJECT_ROOT
-
     try:
-        config = load_production_config(repo_root=repo_root)
+        registry = ProductionModelRegistry.load(PROJECT_ROOT)
     except Exception as exc:  # noqa: BLE001
         print(f"CONFIG ERROR: {exc}", file=sys.stderr)
         return 1
 
-    svc = config.get("prediction_service", {})
-    primary = svc.get("primary", {})
-    allowed = svc.get("allowed_models", [])
-    execution = config.get("execution", {})
+    primary = registry.primary
     state = _read_state()
 
     print("=== Production Status ===")
-    print(f"Model:          {primary.get('model_id', 'unknown')}")
-    print(f"Sport:          {primary.get('sport', 'unknown')}")
-    print(f"Market:         {primary.get('market', 'unknown')}")
-    print(f"Artifact:       {primary.get('artifact', 'unknown')}")
-    print(f"Allowed models: {', '.join(allowed) if allowed else 'none'}")
-    print(f"Fallback:       {svc.get('fallback_action', 'unknown')}")
-    print(f"Auto orders:    {execution.get('automated_orders', False)}")
-    print(f"Manual only:    {execution.get('manual_orders_only', True)}")
+    print(f"Schema:         v{registry.schema_version}")
+    print(f"Primary:        {primary.sport} {primary.market} ({primary.model_id})")
+    print(f"Fallback:       {registry.fallback_action}")
+    print(f"Auto orders:    {registry.automated_orders}")
+    print(f"Manual only:    {registry.manual_orders_only}")
+    print()
+    print("Registered models:")
+    for entry in registry.entries.values():
+        mark = "ok" if entry.available else f"FAILED: {entry.load_error}"
+        print(
+            f"  {entry.model_id:<28} {entry.sport:<12} {entry.market:<10} "
+            f"{entry.implementation:<16} {mark}"
+        )
     print()
     print(f"Last prediction:  {state.get('last_prediction_utc', 'never')}")
     print(f"Last scheduler:   {state.get('last_scheduler_run_utc', 'never')}")

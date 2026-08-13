@@ -1,4 +1,4 @@
-schema_version: "2"
+schema_version: "3"
 
 prediction_service:
   enabled: true
@@ -8,8 +8,109 @@ prediction_service:
     sport: WNBA
     market: moneyline
     model_id: wnba-elo-trend-lr-v4
-    artifact: config/models/wnba-elo-trend-lr-v4.json
 
+  # The registry (src/model_prediction/production_registry.py) is the single
+  # source of truth for production. Every entry below is validated at
+  # startup; a model whose contract cannot resolve is failed closed
+  # (load_error, resolution refused) — never silently served. The primary's
+  # failure is a hard config error.
+  models:
+    - model_id: wnba-elo-trend-lr-v4
+      sport: WNBA
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/wnba-elo-trend-lr-v4.json
+      enabled: true
+      rollback_model: null
+    - model_id: mlb-elo-trend-lr-v8
+      sport: MLB
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/mlb-elo-trend-lr-v8.json
+      enabled: true
+      rollback_model: mlb-elo-trend-lr-v7
+    - model_id: nba-elo-trend-lr-v4
+      sport: NBA
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/nba-elo-trend-lr-v4.json
+      enabled: true
+      rollback_model: null
+    - model_id: nfl-elo-trend-lr-v4
+      sport: NFL
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/nfl-elo-trend-lr-v4.json
+      enabled: true
+      rollback_model: null
+    - model_id: soccer-poisson-dc-v1
+      sport: SOCCER
+      market: moneyline
+      implementation: code_backed_model
+      entry: model_prediction.models.soccer:soccer_model
+      enabled: true
+      rollback_model: null
+    - model_id: tennis-surface-elo-v1
+      sport: TENNIS
+      market: moneyline
+      implementation: code_backed_model
+      entry: model_prediction.models.tennis:tennis_model
+      enabled: true
+      rollback_model: null
+    - model_id: cs2-tiered-elo-v6
+      sport: CS2
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/cs2-tiered-elo-v6.json
+      enabled: true
+      rollback_model: null
+    - model_id: dota2-tiered-elo-v6
+      sport: DOTA2
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/dota2-tiered-elo-v6.json
+      enabled: true
+      rollback_model: null
+    - model_id: lol-tiered-elo-v6
+      sport: LOL
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/lol-tiered-elo-v6.json
+      enabled: true
+      rollback_model: null
+    - model_id: valorant-tiered-elo-v6
+      sport: VALORANT
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/valorant-tiered-elo-v6.json
+      enabled: true
+      rollback_model: null
+    - model_id: rainbow_six-tiered-elo-v6
+      sport: RAINBOW_SIX
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/rainbow_six-tiered-elo-v6.json
+      enabled: true
+      rollback_model: null
+    - model_id: kbo-tie-aware-elo-v2
+      sport: KBO
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/kbo-tie-aware-elo-v2.json
+      enabled: true
+      rollback_model: null
+    - model_id: npb-tie-aware-elo-v2
+      sport: NPB
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/npb-tie-aware-elo-v2.json
+      enabled: true
+      rollback_model: null
+
+  # Kept alongside `models` for backward compatibility with the legacy
+  # validator contract and champion_challenger.freeze(), which still reads
+  # these two sections directly. The registry derives from `models` when
+  # present; legacy v1/v2 configs derive from these instead.
   allowed_models:
     - wnba-elo-trend-lr-v4
     - mlb-elo-trend-lr-v8
@@ -30,6 +131,10 @@ prediction_service:
     mlb-elo-trend-lr-v8: config/models/mlb-elo-trend-lr-v8.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
+    # soccer-poisson-dc-v1 and tennis-surface-elo-v1 are code-backed models
+    # (their predictions come from Python modules); the paths below never
+    # existed on disk and freeze() treats exactly these two ids as
+    # code-backed champions (champion_challenger.CODE_BACKED_MODEL_IDS).
     soccer-poisson-dc-v1: config/models/soccer-poisson-dc-v1.json
     tennis-surface-elo-v1: config/models/tennis-surface-elo-v1.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
