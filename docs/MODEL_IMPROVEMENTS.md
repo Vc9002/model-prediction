@@ -126,6 +126,94 @@ is `PREDICTIVE_RESEARCH_ONLY`. If it needs data available only shortly before
 the event, it should power a late-horizon model or a no-call gate, not be filled
 with a neutral value and described as observed.
 
+### Reporting verdict taxonomy — adopted 2026-08-13
+
+Every experiment report going forward must state its result as one of five
+verdicts, not a free-text conclusion:
+
+| Verdict | Meaning |
+|---|---|
+| `REJECT` | The candidate damaged proper scores, calibration, or coverage, or showed no reliable direction across the required checks. Do not resurrect without a new, prospectively timestamped hypothesis. |
+| `INCONCLUSIVE` | The result is noisy, underpowered, or mixed (e.g. validation regressed while holdout improved) — not evidence for or against, and not a basis for either promoting or permanently rejecting. |
+| `CONTINUE_RESEARCH` | Directionally promising but not yet ablated cleanly enough to trust — more data, a cleaner ablation, or a different functional form is the next step, not activation. |
+| `CONTINUE_SHADOW` | Cleared the predictive gate (or is close) and is running as a shadow/challenger feature with real infrastructure, but has not cleared the economic gate or accumulated enough live track record. |
+| `PROMOTION_CANDIDATE` | Cleared both the predictive and economic gates on a fresh test and is ready for a human promotion decision. |
+
+**`PROMOTED` is never one of these five.** Promotion is always a separate,
+explicit human decision made after a `PROMOTION_CANDIDATE` verdict — see the
+Promotion rule above and section 13's verification checklist. No ablation
+script, report, or artifact should ever self-assign `PROMOTED`.
+
+This taxonomy is the reporting vocabulary for every ablation table in this
+document going forward (section 11's ablation-table `Status` column should
+use these five values). It does not change any code: `src/model_prediction/
+champion_challenger.py`'s `PromotionVerdict.status` field is currently typed
+as only `"promote" | "reject" | "needs_more_data"` (see its dataclass
+definition). That three-state code enum and this five-state reporting
+taxonomy are not the same thing yet — this section documents the more
+precise vocabulary this project's reports should use; it is not a claim
+that `champion_challenger.py` has been updated to emit these five values.
+Reconciling the two is future code work, not something this documentation
+change performs.
+
+### Empirical Bayes / shrinkage — consolidated reference
+
+Shrinkage is used throughout this document (WNBA hierarchical player/lineup
+impact, MLB starter/bullpen rate stats, park factors, NFL preseason priors,
+esports recency) but described piecemeal in each section. The general form
+used across this project is a weighted blend toward increasingly broad
+priors, with weights that grow with sample size:
+
+```
+theta_shrunk = w_r * theta_recent + w_s * theta_season + w_p * theta_prior + w_l * theta_league
+```
+
+where `w_r, w_s, w_p, w_l` depend on the observation count backing each
+term (plate appearances, innings pitched, batters faced, games played,
+etc. — whichever exposure unit is native to the stat) and sum to 1. A
+stat backed by few observations leans on the broader (prior/league) terms;
+a stat backed by many leans on the narrow (recent/season) terms.
+
+For rate stats bounded in `[0, 1]` (a binary success/failure count over
+some number of opportunities), the same idea has a closed form, the
+Beta-Binomial posterior mean:
+
+```
+p = (x + alpha) / (n + alpha + beta)
+```
+
+where `x` is successes, `n` is opportunities, and `Beta(alpha, beta)` is
+the prior. This project's canonical implementations of both forms already
+exist and should be cited/reused rather than reinvented:
+
+- `rebuild/missingness.py::beta_binomial_shrink` — the general Beta-Binomial
+  posterior mean/variance form above, parameterized by `prior_alpha`/
+  `prior_beta`; used for pitcher clean rates, first-inning scoreless rates,
+  and similar bounded rate stats.
+- `rebuild/missingness.py::pitcher_clean_rate_shrink` — a thin wrapper
+  around `beta_binomial_shrink` with league-informed default priors
+  (`alpha=beta=5.0`) for pitcher clean-rate stats specifically.
+- `rebuild/missingness.py::empirical_bayes_shrink` — the continuous-metric
+  case: shrinks each of a list of point estimates toward the grand mean,
+  weighted by `prior_variance / (prior_variance + standard_error^2)`, where
+  `prior_variance` is itself estimated from the spread of the input values
+  net of their average sampling variance.
+- `features/park_factors_pit.py::compute_park_factors_from_games` — the
+  credibility form of the same idea applied to park factors: `PF = (n / (n
+  + k)) * PF_observed + (k / (n + k)) * 1.0`, i.e. `n/(n+k)` credibility
+  weight on the observed park factor versus full shrinkage to a neutral
+  1.0 as sample size `n` falls relative to prior strength `k`. Note: this
+  function was renamed/split out of the older `features/park_factors.py`
+  in a separate fix during this project's history; `park_factors.py` still
+  exists and remains the static-table path behind v8's trained contract
+  (`park_factor` feature name), while `park_factors_pit.py` backs the
+  newer point-in-time-correct `park_factor_pit` feature name used by v9.
+  Confirm which file/feature name a given artifact actually depends on
+  before citing either as canonical for that artifact.
+
+Any new SOP-driven shrinkage work should parameterize against one of these
+three functions rather than writing a fourth shrinkage implementation.
+
 ---
 
 ## 3. Point-in-time feature contract
@@ -240,6 +328,61 @@ silently replace it with a differently defined free proxy.
 - Respect attribution, rate limits, robots/terms, and non-commercial restrictions.
 - Maintain a provider-independent normalized schema so a source can be replaced
   without changing feature semantics.
+
+---
+
+## 4B. Python/ML stack conventions
+
+Tool responsibility is split by job, not by preference: `pybaseball`/
+`pandas`/`polars` for data ingestion and wrangling; `numpy`/`scipy` for
+vectorized math and distribution fitting; `statsmodels` for interpretable
+GLM diagnostics (coefficient signs, p-values, standard errors) when the
+question is "does this variable behave the way theory says it should,"
+not just "does it predict"; `scikit-learn`'s `LogisticRegression` as the
+control baseline every challenger is measured against; `XGBoost` as a
+nonlinear challenger that must be trained on the **identical** feature
+table as the LR control — never confound an algorithm change with a
+feature-set change in the same ablation row, or the result answers neither
+question cleanly; `pyarrow`/Parquet as the preferred large-data storage
+format over Excel/CSV for anything beyond small ledger workbooks; `joblib`
+for serialized model objects, always paired with a `model_id`, training
+date range, feature-schema hash, dataset hash, and git SHA recorded
+alongside the artifact — never trust a serialized model by filename alone,
+since a filename records intent, not what was actually fit.
+
+**Current fact, checked against this codebase**: there are two parallel
+MLB pipelines, and any future SOP-driven feature work must state
+explicitly which one it targets.
+
+- The **legacy/promoted pipeline** (`src/model_prediction/validation.py`,
+  `src/model_prediction/learned_forward.py`) is what `mlb-elo-trend-lr-v7`
+  and the real, sized Main-ledger MLB moneyline calls actually run on. It
+  has no XGBoost anywhere in it (confirmed by grep — no `xgboost` import in
+  either file) and no Beta-Binomial shrinkage; it still depends on
+  `data_sources/mlb_statsapi.py` (the legacy MLB Stats API client) for box
+  scores, starters, and bullpen state, alongside `pybaseball` for
+  Statcast-derived inputs — the two data sources coexist by design, not as
+  leftover cruft, because they cover different data (Stats API for
+  game/roster/transaction state, `pybaseball`/Baseball Savant for
+  pitch-level Statcast).
+- The **`rebuild/` pipeline** (`src/model_prediction/rebuild/`) is where
+  XGBoost is actually wired in (`rebuild/mlb_features.py`,
+  `rebuild/ablation.py`, `rebuild/mlb_shadow_pipeline.py`,
+  `rebuild/mlb_v2_artifact.py`, `rebuild/mlb_model_comparison.py`,
+  `rebuild/xgboost_stress.py`), and where the Empirical Bayes / shrinkage
+  functions cited above (`rebuild/missingness.py`) live. `pybaseball` is
+  also collected here via `rebuild/collectors.py::collect_pybaseball`, and
+  `mlb_statsapi.py` is imported by `rebuild/mlb_features.py` and
+  `rebuild/identity.py` too — so the legacy Stats API client is shared
+  infrastructure across both pipelines, not something the rebuild replaced.
+
+Concretely: XGBoost, Beta-Binomial shrinkage, and richer Statcast-derived
+rate stats already exist in the `rebuild/` pipeline but not in the
+legacy/promoted one. A feature proposal that assumes any of those three
+are "already available" without naming which pipeline it means will
+silently target the wrong one. See `docs/rebuild/` for the rebuild
+pipeline's separate shadow-only, no-production-write contract before
+proposing to wire rebuild-side infrastructure into a promoted artifact.
 
 ---
 
@@ -900,6 +1043,118 @@ every day via the merge refresh, so exact-hash equality would fail
 permanently the day after any artifact is validated. The right invariant
 is closer to "the current file's game count for years the artifact trained
 on hasn't shrunk," not byte-for-byte equality. Flagged, not implemented.
+
+---
+
+## 10C. Tennis feature roadmap
+
+Champion is `tennis-surface-elo-v1`. Unlike the four major-league team
+sports above, tennis's current research priority is **structural, not
+calibration** — the incumbent's surface-blend weight is a fixed constant
+(`surface_weight=0.6` in `models/tennis.py`) applied identically to every
+player regardless of how much surface-specific history that player
+actually has. A player making their tour debut on clay gets the same
+0.6/0.4 surface/overall blend as a ten-year clay-court specialist, which is
+a structural mis-specification, not a calibration problem — improving it
+is unlikely to move ECE much on its own, since the error it produces is
+concentrated in the (currently unflagged) low-surface-history cohort
+rather than spread uniformly across the probability range.
+
+| Rank | Feature group | Concrete construction | Why it can help | Timing/risk |
+|---|---|---|---|---|
+| 1 | Sample-size-adaptive surface weight | `w_s = w_max * n_surface / (n_surface + c)`, then `Rating = w_s * SurfaceElo + (1 - w_s) * OverallElo`, per player per side | A player with zero surface-specific matches should not receive full surface weight from a rating that is really just noise around the default seed; the current fixed 0.6 blend implicitly assumes every player has "enough" surface history | `w_max`, `c` must be chronologically tuned (train/validation split), never hand-picked from the final test |
+| 2 | Result-type handling | Explicit branch per result type: completed, retirement, walkover, default, unfinished | A walkover has no on-court information content and must never move either player's rating; retirement mid-match has partial information and should not be silently treated as identical to a completed loss | Minimum bar: walkover -> no rating update, enforced as a hard rule, not a default. Retirement treatment (full update / partial update / excluded) must be tested as its own ablation arm, not assumed equivalent to a completed match |
+| 3 | Inactivity decay | Time-since-last-match regression toward a wider-uncertainty prior, tunable decay rate | A rating frozen during a long injury layoff misrepresents current form on return | Decay rate is chronologically tunable, same caveat as `w_max`/`c` above — do not fit on the final test |
+| 4 | K-factor by surface/tier | Surface- and/or tournament-tier-specific K, rather than one global K | Match informativeness plausibly differs by surface (faster surfaces = noisier outcomes) and by tier (Slam vs. Challenger) | Adds parameters; only pursue after items 1-3 are validated, to avoid overfitting a small chronological validation fold |
+
+### Tennis model form
+
+`Rating = w_s * SurfaceElo + (1 - w_s) * OverallElo`, with `w_s = w_max *
+n_surface / (n_surface + c)` computed independently per player per match
+(the two players in a match can have different `w_s` if their surface
+histories differ). `w_max`, `c`, `K`, and the inactivity decay rate are all
+chronologically-tunable parameters — select them on inner validation folds
+per section 11's nested-chronology discipline, never on the locked final
+test.
+
+Use stable athlete IDs as the join key across providers and across a
+player's career, never player names — name collisions and transliteration
+variants are a real identity-resolution risk in a global, multi-provider
+sport, and this project's own MLB/KBO/NPB history has repeated the general
+lesson that name-based joins silently misattribute history to the wrong
+entity (see `docs/CHAMPION_CHALLENGER.md` for tennis's current
+cross-provider identity-resolution status).
+
+### Tennis first ablations
+
+1. Fixed-weight surface Elo control (current `tennis-surface-elo-v1`
+   behavior, `surface_weight=0.6` for every player).
+2. `+ sample-size-adaptive surface weight` (`w_s = w_max * n_surface /
+   (n_surface + c)`), `w_max`/`c` selected on validation.
+3. `+ explicit result-type handling` (walkover no-update enforced;
+   retirement treatment as a separate, explicitly tested arm rather than
+   folded into "completed").
+4. `+ inactivity decay`.
+5. Combined model, then a separately calibrated market-residual layer
+   using timestamp-valid executable Polymarket US prices.
+
+---
+
+## 10D. Soccer feature roadmap
+
+Champion is `soccer-poisson-dc-v1`, a Dixon-Coles bivariate Poisson model.
+Research priority is fitting the model's own structural parameters from
+data rather than hand-selecting them, and getting multiclass (home/draw/
+away) calibration right rather than naively extending a binary approach.
+
+| Rank | Feature group | Concrete construction | Why it can help | Timing/risk |
+|---|---|---|---|---|
+| 1 | Home advantage | Fit a home-scoring-rate boost from data (per league, potentially per season) rather than a single hand-picked constant | Home advantage magnitude varies meaningfully by league/era; a global hand-picked value is a structural mis-specification | Must be refit walk-forward, not fit once on the full history and frozen |
+| 2 | Dixon-Coles `rho` (low-score correlation) | Fit `rho` from low-score cell frequency discrepancies (0-0, 1-1 vs. Poisson-implied) during training, not hardcoded | `rho` corrects the independent-Poisson assumption's known underestimate of low-scoring draws; a wrong fixed value miscalibrates exactly the outcome (draw) this model most needs to get right | Needs enough low-score observations per fit window to estimate reliably; watch for degenerate fits on short/thin leagues |
+| 3 | League baseline scoring rate | Per-league (not global) average goals-per-game baseline that attack/defense strengths are normalized against | Scoring environments differ sharply across the 19 wired leagues; a shared baseline biases cross-league comparisons | Must track league identity carefully; a mislabeled league corrupts its own and neighboring baselines |
+| 4 | Attack/defense strength | Per-team, per-side (home/away) attack and defense multipliers, fit via the model's own likelihood rather than hand-tuned | This is the core Dixon-Coles state; getting the fitting procedure right (proper MLE/SGD convergence, not a heuristic) matters more than adding side features on top of a poorly-fit base | Needs enough matches per team per window to fit reliably; new teams/promoted sides need a shrinkage prior, not a cold start at league-average |
+| 5 | Recency decay | Time-weighted match history (recent matches weighted more heavily than older ones) instead of a flat lookback window | Team strength drifts within and across seasons (transfers, manager changes, injuries) faster than a flat window captures | Decay rate is chronologically tunable; do not fit on the final test |
+| 6 | Shrinkage | Empirical-Bayes/credibility shrinkage of attack/defense strength toward the league baseline for teams with few observations (promoted teams, early season) | Avoids extreme, noise-driven strength estimates for thin-sample teams | Reuse this document's Empirical Bayes / shrinkage subsection (section 2) rather than inventing a new form |
+
+Where feasible, fit items 1-3 and 5-6 from data during training rather than
+hand-selecting them — `rebuild/models/soccer.py` already fits `rho` from
+low-score cell discrepancies during training rather than hardcoding it
+(initialized at -0.10, then updated), which is the right pattern to extend
+to home advantage, league baseline, and recency/shrinkage as well.
+
+### Soccer multiclass calibration note
+
+Soccer moneyline has three outcomes (home/draw/away), not two. **Do not**
+independently Platt-calibrate `P(home)`, `P(draw)`, and `P(away)` as three
+separate binary problems — three independently calibrated probabilities
+will not sum to 1, and renormalizing after the fact reintroduces exactly
+the miscalibration the calibration step was meant to remove. Instead, test
+calibration methods that respect the simplex constraint:
+
+- **Identity** (no post-hoc calibration) as the control.
+- **Multiclass temperature scaling** — a single scalar temperature applied
+  to the full three-class logit vector before softmax, preserving the
+  sum-to-1 constraint by construction.
+- **Dirichlet calibration** — a multiclass generalization of Platt scaling
+  that models the full three-class probability vector jointly.
+
+Report calibration (multiclass ECE or a per-class reliability diagram) and
+proper scores (multiclass Brier/log loss) for all three candidates against
+the Identity control before choosing one, per section 2's predictive gate.
+
+### Soccer first ablations
+
+1. Current fitted Dixon-Coles control (`soccer-poisson-dc-v1` as currently
+   trained).
+2. `+ per-league (not global) home advantage and baseline scoring rate`,
+   fit from data.
+3. `+ recency decay` on attack/defense strength fitting.
+4. `+ shrinkage` of attack/defense strength toward league baseline for
+   thin-sample teams.
+5. Multiclass calibration bake-off: Identity vs. multiclass temperature
+   scaling vs. Dirichlet calibration, on the combined model from steps 1-4.
+6. Separately calibrated market-residual layer using timestamp-valid
+   executable Polymarket US prices.
 
 ---
 
