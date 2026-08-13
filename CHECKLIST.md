@@ -53,16 +53,16 @@ Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Current Known Issues
 
-- [ ] MLB ingest pipeline sometimes misses completed games (ESPN API returns data but Ingestor doesn't process)
+- [x] MLB ingest pipeline sometimes misses completed games — root-caused and fixed 2026-08-14: `cache_is_stale` only caught zero-completed caches, so mid-slate partial snapshots (some final, some `STATUS_IN_PROGRESS`) were trusted forever. Now any unfinished event (`state in/pre`) on a past date triggers re-fetch; 7 affected dates backfilled from live ESPN (incl. 5 games from 2026-08-07), processed/historical parity restored. See DEBUG.md 2026-08-14 (later).
 - [ ] NBA/NFL spread/total: 0 snapshots (offseason — will resolve when seasons start)
 - [ ] WNBA total baseline 78.3% suspiciously high — needs investigation with more data
-- [ ] Dashboard startup process uses `pkill -f` — replace with PID-file approach (`.codewhale/instructions.md` explicitly forbids `pkill`)
+- [x] Dashboard startup process used `pkill -f` — replaced with a PID-file approach 2026-08-14 (`./dash` records `.dashboard.pid`, `./stop` signals that exact PID). `.codewhale/instructions.md` records this pattern-matched kill has triggered a macOS security lock on this machine before — never reintroduce it.
 - [x] `config/model.yaml` referenced `market-residual-v1.json` which doesn't exist — resolved 2026-08-03 (F-50), real artifact now trained and wired as diagnostic-only
-- [ ] `mlb-spread-baseline-v1.json` is reused for both spread and total research (should be separate artifacts)
+- [x] `mlb-spread-baseline-v1.json` reused for both spread and total research — resolved 2026-08-03 (P0-5): both keys now point at MLB's real, separately-fitted spread/total pipeline artifacts instead of the unrelated baseline file (see `config/model.yaml` around the P0-5 comment).
 - [x] `nba-spread-baseline-v1.json` and `nfl-spread-baseline-v1.json` "mismatched canonical hashes" — confirmed never a real bug (verification script's own JSON convention), per `docs/PROJECT_STATUS.md` release verdict item 6
 - [x] `/api/scan` dashboard route called a nonexistent function — route no longer exists (removed; P1-9)
-- [ ] 12 orphaned source modules (~1,800 lines of dead code, never imported or tested)
-- [ ] `cli.py` (3,943 lines) has zero dedicated test file
+- [ ] 7 orphaned source modules (301 lines, never imported, zero tests) — re-verified 2026-08-14 by import-graph scan: `data_sources/football_data.py` (79, config-referenced as `soccer_enrichment` — key has no consumers), `data_sources/sportsdataio.py` (24), `features/lineup_strength.py` (40), `features/starting_pitcher.py` (58), `features/tennis_surface.py` (72 — `config/tested_features.json` already documents this feature function as dead; the live surface signal is `models/tennis.py`), `models/nfl.py` (8), `models/wnba.py` (20). Deletion needs operator confirmation (blocks on the same decision as the orphaned-worktree cleanup).
+- [x] `cli.py` (3,943 lines) has zero dedicated test file — `tests/test_cli.py` exists with substantial coverage (grading, ledger routing, WNBA spread promotion tests added 2026-08-14); still not comprehensive line-for-line, but no longer zero.
 - [ ] `dashboard_server.py` (4,782 lines) is monolithic; recommended split into `dashboard/` package
 - [x] ~~Audit chain has 9 verified breaks~~ — repaired (43,304 events, 0 breaks)
 - [x] ~~MLB artifact qualification is inconsistent~~ — operator override documented

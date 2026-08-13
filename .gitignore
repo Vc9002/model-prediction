@@ -50,3 +50,4 @@ outputs/rebuild/main_integration_verification.md
 
 # graphify knowledge-graph skill cache (generated, not project source)
 graphify-out/
+.dashboard.pid
