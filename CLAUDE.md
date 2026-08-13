@@ -164,6 +164,42 @@ a specific real bug, a non-obvious invariant. Don't write comments that
 just restate the code. This project's own code is written this way
 throughout; match it.
 
+## 2026-08-14 — Infrastructure consolidation, Phase A (control plane)
+
+The operator's 20-item consolidation directive (registry / supervisor /
+health / data plane / dashboard) is being executed in phases; **Phase A
+is done and pushed** (`cleanup/final-debug-2026-08-14`). These are the
+new working contracts — don't regress them:
+
+- **`config/production.yaml` is schema v3** with explicit `models:`
+  (13 entries: 11 json_artifact + 2 code_backed soccer/tennis) and a
+  `champions:` map. `src/model_prediction/production_registry.py` is the
+  single source of truth: loading validates EVERY enabled entry and fails
+  that model closed (`load_error`, `resolve()`/`champion()` refuse it);
+  the primary's failure is a hard ValueError. Legacy v1/v2 configs still
+  load (entries derived from allowed_models + artifact_map, identity from
+  each artifact's own fields). Keep `production_canary.py`'s public API
+  (it delegates to the registry; tests pin its messages).
+- **Champion ≠ primary.** The champion is what SERVES a sport/market
+  (`champions:` map); the primary is what the canary predict cycle runs.
+  Promotion is one command, never hand-edited yaml:
+  `python -m model_prediction.model_promotion promote --new … --sport …
+  --market … --approved-by … [--evidence …]`, rollback likewise. Records
+  live in the `promotions` table of `data/runs.db`.
+- **Scheduled runs go through the supervisor**:
+  `python -m model_prediction.run_supervisor run <worker>` (workers:
+  daily/production/rebuild-shadow, command map in `WORKERS`). Run rows
+  (run_id, lease, heartbeat, exit, log) land in `data/runs.db` (SQLite
+  WAL, gitignored). Health reads them — `python -m model_prediction.system_health`
+  reports evidence-based status with reasons (DOWN/DEGRADED/HEALTHY).
+- Historical JSONL files are **ingest-ordered, not event-ordered** —
+  "newest event" is a max-scan over the file, never the last line
+  (system_health learned this the hard way).
+- launchd plists have NOT been rewired to the supervisor yet (explicit
+  operator action, same pending bucket as loading the production/
+  rebuild-shadow agents) — system_health truthfully reports DEGRADED
+  until they are.
+
 ## 2026-08-13 — Champion/challenger + settled-picks + cleanup (this session)
 
 **New module `src/model_prediction/champion_challenger.py`** — production
