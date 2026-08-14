@@ -1058,6 +1058,27 @@ def _production_model_spec(raw: dict) -> dict:
     }
 
 
+def _rolling_declared_hash(artifact_path: str | None) -> str | None:
+    """Declared hash of the ROLLING artifact for a config path, if any.
+
+    K split (2026-08-15): the external validation reports describe the
+    rolling artifacts under the runtime root; the frozen config copy is
+    the promoted snapshot. When a rolling copy exists, its hash is what
+    the report must match.
+    """
+    if not artifact_path:
+        return None
+    from model_prediction.runtime_paths import rolling_models_root
+
+    candidate = rolling_models_root() / Path(artifact_path).name
+    if not candidate.is_file():
+        return None
+    try:
+        return json.loads(candidate.read_text(encoding="utf-8")).get("artifact_hash")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 def _locked_backfill_evidence(
     sport: str,
     version: str,
@@ -1104,7 +1125,8 @@ def _locked_backfill_evidence(
         exact = (
             bool(locked)
             and report_version == version
-            and report_hash == artifact.get("declared_hash")
+            and report_hash
+            == (_rolling_declared_hash(artifact.get("path")) or artifact.get("declared_hash"))
         )
         if not exact:
             return {
@@ -1130,7 +1152,9 @@ def _locked_backfill_evidence(
     report_version = str(report.get("model_version") or "")
     report_hash = report.get("artifact_hash")
     exact_version = report_version == version
-    exact_hash = bool(report_hash) and report_hash == artifact.get("declared_hash")
+    exact_hash = bool(report_hash) and report_hash == (
+        _rolling_declared_hash(artifact.get("path")) or artifact.get("declared_hash")
+    )
     locked = report.get("locked_test") or {}
     if not exact_version or not exact_hash or not locked:
         reasons = []

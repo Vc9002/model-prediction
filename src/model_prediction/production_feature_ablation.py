@@ -26,6 +26,7 @@ from .config import load_config
 from .esports import NeutralElo, _load_matches, _predict
 from .features.base import FeatureStore
 from .models.learned_market import LearnedMarketArtifact, artifact_hash
+from .runtime_paths import rolling_models_root
 from .validation import ValidationRow, build_walk_forward_rows
 
 SCORE_SPORTS = ("mlb", "nba", "wnba", "soccer", "nfl")
@@ -388,9 +389,22 @@ def _score_sport(config: Mapping[str, Any], sport: str, store: FeatureStore) -> 
     }
 
 
+def _resolve_esports_artifact(configured_path: Path) -> Path:
+    """Rolling-first artifact resolution for the esports ablation.
+
+    K split (2026-08-15): the scheduled cycle retrains ratings into the
+    runtime root's models/; the frozen config/models copy is the promoted
+    snapshot and intentionally lags live data. The drift guard below must
+    check the artifact that actually tracks the live matches — the
+    rolling one when it exists, else the configured frozen copy.
+    """
+    rolling_candidate = rolling_models_root() / configured_path.name
+    return rolling_candidate if rolling_candidate.is_file() else configured_path
+
+
 def _esports_model(config: Mapping[str, Any], title: str) -> dict[str, Any]:
     model_config = config["models"][title.upper()]
-    artifact_path = Path(model_config["production_artifact"])
+    artifact_path = _resolve_esports_artifact(Path(model_config["production_artifact"]))
     matches_path = Path("data") / "esports" / title / "matches.jsonl"
     expected_version = model_config.get("active_production_version")
     source_not_inspected = {

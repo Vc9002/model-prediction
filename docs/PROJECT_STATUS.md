@@ -73,8 +73,15 @@ rollback artifacts are not current operational truth.
     (4,258 hash-linked events after the cycle); rolling artifacts, XLSX
     exports, and raw captures outside git; full supervisor production +
     daily cycle leaves `git status --porcelain` empty.
+- Post-K fixes: the esports ablation harness and the dashboard
+  production-evidence check are rolling-aware (they compare against the
+  runtime-root rolling artifact when present, frozen config copy
+  otherwise); their tests are hermetic now that data/ trees are
+  untracked (no machine-local data dependence in CI).
 - Next: N exact-head CI + merge to main + freeze SHA, then O ≥3-day
   burn-in.
+
+## 2026-08-14 session changes (KBO settlement bug, ledger archival, doc corrections)
 
 - **KBO settlement bug fixed**: `parse_kbo_rows` (`international_baseball.py`)
   fabricated a `game_id` for unplayed games (empty relay cell on the official

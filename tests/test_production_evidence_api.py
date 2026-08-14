@@ -450,11 +450,46 @@ def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path
 
 
 def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(monkeypatch, tmp_path: Path) -> None:
-    """Shipped state (2026-08-13, post-fix): every configured production_
-    artifact resolves to its renamed v2 file, so the evidence API must
-    report valid — not fabricate a mismatch. The mismatch-detection path
-    itself stays covered by the synthetic-stale-ref test below."""
+    """Every configured production_artifact is valid and wired, so the
+    evidence API must report valid — not fabricate a mismatch.
+
+    Post-K (2026-08-15): the LIVE validation reports describe the
+    ROLLING artifacts under the runtime root, not the frozen config
+    copies, so this test seeds reports that match the frozen artifacts
+    instead of depending on machine-local runtime state. (Rolling-vs-
+    report agreement in the real runtime root is a burn-in check.) The
+    mismatch-detection path itself stays covered by the synthetic-stale
+    test below and by the empty-OUTPUTS rejection at the end of this test.
+    """
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    monkeypatch.setattr(dashboard_server, "OUTPUTS", tmp_path / "outputs")
+    (tmp_path / "outputs").mkdir(parents=True)
+
+    esports_titles: dict[str, dict] = {}
+    leagues: dict[str, dict] = {}
+    for model in (dashboard_server._config_payload().get("models") or {}).values():
+        if not isinstance(model, dict):
+            continue
+        path = model.get("production_artifact")
+        if not path or not Path(path).exists():
+            continue
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        model_version = str(raw.get("model_version") or "")
+        entry = {
+            "model_version": model_version,
+            "artifact_hash": raw.get("artifact_hash"),
+            "locked_test": {"observations": 1},
+        }
+        if model_version.endswith("tiered-elo-v6"):
+            esports_titles[model_version.split("-")[0]] = entry
+        elif model_version.endswith("tie-aware-elo-v2"):
+            leagues[model_version.split("-")[0]] = entry
+    (tmp_path / "outputs" / "esports-baseline-validation.json").write_text(
+        json.dumps({"titles": esports_titles}), encoding="utf-8"
+    )
+    (tmp_path / "outputs" / "international-baseball-baseline-validation.json").write_text(
+        json.dumps({"leagues": leagues}), encoding="utf-8"
+    )
 
     result = dashboard_server.production_evidence()
     configured = {
