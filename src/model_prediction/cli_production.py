@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -131,6 +132,27 @@ def _record_prediction_run(
     state["today_events"] = event_count
     state["today_predictions"] = prediction_count
     _write_state(state)
+    # When running under the run supervisor, publish structured counters
+    # to its metrics sidecar — the supervisor stores them on the run row
+    # (observability item 18: instantly tell "no games" from "provider
+    # broke" from "gate rejected everything").
+    metrics_path = os.environ.get("RUN_SUPERVISOR_METRICS_PATH")
+    if metrics_path:
+        try:
+            Path(metrics_path).write_text(
+                json.dumps(
+                    {
+                        "events_seen": event_count,
+                        "predictions": prediction_count,
+                        "no_bet": max(event_count - prediction_count, 0),
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
 
 
 def _git_sha() -> str:

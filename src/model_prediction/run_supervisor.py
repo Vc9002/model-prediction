@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS runs (
     exit_code         INTEGER,
     git_sha           TEXT,
     log_path          TEXT,
-    note              TEXT
+    note              TEXT,
+    counters          TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_worker_started
     ON runs (worker, started_at_utc DESC);
@@ -108,6 +109,11 @@ class RunSupervisor:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA busy_timeout=5000")
             conn.executescript(_SCHEMA)
+            # Existing run-state DBs predate the counters column; add it
+            # (CREATE TABLE IF NOT EXISTS won't touch a live table).
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
+            if "counters" not in columns:
+                conn.execute("ALTER TABLE runs ADD COLUMN counters TEXT")
             self._conn = conn
         return self._conn
 
@@ -215,7 +221,7 @@ class RunSupervisor:
                     cwd=self.repo_root,
                     stdout=log_handle,
                     stderr=subprocess.STDOUT,
-                    env=self._worker_env(),
+                    env=self._worker_env(run_id, log_path),
                 )
                 self._insert_run(
                     {
@@ -259,12 +265,20 @@ class RunSupervisor:
                 finally:
                     stop_heartbeat.set()
                     heartbeat_thread.join(timeout=self.heartbeat_interval_seconds + 1)
+            metrics_path = log_path.with_suffix(log_path.suffix + ".metrics.json")
+            counters = None
+            if metrics_path.is_file():
+                try:
+                    counters = json.loads(metrics_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    counters = None
             self._update_run(
                 run_id,
                 status="completed" if exit_code == 0 else "failed",
                 finished_at_utc=datetime.now(UTC).isoformat(),
                 exit_code=exit_code,
                 note=note,
+                counters=json.dumps(counters) if counters else None,
             )
             return exit_code
         finally:
@@ -273,9 +287,16 @@ class RunSupervisor:
 
     # -------------------------------------------------------------- helpers
 
-    def _worker_env(self) -> dict[str, str]:
+    def _worker_env(self, run_id: str, log_path: Path) -> dict[str, str]:
         env = os.environ.copy()
         env["PYTHONPATH"] = "src" + (f":{env['PYTHONPATH']}" if env.get("PYTHONPATH") else "")
+        # Workers publish structured counters to a sidecar; the supervisor
+        # stores them on the run row (observability item 18: source
+        # latency, events seen, predictions, NO_BET, duration...).
+        env["RUN_SUPERVISOR_RUN_ID"] = run_id
+        env["RUN_SUPERVISOR_METRICS_PATH"] = str(
+            log_path.with_suffix(log_path.suffix + ".metrics.json")
+        )
         return env
 
     @staticmethod

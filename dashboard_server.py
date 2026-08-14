@@ -36,6 +36,8 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+from model_prediction.dashboard.data_service import handle as data_service_handle
+
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
@@ -4031,6 +4033,15 @@ class Handler(BaseHTTPRequestHandler):
                     self._send({"error": "dashboard.html missing"}, code=404)
             elif route == "/api/status":
                 self._send(_cached("status", 30, status))
+            elif route.startswith("/api/data/"):
+                # SQL-backed read-only data service (consolidation C):
+                # paginated predictions, counts, runs, promotions, health,
+                # and the cheap change fingerprint. No Excel, no mutation.
+                data_route = route.removeprefix("/api/data/")
+                try:
+                    self._send(data_service_handle(data_route, parse_qs(parsed.query)))
+                except KeyError:
+                    self._send({"error": f"unknown data route: {data_route}"}, code=404)
             elif route == "/api/matrix":
                 self._send(_cached("matrix", 60, matrix))
             elif route == "/api/production-evidence":
@@ -4158,6 +4169,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self) -> None:  # noqa: N802
         route = urlparse(self.path).path
+        if route.startswith("/api/data/"):
+            self._send_head({"ok": True})
+            return
         if route.startswith("/api/rebuild/"):
             view = route.removeprefix("/api/rebuild/")
             if view in _REBUILD_VIEWS:
