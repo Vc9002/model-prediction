@@ -13,7 +13,68 @@ this file exists to be the short, current summary someone can read first.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
-## 2026-08-14 session changes (KBO settlement bug, ledger archival, doc corrections)
+## 2026-08-15 session changes (consolidation P0 — control-plane singularity)
+
+- **P0-1 — runtime root fails closed**: `RuntimePaths.resolve()` gained
+  `require_external_runtime=True`; every operational entry point
+  (run supervisor, production canary, promotion CLI, system health,
+  dashboard server + data service, cli_production) now raises instead of
+  falling back to repo `data/` when `MODEL_PREDICTION_RUNTIME_ROOT` is
+  unset. The env-less fallback had silently created a second runtime next
+  to the canonical one (split-brain). Regression tests pin the refusal
+  and that no repo-local DB appears. Local dev keeps the default
+  `resolve()`; `RunSupervisor` accepts pre-resolved `paths` for read-only
+  callers (system_health).
+- **P0-1b — stray repo-local DB quarantined**: `data/ledgers/ledgers.db`
+  was empty (0 records / 0 events / 0 runs, verified before removal) and
+  moved to `backups/split-brain-quarantine-20260815/`. The repo-local
+  `data/production/predictions.db` (646 rows) is a strict subset of the
+  runtime copy (660 rows, 0 repo-only) — no merge; its untracking is part
+  of K.
+- **P0-2 — exactly one daily scheduler**: the dashboard's "daily" action
+  now runs `python -m model_prediction.run_supervisor run daily` instead
+  of `scripts/run_daily.sh` directly. A busy supervisor lease returns
+  exit 75 (daily_lock convention) and maps to job status `skipped`
+  ("another run already active") instead of `failed`. All three launchd
+  jobs already route through the supervisor.
+- **P0-3 — one launchd-owned dashboard**: verified single listener on
+  :8765; pidfile (`dashboard/server.pid`), launchctl PID, and `lsof` PID
+  agree across two consecutive restarts. Added
+  `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite` to
+  `com.vc.model-dashboard` so dashboard-triggered runs use the same
+  ledger authority as the scheduled jobs (the default was xlsx).
+- **P1 — dashboard job history survives restarts**: `_hydrate_jobs()` at
+  server start loads `dashboard/jobs.json` into memory (persisted
+  `running` → `interrupted`, `started_monotonic` never restored), so the
+  first post-restart persist no longer wipes pre-restart history.
+  Verified live: the pre-restart job record serves via `/api/job` after a
+  `launchctl kickstart` restart.
+- **K — runtime singularity + clean-tree gate PASSED (2026-08-15)**:
+  - Rolling/frozen artifact split: the daily cycle retrains
+    esports/KBO/NPB ratings into the runtime root's `models/`
+    (`RuntimePaths.models_root`); `config/models/*.json` are frozen
+    promoted artifacts. Live daily cycle confirmed: rolling copies
+    rewritten at runtime, checked-in copies untouched.
+  - ~2,300 churn files untracked (`git rm --cached`, files remain on
+    disk): availability captures, player priors, ingest data, odds
+    snapshots, ledger XLSX exports (SQLite canonical), outputs/latest,
+    logs, features, dashboard scratch. `data/archive/` and `snapshots/`
+    remain tracked evidence.
+  - Repo-local split-brain relics quarantined to
+    `backups/split-brain-quarantine-20260815/` (empty ledgers.db, stale
+    production/predictions DBs verified subset-of-runtime, runs.db,
+    dashboard cache, rebuild shadow DBs). No `*.db` remains under
+    repo `data/`.
+  - Frozen-champion snapshots and the dashboard cache DB now write under
+    the runtime root; the daily worker's lock lives at the runtime root.
+  - **10/10 K acceptance criteria pass** — exactly one runtime root; env-less
+    operational invocations fail closed; one daily scheduler; one
+    launchd-owned dashboard with canonical env; SQLite ledger canonical
+    (4,258 hash-linked events after the cycle); rolling artifacts, XLSX
+    exports, and raw captures outside git; full supervisor production +
+    daily cycle leaves `git status --porcelain` empty.
+- Next: N exact-head CI + merge to main + freeze SHA, then O ≥3-day
+  burn-in.
 
 - **KBO settlement bug fixed**: `parse_kbo_rows` (`international_baseball.py`)
   fabricated a `game_id` for unplayed games (empty relay cell on the official

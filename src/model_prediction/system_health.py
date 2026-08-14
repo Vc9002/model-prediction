@@ -166,7 +166,7 @@ def system_health(
     paths = (
         RuntimePaths(repo_root=root, runtime_root=Path(runtime_root))
         if runtime_root is not None
-        else RuntimePaths.resolve(repo_root=root)
+        else RuntimePaths.resolve(repo_root=root, require_external_runtime=True)
     )
 
     report: dict[str, Any] = {
@@ -212,7 +212,7 @@ def system_health(
         )
 
     # 2. Supervisor run rows (A-2): latest run per worker.
-    supervisor = RunSupervisor(repo_root=root, db_path=paths.runs_db)
+    supervisor = RunSupervisor(db_path=paths.runs_db, paths=paths)
     try:
         runs_check: dict[str, Any] = {}
         for worker in WORKERS:

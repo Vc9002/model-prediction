@@ -80,8 +80,14 @@ def _make_repo(tmp_path: Path) -> Path:
 
 
 def _seed_successful_run(repo: Path, worker: str = "daily") -> None:
+    # The supervisor is operational (fail-closed on env); tests inject the
+    # pre-resolved paths the same way system_health does.
+    from model_prediction.runtime_paths import RuntimePaths
+
     sup = RunSupervisor(
-        repo_root=repo, db_path=repo / "data" / "runs.db", heartbeat_interval_seconds=0.05
+        db_path=repo / "data" / "runs.db",
+        paths=RuntimePaths(repo_root=repo, runtime_root=repo / "data"),
+        heartbeat_interval_seconds=0.05,
     )
     sup.run_worker(worker, command=[sys.executable, "-c", "pass"])
     sup.close()
@@ -147,9 +153,13 @@ def test_fully_healthy_system_is_healthy(tmp_path: Path) -> None:
 
 
 def test_failed_worker_run_is_down(tmp_path: Path) -> None:
+    from model_prediction.runtime_paths import RuntimePaths
+
     repo = _make_repo(tmp_path)
     sup = RunSupervisor(
-        repo_root=repo, db_path=repo / "data" / "runs.db", heartbeat_interval_seconds=0.05
+        db_path=repo / "data" / "runs.db",
+        paths=RuntimePaths(repo_root=repo, runtime_root=repo / "data"),
+        heartbeat_interval_seconds=0.05,
     )
     sup.run_worker("daily", command=[sys.executable, "-c", "import sys; sys.exit(1)"])
     sup.close()

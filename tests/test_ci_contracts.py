@@ -79,8 +79,8 @@ def test_supervisor_stores_worker_metrics_on_the_run_row(tmp_path: Path) -> None
     repo = tmp_path / "repo"
     (repo / "data").mkdir(parents=True)
     sup = RunSupervisor(
-        repo_root=repo,
         db_path=tmp_path / "runs.db",
+        paths=RuntimePaths(repo_root=repo, runtime_root=tmp_path / "runtime"),
         heartbeat_interval_seconds=0.05,
     )
     worker = (

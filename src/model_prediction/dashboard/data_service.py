@@ -46,7 +46,7 @@ def _ro_conn(db_path: Path) -> sqlite3.Connection | None:
 
 
 def _paths() -> RuntimePaths:
-    return RuntimePaths.resolve(repo_root=PROJECT_ROOT)
+    return RuntimePaths.resolve(repo_root=PROJECT_ROOT, require_external_runtime=True)
 
 
 def _predictions(query: dict[str, list[str]]) -> dict[str, Any]:
@@ -295,7 +295,9 @@ _HANDLERS = {
     "predictions/counts": _counts,
     "runs": _runs,
     "promotions": _promotions,
-    "health": lambda query: system_health(),
+    "health": lambda query: system_health(
+        repo_root=_paths().repo_root, runtime_root=_paths().runtime_root
+    ),
     "versions": _versions,
     "ledger": _ledger,
     "ledger/counts": _ledger_counts,

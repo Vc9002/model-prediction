@@ -296,7 +296,7 @@ def test_health_check_reports_broken_secondary_as_degraded(tmp_path: Path) -> No
     )
     config = yaml.safe_load((repo / "config/production.yaml").read_text(encoding="utf-8"))
 
-    result = health_check(config, repo_root=repo)
+    result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
 
     assert result["status"] == "DEGRADED"
     assert result["details"]["failed_models"] == ["cs2-tiered-elo-v6"]

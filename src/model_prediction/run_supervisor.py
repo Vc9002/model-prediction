@@ -84,15 +84,23 @@ class RunSupervisor:
         repo_root: Path | str | None = None,
         db_path: Path | str | None = None,
         *,
+        paths: RuntimePaths | None = None,
         heartbeat_interval_seconds: float = 15.0,
     ) -> None:
-        self.repo_root = Path(repo_root) if repo_root else PROJECT_ROOT
-        # Control-plane state resolves through RuntimePaths: the runtime
-        # root when MODEL_PREDICTION_RUNTIME_ROOT is set (the launchd
-        # jobs), repo data/ otherwise (dev shell, tests). Historical
-        # repo-local files are carried over exactly once.
-        self.paths = RuntimePaths.resolve(repo_root=self.repo_root)
-        migrate_legacy_state(self.paths)
+        # Control-plane state resolves through RuntimePaths, fail-closed:
+        # the supervisor is operational, so an env-less invocation must
+        # never fall back to a repo-local second runtime (split-brain).
+        # Read-only callers that already resolved their paths (e.g.
+        # system_health) inject them instead of resolving twice.
+        if paths is not None:
+            self.repo_root = paths.repo_root
+            self.paths = paths
+        else:
+            self.repo_root = Path(repo_root) if repo_root else PROJECT_ROOT
+            self.paths = RuntimePaths.resolve(
+                repo_root=self.repo_root, require_external_runtime=True
+            )
+            migrate_legacy_state(self.paths)
         self.db_path = Path(db_path) if db_path else self.paths.runs_db
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
         # Leases are mutable runtime state and live under the runtime

@@ -74,6 +74,16 @@ def migrate_legacy_state(paths: RuntimePaths) -> list[str]:
     return moved
 
 
+def rolling_models_root(repo_root: Path | str | None = None) -> Path:
+    """Where scheduled retraining writes its rolling rating artifacts.
+
+    The daily cycle retrains esports/KBO/NPB Elo artifacts every run;
+    those full-file rewrites belong under the runtime root so the
+    checked-in config/models/ copies stay frozen promoted artifacts.
+    """
+    return RuntimePaths.resolve(repo_root=repo_root).models_root
+
+
 def _default_repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -179,6 +189,15 @@ class RuntimePaths:
         return self.runtime_root / "ledgers"
 
     @property
+    def models_root(self) -> Path:
+        # Rolling retraining artifacts (esports/KBO/NPB ratings): the
+        # scheduled cycle rewrites these every run, so they live under the
+        # runtime root. config/models/ keeps only the frozen promoted
+        # artifacts (git). See cli._research_models_dir() for the
+        # rolling-first-with-frozen-fallback read contract.
+        return self.runtime_root / "models"
+
+    @property
     def ledgers_db(self) -> Path:
         return self.ledgers_root / "ledgers.db"
 
@@ -204,11 +223,37 @@ class RuntimePaths:
         return self.runtime_root / "logs"
 
     @classmethod
-    def resolve(cls, *, repo_root: Path | str | None = None) -> RuntimePaths:
-        """Resolve from environment, with the repo-local dev fallback described above."""
+    def resolve(
+        cls,
+        *,
+        repo_root: Path | str | None = None,
+        require_external_runtime: bool = False,
+    ) -> RuntimePaths:
+        """Resolve from environment.
+
+        ``require_external_runtime=True`` is the operational contract:
+        the caller may only touch the canonical external runtime root.
+        Without ``MODEL_PREDICTION_RUNTIME_ROOT`` the call raises instead
+        of silently creating a second (split-brain) runtime under the
+        repository — one env-less invocation used to spawn an entirely
+        separate database universe next to the canonical one. Local
+        development keeps the default repo ``data/`` fallback, and tests
+        use :meth:`for_test`.
+        """
         resolved_repo_root = Path(repo_root) if repo_root is not None else _default_repo_root()
         runtime_root_env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
-        runtime_root = Path(runtime_root_env) if runtime_root_env else resolved_repo_root / "data"
+        if runtime_root_env:
+            runtime_root = Path(runtime_root_env)
+        elif require_external_runtime:
+            raise RuntimeError(
+                "MODEL_PREDICTION_RUNTIME_ROOT is required for operational "
+                "invocations; refusing the repo-local data/ fallback because "
+                "it silently creates a second runtime root (split-brain) next "
+                "to the canonical one. Set the env var, or use the default "
+                "resolve() for explicit local development."
+            )
+        else:
+            runtime_root = resolved_repo_root / "data"
         return cls(repo_root=resolved_repo_root, runtime_root=runtime_root)
 
     @classmethod

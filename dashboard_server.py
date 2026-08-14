@@ -116,6 +116,28 @@ _ACTION_LOCK = threading.Lock()
 _LAST_ACTION: dict[str, object] = {}
 _JOBS: dict[str, dict] = {}
 _JOBS_LOCK = threading.Lock()
+
+
+def _hydrate_jobs() -> None:
+    """Load persisted job history into memory at server start.
+
+    _persist_jobs() serializes ONLY the in-memory _JOBS dict, so without
+    this the first persist after a restart would overwrite jobs.json with
+    just the post-restart jobs and wipe all history. A restart also means
+    any job persisted as 'running' was interrupted (its thread is gone)
+    and monotonic timestamps are meaningless across processes — normalize
+    both rather than restore them as if they were still valid.
+    """
+    for job in _load_persisted_jobs().values():
+        if job.get("status") == "running":
+            job["status"] = "interrupted"
+            job["error"] = (
+                "the dashboard server restarted while this job was running; "
+                "the underlying CLI run may still have completed — check the ledger/summary"
+            )
+        job.pop("started_monotonic", None)
+        with _JOBS_LOCK:
+            _JOBS[job.get("job_id", "")] = job
 _RUNNER: list[str] | None = None
 _ORDER_PREVIEWS: dict[str, dict] = {}
 _ORDER_LOCK = threading.Lock()
@@ -255,7 +277,9 @@ def _runtime_paths():
     if not _runtime_paths_cache:
         from model_prediction.runtime_paths import RuntimePaths
 
-        _runtime_paths_cache.append(RuntimePaths.resolve(repo_root=ROOT))
+        _runtime_paths_cache.append(
+            RuntimePaths.resolve(repo_root=ROOT, require_external_runtime=True)
+        )
     return _runtime_paths_cache[0]
 
 
@@ -263,7 +287,14 @@ def rebuild_view(name: str) -> dict:
     """Return one isolated rebuild projection without importing writer classes."""
     from dashboard.rebuild_status import read_rebuild_view
 
-    return read_rebuild_view(name, ROOT, paths=_runtime_paths())
+    try:
+        paths = _runtime_paths()
+    except RuntimeError:
+        # Env-less contexts (CI smoke, dev without the launchd env) get
+        # the read-only view's own repo-local fallback. The rebuild view
+        # never writes, so there is no split-brain risk here.
+        paths = None
+    return read_rebuild_view(name, ROOT, paths=paths)
 
 
 def _unit_value_usd() -> float:
@@ -416,7 +447,13 @@ def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]
     if _DASHBOARD_CACHE is None:
         try:
             from model_prediction.dashboard_cache import get_cache as _get_dc
-            _DASHBOARD_CACHE = _get_dc(DATA)
+            from model_prediction.runtime_paths import RuntimePaths
+
+            # The cache DB is mutable runtime state (runtime root); the
+            # Excel sources it mirrors stay in the repo checkout.
+            _DASHBOARD_CACHE = _get_dc(
+                DATA, db_path=RuntimePaths.resolve(repo_root=ROOT).runtime_root / "dashboard_cache.db"
+            )
         except Exception:
             pass
 
@@ -3767,9 +3804,14 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return [python, "-m", "pytest", "tests/", "-q", "--no-header"]
     cli = runner if len(runner) > 1 else runner  # module or console-script form
     if name == "daily":
-        # Split pipeline: settle → main forecast → flat forecast
-        # Uses run_daily.sh which handles the multi-step flow
-        return ["bash", str(ROOT / "scripts" / "run_daily.sh")]
+        # One scheduling authority: the run supervisor. Executing
+        # run_daily.sh directly here would make the dashboard a second
+        # scheduler — two paths capable of acting like the control plane
+        # fighting over the daily lock, with a legitimate scheduled run
+        # showing up as a failed dashboard job. Route through the
+        # supervisor so a busy lease comes back as exit 75 (the daily_lock
+        # convention) and is recorded as skipped, not failed.
+        return [sys.executable, "-m", "model_prediction.run_supervisor", "run", "daily"]
     if name == "flat_forecast":
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
     if name == "main_forecast":
@@ -3840,6 +3882,19 @@ def _safe_sport(value) -> str:
 # ── SECTION: Jobs & Actions ─────────────────────────────────────────
 
 
+def _job_status_for_returncode(returncode: int) -> str:
+    """Map a job's exit code to a dashboard status.
+
+    75 is the daily_lock convention (LOCK_BUSY_EXIT): the supervisor
+    records the run as skipped when another run holds the lease. A manual
+    trigger landing during the scheduled run is a coalesced skip, not a
+    failure — lock refusal must not be routine scheduling behavior.
+    """
+    if returncode == 75:
+        return "skipped"
+    return "ok" if returncode == 0 else "failed"
+
+
 def start_action(name: str, payload: dict) -> dict:
     """Launch a whitelisted action as a background job; return its id at once.
 
@@ -3900,7 +3955,7 @@ def start_action(name: str, payload: dict) -> dict:
                     job["output_tail"] = "".join(chunks)[-12000:]
                     job["seconds"] = round(time.time() - started, 1)
             returncode = process.wait(timeout=3600)
-            status = "ok" if returncode == 0 else "failed"
+            status = _job_status_for_returncode(returncode)
         except Exception as error:  # noqa: BLE001
             status, returncode = "failed", -1
             chunks.append(f"\n{type(error).__name__}: {error}\n")
@@ -5243,6 +5298,7 @@ def main() -> None:
     options = arguments.parse_args()
 
     DASH_DIR.mkdir(exist_ok=True)
+    _hydrate_jobs()
     server = None
     my_pid = os.getpid()
     try:

@@ -6,6 +6,28 @@ reproduction commands in `DEBUG.md`, and per-sport feature roadmaps in
 `docs/MODEL_IMPROVEMENTS.md`. This file is about *how to work here*, not
 *what's currently true*.
 
+## 2026-08-15 — consolidation K (runtime singularity)
+
+- **Rolling vs frozen model artifacts.** `config/models/*.json` are frozen
+  promoted artifacts (git, never rewritten by the schedule). The daily
+  cycle retrains esports/KBO/NPB ratings into the runtime root's
+  `models/` (`RuntimePaths.models_root`); research forecasts read
+  rolling-first with frozen fallback (`cli._research_models_dir()`).
+  If you add a new retrainable artifact, route its writes through that
+  contract — do not add new checked-in files the schedule rewrites.
+- **The data/ trees are untracked operational output** (`git rm --cached`
+  2026-08-15, files remain on disk): availability, player_priors,
+  production, esports, international_baseball, historical, odds,
+  point_in_time, main/flat/research/gated_research xlsx, model_ledgers
+  xlsx, logs, features, dashboard scratch. The SQLite ledger (runtime
+  root) is the canonical evidence store; `data/archive/` and `snapshots/`
+  remain tracked evidence. Do not re-add files under the ignored trees;
+  if a genuinely new evidence file needs tracking, put it outside them
+  or adjust the ignore list deliberately.
+- **The daily worker's lock lives at the runtime root**
+  (`${MODEL_PREDICTION_RUNTIME_ROOT:-data}/locks/daily.lock`), not in the
+  repo checkout.
+
 ## Knowledge graph
 
 A graphify knowledge graph of this repo lives at `graphify-out/` (graph.json,
@@ -195,10 +217,9 @@ new working contracts — don't regress them:
 - Historical JSONL files are **ingest-ordered, not event-ordered** —
   "newest event" is a max-scan over the file, never the last line
   (system_health learned this the hard way).
-- launchd plists have NOT been rewired to the supervisor yet (explicit
-  operator action, same pending bucket as loading the production/
-  rebuild-shadow agents) — system_health truthfully reports DEGRADED
-  until they are.
+- All three launchd plists (daily / production / rebuild-shadow) are
+  rewired to the supervisor and loaded; the dashboard's "daily" action
+  routes through the supervisor too (2026-08-15).
 
 ## 2026-08-14 (noon) — data-plane contracts (consolidation B)
 
@@ -210,6 +231,22 @@ new working contracts — don't regress them:
   touches runs.db / production.db / production_state.json / supervisor
   logs must go through RuntimePaths, not hand-built paths — the
   2026-08-13 split-brain was exactly this disagreement.
+- **Operational entry points FAIL CLOSED on a missing runtime root**
+  (2026-08-15): `RuntimePaths.resolve(require_external_runtime=True)` —
+  supervisor, canary, promotion, system_health, dashboard,
+  cli_production all raise instead of falling back to repo `data/`,
+  because the fallback silently created a second runtime next to the
+  canonical one. Local dev uses the default `resolve()`; tests use
+  `for_test()` or inject pre-resolved `paths`. Don't add a new
+  operational entry point without the flag.
+- **Exactly one daily scheduler** (2026-08-15): every launchd job
+  (daily/production/rebuild-shadow) and the dashboard's "daily" action
+  route through `run_supervisor`; the dashboard never executes
+  `scripts/run_daily.sh` itself. A busy lease returns exit 75
+  (`daily_lock` convention) and is recorded as skipped — lock refusal is
+  a coalesced skip, never a failed job. The dashboard service
+  (`com.vc.model-dashboard`) is the only owner of port 8765 and carries
+  `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite` like the other jobs.
 - **ProductionPredictionStore** (`production_store.py`) is the ONLY
   writer to `production/production.db` (narrow API, identity key
   event_id+model_id+market_type+horizon+decision_time_utc, decisions +
@@ -295,11 +332,10 @@ change how you should work here:
   form) — several tests pin the no-env repo-colocated default; setting the
   launchd env vars makes ~12 of them red by retargeting them at the live
   runtime root.
-- **Still open (explicit operator action needed)**: loading the
-  `com.modelprediction.production` and `com.modelprediction.rebuild-shadow`
-  launchd agents (plists installed, never loaded — canary predictions and
-  rebuild shadow.db frozen since 08-11); regenerating
+- **Still open (explicit operator action needed)**: regenerating
   `outputs/rebuild/verification.json` (gitignored CI evidence; rebuild
   status shows degraded while absent); the v8 park-factor 2026-table leak
   (needs a refit under v8's contract — v9 is clean via `park_factor_pit`).
+  The `com.modelprediction.production` / `com.modelprediction.rebuild-shadow`
+  agents are loaded as of the 2026-08-14 cutover.
 

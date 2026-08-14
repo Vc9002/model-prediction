@@ -62,7 +62,7 @@ def _db_path(repo_root: Path) -> Path:
     # Same control-plane store as the run supervisor, resolved through
     # RuntimePaths (runtime root when MODEL_PREDICTION_RUNTIME_ROOT is
     # set, repo data/ otherwise; legacy files migrated once).
-    paths = RuntimePaths.resolve(repo_root=repo_root)
+    paths = RuntimePaths.resolve(repo_root=repo_root, require_external_runtime=True)
     migrate_legacy_state(paths)
     return paths.runs_db
 

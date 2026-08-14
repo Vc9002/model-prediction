@@ -19,6 +19,13 @@ from model_prediction.production_canary import _compute_artifact_hash
 from model_prediction.production_registry import ProductionModelRegistry
 
 
+@pytest.fixture(autouse=True)
+def _isolated_runtime_root(tmp_path: Path, monkeypatch) -> None:
+    """Promotion is operational: it must only record to an external
+    runtime root, so every test gets its own isolated one."""
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path / "runtime"))
+
+
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.dump(data), encoding="utf-8")

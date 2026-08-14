@@ -143,13 +143,18 @@ def health_check(
     root = Path(repo_root) if repo_root is not None else _repo_root()
     now_utc = datetime.now(UTC).isoformat()
 
-    # Resolve runtime root for data-freshness check
+    # Resolve runtime root for data-freshness check. Fail closed: an
+    # env-less operational invocation must not fall back to a repo-local
+    # second runtime (split-brain).
     if runtime_root is not None:
         rt = Path(runtime_root)
     elif os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT"):
         rt = Path(os.environ["MODEL_PREDICTION_RUNTIME_ROOT"])
     else:
-        rt = root / "data"
+        raise RuntimeError(
+            "MODEL_PREDICTION_RUNTIME_ROOT is required for the canary "
+            "health check; refusing the repo-local data/ fallback."
+        )
 
     details: dict[str, Any] = {}
 

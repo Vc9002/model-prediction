@@ -329,14 +329,14 @@ class TestHealthCheck:
         repo, artifact_path = _setup_production_env(tmp_path)
         artifact_path.unlink()
         config = load_production_config(repo_root=repo)
-        result = health_check(config, repo_root=repo)
+        result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
         assert result["status"] == "DOWN"
 
     def test_health_check_config_load_failure(self, tmp_path: Path) -> None:
         """health_check returns DOWN when config/production.yaml is missing."""
         repo, _ = _setup_production_env(tmp_path)
         (repo / "config" / "production.yaml").unlink()
-        result = health_check(repo_root=repo)
+        result = health_check(repo_root=repo, runtime_root=tmp_path / "rt")
         assert result["status"] == "DOWN"
 
     def test_health_check_with_nonfinite_probability(self, tmp_path: Path) -> None:
@@ -352,7 +352,7 @@ class TestHealthCheck:
         _write_json(artifact_path, data)
 
         config = load_production_config(repo_root=repo)
-        result = health_check(config, repo_root=repo)
+        result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
         assert result["status"] == "DOWN"
 
 

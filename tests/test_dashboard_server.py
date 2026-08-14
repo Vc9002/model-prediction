@@ -1838,3 +1838,71 @@ def test_pnl_fallback_formula_matches_pricing_profit_units() -> None:
                     f"diverged at odds={odds}, units={units}, result={result}: "
                     f"dashboard={dashboard_value} vs pricing.profit_units={real_value}"
                 )
+
+
+def test_daily_action_routes_through_supervisor_not_run_daily_script() -> None:
+    """Consolidation P0-2: the dashboard is not a second scheduler. The
+    daily action must ask the supervisor — whose lease coalesces with the
+    launchd job — never execute scripts/run_daily.sh itself."""
+    cmd = dashboard_server._action_command("daily", {})
+    joined = " ".join(cmd)
+    assert "run_supervisor" in joined
+    assert "run_daily.sh" not in joined
+    assert "run" in cmd and "daily" in cmd
+
+
+def test_exit_75_is_a_coalesced_skip_not_a_failure() -> None:
+    """P0-2: a manual trigger landing during the scheduled run must come
+    back as a skip (daily_lock LOCK_BUSY_EXIT convention), never as a
+    failed job."""
+    assert dashboard_server._job_status_for_returncode(0) == "ok"
+    assert dashboard_server._job_status_for_returncode(1) == "failed"
+    assert dashboard_server._job_status_for_returncode(75) == "skipped"
+
+
+def test_job_history_survives_restart(monkeypatch, tmp_path: Path) -> None:
+    """Consolidation P1: without startup hydration the first persist after
+    a restart wipes every pre-restart job. Hydration must load A/B/C,
+    normalize a persisted 'running' job to 'interrupted', never resurrect
+    started_monotonic, and a later persist must keep all of them."""
+    monkeypatch.setattr(dashboard_server, "JOBS_FILE", tmp_path / "jobs.json")
+    dashboard_server.JOBS_FILE.write_text(
+        json.dumps(
+            {
+                "a": {"job_id": "a", "action": "daily", "status": "ok", "started_at": "t1"},
+                "b": {
+                    "job_id": "b",
+                    "action": "flat_forecast",
+                    "status": "running",
+                    "started_at": "t2",
+                },
+                "c": {
+                    "job_id": "c",
+                    "action": "main_forecast",
+                    "status": "failed",
+                    "started_at": "t3",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    dashboard_server._JOBS.clear()
+    dashboard_server._hydrate_jobs()
+
+    assert set(dashboard_server._JOBS) == {"a", "b", "c"}
+    assert dashboard_server._JOBS["b"]["status"] == "interrupted"
+    assert "restarted" in dashboard_server._JOBS["b"]["error"]
+    assert "started_monotonic" not in dashboard_server._JOBS["b"]
+
+    # A new job plus persist must keep the history, not replace it.
+    with dashboard_server._JOBS_LOCK:
+        dashboard_server._JOBS["d"] = {
+            "job_id": "d",
+            "action": "daily",
+            "status": "running",
+            "started_at": "t4",
+            "started_monotonic": 1.0,
+        }
+    dashboard_server._persist_jobs()
+    reloaded = json.loads(dashboard_server.JOBS_FILE.read_text(encoding="utf-8"))
+    assert set(reloaded) == {"a", "b", "c", "d"}

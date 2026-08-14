@@ -90,8 +90,12 @@ def _resolve_data_root() -> Path:
 
 
 def _paths() -> RuntimePaths:
-    """One resolution for all canary mutable state."""
-    return RuntimePaths.resolve(repo_root=PROJECT_ROOT)
+    """One resolution for all canary mutable state.
+
+    Fail closed: the canary is operational, so an env-less invocation
+    must not fall back to a repo-local second runtime (split-brain).
+    """
+    return RuntimePaths.resolve(repo_root=PROJECT_ROOT, require_external_runtime=True)
 
 
 def _state_path() -> Path:

@@ -6,7 +6,16 @@ import fcntl
 import sys
 import time
 
-from model_prediction.run_supervisor import RunSupervisor, WORKERS
+import pytest
+
+from model_prediction.run_supervisor import WORKERS, RunSupervisor
+
+
+@pytest.fixture(autouse=True)
+def _isolated_runtime_root(tmp_path, monkeypatch) -> None:
+    """The supervisor is operational: it must only run against an
+    external runtime root, so every test gets its own isolated one."""
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path / "runtime"))
 
 
 def _supervisor(tmp_path) -> RunSupervisor:
@@ -36,7 +45,7 @@ def test_successful_run_records_completed_row(tmp_path) -> None:
     assert row["started_at_utc"] and row["finished_at_utc"]
     assert row["heartbeat_at_utc"]
     assert row["git_sha"] == "unknown"  # tmp repo is not a git checkout
-    log_text = (tmp_path / "repo" / "data" / "logs" / "supervisor" / f"{row['run_id']}.log").read_text()
+    log_text = (tmp_path / "runtime" / "logs" / "supervisor" / f"{row['run_id']}.log").read_text()
     assert "hello from worker" in log_text
     sup.close()
 
@@ -163,3 +172,14 @@ def test_unknown_worker_rejected(tmp_path) -> None:
         raise AssertionError("expected ValueError for unknown worker")
     finally:
         sup.close()
+
+
+def test_fails_closed_without_runtime_env(tmp_path, monkeypatch) -> None:
+    """Consolidation P0-1: an env-less operational invocation must raise
+    instead of silently creating a repo-local second runtime."""
+    monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
+    repo = tmp_path / "repo"
+    with pytest.raises(RuntimeError, match="MODEL_PREDICTION_RUNTIME_ROOT"):
+        RunSupervisor(repo_root=repo)
+    assert not (repo / "data" / "runs.db").exists()
+    assert not (repo / "data" / "ledgers" / "ledgers.db").exists()

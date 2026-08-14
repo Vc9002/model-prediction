@@ -2798,14 +2798,16 @@ async function pollJob(action,jobId){
         setTimeout(tick,3000);return;
       }
       showModal(`<h2>${action}</h2><pre class="red">Lost contact with the dashboard server after 5 retries (${esc(String(e))}).
-The server process has stopped. Restart it:
-  cd ~/"model prediction" && python3 dashboard_server.py
-(or install the auto-start service: bash install_dashboard_service.sh)
+The server process has stopped. Restart it through its launchd service:
+  launchctl kickstart -k gui/$(id -u)/com.vc.model-dashboard
+(Do not start it by hand — one launchd-owned instance is the contract.)
 Crash details, if any, are in dashboard/server.log</pre>`);
       return;
     }
     const spin=d.status==="running"?` <span class="yellow">⏳ running · ${d.seconds||0}s</span>`:
-      d.status==="ok"?' <span class="green">✔ done</span>':` <span class="red">✖ ${d.status}</span>`;
+      d.status==="ok"?' <span class="green">✔ done</span>':
+      d.status==="skipped"?` <span class="yellow">⏭ skipped — another run already active</span>`:
+      `<span class="red">✖ ${d.status}</span>`;
     showModal(`<h2>${action}${spin}</h2>
       <div class="dim small">${d.command||""}</div>
       <pre>${esc(d.output_tail||d.error||"(no output yet)")}</pre>`);
