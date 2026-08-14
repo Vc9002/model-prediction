@@ -164,3 +164,111 @@ def test_data_service_health_and_missing_dbs(tmp_path: Path, monkeypatch) -> Non
     assert health["status"] in ("HEALTHY", "DEGRADED", "DOWN")
     with pytest.raises(KeyError):
         data_service.handle("does-not-exist", {})
+
+
+# ── ledger read path + dashboard equivalence (item 11, I) ──────────────────
+
+
+def _seed_ledger_record(store, **overrides) -> dict:
+    from model_prediction.runtime_ledger_store import LedgerMutation, new_pick_ids
+
+    pick_id, operation_id = new_pick_ids()
+    fields = {
+        "pick_id": pick_id,
+        "operation_id": operation_id,
+        "ledger_tier": "main",
+        "sport": "mlb",
+        "event_type": "append",
+        "created_at_utc": "2026-08-14T12:00:00+00:00",
+        "event_id": "401690001",
+        "market_type": "moneyline",
+        "selection": "home",
+        "model_id": "mlb-elo-trend-lr-v8",
+        "model_probability": 0.61,
+        "units": 1.5,
+        "status": "open",
+    }
+    fields.update(overrides)
+    store.apply(LedgerMutation(**fields))
+    return fields
+
+
+def test_ledger_endpoint_is_paginated_and_readonly(tmp_path: Path, monkeypatch) -> None:
+    from model_prediction.dashboard import data_service
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+
+    paths = RuntimePaths.for_test(tmp_path)
+    monkeypatch.setattr(data_service, "_paths", lambda: paths)
+    with RuntimeLedgerStore(paths) as store:
+        for i in range(5):
+            _seed_ledger_record(
+                store, pick_id=f"pick-{i}", operation_id=f"op-{i}",
+                event_id=f"e{i}", created_at_utc=f"2026-08-14T12:00:0{i}+00:00",
+            )
+
+        page1 = data_service.handle("ledger", {"limit": ["2"]})
+        assert len(page1["records"]) == 2
+        assert page1["next_cursor"] is not None
+        page2 = data_service.handle(
+            "ledger", {"limit": ["2"], "cursor": [page1["next_cursor"]]}
+        )
+        page3 = data_service.handle(
+            "ledger", {"limit": ["2"], "cursor": [page2["next_cursor"]]}
+        )
+        assert len(page2["records"]) == 2 and len(page3["records"]) == 1
+        assert page3["next_cursor"] is None
+
+        filtered = data_service.handle("ledger", {"tier": ["main"], "sport": ["mlb"]})
+        assert len(filtered["records"]) == 5
+
+        counts = data_service.handle("ledger/counts", {})
+        assert counts["counts"]["open"]["n"] == 5
+
+    import os
+
+    before = os.stat(paths.ledgers_db).st_mtime
+    data_service.handle("ledger", {"limit": ["1"]})
+    data_service.handle("ledger/counts", {})
+    assert os.stat(paths.ledgers_db).st_mtime == before
+
+
+def test_ledger_endpoint_missing_db_is_empty_not_an_error(tmp_path: Path, monkeypatch) -> None:
+    from model_prediction.dashboard import data_service
+
+    monkeypatch.setattr(data_service, "_paths", lambda: RuntimePaths.for_test(tmp_path))
+    result = data_service.handle("ledger", {})
+    assert result["records"] == [] and "no ledger database" in result["note"]
+    counts = data_service.handle("ledger/counts", {})
+    assert counts["counts"] == {}
+
+
+def test_dashboard_equivalence_sql_matches_xlsx_for_the_same_tier(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """I: the SQL read path must show the SAME picks, status, and P&L as
+    the XLSX ledger it mirrors — the dashboard-equivalence gate."""
+    from model_prediction.dashboard import data_service
+    from model_prediction.ledger_parity import compare
+    from model_prediction.main_ledgers import main_ledger
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from tests.test_ledger import request as make_request
+
+    repo = tmp_path / "repo"
+    data_root = repo / "data"
+    ledger = main_ledger(data_root, "mlb")
+    logged = ledger.append_call(make_request(), 0.25, 70)
+    ledger.settle(logged["pick_id"], away_score=2, home_score=3)
+
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    monkeypatch.setattr(data_service, "_paths", lambda: paths)
+
+    sql_view = data_service.handle("ledger", {"tier": ["main"], "sport": ["mlb"]})
+    assert len(sql_view["records"]) == 1
+
+    with RuntimeLedgerStore(paths) as store:
+        mirror_records = store.records(tier="main", sport="mlb")
+    report = compare(ledger.rows(), mirror_records)
+    assert report["clean"] is True, report["details"]
+    # The dashboard's SQL view carries the same status/result the XLSX has.
+    assert sql_view["records"][0]["status"] == "settled"
+    assert sql_view["records"][0]["result"] == "loss"

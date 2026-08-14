@@ -13,6 +13,8 @@ Routes (mounted by dashboard_server at ``/api/data/*``):
   /api/data/promotions
   /api/data/health
   /api/data/versions   (cheap change fingerprint for the frontend)
+  /api/data/ledger?tier=&sport=&status=&limit=&cursor=   (item 11: ledger_records)
+  /api/data/ledger/counts?tier=&sport=
 """
 
 from __future__ import annotations
@@ -193,6 +195,101 @@ def _versions(query: dict[str, list[str]]) -> dict[str, Any]:
     return fingerprint
 
 
+_LEDGER_COLUMNS = (
+    "pick_id, operation_id, ledger_tier, sport, event_id, "
+    "canonical_event_id, event_start_utc, market_type, selection, line, "
+    "model_id, model_artifact_hash, feature_schema_version, "
+    "model_probability, market_probability, edge, confidence, units, "
+    "decision, reason_code, status, result, pnl_units, created_at_utc, "
+    "settled_at_utc"
+)
+
+
+def _ledger_conn() -> sqlite3.Connection | None:
+    return _ro_conn(_paths().ledgers_db)
+
+
+def _ledger(query: dict[str, list[str]]) -> dict[str, Any]:
+    conn = _ledger_conn()
+    if conn is None:
+        return {"records": [], "next_cursor": None, "note": "no ledger database yet"}
+    try:
+        if not _has_table(conn, "ledger_records"):
+            return {"records": [], "next_cursor": None, "note": "no ledger database yet"}
+        tier = query.get("tier", [None])[0]
+        sport = query.get("sport", [None])[0]
+        status = query.get("status", [None])[0]
+        limit = min(int(query.get("limit", ["100"])[0]), 500)
+        cursor = query.get("cursor", [None])[0]
+
+        clauses: list[str] = []
+        params: list[Any] = []
+        if tier:
+            clauses.append("ledger_tier = ?")
+            params.append(tier)
+        if sport:
+            clauses.append("sport = ?")
+            params.append(sport)
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+        if cursor:
+            clauses.append("pick_id < ?")
+            params.append(cursor)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        # pick_id has no natural chronology across tiers, so order by the
+        # row's real timestamp and keyset-page on (created_at_utc, pick_id)
+        # would be the general form; created_at_utc DESC with a pick_id
+        # tie-break keeps pagination stable without a composite cursor.
+        sql = (
+            f"SELECT {_LEDGER_COLUMNS} FROM ledger_records{where} "
+            "ORDER BY created_at_utc DESC, pick_id DESC LIMIT ?"
+        )
+        params.append(limit + 1)
+        rows = conn.execute(sql, params).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return {
+            "records": [dict(r) for r in rows],
+            "next_cursor": rows[-1]["pick_id"] if has_more and rows else None,
+        }
+    finally:
+        conn.close()
+
+
+def _ledger_counts(query: dict[str, list[str]]) -> dict[str, Any]:
+    conn = _ledger_conn()
+    if conn is None:
+        return {"counts": {}, "note": "no ledger database yet"}
+    try:
+        if not _has_table(conn, "ledger_records"):
+            return {"counts": {}, "note": "no ledger database yet"}
+        tier = query.get("tier", [None])[0]
+        sport = query.get("sport", [None])[0]
+        clauses: list[str] = []
+        params: list[Any] = []
+        if tier:
+            clauses.append("ledger_tier = ?")
+            params.append(tier)
+        if sport:
+            clauses.append("sport = ?")
+            params.append(sport)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = conn.execute(
+            f"SELECT status, COUNT(*) AS n, COALESCE(SUM(pnl_units), 0) AS pnl "
+            f"FROM ledger_records{where} GROUP BY status",
+            params,
+        ).fetchall()
+        return {
+            "counts": {
+                str(r["status"]): {"n": int(r["n"]), "pnl_units": float(r["pnl"])}
+                for r in rows
+            }
+        }
+    finally:
+        conn.close()
+
+
 _HANDLERS = {
     "predictions": _predictions,
     "predictions/counts": _counts,
@@ -200,6 +297,8 @@ _HANDLERS = {
     "promotions": _promotions,
     "health": lambda query: system_health(),
     "versions": _versions,
+    "ledger": _ledger,
+    "ledger/counts": _ledger_counts,
 }
 
 
@@ -209,3 +308,4 @@ def handle(route: str, query: dict[str, list[str]]) -> dict[str, Any]:
     if handler is None:
         raise KeyError(f"unknown data route: {route}")
     return handler(query)
+
