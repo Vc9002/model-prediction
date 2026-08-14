@@ -102,8 +102,17 @@ to the tree.
 2. ~~Load production + rebuild-shadow agents~~ **DONE** — loaded and
    producing (predictions + counters, shadow.db advancing). The
    08-11→08-14 gap is explicit, not backfilled.
-3. **Shadow-ledger SQLite cutover** — IN PROGRESS next: dual-write →
-   parity proof → SQLite canonical → stop live XLSX writes.
+3. ~~Shadow-ledger SQLite cutover~~ **EXECUTED (J)** — dual-write
+   proven over multiple attended live cycles (22/22 tier-sport parity,
+   both integrity chains GREEN), then
+   `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite` flipped in all three
+   launchd plists and the agents reloaded: the runtime store commits
+   FIRST (canonical; failure aborts the mutation) and the XLSX becomes
+   a best-effort EXPORT written to its existing repo paths. The legacy
+   audit chain + reader remain live for the overlap cycle. Remaining:
+   K relocates the export files under the runtime root and cleans the
+   working tree (classification in
+   docs/WORKING_TREE_CLASSIFICATION.md).
 4. ~~Orphaned modules~~ — deletion authorized; executing.
 5. **Soccer Odds API key** — no replacement key available; soccer stays
    explicitly DEGRADED as a provider signal (not blocking).
