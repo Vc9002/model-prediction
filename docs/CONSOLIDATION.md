@@ -94,20 +94,16 @@ verification artifact to its exact git SHA and retain it as CI
 evidence/release metadata; do not commit generated verification output
 to the tree.
 
-## Operator actions still open
+## Operator actions — updated 2026-08-14 afternoon
 
-1. **Rewire launchd to the supervisor** (safe to do any time — editing
-   the plists does not reload them):
-   `com.modelprediction.daily.plist` →
-   `ProgramArguments: [.venv/bin/python, -m, model_prediction.run_supervisor, run, daily]`
-   (plus the existing env/working-dir keys), same pattern for
-   `production` and `rebuild-shadow` workers, then
-   `launchctl unload/load` each. Until this happens, `system_health`
-   truthfully reports DEGRADED ("never run under the supervisor").
-2. **Load the production + rebuild-shadow agents** (plists installed,
-   never loaded — canary/shadow frozen since 08-11).
-3. **Shadow-ledger SQLite cutover** — approve the parity-checked
-   cutover plan before main/flat/research leave xlsx.
-4. **Orphaned modules** (7 files, 301 lines, zero imports/tests) —
-   deletion awaits operator confirmation.
-5. **Soccer Odds API key** renewal (soccer capture stale 11.2 days).
+1. ~~Rewire launchd to the supervisor~~ **DONE** — all three plists call
+   `run_supervisor run <worker>` (backups as `*.plist.pre-supervisor`),
+   linted, bootstrapped, attended runs verified (see DEBUG.md).
+2. ~~Load production + rebuild-shadow agents~~ **DONE** — loaded and
+   producing (predictions + counters, shadow.db advancing). The
+   08-11→08-14 gap is explicit, not backfilled.
+3. **Shadow-ledger SQLite cutover** — IN PROGRESS next: dual-write →
+   parity proof → SQLite canonical → stop live XLSX writes.
+4. ~~Orphaned modules~~ — deletion authorized; executing.
+5. **Soccer Odds API key** — no replacement key available; soccer stays
+   explicitly DEGRADED as a provider signal (not blocking).

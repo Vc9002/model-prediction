@@ -102,6 +102,34 @@ def test_latest_runs_lists_newest_first_and_filters_by_worker(tmp_path) -> None:
     sup.close()
 
 
+def test_orphaned_started_rows_are_closed_on_next_run(tmp_path) -> None:
+    """Burn-in contract: a SIGKILLed supervisor can't write its own failed
+    row. The next run for the same worker must close the orphaned
+    'started' row truthfully (the lease proves no live supervisor owns
+    it)."""
+    sup = _supervisor(tmp_path)
+    sup._insert_run(
+        {
+            "run_id": "daily-orphan",
+            "worker": "daily",
+            "command": "[]",
+            "status": "started",
+            "started_at_utc": "2026-08-14T00:00:00+00:00",
+            "heartbeat_at_utc": "2026-08-14T00:00:00+00:00",
+            "git_sha": "unknown",
+        }
+    )
+    code = sup.run_worker("daily", command=[sys.executable, "-c", "pass"])
+    assert code == 0
+
+    rows = sup.latest_runs(limit=2)
+    by_id = {r["run_id"]: r for r in rows}
+    assert by_id["daily-orphan"]["status"] == "failed"
+    assert "did not complete" in by_id["daily-orphan"]["note"]
+    assert any(r["status"] == "completed" for r in rows)
+    sup.close()
+
+
 def test_worker_registry_commands_exist_on_disk(tmp_path) -> None:
     """The three real workers must map to commands that exist in the repo."""
     repo = tmp_path / "repo"

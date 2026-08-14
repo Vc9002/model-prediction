@@ -2,6 +2,35 @@
 
 **Last audited**: 2026-08-14 (see new section directly below)
 
+## 2026-08-14 (afternoon) — launchd cutover to the supervisor + health truth source
+
+Operator GO executed: all three launchd plists now invoke
+`run_supervisor run <worker>` (old plists preserved as
+`*.plist.pre-supervisor`; the legacy scripts remain as manual entry
+points). Production + rebuild-shadow agents are LOADED (frozen since
+08-11; the gap is left explicit, not backfilled) and the daily agent was
+reloaded. Attended-run verification, all recorded in the supervisor:
+
+- production: completed exit 0, counters {events_seen 2, predictions 2},
+  production.db latest prediction advanced to 07:36 UTC, rows 646→650
+- rebuild-shadow: completed exit 0, runtime shadow.db freshly written
+- daily: completed exit 0 (full pipeline through the supervisor)
+- system_health under the launchd env: workers all completed — the
+  "never run under the supervisor" reasons are gone; the only remaining
+  DEGRADED reason is soccer capture stale 11.7 days (provider key,
+  deliberately explicit rather than blocking).
+
+Real finding fixed along the way: a SIGKILLed supervisor (launchctl
+bootout mid-run) can never write its own failed row — the next run for
+the same worker now closes orphaned 'started' rows as failed with a
+note (lease proves no live owner). Regression-tested.
+
+Also: `require_probability_normalization` is now ENFORCED (stored
+prediction pairs must satisfy |sum-1| <= 1e-6; violations are DOWN), and
+freshness reads the canonical production.db (MAX(prediction_time_utc)
+via mode=ro), never production_state.json — the state file remains only
+for compatibility consumers.
+
 ## 2026-08-14 (noon) — data plane: RuntimePaths everywhere + ProductionPredictionStore (consolidation B)
 
 **RuntimePaths extended to the incumbent control plane.** `runs_db`,
