@@ -1050,6 +1050,8 @@ class PickLedger:
                     {"rows_changed": changed, "reason": "backfill fixed research-observation sizing rule"},
                 )
                 self._write_rows(rows)
+        for row in rows:
+            self._mirror_row(row, "update", f"op-resize-{row['pick_id']}")
         return changed
 
     def remove_open_rows(

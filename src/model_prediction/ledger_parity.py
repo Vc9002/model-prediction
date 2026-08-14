@@ -1,4 +1,4 @@
-"""XLSX ↔ SQLite ledger parity checker (consolidation G5).
+"""XLSX ↔ SQLite ledger parity checker (consolidation G5) + I2 integrity.
 
 The automatic reconciliation gate for the dual-write migration: compare
 the legacy XLSX rows against the RuntimeLedgerStore mirror on canonical
@@ -9,6 +9,13 @@ fields, with explicit tolerances (never silent rounding):
 Exit 0 only when every delta is zero. During phase 1 (XLSX
 authoritative) any nonzero delta means the mirror is DEGRADED — the
 parity alarm, not a silent failure.
+
+During the I2 overlap the same module also runs the SQLite-native audit
+chain check:
+
+    python -m model_prediction.ledger_parity verify-integrity
+
+Exit 0 only when the hash-linked ledger_events chain replays intact.
 """
 
 from __future__ import annotations
@@ -224,7 +231,15 @@ def main(argv: list[str] | None = None) -> int:
         return default
 
     try:
-        if args and args[0] == "backfill":
+        if args and args[0] == "verify-integrity":
+            report = integrity_report(RuntimePaths.resolve(repo_root=PROJECT_ROOT))
+            print(f"events: {report['events']}")
+            print(f"chain: {'intact' if report['chain_ok'] else 'BROKEN'}")
+            if report["first_problem"]:
+                print(f"first problem: {report['first_problem']}")
+            return 0 if report["chain_ok"] else 1
+        if args and args[0] in ("backfill", "reconcile"):
+            fn = backfill if args[0] == "backfill" else reconcile
             tier = _arg("--tier", "")
             sport = _arg("--sport", "")
             if tier or sport:
@@ -238,16 +253,23 @@ def main(argv: list[str] | None = None) -> int:
             total = {"applied": 0, "already_present": 0, "skipped": 0}
             for t, sp in combos:
                 try:
-                    result = backfill(t, sp)
+                    result = fn(t, sp)
                 except ValueError as exc:
                     print(f"{t:<15} {sp:<14} SKIP ({exc})")
                     total["skipped"] += 1
                     continue
                 total["applied"] += result["applied"]
                 total["already_present"] += result["already_present"]
+                extra = (
+                    f" tombstoned={result.get('tombstoned')}"
+                    if "tombstoned" in result
+                    else ""
+                )
+                if "synced" in result:
+                    extra += f" synced={result['synced']}"
                 print(
                     f"{t:<15} {sp:<14} applied={result['applied']} "
-                    f"already_present={result['already_present']}"
+                    f"already_present={result['already_present']}{extra}"
                 )
             print(f"TOTAL applied={total['applied']} already_present={total['already_present']} skipped={total['skipped']}")
             return 0
@@ -282,6 +304,53 @@ def _open_tier_ledger(tier: str, sport: str, data_root: Path):
     raise ValueError(f"unsupported tier: {tier}")
 
 
+def reconcile(tier: str, sport: str) -> dict[str, int]:
+    """Bring one tier-sport mirror to exact parity with the XLSX (H).
+
+    Two deterministic repairs:
+    1. backfill rows the mirror is missing;
+    2. tombstone mirror rows the XLSX no longer has (status='removed')
+       — those rows were removed from the XLSX through a path that
+       predates the mirror hooks, so the tombstone preserves the audit
+       reference while parity exempts them.
+    Both carry fixed operation ids, so re-runs are no-ops.
+    """
+    result = backfill(tier, sport)
+    paths = RuntimePaths.resolve(repo_root=PROJECT_ROOT)
+    data_root = paths.repo_root / "data"
+    ledger = _open_tier_ledger(tier, sport, data_root)
+    xlsx_rows = {row["pick_id"]: row for row in ledger.rows()}
+    store = RuntimeLedgerStore(paths)
+    try:
+        tombstoned = synced = 0
+        for record in store.records(tier=tier, sport=sport):
+            if record["pick_id"] in xlsx_rows:
+                # Present in both: replay the XLSX row so any field drift
+                # (e.g. settlements written through a pre-mirror path) is
+                # repaired deterministically — upsert overwrites fields.
+                xrow = xlsx_rows[record["pick_id"]]
+                mutation = ledger._row_mutation(
+                    xrow, "update", f"op-sync-{tier}-{record['pick_id']}"
+                )
+                if store.apply(mutation):
+                    synced += 1
+                continue
+            if record["status"] in ("archived", "removed"):
+                continue
+            mutation = ledger._row_mutation(
+                {**record, "status": "removed"},
+                "remove",
+                f"op-tombstone-{tier}-{record['pick_id']}",
+            )
+            if store.apply(mutation):
+                tombstoned += 1
+    finally:
+        store.close()
+    result["tombstoned"] = tombstoned
+    result["synced"] = synced
+    return result
+
+
 def backfill(tier: str, sport: str) -> dict[str, int]:
     """Replay XLSX rows missing from the mirror, deterministically (H-prep).
 
@@ -312,6 +381,22 @@ def backfill(tier: str, sport: str) -> dict[str, int]:
     finally:
         store.close()
     return {"tier": tier, "sport": sport, "applied": applied, "already_present": skipped}
+
+
+def integrity_report(paths: RuntimePaths) -> dict[str, Any]:
+    """I2: replay the SQLite hash chain; event count + first break."""
+    store = RuntimeLedgerStore(paths)
+    try:
+        ok, problems = store.verify_integrity()
+        events = store.event_count()
+    finally:
+        store.close()
+    return {
+        "events": events,
+        "chain_ok": ok,
+        "first_problem": problems[0] if problems else None,
+    }
+
 
 if __name__ == "__main__":
     sys.exit(main())

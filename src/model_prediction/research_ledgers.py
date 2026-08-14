@@ -83,6 +83,9 @@ def existing_research_ledgers(
             path,
             audit_path=Path(data_root) / "events.jsonl",
             model_ledgers_dir=Path(data_root) / "model_ledgers",
+            tier="gated_research" if gated else "research",
+            mirror=ledger_mirror(Path(data_root)),
+            sport=path.stem.casefold(),
         )
         for path in sorted(directory.glob("*.xlsx"))
         if path.stem.casefold() in RESEARCH_LEDGER_SPORTS

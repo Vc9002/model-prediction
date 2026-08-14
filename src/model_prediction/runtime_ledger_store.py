@@ -323,6 +323,13 @@ class RuntimeLedgerStore:
         query += " ORDER BY created_at_utc"
         return [dict(r) for r in self._conn.execute(query, params).fetchall()]
 
+    def event_count(self) -> int:
+        """Total hash-linked audit events (I2 overlap report)."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM ledger_events"
+        ).fetchone()
+        return int(row["n"])
+
     def verify_integrity(self) -> tuple[bool, list[str]]:
         """Replay the hash chain; report the first break (I2 precursor)."""
         rows = self._conn.execute(
