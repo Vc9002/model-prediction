@@ -12,6 +12,7 @@ Principles:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time as time_module
 from collections.abc import Iterable
@@ -26,6 +27,11 @@ from .data_sources.espn import SPORT_LEAGUES, ESPNClient, parse_pregame_and_clos
 from .domain import eastern_today
 
 SPORTS = tuple(SPORT_LEAGUES)
+
+# Bumped when the normalized-row shape of completed_games /
+# completed_tennis_singles_matches changes meaningfully — consumers can
+# tell which parser version produced a normalized row.
+PARSER_VERSION = "espn-scoreboard-1"
 
 _NONTERMINAL_STATES = {"in", "pre"}
 
@@ -152,6 +158,12 @@ class Ingestor:
                 )
                 fetched += 1
                 time_module.sleep(self.rate_limit_seconds)
+            # Every normalized row is traceable to the exact raw snapshot
+            # it came from (content-addressed provenance, consolidation
+            # item 7): source, raw payload hash, and parser version.
+            raw_hash = hashlib.sha256(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
             if sport_key == "tennis":
                 # Combined ATP+WTA tournaments return the same event (with
                 # both gender groupings) from both the ATP and WTA site-API
@@ -159,11 +171,16 @@ class Ingestor:
                 # per-match tour itself; tagging by which endpoint served it
                 # would misattribute WTA matches to ATP (see that function's
                 # docstring), so `league` is deliberately not overwritten here.
-                new_games.extend(ESPNClient.completed_tennis_singles_matches(payload))
+                fresh = ESPNClient.completed_tennis_singles_matches(payload)
             else:
-                for game in ESPNClient.completed_games(payload):
+                fresh = ESPNClient.completed_games(payload)
+                for game in fresh:
                     game["league"] = league
-                    new_games.append(game)
+            for game in fresh:
+                game["raw_source"] = f"espn:{league}:{game_date}"
+                game["raw_hash"] = raw_hash
+                game["parser_version"] = PARSER_VERSION
+            new_games.extend(fresh)
         appended = self._append_games(sport_key, new_games)
         result = {
             "sport": sport_key,
