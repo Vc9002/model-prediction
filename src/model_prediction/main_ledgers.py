@@ -65,12 +65,14 @@ def main_ledger_path(data_root: str | Path, sport: str) -> Path:
 
 def main_ledger(data_root: str | Path, sport: str) -> PickLedger:
     root = Path(data_root)
+    normalized = normalize_main_sport(sport)
     return PickLedger(
-        main_ledger_path(root, sport),
+        main_ledger_path(root, normalized),
         audit_path=root / "events.jsonl",
         model_ledgers_dir=root / "model_ledgers",
         tier="main",
         mirror=ledger_mirror(root),
+        sport=normalized,
     )
 
 
@@ -96,12 +98,14 @@ def flat_ledger_path(data_root: str | Path, sport: str) -> Path:
 
 def flat_ledger(data_root: str | Path, sport: str) -> PickLedger:
     root = Path(data_root)
+    normalized = normalize_main_sport(sport)
     return PickLedger(
-        flat_ledger_path(root, sport),
+        flat_ledger_path(root, normalized),
         audit_path=root / "events.jsonl",
         model_ledgers_dir=root / "model_ledgers",
         tier="flat",
         mirror=ledger_mirror(root),
+        sport=normalized,
     )
 
 

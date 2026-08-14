@@ -349,6 +349,7 @@ class PickLedger:
         model_ledgers_dir: str | Path | None = None,
         tier: str | None = None,
         mirror: RuntimeLedgerStore | None = None,
+        sport: str | None = None,
     ) -> None:
         self.path = Path(path)
         # Canonical per-model evidence directory. Defaults to the legacy
@@ -366,6 +367,11 @@ class PickLedger:
         # ledger failures. tier=None keeps the legacy no-mirror behavior.
         self.tier = tier
         self.mirror = mirror
+        # Canonical sport comes from the constructor, NOT the row's
+        # league field (a tennis row's league is WTA/ATP — using it as
+        # the mirror sport would split one tier across sport labels and
+        # silently break parity, found live on flat/tennis).
+        self.sport = str(sport).lower() if sport else None
         if self.path.suffix.casefold() != ".xlsx":
             raise ValueError("the active picks ledger must be an .xlsx workbook")
         if research_score_units is not None and research_score_units <= 0:
@@ -718,19 +724,25 @@ class PickLedger:
         # reconciled by ledger_parity. The operation_id was generated at
         # the same boundary as pick_id (G3), so an interrupted retry is
         # idempotent in the mirror.
-        if self.mirror is not None and self.tier and not self.retired:
-            try:
-                self.mirror.apply(
-                    self._row_mutation(row, "append", operation_id)
-                )
-            except Exception:
-                logging.getLogger(__name__).warning(
-                    "runtime ledger mirror failed for pick %s (xlsx append already succeeded)",
-                    pick_id,
-                    exc_info=True,
-                )
-                _parity_alarm(self.mirror, f"append {pick_id}")
+        self._mirror_row(row, "append", operation_id)
         return row
+
+    def _mirror_row(
+        self, row: dict[str, str], event_type: str, operation_id: str
+    ) -> None:
+        """Fail-soft mirror write with the parity-alarm contract (G4)."""
+        if self.mirror is None or not self.tier or self.retired:
+            return
+        try:
+            self.mirror.apply(self._row_mutation(row, event_type, operation_id))
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "runtime ledger mirror %s failed for pick %s (xlsx write already succeeded)",
+                event_type,
+                row["pick_id"],
+                exc_info=True,
+            )
+            _parity_alarm(self.mirror, f"{event_type} {row['pick_id']}")
 
     def _row_mutation(
         self, row: dict[str, str], event_type: str, operation_id: str
@@ -746,7 +758,7 @@ class PickLedger:
             pick_id=row["pick_id"],
             operation_id=operation_id,
             ledger_tier=self.tier or "",
-            sport=(row.get("league") or "").lower(),
+            sport=self.sport or (row.get("league") or "").lower(),
             event_type=event_type,
             created_at_utc=row.get("created_at_utc") or iso_utc(utc_now()),
             event_id=row.get("event_id") or None,
@@ -801,6 +813,15 @@ class PickLedger:
             row = self._find(rows, pick_id)
             if row["status"] == PickStatus.SETTLED.value:
                 if row["away_score"] == str(away_score) and row["home_score"] == str(home_score):
+                    # Idempotent re-settlement: the mirror may have missed
+                    # the original settle (e.g. a crash between the two
+                    # backends) — replay it with the SAME deterministic
+                    # operation id, so the mirror heals on the next pass.
+                    self._mirror_row(
+                        row,
+                        "settle",
+                        f"op-settle-{pick_id}-{away_score}-{home_score}-{row['result']}",
+                    )
                     return row
                 if not correction_reason or not correction_reason.strip():
                     raise ValueError("pick is already settled with different scores")
@@ -965,22 +986,11 @@ class PickLedger:
                     pick_id,
                     exc_info=True,
                 )
-        if self.mirror is not None and self.tier and not self.retired:
-            try:
-                self.mirror.apply(
-                    self._row_mutation(
-                        row,
-                        "settle",
-                        f"op-settle-{pick_id}-{away_score}-{home_score}-{result.value}",
-                    )
-                )
-            except Exception:
-                logging.getLogger(__name__).warning(
-                    "runtime ledger mirror settle failed for pick %s (xlsx settle already succeeded)",
-                    pick_id,
-                    exc_info=True,
-                )
-                _parity_alarm(self.mirror, f"settle {pick_id}")
+        self._mirror_row(
+            row,
+            "settle",
+            f"op-settle-{pick_id}-{away_score}-{home_score}-{result.value}",
+        )
         return row
 
     def recompute_research_sizing(self, policy=None) -> int:
@@ -1100,6 +1110,12 @@ class PickLedger:
                         },
                     )
                 self._write_rows(keep)
+        for row in removed:
+            self._mirror_row(
+                {**row, "status": "removed"},
+                "remove",
+                f"op-remove-{row['pick_id']}",
+            )
         return [row["pick_id"] for row in removed]
 
     def archive_settled_rows(
@@ -1163,6 +1179,12 @@ class PickLedger:
                         },
                     )
                 self._write_rows(keep)
+        for row in removed:
+            self._mirror_row(
+                {**row, "status": "archived"},
+                "archive",
+                f"op-archive-{row['pick_id']}",
+            )
         return removed
 
     def import_rows(
@@ -1247,18 +1269,7 @@ class PickLedger:
             )
             self.audit.append("pick_voided", pick_id, {"reason": reason})
             self._write_rows(rows)
-        if self.mirror is not None and self.tier and not self.retired:
-            try:
-                self.mirror.apply(
-                    self._row_mutation(row, "void", f"op-void-{pick_id}")
-                )
-            except Exception:
-                logging.getLogger(__name__).warning(
-                    "runtime ledger mirror void failed for pick %s (xlsx void already succeeded)",
-                    pick_id,
-                    exc_info=True,
-                )
-                _parity_alarm(self.mirror, f"void {pick_id}")
+        self._mirror_row(row, "void", f"op-void-{pick_id}")
         return row
 
     def update_closing(
@@ -1321,6 +1332,7 @@ class PickLedger:
                 },
             )
             self._write_rows(rows)
+        self._mirror_row(updated, "update", f"op-closing-{pick_id}")
         return updated
 
     def review_loss(
@@ -1338,6 +1350,7 @@ class PickLedger:
             if row["result"] != PickResult.LOSS.value:
                 raise ValueError("only lost picks receive a loss review")
             if row["review_status"] == "complete":
+                self._mirror_row(row, "update", f"op-review-{pick_id}")
                 return row
             row.update(
                 {
@@ -1353,6 +1366,7 @@ class PickLedger:
                 {"classification": classification, "cause": cause, "corrective_action": corrective_action},
             )
             self._write_rows(rows)
+        self._mirror_row(row, "update", f"op-review-{pick_id}")
         return row
 
     def score_research(

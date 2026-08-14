@@ -50,19 +50,79 @@ wins. A loss is still a successful research result.
   sample size, tournament level, retirement handling. Keep v1 until v2
   clearly wins.
 
-## P2
+## Revised post-burn-in order (operator, 2026-08-14)
 
-- **Soccer v2** — Dixon-Coles family: home advantage, rho, league
-  baselines, attack/defense strength, time decay, shrinkage; multiclass
-  calibration (temperature/Dirichlet) on the 3-way vector — never
-  calibrate HOME/DRAW/AWAY independently.
-- **Esports v7** — title by title, calibration first, then per-title
-  context (CS2 map pool/roster/LAN; LoL patch/roster/region/side;
-  Valorant map/roster/patch; Dota roster/patch/draft). No generic
-  esports feature model.
-- **KBO/NPB** — Elo + starting pitcher first; then bullpen, lineup,
-  park, weather; long term a score model producing P(home)/P(tie)/P(away)
-  instead of a forced binary structure.
+1 freeze SHA → 2 freeze MLB v8 benchmark → 3 fix MLB reproduction →
+4 MLB v9 starter/FIP/K-BB → 5 bullpen → 6 PIT park/weather → 7 lineup →
+8 LR vs XGB → 9 calibration → 10 joint run distribution → 11 totals/
+spread → 12 prospective v9 → 13 WNBA v5 → 14 WNBA possession/PPP →
+15 NFL calibration → 16 Tennis v2 → 17 soccer framework split →
+18-24 league models (EPL/La Liga/Bundesliga/Serie A/MLS/UCL first,
+rest as sample permits) → 25-29 esports v7 per title (CS2, Valorant,
+LoL, Dota2, R6) → 30 esports region heads → 31-33 KBO/NPB starter +
+run distributions → 34 continuous evaluation.
+
+The binding rule: **shared infrastructure ≠ shared model.** Share CV
+code, calibration evaluator, artifact schema, experiment registry,
+bootstrap, feature-store contracts, PIT checks — never predictive
+assumptions across different sports/games.
+
+## P2 — Soccer, split by league (operator directive 2026-08-14)
+
+**The incumbent `soccer-poisson-dc-v1` with one global HOME_GOAL_BOOST /
+DC_RHO is retired as a research target.** The math engine can be shared;
+the fitted state must not be:
+
+```text
+soccer/
+├── core/           (poisson, dixon_coles, calibration, distributions)
+├── leagues/        (epl.py, la_liga.py, bundesliga.py, serie_a.py,
+│                    mls.py, ucl.py, ...)
+└── registry.py
+```
+
+Each league gets an independently fitted artifact
+(`soccer-epl-poisson-dc-v2`, `soccer-la-liga-poisson-dc-v2`, ...) with
+its own goal baseline, home advantage, rho, time-decay rate,
+attack/defense strengths, shrinkage, dispersion, calibrator. No
+universal constants. Thin leagues use hierarchical shrinkage toward a
+global soccer prior (`theta = w*theta_league + (1-w)*theta_global`,
+w from sample size). UCL gets a later challenger (domestic rating +
+cross-league coefficient + UCL environment), not part of the first
+split. Data must never cross leagues silently (every record carries
+competition_id + season_id); evaluation and promotion are per league
+(add Ranked Probability Score for 1X2; aggregate soccer metrics only
+as a weighted summary). Registry gains a `competition` dimension —
+champion identity becomes sport + competition + market — as a MODEL
+phase infrastructure extension, not during consolidation.
+
+## P2 — Esports, split by title (operator directive 2026-08-14)
+
+No generic `esports-v7`. The shared `esports.py` framework is replaced
+with title-specific packages (common/ holds only genuinely universal
+utilities — identity, chronology, calibration, evaluation, rating):
+
+```text
+esports/{cs2,valorant,lol,dota2,rainbow_six}/{features,model,training,predictor}.py
+```
+
+Title-specific feature sets (CS2: map Elo/map pool/roster/LAN/tier/
+BO format; Valorant: patch/agent-meta/attack-defense side strength;
+LoL: region/patch/blue-red side/objectives, pre- vs post-draft horizons;
+Dota: Radiant/Dire/draft/hero pool; R6: map-specific Elo/attack-defense),
+independent hyperparameters (K, inactivity/recency decay, calibrator —
+nothing inherited between titles), and a hard identity invariant:
+(game_title, provider, provider_team_id/player_id) — Cloud9 CS2 vs
+Cloud9 LoL are distinct entities; an organization name is metadata.
+Region/competition specialization comes second (global title prior +
+region-specific parameters). Model IDs: `cs2-series-v7-lr`,
+`valorant-series-v7-lr`, etc.
+
+## P2 — KBO/NPB
+
+Elo + starting pitcher first; then bullpen, lineup, park, weather; long
+term a score model producing P(home)/P(tie)/P(away) instead of a forced
+binary structure.
 
 ## P3
 

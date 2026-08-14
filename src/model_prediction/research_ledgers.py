@@ -66,6 +66,7 @@ def research_ledger(
         model_ledgers_dir=root / "model_ledgers",
         tier="gated_research" if gated else "research",
         mirror=ledger_mirror(root),
+        sport=normalize_research_sport(sport),
     )
 
 

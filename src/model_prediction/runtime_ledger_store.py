@@ -35,7 +35,7 @@ from .runtime_paths import RuntimePaths
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ledger_records (
-    pick_id                 TEXT PRIMARY KEY,
+    pick_id                 TEXT NOT NULL,
     operation_id            TEXT NOT NULL,
     ledger_tier             TEXT NOT NULL,
     sport                   TEXT NOT NULL,
@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS ledger_records (
     settled_at_utc          TEXT,
 
     decision_payload_json   TEXT,
-    feature_payload_json    TEXT
+    feature_payload_json    TEXT,
+
+    PRIMARY KEY (pick_id, ledger_tier)
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_records_tier_sport
     ON ledger_records (ledger_tier, sport, created_at_utc);
@@ -102,6 +104,10 @@ CREATE TABLE IF NOT EXISTS ledger_runs (
 """
 
 _EVENT_TYPES = ("append", "settle", "void", "update", "archive", "remove")
+# v2: the primary key became (pick_id, ledger_tier) — main and flat
+# legitimately share pick_ids (one decision, two tiers), so a single
+# pick_id key wrongly collapsed them (found live on flat/tennis).
+_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -175,7 +181,27 @@ class RuntimeLedgerStore:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA busy_timeout=5000")
+        schema_row = self._conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'ledger_records'"
+        ).fetchone()
+        pk_matches = (
+            schema_row is not None
+            and "PRIMARY KEY (pick_id, ledger_tier)" in (schema_row[0] or "")
+        )
+        if schema_row is not None and not pk_matches:
+            # Schema change on a mirror: drop + rebuild. This is safe
+            # because the mirror is fully reconstructible from the
+            # authoritative XLSX via ledger_parity backfill (deterministic
+            # operation ids) — never do this to a canonical store. The
+            # check is STRUCTURAL (the table's own declared key), not a
+            # version pragma — a pragma can be stamped by a half-run but
+            # the table can't lie about its shape.
+            self._conn.executescript(
+                "DROP TABLE IF EXISTS ledger_records; "
+                "DROP TABLE IF EXISTS ledger_events;"
+            )
         self._conn.executescript(_SCHEMA)
+        self._conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
     def close(self) -> None:
         self._conn.close()
@@ -202,8 +228,9 @@ class RuntimeLedgerStore:
         )
         with self._conn:
             existing = self._conn.execute(
-                "SELECT operation_id FROM ledger_records WHERE pick_id = ?",
-                (mutation.pick_id,),
+                "SELECT operation_id FROM ledger_records "
+                "WHERE pick_id = ? AND ledger_tier = ?",
+                (mutation.pick_id, mutation.ledger_tier),
             ).fetchone()
             if existing is not None and existing["operation_id"] == mutation.operation_id:
                 return False  # idempotent retry of the exact same mutation
@@ -226,7 +253,7 @@ class RuntimeLedgerStore:
                     :decision, :reason_code, :status, :result, :pnl_units,
                     :created_at_utc, :settled_at_utc,
                     :decision_payload, :feature_payload)
-                ON CONFLICT (pick_id) DO UPDATE SET
+                ON CONFLICT (pick_id, ledger_tier) DO UPDATE SET
                     operation_id = excluded.operation_id,
                     ledger_tier = excluded.ledger_tier,
                     sport = excluded.sport,

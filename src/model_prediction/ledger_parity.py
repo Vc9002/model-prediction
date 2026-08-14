@@ -47,7 +47,14 @@ def compare(
 ) -> dict[str, Any]:
     """Compare two canonical row sets; returns the G5 report."""
     xlsx = {str(r["pick_id"]): r for r in xlsx_rows}
-    sqlite = {str(r["pick_id"]): r for r in sqlite_rows}
+    # Archived/removed records stay in the mirror as tombstones (their
+    # audit events reference them) but have left the XLSX — they are
+    # exempt from the missing_xlsx count, not a parity failure.
+    sqlite = {
+        str(r["pick_id"]): r
+        for r in sqlite_rows
+        if r.get("status") not in ("archived", "removed")
+    }
     report: dict[str, Any] = {
         "rows": {
             "xlsx": len(xlsx),
@@ -148,6 +155,10 @@ def _xlsx_rows(tier: str, sport: str, data_root: Path) -> list[dict[str, Any]]:
         from .main_ledgers import flat_ledger
 
         return flat_ledger(data_root, sport).rows()
+    if tier == "gated_research":
+        from .research_ledgers import research_ledger
+
+        return research_ledger(data_root, sport, gated=True).rows()
     raise ValueError(f"unsupported tier: {tier}")
 
 
@@ -213,6 +224,33 @@ def main(argv: list[str] | None = None) -> int:
         return default
 
     try:
+        if args and args[0] == "backfill":
+            tier = _arg("--tier", "")
+            sport = _arg("--sport", "")
+            if tier or sport:
+                if not (tier and sport):
+                    raise ValueError("backfill needs both --tier and --sport (or neither for --all)")
+                combos = [(tier, sport)]
+            else:
+                combos = [
+                    (t, sp) for t, sports in _TIER_SPORTS.items() for sp in sports
+                ]
+            total = {"applied": 0, "already_present": 0, "skipped": 0}
+            for t, sp in combos:
+                try:
+                    result = backfill(t, sp)
+                except ValueError as exc:
+                    print(f"{t:<15} {sp:<14} SKIP ({exc})")
+                    total["skipped"] += 1
+                    continue
+                total["applied"] += result["applied"]
+                total["already_present"] += result["already_present"]
+                print(
+                    f"{t:<15} {sp:<14} applied={result['applied']} "
+                    f"already_present={result['already_present']}"
+                )
+            print(f"TOTAL applied={total['applied']} already_present={total['already_present']} skipped={total['skipped']}")
+            return 0
         tier = _arg("--tier", "main")
         sport = _arg("--sport", "mlb")
         report = run(tier, sport)
@@ -223,5 +261,59 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if report["clean"] else 1
 
 
+_TIER_SPORTS = {
+    "main": ("mlb", "wnba", "soccer", "tennis"),
+    "flat": ("mlb", "wnba", "soccer", "tennis"),
+    "research": ("lol", "cs2", "dota2", "valorant", "rainbow_six", "kbo", "npb"),
+    "gated_research": ("lol", "cs2", "dota2", "valorant", "rainbow_six", "kbo", "npb"),
+}
+
+
+def _open_tier_ledger(tier: str, sport: str, data_root: Path):
+    from .main_ledgers import flat_ledger, main_ledger
+    from .research_ledgers import research_ledger
+
+    if tier == "main":
+        return main_ledger(data_root, sport)
+    if tier == "flat":
+        return flat_ledger(data_root, sport)
+    if tier in ("research", "gated_research"):
+        return research_ledger(data_root, sport, gated=(tier == "gated_research"))
+    raise ValueError(f"unsupported tier: {tier}")
+
+
+def backfill(tier: str, sport: str) -> dict[str, int]:
+    """Replay XLSX rows missing from the mirror, deterministically (H-prep).
+
+    Historical rows predate the dual-write; this brings the mirror to
+    exact parity so the attended-cycle gate (parity = exact) is reachable.
+    Idempotent: backfilled rows carry a fixed op-backfill-<pick_id>
+    operation id, so a re-run (or an interrupted run) is a no-op.
+    """
+    paths = RuntimePaths.resolve(repo_root=PROJECT_ROOT)
+    data_root = paths.repo_root / "data"
+    ledger = _open_tier_ledger(tier, sport, data_root)
+    store = RuntimeLedgerStore(paths)
+    try:
+        existing = {r["pick_id"] for r in store.records(tier=tier, sport=sport)}
+        applied = 0
+        skipped = 0
+        for row in ledger.rows():
+            if row["pick_id"] in existing:
+                skipped += 1
+                continue
+            mutation = ledger._row_mutation(
+                row, "append", f"op-backfill-{tier}-{row['pick_id']}"
+            )
+            if store.apply(mutation):
+                applied += 1
+            else:
+                skipped += 1
+    finally:
+        store.close()
+    return {"tier": tier, "sport": sport, "applied": applied, "already_present": skipped}
+
 if __name__ == "__main__":
     sys.exit(main())
+
+
