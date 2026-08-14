@@ -175,6 +175,14 @@ class RuntimePaths:
         return self.runtime_root / "production_state.json"
 
     @property
+    def ledgers_root(self) -> Path:
+        return self.runtime_root / "ledgers"
+
+    @property
+    def ledgers_db(self) -> Path:
+        return self.ledgers_root / "ledgers.db"
+
+    @property
     def research_root(self) -> Path:
         return self.runtime_root / "research"
 

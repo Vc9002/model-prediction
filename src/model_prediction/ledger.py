@@ -58,6 +58,7 @@ from .domain import (
 from .eligibility import EligibilityResult
 from .model_ledger import record_from_pick_request, settle_from_pick_row
 from .pricing import american_to_decimal, grade_pick, implied_probability, profit_units
+from .runtime_ledger_store import LedgerMutation, RuntimeLedgerStore
 from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
 
@@ -307,6 +308,35 @@ class _NullAuditLog:
         return {}
 
 
+def _num(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parity_alarm(mirror: RuntimeLedgerStore, message: str) -> None:
+    """Record a mirror failure so monitoring can see the parity DEGRADED
+    state — never raise; the legacy write is authoritative in phase 1."""
+    try:
+        alarm_path = mirror.paths.ledgers_root / "parity_alarm.jsonl"
+        alarm_path.parent.mkdir(parents=True, exist_ok=True)
+        with alarm_path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {"at_utc": iso_utc(utc_now()), "message": message},
+                    separators=(",", ":"),
+                )
+                + "\n"
+            )
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "parity alarm write failed", exc_info=True
+        )
+
+
 class PickLedger:
     def __init__(
         self,
@@ -317,6 +347,8 @@ class PickLedger:
         research_scoring_note: str = "fixed-stake hypothetical research scoring",
         retired: bool = False,
         model_ledgers_dir: str | Path | None = None,
+        tier: str | None = None,
+        mirror: RuntimeLedgerStore | None = None,
     ) -> None:
         self.path = Path(path)
         # Canonical per-model evidence directory. Defaults to the legacy
@@ -328,6 +360,12 @@ class PickLedger:
             Path(model_ledgers_dir) if model_ledgers_dir is not None
             else self.path.parent / "model_ledgers"
         )
+        # Dual-write (G4): when a tier + mirror are supplied, every
+        # mutation is mirrored into the runtime ledger store. The XLSX
+        # stays authoritative; mirror failures are parity alarms, never
+        # ledger failures. tier=None keeps the legacy no-mirror behavior.
+        self.tier = tier
+        self.mirror = mirror
         if self.path.suffix.casefold() != ".xlsx":
             raise ValueError("the active picks ledger must be an .xlsx workbook")
         if research_score_units is not None and research_score_units <= 0:
@@ -560,6 +598,7 @@ class PickLedger:
                 }
             )
             pick_id = uuid.uuid4().hex[:16]
+            operation_id = f"op-append-{pick_id}"
             call_type = (
                 "model_qualified"
                 if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
@@ -674,7 +713,63 @@ class PickLedger:
                     pick_id,
                     exc_info=True,
                 )
+        # SQLite mirror (G4): same fail-soft contract as the model-ledger
+        # hook above — the XLSX write is the authority, the mirror is
+        # reconciled by ledger_parity. The operation_id was generated at
+        # the same boundary as pick_id (G3), so an interrupted retry is
+        # idempotent in the mirror.
+        if self.mirror is not None and self.tier and not self.retired:
+            try:
+                self.mirror.apply(
+                    self._row_mutation(row, "append", operation_id)
+                )
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "runtime ledger mirror failed for pick %s (xlsx append already succeeded)",
+                    pick_id,
+                    exc_info=True,
+                )
+                _parity_alarm(self.mirror, f"append {pick_id}")
         return row
+
+    def _row_mutation(
+        self, row: dict[str, str], event_type: str, operation_id: str
+    ) -> LedgerMutation:
+        """Map a canonical XLSX row to the mirror mutation (G3/G4).
+
+        The full row rides along in decision_payload so reconciliation can
+        replay any field exactly — the mirror stores the queried columns
+        as real columns and the long tail as JSON, per the G1 schema.
+        """
+        line = row.get("decision_line") or row.get("line") or None
+        return LedgerMutation(
+            pick_id=row["pick_id"],
+            operation_id=operation_id,
+            ledger_tier=self.tier or "",
+            sport=(row.get("league") or "").lower(),
+            event_type=event_type,
+            created_at_utc=row.get("created_at_utc") or iso_utc(utc_now()),
+            event_id=row.get("event_id") or None,
+            event_start_utc=row.get("event_start_utc") or None,
+            market_type=row.get("market_type") or None,
+            selection=row.get("selection") or None,
+            line=_num(line),
+            model_id=row.get("model_version") or None,
+            model_artifact_hash=row.get("model_artifact_hash") or None,
+            feature_schema_version=row.get("feature_schema_version") or None,
+            model_probability=_num(row.get("model_probability")),
+            market_probability=_num(row.get("market_implied_probability")),
+            edge=_num(row.get("edge")),
+            confidence=_num(row.get("confidence_score")),
+            units=_num(row.get("units")),
+            decision=row.get("decision") or None,
+            reason_code=row.get("reason_code") or None,
+            status=row.get("status") or "open",
+            result=row.get("result") or None,
+            pnl_units=_num(row.get("pnl_units")),
+            settled_at_utc=row.get("settled_at_utc") or None,
+            decision_payload=dict(row),
+        )
 
     def settle(
         self,
@@ -870,6 +965,22 @@ class PickLedger:
                     pick_id,
                     exc_info=True,
                 )
+        if self.mirror is not None and self.tier and not self.retired:
+            try:
+                self.mirror.apply(
+                    self._row_mutation(
+                        row,
+                        "settle",
+                        f"op-settle-{pick_id}-{away_score}-{home_score}-{result.value}",
+                    )
+                )
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "runtime ledger mirror settle failed for pick %s (xlsx settle already succeeded)",
+                    pick_id,
+                    exc_info=True,
+                )
+                _parity_alarm(self.mirror, f"settle {pick_id}")
         return row
 
     def recompute_research_sizing(self, policy=None) -> int:
@@ -1136,6 +1247,18 @@ class PickLedger:
             )
             self.audit.append("pick_voided", pick_id, {"reason": reason})
             self._write_rows(rows)
+        if self.mirror is not None and self.tier and not self.retired:
+            try:
+                self.mirror.apply(
+                    self._row_mutation(row, "void", f"op-void-{pick_id}")
+                )
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "runtime ledger mirror void failed for pick %s (xlsx void already succeeded)",
+                    pick_id,
+                    exc_info=True,
+                )
+                _parity_alarm(self.mirror, f"void {pick_id}")
         return row
 
     def update_closing(

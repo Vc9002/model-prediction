@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .ledger import PickLedger
+from .runtime_ledger_store import RuntimeLedgerStore
 
 RESEARCH_LEDGER_SPORTS: tuple[str, ...] = (
     "lol",
@@ -33,6 +34,25 @@ def research_ledger_path(
     return Path(data_root) / directory / f"{normalized}.xlsx"
 
 
+def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
+    """The dual-write SQLite mirror for live tiers (G4).
+
+    Resolved against the SAME data root the ledger uses (repo_root is the
+    data root's parent), so tests with tmp roots stay isolated. XLSX stays
+    authoritative; the mirror is fail-soft and reconciled by
+    ledger_parity. Disable with MODEL_PREDICTION_LEDGER_MIRROR=0.
+    """
+    import os
+
+    from .runtime_paths import RuntimePaths
+
+    if os.environ.get("MODEL_PREDICTION_LEDGER_MIRROR", "1") == "0":
+        return None
+    try:
+        return RuntimeLedgerStore(RuntimePaths.resolve(repo_root=Path(data_root).parent))
+    except Exception:  # noqa: BLE001 — mirror must never break ledger construction
+        return None
+
 def research_ledger(
     data_root: str | Path,
     sport: str,
@@ -44,6 +64,8 @@ def research_ledger(
         research_ledger_path(root, sport, gated=gated),
         audit_path=root / "events.jsonl",
         model_ledgers_dir=root / "model_ledgers",
+        tier="gated_research" if gated else "research",
+        mirror=ledger_mirror(root),
     )
 
 

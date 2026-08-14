@@ -27,6 +27,7 @@ from typing import Any
 from .domain import PickRequest
 from .eligibility import EligibilityResult
 from .ledger import PickLedger
+from .runtime_ledger_store import RuntimeLedgerStore
 
 MAIN_LEDGER_SPORTS: tuple[str, ...] = ("mlb", "wnba", "soccer", "tennis")
 
@@ -37,6 +38,25 @@ def normalize_main_sport(sport: str) -> str:
         raise ValueError(f"unsupported main-ledger sport: {sport}")
     return normalized
 
+
+def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
+    """The dual-write SQLite mirror for live tiers (G4).
+
+    Resolved against the SAME data root the ledger uses (repo_root is the
+    data root's parent), so tests with tmp roots stay isolated. XLSX stays
+    authoritative; the mirror is fail-soft and reconciled by
+    ledger_parity. Disable with MODEL_PREDICTION_LEDGER_MIRROR=0.
+    """
+    import os
+
+    from .runtime_paths import RuntimePaths
+
+    if os.environ.get("MODEL_PREDICTION_LEDGER_MIRROR", "1") == "0":
+        return None
+    try:
+        return RuntimeLedgerStore(RuntimePaths.resolve(repo_root=Path(data_root).parent))
+    except Exception:  # noqa: BLE001 — mirror must never break ledger construction
+        return None
 
 def main_ledger_path(data_root: str | Path, sport: str) -> Path:
     normalized = normalize_main_sport(sport)
@@ -49,6 +69,8 @@ def main_ledger(data_root: str | Path, sport: str) -> PickLedger:
         main_ledger_path(root, sport),
         audit_path=root / "events.jsonl",
         model_ledgers_dir=root / "model_ledgers",
+        tier="main",
+        mirror=ledger_mirror(root),
     )
 
 
@@ -78,6 +100,8 @@ def flat_ledger(data_root: str | Path, sport: str) -> PickLedger:
         flat_ledger_path(root, sport),
         audit_path=root / "events.jsonl",
         model_ledgers_dir=root / "model_ledgers",
+        tier="flat",
+        mirror=ledger_mirror(root),
     )
 
 
