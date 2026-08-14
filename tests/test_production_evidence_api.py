@@ -466,7 +466,7 @@ def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(monk
     assert {model["sport"]: model["active_model_version"] for model in result["models"]} == configured
     assert result["all_model_definitions_and_backfills_valid"] is True
     assert result["feature_registry"]["valid"] is True
-    assert len(result["feature_registry"]["features"]) == 25
+    assert len(result["feature_registry"]["features"]) == 24
     assert len(result["feature_registry"]["production_ablation_summary"]) == 15
     rejected = {
         model["sport"]

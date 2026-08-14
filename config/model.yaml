@@ -85,7 +85,6 @@ data_sources:
   sport_data:
     provider: espn_public
     mlb_deep: mlb_statsapi
-    soccer_enrichment: football_data
     tennis_historical: sackmann_csv
     optional_upgrade: sportsdataio
     esports_series:

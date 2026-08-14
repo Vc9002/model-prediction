@@ -20,8 +20,8 @@ def test_feature_registry_is_complete_unique_and_points_to_existing_code() -> No
     names = [feature["name"] for feature in features]
 
     assert registry["schema_version"] == "1"
-    assert registry["last_updated"] == "2026-07-25"
-    assert len(features) == 25
+    assert registry["last_updated"] == "2026-08-14"
+    assert len(features) == 24
     assert len(names) == len(set(names))
     assert registry["retention_policy"]["threshold"] == 0.0
     assert set(feature["verdict"] for feature in features) <= {
@@ -94,7 +94,7 @@ def test_feature_registry_documentation_matches_machine_readable_counts() -> Non
         verdict = feature["verdict"]
         counts[verdict] = counts.get(verdict, 0) + 1
 
-    assert "25 features tracked" in docs
+    assert "24 features tracked" in docs
     assert f"{counts['keep']} keep" in docs
     assert f"{counts['remove'] + counts['remove_candidate']} remove candidates" in docs
     assert f"{counts['reject']} reject" in docs
