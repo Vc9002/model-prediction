@@ -1137,6 +1137,58 @@ def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
     assert history_file.exists()
 
 
+def test_live_balance_unwraps_the_same_value_currency_envelope_as_every_other_amount(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Every other USD amount this API returns (trade price/costBasis/
+    realizedPnl/fee, position cost/cashValue/realized) arrives wrapped as
+    {"value": ..., "currency": ...} and is unwrapped with _amount_value().
+    The four balance.* fields were the one place still parsed with bare
+    _number(), which silently returns None on a dict instead of raising --
+    if the real /v1/account/balances endpoint follows the same envelope
+    convention as every other endpoint in this same authenticated API, the
+    dashboard's balance display (and _auto_adjust_unit_value's bankroll-%
+    sizing, which reads balance.current_usd) would go dark with no error."""
+    monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", tmp_path / "portfolio_history.json")
+    monkeypatch.setattr(dashboard_server, "_today", lambda: "2026-07-17")
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+    monkeypatch.setattr(dashboard_server, "_live_model_links", dict)
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+    raw = {
+        "status": "live",
+        "source": "polymarket_us_authenticated_portfolio",
+        "observed_at_utc": "2026-07-17T15:00:00Z",
+        "positions": {},
+        "activities": [],
+        "balances": [
+            {
+                "currency": "USD",
+                "currentBalance": {"value": "123.45", "currency": "USD"},
+                "buyingPower": {"value": "100.00", "currency": "USD"},
+                "openOrders": {"value": "23.45", "currency": "USD"},
+                "unsettledFunds": {"value": "0.00", "currency": "USD"},
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout=json.dumps(raw), stderr=""
+        ),
+    )
+
+    result = dashboard_server.live_portfolio_view()
+
+    assert result["balance"] == {
+        "current_usd": 123.45,
+        "buying_power_usd": 100.0,
+        "open_orders_usd": 23.45,
+        "unsettled_funds_usd": 0.0,
+    }
+
+
 def test_opposite_side_exchange_activity_is_not_linked_to_model_pick() -> None:
     links = {
         ("wnba-market", "short"): {

@@ -4955,11 +4955,24 @@ def live_portfolio_view() -> dict:
             "realized_pnl_usd": round(sum(_number(item.get("realized_pnl_usd")) for item in positions), 2),
         },
         "recent_history": _portfolio_history_summary(history, "exchange_and_persisted", links),
+        # Every other USD amount this same authenticated API returns (trade
+        # price/costBasis/realizedPnl/fee, position cost/cashValue/realized)
+        # arrives as a {"value": ..., "currency": ...} envelope and is parsed
+        # with _amount_value(), never bare _number() -- these four balance
+        # fields were the one place still using _number(), which returns the
+        # `default` (None here) on a dict instead of raising, so a real
+        # envelope-shaped balance response would have silently rendered every
+        # balance figure (and _auto_adjust_unit_value's bankroll-percent
+        # sizing, which reads current_usd) as unavailable with no error
+        # surfaced.
+        # _amount_value() unwraps the envelope when present and still handles
+        # a bare number, so this is a strict superset, not a behavior change,
+        # for whichever shape the endpoint actually returns.
         "balance": {
-            "current_usd": _number((usd or {}).get("currentBalance"), None),
-            "buying_power_usd": _number((usd or {}).get("buyingPower"), None),
-            "open_orders_usd": _number((usd or {}).get("openOrders"), None),
-            "unsettled_funds_usd": _number((usd or {}).get("unsettledFunds"), None),
+            "current_usd": _amount_value((usd or {}).get("currentBalance")),
+            "buying_power_usd": _amount_value((usd or {}).get("buyingPower")),
+            "open_orders_usd": _amount_value((usd or {}).get("openOrders")),
+            "unsettled_funds_usd": _amount_value((usd or {}).get("unsettledFunds")),
         },
     }
 
