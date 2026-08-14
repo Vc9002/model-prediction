@@ -132,11 +132,19 @@ def _runs(query: dict[str, list[str]]) -> dict[str, Any]:
         conn.close()
 
 
+def _has_table(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?", (table,)
+    ).fetchone() is not None
+
+
 def _promotions(query: dict[str, list[str]]) -> dict[str, Any]:
     conn = _ro_conn(_paths().runs_db)
     if conn is None:
         return {"promotions": [], "note": "no run-state database yet"}
     try:
+        if not _has_table(conn, "promotions"):
+            return {"promotions": [], "note": "no promotions recorded yet"}
         cols = "promotion_id, sport, market, old_model_id, new_model_id, " \
                "approved_by, evidence_id, git_sha, promoted_at_utc, status, note"
         rows = conn.execute(
@@ -167,10 +175,19 @@ def _versions(query: dict[str, list[str]]) -> dict[str, Any]:
                 "SELECT MAX(started_at_utc) AS latest_run FROM runs"
             ).fetchone()
             fingerprint["parts"]["runs"] = dict(row)
-            promo = conn.execute(
-                "SELECT MAX(promoted_at_utc) AS latest_promotion FROM promotions"
-            ).fetchone()
-            fingerprint["parts"]["promotions"] = dict(promo)
+            # The promotions/experiments tables are created lazily by
+            # their writers — a read-only fingerprint must tolerate their
+            # absence, not error.
+            if _has_table(conn, "promotions"):
+                promo = conn.execute(
+                    "SELECT MAX(promoted_at_utc) AS latest_promotion FROM promotions"
+                ).fetchone()
+                fingerprint["parts"]["promotions"] = dict(promo)
+            if _has_table(conn, "experiments"):
+                exp = conn.execute(
+                    "SELECT MAX(created_at_utc) AS latest_experiment FROM experiments"
+                ).fetchone()
+                fingerprint["parts"]["experiments"] = dict(exp)
         finally:
             conn.close()
     return fingerprint
