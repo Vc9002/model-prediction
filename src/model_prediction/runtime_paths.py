@@ -30,12 +30,48 @@ Resolution order for `runtime_root`:
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 
 class RuntimePathError(ValueError):
     """A resolved or explicitly-constructed path configuration is unsafe."""
+
+
+def migrate_legacy_state(paths: RuntimePaths) -> list[str]:
+    """One-time carry-over of pre-runtime-root mutable state into runtime_root.
+
+    The 2026-08-13 split-brain taught this repo the hard way that a HALF
+    migration (some writers on the runtime root, some readers on repo
+    data/) corrupts silently. The rule now is the inverse: every reader
+    and writer resolves through RuntimePaths, and the historical
+    repo-local files are carried over exactly once — only when the
+    runtime-root file does not exist yet — via copy-to-tmp + rename so a
+    concurrent reader never sees a partial file. Legacy files are never
+    deleted (some are git-tracked evidence). Idempotent and safe to call
+    on every open.
+    """
+    moved: list[str] = []
+    legacy_pairs = [
+        (paths.repo_root / "data" / "runs.db", paths.runs_db),
+        (
+            paths.repo_root / "data" / "production" / "predictions.db",
+            paths.production_db,
+        ),
+        (
+            paths.repo_root / "data" / "production_state.json",
+            paths.production_state_file,
+        ),
+    ]
+    for legacy, target in legacy_pairs:
+        if legacy.is_file() and not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            tmp = target.with_suffix(target.suffix + ".migrating")
+            shutil.copy2(legacy, tmp)
+            os.replace(tmp, target)
+            moved.append(f"{legacy} -> {target}")
+    return moved
 
 
 def _default_repo_root() -> Path:
@@ -104,6 +140,51 @@ class RuntimePaths:
     @property
     def rebuild_metadata_db(self) -> Path:
         return self.rebuild_root / "metadata.db"
+
+    # ── mutable production/control-plane state ────────────────────────────
+    # Everything the production canary and the run supervisor write lives
+    # under runtime_root, matching the consolidation target layout:
+    #
+    #   runtime/
+    #   ├── runs.db                    (control plane: runs + promotions)
+    #   ├── production/
+    #   │   ├── production.db          (predictions, decisions, snapshots, runs)
+    #   │   └── production_state.json
+    #   ├── research/research.db       (future shadow-ledger cutover target)
+    #   ├── rebuild/shadow.db
+    #   └── logs/supervisor/           (per-run worker output)
+
+    @property
+    def runs_db(self) -> Path:
+        return self.runtime_root / "runs.db"
+
+    @property
+    def production_root(self) -> Path:
+        return self.runtime_root / "production"
+
+    @property
+    def production_db(self) -> Path:
+        return self.production_root / "production.db"
+
+    @property
+    def production_state_file(self) -> Path:
+        # Directly under runtime_root, matching where the canary's state
+        # file has always lived (repo data/production_state.json) so every
+        # existing reader (health checks, system_health) keeps resolving
+        # to the same file during the cutover.
+        return self.runtime_root / "production_state.json"
+
+    @property
+    def research_root(self) -> Path:
+        return self.runtime_root / "research"
+
+    @property
+    def research_db(self) -> Path:
+        return self.research_root / "research.db"
+
+    @property
+    def supervisor_log_root(self) -> Path:
+        return self.log_root / "supervisor"
 
     @property
     def log_root(self) -> Path:

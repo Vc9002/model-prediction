@@ -34,6 +34,7 @@ import yaml
 
 from .config import PROJECT_ROOT
 from .production_registry import ProductionModelRegistry
+from .runtime_paths import RuntimePaths, migrate_legacy_state
 
 _PROMOTIONS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS promotions (
@@ -58,9 +59,12 @@ CREATE INDEX IF NOT EXISTS idx_promotions_sport_market
 
 
 def _db_path(repo_root: Path) -> Path:
-    # Same control-plane store as the run supervisor (moves under the
-    # runtime root in the data-plane consolidation phase).
-    return repo_root / "data" / "runs.db"
+    # Same control-plane store as the run supervisor, resolved through
+    # RuntimePaths (runtime root when MODEL_PREDICTION_RUNTIME_ROOT is
+    # set, repo data/ otherwise; legacy files migrated once).
+    paths = RuntimePaths.resolve(repo_root=repo_root)
+    migrate_legacy_state(paths)
+    return paths.runs_db
 
 
 def _conn(repo_root: Path) -> sqlite3.Connection:

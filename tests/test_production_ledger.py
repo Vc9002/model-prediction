@@ -12,6 +12,8 @@ import pytest
 
 from model_prediction import cli_production
 from model_prediction.production_ledger import SCHEMA_VERSION, ProductionLedger
+from model_prediction.production_store import ProductionPredictionStore
+from model_prediction.runtime_paths import RuntimePaths
 
 # ── fixtures / helpers ──────────────────────────────────────────────────────
 
@@ -74,12 +76,19 @@ def _fake_slate(candidates: list[_FakeCandidate] | None = None):
 def _run_predict_with_fakes(tmp_path, monkeypatch) -> int:
     """Run the predict CLI with fake ESPN data and slate, real config.
 
-    The data root is monkeypatched directly (not via the env var): since
-    2026-08-13 `_resolve_data_root` is deliberately NOT env-var-aware —
-    production state/ledger/history are incumbent-side repo data, and the
-    runtime-root env var is rebuild-scoped only (see MIGRATION_MANIFEST.json).
+    Feature data (FeatureStore) reads the monkeypatched repo data root;
+    canary STATE (store + state file) resolves through `_paths()`, which
+    is monkeypatched to the tmp runtime root so tests never touch the
+    real production.db (a full-suite run once wrote fake rows into the
+    live database when only `_resolve_data_root` was patched — see the
+    2026-08-14 store migration notes in DEBUG.md).
     """
     monkeypatch.setattr(cli_production, "_resolve_data_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        cli_production,
+        "_paths",
+        lambda: RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data"),
+    )
     monkeypatch.setattr(cli_production.ESPNClient, "scoreboard", _fake_scoreboard())
     monkeypatch.setattr(cli_production, "build_learned_moneyline_slate", _fake_slate())
     return cli_production.main(["predict"])
@@ -315,55 +324,58 @@ def test_migration_adds_lifecycle_columns_to_old_db(tmp_path) -> None:
 
 
 def test_predict_succeeds_when_ledger_unavailable(tmp_path, monkeypatch) -> None:
-    """A ledger open failure must not fail the prediction command."""
+    """A store open failure must not fail the prediction command."""
 
-    def _boom_init(self, path: object) -> None:
-        raise RuntimeError("ledger down")
+    def _boom_init(self, paths: object) -> None:
+        raise RuntimeError("store down")
 
-    monkeypatch.setattr(cli_production.ProductionLedger, "__init__", _boom_init)
+    monkeypatch.setattr(
+        cli_production.ProductionPredictionStore, "__init__", _boom_init
+    )
     assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
 
 
 def test_predict_succeeds_when_ledger_writes_fail(tmp_path, monkeypatch) -> None:
-    """start_run/record_prediction/complete_run failures are fail-soft."""
+    """start_run/append_prediction/finish_run failures are fail-soft."""
 
-    class _RaisingLedger:
-        def __init__(self, path: object) -> None:
+    class _RaisingStore:
+        def __init__(self, paths: object) -> None:
             pass
 
         def start_run(self, *args, **kwargs) -> str:
             raise RuntimeError("disk full")
 
-        def record_prediction(self, *args, **kwargs) -> int:
+        def append_prediction(self, *args, **kwargs) -> int | None:
             raise RuntimeError("disk full")
 
-        def complete_run(self, *args, **kwargs) -> None:
+        def finish_run(self, *args, **kwargs) -> None:
             raise RuntimeError("disk full")
 
-    monkeypatch.setattr(cli_production, "ProductionLedger", _RaisingLedger)
+    monkeypatch.setattr(cli_production, "ProductionPredictionStore", _RaisingStore)
     assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
 
 
 def test_predict_records_to_ledger(tmp_path, monkeypatch) -> None:
-    """Happy path: predict mirrors candidates and completes the run row."""
+    """Happy path: predict mirrors candidates and finishes the run row."""
     assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
-    ledger = ProductionLedger(tmp_path / "production" / "predictions.db")
-    rows = ledger.get_predictions()
+    store = ProductionPredictionStore(
+        RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data")
+    )
+    rows, _ = store.get_predictions()
     assert len(rows) == 1
     row = rows[0]
     assert row["event_id"] == "401690001"
     assert row["sport"] == "WNBA"
     assert row["market"] == "moneyline"
+    assert row["market_type"] == "moneyline"
     assert row["model_id"] == "wnba-elo-trend-lr-v4"
     assert row["status"] == "predicted"
     assert row["predicted_side"] == "home"
     assert row["probabilities"]["home"] == pytest.approx(0.62)
-    run = ledger.conn.execute(
-        "SELECT status, note FROM runs"
-    ).fetchone()
+    run = store._conn.execute("SELECT status, note FROM runs").fetchone()
     assert run["status"] == "completed"
     assert run["note"] == "1 predictions"
-    ledger.close()
+    store.close()
 
 
 # ── CLI lifecycle subcommands ───────────────────────────────────────────────
@@ -371,9 +383,11 @@ def test_predict_records_to_ledger(tmp_path, monkeypatch) -> None:
 
 def test_cli_settle_and_invalid_retransition(tmp_path, monkeypatch, capsys) -> None:
     assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
-    ledger = ProductionLedger(tmp_path / "production" / "predictions.db")
-    row_id = ledger.get_predictions()[0]["id"]
-    ledger.close()
+    store = ProductionPredictionStore(
+        RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data")
+    )
+    row_id = store.get_predictions()[0][0]["id"]
+    store.close()
 
     assert cli_production.main(["settle", str(row_id), "won", "--note", "final"]) == 0
     out = capsys.readouterr().out
@@ -381,31 +395,29 @@ def test_cli_settle_and_invalid_retransition(tmp_path, monkeypatch, capsys) -> N
 
     # Re-transitioning a settled row is rejected loudly (exit 1).
     assert cli_production.main(["settle", str(row_id), "lost"]) == 1
-    assert "already 'settled'" in capsys.readouterr().err
+    assert "terminal" in capsys.readouterr().err
 
     # Bad args are rejected.
     assert cli_production.main(["settle", str(row_id)]) == 1
 
 
 def test_cli_void_supersede_error_commands(tmp_path, monkeypatch, capsys) -> None:
-    assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
-    ledger = ProductionLedger(tmp_path / "production" / "predictions.db")
-    row_id = ledger.get_predictions()[0]["id"]
-    ledger.close()
+    def _fresh_row_id() -> int:
+        assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
+        store = ProductionPredictionStore(
+            RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data")
+        )
+        row_id = store.get_predictions()[0][0]["id"]
+        store.close()
+        return row_id
 
-    assert cli_production.main(["void", str(row_id)]) == 0
+    assert cli_production.main(["void", str(_fresh_row_id())]) == 0
     assert "voided" in capsys.readouterr().out
 
-    assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0  # fresh run/row
-    ledger = ProductionLedger(tmp_path / "production" / "predictions.db")
-    row_id = ledger.get_predictions()[0]["id"]
-    ledger.close()
-    assert cli_production.main(["supersede", str(row_id), "--note", "line moved"]) == 0
+    assert cli_production.main(
+        ["supersede", str(_fresh_row_id()), "--note", "line moved"]
+    ) == 0
     assert "superseded" in capsys.readouterr().out
 
-    assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
-    ledger = ProductionLedger(tmp_path / "production" / "predictions.db")
-    row_id = ledger.get_predictions()[0]["id"]
-    ledger.close()
-    assert cli_production.main(["error", str(row_id), "--note", "bad data"]) == 0
+    assert cli_production.main(["error", str(_fresh_row_id()), "--note", "bad data"]) == 0
     assert "error" in capsys.readouterr().out

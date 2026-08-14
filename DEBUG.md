@@ -2,6 +2,48 @@
 
 **Last audited**: 2026-08-14 (see new section directly below)
 
+## 2026-08-14 (noon) — data plane: RuntimePaths everywhere + ProductionPredictionStore (consolidation B)
+
+**RuntimePaths extended to the incumbent control plane.** `runs_db`,
+`production_db` (`production/production.db`), `production_state_file`,
+`supervisor_log_root`, `research_root/research_db` resolve through ONE
+resolver — `MODEL_PREDICTION_RUNTIME_ROOT` when set (the launchd jobs),
+repo `data/` otherwise. `migrate_legacy_state()` carries the historical
+repo-local files (runs.db, predictions.db, production_state.json) into
+the runtime root exactly once, via copy-to-tmp + rename, never deleting
+the legacy files. Every consumer (run_supervisor, model_promotion,
+system_health, cli_production) now resolves through it — the 2026-08-13
+split-brain class (writer and reader disagreeing on where state lives)
+is structurally impossible.
+
+**ProductionPredictionStore** owns `production/production.db`: narrow
+API (start_run/finish_run, append_prediction with the identity key
+`(event_id, model_id, market_type, horizon, decision_time_utc)` and
+partial unique index, settle/void/supersede/error, record_decision,
+record_market_snapshot, keyset-paginated reads + SQL aggregation,
+xlsx as an explicit `export`). cli_production is fully cut over.
+
+Two real bugs caught by the tests during the cutover:
+1. **Schema-migration trap**: `CREATE TABLE IF NOT EXISTS` leaves a
+   migrated legacy table untouched — the canary's historical
+   predictions.db has no `market_type`/`horizon`/`decision_time_utc`
+   columns, so every store write failed silently (fail-soft) against the
+   migrated database. Fixed with `_ensure_column` migrations +
+   `decision_time_utc` backfill from `prediction_time_utc` + indexes
+   created only after the columns exist.
+2. **Test-helper leak**: the cli integration helper monkeypatched only
+   `_resolve_data_root`, so a full-suite run wrote fake predictions into
+   the LIVE production.db. The helper now monkeypatches `_paths()`
+   (RuntimePaths → tmp) too; the live db was verified clean afterward
+   (all 2162 rows are real canary cycles) and the state file was
+   restored to the committed real record.
+
+The incumbent shadow ledgers (main/flat/research xlsx, written by the
+live 3h daily pipeline and verified by the audit chain) are NOT cut over
+to SQLite yet — that swap needs the operator's explicit go because the
+live writer and `verify-chain` depend on the xlsx audit path; the store
++ research.db schema are ready for the parity/cutover phase.
+
 ## 2026-08-14 (deep night) — truthful health + atomic promotion/rollback (consolidation A-3)
 
 **Evidence-based health** (`src/model_prediction/system_health.py`):

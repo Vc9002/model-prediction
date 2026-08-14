@@ -27,7 +27,6 @@ capture staleness flag only fires for a sport that was recently active.
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -35,6 +34,7 @@ from typing import Any
 from .config import PROJECT_ROOT
 from .production_registry import ProductionModelRegistry
 from .run_supervisor import WORKERS, RunSupervisor
+from .runtime_paths import RuntimePaths
 
 _CAPTURE_STALE_DAYS = 7.0
 _MARKET_STALE_DAYS = 2.0
@@ -156,12 +156,14 @@ def system_health(
 ) -> dict[str, Any]:
     """Run the full evidence-based health check and aggregate a status."""
     root = Path(repo_root) if repo_root is not None else PROJECT_ROOT
-    if runtime_root is not None:
-        rt = Path(runtime_root)
-    elif os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT"):
-        rt = Path(os.environ["MODEL_PREDICTION_RUNTIME_ROOT"])
-    else:
-        rt = root / "data"
+    # One resolution for ALL mutable state — the same RuntimePaths every
+    # writer uses, so health can never read a different file than the
+    # workers write (the 2026-08-13 split-brain lesson).
+    paths = (
+        RuntimePaths(repo_root=root, runtime_root=Path(runtime_root))
+        if runtime_root is not None
+        else RuntimePaths.resolve(repo_root=root)
+    )
 
     report: dict[str, Any] = {
         "status": "HEALTHY",
@@ -206,7 +208,7 @@ def system_health(
         )
 
     # 2. Supervisor run rows (A-2): latest run per worker.
-    supervisor = RunSupervisor(repo_root=root, db_path=rt / "runs.db")
+    supervisor = RunSupervisor(repo_root=root, db_path=paths.runs_db)
     try:
         runs_check: dict[str, Any] = {}
         for worker in WORKERS:
@@ -233,7 +235,7 @@ def system_health(
         supervisor.close()
 
     # 3. Prediction freshness: the production canary's recorded run.
-    state_path = rt / "production_state.json"
+    state_path = paths.production_state_file
     last_prediction = None
     if state_path.is_file():
         try:

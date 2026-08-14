@@ -18,14 +18,17 @@ into a runnable CLI and is the single entrypoint called by the launchd
 production scheduler.
 
 Every prediction the ``predict`` cycle reports is mirrored into the
-production ledger (SQLite, ``<repo data>/production/predictions.db``)
-with an idempotency key, and every cycle starts/completes a run row.  The
-mirror is fail-soft: a ledger failure logs and never fails the prediction
-command.  The lifecycle subcommands (``settle``/``void``/``supersede``/
-``error``) transition an open prediction to a terminal state — guarded so
-a terminal prediction can never be re-transitioned.  Unlike the scheduler
-path, the lifecycle commands are fail-LOUD: an operator action that
-silently no-ops is worse than an error.
+production store (SQLite, ``production/production.db`` under the
+RuntimePaths-resolved runtime root) with the store's identity key
+(event_id, model_id, market_type, horizon, decision_time_utc), and every
+cycle starts/finishes a run row.  The mirror is fail-soft: a store
+failure logs and never fails the prediction command.  The lifecycle
+subcommands (``settle``/``void``/``supersede``/``error``) transition an
+open prediction to a terminal state — guarded so a terminal prediction
+can never be re-transitioned.  Unlike the scheduler path, the lifecycle
+commands are fail-LOUD: an operator action that silently no-ops is worse
+than an error.  ``export [PATH]`` writes the ledger to xlsx — an explicit
+human-review operation, not the database.
 """
 
 from __future__ import annotations
@@ -50,9 +53,10 @@ from .production_canary import (
 )
 from .production_ledger import ProductionLedger
 from .production_registry import ProductionModelRegistry
+from .production_store import ProductionPredictionStore
+from .runtime_paths import RuntimePaths
 
 _STATE_FILE_NAME = "production_state.json"
-_LEDGER_DB_REL = Path("production") / "predictions.db"
 
 _logger = logging.getLogger(__name__)
 
@@ -71,26 +75,29 @@ def _utc_now_iso() -> str:
 
 
 def _resolve_data_root() -> Path:
-    """Incumbent-side production data root: always the repo's data/.
+    """Incumbent-side FEATURE data root: always the repo's data/.
 
-    Deliberately NOT env-var-aware. MIGRATION_MANIFEST.json scoped the
-    runtime root (MODEL_PREDICTION_RUNTIME_ROOT) to rebuild/ mutable state
-    only; the production canary is incumbent-side, and its state file,
-    SQLite ledger, and FeatureStore game history all live under repo
-    ``data/`` and are maintained by the incumbent daily pipeline. Routing
-    them through the runtime root split them in two (a live split-brain
-    found 2026-08-13: the scheduled run wrote a second, empty state file
-    and ledger under the runtime root while the dashboard read the stale
-    repo ones).
+    Game history (data/historical/) is versioned training evidence,
+    maintained by the incumbent daily pipeline — it stays in the repo.
+    Canary STATE (ledger + state file) resolved through RuntimePaths
+    below, so every reader and writer agrees on one location — the
+    2026-08-13 split-brain happened when the scheduled run and the
+    dashboard disagreed on where production state lived; the fix is one
+    resolver, not two conventions.
     """
     return PROJECT_ROOT / "data"
 
 
+def _paths() -> RuntimePaths:
+    """One resolution for all canary mutable state."""
+    return RuntimePaths.resolve(repo_root=PROJECT_ROOT)
+
+
 def _state_path() -> Path:
-    """Path to the production state file under the repo data root."""
-    rt = _resolve_data_root()
-    rt.mkdir(parents=True, exist_ok=True)
-    return rt / _STATE_FILE_NAME
+    """Path to the production state file (RuntimePaths-resolved)."""
+    paths = _paths()
+    paths.production_state_file.parent.mkdir(parents=True, exist_ok=True)
+    return paths.production_state_file
 
 
 def _read_state() -> dict[str, Any]:
@@ -126,11 +133,6 @@ def _record_prediction_run(
     _write_state(state)
 
 
-def _ledger_path(runtime_root: Path) -> Path:
-    """SQLite production ledger location under the runtime root."""
-    return runtime_root / _LEDGER_DB_REL
-
-
 def _git_sha() -> str:
     """Best-effort HEAD SHA for ledger run rows; ``"unknown"`` when unavailable."""
     try:
@@ -143,21 +145,20 @@ def _git_sha() -> str:
         return "unknown"
 
 
-def _open_ledger(runtime_root: Path) -> ProductionLedger | None:
-    """Open the production ledger, or None if it is unavailable.
+def _open_ledger(runtime_root: Path) -> ProductionPredictionStore | None:
+    """Open the production store, or None if it is unavailable.
 
-    Scheduler-path ledger writes are fail-soft (same contract as the
-    model-ledger mirror: a mirror failure must never fail the primary
-    action), so an open failure degrades to no-op writes, not a failed
-    prediction cycle.
+    Scheduler-path writes are fail-soft (same contract as the model-ledger
+    mirror: a mirror failure must never fail the primary action), so an
+    open failure degrades to no-op writes, not a failed prediction cycle.
     """
     try:
-        return ProductionLedger(_ledger_path(runtime_root))
-    except Exception:  # ledger mirror must not fail the prediction cycle
+        return ProductionPredictionStore(_paths())
+    except Exception:  # store must not fail the prediction cycle
         _logger.warning(
-            "production ledger unavailable at %s; this cycle's predictions "
+            "production store unavailable at %s; this cycle's predictions "
             "will not be recorded",
-            _ledger_path(runtime_root),
+            _paths().production_db,
             exc_info=True,
         )
         return None
@@ -193,13 +194,13 @@ def _split_note(args: list[str]) -> tuple[list[str], str | None]:
     return args[:idx] + args[idx + 2 :], args[idx + 1]
 
 
-def _open_ledger_checked(runtime_root: Path) -> ProductionLedger:
-    """Open the ledger for an operator transition command.
+def _open_ledger_checked(runtime_root: Path) -> ProductionPredictionStore:
+    """Open the store for an operator transition command.
 
     Operator commands are fail-LOUD: an explicit human settlement that
     silently no-ops is worse than an error the operator can see.
     """
-    return ProductionLedger(_ledger_path(runtime_root))
+    return ProductionPredictionStore(_paths())
 
 
 def _print_prediction_row(row: dict[str, Any]) -> None:
@@ -263,7 +264,7 @@ def _cmd_predict() -> int:
             run_id = ledger.start_run(git_sha=run_git_sha)
         except Exception:  # ledger mirror must not fail the prediction cycle
             _logger.warning(
-                "production ledger start_run failed; prediction cycle continues",
+                "production store start_run failed; prediction cycle continues",
                 exc_info=True,
             )
 
@@ -275,14 +276,14 @@ def _cmd_predict() -> int:
         events = scoreboard.get("events", [])
     except Exception as exc:  # noqa: BLE001
         print(f"ESPN ERROR: {exc}", file=sys.stderr)
-        _soft_ledger_write(ledger, "complete_run", run_id, "failed",
+        _soft_ledger_write(ledger, "finish_run", run_id, "failed",
                            note=f"ESPN error: {exc}")
         return 1
 
     if not events:
         print(f"NO_EVENTS: no {entry.sport} games scheduled for {today}")
         _record_prediction_run(model_id, artifact_hash, 0, 0)
-        _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+        _soft_ledger_write(ledger, "finish_run", run_id, "completed",
                            note="NO_EVENTS")
         return 0
 
@@ -305,16 +306,16 @@ def _cmd_predict() -> int:
         if "requires" in msg and "cached games before" in msg:
             print(f"NO_EVENTS: insufficient history for {today} — {msg}")
             _record_prediction_run(model_id, artifact_hash, len(events), 0)
-            _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+            _soft_ledger_write(ledger, "finish_run", run_id, "completed",
                                note=f"insufficient history: {msg}")
             return 0
         print(f"PREDICTION ERROR: {exc}", file=sys.stderr)
-        _soft_ledger_write(ledger, "complete_run", run_id, "failed",
+        _soft_ledger_write(ledger, "finish_run", run_id, "failed",
                            note=f"ValueError: {exc}")
         return 1
     except Exception as exc:  # noqa: BLE001
         print(f"PREDICTION ERROR: {exc}", file=sys.stderr)
-        _soft_ledger_write(ledger, "complete_run", run_id, "failed",
+        _soft_ledger_write(ledger, "finish_run", run_id, "failed",
                            note=f"{type(exc).__name__}: {exc}")
         return 1
 
@@ -330,7 +331,7 @@ def _cmd_predict() -> int:
     if not candidates:
         print("NO_PREDICTIONS: all events skipped or filtered")
         _record_prediction_run(model_id, artifact_hash, scheduled, 0)
-        _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+        _soft_ledger_write(ledger, "finish_run", run_id, "completed",
                            note="NO_PREDICTIONS")
         return 0
 
@@ -345,27 +346,29 @@ def _cmd_predict() -> int:
         if d.get("unavailable_features"):
             print(f"    warnings: {', '.join(d['unavailable_features'])}")
         print()
-        # Mirror this prediction into the production ledger (fail-soft).
-        # The idempotency key (run_id, event_id, sport, market, model_id)
-        # makes a re-fired cycle with identical inputs a no-op.
+        # Mirror this prediction into the production store (fail-soft).
+        # The store's identity key (event_id, model_id, market_type,
+        # horizon, decision_time_utc) makes a re-fired cycle with
+        # identical inputs a no-op — append returns None on duplicate.
         _soft_ledger_write(
-            ledger, "record_prediction", run_id,
+            ledger, "append_prediction", run_id=run_id,
             prediction_id=f"{run_id}:{d['event_id']}",
             event_id=d["event_id"],
             sport=entry.sport,
             market=entry.market,
+            market_type=entry.market,
             model_id=model_id,
             probabilities={
                 "home": d["home_probability"],
                 "away": round(1 - d["home_probability"], 6),
             },
+            decision_time_utc=observed_at.isoformat(),
             event_start_utc=d["event_start_utc"],
             prediction_time_utc=observed_at.isoformat(),
             model_artifact_hash=artifact_hash,
             feature_schema_hash=d["feature_snapshot_hash"],
             predicted_side=d["selection"],
             rationale=d["reason"],
-            data_timestamp=observed_at.isoformat(),
             git_sha=run_git_sha,
         )
 
@@ -373,7 +376,7 @@ def _cmd_predict() -> int:
         print(f"  SKIPPED: {s['event_id']} — {s['reason']}")
 
     _record_prediction_run(model_id, artifact_hash, scheduled, len(candidates))
-    _soft_ledger_write(ledger, "complete_run", run_id, "completed",
+    _soft_ledger_write(ledger, "finish_run", run_id, "completed",
                        note=f"{len(candidates)} predictions")
     return 0
 
@@ -445,7 +448,7 @@ def _cmd_ledger(args: list[str]) -> int:
     try:
         ledger = _open_ledger_checked(_resolve_data_root())
         try:
-            rows = ledger.get_predictions(limit=limit)
+            rows, _ = ledger.get_predictions(limit=limit)
         finally:
             ledger.close()
     except Exception as exc:  # noqa: BLE001
@@ -549,6 +552,22 @@ def _cmd_error(args: list[str]) -> int:
     return 0
 
 
+def _cmd_export(args: list[str]) -> int:
+    """Export the production ledger to xlsx — explicit, not the database."""
+    path = args[0] if args else str(_paths().production_root / "export.xlsx")
+    try:
+        store = _open_ledger_checked(_resolve_data_root())
+        try:
+            count = store.export_xlsx(path)
+        finally:
+            store.close()
+    except Exception as exc:  # noqa: BLE001
+        print(f"EXPORT ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"exported {count} predictions to {path}")
+    return 0
+
+
 # ── main ────────────────────────────────────────────────────────────────────
 
 
@@ -559,7 +578,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args:
         print(
             "usage: python -m model_prediction.cli_production "
-            "{predict|health|status|ledger|settle|void|supersede|error}",
+            "{predict|health|status|ledger|export|settle|void|supersede|error}",
             file=sys.stderr,
         )
         return 2
@@ -568,6 +587,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if cmd == "predict":
         return _cmd_predict()
+    elif cmd == "export":
+        return _cmd_export(args[1:])
     elif cmd == "health":
         return _cmd_health()
     elif cmd == "status":
@@ -586,7 +607,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"unknown command: {cmd}", file=sys.stderr)
         print(
             "usage: python -m model_prediction.cli_production "
-            "{predict|health|status|ledger|settle|void|supersede|error}",
+            "{predict|health|status|ledger|export|settle|void|supersede|error}",
             file=sys.stderr,
         )
         return 2

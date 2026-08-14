@@ -200,6 +200,29 @@ new working contracts — don't regress them:
   rebuild-shadow agents) — system_health truthfully reports DEGRADED
   until they are.
 
+## 2026-08-14 (noon) — data-plane contracts (consolidation B)
+
+- **All canary/control-plane mutable state resolves through
+  `RuntimePaths`** (`runtime_paths.py`) — `MODEL_PREDICTION_RUNTIME_ROOT`
+  when set (launchd jobs), repo `data/` otherwise.
+  `migrate_legacy_state()` carries legacy repo-local files into the
+  runtime root once (copy-tmp+rename, never deletes). New code that
+  touches runs.db / production.db / production_state.json / supervisor
+  logs must go through RuntimePaths, not hand-built paths — the
+  2026-08-13 split-brain was exactly this disagreement.
+- **ProductionPredictionStore** (`production_store.py`) is the ONLY
+  writer to `production/production.db` (narrow API, identity key
+  event_id+model_id+market_type+horizon+decision_time_utc, decisions +
+  market_snapshots tables, keyset pagination, `cli_production export`
+  for xlsx). `cli_production` no longer uses `ProductionLedger` (kept
+  for legacy compat + tests). Schema migrations for legacy DBs happen in
+  `_migrate_columns` — new columns/indexes must be added there, NOT
+  only in `_SCHEMA` (CREATE IF NOT EXISTS won't touch a migrated table).
+- **The incumbent shadow ledgers (main/flat/research xlsx) are still
+  the live audit-chain storage** — do not cut them over to SQLite
+  without the operator's explicit go; the 3h daily writer and
+  verify-chain depend on them.
+
 ## 2026-08-13 — Champion/challenger + settled-picks + cleanup (this session)
 
 **New module `src/model_prediction/champion_challenger.py`** — production
