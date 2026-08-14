@@ -123,6 +123,7 @@ from .research_ledgers import (
     existing_research_ledgers,
     research_ledger,
 )
+from .runtime_paths import rolling_models_root
 from .soccer_forward import build_soccer_total_slate
 from .tennis_forward import TENNIS_TOURS, build_tennis_slate
 from .total_score import validate_all_total_score_models
@@ -850,6 +851,20 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
     }
 
 
+def _research_models_dir() -> Path:
+    """Rolling-first artifact directory for research retraining/forecast.
+
+    The scheduled cycle retrains esports/KBO/NPB ratings artifacts every
+    run; those live under the runtime root's models/ so the checked-in
+    config/models copies stay frozen promoted artifacts. Readers fall
+    back to the frozen copies until the first rolling copy exists.
+    """
+    rolling = rolling_models_root(PROJECT_ROOT)
+    if rolling.is_dir() and any(rolling.iterdir()):
+        return rolling
+    return PROJECT_ROOT / "config" / "models"
+
+
 def _refresh_esports_ratings(data_root) -> dict:
     """Keep esports Elo ratings from going stale.
 
@@ -865,7 +880,7 @@ def _refresh_esports_ratings(data_root) -> dict:
     """
     titles = tuple(TITLE_SPECS)
     backfill_results = {title: refresh_recent_matches(data_root, title) for title in titles}
-    validation = validate_all_esports_baselines(data_root, titles, PROJECT_ROOT / "config/models")
+    validation = validate_all_esports_baselines(data_root, titles, _research_models_dir())
     # Keep the dashboard's evidence-consistency report in sync with the
     # artifacts it describes -- otherwise it goes stale again the moment new
     # matches merge in, since it's read as a pinned snapshot elsewhere
@@ -886,7 +901,7 @@ def _refresh_international_baseball_ratings(data_root) -> dict:
         league: refresh_recent_international_baseball_matches(data_root, league) for league in leagues
     }
     validation = validate_all_international_baseball_baselines(
-        data_root, leagues, PROJECT_ROOT / "config/models"
+        data_root, leagues, _research_models_dir()
     )
     report_path = PROJECT_ROOT / "outputs/latest/international-baseball-baseline-validation.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3446,7 +3461,7 @@ def main(argv: list[str] | None = None) -> None:
                     sport_gated = research_ledger(data_directory, sport, gated=True)
                     results[sport] = forecast_esports_slate(
                         data_root=data_directory,
-                        artifact_dir=PROJECT_ROOT / "config/models",
+                        artifact_dir=_research_models_dir(),
                         title=sport,
                         game_date=args.date,
                     )
@@ -3467,7 +3482,7 @@ def main(argv: list[str] | None = None) -> None:
                     # esports above.
                     results[sport] = _forecast_international_sport(
                         data_root=data_directory,
-                        artifact_dir=PROJECT_ROOT / "config/models",
+                        artifact_dir=_research_models_dir(),
                         league=sport,
                         args_date=args.date,
                         config=config,
@@ -3932,7 +3947,7 @@ def main(argv: list[str] | None = None) -> None:
             def _esports_title_task(title: str) -> None:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=data_directory,
-                    artifact_dir=PROJECT_ROOT / "config/models",
+                    artifact_dir=_research_models_dir(),
                     title=title,
                     game_date=args.date,
                 )
@@ -3978,7 +3993,7 @@ def main(argv: list[str] | None = None) -> None:
                 # directive, 2026-08-03) -- same reasoning as esports above.
                 forecast_result[league] = _forecast_international_sport(
                     data_root=data_directory,
-                    artifact_dir=PROJECT_ROOT / "config/models",
+                    artifact_dir=_research_models_dir(),
                     league=league,
                     args_date=args.date,
                     config=config,
@@ -4197,7 +4212,7 @@ def main(argv: list[str] | None = None) -> None:
             output = validate_all_esports_baselines(
                 data_root,
                 args.titles,
-                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+                _research_models_dir() if args.write_artifacts else None,
             )
             destination = PROJECT_ROOT / args.output
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -4216,7 +4231,7 @@ def main(argv: list[str] | None = None) -> None:
             for title in titles:
                 forecast = forecast_esports_slate(
                     data_root,
-                    PROJECT_ROOT / "config/models",
+                    _research_models_dir(),
                     title,
                     args.date,
                     args.timezone,
@@ -4248,7 +4263,7 @@ def main(argv: list[str] | None = None) -> None:
             output = validate_all_international_baseball_baselines(
                 data_root,
                 args.leagues,
-                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+                _research_models_dir() if args.write_artifacts else None,
             )
             destination = PROJECT_ROOT / args.output
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -4260,7 +4275,7 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "international-baseball-forecast":
             output = forecast_international_baseball_slate(
                 data_root,
-                PROJECT_ROOT / "config/models",
+                _research_models_dir(),
                 args.league,
                 args.date,
                 args.timezone,
@@ -4315,7 +4330,7 @@ def main(argv: list[str] | None = None) -> None:
             output = validate_all_total_score_models(
                 FeatureStore(data_root),
                 args.sports,
-                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+                _research_models_dir() if args.write_artifacts else None,
             )
             destination = PROJECT_ROOT / args.output
             destination.parent.mkdir(parents=True, exist_ok=True)

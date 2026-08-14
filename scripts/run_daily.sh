@@ -18,7 +18,7 @@ if [ "${MODEL_PREDICTION_DAILY_LOCK_HELD:-}" != "1" ]; then
     export MODEL_PREDICTION_DAILY_LOCK_HELD=1
     export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
     exec .venv/bin/python -m model_prediction.daily_lock \
-        --lock data/locks/daily.lock -- bash "$0"
+        --lock "${MODEL_PREDICTION_RUNTIME_ROOT:-data}/locks/daily.lock" -- bash "$0"
 fi
 
 RUN_DATE=$(TZ=America/New_York date +%Y-%m-%d)

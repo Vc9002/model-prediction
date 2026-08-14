@@ -24,6 +24,8 @@ from typing import Any
 
 import yaml
 
+from .runtime_paths import RuntimePaths
+
 logger = logging.getLogger(__name__)
 
 
@@ -303,9 +305,11 @@ class ProductionRegistry:
 class FrozenProductionStore:
     """Persist and load the frozen champion snapshot to/from disk.
 
-    Writes to ``data/production/frozen_champions.json`` relative to the
-    project root. The serving pipeline should load this on startup to confirm
-    it is serving the champion, not a challenger.
+    Writes under the runtime root's production dir (RuntimePaths), never
+    the repo checkout — frozen state is operational evidence, and the
+    repo-local copy was a split-brain relic. The serving pipeline should
+    load this on startup to confirm it is serving the champion, not a
+    challenger.
     """
 
     def __init__(self, repo_root: Path | str | None = None) -> None:
@@ -313,7 +317,10 @@ class FrozenProductionStore:
 
     @property
     def path(self) -> Path:
-        return self._repo_root / "data" / "production" / "frozen_champions.json"
+        return (
+            RuntimePaths.resolve(repo_root=self._repo_root).production_root
+            / "frozen_champions.json"
+        )
 
     def write(self, registry: ProductionRegistry) -> None:
         """Write the frozen registry to disk."""

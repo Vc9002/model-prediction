@@ -36,9 +36,12 @@ DASHBOARD_COLUMNS = [
 class DashboardCache:
     """SQLite mirror of all dashboard-relevant Excel ledger data."""
 
-    def __init__(self, data_root: str | Path) -> None:
+    def __init__(self, data_root: str | Path, *, db_path: Path | None = None) -> None:
         self.data_root = Path(data_root)
-        self.db_path = self.data_root / "dashboard_cache.db"
+        # The cache DB is mutable runtime state: callers that run
+        # operationally pass the runtime root's path; the repo-local
+        # default survives only for dev/test convenience.
+        self.db_path = Path(db_path) if db_path is not None else self.data_root / "dashboard_cache.db"
         self._lock = threading.Lock()
 
     # ── public API ──────────────────────────────────────────────────────
@@ -294,7 +297,9 @@ _cache: DashboardCache | None = None
 _cache_lock = threading.Lock()
 
 
-def get_cache(data_root: str | Path | None = None) -> DashboardCache:
+def get_cache(
+    data_root: str | Path | None = None, *, db_path: Path | None = None
+) -> DashboardCache:
     """Return the module-level DashboardCache singleton."""
     global _cache
     if _cache is None:
@@ -303,5 +308,5 @@ def get_cache(data_root: str | Path | None = None) -> DashboardCache:
                 root = Path(data_root) if data_root else (
                     Path(__file__).resolve().parents[1] / "data"
                 )
-                _cache = DashboardCache(root)
+                _cache = DashboardCache(root, db_path=db_path)
     return _cache

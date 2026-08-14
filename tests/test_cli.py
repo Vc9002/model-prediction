@@ -2134,3 +2134,19 @@ def test_wnba_spread_main_ledger_duplicate_is_tracked_not_silently_dropped(
 
     assert len(flat_ledger.appended) == 1  # flat always logs, unaffected
     assert result["main_ledger_duplicate_event_ids"] == ["wnba-spread-1"]
+
+
+def test_research_models_dir_prefers_rolling_over_frozen(monkeypatch, tmp_path) -> None:
+    """K model-artifact split: retraining reads/writes rolling copies under
+    the runtime root's models/, and only falls back to the checked-in
+    frozen config/models/ before the first rolling copy exists."""
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path / "runtime"))
+
+    assert cli._research_models_dir() == cli.PROJECT_ROOT / "config" / "models"
+
+    rolling = cli.rolling_models_root(cli.PROJECT_ROOT)
+    rolling.mkdir(parents=True, exist_ok=True)
+    (rolling / "cs2-tiered-elo-v6.json").write_text("{}", encoding="utf-8")
+
+    assert cli._research_models_dir() == rolling
+    assert cli._research_models_dir() != cli.PROJECT_ROOT / "config" / "models"

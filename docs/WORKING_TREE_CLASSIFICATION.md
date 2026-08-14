@@ -99,3 +99,41 @@ above is runtime output, not a deliberate code/config edit.
 
 This document intentionally stops at classification — no `git
 restore`/`rm`/`checkout` was run against any of the files above.
+
+---
+
+# Execution status — 2026-08-15 (consolidation K)
+
+Executed per the recommended order above:
+
+1. **gitignore/untrack pass**: all Class B and C paths are now untracked
+   (`git rm --cached`, files remain on disk): `data/availability/`,
+   `data/player_priors/`, `data/production/`, `data/esports/`,
+   `data/international_baseball/`, `data/historical/`, `data/odds/`,
+   `data/point_in_time/`, `data/main/`, `data/flat/`, `data/research/`,
+   `data/gated_research/`, `data/model_ledgers/`, `outputs/latest/`,
+   `data/logs/`, `data/features/`, `data/dashboard_cache.db`,
+   `data/market_odds_snapshots.jsonl`, `data/audit_log.jsonl`,
+   `data/espn_probables_cache.jsonl`, and dashboard scratch
+   (`jobs.json`, `archive.json`, `server.log`, `server.pid`,
+   `launchd.*.log`). Still tracked: `data/archive/` (audit archives),
+   `snapshots/` (migration evidence), `data/entities/teams.json`,
+   `data/experiments/`.
+2. **Model-artifact write-path split**: `RuntimePaths.models_root`
+   (runtime root `models/`) now holds the rolling esports/KBO/NPB
+   ratings artifacts; the daily refresh (`_refresh_esports_ratings`,
+   `_refresh_international_baseball_ratings`) retrains into the rolling
+   dir, and research forecasts read rolling-first with a frozen
+   `config/models/` fallback (`cli._research_models_dir()`). The 14
+   checked-in `config/models/*.json` copies are now frozen promoted
+   artifacts and never rewritten by the scheduled cycle. Rolling state
+   seeded into `/Users/vincentc9002/model-prediction-runtime/models/`
+   at cutover.
+3. **Class A (ledger XLSX)**: untracked per the J canonical-cutover
+   decision — SQLite (`ledgers.db`, runtime root) is the authority; XLSX
+   is export-only and lives outside git now.
+4. **Daily worker lock relocated**: `scripts/run_daily.sh` now takes
+   its lock at `${MODEL_PREDICTION_RUNTIME_ROOT:-data}/locks/daily.lock`
+   instead of repo `data/locks/`.
+5. Clean-tree acceptance: a full supervisor production + daily cycle
+   leaving `git status --porcelain` empty is the K gate (burn-in item).
