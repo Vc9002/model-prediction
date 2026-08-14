@@ -92,3 +92,5 @@ data/features/
 
 # Quarantined DB artifacts are local evidence only — never publish
 backups/**/*.db
+backups/split-brain-quarantine-*/*
+!backups/split-brain-quarantine-*/*.md
