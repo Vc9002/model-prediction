@@ -52,6 +52,29 @@ successful run, and never produces duplicate rows or corrupted state**.
 manual interruption (duplicate-run skip, double-append no-op, health
 truthfulness, dashboard data endpoints + latency, clean working tree).
 
+## Known-degraded waiver
+
+```
+KNOWN_DEGRADED:
+soccer_odds_api
+
+reason:
+The Odds API returns 401 — no replacement credential available
+
+accepted:
+2026-08-14
+
+blocks burn-in:
+NO
+
+blocks soccer provider completeness:
+YES
+```
+
+Burn-in rule: **no NEW or unexplained DEGRADED/DOWN conditions.** The
+overall status may remain DEGRADED for the waived soccer provider for
+the whole period; every other check must be HEALTHY.
+
 ## Exit criterion
 
 Every box above checked over ≥3 consecutive days, with the operator's

@@ -95,7 +95,11 @@ class RunSupervisor:
         migrate_legacy_state(self.paths)
         self.db_path = Path(db_path) if db_path else self.paths.runs_db
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
-        self.lock_dir = self.repo_root / "data" / "locks"
+        # Leases are mutable runtime state and live under the runtime
+        # root with everything else (the daily worker's own internal
+        # data/locks/daily.lock is the WORKER's lock, not the
+        # supervisor's — these must not share a root).
+        self.lock_dir = self.paths.lock_root
         self.log_dir = self.paths.supervisor_log_root
         self._conn: sqlite3.Connection | None = None
 

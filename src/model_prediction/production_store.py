@@ -229,7 +229,7 @@ class ProductionPredictionStore:
     def append_prediction(
         self,
         *,
-        run_id: str | None,
+        run_id: str,
         prediction_id: str,
         event_id: str,
         sport: str,
@@ -254,6 +254,13 @@ class ProductionPredictionStore:
         decision_time_utc)`` — a re-fired cycle with identical inputs is a
         no-op instead of a duplicate row.
         """
+        # The run must exist — absent runs are a caller bug, not a state
+        # to normalize (an empty-string run_id would silently orphan the
+        # row from its run lineage).
+        if self._conn.execute(
+            "SELECT 1 FROM runs WHERE run_id = ?", (run_id,)
+        ).fetchone() is None:
+            raise ValueError(f"run_id {run_id!r} does not exist in runs")
         prediction_time = prediction_time_utc or decision_time_utc
         with self._conn:
             cursor = self._conn.execute(
@@ -274,7 +281,7 @@ class ProductionPredictionStore:
                 {
                     "prediction_id": prediction_id,
                     "created_at": datetime.now(UTC).isoformat(),
-                    "run_id": run_id or "",
+                    "run_id": run_id,
                     "schema_version": "3",
                     "event_id": event_id,
                     "canonical_event_id": canonical_event_id,
@@ -317,13 +324,22 @@ class ProductionPredictionStore:
     ) -> dict[str, Any]:
         if outcome not in ("won", "lost", "void"):
             raise ValueError("outcome must be won, lost, or void")
+        # ONE transaction: a crash between "outcome recorded" and "status
+        # transitioned" must never leave status=predicted with a resolved
+        # outcome — settlement is atomic, all fields or none.
         with self._conn:
-            self._conn.execute(
-                "UPDATE predictions SET resolved_outcome = ?, settled_at_utc = ? "
-                "WHERE id = ?",
-                (outcome, datetime.now(UTC).isoformat(), row_id),
+            cursor = self._conn.execute(
+                "UPDATE predictions SET status = 'settled', "
+                "resolved_outcome = ?, settled_at_utc = ?, note = ? "
+                "WHERE id = ? AND status = 'predicted'",
+                (outcome, datetime.now(UTC).isoformat(), note, row_id),
             )
-        return self._transition(row_id, "settled", note)
+            if cursor.rowcount == 0:
+                raise ValueError(
+                    f"prediction {row_id} does not exist or is not in "
+                    "'predicted' state (terminal states are final)"
+                )
+            return self.get_prediction(row_id)  # type: ignore[return-value]
 
     def void_prediction(self, row_id: int, *, note: str | None = None) -> dict[str, Any]:
         return self._transition(row_id, "voided", note)

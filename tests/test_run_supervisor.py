@@ -130,6 +130,20 @@ def test_orphaned_started_rows_are_closed_on_next_run(tmp_path) -> None:
     sup.close()
 
 
+def test_leases_live_under_the_runtime_root(tmp_path, monkeypatch) -> None:
+    """Consolidation pre-fix: supervisor lease files are mutable runtime
+    state and must resolve through RuntimePaths, not repo data/locks."""
+    from model_prediction.runtime_paths import RuntimePaths
+
+    repo = tmp_path / "repo"
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
+    sup = RunSupervisor(repo_root=repo, heartbeat_interval_seconds=0.05)
+    expected = RuntimePaths(repo_root=repo, runtime_root=runtime).lock_root
+    assert sup._lease_path("daily").parent == expected
+    sup.close()
+
+
 def test_worker_registry_commands_exist_on_disk(tmp_path) -> None:
     """The three real workers must map to commands that exist in the repo."""
     repo = tmp_path / "repo"

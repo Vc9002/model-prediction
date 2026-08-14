@@ -129,14 +129,16 @@ def health_check(
       2. Verify the artifact file exists.
       3. Parse the artifact JSON and re-validate its embedded hash.
       4. Verify every probability value in the artifact is finite.
-      5. Data-freshness check: the canary's last prediction run (recorded
-         in ``production_state.json`` under the runtime root) must be
-         younger than ``health.max_data_age_minutes``; a missing, stale, or
-         unreadable state file degrades the check.
+      5. Data-freshness check: the latest prediction in the canonical
+         ``production/production.db`` (under the resolved runtime root)
+         must be younger than ``health.max_data_age_minutes``; a missing
+         database or stale record degrades the check. The legacy
+         ``production_state.json`` is NOT consulted (compatibility
+         consumers only — consolidation item 12).
 
-    *runtime_root* is accepted for forward compatibility but is not yet used
-    beyond the data-freshness check. When ``MODEL_PREDICTION_RUNTIME_ROOT``
-    is set, the health check prefers it.
+    *runtime_root* is accepted to pin the mutable-state root explicitly;
+    otherwise the resolution follows ``RuntimePaths``
+    (``MODEL_PREDICTION_RUNTIME_ROOT`` when set).
     """
     root = Path(repo_root) if repo_root is not None else _repo_root()
     now_utc = datetime.now(UTC).isoformat()

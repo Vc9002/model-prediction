@@ -187,6 +187,11 @@ class RuntimePaths:
         return self.log_root / "supervisor"
 
     @property
+    def lock_root(self) -> Path:
+        # All mutable runtime state is external — leases included.
+        return self.runtime_root / "locks"
+
+    @property
     def log_root(self) -> Path:
         return self.runtime_root / "logs"
 

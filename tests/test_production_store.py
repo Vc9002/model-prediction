@@ -194,6 +194,44 @@ def test_store_migrates_a_legacy_schema_database(tmp_path) -> None:
     store.close()
 
 
+def test_append_with_unknown_run_id_fails_immediately(tmp_path) -> None:
+    """run_id is mandatory and must exist — no silent '' normalization
+    that orphans a row from its run lineage."""
+    with _store(tmp_path) as store:
+        import pytest as _pytest
+
+        with _pytest.raises(ValueError, match="does not exist"):
+            store.append_prediction(
+                run_id="no-such-run",
+                prediction_id="p1",
+                event_id="e1",
+                sport="WNBA",
+                market="moneyline",
+                market_type="moneyline",
+                model_id="wnba-elo-trend-lr-v4",
+                probabilities={"home": 0.6, "away": 0.4},
+                decision_time_utc="2026-08-14T12:00:00+00:00",
+            )
+
+
+def test_settlement_is_one_atomic_transaction(tmp_path) -> None:
+    """status + resolved_outcome + settled_at_utc land in ONE transaction —
+    a failure between outcome and status can never leave
+    status=predicted with a resolved outcome."""
+    with _store(tmp_path) as store:
+        row_id = _append(store, "e1")
+        settled = store.settle_prediction(row_id, "won", note="graded")
+        assert settled["status"] == "settled"
+        assert settled["resolved_outcome"] == "won"
+        # The single-statement form is enforced by the row state: there is
+        # no intermediate state to observe, so a re-transition check is
+        # the observable contract.
+        import pytest as _pytest
+
+        with _pytest.raises(ValueError, match="terminal"):
+            store.settle_prediction(row_id, "lost")
+
+
 def test_start_finish_run_records_counters(tmp_path) -> None:
     with _store(tmp_path) as store:
         run_id = store.start_run(git_sha="abc123")
