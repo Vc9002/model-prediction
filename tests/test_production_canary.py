@@ -239,14 +239,28 @@ class TestArtifactValidation:
 
 class TestHealthCheck:
     @staticmethod
-    def _write_state(runtime_root: Path, last_prediction_utc: str) -> None:
-        """Seed the canary's production_state.json under the runtime root."""
-        runtime_root.mkdir(parents=True, exist_ok=True)
-        (runtime_root / "production_state.json").write_text(
-            json.dumps({"model_id": "wnba-elo-trend-lr-v4", "last_prediction_utc": last_prediction_utc})
-            + "\n",
-            encoding="utf-8",
+    def _seed_db(repo: Path, runtime_root: Path, prediction_time_utc: str) -> None:
+        """Seed the canonical production.db (health's truth source, item 12)."""
+        from model_prediction.production_store import ProductionPredictionStore
+        from model_prediction.runtime_paths import RuntimePaths
+
+        store = ProductionPredictionStore(
+            RuntimePaths(repo_root=repo, runtime_root=runtime_root)
         )
+        run_id = store.start_run(git_sha="test")
+        store.append_prediction(
+            run_id=run_id,
+            prediction_id="p1",
+            event_id="e1",
+            sport="WNBA",
+            market="moneyline",
+            market_type="moneyline",
+            model_id="wnba-elo-trend-lr-v4",
+            probabilities={"home": 0.62, "away": 0.38},
+            decision_time_utc=prediction_time_utc,
+            prediction_time_utc=prediction_time_utc,
+        )
+        store.close()
 
     def test_health_check_returns_healthy(self, tmp_path: Path) -> None:
         """A valid setup with a fresh prediction state returns HEALTHY."""
@@ -254,21 +268,22 @@ class TestHealthCheck:
         config = load_production_config(repo_root=repo)
         # The data-freshness check is real: seed a recent last prediction.
         rt = tmp_path / "rt"
-        self._write_state(rt, datetime.now(UTC).isoformat())
+        self._seed_db(repo, rt, datetime.now(UTC).isoformat())
         result = health_check(config, repo_root=repo, runtime_root=rt)
         assert result["status"] == "HEALTHY"
         assert result["model_id"] == "wnba-elo-trend-lr-v4"
         assert "artifact_hash" in result
         assert "checked_at_utc" in result
 
-    def test_health_check_degrades_without_prediction_state(self, tmp_path: Path) -> None:
-        """A missing production state file must degrade, not silently pass
-        (fail-closed freshness: no recorded prediction = not fresh)."""
+    def test_health_check_degrades_without_prediction_records(self, tmp_path: Path) -> None:
+        """No predictions in the canonical production.db must degrade, not
+        silently pass (fail-closed freshness: no recorded prediction = not
+        fresh). The legacy state file is NOT consulted (item 12)."""
         repo, _ = _setup_production_env(tmp_path)
         config = load_production_config(repo_root=repo)
         result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
         assert result["status"] == "DEGRADED"
-        assert "production state file" in result["reason"]
+        assert "no production predictions recorded" in result["reason"]
 
     def test_health_check_degrades_on_stale_prediction(self, tmp_path: Path) -> None:
         """A last prediction older than max_data_age_minutes degrades."""
@@ -276,10 +291,38 @@ class TestHealthCheck:
         config = load_production_config(repo_root=repo)
         rt = tmp_path / "rt"
         stale = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
-        self._write_state(rt, stale)
+        self._seed_db(repo, rt, stale)
         result = health_check(config, repo_root=repo, runtime_root=rt)
         assert result["status"] == "DEGRADED"
         assert "minutes ago" in result["reason"]
+
+    def test_health_check_down_on_non_normalized_stored_probabilities(self, tmp_path: Path) -> None:
+        """require_probability_normalization is enforced on the STORED
+        predictions: a pair not summing to 1 (within 1e-6) is DOWN."""
+        from model_prediction.production_store import ProductionPredictionStore
+        from model_prediction.runtime_paths import RuntimePaths
+
+        repo, _ = _setup_production_env(tmp_path)
+        rt = tmp_path / "rt"
+        store = ProductionPredictionStore(RuntimePaths(repo_root=repo, runtime_root=rt))
+        run_id = store.start_run(git_sha="test")
+        store.append_prediction(
+            run_id=run_id,
+            prediction_id="p1",
+            event_id="e1",
+            sport="WNBA",
+            market="moneyline",
+            market_type="moneyline",
+            model_id="wnba-elo-trend-lr-v4",
+            probabilities={"home": 0.9, "away": 0.2},
+            decision_time_utc=datetime.now(UTC).isoformat(),
+            prediction_time_utc=datetime.now(UTC).isoformat(),
+        )
+        store.close()
+        config = load_production_config(repo_root=repo)
+        result = health_check(config, repo_root=repo, runtime_root=rt)
+        assert result["status"] == "DOWN"
+        assert "not normalized" in result["reason"]
 
     def test_missing_artifact_returns_degraded_or_down(self, tmp_path: Path) -> None:
         """health_check returns DOWN when artifact is missing."""

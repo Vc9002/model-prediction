@@ -234,10 +234,28 @@ def health_check(
                 "details": details,
             }
 
+    # 4b. Probability normalization — config says normalization is
+    #     required, so health must ENFORCE it: binary outputs must satisfy
+    #     |sum(p) - 1| <= 1e-6. Artifact-embedded pairs are checked where
+    #     they exist; the always-checked source is the stored predictions
+    #     in production.db (the canonical operational record, item 12).
+    if config.get("health", {}).get("require_probability_normalization", True):
+        try:
+            _check_probability_normalization(artifact, root, rt)
+        except ValueError as exc:
+            return {
+                "status": "DOWN",
+                "model_id": model_id,
+                "artifact_hash": artifact_hash,
+                "reason": str(exc),
+                "checked_at_utc": now_utc,
+                "details": details,
+            }
+
     # 5. Data freshness — the canary's last recorded prediction run under
     #    runtime_root must be younger than max_data_age_minutes.
     max_age_minutes = config.get("health", {}).get("max_data_age_minutes", 120)
-    stale = _check_data_freshness(rt, max_age_minutes)
+    stale = _check_data_freshness(root, rt, max_age_minutes)
     if stale:
         details["data_freshness"] = stale
         return {
@@ -288,36 +306,30 @@ def _check_finite_probabilities(artifact: dict[str, Any]) -> None:
 
 
 def _check_data_freshness(
-    runtime_root: Path, max_age_minutes: int
+    repo_root: Path, runtime_root: Path, max_age_minutes: int
 ) -> str | None:
     """Return a human-readable staleness description, or *None* if fresh.
 
-    Freshness is judged on the canary's own last prediction run, recorded
-    by ``cli_production._record_prediction_run`` in ``production_state.json``
-    under the runtime root. A state file that is missing, unreadable, or
-    whose ``last_prediction_utc`` is older than *max_age_minutes* means the
-    model has not produced predictions recently enough to be trusted —
-    fail-closed, never a silent pass.
+    Freshness is judged on the canonical production database
+    (``production/production.db`` under the resolved runtime root), NOT
+    the legacy ``production_state.json`` — one operational truth, one
+    storage (consolidation item 12). The state file remains for
+    compatibility consumers only.
     """
-    state_path = runtime_root / "production_state.json"
-    if not state_path.is_file():
+    from .production_store import read_latest_prediction_utc
+    from .runtime_paths import RuntimePaths
+
+    paths = RuntimePaths(repo_root=repo_root, runtime_root=runtime_root)
+    last_prediction = read_latest_prediction_utc(paths)
+    if last_prediction is None:
         return (
-            f"no production state file at {state_path} "
-            f"(never recorded a prediction run)"
+            f"no production predictions recorded in {paths.production_db} "
+            "(never recorded a prediction run)"
         )
     try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return f"production state unreadable: {exc}"
-    last_prediction = state.get("last_prediction_utc")
-    if not last_prediction:
-        return "production state has no last_prediction_utc"
-    try:
-        last_dt = datetime.fromisoformat(str(last_prediction))
+        last_dt = datetime.fromisoformat(last_prediction)
     except ValueError:
-        return f"production state has unparseable last_prediction_utc {last_prediction!r}"
-    # The canary writes tz-aware ISO timestamps, but be tolerant of a naive
-    # value — treating it as UTC rather than guessing a local zone.
+        return f"unparseable latest prediction timestamp {last_prediction!r}"
     if last_dt.tzinfo is None:
         last_dt = last_dt.replace(tzinfo=UTC)
     age_minutes = (datetime.now(UTC) - last_dt).total_seconds() / 60
@@ -327,6 +339,73 @@ def _check_data_freshness(
             f"(max_data_age_minutes={max_age_minutes})"
         )
     return None
+
+
+_NORMALIZATION_TOLERANCE = 1e-6
+_BINARY_PROBABILITY_PAIRS = (
+    ("home_probability", "away_probability"),
+    ("prob_home", "prob_away"),
+    ("home_win_probability", "away_win_probability"),
+)
+
+
+def _check_probability_normalization(
+    artifact: dict[str, Any], repo_root: Path, runtime_root: Path
+) -> None:
+    """Enforce the normalization contract on every binary probability
+    pair the system stores or emits.
+
+    Two sources are checked:
+    1. Artifact-embedded pairs (where an artifact stores explicit
+       probabilities) — each pair must satisfy |sum - 1| <= 1e-6 and each
+       value must lie in [0, 1].
+    2. The stored predictions in production.db (the canonical record) —
+       the most recent rows' probability pairs must satisfy the same
+       bound. A stored non-normalized pair is a DOWN, not a warning:
+       config says normalization is required, and health enforces it.
+    """
+    for market, model in (artifact.get("market_models") or {}).items():
+        if not isinstance(model, dict):
+            continue
+        for home_key, away_key in _BINARY_PROBABILITY_PAIRS:
+            home = model.get(home_key)
+            away = model.get(away_key)
+            if home is None and away is None:
+                continue
+            if home is None or away is None:
+                raise ValueError(
+                    f"market_models.{market} has {home_key} without {away_key}"
+                )
+            for label, value in ((home_key, home), (away_key, away)):
+                if not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0:
+                    raise ValueError(
+                        f"market_models.{market}.{label} out of [0,1]: {value!r}"
+                    )
+            if abs(float(home) + float(away) - 1.0) > _NORMALIZATION_TOLERANCE:
+                raise ValueError(
+                    f"market_models.{market} probabilities not normalized: "
+                    f"{home} + {away} = {float(home) + float(away)} "
+                    f"(tolerance {_NORMALIZATION_TOLERANCE})"
+                )
+
+    from .production_store import read_recent_probabilities
+    from .runtime_paths import RuntimePaths
+
+    paths = RuntimePaths(repo_root=repo_root, runtime_root=runtime_root)
+    for pair in read_recent_probabilities(paths, limit=20):
+        values = [v for v in pair.values() if isinstance(v, (int, float))]
+        if not values:
+            continue
+        total = sum(values)
+        if any(not 0.0 <= v <= 1.0 for v in values):
+            raise ValueError(
+                f"stored prediction probabilities out of [0,1]: {pair}"
+            )
+        if abs(total - 1.0) > _NORMALIZATION_TOLERANCE:
+            raise ValueError(
+                f"stored prediction probabilities not normalized: {pair} "
+                f"sums to {total} (tolerance {_NORMALIZATION_TOLERANCE})"
+            )
 
 
 def _isfinite(value: float) -> bool:

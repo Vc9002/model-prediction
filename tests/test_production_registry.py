@@ -309,16 +309,27 @@ def test_health_check_healthy_registry_reports_all_models(tmp_path: Path) -> Non
     ]
     repo = _setup_v3(tmp_path, models, "wnba-elo-trend-lr-v4")
     config = yaml.safe_load((repo / "config/production.yaml").read_text(encoding="utf-8"))
+    # Freshness now reads the canonical production.db (item 12) — seed it.
+    from model_prediction.production_store import ProductionPredictionStore
+    from model_prediction.runtime_paths import RuntimePaths
+
     rt = tmp_path / "rt"
-    rt.mkdir(parents=True)
-    (rt / "production_state.json").write_text(
-        json.dumps(
-            {"model_id": "wnba-elo-trend-lr-v4",
-             "last_prediction_utc": datetime.now(UTC).isoformat()}
-        )
-        + "\n",
-        encoding="utf-8",
+    store = ProductionPredictionStore(RuntimePaths(repo_root=repo, runtime_root=rt))
+    run_id = store.start_run()
+    stamp = datetime.now(UTC).isoformat()
+    store.append_prediction(
+        run_id=run_id,
+        prediction_id="p1",
+        event_id="e1",
+        sport="WNBA",
+        market="moneyline",
+        market_type="moneyline",
+        model_id="wnba-elo-trend-lr-v4",
+        probabilities={"home": 0.6, "away": 0.4},
+        decision_time_utc=stamp,
+        prediction_time_utc=stamp,
     )
+    store.close()
 
     result = health_check(config, repo_root=repo, runtime_root=rt)
 

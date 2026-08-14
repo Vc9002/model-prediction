@@ -88,14 +88,28 @@ def _seed_successful_run(repo: Path, worker: str = "daily") -> None:
 
 
 def _seed_prediction_state(repo: Path, minutes_ago: float) -> None:
-    _write_json(
-        repo / "data" / "production_state.json",
-        {
-            "last_prediction_utc": (
-                datetime.now(UTC) - timedelta(minutes=minutes_ago)
-            ).isoformat()
-        },
+    """Seed the canonical production.db — health reads the DATABASE now
+    (item 12), not the legacy state file."""
+    from model_prediction.production_store import ProductionPredictionStore
+    from model_prediction.runtime_paths import RuntimePaths
+
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    store = ProductionPredictionStore(paths)
+    run_id = store.start_run()
+    stamp = (datetime.now(UTC) - timedelta(minutes=minutes_ago)).isoformat()
+    store.append_prediction(
+        run_id=run_id,
+        prediction_id=f"p-{minutes_ago}",
+        event_id=f"e-{minutes_ago}",
+        sport="WNBA",
+        market="moneyline",
+        market_type="moneyline",
+        model_id="wnba-elo-trend-lr-v4",
+        probabilities={"home": 0.6, "away": 0.4},
+        decision_time_utc=stamp,
+        prediction_time_utc=stamp,
     )
+    store.close()
 
 
 def _seed_game(repo: Path, sport: str, days_ago: float) -> None:
@@ -153,6 +167,36 @@ def test_worker_never_run_under_supervisor_degrades(tmp_path: Path) -> None:
 
     assert report["status"] == "DEGRADED"
     assert any("never run" in r for r in report["reasons"])
+
+
+def test_non_normalized_stored_probabilities_are_down(tmp_path: Path) -> None:
+    """require_probability_normalization enforced on production.db rows:
+    a stored pair not summing to 1 (within 1e-6) is DOWN, not a warning."""
+    from model_prediction.production_store import ProductionPredictionStore
+    from model_prediction.runtime_paths import RuntimePaths
+
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    store = ProductionPredictionStore(paths)
+    run_id = store.start_run()
+    store.append_prediction(
+        run_id=run_id,
+        prediction_id="p-bad",
+        event_id="e-bad",
+        sport="WNBA",
+        market="moneyline",
+        market_type="moneyline",
+        model_id="wnba-elo-trend-lr-v4",
+        probabilities={"home": 0.9, "away": 0.2},
+        decision_time_utc=datetime.now(UTC).isoformat(),
+        prediction_time_utc=datetime.now(UTC).isoformat(),
+    )
+    store.close()
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert report["status"] == "DOWN"
+    assert any("not normalized" in r for r in report["reasons"])
 
 
 def test_stale_prediction_degrades(tmp_path: Path) -> None:

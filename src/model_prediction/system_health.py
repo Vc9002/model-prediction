@@ -33,6 +33,10 @@ from typing import Any
 
 from .config import PROJECT_ROOT
 from .production_registry import ProductionModelRegistry
+from .production_store import (
+    read_latest_prediction_utc,
+    read_recent_probabilities,
+)
 from .run_supervisor import WORKERS, RunSupervisor
 from .runtime_paths import RuntimePaths
 
@@ -234,18 +238,10 @@ def system_health(
     finally:
         supervisor.close()
 
-    # 3. Prediction freshness: the production canary's recorded run.
-    state_path = paths.production_state_file
-    last_prediction = None
-    if state_path.is_file():
-        try:
-            last_prediction = str(
-                json.loads(state_path.read_text(encoding="utf-8")).get(
-                    "last_prediction_utc"
-                )
-            )
-        except (OSError, json.JSONDecodeError):
-            pass
+    # 3. Prediction freshness + normalization: the canonical production
+    #    DATABASE, never the legacy production_state.json (item 12 — one
+    #    operational truth, one storage).
+    last_prediction = read_latest_prediction_utc(paths)
     report["checks"]["predictions"] = {
         "latest_prediction_utc": last_prediction,
         "age_minutes": (
@@ -254,13 +250,21 @@ def system_health(
     }
     max_age_minutes = float(registry.health.get("max_data_age_minutes", 120))
     if last_prediction is None:
-        degrade("no production prediction run recorded")
+        degrade("no production prediction runs recorded in production.db")
     elif _age_minutes(last_prediction) > max_age_minutes:
         degrade(
             f"last production prediction "
             f"{_age_minutes(last_prediction):.0f} minutes ago "
             f"(max_data_age_minutes={max_age_minutes:.0f})"
         )
+    if registry.health.get("require_probability_normalization", True):
+        for pair in read_recent_probabilities(paths, limit=20):
+            values = [v for v in pair.values() if isinstance(v, (int, float))]
+            if values and (
+                any(not 0.0 <= v <= 1.0 for v in values)
+                or abs(sum(values) - 1.0) > 1e-6
+            ):
+                down(f"stored prediction probabilities not normalized: {pair}")
 
     # 4. Source capture: historical games + Polymarket snapshots.
     capture = _source_capture(root)

@@ -489,3 +489,61 @@ def _cell_value(value: Any) -> Any:
     if isinstance(value, (dict, list)):
         return json.dumps(value, sort_keys=True)
     return value
+
+
+# ── read-only health helpers (consolidation item 12) ────────────────────────
+# Health must read the CANONICAL database, never the legacy
+# production_state.json — one operational truth, one storage.
+# Connections open mode=ro so a health check can never migrate or write.
+
+
+def _ro_health_conn(paths: RuntimePaths) -> sqlite3.Connection | None:
+    if not paths.production_db.is_file():
+        return None
+    conn = sqlite3.connect(f"file:{paths.production_db}?mode=ro", uri=True, timeout=5.0)
+    conn.execute("PRAGMA busy_timeout=3000")
+    return conn
+
+
+def read_latest_prediction_utc(paths: RuntimePaths) -> str | None:
+    """Latest prediction timestamp from production.db, or None when the
+    database (or the table) doesn't exist yet."""
+    conn = _ro_health_conn(paths)
+    if conn is None:
+        return None
+    try:
+        if conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='predictions'"
+        ).fetchone() is None:
+            return None
+        row = conn.execute(
+            "SELECT MAX(prediction_time_utc) AS latest FROM predictions"
+        ).fetchone()
+        return str(row[0]) if row and row[0] else None
+    finally:
+        conn.close()
+
+
+def read_recent_probabilities(paths: RuntimePaths, limit: int = 20) -> list[dict[str, float]]:
+    """The most recent stored binary probability pairs, newest first."""
+    conn = _ro_health_conn(paths)
+    if conn is None:
+        return []
+    try:
+        if conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='predictions'"
+        ).fetchone() is None:
+            return []
+        out: list[dict[str, float]] = []
+        for row in conn.execute(
+            "SELECT probabilities_json FROM predictions ORDER BY id DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall():
+            try:
+                probs = json.loads(row[0])
+            except json.JSONDecodeError:
+                continue
+            out.append({str(k): float(v) for k, v in probs.items()})
+        return out
+    finally:
+        conn.close()
