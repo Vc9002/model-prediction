@@ -350,6 +350,7 @@ class PickLedger:
         tier: str | None = None,
         mirror: RuntimeLedgerStore | None = None,
         sport: str | None = None,
+        authority: str = "xlsx",
     ) -> None:
         self.path = Path(path)
         # Canonical per-model evidence directory. Defaults to the legacy
@@ -367,6 +368,9 @@ class PickLedger:
         # ledger failures. tier=None keeps the legacy no-mirror behavior.
         self.tier = tier
         self.mirror = mirror
+        if authority not in ("xlsx", "sqlite"):
+            raise ValueError("authority must be 'xlsx' or 'sqlite'")
+        self.authority = authority
         # Canonical sport comes from the constructor, NOT the row's
         # league field (a tennis row's league is WTA/ATP — using it as
         # the mirror sport would split one tier across sport labels and
@@ -696,6 +700,10 @@ class PickLedger:
                     pick_id,
                     {"reason_code": eligibility.reason_code, "record_type": eligibility.record_type.value},
                 )
+            if self.authority == "sqlite":
+                # Canonical store commits first — its failure aborts the
+                # mutation (the export write below becomes best-effort).
+                self._mirror_row(row, "append", operation_id)
             self._write_rows(existing)
         # Operator directive, 2026-08-02: every model also writes to its own
         # per-model ledger going forward (data/model_ledgers/<model-id>.xlsx,
@@ -727,15 +735,58 @@ class PickLedger:
         self._mirror_row(row, "append", operation_id)
         return row
 
+    def _persist(
+        self,
+        rows_to_write: list[dict[str, str]],
+        mirror_row: dict[str, str],
+        event_type: str,
+        operation_id: str,
+    ) -> None:
+        """Commit one mutation with the authority-correct ordering.
+
+        xlsx authority: legacy write first (authoritative), mirror
+        fail-soft after — the G4 dual-write contract.
+
+        sqlite authority: the mirror commits FIRST and its failure
+        raises; the XLSX write becomes a best-effort export (failure
+        logs an alarm, never a mutation failure). The legacy audit
+        chain (events.jsonl) is still appended by the callers either
+        way, so both chains run during the overlap.
+        """
+        if self.authority == "sqlite":
+            self._mirror_row(mirror_row, event_type, operation_id)
+            try:
+                self._write_rows(rows_to_write)
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "xlsx export write failed for pick %s (sqlite commit already succeeded)",
+                    mirror_row["pick_id"],
+                    exc_info=True,
+                )
+                _parity_alarm(self.mirror, f"export {event_type} {mirror_row['pick_id']}")
+            return
+        self._write_rows(rows_to_write)
+        self._mirror_row(mirror_row, event_type, operation_id)
+
     def _mirror_row(
         self, row: dict[str, str], event_type: str, operation_id: str
     ) -> None:
-        """Fail-soft mirror write with the parity-alarm contract (G4)."""
+        """Mirror write with the authority-aware failure contract.
+
+        xlsx authority (dual-write phase): the mirror is fail-soft — a
+        mirror failure logs a parity alarm and the legacy write stands.
+
+        sqlite authority (J cutover): the mirror IS the canonical store.
+        Its failure is a real mutation failure and raises — the caller's
+        transaction must not pretend the mutation landed.
+        """
         if self.mirror is None or not self.tier or self.retired:
             return
         try:
             self.mirror.apply(self._row_mutation(row, event_type, operation_id))
         except Exception:
+            if self.authority == "sqlite":
+                raise
             logging.getLogger(__name__).warning(
                 "runtime ledger mirror %s failed for pick %s (xlsx write already succeeded)",
                 event_type,
@@ -969,6 +1020,12 @@ class PickLedger:
                     **({"correction_reason": correction_reason} if correction_reason else {}),
                 },
             )
+            if self.authority == "sqlite":
+                self._mirror_row(
+                    row,
+                    "settle",
+                    f"op-settle-{pick_id}-{away_score}-{home_score}-{result.value}",
+                )
             self._write_rows(rows)
         # Operator directive, 2026-08-02: settlement also mirrors into the
         # per-model ledger, alongside this real, working write, never
@@ -1049,6 +1106,9 @@ class PickLedger:
                     str(self.path),
                     {"rows_changed": changed, "reason": "backfill fixed research-observation sizing rule"},
                 )
+                if self.authority == "sqlite":
+                    for row in rows:
+                        self._mirror_row(row, "update", f"op-resize-{row['pick_id']}")
                 self._write_rows(rows)
         for row in rows:
             self._mirror_row(row, "update", f"op-resize-{row['pick_id']}")
@@ -1111,6 +1171,13 @@ class PickLedger:
                             "created_at_utc": row["created_at_utc"],
                         },
                     )
+                if self.authority == "sqlite":
+                    for row in removed:
+                        self._mirror_row(
+                            {**row, "status": "removed"},
+                            "remove",
+                            f"op-remove-{row['pick_id']}",
+                        )
                 self._write_rows(keep)
         for row in removed:
             self._mirror_row(
@@ -1180,6 +1247,13 @@ class PickLedger:
                             "archived_row": dict(row),
                         },
                     )
+                if self.authority == "sqlite":
+                    for row in removed:
+                        self._mirror_row(
+                            {**row, "status": "archived"},
+                            "archive",
+                            f"op-archive-{row['pick_id']}",
+                        )
                 self._write_rows(keep)
         for row in removed:
             self._mirror_row(
@@ -1270,6 +1344,8 @@ class PickLedger:
                 }
             )
             self.audit.append("pick_voided", pick_id, {"reason": reason})
+            if self.authority == "sqlite":
+                self._mirror_row(row, "void", f"op-void-{pick_id}")
             self._write_rows(rows)
         self._mirror_row(row, "void", f"op-void-{pick_id}")
         return row
@@ -1333,6 +1409,8 @@ class PickLedger:
                     "probability_clv": updated["probability_clv"],
                 },
             )
+            if self.authority == "sqlite":
+                self._mirror_row(updated, "update", f"op-closing-{pick_id}")
             self._write_rows(rows)
         self._mirror_row(updated, "update", f"op-closing-{pick_id}")
         return updated
@@ -1367,6 +1445,8 @@ class PickLedger:
                 pick_id,
                 {"classification": classification, "cause": cause, "corrective_action": corrective_action},
             )
+            if self.authority == "sqlite":
+                self._mirror_row(row, "update", f"op-review-{pick_id}")
             self._write_rows(rows)
         self._mirror_row(row, "update", f"op-review-{pick_id}")
         return row
@@ -1558,6 +1638,23 @@ class PickLedger:
         return migrated
 
     def _write_rows(self, rows: list[dict[str, str]]) -> None:
+        if self.authority == "sqlite":
+            # The XLSX is a best-effort EXPORT under sqlite authority —
+            # its failure is an alarm, never a mutation failure (the
+            # canonical store already committed).
+            try:
+                self._write_rows_unchecked(rows)
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "xlsx export write failed (sqlite commit already succeeded)",
+                    exc_info=True,
+                )
+                if self.mirror is not None:
+                    _parity_alarm(self.mirror, "export write")
+            return
+        self._write_rows_unchecked(rows)
+
+    def _write_rows_unchecked(self, rows: list[dict[str, str]]) -> None:
         if self.retired:
             # Silent no-op, not an error: every real caller (initialize's
             # empty-workbook bootstrap, a fresh pick append, settle/void/etc.

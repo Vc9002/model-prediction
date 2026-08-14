@@ -386,3 +386,74 @@ def test_same_pick_id_in_two_tiers_is_two_mirror_rows(tmp_path) -> None:
         assert len(store.records(tier="main")) == 1
         assert len(store.records(tier="flat")) == 1
         assert len(store.records()) == 2
+
+
+def test_sqlite_authority_mirror_failure_aborts_the_mutation(tmp_path) -> None:
+    """J: under sqlite authority the mirror IS the canonical store — its
+    failure raises, the mutation did not land, and the XLSX export must
+    not be written for a failed mutation."""
+    from model_prediction.ledger import PickLedger
+    from tests.test_ledger import request as make_request
+
+    class _RaisingMirror:
+        def __init__(self, paths: RuntimePaths) -> None:
+            self.paths = paths
+
+        def apply(self, mutation) -> bool:
+            raise RuntimeError("canonical store down")
+
+    paths = RuntimePaths.for_test(tmp_path)
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tier="main",
+        mirror=_RaisingMirror(paths),
+        authority="sqlite",
+    )
+    import pytest as _pytest
+
+    with _pytest.raises(RuntimeError, match="canonical store down"):
+        ledger.append_call(make_request(), 0.25, 70)
+    # The mutation failed canonically — no open rows anywhere.
+    assert ledger.report()["open"] == 0
+
+
+def test_sqlite_authority_export_failure_is_best_effort(tmp_path) -> None:
+    """J: when the canonical store succeeds, an XLSX export failure is an
+    alarm, never a mutation failure."""
+    from model_prediction.ledger import PickLedger
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from tests.test_ledger import request as make_request
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+
+    class _ExplodingXlsx(PickLedger):
+        # The unchecked writer is the real disk path; the authority-aware
+        # wrapper above it must convert this into an alarm.
+        def _write_rows_unchecked(self, rows) -> None:
+            raise OSError("export disk full")
+
+    ledger = _ExplodingXlsx(
+        tmp_path / "picks.xlsx",
+        tier="flat",
+        mirror=store,
+        authority="sqlite",
+    )
+    row = ledger.append_call(make_request(), 0.25, 70)  # must succeed
+    assert row["pick_id"]
+    # The canonical store has the row; the alarm recorded the export gap.
+    records = store.records(tier="flat")
+    assert len(records) == 1 and records[0]["pick_id"] == row["pick_id"]
+    alarm = paths.ledgers_root / "parity_alarm.jsonl"
+    assert alarm.is_file() and "export" in alarm.read_text(encoding="utf-8")
+    store.close()
+
+
+def test_authority_flag_resolves_from_env_in_constructors(tmp_path, monkeypatch) -> None:
+    """The live constructors honor MODEL_PREDICTION_LEDGER_AUTHORITY."""
+    from model_prediction.main_ledgers import ledger_authority
+
+    monkeypatch.delenv("MODEL_PREDICTION_LEDGER_AUTHORITY", raising=False)
+    assert ledger_authority() == "xlsx"
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "sqlite")
+    assert ledger_authority() == "sqlite"

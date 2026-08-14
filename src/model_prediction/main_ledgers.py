@@ -39,6 +39,15 @@ def normalize_main_sport(sport: str) -> str:
     return normalized
 
 
+def ledger_authority() -> str:
+    """J cutover flag: 'xlsx' (dual-write, legacy authoritative) or
+    'sqlite' (runtime store canonical, XLSX becomes best-effort export).
+    Operator flag-day flips MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite."""
+    import os
+
+    return os.environ.get("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
+
+
 def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
     """The dual-write SQLite mirror for live tiers (G4).
 
@@ -72,6 +81,7 @@ def main_ledger(data_root: str | Path, sport: str) -> PickLedger:
         model_ledgers_dir=root / "model_ledgers",
         tier="main",
         mirror=ledger_mirror(root),
+        authority=ledger_authority(),
         sport=normalized,
     )
 
@@ -87,6 +97,7 @@ def existing_main_ledgers(data_root: str | Path) -> list[PickLedger]:
             model_ledgers_dir=Path(data_root) / "model_ledgers",
             tier="main",
             mirror=ledger_mirror(Path(data_root)),
+            authority=ledger_authority(),
             sport=path.stem.casefold(),
         )
         for path in sorted(directory.glob("*.xlsx"))
@@ -108,6 +119,7 @@ def flat_ledger(data_root: str | Path, sport: str) -> PickLedger:
         model_ledgers_dir=root / "model_ledgers",
         tier="flat",
         mirror=ledger_mirror(root),
+        authority=ledger_authority(),
         sport=normalized,
     )
 
@@ -162,6 +174,7 @@ class MultiSportPickLedger:
                 model_ledgers_dir=self.data_root / "model_ledgers",
                 tier="flat" if flat else "main",
                 mirror=ledger_mirror(self.data_root),
+                authority=ledger_authority(),
                 sport=sport,
                 **ledger_kwargs,
             )

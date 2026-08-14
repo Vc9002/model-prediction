@@ -34,6 +34,15 @@ def research_ledger_path(
     return Path(data_root) / directory / f"{normalized}.xlsx"
 
 
+def ledger_authority() -> str:
+    """J cutover flag: 'xlsx' (dual-write, legacy authoritative) or
+    'sqlite' (runtime store canonical, XLSX becomes best-effort export).
+    Operator flag-day flips MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite."""
+    import os
+
+    return os.environ.get("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
+
+
 def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
     """The dual-write SQLite mirror for live tiers (G4).
 
@@ -66,6 +75,7 @@ def research_ledger(
         model_ledgers_dir=root / "model_ledgers",
         tier="gated_research" if gated else "research",
         mirror=ledger_mirror(root),
+        authority=ledger_authority(),
         sport=normalize_research_sport(sport),
     )
 
@@ -85,6 +95,7 @@ def existing_research_ledgers(
             model_ledgers_dir=Path(data_root) / "model_ledgers",
             tier="gated_research" if gated else "research",
             mirror=ledger_mirror(Path(data_root)),
+            authority=ledger_authority(),
             sport=path.stem.casefold(),
         )
         for path in sorted(directory.glob("*.xlsx"))
