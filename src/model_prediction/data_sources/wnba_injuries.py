@@ -1,4 +1,7 @@
 """Point-in-time capture of the official WNBA injury report.
+# TODO(P2-7): this module has near-zero behavioral coverage — see
+# MASTER.md P2-7. The PDF token extraction is the highest-risk untested
+# path in the WNBA availability pipeline.
 
 The WNBA publishes an index of timestamped PDF reports.  This module stores the
 original bytes and a normalized JSON snapshot together.  A forecast must use a

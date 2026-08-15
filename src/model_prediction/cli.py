@@ -1,4 +1,7 @@
 """model-prediction CLI.
+# TODO(P2-1): ~4,300-line monolith with ~48 subcommands and near-zero
+# direct behavioral coverage — see MASTER.md P2-1 / docs/TODO.md. Split
+# per the ENGINEERING_ROADMAP before adding new commands.
 
 HACK(DD-6): 4,407-line monolithic file with 48 subcommands, near-zero test
 coverage. Should be split into a cli/ package with one module per command

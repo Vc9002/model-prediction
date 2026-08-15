@@ -1,0 +1,9 @@
+# Pre-commit lint gate. Install once with: pre-commit install
+# (DD-9: lint violations previously accumulated between CI runs.)
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
