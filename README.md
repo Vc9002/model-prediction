@@ -25,7 +25,7 @@ defects are repaired.
 | Ruff | ~120 baseline findings (no new findings vs baseline) |
 | Git | `main` + 20 other local / 7 other remote branches (drifts fast — run `git branch -a` for the current list) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
-| Release status | **Blocked** — see `docs/PROJECT_STATUS.md` for why |
+| Release status | **Not released for real money** — all 6 P0 execution defects resolved, but MLB v8 is `qualified: false` (operator-override) and totals is a known gap; see `docs/PROJECT_STATUS.md` → Release verdict |
 
 Do not infer executable profitability from artifact hit rates, synthetic
 `-110` units, shadow-ledger P&L, or a dashboard qualification badge.
@@ -293,7 +293,7 @@ is only one forecast/settlement code path regardless of how it's invoked:
 `execute` and `sell-position` place and close real Polymarket orders. This
 path is architecturally separate from every shadow ledger above, requires
 its own authenticated dashboard endpoint (added 2026-08-02), and is currently
-**blocked** per [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) pending
+**not released for real money** per [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)'s Release verdict
 repair of known execution-binding and ledger/audit transaction defects. None
 of the workflows above ever touch real money — Main, Flat, Research, and
 Gated Research are shadow/paper-trading only.

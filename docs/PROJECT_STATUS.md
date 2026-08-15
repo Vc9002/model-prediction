@@ -307,7 +307,7 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 **The 6 originally-identified P0 real-money-execution defects are resolved or confirmed non-issues** (verified 2026-08-03/04, full evidence in `MASTER.md`'s P0 section and Fixed Bugs log):
 
 1. Execution-ticket binding — resolved 2026-08-03, extended to spread/total/btts (F-49), and the dashboard-side gap that made that fix unreachable from the real order flow is also now fixed (F-53, 2026-08-04)
-2. Ledger/audit atomicity — confirmed the original claim was backwards (audit is appended *before* the ledger write); true cross-file atomicity across separate files still doesn't exist as a lower-severity, real architectural gap
+2. Ledger/audit atomicity — confirmed the original claim was backwards (audit is appended *before* the ledger write); since the J cutover the CANONICAL store commits mutation + audit event in one SQLite transaction (G2), so the cross-file gap now applies only to the legacy XLSX export path
 3. Artifact qualification / quote `timestamp_valid` enforcement — resolved as a deliberate operator decision (qualification no longer gates classification) plus re-verified `timestamp_valid` handling is correct everywhere it applies
 4. `market-residual-v1.json` — resolved 2026-08-03 (F-50), real artifact trained, wired as diagnostic-only
 5. MLB spread artifact reused for totals — resolved 2026-08-03 (F-51), both now point at their own real, live Measured Edge artifacts
@@ -318,7 +318,7 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 - MLB v8 (the active moneyline artifact) is honestly `qualified: false` — real, positive signal (58.5% holdout hit rate, well above the 50% coin-flip line) but does not clear this project's own 60% promotion bar, on top of a validation-set Brier regression vs. the feature set it replaced. It is live via the same operator-override mechanism v7 used, not because it passed cleanly.
 - MLB totals still has a known, unfixed accuracy gap — a real elasticity refit was attempted and promoted 2026-08-04 but honestly did not improve it (P1-17/F-62); needs an absolute-run-environment-specific model change, not another elasticity refit.
 - Esports Elo's thin/stale-data overconfidence gap has a real fix now (F-63, 2026-08-04): inactivity decay + thin-data shrink reduced mean predicted edge on genuinely thin-data matchups by ~30-35% across all 5 titles on real held-out data, at a modest, disclosed locked-test accuracy cost in 4 of 5 titles.
-- The general cross-file ledger/audit atomicity gap (item 2 above) is real, if lower-severity than originally described.
+- The cross-file ledger/audit atomicity gap (item 2 above) now applies only to the legacy XLSX export; the canonical SQLite store is single-transaction since J.
 
 Do not infer executable profitability from artifact hit rates, synthetic
 `-110` units, shadow-ledger P&L, or a dashboard qualification badge.

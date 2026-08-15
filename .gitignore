@@ -94,3 +94,4 @@ data/features/
 backups/**/*.db
 backups/split-brain-quarantine-*/*
 !backups/split-brain-quarantine-*/*.md
+data/experiments/
