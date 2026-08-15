@@ -1,6 +1,6 @@
 {
   "schema_version": "mlb-v9-feature-table-v1",
-  "created_at_utc": "2026-08-15T06:57:14.810457Z",
+  "created_at_utc": "2026-08-15T07:08:47.639505Z",
   "rows": 6528,
   "columns": [
     "away_team",
@@ -41,9 +41,9 @@
   "dataset_hash": "6fe84441b92b96c3d03f665259ddd8730b7f35357fd56b0016091d0dd0fb598e",
   "feature_schema_hash": "e4c955e718207e9c7fc1b6592f30d42249c97bde34d71b819551a49365f9f2e1",
   "source_hashes": {
-    "mlb_games_all.jsonl": "9b553ab1af216b1fc45ce2cdeceb34d8159cd7ff8f05b99d651308f1e940b339"
+    "mlb_games_all.jsonl": "2521c9c5a6a269c0ba3df2e61bd8783de0d75d323614cc9e9f846fedd5ffadb7"
   },
-  "git_sha": "f9b0080c1388d8bca8aa74eb9a80f5aef9e4f1e7",
+  "git_sha": "d8ad141b31d170962011cdd5cbe1623103491cf5",
   "decision_horizon": "game-day walk-forward, ET dates; features computed from strictly prior completed games",
   "status": "PREP_ONLY \u2014 not to be used for model selection until burn-in passes (2026-08-18)",
   "missing_features_not_yet_built": [

@@ -74,12 +74,17 @@ p_refit| = **0.0006**, mean ~1e-4. Aggregate reproduction at the pinned
 threshold is therefore tight (148/148) even though the exact
 probabilities are unrecoverable.
 
-### 4. Provenance gap in the games file
+### 4. Provenance gap in the games file — FIXED 2026-08-15
 
-Only 16 of 8,147 rows carry `raw_source` (the rows ingested since
-08-14). The 08-14 session record claims a provenance backfill for every
-row; it never landed in this file. The frozen v9 feature table manifest
-must not claim source hashes that do not exist.
+Only 16 of 8,147 rows carried `raw_source` (the rows ingested since
+08-14); the 08-14 session record's claimed backfill never landed in this
+file. Fixed: `scripts/mlb_provenance_backfill.py` matched every
+unprovenanced row to the EARLIEST surviving ESPN snapshot containing its
+event_id (8,131 filled, 0 unmatched, 658 distinct snapshots,
+2024-02-22..2026-08-14), stamped the ingest convention verbatim
+(raw_source/raw_hash/parser_version), and verified 0 non-provenance
+field mismatches vs the pre-backfill backup. Walk-forward rows and v8
+parity numbers are unchanged; only the games-file source hash moved.
 
 ### 5. Missingness policy is undocumented
 
