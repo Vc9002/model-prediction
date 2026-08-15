@@ -250,6 +250,13 @@ def test_validation_is_locked_chronological_and_never_promotes(tmp_path) -> None
     artifact = json.loads((tmp_path / "models/kbo-tie-aware-elo-v2.json").read_text())
     assert artifact["qualified_for_betting"] is False
     assert artifact["target"] == "expected moneyline settlement where a tie pays 0.50"
+    # Production-model audit gap #2 (2026-08-15): champion evidence must
+    # live INSIDE the artifact — the v8-style structured blocks.
+    assert set(artifact["training"]) == {"coefficient_fit", "threshold_selection", "locked_holdout"}
+    assert artifact["training"]["coefficient_fit"]["observations"] == report["chronological_split"]["train"]["n"]
+    assert artifact["training"]["locked_holdout"]["observations"] == report["chronological_split"]["locked_test"]["n"]
+    assert "locked_test" in artifact["qualification"]
+    assert artifact["qualification"]["qualified"] is False
 
 
 class _MarketClient:

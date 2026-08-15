@@ -843,6 +843,34 @@ def validate_esports_baseline(
         "matches_sha256": source_manifest["matches_sha256"],
         "qualified_for_betting": False,
         "units": 0,
+        # Structured lineage blocks (added 2026-08-15, production-model
+        # audit gap #2): champion evidence now lives IN the artifact, the
+        # same shape the MLB/WNBA LR artifacts carry — so a promoted
+        # esports artifact self-documents its holdout record instead of
+        # leaving it in external validation reports.
+        "training": {
+            "coefficient_fit": {
+                "observations": len(train),
+                "start_utc": train[0]["start_utc"],
+                "end_utc": train[-1]["start_utc"],
+            },
+            "threshold_selection": {
+                "observations": len(validation),
+                "start_utc": validation[0]["start_utc"],
+                "end_utc": validation[-1]["start_utc"],
+            },
+            "locked_holdout": {
+                "observations": len(test),
+                "start_utc": test[0]["start_utc"],
+                "end_utc": test[-1]["start_utc"],
+            },
+        },
+        "qualification": {
+            "locked_test_all_matches": _metrics(test_predictions),
+            "locked_test_selected_matches": _metrics(test_predictions, chosen_threshold),
+            "qualified": False,
+            "promotion_rationale": "",
+        },
     }
     artifact_hash = hashlib.sha256(_canonical_json(artifact).encode()).hexdigest()
     artifact["artifact_hash"] = artifact_hash
