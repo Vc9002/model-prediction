@@ -1,0 +1,43 @@
+{
+  "sample": 40,
+  "features": {
+    "elo_probability": {
+      "rows_compared": 40,
+      "max_abs_delta": 0.0,
+      "mean_abs_delta": 0.0,
+      "exact_matches": 40
+    },
+    "park_factor": {
+      "rows_compared": 40,
+      "max_abs_delta": 0.0,
+      "mean_abs_delta": 0.0,
+      "exact_matches": 40
+    },
+    "trend_gap": {
+      "rows_compared": 40,
+      "max_abs_delta": 0.0,
+      "mean_abs_delta": 0.0,
+      "exact_matches": 40
+    },
+    "weather_factor": {
+      "rows_compared": 40,
+      "max_abs_delta": 0.029,
+      "mean_abs_delta": 0.008715,
+      "exact_matches": 9
+    },
+    "starter_era_gap": {
+      "rows_compared": 36,
+      "exact_matches": 2,
+      "mismatches": [
+        "401814892 train=1.836623 serve=1.836600",
+        "401814895 train=1.792853 serve=1.792800",
+        "401814901 train=-0.166795 serve=-0.166800",
+        "401814896 train=1.861644 serve=1.861600",
+        "401814893 train=-0.872932 serve=-0.872900"
+      ]
+    }
+  },
+  "layer_L": {
+    "note": "artifacts record positive_class='home'; learned_forward never reads the field and always returns the home-win probability. Consistent with every shipped artifact today, but the orientation field is inert at serving time."
+  }
+}

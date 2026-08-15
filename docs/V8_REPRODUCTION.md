@@ -99,11 +99,11 @@ availability flags per feature per row make this explicit (layer J).
 | B split boundaries | PASS — 3,814 / 1,082 exact; holdout +29 explained |
 | C feature order | PASS — harness order equals artifact order |
 | K threshold | PASS — pinned verbatim |
-| L orientation | CHECK — positive_class applied; serving-side cross-check pending |
+| L orientation | CHECK — artifacts record positive_class='home'; learned_forward never reads the field (always returns home-win p). Consistent with every shipped artifact, but the field is inert at serving — hardening note |
 | A cohort identity | PARTIAL — 31 net-new identified and excluded; 2 freeze-time rows unidentifiable (no snapshot) |
 | Coefficients | FAIL (drift ≤ 0.0107) — freeze-time features unrecoverable |
 | Row probability | BOUNDED — max Δp 0.0006 vs refit; calls 148/148 |
-| D–I per-feature train/serve parity | PENDING — sampled learned_forward cross-check not yet run |
+| D–I per-feature train/serve parity | PASS (40-game sample, 2026-08-15): elo/trend/park 40/40 exact; weather ≤0.029 source-drift (archive recompute vs build-time value, no definition skew); starter ≤5e-4 (map stores rounded gaps, live computes raw) — see outputs/research/mlb_v8_parity/feature_parity_sample.json |
 | J missing-feature | NOTED — no NaN features in holdout; policy undocumented |
 
 ## What this means for the v8 reproduction decision
