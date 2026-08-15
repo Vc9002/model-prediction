@@ -332,10 +332,10 @@ change how you should work here:
   form) — several tests pin the no-env repo-colocated default; setting the
   launchd env vars makes ~12 of them red by retargeting them at the live
   runtime root.
-- **Still open (explicit operator action needed)**: regenerating
-  `outputs/rebuild/verification.json` (gitignored CI evidence; rebuild
-  status shows degraded while absent); the v8 park-factor 2026-table leak
-  (needs a refit under v8's contract — v9 is clean via `park_factor_pit`).
-  The `com.modelprediction.production` / `com.modelprediction.rebuild-shadow`
-  agents are loaded as of the 2026-08-14 cutover.
+- **Standing open items (2026-08-15)**: the v8 park-factor static-table
+  leak is verified and documented (`docs/V8_REPRODUCTION.md`) — v8 is never
+  modified; v9 uses `park_factor_pit`. `outputs/rebuild/verification.json`
+  is CI-generated evidence (CONSOLIDATION.md policy) — a local 404 is
+  expected. Soccer's Odds API credential remains a known-DEGRADED external
+  dependency. The two launchd research agents are loaded and producing.
 

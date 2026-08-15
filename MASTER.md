@@ -64,11 +64,11 @@ since it wasn't in this session's scope, flagged here so it isn't relied on.
 
 | Metric | Value |
 |---|---|
-| Tests | **1759 pass, 3 skipped** (2026-08-14, after the KBO settlement fix; was 706 after F-66/DD-2, 699 after F-63, 694 after F-62, 692 after F-58 through F-61, 686 after F-53 through F-57, 675 after the deep-debug session, 673 after P1 cleanup, 670 after F-47/F-48, 654 before that — many sessions' worth of test growth between 706 and 1759 not individually logged here) |
-| Ruff | **~120 findings in `src/ tests/`** (2026-08-14; same pre-existing baseline, no new findings — most are EXE002 shebang-on-test-files; was 126 as of 2026-08-04) |
+| Tests | **1,875 collected / 1,872+ pass, 3 skipped** (2026-08-15; the +3 are the 2026-08-15 regression tests: supervisor fail-closed, runtime-paths fail-closed, store thread-affinity) |
+| Ruff | **0 findings** (2026-08-15 — baseline cleared: exec bits removed, safe auto-fixes, noqa-with-justification for deliberate catches; `.pre-commit-config.yaml` added) |
 | Audit chain | **Re-verified 2026-08-14**: `verify-chain` reports `chain_intact: true`, `break_count: 0`, after today's 406-row archival + KBO settlement corrections (73,333 audit lines). |
-| Git | **21 local branches (20 besides `main`), 8 remote refs (7 besides `origin/HEAD`) as of 2026-08-14 — not single-branch.** Local `main` HEAD is `e1f12bf`, 8 commits ahead of `origin/main` (`0da4b81`); pushed to `origin/cleanup/final-debug-2026-08-14` for exact-head CI, not yet merged. Older rows below claiming a single-branch state or `31d3b7c`/`01634e2` HEADs are stale. |
-| Last pushed commit | **`e1f12bf` pushed to `origin/cleanup/final-debug-2026-08-14` (2026-08-14) — `origin/main` itself is still at `0da4b81`, 8 commits behind.** The `52da4a5`/`31d3b7c` figures below are stale. |
+| Git | **Single branch: `main`** (2026-08-15 hygiene pass: 19 stale branches + 2 worktrees removed after verification). `main` tracks `origin/main`; consolidation merged via PR #30 (`37be479`), tag `consolidation-2026-08-15`. Research workspace: worktree at the frozen tag, branch `research/mlb-v8-reproduction`. |
+| Last pushed commit | `main` (2026-08-15); CI green on the exact merged head; subsequent pushes are docs/fix commits. |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on every push/PR, Python 3.12, ubuntu-latest. Pre-push hook also runs pytest (blocking) + mypy (advisory) locally. |
 | Dashboard | Live at `127.0.0.1:8765`, launchd-managed, per-session token-based auth. Order-readiness (`_pick_quote`) now correctly resolves spread/total, not just moneyline (F-53). |
 | Daily pipeline | **Running through 2026-08-04**, two real `--log` runs verified today; `run_daily.sh` does settle → ingest → daily forecast; locked via `daily_lock.py`. New capture step keeps `data/mlb_statsapi/game_snapshots.jsonl` current (F-54). |
@@ -301,7 +301,7 @@ exactly, 0 new.
 |---|---|---|
 | P1-11 | WNBA 78.3% total baseline | `wnba-backtest.json` has 0 dates examined (`insufficient_history`). `total_research_artifact` in `config/model.yaml` points to `wnba-spread-baseline-v1.json` — a **spread baseline misused as a totals model** |
 | P1-12 | MLB ingest intermittently misses games | Intermittent ESPN API issue — hard to reproduce. Consider adding a missed-game detector comparing ESPN scoreboard IDs against ingested IDs |
-| P1-13 | Validation report unreproducible | `learned-model-validation.json` from 2026-07-27 references stale worktree paths + old artifacts. Needs regeneration via `model-prediction validate-learned` |
+| P1-13 | Validation report unreproducible | `learned-model-validation.json` from 2026-07-27 references stale worktree paths + old artifacts. → DONE 2026-08-15 via `model-prediction validate-models` (the `validate-learned` name was stale) |
 
 **P1-17 (MLB totals over-picks "over") moved out of this table 2026-08-05**: refit attempted and promoted (F-62) per operator directive — real Poisson-GLM elasticity refit (`mlb-analyst-poisson-trend-v0.3`) shipped, margin/spread genuinely improved, but totals specifically did not improve (see F-62's full numbers). Closed as "worked, honestly did not fix it" rather than left as an open follow-up item — the next real step is a structurally different feature (`totals_specific_market_residual`/`branched_absolute_run_intensity_head`, already in `config/model.yaml`'s `problem_cohorts.totals`), not another elasticity pass. This correction itself fixes a real inconsistency: this table still listed P1-17 as open after Part 2's checklist had already marked it `[x]` done.
 
