@@ -25,17 +25,16 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
-from statistics import mean
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import numpy as np  # noqa: E402
-from sklearn.metrics import roc_auc_score  # noqa: E402
+import numpy as np
+from mlb_research_common import pinned_cohort
+from sklearn.metrics import roc_auc_score
 
-from mlb_research_common import pinned_cohort  # noqa: E402
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
-from model_prediction.validation import (  # noqa: E402
+from model_prediction.config import PROJECT_ROOT
+from model_prediction.validation import (
     FEATURE_VARIANTS,
     _all_rows_calibration,
     _fit,
@@ -45,6 +44,37 @@ from model_prediction.validation import (  # noqa: E402
 DEFAULT_BASELINE = "elo_trend_park_weather_starter_bullpen"
 BOOTSTRAP_SEED = 20260815
 N_BOOTSTRAP = 2000
+
+
+def _in_window_game_count() -> int:
+    """Real MLB games inside v8's pinned holdout window (ET dates)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from mlb_research_common import v8_contract
+
+    c = v8_contract()
+    count = 0
+    games_path = PROJECT_ROOT / "data/historical/mlb_games_all.jsonl"
+    for line in games_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            game = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        start = str(game.get("event_start_utc") or "")
+        if not start:
+            continue
+        day = (
+            datetime.fromisoformat(start)
+            .astimezone(ZoneInfo("America/New_York"))
+            .date()
+            .isoformat()
+        )
+        if c["validation_end"] < day <= c["holdout_end"]:
+            count += 1
+    return count
 
 
 def _scores(probabilities: list[float], outcomes: list[int]) -> dict:
@@ -108,6 +138,8 @@ def main() -> int:
     parser.add_argument("--variants", nargs="+", required=True,
                         help="feature-variant names (validation.FEATURE_VARIANTS keys)")
     parser.add_argument("--baseline", default=DEFAULT_BASELINE)
+    parser.add_argument("--bootstrap", type=int, default=N_BOOTSTRAP,
+                        help="bootstrap resamples per paired metric (smoke runs lower this)")
     parser.add_argument("--out", default=str(
         PROJECT_ROOT / "outputs/research/mlb_evaluator/report.json"))
     args = parser.parse_args()
@@ -146,7 +178,10 @@ def main() -> int:
         probs = _predict(_fit(train, names), exact_holdout, names)
         metrics = _scores(probs, outcomes)
         cal = _all_rows_calibration(probs, exact_holdout)
-        coverage = float(mean(1.0 for r, p in zip(exact_holdout, probs, strict=True) if p == p))
+        # Cohort coverage: rows the walk-forward built / real in-window
+        # games (features drop games with unavailable inputs, so coverage
+        # < 1 is a real availability signal, not a placeholder).
+        coverage = float(len(exact_holdout)) / max(1, _in_window_game_count())
         per_split = {
             "train": _all_rows_calibration(_predict(_fit(train, names), train, names), train),
             "validation": _all_rows_calibration(
@@ -154,8 +189,8 @@ def main() -> int:
             "holdout": cal,
         }
         paired = {
-            "log_loss": _date_cluster_bootstrap_paired(dates, base_probabilities, probs, outcomes, "log_loss"),
-            "brier": _date_cluster_bootstrap_paired(dates, base_probabilities, probs, outcomes, "brier"),
+            "log_loss": _date_cluster_bootstrap_paired(dates, base_probabilities, probs, outcomes, "log_loss", n_bootstrap=args.bootstrap),
+            "brier": _date_cluster_bootstrap_paired(dates, base_probabilities, probs, outcomes, "brier", n_bootstrap=args.bootstrap),
         }
         report["variants"][variant] = {
             "features": names,
