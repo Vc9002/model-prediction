@@ -1,5 +1,12 @@
 # MLB v8 reproduction — contract, findings, status
 
+> CI note: this branch freezes the code at `consolidation-2026-08-15`.
+> The CI "Legacy Ruff no-new-fingerprint" job FAILS HERE BY DESIGN —
+> the frozen code carries the pre-clearance lint findings while the
+> baseline (`origin/main`) was cleared on 2026-08-16, so the gate reads
+> historical findings as "new". The Incumbent test jobs are green;
+> the delta gate matters again only when this branch's work merges.
+
 Research-only document. Burn-in (O) runs through 2026-08-18; no promotion
 or serving decisions are made from anything in this file.
 
