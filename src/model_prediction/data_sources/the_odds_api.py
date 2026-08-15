@@ -47,7 +47,7 @@ class TheOddsAPIClient:
             response = self.client.get(url, **kwargs)
             response.raise_for_status()
             return response
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — both transport and HTTP errors embed the URL; the key must be redacted before re-raising
             # Both transport errors and HTTP status errors embed the URL —
             # redact the API key from the message before re-raising.
             #

@@ -886,7 +886,7 @@ def validate_international_baseball_baseline(
         gate_units = gate_hits * (10 / 11) - (gate_calls - gate_hits) if gate_calls else 0.0
         gate_holdout_end = (
             max(date.fromisoformat(day) for _, _, day in selected_for_grade)
-            if selected_for_grade else date.today()
+            if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
         )
         gate_monthly = _monthly_grade(selected_for_grade, holdout_end=gate_holdout_end)
         gate_every_month_positive = all(

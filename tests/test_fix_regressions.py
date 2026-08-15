@@ -35,31 +35,31 @@ from model_prediction.units import Exposure, UnitPolicy
 
 def _future_request(league=League.LOL, selection="home", **overrides) -> PickRequest:
     start = (datetime.now(UTC) + timedelta(hours=6)).isoformat()
-    values = dict(
-        event_start_utc=start,
-        event_id=overrides.pop("event_id", "evt-1"),
-        league=league,
-        away_team="Team Away",
-        home_team="Team Home",
-        market_type=MarketType.MONEYLINE,
-        selection=selection,
-        line=None,
-        sportsbook="polymarket_us",
-        american_odds=100,
-        model_probability=0.57,
-        model_uncertainty=None,
-        model_version="lol-neutral-series-elo-v2",
-        rationale="Neutral Elo baseline; executable ask 0.5000 (market_slug=aec-lol-a-b-2026).",
-        risks="test",
-        model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=ModelState.SHADOW_QUALIFIED,
-        observed_at_utc=datetime.now(UTC).isoformat(),
-        model_artifact_hash="hash",
-        calibration_method="neutral_elo",
-        calibration_version="lol-neutral-series-elo-v2",
-        calibration_artifact_hash="hash",
-        code_revision="lol-neutral-series-elo-v2",
-    )
+    values = {
+        "event_start_utc": start,
+        "event_id": overrides.pop("event_id", "evt-1"),
+        "league": league,
+        "away_team": "Team Away",
+        "home_team": "Team Home",
+        "market_type": MarketType.MONEYLINE,
+        "selection": selection,
+        "line": None,
+        "sportsbook": "polymarket_us",
+        "american_odds": 100,
+        "model_probability": 0.57,
+        "model_uncertainty": None,
+        "model_version": "lol-neutral-series-elo-v2",
+        "rationale": "Neutral Elo baseline; executable ask 0.5000 (market_slug=aec-lol-a-b-2026).",
+        "risks": "test",
+        "model_origin": ModelOrigin.STATISTICAL_MODEL,
+        "model_state": ModelState.SHADOW_QUALIFIED,
+        "observed_at_utc": datetime.now(UTC).isoformat(),
+        "model_artifact_hash": "hash",
+        "calibration_method": "neutral_elo",
+        "calibration_version": "lol-neutral-series-elo-v2",
+        "calibration_artifact_hash": "hash",
+        "code_revision": "lol-neutral-series-elo-v2",
+    }
     values.update(overrides)
     return PickRequest(**values)
 

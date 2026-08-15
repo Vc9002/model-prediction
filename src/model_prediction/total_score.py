@@ -268,10 +268,7 @@ class TotalScoreArtifact:
     def __init__(self, payload: dict[str, Any]) -> None:
         if payload.get("artifact_hash") != _artifact_hash(payload):
             raise ValueError("total-score artifact hash mismatch")
-        if "model" in payload:
-            self.payload = payload["model"]
-        else:
-            self.payload = payload
+        self.payload = payload.get("model", payload)
         self.fields = self._resolve_fields()
 
     def _resolve_fields(self) -> dict[str, Any]:

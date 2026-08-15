@@ -195,7 +195,7 @@ def test_write_park_factors_file_round_trips(tmp_path):
         180,
     )
     namespace: dict = {}
-    exec(compile(out_path.read_text(encoding="utf-8"), str(out_path), "exec"), namespace)
+    exec(compile(out_path.read_text(encoding="utf-8"), str(out_path), "exec"), namespace)  # noqa: S102 — deliberate: this test executes the generated module to verify its constants
     assert namespace["PARK_RUN_FACTORS"] == {"Team A": 1.05, "Team B": 0.95}
     assert namespace["park_factor"]("Team A")["park_factor"] == 1.05
     assert namespace["park_factor"]("Unknown")["status"] == "unavailable_from_source"

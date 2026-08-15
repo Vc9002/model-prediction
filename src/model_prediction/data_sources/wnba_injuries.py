@@ -131,7 +131,7 @@ def _pdf_tokens(pdf_bytes: bytes) -> tuple[list[_Token], str]:
     for page_number, page in enumerate(reader.pages):
         raw_text.append(page.extract_text() or "")
 
-        def visit(text: str, _cm: list[float], tm: list[float], _font: Any, _size: float) -> None:
+        def visit(text: str, _cm: list[float], tm: list[float], _font: Any, _size: float, page_number: int = page_number) -> None:
             cleaned = " ".join(text.split())
             if cleaned:
                 tokens.append(_Token(page_number, float(tm[4]), float(tm[5]), cleaned))
@@ -212,7 +212,7 @@ def _parse_coordinate_table(
             team_text = _column_text(line, 260, 410)
             if date_text:
                 try:
-                    current_date = datetime.strptime(date_text, "%m/%d/%Y").date().isoformat()
+                    current_date = datetime.strptime(date_text, "%m/%d/%Y").date().isoformat()  # noqa: DTZ007 — date-only extraction from the official PDF; timezone N/A
                 except ValueError as error:
                     raise ValueError(f"invalid game date in official WNBA report: {date_text}") from error
             if time_text:
@@ -256,7 +256,7 @@ def _parse_coordinate_table(
                         continue
                     if kind == "date":
                         with suppress(ValueError):
-                            current_date = datetime.strptime(value, "%m/%d/%Y").date().isoformat()
+                            current_date = datetime.strptime(value, "%m/%d/%Y").date().isoformat()  # noqa: DTZ007 — date-only extraction from the official PDF; timezone N/A
                     elif kind == "time":
                         current_time = value
                     elif kind == "matchup":
@@ -271,7 +271,7 @@ def _parse_coordinate_table(
             team_text = _column_text(line, 260, 410)
             if date_text:
                 try:
-                    current_date = datetime.strptime(date_text, "%m/%d/%Y").date().isoformat()
+                    current_date = datetime.strptime(date_text, "%m/%d/%Y").date().isoformat()  # noqa: DTZ007 — date-only extraction from the official PDF; timezone N/A
                 except ValueError as error:
                     raise ValueError(f"invalid game date in official WNBA report: {date_text}") from error
             if time_text:

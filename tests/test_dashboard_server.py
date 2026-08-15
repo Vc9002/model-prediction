@@ -143,7 +143,7 @@ def test_unsupported_live_market_view_has_timestamp_and_clear_error() -> None:
 
 
 def test_market_table_name_does_not_require_public_metadata(monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "_team_name_index", lambda: {})
+    monkeypatch.setattr(dashboard_server, "_team_name_index", dict)
     monkeypatch.setattr(
         dashboard_server,
         "_public_market_question",

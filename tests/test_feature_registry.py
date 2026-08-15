@@ -24,7 +24,7 @@ def test_feature_registry_is_complete_unique_and_points_to_existing_code() -> No
     assert len(features) == 24
     assert len(names) == len(set(names))
     assert registry["retention_policy"]["threshold"] == 0.0
-    assert set(feature["verdict"] for feature in features) <= {
+    assert {feature["verdict"] for feature in features} <= {
         "keep",
         "remove",
         "remove_candidate",

@@ -1498,7 +1498,7 @@ def _forecast_learned_sport(
                     )
             # Convert UTC event time to Eastern for consistent ledger display
             try:
-                event_et = datetime.fromisoformat(candidate.event_start_utc.replace('Z','+00:00')).astimezone(EASTERN).strftime('%Y-%m-%dT%H:%M:%S%z')
+                event_et = datetime.fromisoformat(candidate.event_start_utc).astimezone(EASTERN).strftime('%Y-%m-%dT%H:%M:%S%z')
             except (ValueError, TypeError):
                 event_et = candidate.event_start_utc
             if quote is not None:
@@ -2574,12 +2574,11 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
         leagues = _LEDGER_LEAGUE_TO_ESPN.get(row["league"], ())
         game_day = start.astimezone(EASTERN).date().isoformat()
         match = _find_espn_result(espn, leagues, game_day, row)
-        if match is None:
+        if match is None and row["league"] == "SOCCER":
             # Soccer: try collected scores from The Odds API for leagues
             # outside ESPN coverage (e.g. Brazil Serie B, K League 1).
-            if row["league"] == "SOCCER":
-                soccer_scores = _load_soccer_scores()
-                match = _find_soccer_result(row, soccer_scores)
+            soccer_scores = _load_soccer_scores()
+            match = _find_soccer_result(row, soccer_scores)
         if match is None:
             pending.append(row["pick_id"])
             continue
@@ -3777,7 +3776,7 @@ def main(argv: list[str] | None = None) -> None:
                     # snapshot for reporting, not a hard prerequisite for the
                     # forecasts that follow -- log loudly and degrade instead
                     # of taking down work that would have otherwise succeeded.
-                    logger.error("Polymarket slate/BBO capture failed for %s", args.date, exc_info=True)
+                    logger.exception("Polymarket slate/BBO capture failed for %s", args.date)
                     slate = {
                         "status": "error",
                         "event_count": 0,
@@ -3826,7 +3825,7 @@ def main(argv: list[str] | None = None) -> None:
                     sport = futures[future]
                     try:
                         forecast_result[sport] = future.result()
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001 — a failed sport must degrade to an error dict, never take down the whole forecast
                         forecast_result[sport] = {
                             "sport": sport, "status": "error", "reason": str(exc),
                             "logged": 0, "candidates": [],

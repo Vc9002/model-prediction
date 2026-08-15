@@ -393,8 +393,9 @@ def _validate_lines(market_type: str, sides: dict[str, MarketSideQuote]) -> None
             raise MarketUnavailableError("spread lines unavailable")
         if abs(sides["away"].line + sides["home"].line) > 1e-9:
             raise MarketUnavailableError("spread lines are not opposites")
-    if market_type == "total":
-        if sides["over"].line is None or sides["under"].line != sides["over"].line:
+    if market_type == "total" and (
+        sides["over"].line is None or sides["under"].line != sides["over"].line
+    ):
             raise MarketUnavailableError("total lines are unavailable or incoherent")
 
 

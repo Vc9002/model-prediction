@@ -220,7 +220,7 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
         hour_index = 0
         if game_start_utc and times:
             game_start = datetime.fromisoformat(
-                game_start_utc.replace("Z", "+00:00")
+                game_start_utc
             ).astimezone(UTC)
             parsed_hours = [
                 datetime.fromisoformat(str(value)).replace(tzinfo=UTC)
@@ -267,7 +267,7 @@ def historical_weather(home_team: str, game_start_utc: str) -> dict[str, Any]:
                 "weather_run_factor": 1.0, "status": "unknown_park", "source": "none"}
     lat, lon = coords
     try:
-        game_start = datetime.fromisoformat(game_start_utc.replace("Z", "+00:00")).astimezone(UTC)
+        game_start = datetime.fromisoformat(game_start_utc).astimezone(UTC)
         day = game_start.date().isoformat()
         url = (f"https://archive-api.open-meteo.com/v1/archive?"
                f"latitude={lat}&longitude={lon}"
@@ -324,7 +324,7 @@ def resolve_weather(home_team: str, game_start_utc: str | None) -> dict[str, Any
         return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
                 "weather_run_factor": 1.0, "status": "unavailable_from_source", "source": "none"}
     try:
-        start = datetime.fromisoformat(str(game_start_utc).replace("Z", "+00:00")).astimezone(UTC)
+        start = datetime.fromisoformat(str(game_start_utc)).astimezone(UTC)
     except ValueError:
         return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
                 "weather_run_factor": 1.0, "status": "unavailable_from_source", "source": "none"}
