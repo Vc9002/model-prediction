@@ -85,11 +85,14 @@ def test_settled_pick_keeps_its_decision_time_model_size() -> None:
     assert dashboard_server._suggested_units(settled_row) == 2.0
 
 
-def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
+def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys, tmp_path: Path) -> None:
     server = Mock()
     server.serve_forever.side_effect = KeyboardInterrupt
     monkeypatch.setattr(dashboard_server, "ThreadingHTTPServer", Mock(return_value=server))
     monkeypatch.setattr("sys.argv", ["dashboard_server.py"])
+    # main() writes/unlinks the pidfile; never touch the live dashboard's
+    # ownership evidence (P0-3: launchctl/lsof/server.pid must agree).
+    monkeypatch.setattr(dashboard_server, "PID_FILE", tmp_path / "server.pid")
 
     dashboard_server.main()
 
