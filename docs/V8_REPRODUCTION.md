@@ -122,5 +122,19 @@ Either way, **v8 itself is never modified** (park defect included).
 
 `mlb_v9_feature_table.parquet` + manifest (dataset_hash,
 feature_schema_hash, source hashes, git SHA, created_at, decision
-horizon) is being prepared during burn-in; it must NOT be used to select
-a model until burn-in passes.
+horizon) is built and committed on this branch
+(`scripts/mlb_v9_feature_table.py`, full walk-forward history, no date
+cap). Not-yet-built features (lineup strength, bullpen talent, PIT
+forecast temperature/humidity/wind/roof) are listed in the manifest;
+any addition changes the schema hash. It must NOT be used to select a
+model until burn-in passes.
+
+## Standardized evaluator (prep)
+
+`scripts/mlb_evaluator.py` — per-candidate: N, coverage, LogLoss, Brier,
+ECE, calibration slope/intercept, accuracy, AUC, per-split metrics,
+paired ΔLogLoss/ΔBrier vs the same-refit v8 baseline, and date-cluster
+bootstrap CI with P(challenger better) (2,000 resamples, seeded).
+Smoke-verified: `elo_only` vs baseline — dLL +0.0033, dBr +0.0016,
+P(better|LL)=0.002 (baseline wins, as expected). Economics stay
+secondary by design.
