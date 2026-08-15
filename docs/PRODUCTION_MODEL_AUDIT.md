@@ -27,8 +27,18 @@ cutover day), `"logged": 0`, `"status": "error"` every cycle since.
 Fixed on main (`6028d00`): one connection per thread (WAL +
 busy_timeout serialize writes), `close()` closes every thread's
 connection, revert-verified regression test
-(`test_store_usable_from_multiple_threads`). WNBA rows for 08-14/15
-remain a documented data gap.
+(`test_store_usable_from_multiple_threads`). Live-verified: the next
+cycle logged 6 open WNBA rows (08-15).
+
+Follow-up analysis of the 08-14 gap: the moneyline path's calls WERE
+logged pregame (the 08-14 log shows calls=2 logged=2 per cycle); 8
+rows were then removed by the same-day re-forecast's remove-then-
+recreate ordering while the forecast errored (thread bug) and could
+not recreate them — the started-game guard in `_clear_today_open` is
+intact; the loss was an amplification of the same root cause, now
+fixed. The WNBA spread baseline's error blocks carry no contracts, so
+those research-tier rows are unrecoverable. Net: 8 moneyline rows for
+08-14 evening games are a documented gap.
 
 ### MLB zero-open-rows — investigated, NOT a defect
 
@@ -46,11 +56,13 @@ clear-and-replace of same-day re-forecasts. No bug.
    (documented in the artifact's promotion_rationale). v9 must earn
    formal qualification; no promotion decisions during burn-in.
 2. **Esports (×5) and KBO/NPB artifacts carry no qualification or
-   training block** — their lineage schema records ratings state but no
-   holdout metrics or promotion rationale. Champion evidence for these
-   seven models lives outside the artifact (in docs/ledgers), unlike
-   the LR artifacts. Recommend: v7/v2-next builds embed the same
-   qualification/training structure v8 carries.
+   training block** — FIXED 2026-08-15 (`234b69c`): the rolling builds
+   now embed v8-style `training` (coefficient_fit / threshold_selection
+   / locked_holdout windows) + `qualification` (locked-test metrics,
+   `qualified: false`, promotion_rationale slot) blocks, hash-covered.
+   The next scheduled retrain writes the enriched schema; the frozen
+   config/models copies keep their promoted snapshot schema until the
+   next explicit promotion.
 3. **NBA and NFL have zero ledger rows ever** — research-only models,
    and NBA is deep offseason (last event 62 days ago). Expected, but
    note the NFL model will start producing rows only when the regular
