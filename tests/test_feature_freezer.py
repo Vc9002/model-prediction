@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from model_prediction.feature_freezer import freeze_features
 from model_prediction.ingest import PARSER_VERSION, Ingestor
 
@@ -64,7 +66,15 @@ def test_ingest_rows_carry_raw_provenance(tmp_path) -> None:
 
 
 def test_freeze_writes_rows_and_manifest(tmp_path) -> None:
-    """The frozen table + manifest let an experiment cite its dataset."""
+    """The frozen table + manifest let an experiment cite its dataset.
+
+    Integration smoke against real MLB history: data/ was untracked in
+    the K consolidation (2026-08-15), so the machine-local historical
+    data only exists on the operator's machine — skip in clean checkouts
+    (CI) rather than depending on untracked files.
+    """
+    if not (Path("data") / "historical" / "mlb_games_all.jsonl").is_file():
+        pytest.skip("machine-local MLB history not present (data/ untracked since K)")
     out = tmp_path / "features" / "pit_mlb.jsonl"
     manifest = freeze_features(
         sport="mlb", out_path=out, data_root=Path("data")
