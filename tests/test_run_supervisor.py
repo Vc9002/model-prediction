@@ -69,18 +69,17 @@ def test_lease_contention_skips_and_records_the_skip(tmp_path) -> None:
     # Hold the worker's lease the way another supervisor process would.
     lock_path = sup._lease_path("daily")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    handle = open(lock_path, "w", encoding="utf-8")
-    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with open(lock_path, "w", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-    code = sup.run_worker("daily", command=[sys.executable, "-c", "print('never')"])
+        code = sup.run_worker("daily", command=[sys.executable, "-c", "print('never')"])
 
-    assert code == 75  # daily_lock convention: LOCK_BUSY_EXIT
-    row = sup.latest_runs()[0]
-    assert row["status"] == "skipped"
-    assert "lease held" in row["note"]
-    assert row["exit_code"] is None
-    fcntl.flock(handle, fcntl.LOCK_UN)
-    handle.close()
+        assert code == 75  # daily_lock convention: LOCK_BUSY_EXIT
+        row = sup.latest_runs()[0]
+        assert row["status"] == "skipped"
+        assert "lease held" in row["note"]
+        assert row["exit_code"] is None
+        fcntl.flock(handle, fcntl.LOCK_UN)
     sup.close()
 
 
