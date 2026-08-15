@@ -3198,6 +3198,33 @@ secret-redaction invariants still lack direct tests.
 
 Run from the project root.
 
+### MLB v8 reproduction (aggregate + row-level)
+
+```bash
+# Aggregate pin-and-replay (date boundaries + threshold read verbatim
+# from the artifact — never re-split, never re-learn the threshold).
+env PYTHONPATH=src:. .venv/bin/python scripts/mlb_v8_reproduction.py
+
+# Row-level parity (cohort / coefficient / probability layers).
+# Lives on the research branch in the isolated worktree
+# (/Users/vincentc9002/worktrees/mlb-research, branch
+# research/mlb-v8-reproduction); see docs/V8_REPRODUCTION.md there.
+env PYTHONPATH=src:. .venv/bin/python scripts/mlb_v8_row_parity.py
+```
+
+2026-08-15 findings (research workspace @ consolidation-2026-08-15):
+aggregate replay reproduces closely (calls 150 vs 148, hit delta
+0.0052); row-level shows a **31-row net cohort drift** (post-freeze
+reconciliation backfill) plus **2 freeze-time rows missing** — v8 never
+snapshotted its holdout event-id list, so exact-cohort reproduction is
+impossible retroactively; excluding the 31 reproduces 148/148 calls.
+**Coefficient parity fails** (refit vs shipped, max delta 0.0107):
+history-dependent features (Elo/trend/park/weather) shifted with the
+backfills, so v8's exact probabilities are unrecoverable; per-row p
+drift bounded at 0.0006. v8 is never modified (its park-factor PIT
+defect is part of what v8 was). The frozen v9 feature table exists to
+prevent this class for future models.
+
 ### Health
 
 ```bash

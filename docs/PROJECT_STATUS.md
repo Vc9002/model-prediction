@@ -87,6 +87,24 @@ rollback artifacts are not current operational truth.
   08-18): checklist and results in `docs/BURN_IN.md`. Day-0 checks pass.
   GitHub purge template for the briefly-exposed quarantine DB commits:
   `docs/PURGE_REQUEST_TEMPLATE.md`.
+- **Git hygiene (2026-08-15)**: 19 stale local branches + 2 stale
+  worktrees deleted after verification (0 unique commits vs origin/main
+  or superseded parallel implementations; one dirty doc diff preserved
+  under `backups/removed-branch-artifacts-20260815/`); merged remote
+  `cleanup/final-debug-2026-08-14` deleted; `main` tracks `origin/main`.
+- **MLB research prep started (burn-in window, isolated workspace)**:
+  worktree at the frozen tag (`worktrees/mlb-research`, branch
+  `research/mlb-v8-reproduction`) with data symlinked from the live
+  checkout. Aggregate v8 pin-and-replay re-confirmed (150 vs 148 calls,
+  hit delta 0.0052). New row-level parity tooling found: 31 net-new
+  post-freeze holdout rows (+2 freeze-time rows lost, no snapshot
+  exists to identify them); excluding the 31 reproduces 148/148 calls;
+  coefficient parity fails (refit vs shipped max delta 0.0107) because
+  history-dependent features shifted with backfills — v8's exact
+  probabilities are unrecoverable, per-row drift bounded at 0.0006.
+  Full contract + findings: `docs/V8_REPRODUCTION.md` (research branch).
+  No promotion decisions; v8 unmodified. Next prep: frozen v9 feature
+  table + standardized evaluator.
 
 ## 2026-08-14 session changes (KBO settlement bug, ledger archival, doc corrections)
 
