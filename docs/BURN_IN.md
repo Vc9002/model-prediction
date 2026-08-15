@@ -53,3 +53,16 @@ Run each at least once per day during the window; record results here.
 Burn-in passes when three consecutive clean days are recorded, after
 which the research sequence starts: MLB v8 reproduction first (frozen
 benchmark, exact reproduction gate), then MLB v9 ablations.
+
+## Mid-burn-in defect fixed (2026-08-15, day 0)
+
+The burn-in caught a real defect: after the sqlite-ledger-authority
+cutover, the WNBA threaded forecast logged **0 rows** (212
+"SQLite objects created in a thread can only be used in that same
+thread" errors in the 08-14 daily log; 0 occurrences on 08-13).
+`RuntimeLedgerStore` shared one sqlite3 connection across the
+ThreadPoolExecutor forecast workers. Fixed with per-thread connections
+(+ regression test, revert-verified). WNBA rows for 08-14/15 are a
+documented data gap — not backfilled. MLB's zero open rows the same
+days were investigated and are design-consistent (below-confidence
+research candidates + overnight unmatched quotes), not a defect.

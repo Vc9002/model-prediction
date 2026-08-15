@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import threading
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Self
@@ -177,34 +178,61 @@ class RuntimeLedgerStore:
     def __init__(self, paths: RuntimePaths) -> None:
         self.paths = paths
         paths.ledgers_root.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(paths.ledgers_db, timeout=10.0)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA busy_timeout=5000")
-        schema_row = self._conn.execute(
-            "SELECT sql FROM sqlite_master WHERE name = 'ledger_records'"
-        ).fetchone()
-        pk_matches = (
-            schema_row is not None
-            and "PRIMARY KEY (pick_id, ledger_tier)" in (schema_row[0] or "")
-        )
-        if schema_row is not None and not pk_matches:
-            # Schema change on a mirror: drop + rebuild. This is safe
-            # because the mirror is fully reconstructible from the
-            # authoritative XLSX via ledger_parity backfill (deterministic
-            # operation ids) — never do this to a canonical store. The
-            # check is STRUCTURAL (the table's own declared key), not a
-            # version pragma — a pragma can be stamped by a half-run but
-            # the table can't lie about its shape.
-            self._conn.executescript(
-                "DROP TABLE IF EXISTS ledger_records; "
-                "DROP TABLE IF EXISTS ledger_events;"
+        # One connection PER THREAD. The forecast fan-out runs sports in
+        # ThreadPoolExecutor workers, and sqlite3 forbids using a
+        # connection from any thread other than the one that created it —
+        # sharing one store connection across workers made every
+        # threaded-forecast ledger write fail with
+        # "SQLite objects created in a thread can only be used in that
+        # same thread" (found live 2026-08-15: WNBA logged 0 rows for a
+        # full day after the sqlite-authority cutover). WAL + busy_timeout
+        # serialize cross-thread writes.
+        self._local = threading.local()
+        self._connections: list[sqlite3.Connection] = []
+        with self._conn as conn:  # bootstrap schema once
+            schema_row = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'ledger_records'"
+            ).fetchone()
+            pk_matches = (
+                schema_row is not None
+                and "PRIMARY KEY (pick_id, ledger_tier)" in (schema_row[0] or "")
             )
-        self._conn.executescript(_SCHEMA)
-        self._conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+            if schema_row is not None and not pk_matches:
+                # Schema change on a mirror: drop + rebuild. This is safe
+                # because the mirror is fully reconstructible from the
+                # authoritative XLSX via ledger_parity backfill (deterministic
+                # operation ids) — never do this to a canonical store. The
+                # check is STRUCTURAL (the table's own declared key), not a
+                # version pragma — a pragma can be stamped by a half-run but
+                # the table can't lie about its shape.
+                conn.executescript(
+                    "DROP TABLE IF EXISTS ledger_records; "
+                    "DROP TABLE IF EXISTS ledger_events;"
+                )
+            conn.executescript(_SCHEMA)
+            conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+
+    @property
+    def _conn(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self.paths.ledgers_db, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
+            self._local.conn = conn
+            self._connections.append(conn)
+        return conn
 
     def close(self) -> None:
-        self._conn.close()
+        # Close every thread's connection; sqlite3 forbids closing a
+        # connection from another thread, so skip any that error.
+        for conn in self._connections:
+            try:
+                conn.close()
+            except sqlite3.ProgrammingError:
+                pass
+        self._connections.clear()
 
     def __enter__(self) -> Self:
         return self
