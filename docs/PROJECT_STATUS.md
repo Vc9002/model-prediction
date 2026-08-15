@@ -1,9 +1,11 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-14, local `main` at `e1f12bf` (8 commits ahead of
-`origin/main` at `0da4b81`, pushed to `origin/cleanup/final-debug-2026-08-14`
-for exact-head CI — not yet merged). Production canary deployed;
-champion/challenger gating added; KBO settlement bug fixed.
+**Last verified**: 2026-08-16, local `main` at `c067fd8` tracking
+`origin/main` (consolidation merged via PR #30 @ `37be479`, tag
+`consolidation-2026-08-15`). Burn-in day 1 of 3 passing. Ruff baseline
+cleared (0 findings), pre-commit hook installed, TODO P0/P1 fully
+resolved with evidence, docs restructured (one-shot records archived
+under `docs/archive/`).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -12,6 +14,35 @@ this file exists to be the short, current summary someone can read first.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-15/16 — open-items closure (post-consolidation sweep)
+
+Every open item from the read-through was fixed, closed with evidence,
+or explicitly deferred by design:
+
+- **Code debt**: dead `SportModel`/`ScoreModel` protocols removed; ruff
+  baseline cleared to **0 findings** with `.pre-commit-config.yaml`
+  installed; in-code debt markers added (cli/dashboard monoliths, WNBA
+  PDF path); DD-14 closed (the 105 model_id-less rows are a bounded
+  08-14 cutover-day artifact, 0 since, not backfillable).
+- **Detectors/reports**: `scripts/check_mlb_ingest_completeness.py`
+  (7-day scan clean); `outputs/latest/learned-model-validation.json`
+  regenerated via `validate-models` (docs' `validate-learned` name was
+  stale); `outputs/rebuild/verification.json` policy documented as
+  CI-generated (local 404 expected).
+- **v8 parity layers D–I + L closed** (research branch): 40-game sample
+  through serving definitions — elo/trend/park 40/40 exact; weather
+  ≤0.029 source-drift; starter ≤5e-4 map rounding; orientation field
+  inert at serving (consistent, hardening note).
+- **Venv hazard fixed**: the launchd dashboard pointed at a deleted
+  `.venvs/model-prediction` interpreter (would have crash-looped on the
+  next restart) — plist now uses the repo `.venv`, verified.
+- **Park leak verified**: static table = 7,926 games (2024-02-22 →
+  2026-08-12) applied retroactively to history; documented, v8 frozen,
+  `park_factor_pit` is the v9 path.
+- **Git hygiene**: 19 local + 7 remote stale branches removed (all
+  verified merged/superseded); remotes now `origin/main` +
+  `origin/research/mlb-v8-reproduction`.
 
 ## 2026-08-15 session changes (consolidation P0 — control-plane singularity)
 
@@ -168,7 +199,7 @@ rollback artifacts are not current operational truth.
   ML/spread/total derived from one joint draw. NB is runnable but not promoted.
 - **Settlement routing fixed**: model-ledger mirror writes canonical
   `data/model_ledgers/` again (was per-tier after the split, freezing the
-  dashboard/loader's read on 2026-08-03). See `docs/SETTLEMENT_GAP.md`.
+  dashboard/loader's read on 2026-08-03). See `docs/archive/SETTLEMENT_GAP.md`.
 
 ## 2026-08-13 deep-audit fix pass
 

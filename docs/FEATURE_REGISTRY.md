@@ -7,9 +7,9 @@ Machine-readable source of truth: `config/tested_features.json`. This document i
 human summary. When they disagree, the JSON wins.
 
 **2026-08-11 audit**: a full model/feature reconciliation audit ran against this registry
-and the models that consume it — see `docs/model_audit/MODEL_INVENTORY.md`,
-`docs/model_audit/FEATURE_RETENTION_MATRIX.md`, and the per-sport files under
-`docs/model_audit/models/` and `docs/model_audit/features/` for full evidence and citations
+and the models that consume it — see `docs/archive/model_audit/MODEL_INVENTORY.md`,
+`docs/archive/model_audit/FEATURE_RETENTION_MATRIX.md`, and the per-sport files under
+`docs/archive/model_audit/models/` and `docs/archive/model_audit/features/` for full evidence and citations
 behind every correction below.
 
 ## The rule
@@ -110,7 +110,7 @@ make the feature production-safe or establish profitability.
 
 ## The question that used to outrank all feature work — now resolved
 
-**RESOLVED 2026-08-11** (audit, `docs/model_audit/models/NBA_ELO_TREND_LR_V4.md`):
+**RESOLVED 2026-08-11** (audit, `docs/archive/model_audit/models/NBA_ELO_TREND_LR_V4.md`):
 **ELO INTEGRITY CONFIRMED — no leakage.** NBA v4 hits **73.66%** while calling **88.2%** of
 games, from a model whose only meaningful coefficient is `elo_probability` at 3.564 — above
 the NBA favorite base rate, which is exactly what made this an open question worth closing

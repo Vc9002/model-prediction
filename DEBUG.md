@@ -3198,6 +3198,18 @@ secret-redaction invariants still lack direct tests.
 
 Run from the project root.
 
+### New tooling (2026-08-15/16)
+
+```bash
+# MLB ingest completeness (P1-12): ESPN-listed vs ingested per ET day
+env PYTHONPATH=src:. .venv/bin/python scripts/check_mlb_ingest_completeness.py --days 7
+
+# v8 feature-parity sample + standardized evaluator (research branch)
+# in the isolated worktree /Users/vincentc9002/worktrees/mlb-research:
+env PYTHONPATH=src:. .venv/bin/python scripts/mlb_v8_feature_parity_sample.py
+env PYTHONPATH=src:. .venv/bin/python scripts/mlb_evaluator.py --variants elo_only
+```
+
 ### MLB v8 reproduction (aggregate + row-level)
 
 ```bash
@@ -3224,6 +3236,19 @@ backfills, so v8's exact probabilities are unrecoverable; per-row p
 drift bounded at 0.0006. v8 is never modified (its park-factor PIT
 defect is part of what v8 was). The frozen v9 feature table exists to
 prevent this class for future models.
+
+### WNBA thread-affinity fix (2026-08-15)
+
+Trace: after the sqlite-authority cutover, the daily log showed
+`"logged": 0, "status": "error", "reason": "SQLite objects created in a
+thread can only be used in that same thread"` — 212 occurrences on
+08-14, 0 on 08-13. `RuntimeLedgerStore` shared one sqlite3 connection
+across the ThreadPoolExecutor forecast workers. Fixed with per-thread
+connections (WAL + busy_timeout serialize writes); regression test
+`test_store_usable_from_multiple_threads` (revert-verified). Live
+confirmation: the next cycle logged 6 open WNBA rows. The 08-14
+removed rows were the remove-then-recreate ordering amplified by the
+same bug (`_clear_today_open`'s started-game guard is intact).
 
 ### Health
 

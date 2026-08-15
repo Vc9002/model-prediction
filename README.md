@@ -320,6 +320,10 @@ python3 dashboard_server.py  # then open http://127.0.0.1:8765/
 ## Documentation index
 
 - [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) — operational status and release verdict
+- [`docs/BURN_IN.md`](docs/BURN_IN.md) — burn-in window checks + results (through 08-18)
+- [`docs/RESEARCH_BACKLOG.md`](docs/RESEARCH_BACKLOG.md) — post-burn-in research queue (MLB v9 first)
+- [`docs/V8_REPRODUCTION.md`](docs/V8_REPRODUCTION.md) — v8 reproduction contract + parity findings (on the `research/mlb-v8-reproduction` branch)
+- [`docs/archive/`](docs/archive/) — one-shot investigation records and dated artifacts
 - [`docs/HISTORY.md`](docs/HISTORY.md) — chronological project history, all phases
 - [`DEBUG.md`](DEBUG.md) — full audit history, every bug found/fixed with trace
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — durable architecture contract

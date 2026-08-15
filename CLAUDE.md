@@ -284,14 +284,15 @@ dead rebuild models). Config root 63 → 27 files.
 
 **Known gap** — canonical `data/model_ledgers/` froze 2026-08-03 (retired main
 ledger was its only writer). Dashboard + settled-picks loader read stale data.
-See `docs/SETTLEMENT_GAP.md`. Do NOT silently re-route production data paths
+See `docs/archive/SETTLEMENT_GAP.md` (fixed 08-13; sqlite canonical since J).
+Do NOT silently re-route production data paths
 without an explicit decision.
 
 **Settlement routing fix** — model-ledger mirror now writes to canonical
 `data/model_ledgers/` (threaded `model_ledgers_dir` through `PickLedger`,
 `main_ledgers.py`, `research_ledgers.py`). Previously each tier mirrored to
 its own subdir (`data/flat/model_ledgers/`, …) while the dashboard + loader
-read only canonical — that froze on 2026-08-03. See `docs/SETTLEMENT_GAP.md`.
+read only canonical — that froze on 2026-08-03. See `docs/archive/SETTLEMENT_GAP.md`.
 
 **MLB distribution methods** — `simulate_game` now takes a `method` argument
 (`gamma_poisson` default / `negative_binomial` / `independent_poisson`);
