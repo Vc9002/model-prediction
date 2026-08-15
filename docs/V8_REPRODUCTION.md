@@ -21,9 +21,12 @@ or serving decisions are made from anything in this file.
 | decision horizon | game-day walk-forward (ET game dates) |
 
 **Known PIT defect, preserved deliberately:** v8's `park_factor` comes
-from a static table with a 2026-table leak into history. Do NOT refit v8
-to fix it — that would destroy the incumbent control. v9 replaces it with
-`park_factor_pit`. Reproducing v8 means reproducing the defect.
+from a static table (verified 2026-08-15: 7,926 games, 2024-02-22 →
+2026-08-12) applied uniformly to every historical walk-forward row — a
+training row from June 2024 receives a factor influenced by 2026 games.
+Do NOT refit v8 to fix it — that would destroy the incumbent control.
+v9 replaces it with `park_factor_pit` (computed from strictly-prior
+games only). Reproducing v8 means reproducing the defect.
 
 ## How the replay works
 
