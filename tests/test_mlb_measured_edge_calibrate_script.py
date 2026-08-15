@@ -67,6 +67,10 @@ def test_main_stamps_model_version_from_the_output_filename_not_a_hardcoded_lite
     monkeypatch.setattr(calibrate, "calibrate_market", lambda *a, **k: dict(fixed))
     monkeypatch.setattr(calibrate, "diagnostic_window_rows", lambda *a, **k: [])
     monkeypatch.setattr(calibrate, "real_market_window_rows", lambda *a, **k: [])
+    # K (2026-08-15): data/ is untracked, so main() must not read the
+    # machine-local games file — point it at an empty tmp file instead.
+    monkeypatch.setattr(calibrate, "GAMES_ALL_PATH", tmp_path / "games.jsonl")
+    (tmp_path / "games.jsonl").write_text("", encoding="utf-8")
     margin_out = tmp_path / "measured-edge-margin-v99.json"
     totals_out = tmp_path / "measured-edge-totals-v99.json"
     monkeypatch.setattr(

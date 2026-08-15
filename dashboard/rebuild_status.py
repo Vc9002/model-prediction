@@ -41,6 +41,43 @@ def _safe_json(path: Path) -> tuple[Any | None, str | None]:
         return None, f"{path.name} is unreadable or malformed: {error}"
 
 
+def _as_int_or_none(value: Any) -> int | None:
+    """Coerce a DB cell to int, tolerating NULL and non-numeric text.
+
+    Defensive: the join key lives in an INTEGER FK column, but a malformed
+    row must degrade to "no match", never raise and 500 the whole view.
+    """
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _side_probability(prediction: dict[str, Any], field: str, side: str | None) -> Any | None:
+    """Extract one side's probability from a prediction JSON column.
+
+    Returns None when the field is absent, malformed, or the side is
+    missing -- never raises, so one bad row cannot take the view down.
+    """
+    if not side:
+        return None
+    raw = prediction.get(field)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if side in parsed:
+        return parsed[side]
+    side_lower = side.lower()
+    if side_lower in parsed:
+        return parsed[side_lower]
+    return None
+
+
 class RebuildStatusReader:
     """Build API payloads without creating or modifying rebuild state."""
 
@@ -307,7 +344,8 @@ class RebuildStatusReader:
             self.shadow_db,
             "SELECT id, created_at, run_id, sport, event_id, horizon, decision_time_utc, "
             "model_artifact_hash, action, predicted_winner, market_type, units, reason_code, "
-            "cost_adjusted_edge, evaluated_market_id, evaluated_team_or_side, evaluated_line "
+            "cost_adjusted_edge, evaluated_market_evaluation_id, evaluated_market_id, "
+            "evaluated_team_or_side, evaluated_line "
             "FROM trade_decisions ORDER BY created_at DESC LIMIT ?",
             (max(1, min(int(limit), 1000)),),
         )
@@ -322,7 +360,10 @@ class RebuildStatusReader:
         prediction_rows, _ = self._query(
             self.shadow_db,
             "SELECT run_id, event_id, horizon, decision_time_utc, predicted_winner, "
-            "probability_lower_json, probability_upper_json, calibration_uncertainty, "
+            "calibrated_probabilities_json, raw_probabilities_json, "
+            "probability_lower_json, probability_upper_json, "
+            "conservative_probabilities_json, "
+            "candidate_version, model_artifact_hash, calibration_uncertainty, "
             "model_disagreement FROM predictions WHERE run_id IN (" + placeholders + ")",
             tuple(run_ids),
         )
@@ -340,6 +381,31 @@ class RebuildStatusReader:
                 "FROM settlements WHERE trade_decision_id IS NOT NULL",
             )
             settlements_by_decision = {int(row["trade_decision_id"]): row for row in settlement_rows}
+
+        # Market evaluations: real executable prices that produced the edge.
+        # The FK is evaluated_market_evaluation_id (autoincrement
+        # market_evaluations.id), NOT evaluated_market_id -- that holds the
+        # Polymarket market slug/market-id TEXT. Joining on the slug made
+        # SQLite INTEGER affinity coerce non-numeric slugs to 0, matching
+        # nothing, so executable prices shipped null in every live row.
+        market_eval_ids = [
+            value for value in (
+                _as_int_or_none(row.get("evaluated_market_evaluation_id"))
+                for row in decisions
+            ) if value is not None
+        ]
+        market_evals_by_id: dict[int, dict] = {}
+        if market_eval_ids:
+            mev_placeholders = ",".join("?" for _ in market_eval_ids)
+            mev_rows, _ = self._query(
+                self.shadow_db,
+                "SELECT id, market_id, market_type, team_or_side, line, "
+                "executable_ask, depth_adjusted_price, quote_age_seconds, "
+                "available_depth FROM market_evaluations WHERE id IN ("
+                + mev_placeholders + ")",
+                tuple(market_eval_ids),
+            )
+            market_evals_by_id = {int(row["id"]): row for row in mev_rows}
 
         stage_rows, _ = self._query(
             self.shadow_db,
@@ -368,19 +434,43 @@ class RebuildStatusReader:
             prediction = predictions_by_key.get(key) or {}
             teams = teams_by_run_event.get((row["run_id"], str(row["event_id"]))) or {}
             settlement = settlements_by_decision.get(int(row["id"])) or {}
+            # evaluated_market_evaluation_id is an INTEGER FK, so sqlite3
+            # already returns an int; _as_int_or_none keeps a malformed row
+            # from raising and 500ing the whole view.
+            market_eval = (
+                market_evals_by_id.get(_as_int_or_none(row.get("evaluated_market_evaluation_id")))
+            ) or {}
 
             side = str(row.get("evaluated_team_or_side") or "") or None
             model_probability = None
-            for source in ("probability_lower_json", "probability_upper_json"):
-                raw = prediction.get(source)
-                if not raw or side not in ("home", "away"):
-                    continue
-                try:
-                    parsed = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                if side in parsed:
-                    model_probability = parsed[side]
+            conservative_probability = None
+            probability_lower = None
+            probability_upper = None
+
+            # Bounds and conservative probability first -- via real
+            # assignments: the earlier locals()[name]=... loop was a CPython
+            # no-op (locals() does not bind names), so all three fields
+            # shipped permanently None even when the JSON was populated.
+            conservative_probability = _side_probability(
+                prediction, "conservative_probabilities_json", side
+            )
+            probability_lower = _side_probability(prediction, "probability_lower_json", side)
+            probability_upper = _side_probability(prediction, "probability_upper_json", side)
+
+            # Conservative precedence: calibrated, then the real conservative
+            # value, then the uncertainty band, then raw. The regressed loop
+            # surfaced raw before lower/upper, so a forecast carrying only the
+            # band showed raw instead of the conservative lower bound (the
+            # reader test pins 0.56 = probability_lower.home here).
+            for source in (
+                _side_probability(prediction, "calibrated_probabilities_json", side),
+                conservative_probability,
+                probability_lower,
+                probability_upper,
+                _side_probability(prediction, "raw_probabilities_json", side),
+            ):
+                if source is not None:
+                    model_probability = source
                     break
 
             side_team = {"home": teams.get("home_team"), "away": teams.get("away_team")}.get(side or "")
@@ -405,14 +495,21 @@ class RebuildStatusReader:
                     "selection": selection_label,
                     "line": row.get("evaluated_line"),
                     "american_odds": None,  # shadow ledger has no American-odds field; only decimal executable prices
-                    "market_implied_probability": None,
+                    "market_implied_probability": market_eval.get("executable_ask"),
+                    "depth_adjusted_price": market_eval.get("depth_adjusted_price"),
+                    "quote_age_seconds": market_eval.get("quote_age_seconds"),
+                    "available_depth": market_eval.get("available_depth"),
                     "model_probability": model_probability,
+                    "conservative_probability": conservative_probability,
+                    "probability_lower": probability_lower,
+                    "probability_upper": probability_upper,
                     "model_uncertainty": prediction.get("calibration_uncertainty"),
                     "edge": row.get("cost_adjusted_edge"),
                     "trade_candidate": row.get("action") == "BET",
                     "confidence_score": None,
                     "units": row.get("units"),
-                    "model_version": row.get("model_artifact_hash"),
+                    "model_version": prediction.get("candidate_version") or row.get("model_artifact_hash"),
+                    "model_artifact_hash": row.get("model_artifact_hash"),
                     "status": "settled" if settlement else "open",
                     "result": settlement.get("outcome"),
                     "away_score": None,

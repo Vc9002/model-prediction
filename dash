@@ -1,7 +1,20 @@
 #!/bin/bash
 # dash — start dashboard
-cd "$HOME/model prediction" || exit 1
+# Records its PID to .dashboard.pid so `./stop` can target this exact
+# process instead of `pkill -f dashboard_server.py` -- .codewhale/
+# instructions.md: that pattern-matched kill has triggered a macOS
+# security lock on this machine before. Never reintroduce it here.
+cd "$HOME/model-prediction" || exit 1
+# Same runtime-root resolution as the launchd jobs: one resolver, one
+# value — the dashboard must read the same databases the workers write.
+export MODEL_PREDICTION_RUNTIME_ROOT="${MODEL_PREDICTION_RUNTIME_ROOT:-$HOME/model-prediction-runtime}"
+PIDFILE="$HOME/model-prediction/.dashboard.pid"
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    echo "Dashboard already running (PID $(cat "$PIDFILE")): http://localhost:8765/"
+    exit 0
+fi
 PYTHONPATH=src .venv/bin/python dashboard_server.py --port 8765 &
+echo $! > "$PIDFILE"
 for _ in $(seq 1 20); do
     curl -sf http://localhost:8765/api/status >/dev/null 2>&1 && echo "Dashboard: http://localhost:8765/" && exit 0
     sleep 0.5

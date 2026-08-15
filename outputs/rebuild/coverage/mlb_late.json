@@ -1,0 +1,9 @@
+{
+  "sport": "mlb",
+  "horizon": "late",
+  "date": "2026-08-06",
+  "generated_from_code": true,
+  "total_games": 12,
+  "rows_built": 5,
+  "coverage_fraction": 0.4166666666666667
+}

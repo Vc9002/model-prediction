@@ -85,3 +85,27 @@ def test_repo_root_and_runtime_root_paths_with_spaces_are_supported(tmp_path):
     paths = RuntimePaths(repo_root=repo, runtime_root=runtime)
     assert paths.repo_root == repo.resolve()
     assert paths.rebuild_shadow_db == (runtime / "rebuild" / "shadow.db").resolve()
+
+
+def test_require_external_runtime_fails_closed_when_env_unset(monkeypatch, tmp_path):
+    monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
+    repo = tmp_path / "repo"
+    with pytest.raises(RuntimeError, match="MODEL_PREDICTION_RUNTIME_ROOT"):
+        RuntimePaths.resolve(repo_root=repo, require_external_runtime=True)
+    # The refusal must leave no runtime state behind under the repo.
+    assert not (repo / "data").exists()
+
+
+def test_require_external_runtime_honors_env(monkeypatch, tmp_path):
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
+    paths = RuntimePaths.resolve(
+        repo_root=tmp_path / "repo", require_external_runtime=True
+    )
+    assert paths.runtime_root == runtime.resolve()
+
+
+def test_default_resolve_keeps_repo_fallback_for_dev(tmp_path):
+    repo = tmp_path / "repo"
+    paths = RuntimePaths.resolve(repo_root=repo)
+    assert paths.runtime_root == (repo / "data").resolve()

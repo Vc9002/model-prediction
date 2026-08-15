@@ -1,0 +1,319 @@
+{
+  "dataset_hash": "b3d8249d46ec0bf4c06d8ef00327e09644c47150a11826b7c993bf82774443bd",
+  "matched_games": 435,
+  "n_moneyline_oof": 203,
+  "totals_line_grid": [
+    7.5,
+    8.0,
+    8.5,
+    9.0,
+    9.5
+  ],
+  "spread_line_grid": [
+    -2.5,
+    -1.5,
+    -0.5,
+    0.5,
+    1.5,
+    2.5
+  ],
+  "per_fold": [
+    {
+      "fold": 0,
+      "train_n": 102,
+      "val_n": 55,
+      "two_head": {
+        "log_loss": 0.6976580011812773,
+        "brier": 0.24963622140909086
+      },
+      "xgb_two_head": {
+        "log_loss": 0.7969873977985641,
+        "brier": 0.2780368600454545
+      },
+      "xgb_direct": {
+        "log_loss": 0.7039565438060046,
+        "brier": 0.2553953544718856
+      }
+    },
+    {
+      "fold": 1,
+      "train_n": 209,
+      "val_n": 72,
+      "two_head": {
+        "log_loss": 0.781865934269729,
+        "brier": 0.28621250493055556
+      },
+      "xgb_two_head": {
+        "log_loss": 0.7830348055415466,
+        "brier": 0.2776901140625
+      },
+      "xgb_direct": {
+        "log_loss": 0.7212570817868479,
+        "brier": 0.2633148087209001
+      }
+    },
+    {
+      "fold": 2,
+      "train_n": 312,
+      "val_n": 76,
+      "two_head": {
+        "log_loss": 0.9532244589122232,
+        "brier": 0.3011221258223684
+      },
+      "xgb_two_head": {
+        "log_loss": 0.7831413730957278,
+        "brier": 0.28786376845394734
+      },
+      "xgb_direct": {
+        "log_loss": 0.7359858005525852,
+        "brier": 0.2711755627299095
+      }
+    }
+  ],
+  "moneyline_oof_summary": {
+    "two_head": {
+      "log_loss": 0.8232049074370429,
+      "brier": 0.281884601453202
+    },
+    "xgb_two_head": {
+      "log_loss": 0.7868549617398415,
+      "brier": 0.2815929158497537
+    },
+    "xgb_direct": {
+      "log_loss": 0.7220839440393096,
+      "brier": 0.2641120861641953
+    }
+  },
+  "totals_oof_summary": {
+    "two_head": {
+      "7.5": {
+        "line": 7.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.7466064039408867,
+        "mean_under_probability": 0.25339359605911327,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8492291107138006,
+        "brier": 0.316488638866995
+      },
+      "8.0": {
+        "line": 8.0,
+        "n": 203,
+        "n_push_real": 22,
+        "mean_over_probability": 0.6873295566502462,
+        "mean_under_probability": 0.3126704433497537,
+        "mean_push_probability": 0.11855073891625616,
+        "log_loss": 0.8294964455372777,
+        "brier": 0.31276042743093924
+      },
+      "8.5": {
+        "line": 8.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.6275847290640394,
+        "mean_under_probability": 0.3724152709359606,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.7936545325411984,
+        "brier": 0.29813637413793104
+      },
+      "9.0": {
+        "line": 9.0,
+        "n": 203,
+        "n_push_real": 11,
+        "mean_over_probability": 0.564112315270936,
+        "mean_under_probability": 0.4358876847290641,
+        "mean_push_probability": 0.12726995073891625,
+        "log_loss": 0.7439027545331532,
+        "brier": 0.2749084565885416
+      },
+      "9.5": {
+        "line": 9.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.5008325123152709,
+        "mean_under_probability": 0.49916748768472907,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.6940667730806401,
+        "brier": 0.25044814118226605
+      }
+    },
+    "xgb_two_head": {
+      "7.5": {
+        "line": 7.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.7071827586206897,
+        "mean_under_probability": 0.29281724137931037,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.9566227025563528,
+        "brier": 0.3257823608374384
+      },
+      "8.0": {
+        "line": 8.0,
+        "n": 203,
+        "n_push_real": 22,
+        "mean_over_probability": 0.6581559113300492,
+        "mean_under_probability": 0.34184408866995075,
+        "mean_push_probability": 0.09888029556650246,
+        "log_loss": 0.9445520880726911,
+        "brier": 0.3331636846685083
+      },
+      "8.5": {
+        "line": 8.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.6079650246305419,
+        "mean_under_probability": 0.39203497536945814,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.9629540447105671,
+        "brier": 0.3404621986699507
+      },
+      "9.0": {
+        "line": 9.0,
+        "n": 203,
+        "n_push_real": 11,
+        "mean_over_probability": 0.5577906403940887,
+        "mean_under_probability": 0.44220935960591135,
+        "mean_push_probability": 0.10129950738916256,
+        "log_loss": 0.911709724682812,
+        "brier": 0.3270671603255208
+      },
+      "9.5": {
+        "line": 9.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_over_probability": 0.5070837438423645,
+        "mean_under_probability": 0.49291625615763546,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8659779494504106,
+        "brier": 0.3121524997044335
+      }
+    }
+  },
+  "spread_oof_summary": {
+    "two_head": {
+      "-2.5": {
+        "home_line": -2.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.19207044334975368,
+        "mean_away_probability": 0.8079295566502463,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.6009446441116632,
+        "brier": 0.18584367532019705
+      },
+      "-1.5": {
+        "home_line": -1.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.2833871921182266,
+        "mean_away_probability": 0.7166128078817734,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.697065699204753,
+        "brier": 0.233677985320197
+      },
+      "-0.5": {
+        "home_line": -0.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.3911512315270936,
+        "mean_away_probability": 0.6088487684729064,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8490763164901467,
+        "brier": 0.29134107975369455
+      },
+      "0.5": {
+        "home_line": 0.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.5090793103448276,
+        "mean_away_probability": 0.4909206896551724,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8186466941400325,
+        "brier": 0.2802181611330049
+      },
+      "1.5": {
+        "home_line": 1.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.6258699507389163,
+        "mean_away_probability": 0.3741300492610838,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8960299034877195,
+        "brier": 0.26010166354679803
+      },
+      "2.5": {
+        "home_line": 2.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.7310985221674877,
+        "mean_away_probability": 0.26890147783251234,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.7902766728801323,
+        "brier": 0.2095712080788177
+      }
+    },
+    "xgb_two_head": {
+      "-2.5": {
+        "home_line": -2.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.23656600985221674,
+        "mean_away_probability": 0.7634339901477832,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.684723718586581,
+        "brier": 0.2179247066502463
+      },
+      "-1.5": {
+        "home_line": -1.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.3285881773399015,
+        "mean_away_probability": 0.6714118226600986,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.7428323558079655,
+        "brier": 0.2577181258128079
+      },
+      "-0.5": {
+        "home_line": -0.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.4341098522167488,
+        "mean_away_probability": 0.5658901477832512,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.8007779955112658,
+        "brier": 0.2874694430049261
+      },
+      "0.5": {
+        "home_line": 0.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.545928078817734,
+        "mean_away_probability": 0.45407192118226597,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.7957310025392282,
+        "brier": 0.28220869605911325
+      },
+      "1.5": {
+        "home_line": 1.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.6549507389162562,
+        "mean_away_probability": 0.34504926108374384,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.7962840398261115,
+        "brier": 0.27110721280788175
+      },
+      "2.5": {
+        "home_line": 2.5,
+        "n": 203,
+        "n_push_real": 0,
+        "mean_home_probability": 0.7510472906403941,
+        "mean_away_probability": 0.2489527093596059,
+        "mean_push_probability": 0.0,
+        "log_loss": 0.7242267487410806,
+        "brier": 0.2217221954679803
+      }
+    }
+  }
+}

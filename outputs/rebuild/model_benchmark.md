@@ -3,24 +3,6 @@
 **Date:** 2026-08-05, MLB section updated 2026-08-09 (Task 17 refresh, then corrected same day: the frozen head-family/distribution combination was never validated together — see "Correction (2026-08-09)" below)
 **Status:** PARTIAL — full benchmark requires trained challenger models for all sports. MLB section below is RESEARCH_ONLY throughout; no promotion decision is made from the already-consumed final test (`outputs/rebuild/mlb_split_manifest.json`, `test_consumption_registry.json`). The frozen challenger does not yet clearly beat a naive constant-0.5 baseline on the identical rows — see the naive-baseline table below.
 
-## Authoritative corrected result (2026-08-09)
-
-The current MLB research benchmark is one jointly validated combination:
-**XGBoost score heads + negative-binomial reconciliation + temperature
-calibration, with no ensemble**. On 168 chronological cross-fit evaluations it
-recorded log loss **0.6927** and Brier **0.2498**. The constant-0.5 baseline on
-the corresponding 223 OOF rows recorded log loss **0.6931** and Brier
-**0.2500**. That difference is negligible evidence, not a meaningful edge.
-
-**Predictive qualification: NOT ESTABLISHED. Economic qualification: NOT
-ESTABLISHED.** `mlb_moneyline_v2` remains an unconsumed prospective test; its
-aggregate accuracy, log loss, Brier, ROI, and CLV must remain sealed until
-deliberate consumption under the registry policy.
-
-All earlier MLB benchmark sections below are **SUPERSEDED — RETAINED FOR AUDIT
-HISTORY** where they disagree with this jointly validated combination. They are
-not promotion evidence.
-
 ## Production model baselines
 
 These are the incumbent models from the existing `main` branch, frozen as controls:

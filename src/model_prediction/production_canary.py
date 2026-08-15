@@ -6,7 +6,8 @@ health-checked path. It is the first real model whose outputs may eventually
 drive live decisions; every other model remains research/shadow only.
 
 The canary is deliberately narrow:
-  - exactly one allowed model (wnba-elo-trend-lr-v4)
+  - an explicit allowlist of models (primary must be allowlisted; the
+    list is non-empty — currently 13 models, primary wnba-elo-trend-lr-v4)
   - manual orders only (automated_orders is locked false)
   - fail-closed: any validation or health failure returns DOWN, never a
     silent fallback
@@ -17,7 +18,6 @@ lives at ``config/models/wnba-elo-trend-lr-v4.json``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from datetime import UTC, datetime
@@ -26,20 +26,16 @@ from typing import Any
 
 import yaml
 
+from .production_registry import (
+    ProductionModelRegistry,
+)
+from .production_registry import (
+    # Re-exported so historical importers (tests, cli_production) keep a
+    # single hash convention without each defining their own copy.
+    compute_artifact_hash as _compute_artifact_hash,  # noqa: F401
+)
+
 # ── helpers ────────────────────────────────────────────────────────────────
-
-
-def _compute_artifact_hash(payload: dict[str, Any]) -> str:
-    """SHA-256 of the canonical JSON form, excluding the embedded hash field.
-
-    Matches the convention used in ``total_score._artifact_hash`` and
-    ``international_baseball``: sort keys, compact separators, and skip the
-    ``artifact_hash`` key so the hash isn't self-referential.
-    """
-    canonical = {k: v for k, v in payload.items() if k != "artifact_hash"}
-    return hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
 
 
 def _repo_root() -> Path:
@@ -75,75 +71,24 @@ def load_production_config(
 def validate_production_config(
     config: dict[str, Any], *, repo_root: Path | str | None = None
 ) -> None:
-    """Validate the production canary config.
+    """Validate the production config via the single production registry.
 
     Rules (fail-closed — any failure raises ``ValueError``):
-      1. ``prediction_service.allowed_models`` must be a list with **exactly
-         one** entry.
-      2. The artifact file referenced by
-         ``prediction_service.primary.artifact`` must exist.
+      1. ``prediction_service.allowed_models`` / ``models`` must be
+         non-empty; the primary model must be one of the entries.
+      2. The artifact file referenced by the primary must exist.
       3. The embedded ``artifact_hash`` in the JSON must match a
          re-computed hash of the rest of the artifact.
       4. ``model_id`` in ``prediction_service.primary`` must match
          ``model_version`` inside the artifact.
+
+    Additionally (the registry's startup contract), **every** enabled entry
+    is validated: a broken *secondary* model is failed closed inside the
+    registry (recorded ``load_error``, resolution refused) rather than
+    raising here — only the primary's failure propagates.
     """
     root = Path(repo_root) if repo_root is not None else _repo_root()
-
-    svc = config.get("prediction_service")
-    if not isinstance(svc, dict):
-        raise ValueError("prediction_service section missing or not a mapping")  # noqa: TRY004
-
-    # ── exactly one allowed model ──
-    allowed = svc.get("allowed_models")
-    if not isinstance(allowed, list) or len(allowed) != 1:
-        raise ValueError(
-            "prediction_service.allowed_models must be a list with exactly one entry"
-        )
-
-    primary = svc.get("primary")
-    if not isinstance(primary, dict):
-        raise ValueError("prediction_service.primary missing or not a mapping")  # noqa: TRY004
-
-    primary_model_id = primary.get("model_id")
-    if not isinstance(primary_model_id, str) or not primary_model_id.strip():
-        raise ValueError("prediction_service.primary.model_id is missing or empty")
-
-    # Must match the single allowed entry
-    if primary_model_id != allowed[0]:
-        raise ValueError(
-            f"primary.model_id '{primary_model_id}' does not match "
-            f"allowed_models[0] '{allowed[0]}'"
-        )
-
-    artifact_rel = primary.get("artifact")
-    if not isinstance(artifact_rel, str) or not artifact_rel.strip():
-        raise ValueError("prediction_service.primary.artifact is missing or empty")
-
-    artifact_path = root / artifact_rel
-    if not artifact_path.is_file():
-        raise FileNotFoundError(f"production artifact not found at {artifact_path}")
-
-    # Load and validate hash + model_version
-    with open(artifact_path, "r", encoding="utf-8") as fh:
-        try:
-            artifact: dict[str, Any] = json.load(fh)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"production artifact is not valid JSON: {exc}") from exc
-
-    embedded_hash = artifact.get("artifact_hash")
-    computed_hash = _compute_artifact_hash(artifact)
-    if embedded_hash != computed_hash:
-        raise ValueError(
-            f"artifact_hash mismatch: embedded '{embedded_hash}' != "
-            f"computed '{computed_hash}'"
-        )
-
-    artifact_model_id = artifact.get("model_version")
-    if artifact_model_id != primary_model_id:
-        raise ValueError(
-            f"model_id mismatch: config says '{primary_model_id}', "
-            f"artifact says '{artifact_model_id}'"
-        )
+    ProductionModelRegistry.from_config(config, repo_root=root)
 
 
 # ── model access ────────────────────────────────────────────────────────────
@@ -184,23 +129,32 @@ def health_check(
       2. Verify the artifact file exists.
       3. Parse the artifact JSON and re-validate its embedded hash.
       4. Verify every probability value in the artifact is finite.
-      5. (Stub) Data-freshness check — not yet wired to a real data source;
-         always passes unless the artifact itself carries a stale timestamp.
+      5. Data-freshness check: the latest prediction in the canonical
+         ``production/production.db`` (under the resolved runtime root)
+         must be younger than ``health.max_data_age_minutes``; a missing
+         database or stale record degrades the check. The legacy
+         ``production_state.json`` is NOT consulted (compatibility
+         consumers only — consolidation item 12).
 
-    *runtime_root* is accepted for forward compatibility but is not yet used
-    beyond the data-freshness check. When ``MODEL_PREDICTION_RUNTIME_ROOT``
-    is set, the health check prefers it.
+    *runtime_root* is accepted to pin the mutable-state root explicitly;
+    otherwise the resolution follows ``RuntimePaths``
+    (``MODEL_PREDICTION_RUNTIME_ROOT`` when set).
     """
     root = Path(repo_root) if repo_root is not None else _repo_root()
     now_utc = datetime.now(UTC).isoformat()
 
-    # Resolve runtime root for data-freshness check
+    # Resolve runtime root for data-freshness check. Fail closed: an
+    # env-less operational invocation must not fall back to a repo-local
+    # second runtime (split-brain).
     if runtime_root is not None:
         rt = Path(runtime_root)
     elif os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT"):
         rt = Path(os.environ["MODEL_PREDICTION_RUNTIME_ROOT"])
     else:
-        rt = root / "data"
+        raise RuntimeError(
+            "MODEL_PREDICTION_RUNTIME_ROOT is required for the canary "
+            "health check; refusing the repo-local data/ fallback."
+        )
 
     details: dict[str, Any] = {}
 
@@ -215,9 +169,11 @@ def health_check(
                 "checked_at_utc": now_utc,
             }
 
-    # 2. Validate config (this also verifies artifact existence + hash)
+    # 2. Build + validate the production registry (this also verifies
+    #    artifact existence + hash for the primary AND resolves every other
+    #    enabled entry, failing them closed per model).
     try:
-        validate_production_config(config, repo_root=root)
+        registry = ProductionModelRegistry.from_config(config, repo_root=root)
     except Exception as exc:  # noqa: BLE001
         return {
             "status": "DOWN",
@@ -228,10 +184,34 @@ def health_check(
             "checked_at_utc": now_utc,
         }
 
-    primary = config["prediction_service"]["primary"]
-    model_id = primary["model_id"]
-    artifact_rel = primary["artifact"]
+    primary = registry.primary
+    model_id = primary.model_id
+    artifact_rel = primary.artifact or ""
     artifact_path = root / artifact_rel
+
+    # Per-model registry contract status — every entry, not just the
+    # primary. A broken secondary model degrades the overall status.
+    details["models"] = {
+        entry.model_id: (
+            "ok" if entry.available else f"failed: {entry.load_error}"
+        )
+        for entry in registry.entries.values()
+    }
+    if registry.problem_entries():
+        details["failed_models"] = [
+            entry.model_id for entry in registry.problem_entries()
+        ]
+        return {
+            "status": "DEGRADED",
+            "model_id": model_id,
+            "artifact_hash": primary.artifact_hash,
+            "reason": (
+                f"{len(registry.problem_entries())} production model(s) "
+                "failed contract validation"
+            ),
+            "checked_at_utc": now_utc,
+            "details": details,
+        }
 
     # 3. Parse the artifact
     try:
@@ -261,10 +241,28 @@ def health_check(
                 "details": details,
             }
 
-    # 5. Data freshness (stub — real implementation would check
-    #    the youngest data file under runtime_root)
+    # 4b. Probability normalization — config says normalization is
+    #     required, so health must ENFORCE it: binary outputs must satisfy
+    #     |sum(p) - 1| <= 1e-6. Artifact-embedded pairs are checked where
+    #     they exist; the always-checked source is the stored predictions
+    #     in production.db (the canonical operational record, item 12).
+    if config.get("health", {}).get("require_probability_normalization", True):
+        try:
+            _check_probability_normalization(artifact, root, rt)
+        except ValueError as exc:
+            return {
+                "status": "DOWN",
+                "model_id": model_id,
+                "artifact_hash": artifact_hash,
+                "reason": str(exc),
+                "checked_at_utc": now_utc,
+                "details": details,
+            }
+
+    # 5. Data freshness — the canary's last recorded prediction run under
+    #    runtime_root must be younger than max_data_age_minutes.
     max_age_minutes = config.get("health", {}).get("max_data_age_minutes", 120)
-    stale = _check_data_freshness(rt, max_age_minutes)
+    stale = _check_data_freshness(root, rt, max_age_minutes)
     if stale:
         details["data_freshness"] = stale
         return {
@@ -281,6 +279,7 @@ def health_check(
         "model_id": model_id,
         "artifact_hash": artifact_hash,
         "checked_at_utc": now_utc,
+        "details": details,
     }
 
 
@@ -314,16 +313,106 @@ def _check_finite_probabilities(artifact: dict[str, Any]) -> None:
 
 
 def _check_data_freshness(
-    runtime_root: Path, max_age_minutes: int
+    repo_root: Path, runtime_root: Path, max_age_minutes: int
 ) -> str | None:
     """Return a human-readable staleness description, or *None* if fresh.
 
-    This is a stub: the real implementation will walk the runtime data
-    directory. For now it always returns *None* (fresh) because the
-    artifact itself contains no live-data timestamp.
+    Freshness is judged on the canonical production database
+    (``production/production.db`` under the resolved runtime root), NOT
+    the legacy ``production_state.json`` — one operational truth, one
+    storage (consolidation item 12). The state file remains for
+    compatibility consumers only.
     """
-    _ = runtime_root, max_age_minutes
+    from .production_store import read_latest_prediction_utc
+    from .runtime_paths import RuntimePaths
+
+    paths = RuntimePaths(repo_root=repo_root, runtime_root=runtime_root)
+    last_prediction = read_latest_prediction_utc(paths)
+    if last_prediction is None:
+        return (
+            f"no production predictions recorded in {paths.production_db} "
+            "(never recorded a prediction run)"
+        )
+    try:
+        last_dt = datetime.fromisoformat(last_prediction)
+    except ValueError:
+        return f"unparseable latest prediction timestamp {last_prediction!r}"
+    if last_dt.tzinfo is None:
+        last_dt = last_dt.replace(tzinfo=UTC)
+    age_minutes = (datetime.now(UTC) - last_dt).total_seconds() / 60
+    if age_minutes > max_age_minutes:
+        return (
+            f"last prediction {age_minutes:.0f} minutes ago "
+            f"(max_data_age_minutes={max_age_minutes})"
+        )
     return None
+
+
+_NORMALIZATION_TOLERANCE = 1e-6
+_BINARY_PROBABILITY_PAIRS = (
+    ("home_probability", "away_probability"),
+    ("prob_home", "prob_away"),
+    ("home_win_probability", "away_win_probability"),
+)
+
+
+def _check_probability_normalization(
+    artifact: dict[str, Any], repo_root: Path, runtime_root: Path
+) -> None:
+    """Enforce the normalization contract on every binary probability
+    pair the system stores or emits.
+
+    Two sources are checked:
+    1. Artifact-embedded pairs (where an artifact stores explicit
+       probabilities) — each pair must satisfy |sum - 1| <= 1e-6 and each
+       value must lie in [0, 1].
+    2. The stored predictions in production.db (the canonical record) —
+       the most recent rows' probability pairs must satisfy the same
+       bound. A stored non-normalized pair is a DOWN, not a warning:
+       config says normalization is required, and health enforces it.
+    """
+    for market, model in (artifact.get("market_models") or {}).items():
+        if not isinstance(model, dict):
+            continue
+        for home_key, away_key in _BINARY_PROBABILITY_PAIRS:
+            home = model.get(home_key)
+            away = model.get(away_key)
+            if home is None and away is None:
+                continue
+            if home is None or away is None:
+                raise ValueError(
+                    f"market_models.{market} has {home_key} without {away_key}"
+                )
+            for label, value in ((home_key, home), (away_key, away)):
+                if not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0:
+                    raise ValueError(
+                        f"market_models.{market}.{label} out of [0,1]: {value!r}"
+                    )
+            if abs(float(home) + float(away) - 1.0) > _NORMALIZATION_TOLERANCE:
+                raise ValueError(
+                    f"market_models.{market} probabilities not normalized: "
+                    f"{home} + {away} = {float(home) + float(away)} "
+                    f"(tolerance {_NORMALIZATION_TOLERANCE})"
+                )
+
+    from .production_store import read_recent_probabilities
+    from .runtime_paths import RuntimePaths
+
+    paths = RuntimePaths(repo_root=repo_root, runtime_root=runtime_root)
+    for pair in read_recent_probabilities(paths, limit=20):
+        values = [v for v in pair.values() if isinstance(v, (int, float))]
+        if not values:
+            continue
+        total = sum(values)
+        if any(not 0.0 <= v <= 1.0 for v in values):
+            raise ValueError(
+                f"stored prediction probabilities out of [0,1]: {pair}"
+            )
+        if abs(total - 1.0) > _NORMALIZATION_TOLERANCE:
+            raise ValueError(
+                f"stored prediction probabilities not normalized: {pair} "
+                f"sums to {total} (tolerance {_NORMALIZATION_TOLERANCE})"
+            )
 
 
 def _isfinite(value: float) -> bool:

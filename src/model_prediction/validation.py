@@ -27,9 +27,10 @@ from .config import PROJECT_ROOT
 from .data_sources.espn_probables import point_in_time_pitcher_era_gap
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
-from .features.bullpen import bullpen_profile
+from .features.bullpen import FATIGUE_WINDOW_DAYS, bullpen_profile
 from .features.elo_ratings import build_elo
 from .features.park_factors import park_factor
+from .features.park_factors_pit import park_factor_at
 from .features.schedule_load import matchup_schedule_load
 from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
@@ -77,13 +78,16 @@ class ValidationRow:
     weather_factor: float
     park_available: bool
     weather_available: bool
+    park_factor_pit: float = 1.0
     elo_neutral_probability: float = 0.5
     trailing_home_win_rate_30d: float = 0.5
     trailing_home_games_30d: int = 0
+    residual_trend_gap: float = 0.0
     defensive_trend_gap: float = 0.0
     pitcher_era_gap: float = 0.0
     starter_era_gap: float = 0.0
     starter_fip_gap: float = 0.0
+    starter_kbb_gap: float = 0.0
     probable_starter_era_gap: float = 0.0
     probable_starter_available: bool = False
     bullpen_weakness_gap: float = 0.0
@@ -217,6 +221,47 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "back_to_back_gap",
         "games_last_7_gap",
     ),
+    # ── v9 ablation: K-BB% replaces ERA ──────────────────────────────────
+    # v9 variants consume the empirical point-in-time park factor
+    # (park_factor_pit), NOT the static table the v8 variants use -- the
+    # static table contains 2026-season data and leaks for any walk-forward
+    # before season end (2026-08-13 audit).
+    "elo_trend_park_weather_starter_kbb_bullpen": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "weather_factor",
+        "starter_kbb_gap",
+        "bullpen_weakness_gap",
+    ),
+    # ── v9 ablation: ERA + K-BB% together ────────────────────────────────
+    "elo_trend_park_weather_starter_era_kbb_bullpen": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "weather_factor",
+        "starter_era_gap",
+        "starter_kbb_gap",
+        "bullpen_weakness_gap",
+    ),
+    # ── v9 ablation: Elo-residualized trend (trailing win% - Elo expect) ─
+    "elo_residual_trend_park_weather_starter_era_bullpen": (
+        "elo_probability",
+        "residual_trend_gap",
+        "park_factor_pit",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    # ── v9 ablation: bullpen fatigue (recent workload) instead of quality ─
+    "elo_trend_park_weather_starter_era_bullpen_fatigue": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_fatigue_gap",
+    ),
 }
 
 
@@ -225,8 +270,17 @@ def build_walk_forward_rows(
     sport: str,
     *,
     minimum_history_games: int = 50,
+    end_date: str | None = None,
 ) -> list[ValidationRow]:
-    """Construct pregame features using only prior completed dates."""
+    """Construct pregame features using only prior completed dates.
+
+    ``end_date`` (ISO ``YYYY-MM-DD``), when given, excludes any row whose
+    date is on/after that cutoff -- lets a replay pin the walk-forward
+    dataset to exactly what an artifact's own recorded ``training`` block
+    describes, instead of picking up games ``games.jsonl`` accumulated
+    afterward (it keeps growing daily). Default ``None`` preserves current
+    behavior exactly (all available history).
+    """
     games = store.load_games(sport)
     by_date: dict[str, list[GameRecord]] = defaultdict(list)
     for game in games:
@@ -235,17 +289,26 @@ def build_walk_forward_rows(
     history: list[GameRecord] = []
     rows: list[ValidationRow] = []
     for day in sorted(by_date):
+        if end_date is not None and day >= end_date:
+            break
         day_games = sorted(by_date[day], key=lambda item: (item.start, item.event_id))
         if len(history) >= minimum_history_games:
             elo = build_elo(history, sport)
             trends = TrendEngine(history)
-            home_win_rate_30d, home_games_30d = _trailing_home_rate(history, day)
             for game in day_games:
                 is_soccer = sport.lower() == "soccer"
                 if not is_soccer and game.home_score == game.away_score:
                     continue
                 home_trend = trends.team_trend(game.home_team)
                 away_trend = trends.team_trend(game.away_team)
+                # Team-specific (matches learned_forward.py's
+                # residual_trend_gap serving definition exactly -- the
+                # league-wide rate it used to be was a train/serve skew,
+                # fixed 2026-08-13; this also changes v9 ablation numbers,
+                # which were computed on the mismatched definition).
+                home_win_rate_30d, home_games_30d = _trailing_home_rate(
+                    history, day, game.home_team
+                )
                 schedule = matchup_schedule_load(
                     history,
                     game.home_team,
@@ -263,6 +326,8 @@ def build_walk_forward_rows(
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
                 # Real starter FIP gap (same methodology, FIP instead of ERA)
                 starter_fip_gap = _starter_fip_gap(game.event_id) if sport.lower() == "mlb" else 0.0
+                # Real starter K-BB% gap (same methodology, (K-BB)/IP instead of ERA/FIP)
+                starter_kbb_gap = _starter_kbb_gap(game.event_id) if sport.lower() == "mlb" else 0.0
 
                 # Real bullpen weakness gap from MLB Stats API snapshots (point-in-time)
                 bullpen_gap, bullpen_ok = (
@@ -305,8 +370,18 @@ def build_walk_forward_rows(
                 # Historical weather from Open-Meteo DB
                 weather = _lookup_weather(game.home_team, game.start.astimezone(EASTERN).date().isoformat())
                 
-                park: dict[str, Any] = (
+                # Static table (v8-compatible: the active
+                # mlb-elo-trend-lr-v8 artifact trained on it) and empirical
+                # PIT factor, stored separately so each variant consumes the
+                # definition it was validated with (v8 variants: static;
+                # v9 variants: park_factor_pit -- 2026-08-13 audit).
+                park_static: dict[str, Any] = (
                     park_factor(game.home_team)
+                    if sport.lower() == "mlb"
+                    else {"park_factor": 1.0, "status": "not_applicable"}
+                )
+                park_pit: dict[str, Any] = (
+                    park_factor_at(game.home_team, day, games_data=history)
                     if sport.lower() == "mlb"
                     else {"park_factor": 1.0, "status": "not_applicable"}
                 )
@@ -320,12 +395,21 @@ def build_walk_forward_rows(
                         outcome_3way = 0
                 else:
                     outcome_3way = 0
+                # Elo-residualized trend: how much the home team's recent
+                # actual win rate diverges from Elo's expectation for this
+                # game. Positive = home is over-performing vs Elo's prior.
+                elo_prob = elo.expected_home_win(game.home_team, game.away_team)
+                residual_trend_gap = (
+                    home_win_rate_30d - elo_prob
+                    if home_games_30d >= 10
+                    else 0.0
+                )
                 rows.append(
                     ValidationRow(
                         date=day,
                         event_id=game.event_id,
                         outcome=int(game.home_score > game.away_score),
-                        elo_probability=elo.expected_home_win(game.home_team, game.away_team),
+                        elo_probability=elo_prob,
                         trend_gap=home_trend.offensive_momentum - away_trend.offensive_momentum,
                         defensive_trend_gap=home_trend.defensive_momentum - away_trend.defensive_momentum,
                         consistency_gap=home_trend.consistency - away_trend.consistency,
@@ -334,18 +418,21 @@ def build_walk_forward_rows(
                         back_to_back_gap=schedule["back_to_back_gap"],
                         games_last_7_gap=schedule["games_last_7_gap"],
                         schedule_available=schedule["schedule_available"],
-                        park_factor=float(park["park_factor"]),
+                        park_factor=float(park_static["park_factor"]),
+                        park_factor_pit=float(park_pit["park_factor"]),
                         weather_factor=float(weather.get("run_factor", 1.0)),
                         pitcher_era_gap=pitcher_gap,
                         starter_era_gap=starter_gap,
                         starter_fip_gap=starter_fip_gap,
+                        starter_kbb_gap=starter_kbb_gap,
+                        residual_trend_gap=residual_trend_gap,
                         probable_starter_era_gap=probable_gap,
                         probable_starter_available=probable_available,
                         bullpen_weakness_gap=bullpen_gap,
                         bullpen_available=bullpen_ok,
                         bullpen_fatigue_gap=bullpen_fatigue_gap,
                         bullpen_fatigue_available=bullpen_fatigue_ok,
-                        park_available=park["status"] == "available",
+                        park_available=park_pit["status"] == "available",
                         weather_available=weather.get("available", False),
                         elo_neutral_probability=elo.expected_neutral_win(
                             game.home_team, game.away_team
@@ -364,10 +451,40 @@ def chronological_split(
     *,
     train_fraction: float = 0.60,
     validation_fraction: float = 0.20,
+    train_end_date: str | None = None,
+    validation_end_date: str | None = None,
 ) -> tuple[list[ValidationRow], list[ValidationRow], list[ValidationRow], dict[str, Any]]:
-    """Split on complete dates so games from one date never cross cohorts."""
+    """Split on complete dates so games from one date never cross cohorts.
+
+    By default splits by fraction-of-unique-dates in ``rows`` (unchanged
+    behavior). When both ``train_end_date`` and ``validation_end_date`` are
+    given (ISO ``YYYY-MM-DD``, inclusive upper bounds on each cohort), the
+    split instead reconstructs the three cohorts at those exact calendar
+    boundaries -- e.g. to replay a production artifact's own recorded
+    ``training`` block rather than recomputing fractions against however
+    many rows the caller happens to hand in today.
+    """
     if not rows:
         raise ValueError("cannot split an empty validation dataset")
+
+    if train_end_date is not None or validation_end_date is not None:
+        if train_end_date is None or validation_end_date is None:
+            raise ValueError("train_end_date and validation_end_date must be given together")
+        if train_end_date >= validation_end_date:
+            raise ValueError("train_end_date must precede validation_end_date")
+        train = [row for row in rows if row.date <= train_end_date]
+        validation = [row for row in rows if train_end_date < row.date <= validation_end_date]
+        holdout = [row for row in rows if row.date > validation_end_date]
+        if not train or not validation or not holdout:
+            raise ValueError("chronological split produced an empty cohort")
+        metadata = {
+            "method": "explicit_date_boundaries",
+            "train": _cohort_metadata(train),
+            "validation": _cohort_metadata(validation),
+            "locked_holdout": _cohort_metadata(holdout),
+        }
+        return train, validation, holdout, metadata
+
     if not 0 < train_fraction < 1 or not 0 < validation_fraction < 1:
         raise ValueError("split fractions must be between zero and one")
     if train_fraction + validation_fraction >= 1:
@@ -448,13 +565,24 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
     }
 
 
-def _trailing_home_rate(history: Sequence[GameRecord], day: str) -> tuple[float, int]:
+def _trailing_home_rate(
+    history: Sequence[GameRecord], day: str, home_team: str
+) -> tuple[float, int]:
+    """Trailing-30-day HOME-TEAM win rate (wins / non-tie home games).
+
+    Must match learned_forward.py's residual_trend_gap serving definition
+    exactly: same 30-day window, same ``home_team`` filter, same tie
+    exclusion; the caller applies the same >=10-team-game gate with the same
+    0.0 fallback. (It used to be a league-wide rate -- a train/serve skew,
+    fixed 2026-08-13.)
+    """
     cutoff = date.fromisoformat(day) - timedelta(days=30)
     recent = [
         game
         for game in history
         if cutoff <= game.start.astimezone(EASTERN).date() < date.fromisoformat(day)
         and game.home_score != game.away_score
+        and game.home_team == home_team
     ]
     if not recent:
         return 0.5, 0
@@ -1031,13 +1159,80 @@ def evaluate_reconstructed_mlb_moneyline(
     }
 
 
+# Features whose availability is tracked by a per-row flag on ValidationRow.
+# Everything else is always computed from history and counts as available.
+_FEATURE_AVAILABILITY_FLAGS: dict[str, str] = {
+    "park_factor": "park_available",
+    "weather_factor": "weather_available",
+    "probable_starter_era_gap": "probable_starter_available",
+    "bullpen_weakness_gap": "bullpen_available",
+    "bullpen_fatigue_gap": "bullpen_fatigue_available",
+}
+
+
+def _all_rows_calibration(
+    probabilities: Sequence[float], rows: Sequence[ValidationRow]
+) -> dict[str, object]:
+    """Model-quality metrics over EVERY row of a split (not just called
+    rows): log loss, Brier, ECE, and calibration slope/intercept. These are
+    threshold-independent, so they are the honest first-order comparison
+    between variants; units/P&L come after (operator directive 2026-08-13:
+    metrics-first reporting, units secondary)."""
+    metrics = calibration_metrics(
+        [min(1 - 1e-12, max(1e-12, float(p))) for p in probabilities],
+        [row.outcome for row in rows],
+    )
+    if metrics.get("status") != "ok":
+        return metrics
+    return {
+        "log_loss": round(float(metrics["log_loss"]), 6),
+        "brier_score": round(float(metrics["brier_score"]), 6),
+        "expected_calibration_error": round(float(metrics["expected_calibration_error"]), 6),
+        "calibration_slope": (
+            round(float(metrics["calibration_slope"]), 6)
+            if metrics["calibration_slope"] is not None else None
+        ),
+        "calibration_intercept": (
+            round(float(metrics["calibration_intercept"]), 6)
+            if metrics["calibration_intercept"] is not None else None
+        ),
+        "sample_size": metrics["sample_size"],
+    }
+
+
+def _variant_coverage(rows: Sequence[ValidationRow], feature_names: Sequence[str]) -> float:
+    """Fraction of rows where every availability-flagged feature is present."""
+    if not rows:
+        return 0.0
+    flagged = [name for name in feature_names if name in _FEATURE_AVAILABILITY_FLAGS]
+    if not flagged:
+        return 1.0
+    available = sum(
+        1
+        for row in rows
+        if all(bool(getattr(row, _FEATURE_AVAILABILITY_FLAGS[name])) for name in flagged)
+    )
+    return round(available / len(rows), 6)
+
+
 def evaluate_variant(
     train: Sequence[ValidationRow],
     validation: Sequence[ValidationRow],
     holdout: Sequence[ValidationRow],
     feature_names: Sequence[str],
+    *,
+    fixed_threshold: float | None = None,
 ) -> dict[str, Any]:
+    """Fit on train, learn (or reuse) a threshold, grade the locked holdout.
+
+    ``fixed_threshold``, when given, is passed through to the primary
+    (0.65-target) threshold step only -- a reproduction replay pins the
+    primary evaluation to a pre-supplied threshold; the diagnostic (0.60
+    target) view still learns its own threshold as before. Default ``None``
+    preserves current behavior exactly.
+    """
     model = _fit(train, feature_names)
+    train_probabilities = _predict(model, train, feature_names)
     validation_probabilities = _predict(model, validation, feature_names)
     holdout_probabilities = _predict(model, holdout, feature_names)
     primary = _learn_and_grade(
@@ -1046,6 +1241,7 @@ def evaluate_variant(
         holdout_probabilities,
         holdout,
         target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
+        fixed_threshold=fixed_threshold,
     )
     diagnostic = _learn_and_grade(
         validation_probabilities,
@@ -1063,6 +1259,19 @@ def evaluate_variant(
         "intercept": round(float(model.intercept_[0]), 10),
         "primary_65": primary,
         "diagnostic_60": diagnostic,
+        # Threshold-independent model-quality metrics over the full holdout
+        # (operator directive 2026-08-13: LogLoss/Brier/ECE/calibration lead;
+        # units are secondary evidence).
+        "holdout_all_rows": _all_rows_calibration(holdout_probabilities, holdout),
+        "coverage": _variant_coverage(holdout, feature_names),
+        # Same all-rows metrics per split so cross-fold stability is visible
+        # (a variant whose holdout beats its validation by a wide margin is
+        # overfit to the fold boundaries, not better).
+        "per_split": {
+            "train": _all_rows_calibration(train_probabilities, train),
+            "validation": _all_rows_calibration(validation_probabilities, validation),
+            "holdout": _all_rows_calibration(holdout_probabilities, holdout),
+        },
     }
 
 
@@ -1691,21 +1900,38 @@ def _learn_and_grade(
     holdout: Sequence[ValidationRow],
     *,
     target_hit_rate: float,
+    fixed_threshold: float | None = None,
 ) -> dict[str, Any]:
-    try:
-        threshold, validation_stats = learn_confidence_threshold(
-            validation_probabilities,
-            [row.outcome for row in validation],
-            target_hit_rate=target_hit_rate,
-            minimum_calls=MINIMUM_CALLS,
-        )
-    except ValueError as error:
-        return {
-            "status": "no_validation_threshold",
+    """Learn a threshold from validation, or reuse one already pinned.
+
+    ``fixed_threshold``, when given, skips ``learn_confidence_threshold``
+    entirely and grades the locked holdout directly against that value --
+    lets a reproduction replay plug in a production artifact's own recorded
+    ``confidence_threshold`` instead of deriving a fresh one from today's
+    validation cohort. Default ``None`` preserves current behavior exactly.
+    """
+    if fixed_threshold is not None:
+        threshold = fixed_threshold
+        validation_stats: dict[str, Any] = {
             "target_hit_rate": target_hit_rate,
             "minimum_calls": MINIMUM_CALLS,
-            "reason": str(error),
+            "source": "fixed_threshold_replay",
         }
+    else:
+        try:
+            threshold, validation_stats = learn_confidence_threshold(
+                validation_probabilities,
+                [row.outcome for row in validation],
+                target_hit_rate=target_hit_rate,
+                minimum_calls=MINIMUM_CALLS,
+            )
+        except ValueError as error:
+            return {
+                "status": "no_validation_threshold",
+                "target_hit_rate": target_hit_rate,
+                "minimum_calls": MINIMUM_CALLS,
+                "reason": str(error),
+            }
     return {
         "status": "evaluated",
         "learned_threshold": threshold,
@@ -2246,6 +2472,93 @@ def _starter_fip_gap(event_id: str) -> float:
     return _load_starter_fip_map().get(event_id, 0.0)
 
 
+# ── Starter K-BB% gap (same methodology, (K-BB)/IP instead of ERA/FIP) ───
+
+_STARTER_KBB_MAP: dict[str, float] | None = None
+
+
+def _load_starter_kbb_map() -> dict[str, float]:
+    """Build point-in-time starter K-BB% gap map from mlb_statsapi snapshots.
+
+    Mirrors ``_load_starter_fip_map`` exactly — same chronological point-in-time
+    logic, same rolling 5-start window, same >=2 prior starts minimum, same
+    crosswalk — but computes (K-BB)/IP instead of FIP."""
+    global _STARTER_KBB_MAP
+    if _STARTER_KBB_MAP is not None:
+        return _STARTER_KBB_MAP
+
+    import json as _json
+
+    snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
+    crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
+    if not snap_path.exists() or not crosswalk_path.exists():
+        _STARTER_KBB_MAP = {}
+        return _STARTER_KBB_MAP
+
+    def _ip_float(v):
+        w, _, f = v.partition(".")
+        return int(w) + {"0": 0.0, "1": 1 / 3, "2": 2 / 3}.get(f, 0.0)
+
+    crosswalk = {}
+    with crosswalk_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            g = _json.loads(line)
+            crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
+
+    with snap_path.open(encoding="utf-8") as f:
+        snaps = [_json.loads(line) for line in f if line.strip()]
+    snaps.sort(key=lambda r: r["game_start_utc"])
+
+    history: dict[int, list[dict]] = {}
+    result: dict[str, float] = {}
+
+    for snap in snaps:
+        key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
+        eid = crosswalk.get(key)
+        if not eid:
+            continue
+
+        home_kbb = away_kbb = None
+        for side_key, side_data in [("home", snap["home"]), ("away", snap["away"])]:
+            order = side_data.get("pitcher_order") or []
+            if not order:
+                continue
+            pid = order[0]
+            player = next((p for p in side_data["players"] if p["player_id"] == pid), None)
+            if not player or "inningsPitched" not in player.get("pitching", {}):
+                continue
+            stats = player["pitching"]
+            ip = _ip_float(stats["inningsPitched"])
+            so = int(stats.get("strikeOuts", 0) or 0)
+            bb = int(stats.get("baseOnBalls", 0) or 0)
+
+            prior = history.get(pid, [])
+            if len(prior) >= 2:
+                recent = prior[-5:]
+                pip = sum(g["ip"] for g in recent)
+                if pip > 0:
+                    kbb = (sum(g["so"] for g in recent) - sum(g["bb"] for g in recent)) / pip
+                    if side_key == "home":
+                        home_kbb = kbb
+                    else:
+                        away_kbb = kbb
+
+            history.setdefault(pid, []).append({"ip": ip, "so": so, "bb": bb})
+
+        if home_kbb is not None and away_kbb is not None:
+            result[eid] = round(home_kbb - away_kbb, 6)
+
+    _STARTER_KBB_MAP = result
+    return result
+
+
+def _starter_kbb_gap(event_id: str) -> float:
+    """Get the real starter K-BB% gap for a given event, or 0.0 if unavailable."""
+    return _load_starter_kbb_map().get(event_id, 0.0)
+
+
 # ── Bullpen weakness gap from MLB Stats API snapshots ────────────────────
 
 _BULLPEN_MAP: dict[str, tuple[float, bool]] | None = None
@@ -2344,7 +2657,7 @@ def _bullpen_weakness_gap(event_id: str) -> tuple[float, bool]:
 
 # ── Bullpen recent-workload (fatigue) gap from MLB Stats API snapshots ───
 
-_FATIGUE_WINDOW_DAYS = 3
+_FATIGUE_WINDOW_DAYS = FATIGUE_WINDOW_DAYS  # single source: features/bullpen.py
 _BULLPEN_FATIGUE_MAP: dict[str, tuple[float, bool]] | None = None
 
 

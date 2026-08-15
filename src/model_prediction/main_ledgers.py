@@ -27,6 +27,7 @@ from typing import Any
 from .domain import PickRequest
 from .eligibility import EligibilityResult
 from .ledger import PickLedger
+from .runtime_ledger_store import RuntimeLedgerStore
 
 MAIN_LEDGER_SPORTS: tuple[str, ...] = ("mlb", "wnba", "soccer", "tennis")
 
@@ -38,6 +39,34 @@ def normalize_main_sport(sport: str) -> str:
     return normalized
 
 
+def ledger_authority() -> str:
+    """J cutover flag: 'xlsx' (dual-write, legacy authoritative) or
+    'sqlite' (runtime store canonical, XLSX becomes best-effort export).
+    Operator flag-day flips MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite."""
+    import os
+
+    return os.environ.get("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
+
+
+def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
+    """The dual-write SQLite mirror for live tiers (G4).
+
+    Resolved against the SAME data root the ledger uses (repo_root is the
+    data root's parent), so tests with tmp roots stay isolated. XLSX stays
+    authoritative; the mirror is fail-soft and reconciled by
+    ledger_parity. Disable with MODEL_PREDICTION_LEDGER_MIRROR=0.
+    """
+    import os
+
+    from .runtime_paths import RuntimePaths
+
+    if os.environ.get("MODEL_PREDICTION_LEDGER_MIRROR", "1") == "0":
+        return None
+    try:
+        return RuntimeLedgerStore(RuntimePaths.resolve(repo_root=Path(data_root).parent))
+    except Exception:  # noqa: BLE001 — mirror must never break ledger construction
+        return None
+
 def main_ledger_path(data_root: str | Path, sport: str) -> Path:
     normalized = normalize_main_sport(sport)
     return Path(data_root) / "main" / f"{normalized}.xlsx"
@@ -45,9 +74,15 @@ def main_ledger_path(data_root: str | Path, sport: str) -> Path:
 
 def main_ledger(data_root: str | Path, sport: str) -> PickLedger:
     root = Path(data_root)
+    normalized = normalize_main_sport(sport)
     return PickLedger(
-        main_ledger_path(root, sport),
+        main_ledger_path(root, normalized),
         audit_path=root / "events.jsonl",
+        model_ledgers_dir=root / "model_ledgers",
+        tier="main",
+        mirror=ledger_mirror(root),
+        authority=ledger_authority(),
+        sport=normalized,
     )
 
 
@@ -56,7 +91,15 @@ def existing_main_ledgers(data_root: str | Path) -> list[PickLedger]:
     if not directory.exists():
         return []
     return [
-        PickLedger(path, audit_path=Path(data_root) / "events.jsonl")
+        PickLedger(
+            path,
+            audit_path=Path(data_root) / "events.jsonl",
+            model_ledgers_dir=Path(data_root) / "model_ledgers",
+            tier="main",
+            mirror=ledger_mirror(Path(data_root)),
+            authority=ledger_authority(),
+            sport=path.stem.casefold(),
+        )
         for path in sorted(directory.glob("*.xlsx"))
         if path.stem.casefold() in MAIN_LEDGER_SPORTS
     ]
@@ -69,9 +112,15 @@ def flat_ledger_path(data_root: str | Path, sport: str) -> Path:
 
 def flat_ledger(data_root: str | Path, sport: str) -> PickLedger:
     root = Path(data_root)
+    normalized = normalize_main_sport(sport)
     return PickLedger(
-        flat_ledger_path(root, sport),
+        flat_ledger_path(root, normalized),
         audit_path=root / "events.jsonl",
+        model_ledgers_dir=root / "model_ledgers",
+        tier="flat",
+        mirror=ledger_mirror(root),
+        authority=ledger_authority(),
+        sport=normalized,
     )
 
 
@@ -80,7 +129,11 @@ def existing_flat_ledgers(data_root: str | Path) -> list[PickLedger]:
     if not directory.exists():
         return []
     return [
-        PickLedger(path, audit_path=Path(data_root) / "events.jsonl")
+        PickLedger(
+            path,
+            audit_path=Path(data_root) / "events.jsonl",
+            model_ledgers_dir=Path(data_root) / "model_ledgers",
+        )
         for path in sorted(directory.glob("*.xlsx"))
         if path.stem.casefold() in MAIN_LEDGER_SPORTS
     ]
@@ -118,6 +171,11 @@ class MultiSportPickLedger:
             sport: PickLedger(
                 (flat_ledger_path if flat else main_ledger_path)(self.data_root, sport),
                 audit_path=self.data_root / "events.jsonl",
+                model_ledgers_dir=self.data_root / "model_ledgers",
+                tier="flat" if flat else "main",
+                mirror=ledger_mirror(self.data_root),
+                authority=ledger_authority(),
+                sport=sport,
                 **ledger_kwargs,
             )
             for sport in MAIN_LEDGER_SPORTS

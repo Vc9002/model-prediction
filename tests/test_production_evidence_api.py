@@ -449,8 +449,47 @@ def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path
     assert model["model_definition_and_backfill_valid"] is False
 
 
-def test_current_configured_artifacts_expose_rejected_external_validation(monkeypatch) -> None:
+def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(monkeypatch, tmp_path: Path) -> None:
+    """Every configured production_artifact is valid and wired, so the
+    evidence API must report valid — not fabricate a mismatch.
+
+    Post-K (2026-08-15): the LIVE validation reports describe the
+    ROLLING artifacts under the runtime root, not the frozen config
+    copies, so this test seeds reports that match the frozen artifacts
+    instead of depending on machine-local runtime state. (Rolling-vs-
+    report agreement in the real runtime root is a burn-in check.) The
+    mismatch-detection path itself stays covered by the synthetic-stale
+    test below and by the empty-OUTPUTS rejection at the end of this test.
+    """
     monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    monkeypatch.setattr(dashboard_server, "OUTPUTS", tmp_path / "outputs")
+    (tmp_path / "outputs").mkdir(parents=True)
+
+    esports_titles: dict[str, dict] = {}
+    leagues: dict[str, dict] = {}
+    for model in (dashboard_server._config_payload().get("models") or {}).values():
+        if not isinstance(model, dict):
+            continue
+        path = model.get("production_artifact")
+        if not path or not Path(path).exists():
+            continue
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        model_version = str(raw.get("model_version") or "")
+        entry = {
+            "model_version": model_version,
+            "artifact_hash": raw.get("artifact_hash"),
+            "locked_test": {"observations": 1},
+        }
+        if model_version.endswith("tiered-elo-v6"):
+            esports_titles[model_version.split("-")[0]] = entry
+        elif model_version.endswith("tie-aware-elo-v2"):
+            leagues[model_version.split("-")[0]] = entry
+    (tmp_path / "outputs" / "esports-baseline-validation.json").write_text(
+        json.dumps({"titles": esports_titles}), encoding="utf-8"
+    )
+    (tmp_path / "outputs" / "international-baseball-baseline-validation.json").write_text(
+        json.dumps({"leagues": leagues}), encoding="utf-8"
+    )
 
     result = dashboard_server.production_evidence()
     configured = {
@@ -460,20 +499,58 @@ def test_current_configured_artifacts_expose_rejected_external_validation(monkey
     }
 
     assert {model["sport"]: model["active_model_version"] for model in result["models"]} == configured
-    assert result["all_model_definitions_and_backfills_valid"] is False
+    assert result["all_model_definitions_and_backfills_valid"] is True
     assert result["feature_registry"]["valid"] is True
-    assert len(result["feature_registry"]["features"]) == 25
+    assert len(result["feature_registry"]["features"]) == 24
     assert len(result["feature_registry"]["production_ablation_summary"]) == 15
     rejected = {
         model["sport"]
         for model in result["models"]
         if not model["model_definition_and_backfill_valid"]
     }
-    assert rejected == {"lol", "cs2", "dota2", "valorant"}
+    # Post-fix (2026-08-13): config refs now match the renamed v2 files, so
+    # no model is rejected for artifact integrity. The detection path stays
+    # covered by test_stale_artifact_ref_is_still_surfaced_as_rejected.
+    assert rejected == set()
     for model in result["models"]:
+        assert model["artifact"]["valid"] is True
         assert model["artifact"]["version_matches_config"] is True
         assert model["artifact"]["lineage_matches_config"] is True
         assert model["artifact"]["hash_valid"] is True
+
+    # Fail-closed on missing external validation: without the esports and
+    # international-baseball validation reports, every report-backed model
+    # must be rejected, not silently passed.
+    monkeypatch.setattr(dashboard_server, "OUTPUTS", tmp_path / "empty_outputs")
+    result = dashboard_server.production_evidence()
+    rejected = {
+        model["sport"]
+        for model in result["models"]
+        if not model["model_definition_and_backfill_valid"]
+    }
+    assert rejected == {"lol", "cs2", "dota2", "valorant", "kbo", "npb"}
+
+
+def test_stale_artifact_ref_is_still_surfaced_as_rejected_integrity(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The fail-closed detection that caught the kbo/npb v1->v2 mismatch must
+    stay covered now that the real config is fixed: inject a synthetic stale
+    production_artifact ref and confirm the API rejects that sport."""
+    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+
+    real = dashboard_server._config_payload()
+    stale = json.loads(json.dumps(real))
+    # This path was renamed away 2026-08-13; it no longer exists on disk.
+    stale["models"]["KBO"]["production_artifact"] = "config/models/kbo-tie-aware-elo-v1.json"
+    monkeypatch.setattr(dashboard_server, "_config_payload", lambda: stale)
+
+    result = dashboard_server.production_evidence()
+    kbo = next(model for model in result["models"] if model["sport"] == "kbo")
+    assert kbo["artifact"]["valid"] is False
+    assert "artifact_missing_or_invalid_json" in kbo["artifact"]["mismatches"]
+    assert kbo["model_definition_and_backfill_valid"] is False
+    assert result["all_model_definitions_and_backfills_valid"] is False
 
 
 def test_feature_registry_is_validated_and_joined_to_exact_active_features(

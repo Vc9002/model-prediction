@@ -12,8 +12,8 @@ and the last known prediction/scheduler run timestamps.
 from __future__ import annotations
 
 import json
-import os
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,17 +23,24 @@ from model_prediction.production_canary import (
     health_check,
     load_production_config,
 )
-from model_prediction.runtime_paths import RuntimePaths
+
+_logger = logging.getLogger(__name__)
 
 _STATE_FILE_NAME = "production_state.json"
 
 
 def _resolve_runtime_root() -> Path:
-    """Resolve the runtime root (mutable state outside the Git repo)."""
-    env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
-    if env:
-        return Path(env)
-    return RuntimePaths.resolve().runtime_root
+    """Incumbent-side production data root: always the repo's data/.
+
+    Deliberately NOT env-var-aware — matches cli_production._resolve_data_root.
+    The runtime root is rebuild-scoped only (MIGRATION_MANIFEST.json); the
+    production canary's state file, ledger, and FeatureStore history are
+    incumbent-side and live under repo ``data/``. Env-aware resolution here
+    split the state in two (2026-08-13: the scheduled run wrote a second
+    state file under the runtime root while this reader followed the env
+    var or fallback depending on how the dashboard was started).
+    """
+    return PROJECT_ROOT / "data"
 
 
 def _read_state() -> dict[str, Any]:
@@ -77,7 +84,7 @@ def get_production_status() -> dict[str, Any]:
         }
     """
     state = _read_state()
-    now_utc = datetime.now(timezone.utc).isoformat()
+    now_utc = datetime.now(UTC).isoformat()
 
     # Defaults from config when state is empty
     model_id = "wnba-elo-trend-lr-v4"
@@ -111,7 +118,7 @@ def get_production_status() -> dict[str, Any]:
             artifact_hash = health.get("artifact_hash", "")
     except Exception:
         # If config can't be loaded, return what we can from state
-        pass
+        _logger.warning("production config/health check failed; serving state-only card", exc_info=True)
 
     # Overlay state (last-run data)
     if state:

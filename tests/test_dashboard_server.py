@@ -1035,11 +1035,14 @@ def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch)
     """Confirmed real gap (2026-07-31): read_picks() only ever parsed
     picks.xlsx (Main), so every open Flat/Research/Gated Research pick's
     price silently went stale forever, since nothing else ever refreshed
-    them. This pins that all four sources feed the price scan now."""
+    them. This pins that all four sources feed the price scan now.
+
+    read_picks()/read_flat_picks() are mocked whole (not _parse_picks):
+    _read_split_picks() now short-circuits to the SQLite dashboard cache
+    and never reaches Excel parsing, so mocking _parse_picks alone leaked
+    real cached rows into the scan."""
     monkeypatch.setattr(dashboard_server, "read_picks", lambda: [{"pick_id": "main-1"}])
-    monkeypatch.setattr(
-        dashboard_server, "_parse_picks", lambda path: [{"pick_id": "flat-1", "source": str(path)}]
-    )
+    monkeypatch.setattr(dashboard_server, "read_flat_picks", lambda: [{"pick_id": "flat-1"}])
     monkeypatch.setattr(
         dashboard_server,
         "_parse_research_picks",
@@ -1132,6 +1135,58 @@ def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
     assert result["recent_history"]["settlement_count"] == 1
     assert result["history_start_date"] == "2026-07-17"
     assert history_file.exists()
+
+
+def test_live_balance_unwraps_the_same_value_currency_envelope_as_every_other_amount(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Every other USD amount this API returns (trade price/costBasis/
+    realizedPnl/fee, position cost/cashValue/realized) arrives wrapped as
+    {"value": ..., "currency": ...} and is unwrapped with _amount_value().
+    The four balance.* fields were the one place still parsed with bare
+    _number(), which silently returns None on a dict instead of raising --
+    if the real /v1/account/balances endpoint follows the same envelope
+    convention as every other endpoint in this same authenticated API, the
+    dashboard's balance display (and _auto_adjust_unit_value's bankroll-%
+    sizing, which reads balance.current_usd) would go dark with no error."""
+    monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", tmp_path / "portfolio_history.json")
+    monkeypatch.setattr(dashboard_server, "_today", lambda: "2026-07-17")
+    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+    monkeypatch.setattr(dashboard_server, "_live_model_links", dict)
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
+    raw = {
+        "status": "live",
+        "source": "polymarket_us_authenticated_portfolio",
+        "observed_at_utc": "2026-07-17T15:00:00Z",
+        "positions": {},
+        "activities": [],
+        "balances": [
+            {
+                "currency": "USD",
+                "currentBalance": {"value": "123.45", "currency": "USD"},
+                "buyingPower": {"value": "100.00", "currency": "USD"},
+                "openOrders": {"value": "23.45", "currency": "USD"},
+                "unsettledFunds": {"value": "0.00", "currency": "USD"},
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        dashboard_server.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout=json.dumps(raw), stderr=""
+        ),
+    )
+
+    result = dashboard_server.live_portfolio_view()
+
+    assert result["balance"] == {
+        "current_usd": 123.45,
+        "buying_power_usd": 100.0,
+        "open_orders_usd": 23.45,
+        "unsettled_funds_usd": 0.0,
+    }
 
 
 def test_opposite_side_exchange_activity_is_not_linked_to_model_pick() -> None:
@@ -1783,3 +1838,71 @@ def test_pnl_fallback_formula_matches_pricing_profit_units() -> None:
                     f"diverged at odds={odds}, units={units}, result={result}: "
                     f"dashboard={dashboard_value} vs pricing.profit_units={real_value}"
                 )
+
+
+def test_daily_action_routes_through_supervisor_not_run_daily_script() -> None:
+    """Consolidation P0-2: the dashboard is not a second scheduler. The
+    daily action must ask the supervisor — whose lease coalesces with the
+    launchd job — never execute scripts/run_daily.sh itself."""
+    cmd = dashboard_server._action_command("daily", {})
+    joined = " ".join(cmd)
+    assert "run_supervisor" in joined
+    assert "run_daily.sh" not in joined
+    assert "run" in cmd and "daily" in cmd
+
+
+def test_exit_75_is_a_coalesced_skip_not_a_failure() -> None:
+    """P0-2: a manual trigger landing during the scheduled run must come
+    back as a skip (daily_lock LOCK_BUSY_EXIT convention), never as a
+    failed job."""
+    assert dashboard_server._job_status_for_returncode(0) == "ok"
+    assert dashboard_server._job_status_for_returncode(1) == "failed"
+    assert dashboard_server._job_status_for_returncode(75) == "skipped"
+
+
+def test_job_history_survives_restart(monkeypatch, tmp_path: Path) -> None:
+    """Consolidation P1: without startup hydration the first persist after
+    a restart wipes every pre-restart job. Hydration must load A/B/C,
+    normalize a persisted 'running' job to 'interrupted', never resurrect
+    started_monotonic, and a later persist must keep all of them."""
+    monkeypatch.setattr(dashboard_server, "JOBS_FILE", tmp_path / "jobs.json")
+    dashboard_server.JOBS_FILE.write_text(
+        json.dumps(
+            {
+                "a": {"job_id": "a", "action": "daily", "status": "ok", "started_at": "t1"},
+                "b": {
+                    "job_id": "b",
+                    "action": "flat_forecast",
+                    "status": "running",
+                    "started_at": "t2",
+                },
+                "c": {
+                    "job_id": "c",
+                    "action": "main_forecast",
+                    "status": "failed",
+                    "started_at": "t3",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    dashboard_server._JOBS.clear()
+    dashboard_server._hydrate_jobs()
+
+    assert set(dashboard_server._JOBS) == {"a", "b", "c"}
+    assert dashboard_server._JOBS["b"]["status"] == "interrupted"
+    assert "restarted" in dashboard_server._JOBS["b"]["error"]
+    assert "started_monotonic" not in dashboard_server._JOBS["b"]
+
+    # A new job plus persist must keep the history, not replace it.
+    with dashboard_server._JOBS_LOCK:
+        dashboard_server._JOBS["d"] = {
+            "job_id": "d",
+            "action": "daily",
+            "status": "running",
+            "started_at": "t4",
+            "started_monotonic": 1.0,
+        }
+    dashboard_server._persist_jobs()
+    reloaded = json.loads(dashboard_server.JOBS_FILE.read_text(encoding="utf-8"))
+    assert set(reloaded) == {"a", "b", "c", "d"}

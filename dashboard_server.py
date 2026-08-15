@@ -36,6 +36,8 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+from model_prediction.dashboard.data_service import handle as data_service_handle
+
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
@@ -114,6 +116,28 @@ _ACTION_LOCK = threading.Lock()
 _LAST_ACTION: dict[str, object] = {}
 _JOBS: dict[str, dict] = {}
 _JOBS_LOCK = threading.Lock()
+
+
+def _hydrate_jobs() -> None:
+    """Load persisted job history into memory at server start.
+
+    _persist_jobs() serializes ONLY the in-memory _JOBS dict, so without
+    this the first persist after a restart would overwrite jobs.json with
+    just the post-restart jobs and wipe all history. A restart also means
+    any job persisted as 'running' was interrupted (its thread is gone)
+    and monotonic timestamps are meaningless across processes — normalize
+    both rather than restore them as if they were still valid.
+    """
+    for job in _load_persisted_jobs().values():
+        if job.get("status") == "running":
+            job["status"] = "interrupted"
+            job["error"] = (
+                "the dashboard server restarted while this job was running; "
+                "the underlying CLI run may still have completed — check the ledger/summary"
+            )
+        job.pop("started_monotonic", None)
+        with _JOBS_LOCK:
+            _JOBS[job.get("job_id", "")] = job
 _RUNNER: list[str] | None = None
 _ORDER_PREVIEWS: dict[str, dict] = {}
 _ORDER_LOCK = threading.Lock()
@@ -253,7 +277,9 @@ def _runtime_paths():
     if not _runtime_paths_cache:
         from model_prediction.runtime_paths import RuntimePaths
 
-        _runtime_paths_cache.append(RuntimePaths.resolve(repo_root=ROOT))
+        _runtime_paths_cache.append(
+            RuntimePaths.resolve(repo_root=ROOT, require_external_runtime=True)
+        )
     return _runtime_paths_cache[0]
 
 
@@ -261,7 +287,14 @@ def rebuild_view(name: str) -> dict:
     """Return one isolated rebuild projection without importing writer classes."""
     from dashboard.rebuild_status import read_rebuild_view
 
-    return read_rebuild_view(name, ROOT, paths=_runtime_paths())
+    try:
+        paths = _runtime_paths()
+    except RuntimeError:
+        # Env-less contexts (CI smoke, dev without the launchd env) get
+        # the read-only view's own repo-local fallback. The rebuild view
+        # never writes, so there is no split-brain risk here.
+        paths = None
+    return read_rebuild_view(name, ROOT, paths=paths)
 
 
 def _unit_value_usd() -> float:
@@ -385,6 +418,9 @@ def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
 
 _PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
 _FLAT_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+# SQLite-backed cache: mirrors Excel ledger data for ~100x faster dashboard reads.
+# Falls back to Excel parsing if the SQLite cache hasn't been built yet.
+_DASHBOARD_CACHE: object | None = None
 # ── SECTION: Picks & Performance ────────────────────────────────────
 
 
@@ -401,7 +437,51 @@ def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]
     keyed on the combined mtime of every file that actually exists so any
     single sport's file changing invalidates the cache -- same "only
     re-parse on change" principle read_picks() always used, just extended
-    to N files instead of one."""
+    to N files instead of one.
+
+    When the SQLite dashboard cache is available, reads from it instead of
+    parsing Excel files (~100x faster).  Falls back to Excel parsing if the
+    cache hasn't been built yet.
+    """
+    global _DASHBOARD_CACHE
+    if _DASHBOARD_CACHE is None:
+        try:
+            from model_prediction.dashboard_cache import get_cache as _get_dc
+            from model_prediction.runtime_paths import RuntimePaths
+
+            # The cache DB is mutable runtime state (runtime root); the
+            # Excel sources it mirrors stay in the repo checkout.
+            _DASHBOARD_CACHE = _get_dc(
+                DATA, db_path=RuntimePaths.resolve(repo_root=ROOT).runtime_root / "dashboard_cache.db"
+            )
+        except Exception:
+            pass
+
+    # Try SQLite cache first
+    if _DASHBOARD_CACHE is not None and paths:
+        first_path = str(paths[0])
+        if "/flat/" in first_path or "\\flat\\" in first_path:
+            tier = "flat"
+        elif "/research/" in first_path or "\\research\\" in first_path:
+            tier = "research"
+        elif "/gated_research/" in first_path:
+            tier = "gated_research"
+        else:
+            tier = "main"
+
+        try:
+            dc = _DASHBOARD_CACHE
+            dc.refresh()  # no-op if mtimes unchanged, fast SQLite otherwise
+            if tier in ("flat", "main", "research", "gated_research"):
+                rows = dc.read_picks(tier)
+            else:
+                rows = dc.read_picks(tier)
+            if rows:
+                return rows
+        except Exception:
+            pass
+
+    # Fallback to Excel parsing (original path)
     if load_workbook is None:
         return []
     existing = [path for path in paths if path.exists()]
@@ -978,6 +1058,27 @@ def _production_model_spec(raw: dict) -> dict:
     }
 
 
+def _rolling_declared_hash(artifact_path: str | None) -> str | None:
+    """Declared hash of the ROLLING artifact for a config path, if any.
+
+    K split (2026-08-15): the external validation reports describe the
+    rolling artifacts under the runtime root; the frozen config copy is
+    the promoted snapshot. When a rolling copy exists, its hash is what
+    the report must match.
+    """
+    if not artifact_path:
+        return None
+    from model_prediction.runtime_paths import rolling_models_root
+
+    candidate = rolling_models_root() / Path(artifact_path).name
+    if not candidate.is_file():
+        return None
+    try:
+        return json.loads(candidate.read_text(encoding="utf-8")).get("artifact_hash")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 def _locked_backfill_evidence(
     sport: str,
     version: str,
@@ -1024,7 +1125,8 @@ def _locked_backfill_evidence(
         exact = (
             bool(locked)
             and report_version == version
-            and report_hash == artifact.get("declared_hash")
+            and report_hash
+            == (_rolling_declared_hash(artifact.get("path")) or artifact.get("declared_hash"))
         )
         if not exact:
             return {
@@ -1050,7 +1152,9 @@ def _locked_backfill_evidence(
     report_version = str(report.get("model_version") or "")
     report_hash = report.get("artifact_hash")
     exact_version = report_version == version
-    exact_hash = bool(report_hash) and report_hash == artifact.get("declared_hash")
+    exact_hash = bool(report_hash) and report_hash == (
+        _rolling_declared_hash(artifact.get("path")) or artifact.get("declared_hash")
+    )
     locked = report.get("locked_test") or {}
     if not exact_version or not exact_hash or not locked:
         reasons = []
@@ -3724,9 +3828,14 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return [python, "-m", "pytest", "tests/", "-q", "--no-header"]
     cli = runner if len(runner) > 1 else runner  # module or console-script form
     if name == "daily":
-        # Split pipeline: settle → main forecast → flat forecast
-        # Uses run_daily.sh which handles the multi-step flow
-        return ["bash", str(ROOT / "scripts" / "run_daily.sh")]
+        # One scheduling authority: the run supervisor. Executing
+        # run_daily.sh directly here would make the dashboard a second
+        # scheduler — two paths capable of acting like the control plane
+        # fighting over the daily lock, with a legitimate scheduled run
+        # showing up as a failed dashboard job. Route through the
+        # supervisor so a busy lease comes back as exit 75 (the daily_lock
+        # convention) and is recorded as skipped, not failed.
+        return [sys.executable, "-m", "model_prediction.run_supervisor", "run", "daily"]
     if name == "flat_forecast":
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
     if name == "main_forecast":
@@ -3797,6 +3906,19 @@ def _safe_sport(value) -> str:
 # ── SECTION: Jobs & Actions ─────────────────────────────────────────
 
 
+def _job_status_for_returncode(returncode: int) -> str:
+    """Map a job's exit code to a dashboard status.
+
+    75 is the daily_lock convention (LOCK_BUSY_EXIT): the supervisor
+    records the run as skipped when another run holds the lease. A manual
+    trigger landing during the scheduled run is a coalesced skip, not a
+    failure — lock refusal must not be routine scheduling behavior.
+    """
+    if returncode == 75:
+        return "skipped"
+    return "ok" if returncode == 0 else "failed"
+
+
 def start_action(name: str, payload: dict) -> dict:
     """Launch a whitelisted action as a background job; return its id at once.
 
@@ -3857,7 +3979,7 @@ def start_action(name: str, payload: dict) -> dict:
                     job["output_tail"] = "".join(chunks)[-12000:]
                     job["seconds"] = round(time.time() - started, 1)
             returncode = process.wait(timeout=3600)
-            status = "ok" if returncode == 0 else "failed"
+            status = _job_status_for_returncode(returncode)
         except Exception as error:  # noqa: BLE001
             status, returncode = "failed", -1
             chunks.append(f"\n{type(error).__name__}: {error}\n")
@@ -3990,6 +4112,15 @@ class Handler(BaseHTTPRequestHandler):
                     self._send({"error": "dashboard.html missing"}, code=404)
             elif route == "/api/status":
                 self._send(_cached("status", 30, status))
+            elif route.startswith("/api/data/"):
+                # SQL-backed read-only data service (consolidation C):
+                # paginated predictions, counts, runs, promotions, health,
+                # and the cheap change fingerprint. No Excel, no mutation.
+                data_route = route.removeprefix("/api/data/")
+                try:
+                    self._send(data_service_handle(data_route, parse_qs(parsed.query)))
+                except KeyError:
+                    self._send({"error": f"unknown data route: {data_route}"}, code=404)
             elif route == "/api/matrix":
                 self._send(_cached("matrix", 60, matrix))
             elif route == "/api/production-evidence":
@@ -4047,23 +4178,18 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 )
             elif route == "/api/research-picks":
-                research = _parse_research_picks()
-                decorated = [_decorate_pick(r) for r in research]
-                self._send(_cached("research-picks", 30, lambda: decorated))
+                self._send(_cached("research-picks", 60, lambda: [_decorate_pick(r) for r in _parse_research_picks()]))
             elif route == "/api/gated-research-performance":
                 sport = str(query.get("sport") or "").strip()
-                gated = _parse_research_picks(gated=True)
                 self._send(
                     _cached(
                         f"gated-research-performance:{sport.casefold() or 'all'}",
-                        30,
-                        lambda: performance_for_sport(gated, sport),
+                        60,
+                        lambda: performance_for_sport(_parse_research_picks(gated=True), sport),
                     )
                 )
             elif route == "/api/gated-research-picks":
-                gated = _parse_research_picks(gated=True)
-                decorated = [_decorate_pick(r) for r in gated]
-                self._send(_cached("gated-research-picks", 30, lambda: decorated))
+                self._send(_cached("gated-research-picks", 60, lambda: [_decorate_pick(r) for r in _parse_research_picks(gated=True)]))
             elif route == "/api/backtests":
                 self._send(_cached("backtests", 60, backtests))
             elif route == "/api/backtest":
@@ -4122,6 +4248,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self) -> None:  # noqa: N802
         route = urlparse(self.path).path
+        if route.startswith("/api/data/"):
+            self._send_head({"ok": True})
+            return
         if route.startswith("/api/rebuild/"):
             view = route.removeprefix("/api/rebuild/")
             if view in _REBUILD_VIEWS:
@@ -4905,11 +5034,24 @@ def live_portfolio_view() -> dict:
             "realized_pnl_usd": round(sum(_number(item.get("realized_pnl_usd")) for item in positions), 2),
         },
         "recent_history": _portfolio_history_summary(history, "exchange_and_persisted", links),
+        # Every other USD amount this same authenticated API returns (trade
+        # price/costBasis/realizedPnl/fee, position cost/cashValue/realized)
+        # arrives as a {"value": ..., "currency": ...} envelope and is parsed
+        # with _amount_value(), never bare _number() -- these four balance
+        # fields were the one place still using _number(), which returns the
+        # `default` (None here) on a dict instead of raising, so a real
+        # envelope-shaped balance response would have silently rendered every
+        # balance figure (and _auto_adjust_unit_value's bankroll-percent
+        # sizing, which reads current_usd) as unavailable with no error
+        # surfaced.
+        # _amount_value() unwraps the envelope when present and still handles
+        # a bare number, so this is a strict superset, not a behavior change,
+        # for whichever shape the endpoint actually returns.
         "balance": {
-            "current_usd": _number((usd or {}).get("currentBalance"), None),
-            "buying_power_usd": _number((usd or {}).get("buyingPower"), None),
-            "open_orders_usd": _number((usd or {}).get("openOrders"), None),
-            "unsettled_funds_usd": _number((usd or {}).get("unsettledFunds"), None),
+            "current_usd": _amount_value((usd or {}).get("currentBalance")),
+            "buying_power_usd": _amount_value((usd or {}).get("buyingPower")),
+            "open_orders_usd": _amount_value((usd or {}).get("openOrders")),
+            "unsettled_funds_usd": _amount_value((usd or {}).get("unsettledFunds")),
         },
     }
 
@@ -5180,6 +5322,7 @@ def main() -> None:
     options = arguments.parse_args()
 
     DASH_DIR.mkdir(exist_ok=True)
+    _hydrate_jobs()
     server = None
     my_pid = os.getpid()
     try:

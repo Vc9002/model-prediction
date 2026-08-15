@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -160,30 +161,52 @@ class TestAllowedModelConstraints:
         assert len(allowed) == 1
         assert allowed[0] == "wnba-elo-trend-lr-v4"
 
-    def test_exactly_one_model_allowlisted(self, tmp_path: Path) -> None:
-        """validate rejects zero allowed models."""
+    def test_empty_allowlist_rejected(self, tmp_path: Path) -> None:
+        """validate rejects an empty allowed_models list (shipped constraint:
+        the list must be non-empty — currently 13 production models)."""
         repo, _ = _setup_production_env(tmp_path)
         bad = _make_production_config(
             {"prediction_service": {"allowed_models": []}}
         )
         _write_yaml(repo / "config" / "production.yaml", bad)
         config = load_production_config(repo_root=repo)
-        with pytest.raises(ValueError, match="exactly one"):
+        with pytest.raises(ValueError, match="non-empty"):
             validate_production_config(config, repo_root=repo)
 
-    def test_multiple_models_in_allowlist_rejected(self, tmp_path: Path) -> None:
-        """validate rejects more than one allowed model."""
+    def test_multiple_models_in_allowlist_accepted_when_primary_members(self, tmp_path: Path) -> None:
+        """Multiple allowlisted models are shipped behavior (the real
+        allowlist holds 13); validation must accept them — the real
+        constraint is that the primary model is one of the allowed entries."""
         repo, _ = _setup_production_env(tmp_path)
-        bad = _make_production_config(
+        multi = _make_production_config(
             {
                 "prediction_service": {
                     "allowed_models": ["wnba-elo-trend-lr-v4", "nba-elo-trend-lr-v4"],
                 }
             }
         )
+        _write_yaml(repo / "config" / "production.yaml", multi)
+        config = load_production_config(repo_root=repo)
+        validate_production_config(config, repo_root=repo)  # must not raise
+
+    def test_primary_not_in_allowlist_rejected(self, tmp_path: Path) -> None:
+        """A primary model missing from the allowlist is rejected even when
+        the list is non-empty."""
+        repo, _ = _setup_production_env(tmp_path)
+        bad = _make_production_config(
+            {
+                "prediction_service": {
+                    "primary": {
+                        "model_id": "nba-elo-trend-lr-v4",
+                        "artifact": "config/models/wnba-elo-trend-lr-v4.json",
+                    },
+                    "allowed_models": ["wnba-elo-trend-lr-v4"],
+                }
+            }
+        )
         _write_yaml(repo / "config" / "production.yaml", bad)
         config = load_production_config(repo_root=repo)
-        with pytest.raises(ValueError, match="exactly one"):
+        with pytest.raises(ValueError, match="not in"):
             validate_production_config(config, repo_root=repo)
 
 
@@ -215,29 +238,105 @@ class TestArtifactValidation:
 
 
 class TestHealthCheck:
+    @staticmethod
+    def _seed_db(repo: Path, runtime_root: Path, prediction_time_utc: str) -> None:
+        """Seed the canonical production.db (health's truth source, item 12)."""
+        from model_prediction.production_store import ProductionPredictionStore
+        from model_prediction.runtime_paths import RuntimePaths
+
+        store = ProductionPredictionStore(
+            RuntimePaths(repo_root=repo, runtime_root=runtime_root)
+        )
+        run_id = store.start_run(git_sha="test")
+        store.append_prediction(
+            run_id=run_id,
+            prediction_id="p1",
+            event_id="e1",
+            sport="WNBA",
+            market="moneyline",
+            market_type="moneyline",
+            model_id="wnba-elo-trend-lr-v4",
+            probabilities={"home": 0.62, "away": 0.38},
+            decision_time_utc=prediction_time_utc,
+            prediction_time_utc=prediction_time_utc,
+        )
+        store.close()
+
     def test_health_check_returns_healthy(self, tmp_path: Path) -> None:
-        """A valid setup returns HEALTHY."""
+        """A valid setup with a fresh prediction state returns HEALTHY."""
         repo, _ = _setup_production_env(tmp_path)
         config = load_production_config(repo_root=repo)
-        result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
+        # The data-freshness check is real: seed a recent last prediction.
+        rt = tmp_path / "rt"
+        self._seed_db(repo, rt, datetime.now(UTC).isoformat())
+        result = health_check(config, repo_root=repo, runtime_root=rt)
         assert result["status"] == "HEALTHY"
         assert result["model_id"] == "wnba-elo-trend-lr-v4"
         assert "artifact_hash" in result
         assert "checked_at_utc" in result
+
+    def test_health_check_degrades_without_prediction_records(self, tmp_path: Path) -> None:
+        """No predictions in the canonical production.db must degrade, not
+        silently pass (fail-closed freshness: no recorded prediction = not
+        fresh). The legacy state file is NOT consulted (item 12)."""
+        repo, _ = _setup_production_env(tmp_path)
+        config = load_production_config(repo_root=repo)
+        result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
+        assert result["status"] == "DEGRADED"
+        assert "no production predictions recorded" in result["reason"]
+
+    def test_health_check_degrades_on_stale_prediction(self, tmp_path: Path) -> None:
+        """A last prediction older than max_data_age_minutes degrades."""
+        repo, _ = _setup_production_env(tmp_path)
+        config = load_production_config(repo_root=repo)
+        rt = tmp_path / "rt"
+        stale = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+        self._seed_db(repo, rt, stale)
+        result = health_check(config, repo_root=repo, runtime_root=rt)
+        assert result["status"] == "DEGRADED"
+        assert "minutes ago" in result["reason"]
+
+    def test_health_check_down_on_non_normalized_stored_probabilities(self, tmp_path: Path) -> None:
+        """require_probability_normalization is enforced on the STORED
+        predictions: a pair not summing to 1 (within 1e-6) is DOWN."""
+        from model_prediction.production_store import ProductionPredictionStore
+        from model_prediction.runtime_paths import RuntimePaths
+
+        repo, _ = _setup_production_env(tmp_path)
+        rt = tmp_path / "rt"
+        store = ProductionPredictionStore(RuntimePaths(repo_root=repo, runtime_root=rt))
+        run_id = store.start_run(git_sha="test")
+        store.append_prediction(
+            run_id=run_id,
+            prediction_id="p1",
+            event_id="e1",
+            sport="WNBA",
+            market="moneyline",
+            market_type="moneyline",
+            model_id="wnba-elo-trend-lr-v4",
+            probabilities={"home": 0.9, "away": 0.2},
+            decision_time_utc=datetime.now(UTC).isoformat(),
+            prediction_time_utc=datetime.now(UTC).isoformat(),
+        )
+        store.close()
+        config = load_production_config(repo_root=repo)
+        result = health_check(config, repo_root=repo, runtime_root=rt)
+        assert result["status"] == "DOWN"
+        assert "not normalized" in result["reason"]
 
     def test_missing_artifact_returns_degraded_or_down(self, tmp_path: Path) -> None:
         """health_check returns DOWN when artifact is missing."""
         repo, artifact_path = _setup_production_env(tmp_path)
         artifact_path.unlink()
         config = load_production_config(repo_root=repo)
-        result = health_check(config, repo_root=repo)
+        result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
         assert result["status"] == "DOWN"
 
     def test_health_check_config_load_failure(self, tmp_path: Path) -> None:
         """health_check returns DOWN when config/production.yaml is missing."""
         repo, _ = _setup_production_env(tmp_path)
         (repo / "config" / "production.yaml").unlink()
-        result = health_check(repo_root=repo)
+        result = health_check(repo_root=repo, runtime_root=tmp_path / "rt")
         assert result["status"] == "DOWN"
 
     def test_health_check_with_nonfinite_probability(self, tmp_path: Path) -> None:
@@ -253,7 +352,7 @@ class TestHealthCheck:
         _write_json(artifact_path, data)
 
         config = load_production_config(repo_root=repo)
-        result = health_check(config, repo_root=repo)
+        result = health_check(config, repo_root=repo, runtime_root=tmp_path / "rt")
         assert result["status"] == "DOWN"
 
 

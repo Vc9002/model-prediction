@@ -30,12 +30,58 @@ Resolution order for `runtime_root`:
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 
 class RuntimePathError(ValueError):
     """A resolved or explicitly-constructed path configuration is unsafe."""
+
+
+def migrate_legacy_state(paths: RuntimePaths) -> list[str]:
+    """One-time carry-over of pre-runtime-root mutable state into runtime_root.
+
+    The 2026-08-13 split-brain taught this repo the hard way that a HALF
+    migration (some writers on the runtime root, some readers on repo
+    data/) corrupts silently. The rule now is the inverse: every reader
+    and writer resolves through RuntimePaths, and the historical
+    repo-local files are carried over exactly once — only when the
+    runtime-root file does not exist yet — via copy-to-tmp + rename so a
+    concurrent reader never sees a partial file. Legacy files are never
+    deleted (some are git-tracked evidence). Idempotent and safe to call
+    on every open.
+    """
+    moved: list[str] = []
+    legacy_pairs = [
+        (paths.repo_root / "data" / "runs.db", paths.runs_db),
+        (
+            paths.repo_root / "data" / "production" / "predictions.db",
+            paths.production_db,
+        ),
+        (
+            paths.repo_root / "data" / "production_state.json",
+            paths.production_state_file,
+        ),
+    ]
+    for legacy, target in legacy_pairs:
+        if legacy.is_file() and not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            tmp = target.with_suffix(target.suffix + ".migrating")
+            shutil.copy2(legacy, tmp)
+            os.replace(tmp, target)
+            moved.append(f"{legacy} -> {target}")
+    return moved
+
+
+def rolling_models_root(repo_root: Path | str | None = None) -> Path:
+    """Where scheduled retraining writes its rolling rating artifacts.
+
+    The daily cycle retrains esports/KBO/NPB Elo artifacts every run;
+    those full-file rewrites belong under the runtime root so the
+    checked-in config/models/ copies stay frozen promoted artifacts.
+    """
+    return RuntimePaths.resolve(repo_root=repo_root).models_root
 
 
 def _default_repo_root() -> Path:
@@ -105,16 +151,109 @@ class RuntimePaths:
     def rebuild_metadata_db(self) -> Path:
         return self.rebuild_root / "metadata.db"
 
+    # ── mutable production/control-plane state ────────────────────────────
+    # Everything the production canary and the run supervisor write lives
+    # under runtime_root, matching the consolidation target layout:
+    #
+    #   runtime/
+    #   ├── runs.db                    (control plane: runs + promotions)
+    #   ├── production/
+    #   │   ├── production.db          (predictions, decisions, snapshots, runs)
+    #   │   └── production_state.json
+    #   ├── research/research.db       (future shadow-ledger cutover target)
+    #   ├── rebuild/shadow.db
+    #   └── logs/supervisor/           (per-run worker output)
+
+    @property
+    def runs_db(self) -> Path:
+        return self.runtime_root / "runs.db"
+
+    @property
+    def production_root(self) -> Path:
+        return self.runtime_root / "production"
+
+    @property
+    def production_db(self) -> Path:
+        return self.production_root / "production.db"
+
+    @property
+    def production_state_file(self) -> Path:
+        # Directly under runtime_root, matching where the canary's state
+        # file has always lived (repo data/production_state.json) so every
+        # existing reader (health checks, system_health) keeps resolving
+        # to the same file during the cutover.
+        return self.runtime_root / "production_state.json"
+
+    @property
+    def ledgers_root(self) -> Path:
+        return self.runtime_root / "ledgers"
+
+    @property
+    def models_root(self) -> Path:
+        # Rolling retraining artifacts (esports/KBO/NPB ratings): the
+        # scheduled cycle rewrites these every run, so they live under the
+        # runtime root. config/models/ keeps only the frozen promoted
+        # artifacts (git). See cli._research_models_dir() for the
+        # rolling-first-with-frozen-fallback read contract.
+        return self.runtime_root / "models"
+
+    @property
+    def ledgers_db(self) -> Path:
+        return self.ledgers_root / "ledgers.db"
+
+    @property
+    def research_root(self) -> Path:
+        return self.runtime_root / "research"
+
+    @property
+    def research_db(self) -> Path:
+        return self.research_root / "research.db"
+
+    @property
+    def supervisor_log_root(self) -> Path:
+        return self.log_root / "supervisor"
+
+    @property
+    def lock_root(self) -> Path:
+        # All mutable runtime state is external — leases included.
+        return self.runtime_root / "locks"
+
     @property
     def log_root(self) -> Path:
         return self.runtime_root / "logs"
 
     @classmethod
-    def resolve(cls, *, repo_root: Path | str | None = None) -> RuntimePaths:
-        """Resolve from environment, with the repo-local dev fallback described above."""
+    def resolve(
+        cls,
+        *,
+        repo_root: Path | str | None = None,
+        require_external_runtime: bool = False,
+    ) -> RuntimePaths:
+        """Resolve from environment.
+
+        ``require_external_runtime=True`` is the operational contract:
+        the caller may only touch the canonical external runtime root.
+        Without ``MODEL_PREDICTION_RUNTIME_ROOT`` the call raises instead
+        of silently creating a second (split-brain) runtime under the
+        repository — one env-less invocation used to spawn an entirely
+        separate database universe next to the canonical one. Local
+        development keeps the default repo ``data/`` fallback, and tests
+        use :meth:`for_test`.
+        """
         resolved_repo_root = Path(repo_root) if repo_root is not None else _default_repo_root()
         runtime_root_env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
-        runtime_root = Path(runtime_root_env) if runtime_root_env else resolved_repo_root / "data"
+        if runtime_root_env:
+            runtime_root = Path(runtime_root_env)
+        elif require_external_runtime:
+            raise RuntimeError(
+                "MODEL_PREDICTION_RUNTIME_ROOT is required for operational "
+                "invocations; refusing the repo-local data/ fallback because "
+                "it silently creates a second runtime root (split-brain) next "
+                "to the canonical one. Set the env var, or use the default "
+                "resolve() for explicit local development."
+            )
+        else:
+            runtime_root = resolved_repo_root / "data"
         return cls(repo_root=resolved_repo_root, runtime_root=runtime_root)
 
     @classmethod

@@ -83,6 +83,88 @@ def test_parse_official_kbo_result_including_tie() -> None:
     ]
 
 
+def test_parse_kbo_rows_skips_unplayed_games_with_empty_relay() -> None:
+    """Regression: the KBO schedule renders unplayed games as "0 vs 0" with
+    an EMPTY relay cell (verified live 2026-08-13). The old fallback
+    fabricated a game_id for those rows and cached them as phantom 0-0
+    ties, which settled real picks as scoreless ties and inflated the
+    tie-rate training stats. Unplayed games must be skipped, exactly like
+    NPB's unplayed "*" rows."""
+    payload = {
+        "rows": [
+            {
+                "row": [
+                    {"Text": "08.13(목)", "Class": "day"},
+                    {"Text": "<b>19:00</b>", "Class": "time"},
+                    {
+                        "Text": '<span>한화</span><em><span class="same">0</span>'
+                        '<span>vs</span><span class="same">0</span></em><span>두산</span>',
+                        "Class": "play",
+                    },
+                    {"Text": "", "Class": "relay"},
+                ]
+            }
+        ]
+    }
+    assert parse_kbo_rows(payload, 2026) == []
+
+
+def test_find_result_ignores_fabricated_id_phantom_rows(tmp_path) -> None:
+    """Regression: pre-2026-08-13 caches hold phantom 0-0 rows whose game_id
+    was fabricated from date+teams. Those sort before the real source id for
+    the same game, so the matcher used to return (0, 0) — a fake tie — even
+    though the real-scored row for the same date and teams was right there."""
+    root = tmp_path / "international_baseball" / "kbo"
+    root.mkdir(parents=True)
+    (root / "games.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "game_id": "kbo:20260812:HANWHA:DOOSAN",  # fabricated
+                        "league": "kbo",
+                        "season": 2026,
+                        "game_date": "2026-08-12",
+                        "away_team_id": "HANWHA",
+                        "home_team_id": "DOOSAN",
+                        "away_score": 0,
+                        "home_score": 0,
+                        "tie": True,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "game_id": "kbo:20260812HHOB0",  # real source id
+                        "league": "kbo",
+                        "season": 2026,
+                        "game_date": "2026-08-12",
+                        "away_team_id": "HANWHA",
+                        "home_team_id": "DOOSAN",
+                        "away_score": 4,
+                        "home_score": 3,
+                        "tie": False,
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (root / "teams.json").write_text(
+        json.dumps(
+            {
+                "HANWHA": {"name": "Hanwha Eagles", "aliases": ["Hanwha Eagles"]},
+                "DOOSAN": {"name": "Doosan Bears", "aliases": ["Doosan Bears"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = find_international_baseball_result(
+        tmp_path, "kbo", "2026-08-12", "Doosan Bears", "Hanwha Eagles"
+    )
+    assert result == (4, 3)
+
+
 def test_parse_official_npb_calendar_skips_cancellations_and_keeps_ties() -> None:
     page = """
     <a href="/bis/eng/2025/games/s2025040200119.html">T 6 - 6 DB</a>
@@ -165,7 +247,7 @@ def test_validation_is_locked_chronological_and_never_promotes(tmp_path) -> None
     assert report["chronological_split"]["validation"]["through_date"] < report["chronological_split"]["locked_test"]["from_date"]
     assert report["promotion_eligible"] is False
     assert report["units"] == 0
-    artifact = json.loads((tmp_path / "models/kbo-tie-aware-elo-v1.json").read_text())
+    artifact = json.loads((tmp_path / "models/kbo-tie-aware-elo-v2.json").read_text())
     assert artifact["qualified_for_betting"] is False
     assert artifact["target"] == "expected moneyline settlement where a tie pays 0.50"
 
@@ -213,10 +295,10 @@ def test_forecast_uses_home_away_and_current_asks_but_stays_zero_unit(tmp_path) 
     )
     models = tmp_path / "models"
     models.mkdir()
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(
             {
-                "model_version": "kbo-tie-aware-elo-v1",
+                "model_version": "kbo-tie-aware-elo-v2",
                 "artifact_hash": "abc",
                 "k": 20,
                 "home_advantage": 50,
@@ -272,7 +354,7 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
 
     def _artifact(prefix_hash: str) -> dict:
         return {
-            "model_version": "kbo-tie-aware-elo-v1",
+            "model_version": "kbo-tie-aware-elo-v2",
             "artifact_hash": "abc",
             "k": 20,
             "home_advantage": 50,
@@ -283,7 +365,7 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
         }
 
     # Wrong hash (as if the history was altered after this artifact trained) -> refused.
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(_artifact("0" * 64)), encoding="utf-8"
     )
     with pytest.raises(ValueError, match="training history has changed"):
@@ -292,7 +374,7 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
         )
 
     # Real matching hash -> forecast proceeds normally.
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(_artifact(real_prefix_hash)), encoding="utf-8"
     )
     output = forecast_international_baseball_slate(
@@ -344,10 +426,10 @@ def test_forecast_resolves_home_away_by_tag_not_by_raw_side_position(tmp_path) -
     )
     models = tmp_path / "models"
     models.mkdir()
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(
             {
-                "model_version": "kbo-tie-aware-elo-v1",
+                "model_version": "kbo-tie-aware-elo-v2",
                 "artifact_hash": "abc",
                 "k": 20,
                 "home_advantage": 50,
@@ -406,10 +488,10 @@ def test_forecast_no_calls_when_both_sides_resolve_to_same_team(tmp_path) -> Non
     )
     models = tmp_path / "models"
     models.mkdir()
-    (models / "kbo-tie-aware-elo-v1.json").write_text(
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
         json.dumps(
             {
-                "model_version": "kbo-tie-aware-elo-v1",
+                "model_version": "kbo-tie-aware-elo-v2",
                 "artifact_hash": "abc",
                 "k": 20,
                 "home_advantage": 50,

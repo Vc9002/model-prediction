@@ -16,3 +16,4 @@ Diagnose → Test → Implement → Verify (pytest + ruff) → Document
 - Reject retrospective features that cannot prove they were observable before event start.
 - Do not invent spread, total, F5, or YRFI/NRFI contracts when exact historical lines are absent.
 - Shadow calls are not orders. Never log or execute during model validation.
+- Codebase-structure questions go to the `/graphify` skill first (graph at `graphify-out/graph.json` in the repo root) instead of re-reading files.

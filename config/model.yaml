@@ -3,17 +3,16 @@ project:
   execution_mode: live_manual
   timezone: UTC
   ledger_path: data/picks.xlsx
-  # Set false 2026-08-11: data/main was archived (data/archive/2026-08-10-
-  # main-ledger-archived-shadow-primary/), the dashboard's primary display
-  # is now the rebuild shadow ledger. With this false, cli.py constructs the
-  # incumbent Main PickLedger with retired=True (see ledger.py's PickLedger
-  # docstring) -- it stays fully readable (an honest empty list, same
-  # contract the dashboard's picks reader already relies on) but every
-  # write silently no-ops instead of recreating data/main/*.xlsx. Flat,
-  # research, gated-research, model ledgers, settlement, and every capture
-  # step are unaffected. Flip back to true only alongside an explicit
-  # decision to bring Main back.
-  main_ledger_enabled: false
+  # Re-enabled true 2026-08-13 by explicit operator directive ("unretire
+  # main ledger"). data/main had been archived 2026-08-11
+  # (data/archive/2026-08-10-main-ledger-archived-shadow-primary/) and the
+  # dashboard's primary display switched to the rebuild shadow ledger.
+  # With false, cli.py constructs the incumbent Main PickLedger with
+  # retired=True (see ledger.py's PickLedger docstring) -- readable but
+  # every write silently no-ops instead of recreating data/main/*.xlsx.
+  # With true, Main is back in the daily write path; the archived
+  # per-sport workbooks were restored to data/main/ on 2026-08-13.
+  main_ledger_enabled: true
   audit_path: data/events.jsonl
   polymarket_snapshot_path: data/polymarket_us_snapshots.jsonl
   market_odds_snapshot_path: data/market_odds_snapshots.jsonl
@@ -86,7 +85,6 @@ data_sources:
   sport_data:
     provider: espn_public
     mlb_deep: mlb_statsapi
-    soccer_enrichment: football_data
     tennis_historical: sackmann_csv
     optional_upgrade: sportsdataio
     esports_series:
@@ -236,11 +234,10 @@ models:
     - nba-elo-trend-v1
     - nba-elo-trend-lr-v1
     - nba-elo-trend-lr-v3
-    active_research_version: spread-baseline-v1
-    active_research_name: Spread & Total Baseline
-    min_edge: 0.0
-    spread_research_artifact: config/models/nba-spread-baseline-v1.json
-    total_research_artifact: config/models/nba-spread-baseline-v1.json
+    # Spread/total baselines for NBA were archived 2026-08-13 (config/models/
+    # archive/nba-spread-baseline-v1.json) as obsolete; the dangling research
+    # refs were removed with them. Re-add a real artifact when NBA spread/
+    # total research resumes.
   WNBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
@@ -252,10 +249,10 @@ models:
     - wnba-elo-trend-v1
     - wnba-elo-trend-lr-v1
     - wnba-elo-trend-lr-v3
-    active_research_version: spread-baseline-v1
+    active_research_version: spread-margin-v1
     active_research_name: Spread & Total Baseline
-    spread_research_artifact: config/models/wnba-spread-baseline-v1.json
-    total_research_artifact: config/models/wnba-spread-baseline-v1.json
+    spread_research_artifact: config/models/wnba-spread-margin-v1.json
+    total_research_artifact: config/models/wnba-total-score-ridge-v1.json
     sizing_recommendation: flat_1.5_to_2.0u
     sizing_recommendation_reason: '2026-07-22 analysis: Kelly/edge-scaled sizing underperforms
       flat betting for WNBA due to thin edges. Flat 2.0u produced +2.64u on 13 settled
@@ -321,11 +318,10 @@ models:
     origin: statistical_model
     active_production_version: nfl-elo-trend-lr-v4
     production_artifact: config/models/nfl-elo-trend-lr-v4.json
-    active_research_version: spread-baseline-v1
-    active_research_name: Spread & Total Baseline
-    min_edge: 0.0
-    spread_research_artifact: config/models/nfl-spread-baseline-v1.json
-    total_research_artifact: config/models/nfl-spread-baseline-v1.json
+    # Spread/total baselines for NFL were archived 2026-08-13 (config/models/
+    # archive/nfl-spread-baseline-v1.json) as obsolete; the dangling research
+    # refs were removed with them. Re-add a real artifact when NFL spread/
+    # total research resumes.
   TENNIS:
     family: surface_blended_elo
     status: shadow_qualified
@@ -470,11 +466,11 @@ models:
       gate does not apply to tie-paying-half settlement. v2 adds margin-weighted K,
       recency decay, and game-specific tie probability.
     active_research_version: kbo-tie-aware-elo-v2
-    research_artifact: config/models/kbo-tie-aware-elo-v1.json
+    research_artifact: config/models/kbo-tie-aware-elo-v2.json
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
     active_production_version: kbo-tie-aware-elo-v2
-    production_artifact: config/models/kbo-tie-aware-elo-v1.json
+    production_artifact: config/models/kbo-tie-aware-elo-v2.json
     # Honest disclosure (2026-08-03): international_baseball.py's new
     # confidence-threshold sweep learned 0.123889 on the validation split
     # (65% hit rate there) but did NOT generalize to the locked holdout --
@@ -492,11 +488,11 @@ models:
       gate does not apply to tie-paying-half settlement. v2 adds margin-weighted K (0.5),
       recency decay (0.002/day), and game-specific tie probability (elo_gap).
     active_research_version: npb-tie-aware-elo-v2
-    research_artifact: config/models/npb-tie-aware-elo-v1.json
+    research_artifact: config/models/npb-tie-aware-elo-v2.json
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
     active_production_version: npb-tie-aware-elo-v2
-    production_artifact: config/models/npb-tie-aware-elo-v1.json
+    production_artifact: config/models/npb-tie-aware-elo-v2.json
     # Honest disclosure (2026-08-03): same story as KBO above -- learned
     # 0.090624 on validation (65% hit rate there), did NOT generalize to
     # the locked holdout (55.7% hit rate on 176 calls, qualified=false,

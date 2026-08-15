@@ -19,9 +19,16 @@ data/raw/
 data/*.bak-*
 data/*.before-backtest-cleanup-*
 data/*.pre-fix-*
-data/logs/*.log
+data/logs/
+dashboard/server.log
 data/events.jsonl
 data/mlb_statsapi/game_snapshots.jsonl
+
+# SQLite WAL/SHM journal side-files — transient, checkpoint into the main
+# .db before committing rather than tracking these (tracked .db files, e.g.
+# data/production/predictions.db, are the real audit-chain evidence).
+data/**/*.db-wal
+data/**/*.db-shm
 
 # Clean-slate rebuild runtime state
 data/rebuild/raw/
@@ -37,3 +44,53 @@ data/rebuild/*.sqlite-*
 outputs/rebuild/runtime/
 outputs/rebuild/verification.json
 outputs/rebuild/main_integration_verification.md
+
+# virtualenv symlink (local env pointer, never commit)
+.venv
+
+# graphify knowledge-graph skill cache (generated, not project source)
+graphify-out/
+.dashboard.pid
+
+# Run-supervisor operational state (run rows + per-run logs) — mutable
+# runtime state, not evidence; moves under MODEL_PREDICTION_RUNTIME_ROOT
+# in the data-plane consolidation phase.
+data/runs.db
+
+# ── K consolidation (2026-08-15): mutable runtime churn lives outside git ──
+# The SQLite ledger (runtime root) is the canonical evidence store; the
+# trees below are operational output — raw captures, ingest appends, XLSX
+# exports, rolling ratings (now retrained under runtime models/), dashboard
+# scratch. Files stay on disk where the pipeline expects them; they are
+# just no longer tracked. data/archive/ and snapshots/ remain tracked
+# evidence.
+data/availability/
+data/player_priors/
+data/production/
+data/esports/
+data/international_baseball/
+data/historical/
+data/odds/
+data/point_in_time/
+data/main/
+data/flat/
+data/research/
+data/gated_research/
+data/model_ledgers/
+outputs/latest/
+dashboard/jobs.json
+dashboard/archive.json
+dashboard/server.log
+dashboard/launchd.err.log
+dashboard/launchd.out.log
+dashboard/server.pid
+data/dashboard_cache.db
+data/market_odds_snapshots.jsonl
+data/audit_log.jsonl
+data/espn_probables_cache.jsonl
+data/features/
+
+# Quarantined DB artifacts are local evidence only — never publish
+backups/**/*.db
+backups/split-brain-quarantine-*/*
+!backups/split-brain-quarantine-*/*.md

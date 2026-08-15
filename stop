@@ -1,3 +1,17 @@
 #!/bin/bash
-# stop — kill all dashboard processes
-kill $(pgrep -f dashboard_server.py 2>/dev/null) 2>/dev/null && echo "Dashboard stopped" || echo "No dashboard running"
+# stop — stop the dashboard started by ./dash
+# Targets the exact PID recorded in .dashboard.pid, never a pattern match.
+# NEVER use `pkill -f dashboard_server.py` here -- .codewhale/instructions.md
+# records that it has triggered a macOS security lock on this machine.
+PIDFILE="$HOME/model-prediction/.dashboard.pid"
+if [ ! -f "$PIDFILE" ]; then
+    echo "No PID file — dashboard wasn't started by ./dash (or already stopped)."
+    exit 0
+fi
+PID="$(cat "$PIDFILE")"
+if kill -0 "$PID" 2>/dev/null; then
+    kill "$PID" && echo "Dashboard stopped (PID $PID)"
+else
+    echo "No process at PID $PID — already stopped."
+fi
+rm -f "$PIDFILE"

@@ -233,3 +233,59 @@ def starter_fip_gap_live(
             f"away={away_starter_name!r} status={away['status']}"
         )
     return round(home["fip"] - away["fip"], 6)
+
+
+def _rolling_kbb_pct(recent: list[tuple]) -> float:
+    """K-BB% = (K - BB) / IP from a rolling window of starts."""
+    innings = sum(item[1] for item in recent)
+    so = sum(item[3] for item in recent)
+    bb = sum(item[4] for item in recent)
+    if innings <= 0:
+        return 0.0
+    return (so - bb) / innings
+
+
+def starter_rolling_kbb(
+    starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+    lookback_starts: int = DEFAULT_LOOKBACK_STARTS,
+    minimum_prior_starts: int = MINIMUM_PRIOR_STARTS,
+) -> dict[str, Any]:
+    """Rolling K-BB% from this pitcher's last N real starts strictly before decision.
+
+    Same fail-closed contract as ``starter_rolling_era``.
+    """
+    index = load_starter_index(snapshot_path)
+    starts = [s for s in index.get(_normalize_name(starter_name), []) if s[0] < decision]
+    if not starts:
+        return {"kbb_pct": None, "starts": 0, "status": "unavailable_from_source"}
+    recent = starts[-lookback_starts:]
+    if len(recent) < minimum_prior_starts:
+        return {"kbb_pct": None, "starts": len(recent), "status": "insufficient_sample"}
+    return {
+        "kbb_pct": round(_rolling_kbb_pct(recent), 4),
+        "starts": len(recent),
+        "innings": round(sum(item[1] for item in recent), 2),
+        "status": "available",
+    }
+
+
+def starter_kbb_gap_live(
+    home_starter_name: str,
+    away_starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+) -> float:
+    """home_starter's rolling K-BB% minus away_starter's (home_kbb - away_kbb)."""
+    home = starter_rolling_kbb(home_starter_name, decision, snapshot_path=snapshot_path)
+    away = starter_rolling_kbb(away_starter_name, decision, snapshot_path=snapshot_path)
+    if home["status"] != "available" or away["status"] != "available":
+        raise ValueError(
+            "NO_CALL_STARTER_KBB_GAP_INSUFFICIENT_HISTORY: "
+            f"home={home_starter_name!r} status={home['status']}, "
+            f"away={away_starter_name!r} status={away['status']}"
+        )
+    return round(home["kbb_pct"] - away["kbb_pct"], 6)

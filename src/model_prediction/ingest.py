@@ -12,6 +12,7 @@ Principles:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time as time_module
 from collections.abc import Iterable
@@ -26,6 +27,31 @@ from .data_sources.espn import SPORT_LEAGUES, ESPNClient, parse_pregame_and_clos
 from .domain import eastern_today
 
 SPORTS = tuple(SPORT_LEAGUES)
+
+# Bumped when the normalized-row shape of completed_games /
+# completed_tennis_singles_matches changes meaningfully — consumers can
+# tell which parser version produced a normalized row.
+PARSER_VERSION = "espn-scoreboard-1"
+
+_NONTERMINAL_STATES = {"in", "pre"}
+
+
+def _has_unfinished_events(scoreboard: dict[str, Any]) -> bool:
+    """True if any event is still pre-game or in progress.
+
+    A cache containing some finished AND some unfinished events is a partial
+    snapshot captured mid-slate -- see the staleness comment in
+    ingest_scores for the live case that motivated this (5 MLB games from
+    2026-08-07 frozen at STATUS_IN_PROGRESS while 10 others were already
+    final). Postponed/canceled events are terminal (state "post") and
+    deliberately do not count.
+    """
+    for event in scoreboard.get("events", []):
+        competition = (event.get("competitions") or [{}])[0]
+        state = (competition.get("status") or {}).get("type", {}).get("state")
+        if state in _NONTERMINAL_STATES:
+            return True
+    return False
 
 
 class Ingestor:
@@ -71,14 +97,19 @@ class Ingestor:
             # payload is never overwritten -- it does not mean a snapshot
             # captured mid-day, while games were still STATUS_SCHEDULED/
             # IN_PROGRESS, gets treated as the permanent record forever.
-            # Confirmed live: 2026-07-26's cache was written at 14:29 (before
-            # that evening's games), froze every event at STATUS_SCHEDULED,
-            # and every ingest since silently skipped re-fetching it --
-            # data/processed/mlb/games.jsonl (and the live Elo/trend features
-            # every forecast reads from it) went stale for days with no
-            # error. Only a past date's cache with zero completed events (an
-            # in-progress/pre-game snapshot) is treated as stale; a genuinely
-            # final historical payload is still never re-fetched.
+            # Two confirmed live cases:
+            #   1. 2026-07-26: cache written at 14:29 (before that
+            #      evening's games) froze every event at STATUS_SCHEDULED,
+            #      and every ingest since silently skipped re-fetching it.
+            #   2. 2026-08-07: cache written mid-slate froze 5 games at
+            #      STATUS_IN_PROGRESS while 10 others were already final.
+            #      The old check only flagged a cache with ZERO completed
+            #      events, so a partially-completed snapshot was trusted
+            #      forever and those 5 games never reached processed/
+            #      historical (and the Elo/trend features that read it).
+            # A past-date cache is therefore re-fetched when it holds any
+            # unfinished event (state "pre"/"in"); postponed/canceled
+            # events are terminal and never trigger a refetch.
             #
             # Must use the SAME completion parser as the real ingest below
             # (completed_tennis_singles_matches for tennis, completed_games
@@ -88,7 +119,9 @@ class Ingestor:
             # matches for tennis regardless of true completion state. Using
             # it here first flagged ~1748 tennis dates as "stale" that were
             # actually fine -- a false positive from the wrong parser, not
-            # real staleness like the MLB/WNBA/soccer case above.
+            # real staleness like the MLB/WNBA/soccer case above. The
+            # unfinished-event scan is likewise sport-aware: tennis payloads
+            # are tournaments, not per-game events, so it is skipped there.
             completed_events = (
                 ESPNClient.completed_tennis_singles_matches(cached_payload)
                 if sport_key == "tennis" and cached_payload is not None
@@ -97,8 +130,11 @@ class Ingestor:
             cache_is_stale = (
                 cached_payload is not None
                 and is_past_date
-                and cached_payload.get("events")
-                and not completed_events
+                and bool(cached_payload.get("events"))
+                and (
+                    not completed_events
+                    or (sport_key != "tennis" and _has_unfinished_events(cached_payload))
+                )
             )
             if cached_payload is not None and not cache_is_stale:
                 skipped += 1
@@ -122,6 +158,12 @@ class Ingestor:
                 )
                 fetched += 1
                 time_module.sleep(self.rate_limit_seconds)
+            # Every normalized row is traceable to the exact raw snapshot
+            # it came from (content-addressed provenance, consolidation
+            # item 7): source, raw payload hash, and parser version.
+            raw_hash = hashlib.sha256(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
             if sport_key == "tennis":
                 # Combined ATP+WTA tournaments return the same event (with
                 # both gender groupings) from both the ATP and WTA site-API
@@ -129,11 +171,16 @@ class Ingestor:
                 # per-match tour itself; tagging by which endpoint served it
                 # would misattribute WTA matches to ATP (see that function's
                 # docstring), so `league` is deliberately not overwritten here.
-                new_games.extend(ESPNClient.completed_tennis_singles_matches(payload))
+                fresh = ESPNClient.completed_tennis_singles_matches(payload)
             else:
-                for game in ESPNClient.completed_games(payload):
+                fresh = ESPNClient.completed_games(payload)
+                for game in fresh:
                     game["league"] = league
-                    new_games.append(game)
+            for game in fresh:
+                game["raw_source"] = f"espn:{league}:{game_date}"
+                game["raw_hash"] = raw_hash
+                game["parser_version"] = PARSER_VERSION
+            new_games.extend(fresh)
         appended = self._append_games(sport_key, new_games)
         result = {
             "sport": sport_key,

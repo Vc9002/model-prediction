@@ -18,12 +18,14 @@ weeks) before that week's games are appended — "snapshot, then extend."
 
 from __future__ import annotations
 
-import math
+import logging
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import polars as pl
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_ELO = 1500.0
 NFL_ELO_CONFIG = {
@@ -163,7 +165,8 @@ def load_games(data_root: str, seasons: list[int] | None = None) -> list[NFLGame
     for season in (seasons or [2021, 2022, 2023, 2024, 2025]):
         try:
             frame = store.read_season("games", season)
-        except (FileNotFoundError, Exception):
+        except Exception as error:  # noqa: BLE001 — a missing/partial season file must skip, not abort the table build
+            logger.warning("skipping NFL season %s: %s", season, error)
             continue
 
         if frame.is_empty():

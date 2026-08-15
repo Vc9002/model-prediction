@@ -1,6 +1,332 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-02 (see new section directly below)
+**Last audited**: 2026-08-14 (see new section directly below)
+
+## 2026-08-14 (afternoon) — launchd cutover to the supervisor + health truth source
+
+Operator GO executed: all three launchd plists now invoke
+`run_supervisor run <worker>` (old plists preserved as
+`*.plist.pre-supervisor`; the legacy scripts remain as manual entry
+points). Production + rebuild-shadow agents are LOADED (frozen since
+08-11; the gap is left explicit, not backfilled) and the daily agent was
+reloaded. Attended-run verification, all recorded in the supervisor:
+
+- production: completed exit 0, counters {events_seen 2, predictions 2},
+  production.db latest prediction advanced to 07:36 UTC, rows 646→650
+- rebuild-shadow: completed exit 0, runtime shadow.db freshly written
+- daily: completed exit 0 (full pipeline through the supervisor)
+- system_health under the launchd env: workers all completed — the
+  "never run under the supervisor" reasons are gone; the only remaining
+  DEGRADED reason is soccer capture stale 11.7 days (provider key,
+  deliberately explicit rather than blocking).
+
+Real finding fixed along the way: a SIGKILLed supervisor (launchctl
+bootout mid-run) can never write its own failed row — the next run for
+the same worker now closes orphaned 'started' rows as failed with a
+note (lease proves no live owner). Regression-tested.
+
+Also: `require_probability_normalization` is now ENFORCED (stored
+prediction pairs must satisfy |sum-1| <= 1e-6; violations are DOWN), and
+freshness reads the canonical production.db (MAX(prediction_time_utc)
+via mode=ro), never production_state.json — the state file remains only
+for compatibility consumers.
+
+## 2026-08-14 (noon) — data plane: RuntimePaths everywhere + ProductionPredictionStore (consolidation B)
+
+**RuntimePaths extended to the incumbent control plane.** `runs_db`,
+`production_db` (`production/production.db`), `production_state_file`,
+`supervisor_log_root`, `research_root/research_db` resolve through ONE
+resolver — `MODEL_PREDICTION_RUNTIME_ROOT` when set (the launchd jobs),
+repo `data/` otherwise. `migrate_legacy_state()` carries the historical
+repo-local files (runs.db, predictions.db, production_state.json) into
+the runtime root exactly once, via copy-to-tmp + rename, never deleting
+the legacy files. Every consumer (run_supervisor, model_promotion,
+system_health, cli_production) now resolves through it — the 2026-08-13
+split-brain class (writer and reader disagreeing on where state lives)
+is structurally impossible.
+
+**ProductionPredictionStore** owns `production/production.db`: narrow
+API (start_run/finish_run, append_prediction with the identity key
+`(event_id, model_id, market_type, horizon, decision_time_utc)` and
+partial unique index, settle/void/supersede/error, record_decision,
+record_market_snapshot, keyset-paginated reads + SQL aggregation,
+xlsx as an explicit `export`). cli_production is fully cut over.
+
+Two real bugs caught by the tests during the cutover:
+1. **Schema-migration trap**: `CREATE TABLE IF NOT EXISTS` leaves a
+   migrated legacy table untouched — the canary's historical
+   predictions.db has no `market_type`/`horizon`/`decision_time_utc`
+   columns, so every store write failed silently (fail-soft) against the
+   migrated database. Fixed with `_ensure_column` migrations +
+   `decision_time_utc` backfill from `prediction_time_utc` + indexes
+   created only after the columns exist.
+2. **Test-helper leak**: the cli integration helper monkeypatched only
+   `_resolve_data_root`, so a full-suite run wrote fake predictions into
+   the LIVE production.db. The helper now monkeypatches `_paths()`
+   (RuntimePaths → tmp) too; the live db was verified clean afterward
+   (all 2162 rows are real canary cycles) and the state file was
+   restored to the committed real record.
+
+The incumbent shadow ledgers (main/flat/research xlsx, written by the
+live 3h daily pipeline and verified by the audit chain) are NOT cut over
+to SQLite yet — that swap needs the operator's explicit go because the
+live writer and `verify-chain` depend on the xlsx audit path; the store
++ research.db schema are ready for the parity/cutover phase.
+
+## 2026-08-14 (deep night) — truthful health + atomic promotion/rollback (consolidation A-3)
+
+**Evidence-based health** (`src/model_prediction/system_health.py`):
+status is derived from what the system produced — registry contracts,
+supervisor run rows, prediction records, and source capture — never a
+file mtime. DOWN: primary contract broken or a worker's latest run
+failed. DEGRADED: broken secondary models, skipped/never-run workers,
+stale predictions, or a sport's capture going quiet 7-28 days (offseason
+stays informational). Live check right now truthfully reports: production
++ rebuild-shadow never ran under the supervisor, canary prediction 122
+minutes old, soccer capture stale 11.2 days (The Odds API key). One
+real bug caught while wiring it: the historical JSONL files are ordered
+by INGEST time, not event time (the 07-19/21 reconciliation batch landed
+after the 08-13 games), so "newest event" is a max-scan, not the last
+line.
+
+**Atomic promotion/rollback** (`src/model_prediction/model_promotion.py`):
+`production.yaml` gained an explicit `champions:` map (sport → market →
+model_id) — the champion is what SERVES a sport/market; the `primary` is
+what the canary predict cycle runs. `promote --new … --approved-by …
+--evidence …` validates the candidate, freezes hashes, points the
+champion, preserves the old champion as the new entry's rollback model,
+writes the yaml atomically (tmp + os.replace), re-validates through the
+registry before marking the record active, and logs a promotions row
+(sport, market, old/new model ids + hashes, approved_by, evidence_id,
+git_sha) in `data/runs.db`. `rollback --sport --market` restores the
+previous champion in one command and closes the prior record.
+8 tests each for health and promotion.
+
+## 2026-08-14 (night) — run supervisor: launchd as a trigger, not the architecture (consolidation A-2)
+
+`src/model_prediction/run_supervisor.py` gives every scheduled run one
+protocol: unique `run_id`, per-worker fcntl lease (busy runs are recorded
+as `skipped`, exit 75 — `daily_lock.py`'s convention), heartbeat thread,
+subprocess execution with the output captured to
+`data/logs/supervisor/<run_id>.log`, and an outcome row in `data/runs.db`
+(SQLite, WAL). Worker→command mapping lives in `WORKERS` (daily /
+production / rebuild-shadow); the launchd plists can now just invoke
+`python -m model_prediction.run_supervisor run <worker>` instead of each
+script re-deciding what "run" means. The workers themselves are
+unchanged. `status [worker]` / `runs [LIMIT]` read the history — the
+foundation the truthful-health phase reads instead of file mtimes.
+
+7 tests in `tests/test_run_supervisor.py` (completed/failed/skipped rows,
+lease contention, heartbeat advancement, per-worker filtering).
+
+## 2026-08-14 (even later) — one production model registry (consolidation A-1)
+
+The production stack had a split personality: `config/production.yaml` listed
+13 models in `allowed_models`, but validation, health, and the predict cycle
+only ever saw the single WNBA `primary`. Twelve "production" models were
+never contract-checked, never resolved, never served.
+
+**`src/model_prediction/production_registry.py`** is now the single source of
+truth. Every entry carries `model_id`, `sport`, `market`, implementation
+type (`json_artifact` / `code_backed_model` / `rating_engine`), artifact
+path, verified hash, feature-schema version, enabled state, and rollback
+model. Loading validates **every enabled entry** and fails *that model*
+closed (`load_error` recorded, `resolve()` refuses it) — the primary's
+failure stays a hard `ValueError`. Legacy v1/v2 configs (`allowed_models` +
+`artifact_map`) still derive entries, with sport/market identity coming
+from each artifact's own fields.
+
+- `config/production.yaml` migrated to `schema_version: "3"` with explicit
+  `models:` (11 json_artifact + 2 code_backed: soccer/tennis, whose
+  artifact files never existed — their contracts are resolvable Python
+  entry points instead). `allowed_models`/`artifact_map` retained for
+  `champion_challenger.freeze()` compatibility.
+- `production_canary.py` now delegates validation to the registry and
+  `health_check` reports per-model contract status; a broken **secondary**
+  model degrades overall health to DEGRADED (truthful, not silently
+  "healthy") while the primary's deep checks (hash, finite probabilities,
+  data freshness) are unchanged.
+- `cli_production.py` predict/status are registry-driven — no hardcoded
+  WNBA identity; the primary entry is the served model, single-model
+  execution is now an explicit scheduling policy.
+- 11 new tests in `tests/test_production_registry.py`, including the CI
+  contract test that the **actual checked-in production.yaml resolves all
+  13 models**. Full suite: 1777 passed, 3 skipped; ruff at the 120 baseline.
+
+## 2026-08-14 (later) — MLB ingest partial-completion cache bug: 5 games permanently missing, fixed + backfilled
+
+`ingest.py`'s staleness check only re-fetched a past-date raw cache when it
+contained **zero** completed events (the 2026-07-26 pregame-snapshot class).
+A cache written **mid-slate** — some events `STATUS_FINAL`, some still
+`STATUS_IN_PROGRESS` — passed the check forever, so the in-progress games
+never reached `data/processed/mlb/games.jsonl` or
+`data/historical/mlb_games_all.jsonl` (and the Elo/trend features that read
+it). Confirmed live:
+
+- `data/raw/mlb/2026-08-07/` was written 2026-08-08 04:04 UTC with 10 final
+  + 5 in-progress events. Events **401816426, 401816435, 401816436,
+  401816437, 401816438** were missing from processed/historical while ESPN
+  had final scores for all five.
+- The same partial-snapshot class also hit 2026-07-30 (2 games), 2026-08-01
+  (1), 2026-08-04 (1). Three more dates (2026-07-16, 07-21, 07-25) had full
+  slates frozen at `STATUS_SCHEDULED` — caches written by manual bootstraps
+  before the daily ingest loop existed (added ~07-25), never revisited.
+
+**Fix** (`src/model_prediction/ingest.py`): a past-date cache is stale when
+it holds any unfinished event — competition `status.type.state` in
+`{"in", "pre"}` — not just when zero events completed.
+Postponed/canceled events are terminal (`state: "post"`) and deliberately
+don't trigger refetch (a rainout-heavy date would otherwise re-fetch on
+every bootstrap). Skipped for tennis, whose payload events are tournaments,
+not per-game events (same sport-aware logic as the completion parser).
+
+**Backfill executed**: re-ingested all 7 affected dates from live ESPN; all
+15 events on 2026-08-07 now in processed + historical with real final
+scores. Also found 31 processed-only games from 2026-07-19/20/21 (ingested
+before the historical append path existed) and appended them to historical
+— processed/historical event-id parity is now exact (0/0).
+
+**Tests**: 2 new in `tests/test_ingest.py` — partial-completion refetch and
+postponed-is-terminal (verified the first FAILS on the old logic, per the
+fix-verification convention). Full suite: 1766 passed, 3 skipped; ruff at
+the same 120-finding baseline.
+
+## 2026-08-14 — WNBA spread promoted to live serving (wnba-spread-margin-v1)
+
+The 2026-08-13 audit found `wnba-spread-margin-v1` (the fixed replacement
+for the broken moneyline-not-spread `wnba-spread-baseline-v1`) had **zero
+serving consumers** — config pointed at it, `models/basketball.py`
+implemented it, but nothing built a slate or logged a pick. Wired it up:
+
+- **`cli._forecast_wnba_spread_slate`**: builds `BasketballModel` spread
+  predictions from `data/processed/wnba/games.jsonl` history, matched
+  against the Polymarket WNBA spread snapshots
+  (`data/odds/wnba/{date}/polymarket_snapshots.jsonl`). Alternate lines per
+  game are resolved by `_select_wnba_spread_market` — same "most balanced
+  line wins" rule `mlb_market_odds._market_balance` uses for MLB, adapted
+  to this snapshot format's embedded long/short asks.
+- **Sign convention, verified against `PolymarketUSClient.snapshot`'s own
+  documented contract**: each spread snapshot row is anchored to one team
+  (`team`) with `line` always that team's own spread; empirically confirmed
+  live (2026-08-14) that Polymarket anchors WNBA rows to the *away* team,
+  so a row's `line` is directly `BasketballModel`'s `spread_away_line`
+  input. Selecting "away" logs that line as-is; selecting "home" logs its
+  negation (`grade_pick`'s selection-relative-line contract, confirmed
+  against the 2026-08-13 grading audit's spread-sign test coverage).
+- **Routing**: Main (CALL only) + Flat (every candidate) — same rule MLB
+  spread/total uses (operator directive 2026-08-03), trust-boundary-only
+  `evaluate_eligibility` (not the curated min-edge gate esports/soccer/
+  tennis use), since WNBA is a Main-ledger "show everything" sport like MLB.
+- **`model_ledger.py`**: `("WNBA", "spread")` already repointed from the
+  archived `wnba-spread-baseline` to `wnba-spread-margin` on 2026-08-13.
+- Wired into the `daily` command's concurrent research pool
+  (`_wnba_spread_task`, alongside `_mlb_totals_task`/`_soccer_task`/
+  `_tennis_task`) — independent of WNBA moneyline, which the learned-sports
+  pool already logs separately.
+- Live dry-run against 2026-08-13's real 3-game WNBA slate (isolated temp
+  ledgers, no writes to real data): 3/3 games matched a spread market,
+  3/3 logged CALL to both Main and Flat with real Kelly-scaled units
+  (1.5U–2.0U) and correctly-signed lines.
+- 5 new tests in `tests/test_cli.py` (line-selection, flat-always-logs,
+  main-CALL-only, duplicate-tracking). Full suite: 1764 passed, 3 skipped.
+  Ruff: same 120-finding baseline, 0 new.
+- **Not changed**: `config/model.yaml`'s WNBA `status`/`active_research_version`
+  fields — left as `active_research_version: spread-margin-v1`, matching
+  the precedent that MLB spread/total also serve to Main+Flat while still
+  configured as `active_research`, not a separate "promoted" status tier.
+
+## 2026-08-13 — KBO phantom 0-0 settlement: every pick settled as a scoreless tie, root-caused and fixed
+
+**Symptom**: all 16 settled KBO picks in `data/research/kbo.xlsx` showed
+`away_score=0, home_score=0`, `result=push`, with nonzero pnl — impossible
+for real baseball (16 different games, zero runs scored), while NPB (same
+settlement code path) had zero 0-0 rows.
+
+**Root cause** (two layers, both in `international_baseball.py`):
+
+1. `parse_kbo_rows` treated a game with an EMPTY relay cell (the official
+   KBO page renders unplayed games as "0 vs 0" with no `gameId=` link —
+   verified live against `KBO_RESULTS_ENDPOINT`) as a real row, fabricating
+   a fallback game_id (`kbo:YYYYMMDD:AWAY:HOME`) and caching it as a 0-0
+   `tie=true` row. Once the game actually completed, the source provided
+   the real gameId and real scores — a second row with a different id, so
+   the merge-by-game_id could never overwrite the phantom.
+2. `find_international_baseball_result._match` matched by date+teams and
+   returned the first row in sorted (date, game_id) order. The fabricated
+   id sorts before the real source id, so the phantom 0-0 row shadowed the
+   real-scored row for the same game, and settlement graded a fake tie.
+
+**Fix** (2026-08-13):
+- `parse_kbo_rows` now SKIPS rows with no `gameId=` in the relay (same
+  spirit as NPB's unplayed-`*` skip). The row reappears with real id and
+  scores once the game completes.
+- `_match` ignores any row whose game_id matches the fabricated fallback
+  pattern (`_FABRICATED_KBO_ID_RE`) — defense in depth for caches written
+  before the fix.
+- Purged the 30 phantom rows from `data/international_baseball/kbo/games.jsonl`
+  (only 2 genuine historical 0-0 rows remain, both with real source ids).
+  These phantoms had also contaminated the tie-rate training stats (30
+  phantom ties in ~2 weeks vs 2 genuine in 10 years); the daily
+  recalibration rebuilds ratings from the cleaned dataset.
+- Corrected the 11 ledger rows whose real scores were already in the cache
+  via `PickLedger.settle(..., correction_reason=...)`, and mirrored the
+  corrections into `data/model_ledgers/kbo-tie-aware-elo.xlsx`.
+- Regression tests: `test_parse_kbo_rows_skips_unplayed_games_with_empty_relay`
+  and `test_find_result_ignores_fabricated_id_phantom_rows`.
+
+**Remaining follow-up**: the 5 rows from 2026-08-13's own games were still
+in progress at fix time. `scripts/correct_phantom_tie_settlements.py`
+(idempotent) corrects any rows still carrying the phantom signature once
+real scores land — run it after the next daily refresh.
+
+## 2026-08-13 (later) — in-depth bug search: fixes applied
+
+Cross-ledger invariant scan + two parallel audit agents (grading logic;
+newest-code PIT/parity) produced these fixes:
+
+- **ProductionLedger idempotency index kept superseded rows in the slot**
+  (`production_ledger.py`): the unique index predicate was
+  `WHERE supersedes_id IS NULL`, so a superseded row (which keeps
+  `supersedes_id` NULL) still collided with a re-fired identical cycle,
+  returning the stale row's id instead of the correction's. Predicate is
+  now `WHERE status = 'predicted'` (SCHEMA_VERSION bumped to 2), with an
+  init-time migration that drops/recreates the index in pre-existing DBs
+  (the live `data/production/predictions.db` migrates on its next open).
+  Regression tests: `test_rerun_after_supersede_returns_correction_not_stale_row`,
+  `test_old_index_predicate_is_migrated`.
+- **run_rebuild.sh silently exited 0 with an empty sports list** (config
+  read failure → zero rebuilds "succeeding"): now exits non-zero when no
+  enabled sports derive from `config/rebuild.yaml`.
+- **Tennis ratings frozen since 2026-07-27**: the daily ingest loop covered
+  only mlb/nba/wnba/nfl while `models/tennis.py` rebuilds its surface Elo
+  from `data/processed/tennis/games.jsonl` every forecast — the file
+  stopped advancing when training work stopped and nothing on the schedule
+  wrote it. `scripts/run_daily.sh` Step 1b now ingests tennis too (verified
+  live: 287 games appended for 2026-08-12). Tennis predictions will shift
+  as ratings re-advance — expected, that's the data flow being restored.
+- **WNBA spread attribution mapped to the archived model**:
+  `model_ledger.py`'s `MODEL_ID_BY_LEAGUE_AND_MARKET` mapped
+  `("WNBA","spread")` to `wnba-spread-baseline` (the archived broken
+  model) — now `wnba-spread-margin`.
+- **frozen_champions.json re-frozen**: the pre-fix snapshot recorded
+  kbo/npb as CODE_BACKED even though their artifacts exist; `freeze-production`
+  re-run, both now carry real artifact hashes.
+- **Test hardening**: `tests/test_pricing.py` now pins all four spread
+  sign combinations, away-side integer pushes, and totals push-at-integer
+  behavior (the 2026-08-13 audit found only home-side combos were covered).
+
+**Investigated and deliberately left alone** (each needs an explicit
+decision, not a silent change): WNBA spread artifact `wnba-spread-margin-v1`
+has zero serving consumers (the "fix" is config-wired but nothing loads it —
+promotion/wiring decision); tennis walkovers/retirements settle and
+Elo-update as full-strength matches (docs/MODEL_IMPROVEMENTS.md demands
+walkover → no rating update; implementing it changes model behavior);
+soccer score collection is 401-broken (THE_ODDS_API_KEY rejected on all 12
+leagues) and the Celta Vigo @ Napoli friendly is outside the 12 configured
+leagues anyway; v9 `park_factor_pit` prior-strength drift vs v8's static
+table is challenger-only by design.
+
+
 
 ## 2026-08-02 (latest) — Live-run verification of the per-model ledger architecture: 3 real bugs found and fixed, soccer draw settlement corrected
 
@@ -2897,6 +3223,12 @@ env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli verify-chain
 
 ### Canonical artifact hashes
 
+NOTE (2026-08-13): the codebase's real loader convention is
+`ensure_ascii=True` — this snippet previously used `ensure_ascii=False` and
+"mismatched" every artifact, including two historical "mismatch" reports that
+were artifacts of this snippet, never real bugs. If a run reports MISMATCH,
+check the artifact with `ensure_ascii=True` before treating it as a finding.
+
 ```bash
 .venv/bin/python - <<'PY'
 import hashlib
@@ -2912,7 +3244,7 @@ for path in sorted(Path("config/models").glob("*.json")):
             canonical,
             sort_keys=True,
             separators=(",", ":"),
-            ensure_ascii=False,
+            ensure_ascii=True,
         ).encode()
     ).hexdigest()
     print(path.name, "OK" if computed == raw.get(key) else "MISMATCH")

@@ -1,0 +1,21 @@
+{
+  "method": "margin_normal",
+  "model_version": "wnba-spread-margin-v1",
+  "schema_version": "1",
+  "sport": "wnba",
+  "positive_class": "away_cover",
+  "margin_sd": 10.5,
+  "expected_margin_source": "elo_trend_normal_approximation",
+  "expected_margin_formula": "home_points - away_points + 2.0 (home-court bump)",
+  "expected_margin_detail": "home_points = (home_trend.offense.hl10 + away_trend.defense.hl10) / 2, away_points = (away_trend.offense.hl10 + home_trend.defense.hl10) / 2",
+  "cdf_family": "normal",
+  "prediction_formula": "P(away_cover) = normal_cdf(spread_away_line, expected_margin, margin_sd)",
+  "note": "Replaces the broken wnba-spread-baseline-v1.json which used baseline_heuristic with coefficients [1.0] on elo_margin \u2014 that model predicted moneyline (who wins), not spread (who covers), and never conditioned on the spread line. This replacement uses BasketballModel's normal CDF approach: P(away covers) = \u03a6(spread_away_line; expected_margin, 10.5), correctly conditioning on the spread line.",
+  "qualification": {
+    "qualified": false,
+    "status": "research_baseline",
+    "framework": "basketball_normal_cdf",
+    "note": "Replacement baseline for the broken wnba-spread-baseline-v1. Uses the same BasketballModel spread logic as the live WNBA model (wnba-elo-trend-v1), which computes away_cover = normal_cdf(spread_away_line, expected_margin, margin_sd=10.5). Not yet qualified \u2014 backtest pending."
+  },
+  "artifact_hash": "23ba88bcc86a710d76233b349116f2eefe021a993d2d3b9102922e567a027b4c"
+}

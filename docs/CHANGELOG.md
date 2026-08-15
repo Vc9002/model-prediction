@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-08-13 — Champion/challenger gating, MLB v9, WNBA spread fix, settlement routing
+
+- Added `src/model_prediction/champion_challenger.py`: `ProductionRegistry`
+  freeze + tamper detection, `FrozenProductionStore`, `PairedComparison`
+  (ΔLogLoss/ΔBrier/ΔECE with date-cluster bootstrap), `PromotionVerdict`, and
+  settled-picks loader (`load_settled_predictions`,
+  `settled_champion_calibration`). CLI: `freeze-production`, `compare-champion`.
+  Frozen 13 production champions to `data/production/frozen_champions.json`.
+- MLB v9 Phase 1: wired `starter_kbb_gap`, `residual_trend_gap`,
+  `bullpen_fatigue_gap` through `validation.py` / `learned_forward.py` /
+  `features/starter_history.py`; runner `scripts/mlb_v9_ablation.py`. Ablation:
+  residual-trend variant wins (+56.4u vs +43.1u raw trend).
+- MLB v9 Phase 2: `park_factor_at()` PIT-correct park factors
+  (`features/park_factors.py`), wired into walk-forward validation.
+- MLB distribution methods: `simulate_game` gains
+  `gamma_poisson`/`negative_binomial`/`independent_poisson`; new
+  `compare_distribution_methods()` prices ML/spread/total from one coherent
+  joint draw; wired through `MeasuredEdgeMarginModel`/`MeasuredEdgeTotalsModel`.
+  NB is the first serious challenger (runnable, not yet promoted).
+- WNBA spread fix: `wnba-spread-baseline-v1` predicted moneyline not spread
+  (never used the line); replaced with `wnba-spread-margin-v1`
+  (`P(away_cover)=Φ(line; margin, 10.5)`). `config/model.yaml` spread/total
+  refs corrected.
+- Settlement routing fix: model-ledger mirror now targets canonical
+  `data/model_ledgers/` (threaded `model_ledgers_dir` through `PickLedger`,
+  `main_ledgers.py`, `research_ledgers.py`); previously per-tier subdirs
+  diverged from the dashboard/loader's canonical read. See
+  `docs/SETTLEMENT_GAP.md`.
+- Cleanup: 38 obsolete files removed (12 `*.previous.json`, retired config
+  models, 4 dead rebuild models). Config root 63 → 27 files.
+- Docs: `docs/CHAMPION_CHALLENGER.md`, `docs/SETTLEMENT_GAP.md` added;
+  `CLAUDE.md` updated.
+
 ## 2026-07-26 — full DEBUG audit and documentation truth reset
 
 - Ran the current `DEBUG.md` health, integrity, runtime, lint, source, pipeline,

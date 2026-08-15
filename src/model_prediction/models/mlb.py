@@ -270,32 +270,71 @@ def estimate_runs(features: MLBGameFeatures, spec: FormulaSpec) -> RunEstimate:
     )
 
 
+# Valid joint score-distribution methods for simulate_game. Each draws away/home
+# runs from ONE coherent joint distribution; the market heads (moneyline/spread/
+# total) are then derived from that single draw, never from disconnected
+# classifiers. gamma_poisson (default) is the incumbent correlated-overdispersion
+# draw (shared + team-specific gamma multipliers around a Poisson mean);
+# negative_binomial is the first serious challenger per the model roadmap
+# (independent NB, overdispersion tuned by spec.simulation["negative_binomial_phi"]);
+# independent_poisson is the no-overdispersion null.
+DISTRIBUTION_METHODS = ("gamma_poisson", "negative_binomial", "independent_poisson")
+
+
 def simulate_game(
     features: MLBGameFeatures,
     estimate: RunEstimate,
     spec: FormulaSpec,
     simulations: int | None = None,
     seed_namespace: str = "",
+    method: str = "gamma_poisson",
 ) -> ScoreSimulation:
     count = simulations or int(spec.simulation["simulations"])
     if count <= 0:
         raise ValueError("simulation count must be positive")
-    seed = stable_seed(
+    if method not in DISTRIBUTION_METHODS:
+        raise ValueError(f"unknown distribution method {method!r}; expected one of {DISTRIBUTION_METHODS}")
+    # The `method` part of the seed is deliberately EXCLUDED for the default
+    # gamma_poisson path: the method refactor appended it to every seed and
+    # silently changed every incumbent simulated price bit-for-bit versus the
+    # pre-refactor formula (found 2026-08-13). Non-default methods have no
+    # pre-existing stream to preserve, so they keep method in the seed.
+    seed_parts = [
         features.event_id,
         spec.formula_version,
         features.decision_timestamp_utc,
         features.market_snapshot_hash,
         features.feature_snapshot_hash,
         seed_namespace,
-    )
+    ]
+    if method != "gamma_poisson":
+        seed_parts.append(method)
+    seed = stable_seed(*seed_parts)
     rng = np.random.default_rng(seed)
-    shared_variance = float(spec.simulation["shared_environment_variance"])
-    team_variance = float(spec.simulation["team_specific_variance"])
-    shared = rng.gamma(1 / shared_variance, shared_variance, count)
-    away_specific = rng.gamma(1 / team_variance, team_variance, count)
-    home_specific = rng.gamma(1 / team_variance, team_variance, count)
-    away = rng.poisson(estimate.away_expected_runs * shared * away_specific)
-    home = rng.poisson(estimate.home_expected_runs * shared * home_specific)
+    away = home = None
+    if method == "independent_poisson":
+        away = rng.poisson(estimate.away_expected_runs, count)
+        home = rng.poisson(estimate.home_expected_runs, count)
+    elif method == "negative_binomial":
+        # Independent NB per team. Parameterized by mean + overdispersion phi
+        # (variance = mean * phi), so phi=1.0 collapses to Poisson. Fitted MLB
+        # run scoring is overdispersed (~1.2x variance); the challenger defaults
+        # to that, configurable via spec.simulation["negative_binomial_phi"].
+        phi = float(spec.simulation.get("negative_binomial_phi", 1.2))
+        phi = max(1.0 + 1e-9, phi)
+        away_n, home_n = _nb_n(estimate.away_expected_runs, phi), _nb_n(estimate.home_expected_runs, phi)
+        away_p = away_n / (away_n + estimate.away_expected_runs)
+        home_p = home_n / (home_n + estimate.home_expected_runs)
+        away = rng.negative_binomial(away_n, away_p, count)
+        home = rng.negative_binomial(home_n, home_p, count)
+    else:  # gamma_poisson (incumbent)
+        shared_variance = float(spec.simulation["shared_environment_variance"])
+        team_variance = float(spec.simulation["team_specific_variance"])
+        shared = rng.gamma(1 / shared_variance, shared_variance, count)
+        away_specific = rng.gamma(1 / team_variance, team_variance, count)
+        home_specific = rng.gamma(1 / team_variance, team_variance, count)
+        away = rng.poisson(estimate.away_expected_runs * shared * away_specific)
+        home = rng.poisson(estimate.home_expected_runs * shared * home_specific)
     ties = away == home
     if ties.any():
         lower, upper = spec.simulation["extra_inning_home_probability_bounds"]
@@ -308,6 +347,19 @@ def simulate_game(
         home[tie_indices[home_wins]] += 1
         away[tie_indices[~home_wins]] += 1
     return ScoreSimulation(away.tolist(), home.tolist(), estimate.uncertainty, spec.formula_version)
+
+
+def _nb_n(mean: float, phi: float) -> float:
+    """NB size parameter n for mean + overdispersion phi (variance = mean*phi).
+
+    Standard NB mean/variance identities: mean = n*(1-p)/p, var = n*(1-p)/p^2.
+    With phi = var/mean = 1/p, we get p = 1/phi and n = mean/(phi - 1).
+    Clamped so n stays positive and finite for phi > 1.
+    """
+    if mean <= 0:
+        return 1.0
+    n = mean / (phi - 1.0)
+    return max(n, 0.05)
 
 
 def derive_market_distribution(
@@ -332,6 +384,41 @@ def derive_market_distribution(
     second_wins = float(np.mean(first_margin < 0))
     pushes = float(np.mean(first_margin == 0))
     return MarketDistribution(first, first_wins, second, second_wins, pushes)
+
+
+def compare_distribution_methods(
+    features: MLBGameFeatures,
+    estimate: RunEstimate,
+    spec: FormulaSpec,
+    *,
+    methods: Sequence[str] = DISTRIBUTION_METHODS,
+    simulations: int | None = None,
+    spread_line: float | None = None,
+    total_line: float | None = None,
+) -> dict[str, dict[str, MarketDistribution]]:
+    """Price moneyline/spread/total under each joint score distribution.
+
+    For every method this draws ONE coherent joint score distribution (via
+    simulate_game with that method) and derives all three markets from that
+    single draw. The three market heads can never silently contradict each
+    other because they share one score simulation per method — the exact
+    invariant the model roadmap's "one MLB score distribution for ML + spread
+    + total" architecture requires. Returns {method: {market: MarketDistribution}}.
+    """
+    result: dict[str, dict[str, MarketDistribution]] = {}
+    for method in methods:
+        simulation = simulate_game(
+            features, estimate, spec, simulations=simulations, seed_namespace="distribution_compare", method=method
+        )
+        markets = {
+            "moneyline": derive_market_distribution(simulation, MarketType.MONEYLINE),
+        }
+        if spread_line is not None:
+            markets["spread"] = derive_market_distribution(simulation, MarketType.SPREAD, spread_line)
+        if total_line is not None:
+            markets["total"] = derive_market_distribution(simulation, MarketType.TOTAL, total_line)
+        result[method] = markets
+    return result
 
 
 def stable_seed(*parts: str) -> int:
@@ -481,9 +568,10 @@ class MeasuredEdgeMarginModel:
         self,
         features: MLBGameFeatures,
         away_spread_line: float | None = None,
+        method: str = "gamma_poisson",
     ) -> MarginModelOutput:
         estimate = estimate_runs(features, self.formula_spec)
-        simulation = simulate_game(features, estimate, self.formula_spec)
+        simulation = simulate_game(features, estimate, self.formula_spec, method=method)
         return MarginModelOutput(
             run_estimate=estimate,
             simulation=simulation,
@@ -569,6 +657,7 @@ class MeasuredEdgeTotalsModel:
         features: MLBGameFeatures,
         total_line: float,
         feature_overrides: dict[str, float] | None = None,
+        method: str = "gamma_poisson",
     ) -> TotalsModelOutput:
         totals_features = self._apply_feature_overrides(features, feature_overrides)
         estimate = estimate_runs(totals_features, self.formula_spec)
@@ -577,6 +666,7 @@ class MeasuredEdgeTotalsModel:
             estimate,
             self.formula_spec,
             seed_namespace="totals",
+            method=method,
         )
         return TotalsModelOutput(
             run_estimate=estimate,

@@ -29,6 +29,11 @@ import httpx
 from .audit import AuditLog
 from .backtester import walk_forward_backtest
 from .bans import TeamBanList
+from .champion_challenger import (
+    FrozenProductionStore,
+    ProductionRegistry,
+    compare_champion_vs_challenger,
+)
 from .config import (
     PROJECT_ROOT,
     audit_path,
@@ -118,6 +123,7 @@ from .research_ledgers import (
     existing_research_ledgers,
     research_ledger,
 )
+from .runtime_paths import rolling_models_root
 from .soccer_forward import build_soccer_total_slate
 from .tennis_forward import TENNIS_TOURS, build_tennis_slate
 from .total_score import validate_all_total_score_models
@@ -634,6 +640,36 @@ def parser() -> argparse.ArgumentParser:
         "verify-chain",
         help="verify audit-chain link/hash integrity and ledger<->audit reconciliation",
     )
+
+    freeze = commands.add_parser(
+        "freeze-production",
+        help="snapshot current production champions as an immutable frozen registry",
+    )
+    freeze.add_argument(
+        "--output",
+        default=None,
+        help="override the default frozen champions path",
+    )
+
+    compare = commands.add_parser(
+        "compare-champion",
+        help="run a paired champion-vs-challenger evaluation",
+    )
+    compare.add_argument(
+        "--challenger-predictions",
+        required=True,
+        help="path to JSON/JSONL file with challenger predictions",
+    )
+    compare.add_argument(
+        "--champion-predictions",
+        required=True,
+        help="path to JSON/JSONL file with champion predictions",
+    )
+    compare.add_argument("--sport", required=True, help="sport key (mlb, wnba, etc.)")
+    compare.add_argument(
+        "--market", default="moneyline", help="market type (default: moneyline)"
+    )
+
     return root
 
 
@@ -815,6 +851,20 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
     }
 
 
+def _research_models_dir() -> Path:
+    """Rolling-first artifact directory for research retraining/forecast.
+
+    The scheduled cycle retrains esports/KBO/NPB ratings artifacts every
+    run; those live under the runtime root's models/ so the checked-in
+    config/models copies stay frozen promoted artifacts. Readers fall
+    back to the frozen copies until the first rolling copy exists.
+    """
+    rolling = rolling_models_root(PROJECT_ROOT)
+    if rolling.is_dir() and any(rolling.iterdir()):
+        return rolling
+    return PROJECT_ROOT / "config" / "models"
+
+
 def _refresh_esports_ratings(data_root) -> dict:
     """Keep esports Elo ratings from going stale.
 
@@ -830,7 +880,7 @@ def _refresh_esports_ratings(data_root) -> dict:
     """
     titles = tuple(TITLE_SPECS)
     backfill_results = {title: refresh_recent_matches(data_root, title) for title in titles}
-    validation = validate_all_esports_baselines(data_root, titles, PROJECT_ROOT / "config/models")
+    validation = validate_all_esports_baselines(data_root, titles, _research_models_dir())
     # Keep the dashboard's evidence-consistency report in sync with the
     # artifacts it describes -- otherwise it goes stale again the moment new
     # matches merge in, since it's read as a pinned snapshot elsewhere
@@ -851,7 +901,7 @@ def _refresh_international_baseball_ratings(data_root) -> dict:
         league: refresh_recent_international_baseball_matches(data_root, league) for league in leagues
     }
     validation = validate_all_international_baseball_baselines(
-        data_root, leagues, PROJECT_ROOT / "config/models"
+        data_root, leagues, _research_models_dir()
     )
     report_path = PROJECT_ROOT / "outputs/latest/international-baseball-baseline-validation.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -985,6 +1035,257 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
             "separately by the learned production path."
         ),
     }
+
+
+def _select_wnba_spread_market(rows: list[dict]) -> dict | None:
+    """Among alternate WNBA spread lines for one event, the main line is the
+    one whose long-side ask sits closest to a coin flip -- same "most
+    balanced line wins" rule mlb_market_odds._market_balance uses for MLB's
+    alternate lines, adapted to this snapshot format's embedded long/short
+    asks instead of a two-sided quote list."""
+    candidates = [
+        row for row in rows
+        if isinstance(row.get("long"), dict) and row["long"].get("ask") is not None
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+
+
+def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
+    """Price WNBA spreads with BasketballModel's normal-CDF margin approach
+    (wnba-spread-margin-v1), matched against the main (most-balanced)
+    Polymarket alternate line per game.
+
+    Snapshot rows are anchored to one team (``team``) with ``line`` always
+    that team's own spread -- see PolymarketUSClient.snapshot's docstring
+    comment for the exact convention this mirrors: ``long`` prices "team
+    covers its own line", ``short`` prices the negation. ESPN's away team is
+    matched to the snapshot's anchor team by name (verified empirically
+    2026-08-14: Polymarket anchors WNBA spread rows to the away team), which
+    makes the row's own ``line`` exactly BasketballModel's
+    ``spread_away_line`` input with no sign transform needed.
+    """
+    from .learned_forward import _team_matches, _teams
+    from .models.basketball import BasketballModel, UpcomingGame
+
+    observed_at = utc_now()
+    model_version = "wnba-spread-margin-v1"
+    # Read the artifact's own hash rather than hardcode it -- a hand-copied
+    # literal silently goes stale the moment the artifact is regenerated
+    # (see F-73/F-74 in DEBUG.md for two real incidents this exact failure
+    # mode caused elsewhere in this project).
+    artifact_path = PROJECT_ROOT / "config/models/wnba-spread-margin-v1.json"
+    model_artifact_hash = str(json.loads(artifact_path.read_text(encoding="utf-8"))["artifact_hash"])
+    model = BasketballModel(sport="wnba", version=model_version, margin_sd=10.5, total_sd=15.0, league="WNBA")
+    store = FeatureStore(data_root)
+    history = store.games_before("wnba", args_date)
+
+    scoreboard = client.scoreboard("WNBA", args_date)
+    events = scoreboard.get("events", [])
+
+    snapshot_path = Path(data_root) / "odds" / "wnba" / args_date / "polymarket_snapshots.jsonl"
+    snapshot_rows: list[dict] = []
+    if snapshot_path.exists():
+        with snapshot_path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    snapshot_rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    spread_rows = [row for row in snapshot_rows if row.get("market_type") == "spread"]
+
+    upcoming: list[UpcomingGame] = []
+    market_by_event_id: dict[str, dict] = {}
+    unmatched: list[dict[str, str]] = []
+    for event in events:
+        try:
+            event_id = str(event["id"])
+            start = parse_utc(str(event["date"]))
+            if start <= observed_at:
+                continue
+            away_team, home_team = _teams(event)
+        except (KeyError, TypeError, ValueError):
+            continue
+        # Matched by team name + start time, not Polymarket's own event_id
+        # (a different id space than ESPN's -- these snapshot rows carry
+        # Polymarket's event_id, which this loop never needs since matching
+        # happens the same way every other sport in this project matches a
+        # Polymarket quote to an ESPN event).
+        candidates = [
+            row for row in spread_rows
+            if _team_matches(away_team, str(row.get("team") or ""))
+            and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
+        ]
+        market = _select_wnba_spread_market(candidates)
+        if market is None:
+            unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
+            continue
+        upcoming.append(
+            UpcomingGame(
+                event_id=event_id,
+                event_start_utc=str(event["date"]),
+                away_team=away_team,
+                home_team=home_team,
+                spread_away_line=float(market["line"]),
+            )
+        )
+        market_by_event_id[event_id] = market
+
+    predictions = [
+        p for p in model.predict_games(history, upcoming) if p.market_type == "spread"
+    ]
+
+    priced_contracts = []
+    for prediction in predictions:
+        market = market_by_event_id[prediction.event_id]
+        # Model's own pick: the side with higher probability (same
+        # convention as every other sport in this project).
+        away_prob = prediction.probability("away")
+        if away_prob >= 0.5:
+            selection, model_probability = "away", away_prob
+            ask = market["long"]["ask"]
+            line = float(market["line"])
+        else:
+            selection, model_probability = "home", 1 - away_prob
+            ask = market["short"]["ask"]
+            line = -float(market["line"])
+        if ask is None or not 0 < float(ask) < 1:
+            continue
+        priced_contracts.append(
+            {
+                "event_id": prediction.event_id,
+                "event_start_utc": prediction.event_start_utc,
+                "away_team": prediction.away_team,
+                "home_team": prediction.home_team,
+                "market_type": "spread",
+                "selection": selection,
+                "line": line,
+                "executable_ask": float(ask),
+                "model_probability": round(model_probability, 6),
+                "model_uncertainty": prediction.uncertainty,
+                "model_version": model_version,
+                "model_artifact_hash": model_artifact_hash,
+                "rationale": prediction.rationale,
+                "market_slug": market.get("market_slug"),
+                "observed_at_utc": observed_at.isoformat(),
+            }
+        )
+
+    return {
+        "sport": "wnba_spread",
+        "model_name": "WNBA Spread (margin normal CDF)",
+        "model_version": model_version,
+        "game_date": args_date,
+        "scheduled_games": len(events),
+        "market_candidates": len(priced_contracts),
+        "priced_contracts": priced_contracts,
+        "unmatched": unmatched,
+        "observed_at_utc": observed_at.isoformat(),
+    }
+
+
+def _forecast_wnba_spread_sport(
+    *, data_root, args_date: str, config: dict, registry, bans, main_ledger=None, flat_ledger=None,
+) -> dict:
+    """Log WNBA spread picks to Main (CALL only) + Flat (every candidate) --
+    same routing MLB spread/total uses (operator directive, 2026-08-03: MLB
+    spread + total belong in Main alongside moneyline; WNBA is a Main-ledger
+    sport under the same "show everything, human decides" philosophy).
+
+    Trust-boundary-only eligibility (evaluate_eligibility), not the
+    curated min-edge gate esports/soccer/tennis Gated Research uses -- this
+    mirrors _forecast_mlb_totals_flat exactly, not _forecast_soccer_sport.
+    ``registry``/``bans`` are the same instances the daily dispatch already
+    builds once for WNBA moneyline -- not reconstructed here.
+    """
+    from .data_sources.polymarket_us import probability_to_american
+
+    forecast = _forecast_wnba_spread_slate(data_root, args_date, ESPNClient())
+    exposure_source = flat_ledger or main_ledger
+    if exposure_source is None:
+        forecast["logged"] = 0
+        return forecast
+
+    observed_now = utc_now()
+    logged: list[dict] = []
+    duplicates: list[str] = []
+    main_duplicates: list[str] = []
+    skipped: list[dict] = []
+    for contract in forecast["priced_contracts"]:
+        ask = contract["executable_ask"]
+        request = PickRequest(
+            event_start_utc=contract["event_start_utc"],
+            event_id=contract["event_id"],
+            league=League.WNBA,
+            away_team=contract["away_team"],
+            home_team=contract["home_team"],
+            market_type=MarketType.SPREAD,
+            selection=contract["selection"],
+            line=contract["line"],
+            sportsbook="polymarket_us",
+            american_odds=probability_to_american(ask),
+            model_probability=contract["model_probability"],
+            model_uncertainty=contract["model_uncertainty"],
+            model_version=contract["model_version"],
+            rationale=(
+                f"{contract['rationale']} Executable ask {ask:.4f} "
+                f"({contract['market_slug']})."
+            ),
+            risks="Research-baseline margin-normal spread model; not yet locked-holdout qualified.",
+            model_origin=ModelOrigin.STATISTICAL_MODEL,
+            model_state=ModelState.RESEARCH,
+            observed_at_utc=contract["observed_at_utc"],
+            model_artifact_hash=contract["model_artifact_hash"],
+            calibration_method="margin_normal",
+            calibration_version=contract["model_version"],
+            calibration_artifact_hash=contract["model_artifact_hash"],
+            feature_schema_version="wnba-spread-margin-v1",
+            code_revision=contract["model_artifact_hash"],
+        )
+        try:
+            request.validate(now=observed_now)
+            away = registry.resolve(request.league, request.away_team, request.event_start_utc)
+            home = registry.resolve(request.league, request.home_team, request.event_start_utc)
+            with _LEDGER_LOCK:
+                eligibility = evaluate_eligibility(
+                    request,
+                    registry,
+                    bans,
+                    exposure_source.exposure(
+                        request,
+                        now=observed_now,
+                        canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
+                    ),
+                    unit_policy(config),
+                    now=observed_now,
+                )
+                if flat_ledger is not None and _append_secondary_ledger(
+                    flat_ledger, request, eligibility, observed_now, "wnba_spread:flat_ledger"
+                ) is not None:
+                    duplicates.append(contract["event_id"])
+                if (
+                    main_ledger is not None
+                    and eligibility.decision == "CALL"
+                    and _append_secondary_ledger(
+                        main_ledger, request, eligibility, observed_now, "wnba_spread:main_ledger"
+                    ) is not None
+                ):
+                    main_duplicates.append(contract["event_id"])
+            logged.append(contract["event_id"])
+        except DuplicatePickError as error:
+            duplicates.append(error.pick_id)
+        except (EntityResolutionError, ValueError) as error:
+            skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
+
+    forecast["logged"] = len(logged)
+    forecast["logged_event_ids"] = logged
+    forecast["duplicate_pick_ids"] = duplicates
+    forecast["main_ledger_duplicate_event_ids"] = main_duplicates
+    forecast["skipped"] = forecast.get("unmatched", []) + skipped
+    return forecast
 
 
 def _load_market_residual_model(config) -> MarketResidualModel | None:
@@ -3160,7 +3461,7 @@ def main(argv: list[str] | None = None) -> None:
                     sport_gated = research_ledger(data_directory, sport, gated=True)
                     results[sport] = forecast_esports_slate(
                         data_root=data_directory,
-                        artifact_dir=PROJECT_ROOT / "config/models",
+                        artifact_dir=_research_models_dir(),
                         title=sport,
                         game_date=args.date,
                     )
@@ -3181,7 +3482,7 @@ def main(argv: list[str] | None = None) -> None:
                     # esports above.
                     results[sport] = _forecast_international_sport(
                         data_root=data_directory,
-                        artifact_dir=PROJECT_ROOT / "config/models",
+                        artifact_dir=_research_models_dir(),
                         league=sport,
                         args_date=args.date,
                         config=config,
@@ -3602,6 +3903,29 @@ def main(argv: list[str] | None = None) -> None:
                         len(_priced_soccer),
                     )
 
+            def _wnba_spread_task() -> None:
+                # WNBA spread: Main+Flat, same routing as MLB spread/total
+                # (operator directive 2026-08-03). Independent of WNBA
+                # moneyline (already logged by the learned-sports pool above).
+                try:
+                    forecast_result["wnba_spread"] = _forecast_wnba_spread_sport(
+                        data_root=data_directory,
+                        args_date=args.date,
+                        config=config,
+                        registry=registry,
+                        bans=bans,
+                        main_ledger=ledger,
+                        flat_ledger=flat_ledger,
+                    )
+                    _priced_wnba_spread = forecast_result["wnba_spread"].get("priced_contracts") or []
+                    if _priced_wnba_spread and not forecast_result["wnba_spread"].get("logged"):
+                        logger.warning(
+                            "zero rows logged for wnba_spread despite %d priced contracts",
+                            len(_priced_wnba_spread),
+                        )
+                except Exception:
+                    logger.warning("WNBA spread forecast failed", exc_info=True)
+
             def _tennis_task() -> None:
                 try:
                     forecast_result["tennis"] = _forecast_tennis_sport(
@@ -3623,7 +3947,7 @@ def main(argv: list[str] | None = None) -> None:
             def _esports_title_task(title: str) -> None:
                 forecast_result[title] = forecast_esports_slate(
                     data_root=data_directory,
-                    artifact_dir=PROJECT_ROOT / "config/models",
+                    artifact_dir=_research_models_dir(),
                     title=title,
                     game_date=args.date,
                 )
@@ -3669,7 +3993,7 @@ def main(argv: list[str] | None = None) -> None:
                 # directive, 2026-08-03) -- same reasoning as esports above.
                 forecast_result[league] = _forecast_international_sport(
                     data_root=data_directory,
-                    artifact_dir=PROJECT_ROOT / "config/models",
+                    artifact_dir=_research_models_dir(),
                     league=league,
                     args_date=args.date,
                     config=config,
@@ -3708,11 +4032,12 @@ def main(argv: list[str] | None = None) -> None:
                                 league, exc_info=True,
                             )
 
-            with ThreadPoolExecutor(max_workers=5) as research_pool:
+            with ThreadPoolExecutor(max_workers=6) as research_pool:
                 research_futures = [
                     research_pool.submit(_mlb_totals_task),
                     research_pool.submit(_soccer_task),
                     research_pool.submit(_tennis_task),
+                    research_pool.submit(_wnba_spread_task),
                     research_pool.submit(_esports_block),
                     research_pool.submit(_intl_baseball_block),
                 ]
@@ -3887,7 +4212,7 @@ def main(argv: list[str] | None = None) -> None:
             output = validate_all_esports_baselines(
                 data_root,
                 args.titles,
-                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+                _research_models_dir() if args.write_artifacts else None,
             )
             destination = PROJECT_ROOT / args.output
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -3906,7 +4231,7 @@ def main(argv: list[str] | None = None) -> None:
             for title in titles:
                 forecast = forecast_esports_slate(
                     data_root,
-                    PROJECT_ROOT / "config/models",
+                    _research_models_dir(),
                     title,
                     args.date,
                     args.timezone,
@@ -3938,7 +4263,7 @@ def main(argv: list[str] | None = None) -> None:
             output = validate_all_international_baseball_baselines(
                 data_root,
                 args.leagues,
-                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+                _research_models_dir() if args.write_artifacts else None,
             )
             destination = PROJECT_ROOT / args.output
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -3950,7 +4275,7 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "international-baseball-forecast":
             output = forecast_international_baseball_slate(
                 data_root,
-                PROJECT_ROOT / "config/models",
+                _research_models_dir(),
                 args.league,
                 args.date,
                 args.timezone,
@@ -4005,7 +4330,7 @@ def main(argv: list[str] | None = None) -> None:
             output = validate_all_total_score_models(
                 FeatureStore(data_root),
                 args.sports,
-                PROJECT_ROOT / "config/models" if args.write_artifacts else None,
+                _research_models_dir() if args.write_artifacts else None,
             )
             destination = PROJECT_ROOT / args.output
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -4295,6 +4620,46 @@ def main(argv: list[str] | None = None) -> None:
             output = ledger.void(args.pick_id, args.reason)
         elif args.command == "review-loss":
             output = ledger.review_loss(args.pick_id, args.classification, args.cause, args.action)
+        elif args.command == "freeze-production":
+            registry = ProductionRegistry()
+            snapshots = registry.freeze()
+            store = FrozenProductionStore()
+            store.write(registry)
+            output = {
+                "status": "frozen",
+                "frozen_at_utc": snapshots[0].frozen_at_utc if snapshots else "",
+                "champions": [s.to_dict() for s in snapshots],
+            }
+        elif args.command == "compare-champion":
+            import json as _json
+
+            def _load_predictions(pth):
+                raw = Path(pth).read_text(encoding="utf-8")
+                if raw.strip().startswith("["):
+                    return _json.loads(raw)
+                return [_json.loads(line) for line in raw.strip().splitlines() if line.strip()]
+
+            champion_preds = _load_predictions(args.champion_predictions)
+            challenger_preds = _load_predictions(args.challenger_predictions)
+            verdict = compare_champion_vs_challenger(
+                challenger_predictions=challenger_preds,
+                champion_predictions=champion_preds,
+                sport=args.sport,
+                market=args.market,
+            )
+            output = {
+                "status": verdict.status,
+                "paired_metrics": verdict.paired_metrics,
+                # Pass the CI dicts through as-is: each value is already a
+                # JSON-serializable dict (status/dates/point_estimate/
+                # ci_low/ci_high). The previous version indexed values with
+                # [0]/[1] -- that raised KeyError on dict values, which the
+                # outer except swallowed and reported as
+                # NO_CALL_INVALID_MARKET for a perfectly healthy comparison.
+                "bootstrap_ci": verdict.bootstrap_ci,
+                "failures": verdict.failures,
+                "recommendation": verdict.recommendation,
+            }
         else:
             raise ValueError(f"unknown command: {args.command}")
         print(json.dumps(output, indent=2, sort_keys=True, default=str))

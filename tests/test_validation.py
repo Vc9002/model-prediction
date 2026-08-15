@@ -8,6 +8,7 @@ from model_prediction.validation import (
     _add_legacy_backfill,
     _grade,
     build_production_artifact,
+    build_walk_forward_rows,
     chronological_split,
     evaluate_reconstructed_mlb_moneyline,
     historical_pitcher_feature_audit,
@@ -298,6 +299,152 @@ def test_bullpen_weakness_gap_requires_two_prior_games_and_uses_pit_history(
         assert gap2 == round(home_weakness - away_weakness, 6)
     finally:
         validation_module._BULLPEN_MAP = None
+
+
+def test_train_serve_parity_for_v9_features(tmp_path, monkeypatch) -> None:
+    """The three MLB v9 features must compute IDENTICAL values in walk-forward
+    training (validation.py) and live serving (learned_forward.py). The
+    2026-08-13 audit found real train/serve definition skews on all three:
+    residual_trend_gap trained on a league-wide rate (serving was already
+    team-specific), park_factor trained on the PIT factor while the v8
+    artifact's live serving stays on the static table (hence separate
+    park_factor / park_factor_pit names), and bullpen_fatigue_gap trained on
+    a 3-calendar-day window while serving used the last-N-games lookback."""
+    import json
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    from model_prediction import learned_forward
+    from model_prediction import validation as validation_module
+    from model_prediction.features.base import FeatureStore
+    from model_prediction.features.elo_ratings import build_elo
+    from model_prediction.features.trends import TrendEngine
+    from model_prediction.learned_forward import _compute_features
+
+    HOME, AWAY, NEUTRAL = "Colorado Rockies", "Away Team", "Neutral Team"
+    store = FeatureStore(tmp_path)
+
+    def game(eid, ts, home, away, hs, as_):
+        return {
+            "event_id": eid, "event_start_utc": ts, "league": "MLB",
+            "home_team": home, "away_team": away, "home_score": hs, "away_score": as_,
+        }
+
+    games_rows = []
+    # 40 pre-window games (home loses every one: 3-4). A league-wide home
+    # win rate would therefore be very different from the Rockies' own
+    # 1.000 -- exactly the skew the residual_trend_gap assertions must catch.
+    for i in range(40):
+        if i % 2:
+            home, away = NEUTRAL, AWAY
+        else:
+            home, away = AWAY, NEUTRAL
+        games_rows.append(game(f"hist-{i}", f"2026-05-{i % 28 + 1:02d}T12:00:00Z", home, away, 3, 4))
+    # 29 window games (2026-06-18..2026-07-16). Rockies home on even days
+    # plus 07-01 (all Rockies-home games are wins, 8-1); Away Team home on
+    # the other odd days (home loses, 1-8). All totals = 9 except the
+    # neutral games (7), so the PIT park factor is non-trivial.
+    window_days = [f"2026-06-{d:02d}" for d in range(18, 31)] + [f"2026-07-{d:02d}" for d in range(1, 17)]
+    for day in window_days:
+        # 07-01/07-15/07-16 are Rockies-home so the snapshot crosswalk
+        # (home/away team names) matches the games file for those snaps.
+        if day in ("2026-07-01", "2026-07-15", "2026-07-16") or int(day[-2:]) % 2 == 0:
+            home, away, hs, as_ = HOME, AWAY, 8, 1
+        else:
+            home, away, hs, as_ = AWAY, HOME, 1, 8
+        games_rows.append(game(f"win-{day}", f"{day}T12:00:00Z", home, away, hs, as_))
+    target = game("target-1", "2026-07-17T23:00:00Z", HOME, AWAY, 5, 3)
+    games_rows.append(target)
+
+    games_path = tmp_path / "processed/mlb/games.jsonl"
+    games_path.parent.mkdir(parents=True)
+    games_path.write_text("".join(json.dumps(r) + "\n" for r in games_rows), encoding="utf-8")
+    # The validation map loaders key off PROJECT_ROOT (tmp_path) and read a
+    # separate crosswalk file under data/processed/ -- same rows.
+    crosswalk_path = tmp_path / "data/processed/mlb/games.jsonl"
+    crosswalk_path.parent.mkdir(parents=True)
+    crosswalk_path.write_text("".join(json.dumps(r) + "\n" for r in games_rows), encoding="utf-8")
+
+    def side(team_name, ip):
+        return {
+            "team_name": team_name,
+            "pitcher_order": [1, 101],
+            "players": [{"player_id": 101, "pitching": {"inningsPitched": ip, "earnedRuns": 0}}],
+        }
+
+    # 07-01 is 16 days before the target -- outside the 3-day fatigue window,
+    # so if serving ever reverts to the last-N-games lookback, its fatigue sum
+    # jumps to home 8.0 - away 6.0 = +2.0 instead of -1.0 (asymmetric 5.0/2.0
+    # lines) and the parity assertion below fails.
+    snaps = [
+        ("2026-07-01T12:00:00Z", "5.0", "2.0"),
+        ("2026-07-15T12:00:00Z", "2.1", "1.0"),
+        ("2026-07-16T12:00:00Z", "0.2", "3.0"),
+        ("2026-07-17T23:00:00Z", "9.0", "9.0"),  # the query game itself: must not leak
+    ]
+    snap_path = tmp_path / "data/mlb_statsapi/game_snapshots.jsonl"
+    snap_path.parent.mkdir(parents=True)
+    with snap_path.open("w", encoding="utf-8") as handle:
+        for ts, home_ip, away_ip in snaps:
+            handle.write(
+                json.dumps({"game_start_utc": ts, "home": side(HOME, home_ip), "away": side(AWAY, away_ip)})
+                + "\n"
+            )
+
+    monkeypatch.setattr(validation_module, "PROJECT_ROOT", tmp_path)
+    for cache in ("_BULLPEN_FATIGUE_MAP", "_BULLPEN_MAP", "_STARTER_ERA_MAP",
+                  "_STARTER_FIP_MAP", "_STARTER_KBB_MAP"):
+        setattr(validation_module, cache, None)
+
+    try:
+        # ── Training side: the real walk-forward row builder ───────────────
+        rows = build_walk_forward_rows(store, "mlb")
+        target_row = next(row for row in rows if row.event_id == "target-1")
+
+        # ── Serving side: the real live feature computation ────────────────
+        learned_forward._FEATURE_PROVIDERS.clear()
+        real_lines = learned_forward.team_recent_relief_lines
+        monkeypatch.setattr(
+            learned_forward,
+            "team_recent_relief_lines",
+            lambda team, decision, **kwargs: real_lines(team, decision, snapshot_path=snap_path, **kwargs),
+        )
+        history = store.games_before("mlb", "2026-07-17")
+        target_rec = next(g for g in store.load_games("mlb") if g.event_id == "target-1")
+        elo = build_elo(history, "mlb")
+        trends = TrendEngine(history)
+        artifact = SimpleNamespace(raw={"market_models": {"moneyline": {"feature_names": [
+            "residual_trend_gap", "park_factor", "park_factor_pit", "bullpen_fatigue_gap",
+        ]}}})
+        served, unavailable = _compute_features(
+            "mlb", artifact, HOME, AWAY, "target-1", "2026-07-17",
+            target_rec.start, history, elo,
+            trends.team_trend(HOME), trends.team_trend(AWAY),
+            tmp_path, datetime(2026, 7, 17, 12, tzinfo=UTC),
+        )
+
+        # residual_trend_gap: team-specific 30-day window, >=10-team-game
+        # gate (16 Rockies home games here), 0.0 fallback -- identical.
+        assert target_row.residual_trend_gap != 0.0  # gate passed
+        assert served["residual_trend_gap"] == pytest.approx(target_row.residual_trend_gap, abs=1e-6)
+        # park_factor: static table on BOTH sides (v8 contract). Compares
+        # against the live PARK_RUN_FACTORS entry rather than a hardcoded
+        # literal, since that table is auto-regenerated daily
+        # (mlb_baseline_refresh.refresh_park_factors) and its values drift.
+        from model_prediction.features.park_factors import PARK_RUN_FACTORS
+        assert served["park_factor"] == target_row.park_factor == PARK_RUN_FACTORS["Colorado Rockies"]
+        # ...park_factor_pit: empirical PIT factor on BOTH sides, and it
+        # must differ from the static value the v8 variants consume.
+        assert served["park_factor_pit"] == target_row.park_factor_pit
+        assert served["park_factor_pit"] != served["park_factor"]
+        # bullpen_fatigue_gap: 3-calendar-day window, exact equality.
+        assert target_row.bullpen_fatigue_gap == served["bullpen_fatigue_gap"] == -1.0
+        assert all(name not in unavailable for name in artifact.raw["market_models"]["moneyline"]["feature_names"])
+    finally:
+        learned_forward._FEATURE_PROVIDERS.clear()
+        for cache in ("_BULLPEN_FATIGUE_MAP", "_BULLPEN_MAP", "_STARTER_ERA_MAP",
+                      "_STARTER_FIP_MAP", "_STARTER_KBB_MAP"):
+            setattr(validation_module, cache, None)
 
 
 def test_bullpen_fatigue_gap_uses_trailing_calendar_window_not_self(

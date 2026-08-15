@@ -6,7 +6,7 @@
   "corrected_claims": [
     {
       "claim": "MLB is underconfident; 60% predictions win 75% of the time; Platt scaling would fix it.",
-      "correction": "The load-bearing locked-holdout reliability bucket holds 237 of 254 calls at mean-predicted 63.4% vs actual 55.3% \u2014 overconfident by roughly 8pp, the opposite direction. No bucket anywhere shows 60% predicted resolving to 75% actual.",
+      "correction": "The load-bearing locked-holdout reliability bucket holds 237 of 254 calls at mean-predicted 63.4% vs actual 55.3% — overconfident by roughly 8pp, the opposite direction. No bucket anywhere shows 60% predicted resolving to 75% actual.",
       "date": "2026-07-21",
       "status": "FALSE"
     },
@@ -24,7 +24,7 @@
     },
     {
       "claim": "Zero calibration exists anywhere in the project.",
-      "correction": "Every production artifact records calibration DIAGNOSTICS under qualification.calibration (slope, intercept, expected_calibration_error). What is absent is an APPLIED calibrator \u2014 the serving path uses identity. NBA slope 1.785 and WNBA 1.270 indicate underconfidence; SOCCER slope 0.776 indicates overconfidence; NFL has the worst ECE at 0.1009.",
+      "correction": "Every production artifact records calibration DIAGNOSTICS under qualification.calibration (slope, intercept, expected_calibration_error). What is absent is an APPLIED calibrator — the serving path uses identity. NBA slope 1.785 and WNBA 1.270 indicate underconfidence; SOCCER slope 0.776 indicates overconfidence; NFL has the worst ECE at 0.1009.",
       "date": "2026-07-22",
       "status": "MISLEADING"
     },
@@ -220,8 +220,8 @@
         "MLB_v4": -0.0179
       },
       "name": "starter_era_gap",
-      "notes": "UNSERVABLE \u2014 do not reinstate under any name. validation.py:1509 _starter_era_gap() reads _load_starter_era_map(), a dict built by replaying HISTORICAL box scores keyed by event_id. An unplayed game is never in that map, so it returns the 0.0 default at serve time. It therefore trains on real ERA and serves as a constant zero: textbook train/serve skew. learned_forward.py:104-112 already documents this and deliberately provides NO provider, failing closed instead.",
-      "production_incident": "mlb-elo-trend-lr-v4 SHIPPED this feature (feature_names: elo_probability, trend_gap, park_factor, starter_era_gap; coefficient -0.0179) and made 100% of the settled live MLB picks in both ledgers. Every one of those 59 predictions was produced by a model whose fourth feature was silently 0.0 at prediction time. Practical damage is small because the coefficient is near zero, but the mechanism is exactly the failure mode. v5 removed it and substituted the servable pitcher_era_gap \u2014 so the v4 to v5 change was a BUG FIX, not feature bloat.",
+      "notes": "UNSERVABLE — do not reinstate under any name. validation.py:1509 _starter_era_gap() reads _load_starter_era_map(), a dict built by replaying HISTORICAL box scores keyed by event_id. An unplayed game is never in that map, so it returns the 0.0 default at serve time. It therefore trains on real ERA and serves as a constant zero: textbook train/serve skew. learned_forward.py:104-112 already documents this and deliberately provides NO provider, failing closed instead.",
+      "production_incident": "mlb-elo-trend-lr-v4 SHIPPED this feature (feature_names: elo_probability, trend_gap, park_factor, starter_era_gap; coefficient -0.0179) and made 100% of the settled live MLB picks in both ledgers. Every one of those 59 predictions was produced by a model whose fourth feature was silently 0.0 at prediction time. Practical damage is small because the coefficient is near zero, but the mechanism is exactly the failure mode. v5 removed it and substituted the servable pitcher_era_gap — so the v4 to v5 change was a BUG FIX, not feature bloat.",
       "retest_when": "Never. Remove elo_trend_park_starter from FEATURE_VARIANTS so it cannot be selected again.",
       "sports": [
         "MLB"
@@ -230,21 +230,6 @@
       "tested_on": "2026-07-22",
       "verdict": "remove",
       "addendum_2026_08_10": "learned_forward.py now has a real starter_era_gap_live provider (src/model_prediction/features/starter_history.py, added 2026-08-05 alongside the F-68 FIP pipeline) that is architecturally different from the unservable one described above -- it indexes each pitcher's own prior starts and filters strictly before decision time, so it is genuinely live-servable rather than a constant-zero train/serve-skew feature. It is NOT in any promoted model's feature_names (dormant scaffolding only). This does not satisfy the 'Never' retest_when on its own -- the original verdict stands until an operator explicitly re-evaluates this new implementation and updates this entry -- but the 'deliberately provides NO provider' claim in this entry's own notes is now stale and should not be relied on without checking the current code."
-    },
-    {
-      "evidence_grade": "B",
-      "evidence_ref": "branch worktree-orphaned-feature-eval, scripts/evaluate_orphaned_features.py",
-      "file": "src/model_prediction/features/starting_pitcher.py",
-      "measured_effect": "84% data coverage, zero measurable effect on locked holdout",
-      "name": "starting_pitcher_fip",
-      "notes": "Collinear with the existing pitcher_era_gap. Rejected on evidence, not neglect. Do not confuse with starter_fip_gap below -- different feature, different mechanism, different verdict.",
-      "retest_when": "Only if pitcher_era_gap is removed from the model, which would break the collinearity.",
-      "sports": [
-        "MLB"
-      ],
-      "status": "orphan",
-      "tested_on": "2026-07-21",
-      "verdict": "reject"
     },
     {
       "evidence_grade": "C",
@@ -339,7 +324,7 @@
       "evidence_ref": "outputs/roadmap_challenger/roadmap-challenger-factorial-v1.json",
       "file": "src/model_prediction/features/schedule_load.py",
       "name": "schedule_load",
-      "notes": "Sub-features (rest_disparity, back_to_back_gap, games_last_7_gap, schedule_missingness) tested in factorial roadmap challenger (v3 incumbents). MLB: rest_disparity alone improves holdout by -0.0004 but validation regresses (+0.0004). NBA: best variant (consistency+hot_cold+rest_disparity+schedule_density+schedule_missingness) improves holdout by -0.0012 and validation by -0.0010. NFL: largest gains \u2014 rest_disparity+schedule_density improves holdout by -0.0038. WNBA: holdout improves (-0.0010) but validation regresses. NBA is the most promising target for schedule features. Currently wired in learned_forward.py but not in any active model config.",
+      "notes": "Sub-features (rest_disparity, back_to_back_gap, games_last_7_gap, schedule_missingness) tested in factorial roadmap challenger (v3 incumbents). MLB: rest_disparity alone improves holdout by -0.0004 but validation regresses (+0.0004). NBA: best variant (consistency+hot_cold+rest_disparity+schedule_density+schedule_missingness) improves holdout by -0.0012 and validation by -0.0010. NFL: largest gains — rest_disparity+schedule_density improves holdout by -0.0038. WNBA: holdout improves (-0.0010) but validation regresses. NBA is the most promising target for schedule features. Currently wired in learned_forward.py but not in any active model config.",
       "sports": [
         "NBA",
         "WNBA"
@@ -466,7 +451,7 @@
       "verdict": "tested_marginal"
     }
   ],
-  "last_updated": "2026-07-25",
+  "last_updated": "2026-08-14",
   "production_ablation_summary": [
     {
       "economic_claim_allowed": false,

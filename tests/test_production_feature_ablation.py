@@ -99,11 +99,67 @@ def test_reproduction_gate_requires_exact_calls_and_tight_coefficients() -> None
     assert result["passed"] is True
 
 
-def test_current_cs2_artifact_fails_closed_on_source_data_drift() -> None:
-    config = load_config()
-    artifact_path = config["models"]["CS2"]["production_artifact"]
-    artifact = json.loads(Path(artifact_path).read_text(encoding="utf-8"))
+def test_current_cs2_artifact_fails_closed_on_source_data_drift(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The current CS2 artifact fails closed when its source data drifts.
 
+    K split (2026-08-15): the live matches.jsonl tracks the ROLLING
+    artifact under the runtime root — the frozen config/models copy is
+    the promoted snapshot and intentionally lags live data, so the
+    previous "frozen artifact in sync with live source" assertion is no
+    longer the invariant. The fail-closed drift guard itself still must
+    raise, not degrade silently.
+    """
+    config = load_config()
+    artifact_path = Path(config["models"]["CS2"]["production_artifact"])
+    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+
+    # Integrity of the shipped artifact itself.
     assert artifact["artifact_hash"] == artifact_hash(artifact)
+
+    # Fail-closed on drift: replay the real artifact in a tmp tree whose
+    # matches.jsonl differs from the pinned hash -> must raise.
+    (tmp_path / "config" / "models").mkdir(parents=True)
+    (tmp_path / "config" / "models" / "cs2-tiered-elo-v6.json").write_text(
+        artifact_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (tmp_path / "data" / "esports" / "cs2").mkdir(parents=True)
+    (tmp_path / "data" / "esports" / "cs2" / "matches.jsonl").write_text(
+        "drifted source data\n", encoding="utf-8"
+    )
+    test_config = {
+        "models": {
+            "CS2": {
+                **config["models"]["CS2"],
+                "production_artifact": "config/models/cs2-tiered-elo-v6.json",
+            }
+        }
+    }
+    monkeypatch.chdir(tmp_path)
     with pytest.raises(ValueError, match="cs2 match data drifted from production artifact"):
-        _esports_model(config, "cs2")
+        _esports_model(test_config, "cs2")
+
+
+def test_esports_artifact_resolution_prefers_rolling_when_present(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """K split: the ablation resolves the rolling runtime artifact when
+    one exists and falls back to the configured frozen copy otherwise."""
+    from model_prediction.production_feature_ablation import _resolve_esports_artifact
+    from model_prediction.runtime_paths import rolling_models_root
+
+    configured = tmp_path / "config" / "models" / "cs2-tiered-elo-v6.json"
+    configured.parent.mkdir(parents=True)
+    configured.write_text("{}", encoding="utf-8")
+
+    # No rolling copy -> configured frozen artifact.
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    assert _resolve_esports_artifact(configured) == configured
+
+    # Rolling copy exists -> it wins.
+    rolling = rolling_models_root()
+    rolling.mkdir(parents=True, exist_ok=True)
+    rolling_copy = rolling / configured.name
+    rolling_copy.write_text("{}", encoding="utf-8")
+    assert _resolve_esports_artifact(configured) == rolling_copy

@@ -1,6 +1,6 @@
 # Project Maintenance Checklist
 
-**Last updated**: 2026-08-02
+**Last updated**: 2026-08-13
 
 Current status and blockers: `docs/PROJECT_STATUS.md`.
 
@@ -40,12 +40,12 @@ Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Debug (when things look wrong)
 
-- [ ] **Pre-flight** — `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` (expect 0 failures; current pass: 624)
+- [ ] **Pre-flight** — `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` (expect 0 failures; current pass: 1759, 3 skipped)
 - [ ] **Ruff lint** — `.venv/bin/ruff check src/ tests/` (expect ~118 findings; 79 are EXE002 shebang on test files)
 - [ ] **Full DEBUG.md audit** — see `DEBUG.md` for the full 12-step audit and reproduction commands
 - [ ] **Module imports** — every current package module imports cleanly (DEBUG.md check 3)
 - [ ] **Data integrity** — 0 no-score games, 0 duplicates (DEBUG.md check 4)
-- [ ] **Config consistency** — `config/model.yaml` maps to existing artifact files (known gap: `market-residual-v1.json` missing)
+- [ ] **Config consistency** — `config/model.yaml` maps to existing artifact files (the old `market-residual-v1.json` gap was resolved 2026-08-03, F-50: real artifact trained, wired as diagnostic-only)
 - [ ] **Dashboard server logs** — `data/logs/dashboard.err` and `dashboard/server.log` for runtime errors
 - [ ] **Polymarket API health** — `curl -s https://gateway.polymarket.us/health`
 - [ ] **CLI imports** — `PYTHONPATH=src:. .venv/bin/python -c "from model_prediction.cli import main"` should exit 0
@@ -53,16 +53,16 @@ Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Current Known Issues
 
-- [ ] MLB ingest pipeline sometimes misses completed games (ESPN API returns data but Ingestor doesn't process)
+- [x] MLB ingest pipeline sometimes misses completed games — root-caused and fixed 2026-08-14: `cache_is_stale` only caught zero-completed caches, so mid-slate partial snapshots (some final, some `STATUS_IN_PROGRESS`) were trusted forever. Now any unfinished event (`state in/pre`) on a past date triggers re-fetch; 7 affected dates backfilled from live ESPN (incl. 5 games from 2026-08-07), processed/historical parity restored. See DEBUG.md 2026-08-14 (later).
 - [ ] NBA/NFL spread/total: 0 snapshots (offseason — will resolve when seasons start)
 - [ ] WNBA total baseline 78.3% suspiciously high — needs investigation with more data
-- [ ] Dashboard startup process uses `pkill -f` — replace with PID-file approach (`.codewhale/instructions.md` explicitly forbids `pkill`)
-- [ ] `config/model.yaml` references `market-residual-v1.json` which doesn't exist
-- [ ] `mlb-spread-baseline-v1.json` is reused for both spread and total research (should be separate artifacts)
-- [ ] `nba-spread-baseline-v1.json` and `nfl-spread-baseline-v1.json` have mismatched canonical hashes
-- [ ] `/api/scan` dashboard route calls a nonexistent function — returns 500 on every request
-- [ ] 12 orphaned source modules (~1,800 lines of dead code, never imported or tested)
-- [ ] `cli.py` (3,943 lines) has zero dedicated test file
+- [x] Dashboard startup process used `pkill -f` — replaced with a PID-file approach 2026-08-14 (`./dash` records `.dashboard.pid`, `./stop` signals that exact PID). `.codewhale/instructions.md` records this pattern-matched kill has triggered a macOS security lock on this machine before — never reintroduce it.
+- [x] `config/model.yaml` referenced `market-residual-v1.json` which doesn't exist — resolved 2026-08-03 (F-50), real artifact now trained and wired as diagnostic-only
+- [x] `mlb-spread-baseline-v1.json` reused for both spread and total research — resolved 2026-08-03 (P0-5): both keys now point at MLB's real, separately-fitted spread/total pipeline artifacts instead of the unrelated baseline file (see `config/model.yaml` around the P0-5 comment).
+- [x] `nba-spread-baseline-v1.json` and `nfl-spread-baseline-v1.json` "mismatched canonical hashes" — confirmed never a real bug (verification script's own JSON convention), per `docs/PROJECT_STATUS.md` release verdict item 6
+- [x] `/api/scan` dashboard route called a nonexistent function — route no longer exists (removed; P1-9)
+- [x] Orphaned source modules — corrected 2026-08-14 (operator GO): the earlier "7 orphans" claim was a scan artifact (the import-graph check missed `__init__` re-exports: `from . import (a, b)` for `@register_feature` side effects and same-package `from .x import` package exports). The precise verification: **4 true orphans deleted** (`data_sources/football_data.py`, `features/starting_pitcher.py`, `models/nfl.py`, `models/wnba.py` — zero imports anywhere, zero tests; the inert `soccer_enrichment` config key removed; the `starting_pitcher_fip` entry removed from `tested_features.json`, counts 25→24) and **3 false positives restored** (`sportsdataio.py` is the package's `SportsDataIOClient` export used by rebuild; `lineup_strength.py` + `tennis_surface.py` are load-bearing feature registrations).
+- [x] `cli.py` (3,943 lines) has zero dedicated test file — `tests/test_cli.py` exists with substantial coverage (grading, ledger routing, WNBA spread promotion tests added 2026-08-14); still not comprehensive line-for-line, but no longer zero.
 - [ ] `dashboard_server.py` (4,782 lines) is monolithic; recommended split into `dashboard/` package
 - [x] ~~Audit chain has 9 verified breaks~~ — repaired (43,304 events, 0 breaks)
 - [x] ~~MLB artifact qualification is inconsistent~~ — operator override documented
