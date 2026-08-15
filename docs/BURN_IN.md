@@ -1,7 +1,8 @@
 # Burn-in window — consolidation freeze (O)
 
-**Start**: 2026-08-15 (GMT+8) — clock starts when the merged consolidation
-SHA is what the launchd jobs and dashboard run locally.
+**Start**: 2026-08-15 05:25 UTC (merged SHA `37be479`, tag
+`consolidation-2026-08-15`; local checkout and launchd jobs run this
+code).
 **Duration**: ≥ 3 days, i.e. through 2026-08-18.
 
 ## Burn-in checks (review contract)
@@ -44,7 +45,7 @@ Run each at least once per day during the window; record results here.
 
 | Date | Checks 1-7 | Notes |
 |---|---|---|
-| 2026-08-15 | | |
+| 2026-08-15 | PASS (day 0) | No repo DBs; supervisor runs all completed (daily ×4, production ×4, rebuild ×3 since cutover, incl. launchd-scheduled cycles on the new code); dashboard listener = server.pid = launchctl pid after kickstart; pre-restart job history serves via /api/job; tree clean after cycles |
 | 2026-08-16 | | |
 | 2026-08-17 | | |
 | 2026-08-18 | | |

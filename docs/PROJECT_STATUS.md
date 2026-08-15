@@ -78,8 +78,15 @@ rollback artifacts are not current operational truth.
   runtime-root rolling artifact when present, frozen config copy
   otherwise); their tests are hermetic now that data/ trees are
   untracked (no machine-local data dependence in CI).
-- Next: N exact-head CI + merge to main + freeze SHA, then O ≥3-day
-  burn-in.
+- **N — exact-head CI + merge + freeze DONE**: full suite 1871 passed
+  locally; CI green on the exact branch head (all 4 jobs: incumbent
+  3.11/3.12/3.13 + rebuild acceptance incl. ruff/mypy delta gates and
+  dashboard smoke); merged to `main` via PR #30 (merge SHA `37be479`);
+  tag `consolidation-2026-08-15` published on the merge SHA.
+- **O — burn-in clock STARTED 2026-08-15 05:25 UTC** (≥3 days, through
+  08-18): checklist and results in `docs/BURN_IN.md`. Day-0 checks pass.
+  GitHub purge template for the briefly-exposed quarantine DB commits:
+  `docs/PURGE_REQUEST_TEMPLATE.md`.
 
 ## 2026-08-14 session changes (KBO settlement bug, ledger archival, doc corrections)
 
