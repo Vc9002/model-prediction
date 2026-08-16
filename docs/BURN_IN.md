@@ -47,7 +47,7 @@ Run each at least once per day during the window; record results here.
 |---|---|---|
 | 2026-08-15 | PASS (day 0) | No repo DBs; supervisor runs all completed (daily ×4, production ×4, rebuild ×3 since cutover, incl. launchd-scheduled cycles on the new code); dashboard listener = server.pid = launchctl pid after kickstart; pre-restart job history serves via /api/job; tree clean after cycles |
 | 2026-08-16 | PASS (day 1) | No repo DBs; supervisor runs completed except ONE transient rebuild-shadow failure (23:15 UTC, exit 1, zero output — undiagnosable; 3 subsequent runs green; startup echo added to run_rebuild.sh so silent failures can't recur); dashboard lsof=pidfile=launchctl (95673); job history serves; tree clean; main CI green |
-| 2026-08-17 | | |
+| 2026-08-17 | PASS (day 2) | No repo DBs; supervisor runs all completed (daily ×10, production ×11, rebuild-shadow ×10 since cutover; the one failed row remains the documented 08-15 23:15 UTC transient, zero repeats); 0 skipped rows (no lock refusals occurred to coalesce); dashboard lsof=pidfile=launchctl (76750) after a kickstart-restart this session; pre-restart job history (daily-1786732799, 08-14) serves via /api/job; tree clean (session work committed as 287d979→7efdd5f); evidence API all_model_definitions_and_backfills_valid=True |
 | 2026-08-18 | | |
 
 Burn-in passes when three consecutive clean days are recorded, after
