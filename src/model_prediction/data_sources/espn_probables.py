@@ -17,9 +17,7 @@ from ..config import PROJECT_ROOT
 from ..domain import iso_utc, parse_utc, utc_now
 
 _DISK_CACHE_PATH = PROJECT_ROOT / "data" / "espn_probables_cache.jsonl"
-_PIT_ARCHIVE_PATH = (
-    PROJECT_ROOT / "data" / "point_in_time" / "mlb_probable_starters.jsonl"
-)
+_PIT_ARCHIVE_PATH = PROJECT_ROOT / "data" / "point_in_time" / "mlb_probable_starters.jsonl"
 
 
 def _load_disk_cache() -> dict[str, dict]:
@@ -68,10 +66,7 @@ def _fetch_espn_probables(
     normalized_date = date_str.replace("-", "")
     if len(normalized_date) != 8 or not normalized_date.isdigit():
         return {}
-    url = (
-        "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
-        f"?dates={normalized_date}"
-    )
+    url = f"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={normalized_date}"
     try:
         resp = httpx.get(url, timeout=15)
         if resp.status_code != 200:
@@ -95,11 +90,7 @@ def _fetch_espn_probables(
             home_away = competitor.get("homeAway", "")
             probables = competitor.get("probables", [])
             starter = next(
-                (
-                    probable
-                    for probable in probables
-                    if probable.get("name") == "probableStartingPitcher"
-                ),
+                (probable for probable in probables if probable.get("name") == "probableStartingPitcher"),
                 None,
             )
             if starter:
@@ -110,15 +101,17 @@ def _fetch_espn_probables(
                     None,
                 )
                 try:
-                    era = (
-                        float(era_stat.get("displayValue"))
-                        if era_stat is not None
-                        else None
-                    )
+                    era = float(era_stat.get("displayValue")) if era_stat is not None else None
                 except (TypeError, ValueError):
                     era = None
                 name = athlete.get("fullName", athlete.get("displayName", "?"))
-                eras[home_away] = {"name": name, "era": era}
+                # ESPN's own athlete id -- not yet joinable to MLB Stats
+                # API's player_id (no crosswalk exists between the two;
+                # pybaseball's registry covers mlbam/bbref/retrosheet/FG,
+                # not ESPN), but capturing it now means a future crosswalk
+                # doesn't need to re-fetch every historical ESPN response.
+                espn_athlete_id = athlete.get("id")
+                eras[home_away] = {"name": name, "era": era, "espn_athlete_id": espn_athlete_id}
 
         if "home" not in eras or "away" not in eras:
             continue
@@ -127,6 +120,8 @@ def _fetch_espn_probables(
             "away_era": eras["away"]["era"],
             "home_starter": eras["home"]["name"],
             "away_starter": eras["away"]["name"],
+            "home_starter_espn_id": eras["home"]["espn_athlete_id"],
+            "away_starter_espn_id": eras["away"]["espn_athlete_id"],
         }
         result[eid] = entry
         event_start_utc = str(ev.get("date") or "")
@@ -146,9 +141,7 @@ def _fetch_espn_probables(
                 **entry,
                 "pit_eligible": pit_eligible,
                 "provenance": (
-                    "prospective_pregame"
-                    if pit_eligible
-                    else "retroactive_or_unverifiable_non_pit"
+                    "prospective_pregame" if pit_eligible else "retroactive_or_unverifiable_non_pit"
                 ),
             }
         )
@@ -201,6 +194,7 @@ def _pull_espn_probables(date_str: str) -> dict[str, dict]:
     # "less than" a compact today-string regardless of the actual date,
     # silently caching today's incomplete result forever.
     from ..domain import eastern_today
+
     if normalized_date < eastern_today().strftime("%Y%m%d"):
         _append_disk_cache(date_str, result)
     return result
@@ -284,8 +278,7 @@ def point_in_time_probable_starters(
     }
 
 
-def espn_pitcher_era_gap(event_id: str, home_team: str, away_team: str,
-                         date_str: str = "") -> float:
+def espn_pitcher_era_gap(event_id: str, home_team: str, away_team: str, date_str: str = "") -> float:
     """Live probable pitcher ERA gap from ESPN.
 
     Returns home_starter_ERA - away_starter_ERA.
@@ -295,6 +288,7 @@ def espn_pitcher_era_gap(event_id: str, home_team: str, away_team: str,
     """
     if not date_str:
         from ..domain import eastern_today
+
         date_str = eastern_today().strftime("%Y%m%d")
 
     probables = _pull_espn_probables(date_str)

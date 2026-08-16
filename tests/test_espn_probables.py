@@ -85,16 +85,15 @@ def test_probables_normalizes_iso_date_and_returns_exact_starters(monkeypatch) -
     entry = espn_probables._pull_espn_probables("2026-07-18")["401816170"]
 
     assert requested_urls == [
-        (
-            "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
-            "?dates=20260718"
-        )
+        ("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=20260718")
     ]
     assert entry == {
         "home_era": 3.67,
         "away_era": 4.90,
         "home_starter": "J.T. Ginn",
         "away_starter": "Zack Littell",
+        "home_starter_espn_id": None,
+        "away_starter_espn_id": None,
     }
 
 
@@ -112,9 +111,7 @@ def test_pitcher_gap_uses_exact_probable_starter_eras(monkeypatch) -> None:
         },
     )
 
-    gap = espn_probables.espn_pitcher_era_gap(
-        "401816170", "Athletics", "Washington Nationals", "2026-07-18"
-    )
+    gap = espn_probables.espn_pitcher_era_gap("401816170", "Athletics", "Washington Nationals", "2026-07-18")
 
     assert gap == -1.23
 
@@ -127,9 +124,7 @@ def test_missing_probable_starter_fails_closed_without_team_proxy(monkeypatch) -
     )
 
     with pytest.raises(ValueError, match="NO_CALL_STARTERS_UNAVAILABLE"):
-        espn_probables.espn_pitcher_era_gap(
-            "401816170", "Athletics", "Washington Nationals", "2026-07-18"
-        )
+        espn_probables.espn_pitcher_era_gap("401816170", "Athletics", "Washington Nationals", "2026-07-18")
 
 
 def test_prospective_capture_archives_observation_and_is_usable_before_first_pitch(
@@ -154,8 +149,7 @@ def test_prospective_capture_archives_observation_and_is_usable_before_first_pit
     assert result["401816170"]["home_starter"] == "J.T. Ginn"
     assert gap == -1.23
     archived = [
-        json.loads(line)
-        for line in espn_probables._PIT_ARCHIVE_PATH.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in espn_probables._PIT_ARCHIVE_PATH.read_text(encoding="utf-8").splitlines()
     ]
     assert archived[0]["observed_at_utc"] == "2099-07-18T18:00:00Z"
     assert archived[0]["event_start_utc"] == "2099-07-18T23:00:00Z"
@@ -184,9 +178,7 @@ def test_point_in_time_probable_starters_exposes_names_not_just_era_gap(monkeypa
 
 def test_point_in_time_probable_starters_fails_closed_without_archive() -> None:
     with pytest.raises(ValueError, match="NO_PIT_ARCHIVE"):
-        espn_probables.point_in_time_probable_starters(
-            "no-such-event", datetime(2099, 7, 18, 22, tzinfo=UTC)
-        )
+        espn_probables.point_in_time_probable_starters("no-such-event", datetime(2099, 7, 18, 22, tzinfo=UTC))
 
 
 def test_retroactive_capture_is_archived_as_non_pit_and_rejected(monkeypatch) -> None:
