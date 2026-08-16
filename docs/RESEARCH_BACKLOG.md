@@ -320,3 +320,35 @@ None scheduled; same triage contract as the first pass.
   is nearly free to build from existing payload data, and makes
   operator-side judgment (like the 2026-08-16 Tidwell discussion) far
   easier to have.
+
+## Accuracy-first feature queue (operator directive, 2026-08-17)
+
+The operator's stated goal is model **accuracy** (proper scores), not
+edge hunting — these items are queued on accuracy grounds, with economic
+value explicitly secondary. Sources: `docs/RESEARCH_LITERATURE_DIVE_3_2026-08-17.md`
+(tier-1 citations inline there).
+
+1. **Totals distribution fix (MLB Phase 6).** Runs are not Poisson:
+   variance ≈ 2.2× mean, NB r ≈ 3.7 prior, and both Poisson and NB
+   underestimate the shutout rate — zero-inflation needed. Accuracy
+   lever: exact-run-count pricing makes the shutout tail and
+   overdispersion directly visible in totals Brier/LogLoss. Action:
+   swap Phase-6 candidate set to NB + zero-inflated NB, re-estimate
+   dispersion from our own game snapshots, report proper-score deltas
+   vs the current totals model.
+2. **Starter-IP distribution feature (MLB).** Starters throw ~5.2 IP
+   and falling (39.8% of starts ≥6 IP in 2023 vs 60.7% in 2013).
+   Accuracy lever: bullpen exposure is decided by starter length;
+   modeling the right-skewed IP distribution feeds the second half of
+   totals variance. PIT-safe from our own box-score snapshots.
+3. **Umpire strike-zone feature (MLB totals).** Peer-reviewed 0.3–0.5
+   runs/game class effect (Mills 2016), time-varying, with no
+   published per-umpire pricing. Accuracy lever: rolling umpire
+   called-strike-rate / zone-size z-score from Statcast; expected
+   ±0.1–0.3 runs/game at the extremes. Must be rolling (the era effect
+   moves); validated on proper scores first.
+
+Each ships through the standard chain (shadow feature → walk-forward →
+proper-score gate → promotion decision), per the accuracy-first
+criterion: proper scores decide; economic numbers are reported but
+secondary.
