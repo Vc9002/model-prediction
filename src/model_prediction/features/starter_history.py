@@ -28,7 +28,8 @@ API player_id crosswalk would close this gap if it becomes a live concern.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import unicodedata
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +53,14 @@ def _baseball_innings(value: Any) -> float:
 
 
 def _normalize_name(name: str) -> str:
-    return "".join(c.lower() for c in name if c.isalnum())
+    """Fold to comparable ASCII-alnum-lowercase, so cross-source spelling
+    differences (e.g. MLB Stats API's "José Soriano" vs. ESPN's "Jose
+    Soriano" -- the same real person) match instead of silently missing
+    each other. NFKD decomposition splits accented letters into a base
+    letter plus a combining mark (category "Mn"), which is then dropped.
+    """
+    decomposed = unicodedata.normalize("NFKD", name)
+    return "".join(c.lower() for c in decomposed if c.isalnum() and not unicodedata.combining(c))
 
 
 def load_starter_index(
@@ -123,6 +131,7 @@ def starter_rolling_era(
     snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
     lookback_starts: int = DEFAULT_LOOKBACK_STARTS,
     minimum_prior_starts: int = MINIMUM_PRIOR_STARTS,
+    max_days_since_start: int | None = None,
 ) -> dict[str, Any]:
     """Rolling ERA from this pitcher's last N real starts strictly before decision.
 
@@ -130,9 +139,22 @@ def starter_rolling_era(
     rather than guessing -- caller decides how to treat that (raise, neutral
     default, or unavailable-features note), matching every other feature
     provider in this codebase.
+
+    ``max_days_since_start`` (default ``None`` -- identical to prior behavior,
+    load-bearing for v8's frozen contract and its train/serve parity with
+    ``validation.py::_load_starter_era_map``) optionally drops starts older
+    than that many days before ``decision``. Without it, a starter coming
+    back from a long injury/demotion gap can have a "last 5 starts" window
+    that silently blends in a start from a different season -- not recent
+    form, just the oldest data available. This parameter is for the shadow
+    variant below; do not flip its default without a real walk-forward
+    validation run.
     """
     index = load_starter_index(snapshot_path)
     starts = [s for s in index.get(_normalize_name(starter_name), []) if s[0] < decision]
+    if max_days_since_start is not None:
+        cutoff = decision - timedelta(days=max_days_since_start)
+        starts = [s for s in starts if s[0] >= cutoff]
     if not starts:
         return {"era": None, "starts": 0, "status": "unavailable_from_source"}
     recent = starts[-lookback_starts:]
@@ -168,6 +190,35 @@ def starter_era_gap_live(
     """
     home = starter_rolling_era(home_starter_name, decision, snapshot_path=snapshot_path)
     away = starter_rolling_era(away_starter_name, decision, snapshot_path=snapshot_path)
+    if home["status"] != "available" or away["status"] != "available":
+        raise ValueError(
+            "NO_CALL_STARTER_ERA_GAP_INSUFFICIENT_HISTORY: "
+            f"home={home_starter_name!r} status={home['status']}, "
+            f"away={away_starter_name!r} status={away['status']}"
+        )
+    return round(home["era"] - away["era"], 6)
+
+
+def starter_era_gap_recency_gated(
+    home_starter_name: str,
+    away_starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+    max_days_since_start: int = 90,
+) -> float:
+    """Shadow variant of ``starter_era_gap_live`` -- excludes starts older
+    than ``max_days_since_start`` before ``decision``, so a pitcher's rolling
+    window can't silently blend in a start from a different season after a
+    long injury/demotion gap. Not wired into any model; for offline
+    comparison against settled picks before any promotion decision.
+    """
+    home = starter_rolling_era(
+        home_starter_name, decision, snapshot_path=snapshot_path, max_days_since_start=max_days_since_start
+    )
+    away = starter_rolling_era(
+        away_starter_name, decision, snapshot_path=snapshot_path, max_days_since_start=max_days_since_start
+    )
     if home["status"] != "available" or away["status"] != "available":
         raise ValueError(
             "NO_CALL_STARTER_ERA_GAP_INSUFFICIENT_HISTORY: "
