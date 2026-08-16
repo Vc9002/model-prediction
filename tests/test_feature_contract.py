@@ -8,16 +8,16 @@ from model_prediction.feature_contract import (
 
 
 def _observation(**overrides) -> FeatureObservation:
-    defaults = dict(
-        event_id="401816159",
-        entity_id="mlb-pit",
-        feature_name="starter_era",
-        value=3.21,
-        effective_at_utc="2026-07-18T19:00:00Z",
-        observed_at_utc="2026-07-18T18:00:00Z",
-        source="espn",
-        source_version="v1",
-    )
+    defaults = {
+        "event_id": "401816159",
+        "entity_id": "mlb-pit",
+        "feature_name": "starter_era",
+        "value": 3.21,
+        "effective_at_utc": "2026-07-18T19:00:00Z",
+        "observed_at_utc": "2026-07-18T18:00:00Z",
+        "source": "espn",
+        "source_version": "v1",
+    }
     defaults.update(overrides)
     return FeatureObservation(**defaults)
 
@@ -80,11 +80,11 @@ def test_validate_observation_reports_missing_fields() -> None:
 
 
 def test_validate_observation_accepts_a_full_dict() -> None:
-    payload = dict(
-        event_id="1", entity_id="e", feature_name="f", value=1.0,
-        effective_at_utc="2026-07-18T19:00:00Z", observed_at_utc="2026-07-18T18:00:00Z",
-        source="espn", source_version="v1", available=True, missing_reason=None,
-    )
+    payload = {
+        "event_id": "1", "entity_id": "e", "feature_name": "f", "value": 1.0,
+        "effective_at_utc": "2026-07-18T19:00:00Z", "observed_at_utc": "2026-07-18T18:00:00Z",
+        "source": "espn", "source_version": "v1", "available": True, "missing_reason": None,
+    }
     assert validate_observation(payload) == []
 
 

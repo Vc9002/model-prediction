@@ -457,3 +457,46 @@ def test_authority_flag_resolves_from_env_in_constructors(tmp_path, monkeypatch)
     assert ledger_authority() == "xlsx"
     monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "sqlite")
     assert ledger_authority() == "sqlite"
+
+
+def test_store_usable_from_multiple_threads(tmp_path) -> None:
+    """The forecast fan-out uses the store from ThreadPoolExecutor
+    workers; sqlite3 forbids using a connection from any thread other
+    than the one that created it. Found live 2026-08-15: after the
+    sqlite-authority cutover, the WNBA threaded forecast logged 0 rows
+    for a full day with 'SQLite objects created in a thread can only be
+    used in that same thread'. The store must hand each thread its own
+    connection (WAL + busy_timeout serialize the writes)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from model_prediction.runtime_ledger_store import (
+        LedgerMutation,
+        RuntimeLedgerStore,
+        new_pick_ids,
+    )
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+
+    def worker(index: int) -> bool:
+        pick_id, operation_id = new_pick_ids()
+        store.apply(
+            LedgerMutation(
+                pick_id=pick_id,
+                operation_id=operation_id,
+                ledger_tier="research",
+                sport="wnba",
+                event_type="append",
+                created_at_utc="2026-08-15T00:00:00Z",
+                model_id="wnba-elo-trend-lr-v4",
+                model_probability=0.6,
+            )
+        )
+        # A read back through the SAME worker thread's connection.
+        return store.records(tier="research") is not None
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(worker, range(8)))
+    assert all(results)
+    assert store.records(tier="research", sport="wnba")
+    store.close()

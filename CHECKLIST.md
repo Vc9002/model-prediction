@@ -1,6 +1,6 @@
 # Project Maintenance Checklist
 
-**Last updated**: 2026-08-13
+**Last updated**: 2026-08-16
 
 Current status and blockers: `docs/PROJECT_STATUS.md`.
 
@@ -8,11 +8,13 @@ Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Daily
 
+- [ ] **Burn-in checks** (through 08-18) — `docs/BURN_IN.md` table
 - [ ] **Dashboard alive** — `http://127.0.0.1:8765` loads, matrix shows all sports
 - [ ] **Daily pipeline ran** — check `data/logs/daily_$(date +%Y-%m-%d).log` exists
 - [ ] **Polymarket snapshots captured** — `ls data/odds/{mlb,wnba,esports,kbo,npb,soccer,tennis}/$(date +%Y-%m-%d)/`
 - [ ] **scheduled jobs verified** — inspect the actual loaded launchd labels; do not assume documented labels are current
 - [ ] **Dashboard server token valid** — dashboard startup generates a fresh per-session token; if the browser shows auth errors on order submission, restart the dashboard
+- [ ] **MLB ingest completeness** — `env PYTHONPATH=src:. .venv/bin/python scripts/check_mlb_ingest_completeness.py --days 7` (P1-12 detector)
 
 ## Weekly
 

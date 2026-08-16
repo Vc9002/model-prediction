@@ -110,7 +110,7 @@ def build_holdout(store: FeatureStore, sport: str, artifact_path: str):
         history.extend(day_games)
 
     _, _, holdout_rows, _ = chronological_split(all_rows)
-    hd = set(r.date for r in holdout_rows)
+    hd = {r.date for r in holdout_rows}
     return [e for e, r in zip(all_extra, all_rows) if r.date in hd], holdout_rows, threshold
 
 
@@ -132,8 +132,7 @@ def apply(extra, rows, threshold, fname):
             if side == "away" and disp >= 3:
                 keep = False
 
-        elif "both sides" in fname:
-            if side == "home" and disp <= -3 or side == "away" and disp >= 3:
+        elif "both sides" in fname and (side == "home" and disp <= -3 or side == "away" and disp >= 3):
                 keep = False
         if keep:
             outcome = row.outcome if prob >= 0.5 else 1 - row.outcome

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# TODO(DD-5): ~5,100-line monolithic server with manual if/elif routing
+# (~20 GET + ~15 POST routes) — see MASTER.md DD-5. Split into
+# dashboard/routes.py + views.py + orders.py before the next feature.
 """Local operations dashboard server for the model-prediction system.
 
 HACK(DD-5): 5,121-line monolithic file with ~35 routes dispatched via manual

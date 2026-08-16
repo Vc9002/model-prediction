@@ -342,4 +342,4 @@ def _number(value: Any) -> float | None:
 
 
 def _parse_utc(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+    return datetime.fromisoformat(value).astimezone(UTC)

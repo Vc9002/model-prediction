@@ -83,7 +83,7 @@ def collect_soccer_scores(
     def _fetch(league_name: str) -> tuple[list[Any] | None, str | None]:
         try:
             return client.scores(league_name, days_from=days_from), None
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — the caller needs the redacted message as data, not a raised error
             return None, _redact_api_key(str(exc), api_key)[:100]
 
     with ThreadPoolExecutor(max_workers=min(12, len(ordered_leagues)) or 1) as pool:

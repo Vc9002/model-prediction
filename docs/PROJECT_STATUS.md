@@ -1,9 +1,12 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-14, local `main` at `e1f12bf` (8 commits ahead of
-`origin/main` at `0da4b81`, pushed to `origin/cleanup/final-debug-2026-08-14`
-for exact-head CI — not yet merged). Production canary deployed;
-champion/challenger gating added; KBO settlement bug fixed.
+**Last verified**: 2026-08-16, local `main` at `e933c7a` tracking
+`origin/main` (consolidation merged via PR #30 @ `37be479`, tag
+`consolidation-2026-08-15`). Burn-in day 1 of 3 passing. Ruff baseline
+cleared (0 findings), pre-commit hook installed, TODO P0/P1 fully
+resolved with evidence, docs restructured (one-shot records archived
+under `docs/archive/`), deep feature+model audit complete
+(`scripts/feature_model_audit.py`, findings on the research branch).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -12,6 +15,35 @@ this file exists to be the short, current summary someone can read first.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-15/16 — open-items closure (post-consolidation sweep)
+
+Every open item from the read-through was fixed, closed with evidence,
+or explicitly deferred by design:
+
+- **Code debt**: dead `SportModel`/`ScoreModel` protocols removed; ruff
+  baseline cleared to **0 findings** with `.pre-commit-config.yaml`
+  installed; in-code debt markers added (cli/dashboard monoliths, WNBA
+  PDF path); DD-14 closed (the 105 model_id-less rows are a bounded
+  08-14 cutover-day artifact, 0 since, not backfillable).
+- **Detectors/reports**: `scripts/check_mlb_ingest_completeness.py`
+  (7-day scan clean); `outputs/latest/learned-model-validation.json`
+  regenerated via `validate-models` (docs' `validate-learned` name was
+  stale); `outputs/rebuild/verification.json` policy documented as
+  CI-generated (local 404 expected).
+- **v8 parity layers D–I + L closed** (research branch): 40-game sample
+  through serving definitions — elo/trend/park 40/40 exact; weather
+  ≤0.029 source-drift; starter ≤5e-4 map rounding; orientation field
+  inert at serving (consistent, hardening note).
+- **Venv hazard fixed**: the launchd dashboard pointed at a deleted
+  `.venvs/model-prediction` interpreter (would have crash-looped on the
+  next restart) — plist now uses the repo `.venv`, verified.
+- **Park leak verified**: static table = 7,926 games (2024-02-22 →
+  2026-08-12) applied retroactively to history; documented, v8 frozen,
+  `park_factor_pit` is the v9 path.
+- **Git hygiene**: 19 local + 7 remote stale branches removed (all
+  verified merged/superseded); remotes now `origin/main` +
+  `origin/research/mlb-v8-reproduction`.
 
 ## 2026-08-15 session changes (consolidation P0 — control-plane singularity)
 
@@ -78,8 +110,33 @@ rollback artifacts are not current operational truth.
   runtime-root rolling artifact when present, frozen config copy
   otherwise); their tests are hermetic now that data/ trees are
   untracked (no machine-local data dependence in CI).
-- Next: N exact-head CI + merge to main + freeze SHA, then O ≥3-day
-  burn-in.
+- **N — exact-head CI + merge + freeze DONE**: full suite 1871 passed
+  locally; CI green on the exact branch head (all 4 jobs: incumbent
+  3.11/3.12/3.13 + rebuild acceptance incl. ruff/mypy delta gates and
+  dashboard smoke); merged to `main` via PR #30 (merge SHA `37be479`);
+  tag `consolidation-2026-08-15` published on the merge SHA.
+- **O — burn-in clock STARTED 2026-08-15 05:25 UTC** (≥3 days, through
+  08-18): checklist and results in `docs/BURN_IN.md`. Day-0 checks pass.
+  GitHub purge template for the briefly-exposed quarantine DB commits:
+  `docs/PURGE_REQUEST_TEMPLATE.md`.
+- **Git hygiene (2026-08-15)**: 19 stale local branches + 2 stale
+  worktrees deleted after verification (0 unique commits vs origin/main
+  or superseded parallel implementations; one dirty doc diff preserved
+  under `backups/removed-branch-artifacts-20260815/`); merged remote
+  `cleanup/final-debug-2026-08-14` deleted; `main` tracks `origin/main`.
+- **MLB research prep started (burn-in window, isolated workspace)**:
+  worktree at the frozen tag (`worktrees/mlb-research`, branch
+  `research/mlb-v8-reproduction`) with data symlinked from the live
+  checkout. Aggregate v8 pin-and-replay re-confirmed (150 vs 148 calls,
+  hit delta 0.0052). New row-level parity tooling found: 31 net-new
+  post-freeze holdout rows (+2 freeze-time rows lost, no snapshot
+  exists to identify them); excluding the 31 reproduces 148/148 calls;
+  coefficient parity fails (refit vs shipped max delta 0.0107) because
+  history-dependent features shifted with backfills — v8's exact
+  probabilities are unrecoverable, per-row drift bounded at 0.0006.
+  Full contract + findings: `docs/V8_REPRODUCTION.md` (research branch).
+  No promotion decisions; v8 unmodified. Next prep: frozen v9 feature
+  table + standardized evaluator.
 
 ## 2026-08-14 session changes (KBO settlement bug, ledger archival, doc corrections)
 
@@ -143,7 +200,7 @@ rollback artifacts are not current operational truth.
   ML/spread/total derived from one joint draw. NB is runnable but not promoted.
 - **Settlement routing fixed**: model-ledger mirror writes canonical
   `data/model_ledgers/` again (was per-tier after the split, freezing the
-  dashboard/loader's read on 2026-08-03). See `docs/SETTLEMENT_GAP.md`.
+  dashboard/loader's read on 2026-08-03). See `docs/archive/SETTLEMENT_GAP.md`.
 
 ## 2026-08-13 deep-audit fix pass
 
@@ -251,7 +308,7 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 **The 6 originally-identified P0 real-money-execution defects are resolved or confirmed non-issues** (verified 2026-08-03/04, full evidence in `MASTER.md`'s P0 section and Fixed Bugs log):
 
 1. Execution-ticket binding — resolved 2026-08-03, extended to spread/total/btts (F-49), and the dashboard-side gap that made that fix unreachable from the real order flow is also now fixed (F-53, 2026-08-04)
-2. Ledger/audit atomicity — confirmed the original claim was backwards (audit is appended *before* the ledger write); true cross-file atomicity across separate files still doesn't exist as a lower-severity, real architectural gap
+2. Ledger/audit atomicity — confirmed the original claim was backwards (audit is appended *before* the ledger write); since the J cutover the CANONICAL store commits mutation + audit event in one SQLite transaction (G2), so the cross-file gap now applies only to the legacy XLSX export path
 3. Artifact qualification / quote `timestamp_valid` enforcement — resolved as a deliberate operator decision (qualification no longer gates classification) plus re-verified `timestamp_valid` handling is correct everywhere it applies
 4. `market-residual-v1.json` — resolved 2026-08-03 (F-50), real artifact trained, wired as diagnostic-only
 5. MLB spread artifact reused for totals — resolved 2026-08-03 (F-51), both now point at their own real, live Measured Edge artifacts
@@ -262,7 +319,7 @@ Restructured 2026-08-03/04: Main and Flat are now **per-sport files**, not one s
 - MLB v8 (the active moneyline artifact) is honestly `qualified: false` — real, positive signal (58.5% holdout hit rate, well above the 50% coin-flip line) but does not clear this project's own 60% promotion bar, on top of a validation-set Brier regression vs. the feature set it replaced. It is live via the same operator-override mechanism v7 used, not because it passed cleanly.
 - MLB totals still has a known, unfixed accuracy gap — a real elasticity refit was attempted and promoted 2026-08-04 but honestly did not improve it (P1-17/F-62); needs an absolute-run-environment-specific model change, not another elasticity refit.
 - Esports Elo's thin/stale-data overconfidence gap has a real fix now (F-63, 2026-08-04): inactivity decay + thin-data shrink reduced mean predicted edge on genuinely thin-data matchups by ~30-35% across all 5 titles on real held-out data, at a modest, disclosed locked-test accuracy cost in 4 of 5 titles.
-- The general cross-file ledger/audit atomicity gap (item 2 above) is real, if lower-severity than originally described.
+- The cross-file ledger/audit atomicity gap (item 2 above) now applies only to the legacy XLSX export; the canonical SQLite store is single-transaction since J.
 
 Do not infer executable profitability from artifact hit rates, synthetic
 `-110` units, shadow-ledger P&L, or a dashboard qualification badge.

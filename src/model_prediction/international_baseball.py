@@ -886,7 +886,7 @@ def validate_international_baseball_baseline(
         gate_units = gate_hits * (10 / 11) - (gate_calls - gate_hits) if gate_calls else 0.0
         gate_holdout_end = (
             max(date.fromisoformat(day) for _, _, day in selected_for_grade)
-            if selected_for_grade else date.today()
+            if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
         )
         gate_monthly = _monthly_grade(selected_for_grade, holdout_end=gate_holdout_end)
         gate_every_month_positive = all(
@@ -949,6 +949,31 @@ def validate_international_baseball_baseline(
         "training_prefix_sha256": _training_prefix_sha256(rows, rows[-1]["game_date"]),
         "qualified_for_betting": False,
         "units": 0,
+        # Structured lineage blocks (added 2026-08-15, production-model
+        # audit gap #2): champion evidence now lives IN the artifact, the
+        # same shape the MLB/WNBA LR artifacts carry.
+        "training": {
+            "coefficient_fit": {
+                "observations": len(train),
+                "start_date": train[0]["game_date"],
+                "end_date": train[-1]["game_date"],
+            },
+            "threshold_selection": {
+                "observations": len(validation),
+                "start_date": validation[0]["game_date"],
+                "end_date": validation[-1]["game_date"],
+            },
+            "locked_holdout": {
+                "observations": len(test),
+                "start_date": test[0]["game_date"],
+                "end_date": test[-1]["game_date"],
+            },
+        },
+        "qualification": {
+            "locked_test": _metrics(test_predictions),
+            "qualified": False,
+            "promotion_rationale": "",
+        },
     }
     artifact["artifact_hash"] = hashlib.sha256(_canonical_json(artifact).encode()).hexdigest()
     artifact_path = None

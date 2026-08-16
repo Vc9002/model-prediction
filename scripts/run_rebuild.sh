@@ -14,6 +14,10 @@
 
 set -uo pipefail
 
+# First output line, deliberately before anything can fail silently:
+# a zero-output failed run is undiagnosable (seen once, 2026-08-15T23:15Z).
+echo "[start] rebuild-shadow $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
 REPO_ROOT="${MODEL_PREDICTION_REPO_ROOT:-/Users/vincentc9002/model-prediction}"
 RUNTIME_ROOT="${MODEL_PREDICTION_RUNTIME_ROOT:-/Users/vincentc9002/model-prediction-runtime}"
 

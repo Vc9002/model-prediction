@@ -284,14 +284,15 @@ dead rebuild models). Config root 63 → 27 files.
 
 **Known gap** — canonical `data/model_ledgers/` froze 2026-08-03 (retired main
 ledger was its only writer). Dashboard + settled-picks loader read stale data.
-See `docs/SETTLEMENT_GAP.md`. Do NOT silently re-route production data paths
+See `docs/archive/SETTLEMENT_GAP.md` (fixed 08-13; sqlite canonical since J).
+Do NOT silently re-route production data paths
 without an explicit decision.
 
 **Settlement routing fix** — model-ledger mirror now writes to canonical
 `data/model_ledgers/` (threaded `model_ledgers_dir` through `PickLedger`,
 `main_ledgers.py`, `research_ledgers.py`). Previously each tier mirrored to
 its own subdir (`data/flat/model_ledgers/`, …) while the dashboard + loader
-read only canonical — that froze on 2026-08-03. See `docs/SETTLEMENT_GAP.md`.
+read only canonical — that froze on 2026-08-03. See `docs/archive/SETTLEMENT_GAP.md`.
 
 **MLB distribution methods** — `simulate_game` now takes a `method` argument
 (`gamma_poisson` default / `negative_binomial` / `independent_poisson`);
@@ -332,10 +333,10 @@ change how you should work here:
   form) — several tests pin the no-env repo-colocated default; setting the
   launchd env vars makes ~12 of them red by retargeting them at the live
   runtime root.
-- **Still open (explicit operator action needed)**: regenerating
-  `outputs/rebuild/verification.json` (gitignored CI evidence; rebuild
-  status shows degraded while absent); the v8 park-factor 2026-table leak
-  (needs a refit under v8's contract — v9 is clean via `park_factor_pit`).
-  The `com.modelprediction.production` / `com.modelprediction.rebuild-shadow`
-  agents are loaded as of the 2026-08-14 cutover.
+- **Standing open items (2026-08-15)**: the v8 park-factor static-table
+  leak is verified and documented (`docs/V8_REPRODUCTION.md`) — v8 is never
+  modified; v9 uses `park_factor_pit`. `outputs/rebuild/verification.json`
+  is CI-generated evidence (CONSOLIDATION.md policy) — a local 404 is
+  expected. Soccer's Odds API credential remains a known-DEGRADED external
+  dependency. The two launchd research agents are loaded and producing.
 

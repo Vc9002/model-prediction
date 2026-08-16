@@ -155,8 +155,7 @@ def test_month_with_fewer_than_ten_calls_is_reported_but_not_a_gate() -> None:
         for index, outcome in enumerate([1] * 41 + [0] * 9)
     ]
     rows.extend(
-        ValidationRow("2026-01-01", f"jan-{index}", 0, 0.7, 0, 1, 1, False, False)
-        for index in range(9)
+        ValidationRow("2026-01-01", f"jan-{index}", 0, 0.7, 0, 1, 1, False, False) for index in range(9)
     )
     rows.append(ValidationRow("2026-02-01", "end", 0, 0.5, 0, 1, 1, False, False))
 
@@ -174,8 +173,7 @@ def test_incomplete_final_month_is_provisional_even_with_ten_calls() -> None:
         for index, outcome in enumerate([1] * 41 + [0] * 9)
     ]
     rows.extend(
-        ValidationRow("2026-01-15", f"jan-{index}", 0, 0.7, 0, 1, 1, False, False)
-        for index in range(10)
+        ValidationRow("2026-01-15", f"jan-{index}", 0, 0.7, 0, 1, 1, False, False) for index in range(10)
     )
 
     result = _grade([0.7] * 60, rows, 0.6, qualification_eligible=True)
@@ -214,9 +212,7 @@ def test_historical_pitcher_audit_rejects_unversioned_retroactive_stats(tmp_path
     assert audit["decision"] == "REJECT_HISTORICAL_PITCHER_FEATURES_LEAKAGE_RISK"
 
 
-def test_bullpen_weakness_gap_requires_two_prior_games_and_uses_pit_history(
-    tmp_path, monkeypatch
-) -> None:
+def test_bullpen_weakness_gap_requires_two_prior_games_and_uses_pit_history(tmp_path, monkeypatch) -> None:
     import json
 
     import model_prediction.validation as validation_module
@@ -326,8 +322,13 @@ def test_train_serve_parity_for_v9_features(tmp_path, monkeypatch) -> None:
 
     def game(eid, ts, home, away, hs, as_):
         return {
-            "event_id": eid, "event_start_utc": ts, "league": "MLB",
-            "home_team": home, "away_team": away, "home_score": hs, "away_score": as_,
+            "event_id": eid,
+            "event_start_utc": ts,
+            "league": "MLB",
+            "home_team": home,
+            "away_team": away,
+            "home_score": hs,
+            "away_score": as_,
         }
 
     games_rows = []
@@ -392,8 +393,13 @@ def test_train_serve_parity_for_v9_features(tmp_path, monkeypatch) -> None:
             )
 
     monkeypatch.setattr(validation_module, "PROJECT_ROOT", tmp_path)
-    for cache in ("_BULLPEN_FATIGUE_MAP", "_BULLPEN_MAP", "_STARTER_ERA_MAP",
-                  "_STARTER_FIP_MAP", "_STARTER_KBB_MAP"):
+    for cache in (
+        "_BULLPEN_FATIGUE_MAP",
+        "_BULLPEN_MAP",
+        "_STARTER_ERA_MAP",
+        "_STARTER_FIP_MAP",
+        "_STARTER_KBB_MAP",
+    ):
         setattr(validation_module, cache, None)
 
     try:
@@ -413,14 +419,34 @@ def test_train_serve_parity_for_v9_features(tmp_path, monkeypatch) -> None:
         target_rec = next(g for g in store.load_games("mlb") if g.event_id == "target-1")
         elo = build_elo(history, "mlb")
         trends = TrendEngine(history)
-        artifact = SimpleNamespace(raw={"market_models": {"moneyline": {"feature_names": [
-            "residual_trend_gap", "park_factor", "park_factor_pit", "bullpen_fatigue_gap",
-        ]}}})
+        artifact = SimpleNamespace(
+            raw={
+                "market_models": {
+                    "moneyline": {
+                        "feature_names": [
+                            "residual_trend_gap",
+                            "park_factor",
+                            "park_factor_pit",
+                            "bullpen_fatigue_gap",
+                        ]
+                    }
+                }
+            }
+        )
         served, unavailable = _compute_features(
-            "mlb", artifact, HOME, AWAY, "target-1", "2026-07-17",
-            target_rec.start, history, elo,
-            trends.team_trend(HOME), trends.team_trend(AWAY),
-            tmp_path, datetime(2026, 7, 17, 12, tzinfo=UTC),
+            "mlb",
+            artifact,
+            HOME,
+            AWAY,
+            "target-1",
+            "2026-07-17",
+            target_rec.start,
+            history,
+            elo,
+            trends.team_trend(HOME),
+            trends.team_trend(AWAY),
+            tmp_path,
+            datetime(2026, 7, 17, 12, tzinfo=UTC),
         )
 
         # residual_trend_gap: team-specific 30-day window, >=10-team-game
@@ -432,6 +458,7 @@ def test_train_serve_parity_for_v9_features(tmp_path, monkeypatch) -> None:
         # literal, since that table is auto-regenerated daily
         # (mlb_baseline_refresh.refresh_park_factors) and its values drift.
         from model_prediction.features.park_factors import PARK_RUN_FACTORS
+
         assert served["park_factor"] == target_row.park_factor == PARK_RUN_FACTORS["Colorado Rockies"]
         # ...park_factor_pit: empirical PIT factor on BOTH sides, and it
         # must differ from the static value the v8 variants consume.
@@ -439,17 +466,22 @@ def test_train_serve_parity_for_v9_features(tmp_path, monkeypatch) -> None:
         assert served["park_factor_pit"] != served["park_factor"]
         # bullpen_fatigue_gap: 3-calendar-day window, exact equality.
         assert target_row.bullpen_fatigue_gap == served["bullpen_fatigue_gap"] == -1.0
-        assert all(name not in unavailable for name in artifact.raw["market_models"]["moneyline"]["feature_names"])
+        assert all(
+            name not in unavailable for name in artifact.raw["market_models"]["moneyline"]["feature_names"]
+        )
     finally:
         learned_forward._FEATURE_PROVIDERS.clear()
-        for cache in ("_BULLPEN_FATIGUE_MAP", "_BULLPEN_MAP", "_STARTER_ERA_MAP",
-                      "_STARTER_FIP_MAP", "_STARTER_KBB_MAP"):
+        for cache in (
+            "_BULLPEN_FATIGUE_MAP",
+            "_BULLPEN_MAP",
+            "_STARTER_ERA_MAP",
+            "_STARTER_FIP_MAP",
+            "_STARTER_KBB_MAP",
+        ):
             setattr(validation_module, cache, None)
 
 
-def test_bullpen_fatigue_gap_uses_trailing_calendar_window_not_self(
-    tmp_path, monkeypatch
-) -> None:
+def test_bullpen_fatigue_gap_uses_trailing_calendar_window_not_self(tmp_path, monkeypatch) -> None:
     import json
 
     import model_prediction.validation as validation_module
@@ -587,3 +619,89 @@ def test_multi_market_readiness_logs_snapshot_read_failure(tmp_path, monkeypatch
         "failed reading" in record.message and "polymarket_snapshots.jsonl" in record.message
         for record in caplog.records
     )
+
+
+def test_adaptive_hfa_features_now_serve_and_match_training_definitions(tmp_path) -> None:
+    """Feature audit 2026-08-16: elo_trend_adaptive_hfa's two features
+    (elo_neutral_probability, trailing_home_win_rate_30d) had NO serving
+    path — the variant could never serve. Both now compute in
+    learned_forward with the exact training-side definitions."""
+    from datetime import UTC, datetime, timedelta
+
+    from model_prediction.features.elo_ratings import build_elo
+    from model_prediction.features.trends import TrendEngine
+    from model_prediction.learned_forward import _compute_features
+    from model_prediction.validation import _trailing_home_rate
+
+    HOME, AWAY = "Home Team", "Away Team"
+    base = datetime(2026, 7, 1, tzinfo=UTC)
+    history = []
+    # 12 home games in the last 30 days: 9 wins, 1 tie (excluded), 2 losses
+    for i in range(12):
+        outcome = "win" if i < 9 else ("tie" if i == 9 else "loss")
+        home_score = 5 if outcome in ("win", "tie") else 2
+        away_score = 5 if outcome == "tie" else (2 if outcome == "win" else 5)
+        history.append(
+            type(
+                "G",
+                (),
+                {
+                    "event_id": f"g{i}",
+                    "start": base + timedelta(days=i),
+                    "home_team": HOME,
+                    "away_team": AWAY,
+                    "home_score": home_score,
+                    "away_score": away_score,
+                    "margin": home_score - away_score,
+                },
+            )()
+        )
+    game = type(
+        "G",
+        (),
+        {
+            "event_id": "target",
+            "start": base + timedelta(days=13),
+            "home_team": HOME,
+            "away_team": AWAY,
+            "home_score": 3,
+            "away_score": 1,
+            "margin": 2,
+        },
+    )()
+
+    artifact = type(
+        "A",
+        (),
+        {
+            "raw": {
+                "market_models": {
+                    "moneyline": {
+                        "feature_names": ["elo_neutral_probability", "trailing_home_win_rate_30d"],
+                    }
+                }
+            },
+        },
+    )()
+    elo = build_elo(history, "mlb")
+    trends = TrendEngine(history)
+    features, unavailable = _compute_features(
+        "mlb",
+        artifact,
+        HOME,
+        AWAY,
+        game.event_id,
+        "2026-07-14",
+        game.start,
+        history,
+        elo,
+        trends.team_trend(HOME),
+        trends.team_trend(AWAY),
+        tmp_path,
+        game.start,
+    )
+    assert unavailable == ()
+    assert features["elo_neutral_probability"] == pytest.approx(elo.expected_neutral_win(HOME, AWAY))
+    expected_rate, expected_games = _trailing_home_rate(history, "2026-07-14", HOME)
+    assert features["trailing_home_win_rate_30d"] == pytest.approx(expected_rate)
+    assert expected_games == 11  # 12 games minus the excluded tie

@@ -117,7 +117,7 @@ class EntityRegistry:
         if "T" not in value:
             suffix = "T23:59:59.999999+00:00" if end_of_day else "T00:00:00+00:00"
             return datetime.fromisoformat(value + suffix)
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value)
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=UTC)
         return parsed.astimezone(UTC)

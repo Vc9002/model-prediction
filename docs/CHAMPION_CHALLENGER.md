@@ -57,4 +57,4 @@ settled-picks loader read) is written by the **retired main ledger's** mirror
 hook. Since the main ledger was retired (`main_ledger_enabled: false`), that
 mirror no longer fires. The live per-tier mirrors at
 `data/{flat,research,gated_research}/model_ledgers/` are current, but the
-canonical directory froze on 2026-08-03. See `docs/SETTLEMENT_GAP.md`.
+canonical directory froze on 2026-08-03. See `docs/archive/SETTLEMENT_GAP.md`.

@@ -27,10 +27,10 @@
   `data/model_ledgers/` (threaded `model_ledgers_dir` through `PickLedger`,
   `main_ledgers.py`, `research_ledgers.py`); previously per-tier subdirs
   diverged from the dashboard/loader's canonical read. See
-  `docs/SETTLEMENT_GAP.md`.
+  `docs/archive/SETTLEMENT_GAP.md`.
 - Cleanup: 38 obsolete files removed (12 `*.previous.json`, retired config
   models, 4 dead rebuild models). Config root 63 → 27 files.
-- Docs: `docs/CHAMPION_CHALLENGER.md`, `docs/SETTLEMENT_GAP.md` added;
+- Docs: `docs/CHAMPION_CHALLENGER.md`, `docs/SETTLEMENT_GAP.md` added (now archived);
   `CLAUDE.md` updated.
 
 ## 2026-07-26 — full DEBUG audit and documentation truth reset

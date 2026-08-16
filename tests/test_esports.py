@@ -307,6 +307,13 @@ def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_p
     assert artifact["qualified_for_betting"] is False
     assert artifact["model_state"] == "research"
     assert artifact["artifact_hash"] == result["artifact_hash"]
+    # Production-model audit gap #2 (2026-08-15): champion evidence must
+    # live INSIDE the artifact — the v8-style structured blocks.
+    assert set(artifact["training"]) == {"coefficient_fit", "threshold_selection", "locked_holdout"}
+    assert artifact["training"]["coefficient_fit"]["observations"] == 360
+    assert artifact["training"]["locked_holdout"]["observations"] == 120
+    assert "locked_test_all_matches" in artifact["qualification"]
+    assert artifact["qualification"]["qualified"] is False
 
 
 def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> None:
@@ -374,3 +381,4 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
     assert result["priced_contracts"][0]["source_teams_resolved"] is True
     assert result["priced_contracts"][0]["source_teams_trained"] is True
     assert result["priced_contracts"][0]["gated_research_eligible"] is True
+

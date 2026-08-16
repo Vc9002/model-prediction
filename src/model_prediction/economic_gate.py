@@ -155,8 +155,11 @@ def economic_gate(
         elif mean_clv <= 0:
             reasons.append(f"mean CLV {mean_clv:.4f} is not positive")
     drawdown = max_drawdown(pnl_sequence) if pnl_sequence else None
-    if maximum_drawdown_units is not None and drawdown is not None:
-        if drawdown.max_drawdown_units > maximum_drawdown_units:
+    if (
+        maximum_drawdown_units is not None
+        and drawdown is not None
+        and drawdown.max_drawdown_units > maximum_drawdown_units
+    ):
             reasons.append(
                 f"max drawdown {drawdown.max_drawdown_units:.2f}U exceeds the "
                 f"{maximum_drawdown_units:.2f}U limit"

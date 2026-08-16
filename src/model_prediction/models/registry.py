@@ -149,7 +149,7 @@ def _status_from_config(league: League) -> ModelState | None:
                 import yaml
                 raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
                 models = raw.get("models") or {}
-            except Exception:
+            except Exception:  # noqa: BLE001 — config fallback must never crash status derivation
                 models = {}
             for lk, v in models.items():
                 if lk not in League.__members__:

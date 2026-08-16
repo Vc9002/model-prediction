@@ -93,9 +93,7 @@ def _compute_features(
         # Same definition as training (features/team_runs): rolling team
         # runs-allowed gap from prior cached games. Never an ESPN starter ERA —
         # that was a different quantity and caused train/serve skew.
-        features["pitcher_era_gap"] = pitcher_era_gap_from_history(
-            history, home_team, away_team
-        )
+        features["pitcher_era_gap"] = pitcher_era_gap_from_history(history, home_team, away_team)
     if "starter_era_gap" in wanted:
         try:
             if not home_starter_name or not away_starter_name:
@@ -141,12 +139,12 @@ def _compute_features(
         # which is a historical event_id crosswalk with no path to a future
         # game. home-minus-away, same sign convention as every other gap
         # feature in this module.
-        home_weakness = bullpen_profile(
-            team_recent_relief_lines(home_team, event_start)
-        )["bullpen_weakness_index"]
-        away_weakness = bullpen_profile(
-            team_recent_relief_lines(away_team, event_start)
-        )["bullpen_weakness_index"]
+        home_weakness = bullpen_profile(team_recent_relief_lines(home_team, event_start))[
+            "bullpen_weakness_index"
+        ]
+        away_weakness = bullpen_profile(team_recent_relief_lines(away_team, event_start))[
+            "bullpen_weakness_index"
+        ]
         features["bullpen_weakness_gap"] = round(home_weakness - away_weakness, 6)
     if "bullpen_fatigue_gap" in wanted:
         # Bullpen fatigue = total recent relief innings per team.
@@ -157,12 +155,8 @@ def _compute_features(
         # trailing window is FATIGUE_WINDOW_DAYS calendar days, identical to
         # validation.py's training-time map (2026-08-13 audit: this used to
         # be a last-N-games lookback with no calendar cap -- real skew).
-        home_relief = team_recent_relief_lines(
-            home_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS
-        )
-        away_relief = team_recent_relief_lines(
-            away_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS
-        )
+        home_relief = team_recent_relief_lines(home_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS)
+        away_relief = team_recent_relief_lines(away_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS)
         home_fatigue = sum(float(line.get("innings", 0)) for line in home_relief)
         away_fatigue = sum(float(line.get("innings", 0)) for line in away_relief)
         features["bullpen_fatigue_gap"] = round(home_fatigue - away_fatigue, 6)
@@ -176,7 +170,8 @@ def _compute_features(
         cutoff = event_start.astimezone(EASTERN).date() - timedelta(days=30)
         game_date_dt = event_start.astimezone(EASTERN).date()
         recent_home = [
-            g for g in history
+            g
+            for g in history
             if cutoff <= g.start.astimezone(EASTERN).date() < game_date_dt
             and g.home_score != g.away_score
             and g.home_team == home_team
@@ -186,6 +181,29 @@ def _compute_features(
             features["residual_trend_gap"] = round(home_win_pct - features.get("elo_probability", 0.5), 6)
         else:
             features["residual_trend_gap"] = 0.0
+    if "trailing_home_win_rate_30d" in wanted or "elo_neutral_probability" in wanted:
+        # elo_trend_adaptive_hfa's two features were train-only until
+        # 2026-08-16 (feature audit): the variant could never serve. Same
+        # 30-day home-team rate definition as the residual_trend_gap
+        # branch above and validation.py's _trailing_home_rate — raw
+        # value here (the variant's own coefficients decide gating).
+        if "trailing_home_win_rate_30d" in wanted:
+            cutoff = event_start.astimezone(EASTERN).date() - timedelta(days=30)
+            game_date_dt = event_start.astimezone(EASTERN).date()
+            recent_home = [
+                g
+                for g in history
+                if cutoff <= g.start.astimezone(EASTERN).date() < game_date_dt
+                and g.home_score != g.away_score
+                and g.home_team == home_team
+            ]
+            features["trailing_home_win_rate_30d"] = (
+                sum(g.home_score > g.away_score for g in recent_home) / len(recent_home)
+                if recent_home
+                else 0.0
+            )
+        if "elo_neutral_probability" in wanted:
+            features["elo_neutral_probability"] = elo.expected_neutral_win(home_team, away_team)
     if wanted & AVAILABILITY_FEATURE_NAMES:
         if sport != "wnba":
             raise ValueError(
@@ -201,16 +219,11 @@ def _compute_features(
                 event_start=event_start,
                 event_id=event_id,
             )
-            features.update(
-                {name: value for name, value in availability.items() if name in wanted}
-            )
+            features.update({name: value for name, value in availability.items() if name in wanted})
         except (KeyError, TypeError, ValueError) as error:
             for name in wanted & AVAILABILITY_FEATURE_NAMES:
                 features[name] = 0.0
-            unavailable.append(
-                str(error).split(":", 1)[0].strip()
-                or "wnba_availability_unavailable"
-            )
+            unavailable.append(str(error).split(":", 1)[0].strip() or "wnba_availability_unavailable")
     if wanted & MLB_AVAILABILITY_FEATURE_NAMES:
         # Shadow-only: no production artifact lists these feature names in
         # its own feature_names config today, so this branch is inert in
@@ -230,16 +243,11 @@ def _compute_features(
                 event_start=event_start,
                 event_id=event_id,
             )
-            features.update(
-                {name: value for name, value in mlb_availability.items() if name in wanted}
-            )
+            features.update({name: value for name, value in mlb_availability.items() if name in wanted})
         except (KeyError, TypeError, ValueError) as error:
             for name in wanted & MLB_AVAILABILITY_FEATURE_NAMES:
                 features[name] = 0.0
-            unavailable.append(
-                str(error).split(":", 1)[0].strip()
-                or "mlb_availability_unavailable"
-            )
+            unavailable.append(str(error).split(":", 1)[0].strip() or "mlb_availability_unavailable")
     if wanted & MLB_PITCHING_STAFF_FEATURE_NAMES:
         # Shadow-only, same inert-until-requested design as the starter
         # availability branch above -- see
@@ -256,16 +264,11 @@ def _compute_features(
                 observed_at=observed_at,
                 event_start=event_start,
             )
-            features.update(
-                {name: value for name, value in pitching_staff.items() if name in wanted}
-            )
+            features.update({name: value for name, value in pitching_staff.items() if name in wanted})
         except (KeyError, TypeError, ValueError) as error:
             for name in wanted & MLB_PITCHING_STAFF_FEATURE_NAMES:
                 features[name] = 0.0
-            unavailable.append(
-                str(error).split(":", 1)[0].strip()
-                or "mlb_pitching_staff_unavailable"
-            )
+            unavailable.append(str(error).split(":", 1)[0].strip() or "mlb_pitching_staff_unavailable")
     if wanted & MLB_POSITION_PLAYER_FEATURE_NAMES:
         # Shadow-only, same inert-until-requested design as the other MLB
         # availability branches above.
@@ -281,16 +284,11 @@ def _compute_features(
                 observed_at=observed_at,
                 event_start=event_start,
             )
-            features.update(
-                {name: value for name, value in position_players.items() if name in wanted}
-            )
+            features.update({name: value for name, value in position_players.items() if name in wanted})
         except (KeyError, TypeError, ValueError) as error:
             for name in wanted & MLB_POSITION_PLAYER_FEATURE_NAMES:
                 features[name] = 0.0
-            unavailable.append(
-                str(error).split(":", 1)[0].strip()
-                or "mlb_position_players_unavailable"
-            )
+            unavailable.append(str(error).split(":", 1)[0].strip() or "mlb_position_players_unavailable")
     _init_providers()
     if "park_factor_pit" in wanted:
         # PIT-correct empirical park factor from cached history -- exactly
@@ -299,11 +297,9 @@ def _compute_features(
         # don't receive history; the loop below consumes it immediately, so
         # the captured history is always this game's. Inert in production
         # until an artifact's feature_names lists it (repo pattern).
-        _FEATURE_PROVIDERS["park_factor_pit"] = (
-            lambda h, a, eid, gd, es, _history=history: float(
-                park_factor_at(
-                    h, es.astimezone(EASTERN).date().isoformat(), games_data=_history
-                ).get("park_factor", 1.0)
+        _FEATURE_PROVIDERS["park_factor_pit"] = lambda h, a, eid, gd, es, _history=history: float(
+            park_factor_at(h, es.astimezone(EASTERN).date().isoformat(), games_data=_history).get(
+                "park_factor", 1.0
             )
         )
     for name in wanted:
@@ -349,26 +345,31 @@ def _init_providers() -> None:
         return
     # Lazy imports to avoid circular dependencies
     from .features.park_factors import park_factor as _pf
+
     _FEATURE_PROVIDERS["park_factor"] = lambda h, a, eid, gd, es: float(_pf(h).get("park_factor", 1.0))
 
     from .features.weather import live_weather
+
     # Pass the real event start (not "now") -- a slate built hours before
     # first pitch (e.g. a morning cron run) must get the forecast for game
     # time, not the current-moment reading; live_weather's own hour-
     # alignment logic expects exactly this, matching validation.py's
     # training-time lookup which keys off game.start. Previously silently
     # ignored, a real train/serve skew (found 2026-07-31).
-    _FEATURE_PROVIDERS["weather_factor"] = (
-        lambda h, a, eid, gd, es: float(live_weather(h, es.isoformat()).get("weather_run_factor", 1.0))
+    _FEATURE_PROVIDERS["weather_factor"] = lambda h, a, eid, gd, es: float(
+        live_weather(h, es.isoformat()).get("weather_run_factor", 1.0)
     )
 
     from .data_sources.espn_probables import espn_pitcher_era_gap
-    _FEATURE_PROVIDERS["probable_starter_era_gap"] = (
-        lambda h, a, eid, gd, es: espn_pitcher_era_gap(eid, h, a, gd.replace("-", ""))
+
+    _FEATURE_PROVIDERS["probable_starter_era_gap"] = lambda h, a, eid, gd, es: espn_pitcher_era_gap(
+        eid, h, a, gd.replace("-", "")
     )
 
 
-def _build_basis(features: dict[str, float], home_trend: Any, away_trend: Any, history_games: int) -> dict[str, float | int]:
+def _build_basis(
+    features: dict[str, float], home_trend: Any, away_trend: Any, history_games: int
+) -> dict[str, float | int]:
     basis: dict[str, float | int] = {
         "history_games": history_games,
         "home_history_games": home_trend.games_played,
@@ -438,8 +439,7 @@ def build_learned_moneyline_slate(
     history = store.games_before(key, game_date)
     if len(history) < minimum_history_games:
         raise ValueError(
-            f"{key} requires {minimum_history_games}+ cached games before {game_date}; "
-            f"found {len(history)}"
+            f"{key} requires {minimum_history_games}+ cached games before {game_date}; found {len(history)}"
         )
     espn_leagues = leagues or (key.upper(),)
     events: list[dict[str, Any]] = []
@@ -454,11 +454,12 @@ def build_learned_moneyline_slate(
         # forecast concurrently up front instead of one HTTP round trip per
         # event in turn.
         from .features.weather import prefetch_live_weather
+
         home_teams = []
         for event in events:
             try:
                 home_teams.append(_teams(event)[1])
-            except (KeyError, TypeError, ValueError):
+            except KeyError, TypeError, ValueError:
                 continue
         prefetch_live_weather(home_teams)
     elo = build_elo(history, key)
@@ -519,7 +520,9 @@ def build_learned_moneyline_slate(
                 away_starter_name=away_starter_name,
             )
             home_probability = artifact.probability("moneyline", features)
-            confidence_threshold = artifact.raw.get("market_models", {}).get("moneyline", {}).get("confidence_threshold", 0.50)
+            confidence_threshold = (
+                artifact.raw.get("market_models", {}).get("moneyline", {}).get("confidence_threshold", 0.50)
+            )
 
             # ── WNBA availability gate (5pp threshold) ──────────────────────
             availability_notes: list[str] = []
@@ -553,17 +556,16 @@ def build_learned_moneyline_slate(
                         home_probability = adjusted_home
                 except (ValueError, KeyError, TypeError) as exc:
                     warning_code = str(exc).split(":", 1)[0].strip()
-                    availability_notes.append(
-                        warning_code or "wnba_availability_unavailable"
-                    )
+                    availability_notes.append(warning_code or "wnba_availability_unavailable")
                     logger.warning(
                         "WNBA availability context unavailable for %s @ %s on %s; "
                         "model call retained with Today warning: %s",
-                        away_team, home_team, game_date, exc,
+                        away_team,
+                        home_team,
+                        game_date,
+                        exc,
                     )
-            unavailable_features = tuple(
-                dict.fromkeys((*unavailable_features, *availability_notes))
-            )
+            unavailable_features = tuple(dict.fromkeys((*unavailable_features, *availability_notes)))
 
             # Recompute selection/call/action/reason from (possibly adjusted) probability.
             # Operator directive (2026-07-30): every candidate is a real,
@@ -587,7 +589,7 @@ def build_learned_moneyline_slate(
             )
             basis = _build_basis(features, home_trend, away_trend, len(history))
             snap_hash = _feature_hash(key, game_date, event_id, basis)
-            
+
             # Deduplication: skip if this exact feature snapshot was already logged
             if snap_hash in seen_hashes:
                 continue
@@ -660,9 +662,8 @@ def match_executable_quote(
             # Polymarket uses short nicknames ("Storm"); ESPN uses full display
             # names ("Seattle Storm"). Require the two sides to map uniquely
             # onto the two teams, in either order.
-            pairing = (
-                (_team_matches(away, long_desc) and _team_matches(home, short_desc))
-                or (_team_matches(home, long_desc) and _team_matches(away, short_desc))
+            pairing = (_team_matches(away, long_desc) and _team_matches(home, short_desc)) or (
+                _team_matches(home, long_desc) and _team_matches(away, short_desc)
             )
             if not pairing:
                 continue
@@ -750,9 +751,7 @@ def _feature_hash(
         "event_id": event_id,
         "features": dict(features),
     }
-    return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _teams(event: Mapping[str, Any]) -> tuple[str, str]:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol, TypedDict
+from typing import TypedDict
 
 from ..domain import MarketType
 
@@ -39,18 +39,6 @@ class ScoreSimulation:
             wins += margin > 0
             pushes += margin == 0
         return (wins + 0.5 * pushes) / len(self.away_scores)
-
-
-class ScoreModel(Protocol):
-    @property
-    def version(self) -> str: ...
-
-    @property
-    def required_features(self) -> tuple[str, ...]: ...
-
-    def fit(self, rows: object) -> None: ...
-
-    def predict_distribution(self, features: object) -> ScoreSimulation: ...
 
 
 @dataclass(frozen=True)
@@ -94,24 +82,3 @@ class GamePredictionBase(TypedDict):
     uncertainty: float
     model_version: str
     feature_basis: dict[str, object]
-
-
-class SportModel(Protocol):
-    """Interface every unified sport model implements.
-
-    ``history``/``matches`` is each sport's chronological training data
-    (``Sequence[GameRecord]`` for basketball/soccer, raw match dicts for
-    tennis -- no single concrete type fits every sport's data shape, hence
-    ``object`` here); ``upcoming`` is the slate to predict, one
-    sport-specific "UpcomingX" type per implementation.
-    """
-
-    @property
-    def version(self) -> str: ...
-
-    @property
-    def sport(self) -> str: ...
-
-    def predict_games(
-        self, history: Sequence[object], upcoming: Sequence[object]
-    ) -> list[GamePrediction]: ...

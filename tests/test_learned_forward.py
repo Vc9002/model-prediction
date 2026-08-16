@@ -244,9 +244,7 @@ def test_starter_era_gap_served_live_from_real_matching_starter_history(tmp_path
     # Home starter: 1 ER/start (ERA 1.5). Away starter: 4 ER/start (ERA 6.0).
     # gap = home - away = 1.5 - 6.0 = -4.5 -- unambiguously a real computed
     # value, not the 0.0 neutral fallback the test above already covers.
-    rows = [
-        _start(f"2026-05-{d:02d}T18:00:00Z", 1, "Home Pitcher Name", "home", 1) for d in (1, 8, 15)
-    ] + [
+    rows = [_start(f"2026-05-{d:02d}T18:00:00Z", 1, "Home Pitcher Name", "home", 1) for d in (1, 8, 15)] + [
         _start(f"2026-05-{d:02d}T18:00:00Z", 2, "Away Pitcher Name", "away", 4) for d in (1, 8, 15)
     ]
     snapshot_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
@@ -258,6 +256,7 @@ def test_starter_era_gap_served_live_from_real_matching_starter_history(tmp_path
     # points at instead, forcing the real function to always use this
     # test's isolated path.
     from model_prediction.features import starter_history
+
     starter_history._STARTER_INDEX_CACHE.clear()
     real_starter_era_gap_live = starter_history.starter_era_gap_live
     monkeypatch.setattr(
@@ -346,3 +345,58 @@ def test_bullpen_weakness_gap_served_live_from_real_relief_functions(tmp_path, m
     assert len(candidates) == 1
     assert "bullpen_weakness_gap" in candidates[0].feature_basis
     assert isinstance(candidates[0].feature_basis["bullpen_weakness_gap"], float)
+
+
+def test_starter_fip_and_kbb_gaps_home_minus_away_sign_convention(tmp_path) -> None:
+    """Feature audit 2026-08-16: starter_fip_gap / starter_kbb_gap had zero
+    direct test coverage. Both must be (home - away), computed from each
+    pitcher's last N starts strictly before the decision time."""
+    import json
+
+    from model_prediction.features.starter_history import (
+        starter_fip_gap_live,
+        starter_kbb_gap_live,
+    )
+
+    def snapshot(day, side, pitcher_id, name, innings, so, bb, hr, hbp):
+        return {
+            "game_start_utc": f"2026-07-{day:02d}T00:00:00Z",
+            side: {
+                "pitcher_order": [pitcher_id],
+                "players": [
+                    {
+                        "player_id": pitcher_id,
+                        "name": name,
+                        "pitching": {
+                            "inningsPitched": innings,
+                            "strikeOuts": so,
+                            "baseOnBalls": bb,
+                            "homeRuns": hr,
+                            "hitBatsmen": hbp,
+                        },
+                    }
+                ],
+            },
+        }
+
+    snapshots = [
+        # Home starter: 6 IP, 9 K, 1 BB, 0 HR, 0 HBP per start (elite FIP)
+        snapshot(1, "home", "h1", "Home Ace", "6.0", 9, 1, 0, 0),
+        snapshot(5, "home", "h1", "Home Ace", "6.0", 9, 1, 0, 0),
+        # Away starter: 5 IP, 3 K, 4 BB, 2 HR, 1 HBP per start (poor FIP)
+        snapshot(2, "away", "a1", "Away Arms", "5.0", 3, 4, 2, 1),
+        snapshot(6, "away", "a1", "Away Arms", "5.0", 3, 4, 2, 1),
+    ]
+    snap_path = tmp_path / "game_snapshots.jsonl"
+    snap_path.write_text("\n".join(json.dumps(s) for s in snapshots) + "\n", encoding="utf-8")
+
+    decision = datetime(2026, 7, 10, tzinfo=UTC)
+    fip_gap = starter_fip_gap_live("Home Ace", "Away Arms", decision, snapshot_path=snap_path)
+    # home FIP = (0 + 3*1 - 2*9)/6 + 3.10 = (3-18)/6 + 3.10 = 0.60
+    # away FIP = (13*2 + 3*5 - 2*3)/5 + 3.10 = (26+15-6)/5 + 3.10 = 10.10
+    # gap = 0.60 - 10.10 = -9.50 (home better -> negative, home-minus-away)
+    assert fip_gap == pytest.approx(-9.5, abs=0.01)
+
+    kbb_gap = starter_kbb_gap_live("Home Ace", "Away Arms", decision, snapshot_path=snap_path)
+    # home K-BB% = (9-1)/6 = 1.333; away = (3-4)/5 = -0.2; gap = 1.533
+    assert kbb_gap == pytest.approx(1.533, abs=0.01)

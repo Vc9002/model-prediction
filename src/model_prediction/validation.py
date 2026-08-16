@@ -1378,7 +1378,7 @@ def evaluate_variant_3way(
     holdout_end = (
         max(date.fromisoformat(row.date) for _, _, row in zip(ho_confidences, ho_selections, holdout))
         if holdout
-        else date.today()
+        else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
 
@@ -1551,7 +1551,7 @@ def qualify_soccer_poisson_model(store: FeatureStore, minimum_history_games: int
     hit_rate = hits / calls if calls else 0.0
     units = hits * (10 / 11) - (calls - hits) if calls else 0.0
     holdout_end = (
-        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
     every_month_positive = all(
@@ -1680,7 +1680,7 @@ def qualify_soccer_total_model(store: FeatureStore, minimum_history_games: int =
     hit_rate = hits / calls if calls else 0.0
     units = hits * (10 / 11) - (calls - hits) if calls else 0.0
     holdout_end = (
-        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
     every_month_positive = all(
@@ -1840,7 +1840,7 @@ def qualify_tennis_elo_model(
     hit_rate = hits / calls if calls else 0.0
     units = hits * (10 / 11) - (calls - hits) if calls else 0.0
     holdout_end = (
-        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
     every_month_positive = all(

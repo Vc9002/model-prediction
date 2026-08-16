@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS experiments (
     artifact_hashes       TEXT,
     verdict               TEXT,
     status                TEXT NOT NULL DEFAULT 'running'
-        CHECK(status IN ('running', 'completed', 'void')),
+        CHECK(status IN ('queued', 'running', 'completed', 'void')),
     void_reason           TEXT,
     created_at_utc        TEXT NOT NULL,
     updated_at_utc        TEXT NOT NULL
@@ -51,7 +51,10 @@ CREATE INDEX IF NOT EXISTS idx_experiments_model
     ON experiments (model_id, created_at_utc DESC);
 """
 
-_STATUSES = ("running", "completed", "void")
+# Matches the research-backlog experiment template's lifecycle
+# (queued | running | completed | void); "queued" was missing from the
+# registry while RESEARCH_BACKLOG.md documented it — found 2026-08-16.
+_STATUSES = ("queued", "running", "completed", "void")
 
 
 def _conn(repo_root: Path | None = None) -> sqlite3.Connection:
@@ -62,6 +65,13 @@ def _conn(repo_root: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(paths.runs_db, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout=5000")
+    # Structural migration: the pre-2026-08-16 table's CHECK constraint
+    # lacks 'queued'. The table has never held a real experiment row (the
+    # registry only gained live usage today), so dropping it is safe —
+    # the same structural-check pattern runtime_ledger_store uses.
+    existing = conn.execute("SELECT sql FROM sqlite_master WHERE name = 'experiments'").fetchone()
+    if existing is not None and "'queued'" not in (existing[0] or ""):
+        conn.executescript("DROP TABLE experiments")
     conn.executescript(_SCHEMA)
     return conn
 
@@ -119,17 +129,13 @@ def record(
                     now,
                 ),
             )
-        row = conn.execute(
-            "SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
         return _decode(row)
     finally:
         conn.close()
 
 
-def void(
-    experiment_id: str, reason: str, repo_root: Path | str | None = None
-) -> dict[str, Any]:
+def void(experiment_id: str, reason: str, repo_root: Path | str | None = None) -> dict[str, Any]:
     """Void a recorded experiment — kept in the registry with a reason."""
     conn = _conn(repo_root)
     try:
@@ -141,9 +147,7 @@ def void(
             )
             if cursor.rowcount == 0:
                 raise ValueError(f"no experiment with id {experiment_id}")
-        row = conn.execute(
-            "SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
         return _decode(row)
     finally:
         conn.close()
@@ -166,14 +170,10 @@ def list_experiments(
         conn.close()
 
 
-def show(
-    experiment_id: str, repo_root: Path | str | None = None
-) -> dict[str, Any] | None:
+def show(experiment_id: str, repo_root: Path | str | None = None) -> dict[str, Any] | None:
     conn = _conn(repo_root)
     try:
-        row = conn.execute(
-            "SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
         return _decode(row)
     finally:
         conn.close()
@@ -223,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
             "usage: python -m model_prediction.experiment_registry "
             "{record --model-id ID [--incumbent ID] [--dataset-hash H] "
             "[--feature-schema-hash H] [--calibrator C] [--verdict V] "
+            "[--status queued|running|completed|void] [--git-sha S] "
             "[--metrics k=v,...] | void ID --reason TEXT | list [N] | show ID}",
             file=sys.stderr,
         )
@@ -243,6 +244,8 @@ def main(argv: list[str] | None = None) -> int:
                 oof_metrics=_kv_arg(args, "--metrics"),
                 hyperparameters=_kv_arg(args, "--hyperparameters"),
                 artifact_hashes=_kv_arg(args, "--artifact-hashes"),
+                status=_arg(args, "--status") or "completed",
+                git_sha=_arg(args, "--git-sha"),
             )
             print(json.dumps(row, indent=2, default=str))
             return 0

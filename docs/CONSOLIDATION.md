@@ -4,6 +4,15 @@ Executed 2026-08-14 from the operator's 20-item consolidation plan.
 This document is the single status page for the whole program; per-phase
 bug detail lives in `DEBUG.md`.
 
+## Status: COMPLETE (2026-08-16)
+
+The full program (A control plane, B data plane, C presentation,
+J sqlite cutover, K runtime singularity, N merge/freeze, O burn-in
+started) is shipped: merged via PR #30 @ `37be479`, tag
+`consolidation-2026-08-15`, 10/10 K acceptance criteria pass, ruff 0
+findings, burn-in day 1 passing. This document is retained as the
+program record; the live status lives in `docs/PROJECT_STATUS.md`.
+
 ## What is done (committed + pushed to `cleanup/final-debug-2026-08-14`)
 
 **A. Control plane**
@@ -32,13 +41,10 @@ bug detail lives in `DEBUG.md`.
   `(event_id, model_id, market_type, horizon, decision_time_utc)`,
   decisions, market snapshots, keyset pagination, SQL aggregation,
   xlsx via explicit `cli_production export`.
-- **NOT cut over yet (deliberate boundary)**: the incumbent shadow
-  ledgers (main/flat/research xlsx). They are written by the live 3h
-  daily pipeline and verified by the audit chain — swapping them to
-  SQLite needs the operator's explicit go and a parity-checked
-  cutover, not a silent mid-session writer swap. `research.db` schema
-  path exists in RuntimePaths; the store pattern is proven by
-  production.db.
+- **Cut over 2026-08-14 (J)**: `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite`
+  in all launchd jobs — the SQLite store commits first (canonical), the
+  XLSX is a best-effort export at its existing repo paths (untracked
+  since K).
 
 **B/C. Research**
 - **Ingest provenance** — every normalized row carries `raw_source`,
@@ -81,9 +87,7 @@ bug detail lives in `DEBUG.md`.
   idempotent (identity key), never a duplicate row.
 - Dashboard startup makes no external API calls.
 - Normal scheduled operation must not modify the git working tree
-  (Phase B cut the canary/control-plane writes out of the checkout;
-  the incumbent shadow ledgers still write repo `data/` until the
-  approved cutover).
+  (verified: full production + daily cycles leave `git status` clean).
 
 ## verification.json policy (item 17)
 
@@ -112,7 +116,8 @@ to the tree.
    audit chain + reader remain live for the overlap cycle. Remaining:
    K relocates the export files under the runtime root and cleans the
    working tree (classification in
-   docs/WORKING_TREE_CLASSIFICATION.md).
+   docs/archive/WORKING_TREE_CLASSIFICATION.md; K executed 2026-08-15 —
+   rolling/frozen split shipped, churn untracked, 10/10 criteria pass).
 4. ~~Orphaned modules~~ — deletion authorized; executing.
 5. **Soccer Odds API key** — no replacement key available; soccer stays
    explicitly DEGRADED as a provider signal (not blocking).

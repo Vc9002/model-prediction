@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "ca63f600d400e271a12f8a2e0fa31404635ac263c1c1ff660ad986eea00ec617",
+  "artifact_hash": "4c253a4c755150aa762c3cde7c3e34dc8141fd2ceaf7f7fc824527099a4ecec5",
   "calibration_metrics": {
     "accuracy": 0.48410504492052525,
     "actual_away_pct": 0.30511402902557017,

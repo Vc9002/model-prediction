@@ -129,7 +129,7 @@ THIN_DATA_MAX_SHRINK: float = 0.5
 
 
 def _parse_date(value: str) -> date:
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+    return datetime.fromisoformat(value).date()
 
 
 def _fit_platt(
@@ -543,7 +543,7 @@ class NeutralElo:
         if not last_seen:
             return rating
         try:
-            last_dt = datetime.fromisoformat(str(last_seen).replace("Z", "+00:00"))
+            last_dt = datetime.fromisoformat(str(last_seen))
         except (ValueError, TypeError):
             return rating
         ref_dt = reference_date
@@ -597,7 +597,7 @@ class NeutralElo:
         start = row.get("start_utc")
         if RECENCY_HALF_LIFE_DAYS > 0 and start and hasattr(self, 'reference_date') and self.reference_date is not None:
             try:
-                match_dt = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+                match_dt = datetime.fromisoformat(str(start))
                 ref_dt = self.reference_date
                 if match_dt.tzinfo is None and ref_dt.tzinfo is not None:
                     match_dt = match_dt.replace(tzinfo=ref_dt.tzinfo)
@@ -643,7 +643,7 @@ def _predict(book: NeutralElo, rows: Iterable[dict[str, Any]], update: bool = Tr
         start = row.get("start_utc")
         if start:
             try:
-                reference_date = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+                reference_date = datetime.fromisoformat(str(start))
             except (ValueError, TypeError):
                 reference_date = None
         probability = book.probability(row["team1_id"], row["team2_id"], reference_date)
@@ -744,7 +744,7 @@ def validate_esports_baseline(
     # Grid search K: train Elo on train, predict validation (no update), score raw.
     # Set reference_date to last train match for recency weighting.
     train_ref_date = datetime.fromisoformat(
-        str(train[-1]["start_utc"]).replace("Z", "+00:00")
+        str(train[-1]["start_utc"])
     )
     candidate_scores: list[dict[str, Any]] = []
     validation_predictions_raw: dict[float, list[dict[str, Any]]] = {}
@@ -804,7 +804,7 @@ def validate_esports_baseline(
 
     # Locked test with Platt: train Elo on train+validation, predict test
     val_ref_date = datetime.fromisoformat(
-        str(validation[-1]["start_utc"]).replace("Z", "+00:00")
+        str(validation[-1]["start_utc"])
     )
     test_book = NeutralElo(k=chosen_k, ratings={},
                            platt_intercept=platt_intercept, platt_slope=platt_slope)
@@ -814,7 +814,7 @@ def validate_esports_baseline(
 
     # Final ratings trained on all data (no Platt — ratings are raw)
     all_ref_date = datetime.fromisoformat(
-        str(rows[-1]["start_utc"]).replace("Z", "+00:00")
+        str(rows[-1]["start_utc"])
     )
     all_book = NeutralElo(k=chosen_k, ratings={})
     all_book.reference_date = all_ref_date  # type: ignore[attr-defined]
@@ -843,6 +843,34 @@ def validate_esports_baseline(
         "matches_sha256": source_manifest["matches_sha256"],
         "qualified_for_betting": False,
         "units": 0,
+        # Structured lineage blocks (added 2026-08-15, production-model
+        # audit gap #2): champion evidence now lives IN the artifact, the
+        # same shape the MLB/WNBA LR artifacts carry — so a promoted
+        # esports artifact self-documents its holdout record instead of
+        # leaving it in external validation reports.
+        "training": {
+            "coefficient_fit": {
+                "observations": len(train),
+                "start_utc": train[0]["start_utc"],
+                "end_utc": train[-1]["start_utc"],
+            },
+            "threshold_selection": {
+                "observations": len(validation),
+                "start_utc": validation[0]["start_utc"],
+                "end_utc": validation[-1]["start_utc"],
+            },
+            "locked_holdout": {
+                "observations": len(test),
+                "start_utc": test[0]["start_utc"],
+                "end_utc": test[-1]["start_utc"],
+            },
+        },
+        "qualification": {
+            "locked_test_all_matches": _metrics(test_predictions),
+            "locked_test_selected_matches": _metrics(test_predictions, chosen_threshold),
+            "qualified": False,
+            "promotion_rationale": "",
+        },
     }
     artifact_hash = hashlib.sha256(_canonical_json(artifact).encode()).hexdigest()
     artifact["artifact_hash"] = artifact_hash

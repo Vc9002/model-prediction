@@ -51,7 +51,7 @@ def edge_scaled_units(
     model_probability: float,
     model_uncertainty: float,
     american_odds: int,
-    policy: UnitPolicy = UnitPolicy(),
+    policy: UnitPolicy | None = None,
 ) -> float:
     """Scale units by uncertainty-adjusted model edge: 0.5U base + 10× edge
     above 50/50.
@@ -74,6 +74,8 @@ def edge_scaled_units(
     Higher (uncertainty-adjusted) edge = more units. Lower edge = fewer
     units. Caps at policy.max_pick_units, floors at policy.min_pick_units.
     """
+    if policy is None:
+        policy = UnitPolicy()
     adjusted_edge = max(0.0, abs(model_probability - 0.5) - max(0.0, model_uncertainty))
     raw = policy.min_pick_units + adjusted_edge * (policy.max_pick_units - policy.min_pick_units) / 0.15
     units = max(policy.min_pick_units, min(policy.max_pick_units, raw))
@@ -86,10 +88,11 @@ def recommend_units(
     model_uncertainty: float,
     american_odds: int,
     exposure: Exposure,
-    policy: UnitPolicy = UnitPolicy(),
+    policy: UnitPolicy | None = None,
     validated_model: bool = False,
     force_shadow_call: bool = False,
 ) -> UnitRecommendation:
+    policy = policy or UnitPolicy()
     decimal_odds = american_to_decimal(american_odds)
     market_probability = implied_probability(american_odds)
     edge = model_probability - market_probability

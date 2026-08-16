@@ -25,7 +25,7 @@ defects are repaired.
 | Ruff | ~120 baseline findings (no new findings vs baseline) |
 | Git | `main` + 20 other local / 7 other remote branches (drifts fast — run `git branch -a` for the current list) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
-| Release status | **Blocked** — see `docs/PROJECT_STATUS.md` for why |
+| Release status | **Not released for real money** — all 6 P0 execution defects resolved, but MLB v8 is `qualified: false` (operator-override) and totals is a known gap; see `docs/PROJECT_STATUS.md` → Release verdict |
 
 Do not infer executable profitability from artifact hit rates, synthetic
 `-110` units, shadow-ledger P&L, or a dashboard qualification badge.
@@ -293,7 +293,7 @@ is only one forecast/settlement code path regardless of how it's invoked:
 `execute` and `sell-position` place and close real Polymarket orders. This
 path is architecturally separate from every shadow ledger above, requires
 its own authenticated dashboard endpoint (added 2026-08-02), and is currently
-**blocked** per [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) pending
+**not released for real money** per [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)'s Release verdict
 repair of known execution-binding and ledger/audit transaction defects. None
 of the workflows above ever touch real money — Main, Flat, Research, and
 Gated Research are shadow/paper-trading only.
@@ -320,6 +320,10 @@ python3 dashboard_server.py  # then open http://127.0.0.1:8765/
 ## Documentation index
 
 - [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) — operational status and release verdict
+- [`docs/BURN_IN.md`](docs/BURN_IN.md) — burn-in window checks + results (through 08-18)
+- [`docs/RESEARCH_BACKLOG.md`](docs/RESEARCH_BACKLOG.md) — post-burn-in research queue (MLB v9 first)
+- [`docs/V8_REPRODUCTION.md`](docs/V8_REPRODUCTION.md) — v8 reproduction contract + parity findings (on the `research/mlb-v8-reproduction` branch)
+- [`docs/archive/`](docs/archive/) — one-shot investigation records and dated artifacts
 - [`docs/HISTORY.md`](docs/HISTORY.md) — chronological project history, all phases
 - [`DEBUG.md`](DEBUG.md) — full audit history, every bug found/fixed with trace
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — durable architecture contract
