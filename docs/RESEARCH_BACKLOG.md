@@ -159,3 +159,69 @@ verdict:     promote | retain | reject
 
 `python -m model_prediction.experiment_registry record --model-id ...`
 registers every run; invalidated results become `void` with a reason.
+
+## 2026-08-17 brainstorm session (data/structure ideas — queued, not scheduled)
+
+Recorded for future ordering decisions; none of these has an owner or
+start date. Honest scoping notes included so the queue stays triageable.
+
+- **`statsmodels` for residual diagnostics** — scikit-learn/xgboost give
+  point predictions but nothing for time-series/GLM diagnostics on
+  calibration residuals (autocorrelation, heteroskedasticity). Low
+  effort to add as a dev-only dependency; useful before the calibration
+  work (P1/P0 step 9), not urgent before.
+- **`pyarrow`/parquet caching for `game_snapshots.jsonl`** —
+  `load_starter_index` re-reads and re-parses the whole JSONL on every
+  cold process start (observed 2026-08-16/17 while running feature
+  backtests). A parquet cache (or feather) with mtime-based invalidation
+  would speed every cold-start feature read. Low risk, moderate effort.
+- **Declarative schema-validation layer at ingestion** — the codebase
+  hand-rolls a lot of "fail closed on bad data" logic per provider; a
+  data-contract layer (pydantic is already a dependency; a thin validator
+  over ingested JSONL records is enough — no need for a heavyweight
+  framework) could consolidate it. Architectural change; needs care not
+  to duplicate the existing fail-closed behavior it would replace.
+- **Batter-level lineup features** — `game_snapshots.jsonl` carries full
+  box-score player data but only `pitcher_order[0]` (and partially the
+  bullpen) is consumed; batter-level data is untapped for lineup-strength
+  signals. Depends on P0 step K/L ordering (projected vs confirmed
+  lineup); don't start before the PIT-safe lineup work defines its source
+  contract.
+- **Wind-direction × park-orientation** — `weather` is captured per game
+  but the model flattens it to one scalar `weather_factor`; wind direction
+  relative to park orientation is a real, known park-specific effect. Data
+  is already collected; needs a per-park orientation table + validation.
+  Fits naturally inside P0 step J (PIT weather).
+- **Line-movement features** — shadow module built 2026-08-16/17
+  (`features/line_movement.py`, inert, not wired). First backtest on 104
+  real settled v7/v8 MLB moneyline picks: movement toward the picked side
+  won 55.3% vs 50.0% away/flat; point-biserial r ≈ 0.08 (n=104). Weak,
+  directionally consistent, nowhere near promotable. Revisit when the
+  settled-pick sample is several times larger, or run as a real ablation
+  with the frozen feature table.
+- **Opponent-quality (SOS) adjustment for pitcher rolling stats** — the
+  rolling ERA/FIP/K-BB% features average raw starts with no adjustment
+  for opponent strength or park context. Standard sabermetric gap; worth
+  revisiting after the v9 starter-feature ablations (P0 A–D) land, since
+  SOS interacts with every one of them.
+- **Gap-flagging for starter windows** — a start from >90 days ago is
+  blended into "last 5 starts" as if equally recent (the 2026-08-16
+  Tidwell case: 2 starts from 2025-05/06 + 2 from 2026-08). Shadow
+  variant `starter_era_gap_recency_gated` built 2026-08-16; backtest on
+  10 diverged real settled picks showed no clear win (70% win rate on
+  diverged, but n=10 and mixed sign-flips). Not rejected, not promoted —
+  needs the full walk-forward ablation (same gate as any feature) if
+  revisited.
+- **Shared cross-sport rest/travel module** — Elo/trend infrastructure is
+  duplicated per sport (soccer, esports, NFL, tennis); a shared
+  "days-since-last-game / travel distance / rest disparity" feature
+  module could serve all of them. High effort (touches 4+ pipelines),
+  good payoff only after the per-sport work stabilizes.
+- **ESPN → MLB Stats API player_id crosswalk** — no ready-made bridge
+  exists (pybaseball covers mlbam/bbref/retrosheet/FG, not ESPN). ESPN's
+  athlete id is now captured prospectively in
+  `mlb_probable_starters.jsonl` (2026-08-16) so a future crosswalk
+  doesn't need historical re-fetching. Remaining name-based misses are
+  the 6 known-unmatchable starters (Cole Winn, Yohan Ramirez, Edgardo
+  Henriquez, Eddy Yean, Thomas Pannone, Caleb Ferguson — in the MLB Stats
+  API data under different names or not at all, verified 2026-08-16).

@@ -255,10 +255,21 @@ new working contracts — don't regress them:
   for legacy compat + tests). Schema migrations for legacy DBs happen in
   `_migrate_columns` — new columns/indexes must be added there, NOT
   only in `_SCHEMA` (CREATE IF NOT EXISTS won't touch a migrated table).
-- **The incumbent shadow ledgers (main/flat/research xlsx) are still
-  the live audit-chain storage** — do not cut them over to SQLite
-  without the operator's explicit go; the 3h daily writer and
-  verify-chain depend on them.
+- **Superseded 2026-08-16 (verified live)**: the SQLite cutover this
+  note warned against has already happened and is the current state —
+  all four scheduled jobs (daily/production/rebuild-shadow/dashboard)
+  run with `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite`; `PickLedger`
+  (`ledger.py`) treats the runtime-root SQLite store
+  (`ledgers/ledgers.db`) as canonical, and the main/flat/research xlsx
+  are now a best-effort EXPORT whose failure only logs a warning
+  (`ledger.py::_write_rows`, ~line 1641) — never blocks the commit.
+  Verified 2026-08-16: sqlite `ledger_records` has real rows across all
+  four tiers (main/flat/research/gated_research); `data/main/mlb.xlsx`'s
+  **Picks** sheet (not the Summary tab) row count matches sqlite's
+  open+settled count exactly (97 = 31+66); archived/removed rows live
+  under `data/archive/`, not deleted. Don't re-flip authority back to
+  `xlsx` without an explicit decision — that's the real remaining
+  governance question, not whether the cutover happened.
 
 ## 2026-08-13 — Champion/challenger + settled-picks + cleanup (this session)
 
