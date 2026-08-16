@@ -21,6 +21,7 @@ import logging
 import os
 import sys
 import threading
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime, timedelta
@@ -2981,7 +2982,15 @@ def _settle_tennis_pick(row: dict, ledger, espn: ESPNClient, data_root=None) -> 
 
 
 def _identity_key(value: str) -> str:
-    return "".join(c.lower() for c in value if c.isalnum())
+    """Fold to comparable ASCII-alnum-lowercase (NFKD decomposition drops
+    accents/diacritics), so real esports team names with accented spellings
+    (e.g. "Grêmio Esports", "KRÜ Esports") match a market's side
+    description consistently rather than silently falling into the
+    "matches neither ledger team" fail-closed path. Same fix as
+    ``features/starter_history.py::_normalize_name``.
+    """
+    decomposed = unicodedata.normalize("NFKD", value)
+    return "".join(c.lower() for c in decomposed if c.isalnum() and not unicodedata.combining(c))
 
 
 def _load_soccer_scores() -> dict[str, dict[str, Any]]:
