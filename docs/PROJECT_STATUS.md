@@ -1,11 +1,12 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-16, local `main` at `c067fd8` tracking
+**Last verified**: 2026-08-16, local `main` at `e933c7a` tracking
 `origin/main` (consolidation merged via PR #30 @ `37be479`, tag
 `consolidation-2026-08-15`). Burn-in day 1 of 3 passing. Ruff baseline
 cleared (0 findings), pre-commit hook installed, TODO P0/P1 fully
 resolved with evidence, docs restructured (one-shot records archived
-under `docs/archive/`).
+under `docs/archive/`), deep feature+model audit complete
+(`scripts/feature_model_audit.py`, findings on the research branch).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
