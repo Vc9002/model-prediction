@@ -352,3 +352,13 @@ Each ships through the standard chain (shadow feature → walk-forward →
 proper-score gate → promotion decision), per the accuracy-first
 criterion: proper scores decide; economic numbers are reported but
 secondary.
+
+### Distribution migration (index)
+
+The strategic shift from outcome-level models to score-distribution
+models — one joint distribution per match, every market as a
+functional — is specified in
+`docs/DISTRIBUTION_MIGRATION_PLAN.md` (2026-08-17): per-market
+from→to states, build orders, data blockers, sequencing against the
+v9 phases, risks, acceptance criteria. Companion:
+`docs/PREDICTION_PLAYBOOKS.md` (the per-market recipes).
