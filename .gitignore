@@ -96,3 +96,4 @@ backups/split-brain-quarantine-*/*
 !backups/split-brain-quarantine-*/*.md
 data/experiments/
 data/ledgers/
+outputs/research/
