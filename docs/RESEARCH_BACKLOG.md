@@ -225,3 +225,98 @@ start date. Honest scoping notes included so the queue stays triageable.
   the 6 known-unmatchable starters (Cole Winn, Yohan Ramirez, Edgardo
   Henriquez, Eddy Yean, Thomas Pannone, Caleb Ferguson — in the MLB Stats
   API data under different names or not at all, verified 2026-08-16).
+
+## 2026-08-17 brainstorm #2 (portfolio, data already collected, ops hardening)
+
+Second pass — focused on risk/portfolio structure, signals whose raw data
+the system ALREADY captures but never uses, and operational hardening.
+None scheduled; same triage contract as the first pass.
+
+### Risk & portfolio (real-money adjacent — highest impact per unit effort)
+
+- **Correlation-aware exposure sizing.** Every pick payload already carries
+  `correlation_tags` (`same_event`, `same_team_same_day`,
+  `same_league_same_day`) but sizing treats each pick independently. Use the
+  tags for portfolio-level caps: correlated picks share one exposure bucket
+  so a same-game ML+spread+total call can't silently triple the stake the
+  per-pick math approved. Natural home: the exposure check that already
+  runs under `lock_exclusive` in the daily writer.
+- **Formal bankroll re-scaling policy.** When units get re-sized after
+  win/loss streaks is currently an operator moment, not a rule. Specify the
+  re-scaling trigger and cadence (e.g. review every N settled picks, move
+  only in small steps, never mid-slump) so streaks can't produce
+  emotional or drift-driven sizing changes.
+- **Sequential promotion testing (SPRT).** Replace fixed-sample promotion
+  gates with a pre-specified sequential test: promote earlier when a
+  challenger is decisively ahead, keep running longer when it's ambiguous,
+  with the stopping rule registered BEFORE the run starts (anti-threshold-
+  fishing). Fits directly on the existing experiment registry.
+- **Pre-registered experiment thresholds.** Extend the experiment template
+  with a `registered_threshold` field: hypothesis + success criteria must
+  be recorded before the ablation runs, not after seeing the OOF deltas.
+  Cheap discipline, directly counters the "run it until it looks good"
+  failure mode the registry exists to prevent.
+
+### Signals whose data is already being captured (near-zero acquisition cost)
+
+- **Umpire over/under factors.** `game_snapshots.jsonl` already records
+  `officials` per game (home-plate umpire included). Umpire-specific
+  strike-zone tendencies are a classic, well-documented totals edge; a
+  per-umpire historical over/under + strike-call rate table is buildable
+  from data we already have. Fits inside P0 totals work.
+- **Altitude / park elevation.** `venue_name` is captured per game; park
+  factors exist for v9. Coors Field alone is a multi-tenths-of-a-run effect
+  on totals that a static park factor may not fully separate from general
+  park effects — an elevation term is a small addition to the v9 park work.
+- **Starter velocity/spin trend.** The rebuild track already has a Statcast
+  provider; incumbent side doesn't use pitch-level data at all. A
+  declining-velocity trend across a starter's last 3 outings is a known
+  fatigue/injury proxy — stronger and more PIT-safe than most box-score
+  aggregates.
+- **Sharp-book lead/lag signal.** The Odds API already aggregates multiple
+  books; treating Pinnacle (or the sharpest available book) as a reference
+  price and measuring Polymarket's lag behind sharp moves gives a
+  lead/lag feature for execution timing — when the sharp line moves, delay
+  or skip the order until Polymarket catches up, or size accordingly.
+- **Market-as-prior shrinkage.** Blend the model probability with the
+  market-implied probability with a shrinkage weight learned out-of-fold
+  (Bayesian shrinkage toward the market consensus). Standard in sports
+  modeling; near-free to evaluate as a calibration-layer variant given the
+  existing calibration pipeline.
+
+### Operational hardening
+
+- **Runtime-root backup + offsite copy.** The canonical sqlite ledgers and
+  audit chain are real-money evidence living on one machine. Nightly
+  snapshot (sqlite backup API or wal checkpoint + copy) to an offsite
+  target is the single most important piece of boring infra not yet
+  present.
+- **Push alerting on evidence states.** `system_health` computes
+  evidence-based DOWN/DEGRADED/HEALTHY states, but discovering them is
+  pull-only (dashboard visit). A push channel (Telegram/webhook) on
+  DEGRADED transitions, stale quotes before a slate, and missed cycles
+  closes the loop for a system that runs unattended 20+ hours a day.
+- **Paper-trading rehearsal of the execution path.** The order-readiness
+  gate and execution tickets are tested in CI, but the live dashboard
+  order path gets exercised rarely (manual-orders-only). A scheduled
+  rehearsal that walks every step up to (but not including) submission
+  against live quotes keeps the real-money path warm and detects bit-rot
+  between operator sessions.
+- **Hypothesis stateful testing of ledger APIs.** Hypothesis is now a dev
+  dependency; the next step beyond property tests is stateful testing of
+  the ledger mutation surface (create → settle → void sequences against
+  chain invariants), which example-based tests can't exhaust.
+- **Systematic post-loss review workflow.** Payloads already carry
+  `loss_cause` / `loss_classification` on settled rows. Wire a review
+  trigger: every settled loss cluster gets classified variance-vs-signal
+  from those fields, and consecutive signal losses raise an operator
+  review item instead of silently accumulating.
+
+### Explainability & operator UX
+
+- **Per-pick feature-contribution panel.** Decision payloads store every
+  feature value and the models are linear/logistic — a dashboard panel
+  showing feature × coefficient per pick ("why did the model say 62%")
+  is nearly free to build from existing payload data, and makes
+  operator-side judgment (like the 2026-08-16 Tidwell discussion) far
+  easier to have.
