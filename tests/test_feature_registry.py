@@ -7,7 +7,7 @@ from model_prediction.models.learned_market import artifact_hash
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "config" / "tested_features.json"
-ABLATION_PATH = ROOT / "config" / "models" / "production-feature-ablation-2026-07-22.json"
+ABLATION_PATH = ROOT / "config" / "models" / "archive" / "production-feature-ablation-2026-07-22.json"
 
 
 def _load(path: Path) -> dict:

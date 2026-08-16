@@ -27,7 +27,7 @@ def test_metrics_refuse_small_sample_and_report_full_contract() -> None:
 
 
 def test_versioned_mlb_platt_calibrator_is_hash_verified_and_shrinks_overconfidence() -> None:
-    path = Path(__file__).parents[1] / "config/models/mlb-v0.2-platt-2026-07-07-to-10-v1.json"
+    path = Path(__file__).parents[1] / "config/models/archive/mlb-v0.2-platt-2026-07-07-to-10-v1.json"
     calibrator = FixedPlattCalibrator(path)
     assert calibrator.metadata.sample_size == 115
     assert calibrator.metadata.base_model_version == "mlb-analyst-poisson-trend-v0.2"
