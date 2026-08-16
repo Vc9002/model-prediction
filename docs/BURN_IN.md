@@ -46,7 +46,7 @@ Run each at least once per day during the window; record results here.
 | Date | Checks 1-7 | Notes |
 |---|---|---|
 | 2026-08-15 | PASS (day 0) | No repo DBs; supervisor runs all completed (daily ×4, production ×4, rebuild ×3 since cutover, incl. launchd-scheduled cycles on the new code); dashboard listener = server.pid = launchctl pid after kickstart; pre-restart job history serves via /api/job; tree clean after cycles |
-| 2026-08-16 | PASS (day 1) | No repo DBs; runtime root intact; supervisor runs all completed (daily ×2, production ×2, rebuild ×2 since noon UTC); dashboard lsof=pidfile=launchctl (95673); job history serves; tree clean; main CI green @0e7c1cd |
+| 2026-08-16 | PASS (day 1) | No repo DBs; supervisor runs completed except ONE transient rebuild-shadow failure (23:15 UTC, exit 1, zero output — undiagnosable; 3 subsequent runs green; startup echo added to run_rebuild.sh so silent failures can't recur); dashboard lsof=pidfile=launchctl (95673); job history serves; tree clean; main CI green |
 | 2026-08-17 | | |
 | 2026-08-18 | | |
 
