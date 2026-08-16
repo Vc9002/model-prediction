@@ -1,6 +1,15 @@
 {
-  "model_id": "mlb-two-head-v1",
-  "method": "independent_poisson",
+  "accuracy": 0.5,
+  "artifact_hash": "1c3f57e620be5fb5567cacf3295dd04837ed068c239fdbf2e9782169c1284615",
+  "brier_score": 0.26012417046052627,
+  "differential_features": [
+    "home_rolling_run_diff",
+    "away_rolling_run_diff",
+    "home_win_pct",
+    "away_win_pct"
+  ],
+  "ece": 0.2073355263157895,
+  "fitted": true,
   "intensity_features": [
     "home_rolling_runs_scored",
     "away_rolling_runs_scored",
@@ -9,19 +18,10 @@
     "home_avg_total",
     "away_avg_total"
   ],
-  "differential_features": [
-    "home_rolling_run_diff",
-    "away_rolling_run_diff",
-    "home_win_pct",
-    "away_win_pct"
-  ],
-  "fitted": true,
-  "artifact_hash": "d81391d31e967cde4b861abd9fd260328cacb65bdce88fedfa5f68f25dc24ea0",
   "log_loss": 0.713845197865458,
-  "brier_score": 0.26012417046052627,
-  "ece": 0.2073355263157895,
-  "accuracy": 0.5,
-  "train_games": 150,
+  "method": "independent_poisson",
+  "model_id": "mlb-two-head-v1",
   "test_games": 38,
-  "total_completed": 188
+  "total_completed": 188,
+  "train_games": 150
 }
