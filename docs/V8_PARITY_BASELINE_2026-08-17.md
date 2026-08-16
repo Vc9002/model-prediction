@@ -52,3 +52,16 @@ can be interpreted — per `docs/V9_RESEARCH_PLAN.md` §0.6:
 
 No candidate selection, promotion, or live-system change was made by
 this work; it is research-prep per the burn-in boundary.
+
+## Known branch issue (2026-08-17, post-sync)
+
+`tests/rebuild/test_rebuild_shadow_cli.py::test_direct_run_rejects_repo_production_root_before_opening_ledger`
+FAILS in this worktree (passes on main: 1879 green there). The test
+expects `RebuildSafetyError` before a rebuild run opens a ledger at
+`data/main/rebuild_must_not_create`; in the worktree checkout it does
+not raise. Not caused by the A1/A3 work (calibration decomposition +
+air-density module — untouched paths); appears to be a checkout-location
+interaction in the rebuild safety path resolution. Does not affect the
+v8 row-parity gate (no rebuild paths involved), but MUST be fixed
+before any rebuild-shadow work runs from this branch. Status: open,
+unowned.

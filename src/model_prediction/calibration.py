@@ -127,9 +127,7 @@ class TrainablePlattCalibrator:
 class IsotonicCalibrator:
     """Isotonic regression via pool-adjacent-violators, with linear interpolation."""
 
-    def __init__(
-        self, thresholds: list[float], values: list[float], metadata: CalibrationMetadata
-    ) -> None:
+    def __init__(self, thresholds: list[float], values: list[float], metadata: CalibrationMetadata) -> None:
         self.thresholds = thresholds
         self.values = values
         self.metadata = metadata
@@ -219,9 +217,34 @@ def calibration_metrics(
         mean_y = sum(y for _, y in members) / len(members)
         ece += len(members) / len(clipped) * abs(mean_p - mean_y)
         buckets.append(
-            {"lower": lower, "upper": upper, "count": len(members), "mean_p": mean_p, "hit_rate": mean_y}
+            {
+                "lower": lower,
+                "upper": upper,
+                "count": len(members),
+                "mean_p": mean_p,
+                "hit_rate": mean_y,
+            }
         )
     intercept, slope = _logistic_calibration(clipped, outcomes)
+    # Three-way Brier decomposition of the BINNED forecast (Murphy 1973):
+    # uncertainty - resolution + reliability. The three terms reconstruct
+    # the Brier score of the binned (discretized) forecast exactly; the raw
+    # Brier additionally carries within-bucket prediction spread and
+    # within-bucket p-y covariance, which the textbook decomposition
+    # deliberately excludes (it treats each bin as one forecast at mean_p).
+    # Resolution = how well the model separates easy from hard games;
+    # reliability = calibration error; uncertainty is irreducible (base-rate
+    # entropy). A model can improve resolution while degrading reliability —
+    # accuracy alone hides that; this decomposition is the diagnostic the
+    # LR-vs-XGB decision needs.
+    base_rate = sum(outcomes) / len(outcomes)
+    uncertainty = base_rate * (1.0 - base_rate)
+    reliability = 0.0
+    resolution = 0.0
+    for bucket in buckets:
+        weight = bucket["count"] / len(clipped)
+        reliability += weight * (bucket["mean_p"] - bucket["hit_rate"]) ** 2
+        resolution += weight * (bucket["hit_rate"] - base_rate) ** 2
     return {
         "status": "ok",
         "sample_size": len(clipped),
@@ -230,6 +253,9 @@ def calibration_metrics(
         "calibration_intercept": intercept,
         "calibration_slope": slope,
         "expected_calibration_error": ece,
+        "brier_reliability": reliability,
+        "brier_resolution": resolution,
+        "brier_uncertainty": uncertainty,
         "reliability_buckets": buckets,
     }
 

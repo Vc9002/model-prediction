@@ -40,18 +40,14 @@ ADDITIONS: OrderedDict[str, tuple[str, ...]] = OrderedDict(
     )
 )
 GATE_GRID = tuple(round(0.50 + 0.025 * index, 3) for index in range(13))
-DEFAULT_SNAPSHOT_DIRECTORY = Path(
-    "snapshots/20260720T073745+0800-pre-roadmap-challenger"
-)
+DEFAULT_SNAPSHOT_DIRECTORY = Path("snapshots/20260720T073745+0800-pre-roadmap-challenger")
 
 
 def _matrix(rows: Sequence[ValidationRow], features: Sequence[str]) -> list[list[float]]:
     return [[float(getattr(row, feature)) for feature in features] for row in rows]
 
 
-def _fit(
-    train: Sequence[ValidationRow], features: Sequence[str]
-) -> LogisticRegression:
+def _fit(train: Sequence[ValidationRow], features: Sequence[str]) -> LogisticRegression:
     model = LogisticRegression(max_iter=2_000, solver="lbfgs")
     model.fit(_matrix(train, features), [row.outcome for row in train])
     return model
@@ -71,9 +67,7 @@ def _artifact_predict(
     features: Sequence[str],
 ) -> list[float]:
     return [
-        artifact.probability(
-            "moneyline", {feature: float(getattr(row, feature)) for feature in features}
-        )
+        artifact.probability("moneyline", {feature: float(getattr(row, feature)) for feature in features})
         for row in rows
     ]
 
@@ -81,7 +75,10 @@ def _artifact_predict(
 def _all_metrics(probabilities: Sequence[float], rows: Sequence[ValidationRow]) -> dict[str, Any]:
     outcomes = [row.outcome for row in rows]
     metrics = calibration_metrics(probabilities, outcomes)
-    hits = sum((probability >= 0.5) == bool(outcome) for probability, outcome in zip(probabilities, outcomes, strict=True))
+    hits = sum(
+        (probability >= 0.5) == bool(outcome)
+        for probability, outcome in zip(probabilities, outcomes, strict=True)
+    )
     brier_score = metrics["brier_score"]
     log_loss = metrics["log_loss"]
     expected_calibration_error = metrics["expected_calibration_error"]
@@ -94,6 +91,9 @@ def _all_metrics(probabilities: Sequence[float], rows: Sequence[ValidationRow]) 
         "brier_score": round(float(brier_score), 6),
         "log_loss": round(float(log_loss), 6),
         "expected_calibration_error": round(float(expected_calibration_error), 6),
+        "brier_reliability": round(float(metrics.get("brier_reliability", float("nan"))), 6),
+        "brier_resolution": round(float(metrics.get("brier_resolution", float("nan"))), 6),
+        "brier_uncertainty": round(float(metrics.get("brier_uncertainty", float("nan"))), 6),
         "calibration_intercept": metrics.get("calibration_intercept"),
         "calibration_slope": metrics.get("calibration_slope"),
     }
@@ -124,9 +124,7 @@ def _gate_metrics(
             if calls
             else None
         ),
-        "diagnostic_units_at_minus_110": (
-            round(hits * (10 / 11) - (calls - hits), 6) if calls else 0.0
-        ),
+        "diagnostic_units_at_minus_110": (round(hits * (10 / 11) - (calls - hits), 6) if calls else 0.0),
     }
 
 
@@ -165,9 +163,7 @@ def _cluster_bootstrap_brier_delta(
     n_resamples: int = 2_000,
 ) -> dict[str, Any]:
     by_date: dict[str, list[float]] = defaultdict(list)
-    for incumbent, candidate, row in zip(
-        incumbent_probabilities, candidate_probabilities, rows, strict=True
-    ):
+    for incumbent, candidate, row in zip(incumbent_probabilities, candidate_probabilities, rows, strict=True):
         outcome = row.outcome
         by_date[row.date].append((candidate - outcome) ** 2 - (incumbent - outcome) ** 2)
     dates = sorted(by_date)
@@ -201,12 +197,8 @@ def _cluster_sign_flip_p_value(
 ) -> dict[str, Any]:
     """Two-sided paired randomization test with game dates as clusters."""
     by_date: dict[str, float] = defaultdict(float)
-    for incumbent, candidate, row in zip(
-        incumbent_probabilities, candidate_probabilities, rows, strict=True
-    ):
-        by_date[row.date] += (candidate - row.outcome) ** 2 - (
-            incumbent - row.outcome
-        ) ** 2
+    for incumbent, candidate, row in zip(incumbent_probabilities, candidate_probabilities, rows, strict=True):
+        by_date[row.date] += (candidate - row.outcome) ** 2 - (incumbent - row.outcome) ** 2
     cluster_sums = list(by_date.values())
     observed = abs(sum(cluster_sums))
     if observed == 0 and all(value == 0 for value in cluster_sums):
@@ -219,9 +211,7 @@ def _cluster_sign_flip_p_value(
     rng = random.Random(seed)
     extreme = 0
     for _ in range(n_resamples):
-        randomized = sum(
-            value if rng.getrandbits(1) else -value for value in cluster_sums
-        )
+        randomized = sum(value if rng.getrandbits(1) else -value for value in cluster_sums)
         extreme += int(abs(randomized) >= observed)
     return {
         "method": "paired_date_cluster_sign_flip",
@@ -293,9 +283,7 @@ def _variant_name(additions: Iterable[str]) -> str:
 def _all_combinations() -> list[tuple[str, ...]]:
     names = tuple(ADDITIONS)
     return [
-        combination
-        for size in range(len(names) + 1)
-        for combination in itertools.combinations(names, size)
+        combination for size in range(len(names) + 1) for combination in itertools.combinations(names, size)
     ]
 
 
@@ -312,9 +300,7 @@ def evaluate_sport(store: FeatureStore, sport: str, config: Mapping[str, Any]) -
     model_config = config["models"][sport.upper()]
     artifact_path = Path(str(model_config["production_artifact"]))
     artifact = LearnedMarketArtifact.load(artifact_path)
-    incumbent_features = tuple(
-        artifact.raw["market_models"]["moneyline"]["feature_names"]
-    )
+    incumbent_features = tuple(artifact.raw["market_models"]["moneyline"]["feature_names"])
     rows = build_walk_forward_rows(store, sport)
     train, validation, holdout, split = chronological_split(rows)
     active_model = artifact.raw["market_models"]["moneyline"]
@@ -326,16 +312,14 @@ def evaluate_sport(store: FeatureStore, sport: str, config: Mapping[str, Any]) -
     feature_names = tuple(feature for group in ADDITIONS.values() for feature in group)
     data_validation = _processed_data_validation(store, sport)
     data_validation["walk_forward_rows"] = len(rows)
-    data_validation["excluded_before_binary_evaluation"] = (
-        data_validation["loaded_modeling_games"] - len(rows)
+    data_validation["excluded_before_binary_evaluation"] = data_validation["loaded_modeling_games"] - len(
+        rows
     )
     data_validation["walk_forward_exclusion_rule"] = (
         "The first 50 history games seed features; tied non-soccer results are excluded."
     )
     data_validation["feature_stats"] = {
-        cohort_name: {
-            feature: _feature_stats(cohort, feature) for feature in feature_names
-        }
+        cohort_name: {feature: _feature_stats(cohort, feature) for feature in feature_names}
         for cohort_name, cohort in (
             ("train", train),
             ("validation", validation),
@@ -343,9 +327,7 @@ def evaluate_sport(store: FeatureStore, sport: str, config: Mapping[str, Any]) -
         )
     }
     data_validation["schedule_coverage"] = {
-        cohort_name: round(
-            sum(row.schedule_available for row in cohort) / len(cohort), 6
-        )
+        cohort_name: round(sum(row.schedule_available for row in cohort) / len(cohort), 6)
         for cohort_name, cohort in (
             ("train", train),
             ("validation", validation),
@@ -417,13 +399,11 @@ def evaluate_sport(store: FeatureStore, sport: str, config: Mapping[str, Any]) -
             seed=seed,
         )
         if len(variant["additions"]) == 1:
-            variant["holdout_brier_date_cluster_sign_flip"] = (
-                _cluster_sign_flip_p_value(
-                    incumbent_probabilities,
-                    probability_cache[name]["holdout"],
-                    holdout,
-                    seed=seed ^ 0xA5A5A5A5,
-                )
+            variant["holdout_brier_date_cluster_sign_flip"] = _cluster_sign_flip_p_value(
+                incumbent_probabilities,
+                probability_cache[name]["holdout"],
+                holdout,
+                seed=seed ^ 0xA5A5A5A5,
             )
 
     gate_sweeps: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
@@ -432,9 +412,7 @@ def evaluate_sport(store: FeatureStore, sport: str, config: Mapping[str, Any]) -
         gate_sweeps[name] = [
             {
                 "gate": gate,
-                "validation": _gate_metrics(
-                    probability_cache[name]["validation"], validation, gate
-                ),
+                "validation": _gate_metrics(probability_cache[name]["validation"], validation, gate),
                 "holdout": _gate_metrics(probability_cache[name]["holdout"], holdout, gate),
             }
             for gate in GATE_GRID
@@ -450,20 +428,14 @@ def evaluate_sport(store: FeatureStore, sport: str, config: Mapping[str, Any]) -
             "features": list(incumbent_features),
             "active_coefficients": {
                 feature: float(coefficient)
-                for feature, coefficient in zip(
-                    incumbent_features, active_model["coefficients"], strict=True
-                )
+                for feature, coefficient in zip(incumbent_features, active_model["coefficients"], strict=True)
             },
             "active_intercept": float(active_model["intercept"]),
             "active_threshold": float(active_model["confidence_threshold"]),
             "current_cohort_metrics": {
                 "train_all_predictions": _all_metrics(active_probabilities["train"], train),
-                "validation_all_predictions": _all_metrics(
-                    active_probabilities["validation"], validation
-                ),
-                "holdout_all_predictions": _all_metrics(
-                    active_probabilities["holdout"], holdout
-                ),
+                "validation_all_predictions": _all_metrics(active_probabilities["validation"], validation),
+                "holdout_all_predictions": _all_metrics(active_probabilities["holdout"], holdout),
                 "validation_at_active_threshold": _gate_metrics(
                     active_probabilities["validation"],
                     validation,
@@ -476,12 +448,8 @@ def evaluate_sport(store: FeatureStore, sport: str, config: Mapping[str, Any]) -
                 ),
             },
             "matched_refit_coefficient_delta": {
-                feature: round(
-                    refit_control["coefficients"][feature] - float(coefficient), 10
-                )
-                for feature, coefficient in zip(
-                    incumbent_features, active_model["coefficients"], strict=True
-                )
+                feature: round(refit_control["coefficients"][feature] - float(coefficient), 10)
+                for feature, coefficient in zip(incumbent_features, active_model["coefficients"], strict=True)
             },
             "matched_refit_intercept_delta": round(
                 refit_control["intercept"] - float(active_model["intercept"]), 10
@@ -575,9 +543,7 @@ def build_markdown(report: Mapping[str, Any]) -> str:
 
     clean_passes: list[str] = []
     for sport, result in report["sports"].items():
-        baseline = result["variants"]["incumbent"]["validation_all_predictions"][
-            "brier_score"
-        ]
+        baseline = result["variants"]["incumbent"]["validation_all_predictions"]["brier_score"]
         for name, variant in result["variants"].items():
             evaluated = dict(variant)
             evaluated["incumbent_validation_brier"] = baseline
@@ -613,9 +579,7 @@ def build_markdown(report: Mapping[str, Any]) -> str:
     for sport, name, interpretation in review_candidates:
         result = report["sports"][sport]
         variant = result["variants"][name]
-        baseline = result["variants"]["incumbent"]["validation_all_predictions"][
-            "brier_score"
-        ]
+        baseline = result["variants"]["incumbent"]["validation_all_predictions"]["brier_score"]
         ci = variant["holdout_brier_delta_cluster_bootstrap"]
         lines.append(
             f"| {sport.upper()} | `{name}` | "
@@ -669,9 +633,7 @@ def build_markdown(report: Mapping[str, Any]) -> str:
         refit_metrics = variants["incumbent"]
         refit_gate_result = refit_metrics["validation_selected_gate_60"]
         refit_gate = (
-            refit_gate_result.get("holdout", {})
-            if refit_gate_result.get("status") == "evaluated"
-            else {}
+            refit_gate_result.get("holdout", {}) if refit_gate_result.get("status") == "evaluated" else {}
         )
         lines.extend(
             [
@@ -681,9 +643,7 @@ def build_markdown(report: Mapping[str, Any]) -> str:
                 "Active-to-refit coefficient deltas: `"
                 + ", ".join(
                     f"{feature}={delta:+.6f}"
-                    for feature, delta in result["incumbent"][
-                        "matched_refit_coefficient_delta"
-                    ].items()
+                    for feature, delta in result["incumbent"]["matched_refit_coefficient_delta"].items()
                 )
                 + f", intercept={result['incumbent']['matched_refit_intercept_delta']:+.6f}`",
                 "",
@@ -755,9 +715,9 @@ def build_markdown(report: Mapping[str, Any]) -> str:
                 )
             lines.append("")
 
-        ranked = sorted(
-            variants.items(), key=lambda item: item[1]["holdout_all_predictions"]["brier_score"]
-        )[:10]
+        ranked = sorted(variants.items(), key=lambda item: item[1]["holdout_all_predictions"]["brier_score"])[
+            :10
+        ]
         lines.extend(
             [
                 "## Development ranking (not a promotion ranking)",
@@ -917,11 +877,7 @@ def build_independent_markdown(report: Mapping[str, Any]) -> str:
             holdout_delta = variant["holdout_delta_vs_incumbent"]["brier"]
             ci = variant["holdout_brier_delta_cluster_bootstrap"]
             gate_result = variant["validation_selected_gate_60"]
-            gate = (
-                gate_result.get("holdout", {})
-                if gate_result.get("status") == "evaluated"
-                else {}
-            )
+            gate = gate_result.get("holdout", {}) if gate_result.get("status") == "evaluated" else {}
             key = f"{sport}:{addition}"
             label = _independent_effect_label(
                 addition,
@@ -1017,9 +973,7 @@ def main() -> None:
     independent_markdown_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     markdown_path.write_text(build_markdown(report) + "\n", encoding="utf-8")
-    independent_markdown_path.write_text(
-        build_independent_markdown(report) + "\n", encoding="utf-8"
-    )
+    independent_markdown_path.write_text(build_independent_markdown(report) + "\n", encoding="utf-8")
     print(
         json.dumps(
             {

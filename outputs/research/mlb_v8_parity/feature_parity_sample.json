@@ -21,8 +21,8 @@
     },
     "weather_factor": {
       "rows_compared": 40,
-      "max_abs_delta": 0.029,
-      "mean_abs_delta": 0.008715,
+      "max_abs_delta": 0.0269,
+      "mean_abs_delta": 0.0089775,
       "exact_matches": 9
     },
     "starter_era_gap": {
