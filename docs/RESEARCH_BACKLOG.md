@@ -1,5 +1,20 @@
 # Research backlog (post-consolidation)
 
+## Contents
+
+- [P0 — MLB v9](#p0--mlb-v9-first-full-test-of-the-new-system) — ablation matrix, LR-vs-XGB, run distribution, promotion process
+- [P1](#p1) — WNBA v5, NFL calibration, tennis v2, soccer split
+- [Revised post-burn-in order](#revised-post-burn-in-order-operator-2026-08-14)
+- [P3 / Cross-cutting](#p3) — economic evaluator, continuous evaluation, ergonomics
+- [Accuracy-first feature queue (2026-08-17)](#accuracy-first-feature-queue-operator-directive-2026-08-17) — totals distribution, starter IP, umpire zone
+- [Distribution migration (2026-08-17)](#distribution-migration-index) — outcome models → score distributions
+- [Brainstorm sessions (2026-08-17)](#2026-08-17-brainstorm-session-data-structure-ideas--queued-not-scheduled) — data/structure ideas, portfolio/ops hardening
+- [Post-burn-in execution](#post-burn-in-execution-prompt) — run `docs/POST_BURNIN_PROMPT.md` after 2026-08-18 05:25 UTC
+- [Experiment template](#experiment-template)
+
+---
+
+
 After consolidation the project is a repeatable model-research and
 production-improvement system. Research is queued, not ad hoc: every
 experiment has a hypothesis, owner, dataset, candidate ID, status,
