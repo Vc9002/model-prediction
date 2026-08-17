@@ -52,7 +52,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py314"
+target-version = "py311"
 
 [tool.mypy]
 python_version = "3.14"
