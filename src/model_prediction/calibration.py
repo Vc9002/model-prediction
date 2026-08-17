@@ -188,6 +188,69 @@ class IsotonicCalibrator:
         return self.values[-1]
 
 
+class TemperatureCalibrator:
+    """Temperature scaling: p_cal = sigmoid(logit(p) / T).
+
+    T < 1 SHARPENS (amplifies logits, fixes underconfidence, measured
+    slope > 1); T > 1 SOFTENS (shrinks logits, fixes overconfidence,
+    measured slope < 1). Fitted by grid search minimizing log-loss on the
+    provided (validation) predictions. Follows the same
+    fit/fail-closed-to-identity contract as the Platt and isotonic
+    calibrators. First validated use: WNBA v4 (2026-08-17 holdout test --
+    Brier 0.214138 -> 0.212096, the first challenger of the v9 cycle to
+    clear the -0.002 magnitude bar).
+    """
+
+    TEMPERATURE_GRID = (0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0)
+
+    def __init__(self, temperature: float, metadata: CalibrationMetadata) -> None:
+        self.temperature = temperature
+        self.metadata = metadata
+
+    @classmethod
+    def fit(
+        cls,
+        probabilities: Sequence[float],
+        outcomes: Sequence[int],
+        base_model_version: str,
+        version: str = "temperature-rolling-v1",
+        minimum_sample: int = 100,
+    ) -> TemperatureCalibrator | IdentityCalibrator:
+        if len(probabilities) != len(outcomes):
+            raise ValueError("probabilities and outcomes must have equal length")
+        if len(probabilities) < minimum_sample:
+            return IdentityCalibrator(base_model_version, f"{version}-identity-fallback")
+        clipped = [min(1 - 1e-9, max(1e-9, p)) for p in probabilities]
+        logits = [math.log(p / (1 - p)) for p in clipped]
+        best_t, best_loss = 1.0, float("inf")
+        for t in cls.TEMPERATURE_GRID:
+            loss = 0.0
+            for z, y in zip(logits, outcomes, strict=True):
+                p = min(1 - 1e-9, max(1e-9, 1.0 / (1.0 + math.exp(-z / t))))
+                loss += -(y * math.log(p) + (1 - y) * math.log(1 - p))
+            if loss < best_loss:
+                best_loss, best_t = loss, t
+        raw = {
+            "method": "temperature",
+            "version": version,
+            "base_model_version": base_model_version,
+            "temperature": best_t,
+            "sample_size": len(probabilities),
+        }
+        artifact_hash = hashlib.sha256(
+            json.dumps(raw, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        metadata = CalibrationMetadata(
+            "temperature", version, base_model_version, None, None, len(probabilities), artifact_hash
+        )
+        return cls(best_t, metadata)
+
+    def transform(self, probability: float) -> float:
+        clipped = min(1 - 1e-12, max(1e-12, probability))
+        logit = math.log(clipped / (1 - clipped))
+        return 1 / (1 + math.exp(-logit / self.temperature))
+
+
 def calibration_metrics(
     probabilities: Sequence[float], outcomes: Sequence[int], minimum_sample: int = 30
 ) -> dict[str, object]:

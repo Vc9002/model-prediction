@@ -109,3 +109,58 @@ def test_threshold_is_learned_from_observed_confidences() -> None:
 def test_artifact_hash_ignores_only_hash_field() -> None:
     raw = _artifact()
     assert artifact_hash(raw) == raw["artifact_hash"]
+
+
+def _temperature_artifact() -> dict:
+    raw = _artifact()
+    raw["market_models"]["moneyline"]["calibration"] = {
+        "method": "temperature",
+        "temperature": 0.8,
+    }
+    raw["artifact_hash"] = artifact_hash(raw)
+    return raw
+
+
+def test_temperature_calibration_sharpens_served_probability() -> None:
+    model = LearnedMarketArtifact(_temperature_artifact())
+    raw_p = LearnedMarketArtifact(_artifact()).probability(
+        "moneyline", {"raw_probability": 0.7, "trend_gap": 1.0}
+    )
+    calibrated = model.probability("moneyline", {"raw_probability": 0.7, "trend_gap": 1.0})
+    if raw_p > 0.5:
+        assert calibrated > raw_p  # T<1 sharpens
+    else:
+        assert calibrated < raw_p
+    assert 0.0 < calibrated < 1.0
+
+
+def test_unknown_calibration_method_fails_closed() -> None:
+    raw = _artifact()
+    raw["market_models"]["moneyline"]["calibration"] = {
+        "method": "nonexistent",
+        "temperature": 0.8,
+    }
+    raw["artifact_hash"] = artifact_hash(raw)
+    model = LearnedMarketArtifact(raw)
+    try:
+        model.probability("moneyline", {"raw_probability": 0.7, "trend_gap": 1.0})
+    except ValueError as error:
+        assert "nonexistent" in str(error)
+    else:
+        raise AssertionError("unknown calibration method must fail closed")
+
+
+def test_invalid_temperature_fails_closed() -> None:
+    raw = _artifact()
+    raw["market_models"]["moneyline"]["calibration"] = {
+        "method": "temperature",
+        "temperature": 0.0,
+    }
+    raw["artifact_hash"] = artifact_hash(raw)
+    model = LearnedMarketArtifact(raw)
+    try:
+        model.probability("moneyline", {"raw_probability": 0.7, "trend_gap": 1.0})
+    except ValueError as error:
+        assert "temperature" in str(error)
+    else:
+        raise AssertionError("non-positive temperature must fail closed")
