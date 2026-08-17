@@ -127,11 +127,20 @@ def coverage_fraction(rows: list[ValidationRow], features: tuple[str, ...]) -> f
     return covered / len(rows) if rows else 0.0
 
 
-def run_variant(*, variant: str, features: tuple[str, ...], seed: int, description: str) -> dict:
+def run_variant(
+    *,
+    variant: str,
+    features: tuple[str, ...],
+    seed: int,
+    description: str,
+    min_date: str | None = None,
+) -> dict:
     all_rows = load_frozen_rows(FROZEN_TABLE)
     _, _, locked_holdout, _ = chronological_split(all_rows)
     holdout_dates = {r.date for r in locked_holdout}
     cv_rows = [r for r in all_rows if r.date not in holdout_dates]
+    if min_date is not None:
+        cv_rows = [r for r in cv_rows if r.date >= min_date]
 
     folds = walk_forward_folds(cv_rows, n_folds=5)
     fold_results = []
@@ -212,7 +221,8 @@ def run_variant(*, variant: str, features: tuple[str, ...], seed: int, descripti
     }
     out_dir = PROJECT_ROOT / "outputs/research/mlb_v9_ablation"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"variant_{variant}.json"
+    suffix = f"_from{min_date}" if min_date else ""
+    out_path = out_dir / f"variant_{variant}{suffix}.json"
     out_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     report["_file"] = str(out_path)
     return report
@@ -225,11 +235,16 @@ def main() -> int:
     parser.add_argument("--swap", nargs="*", default=[], help="Control features to remove")
     parser.add_argument("--seed", type=int, default=20260817)
     parser.add_argument("--description", default="")
+    parser.add_argument("--min-date", default=None, help="Restrict CV rows to date >= this ISO date")
     args = parser.parse_args()
 
     features = make_feature_set(args.features, args.swap)
     report = run_variant(
-        variant=args.variant, features=features, seed=args.seed, description=args.description
+        variant=args.variant,
+        features=features,
+        seed=args.seed,
+        description=args.description,
+        min_date=args.min_date,
     )
     print(json.dumps({k: v for k, v in report.items() if k != "fold_results"}, indent=2))
     return 0
