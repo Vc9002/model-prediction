@@ -48,11 +48,20 @@ Run each at least once per day during the window; record results here.
 | 2026-08-15 | PASS (day 0) | No repo DBs; supervisor runs all completed (daily ×4, production ×4, rebuild ×3 since cutover, incl. launchd-scheduled cycles on the new code); dashboard listener = server.pid = launchctl pid after kickstart; pre-restart job history serves via /api/job; tree clean after cycles |
 | 2026-08-16 | PASS (day 1) | No repo DBs; supervisor runs completed except ONE transient rebuild-shadow failure (23:15 UTC, exit 1, zero output — undiagnosable; 3 subsequent runs green; startup echo added to run_rebuild.sh so silent failures can't recur); dashboard lsof=pidfile=launchctl (95673); job history serves; tree clean; main CI green |
 | 2026-08-17 | PASS (day 2) | No repo DBs; supervisor runs all completed (daily ×10, production ×11, rebuild-shadow ×10 since cutover; the one failed row remains the documented 08-15 23:15 UTC transient, zero repeats); 0 skipped rows (no lock refusals occurred to coalesce); dashboard lsof=pidfile=launchctl (76750) after a kickstart-restart this session; pre-restart job history (daily-1786732799, 08-14) serves via /api/job; tree clean (session work committed as 287d979→7efdd5f); evidence API all_model_definitions_and_backfills_valid=True |
-| 2026-08-18 | | |
+| 2026-08-17 | PASS (day 3 — final acceptance) | Full final suite re-run live: checks 1–7 all pass (no repo DBs; single runtime root; daily ×11, production ×12, rebuild-shadow ×11 completed across the window — only the documented 08-15 transient failed, zero repeats; 0 skipped; dashboard lsof=pidfile=launchctl (76750); pre-restart job history serves; tree clean at 4b16089). `PRAGMA integrity_check` ok on runs.db and ledgers.db. Evidence API `all_model_definitions_and_backfills_valid=True`. system_health DEGRADED verdict fully explained: (a) soccer capture stale — the documented accepted external credential issue; (b) last production prediction 606 min — the machine slept 03:00–13:00 local (pmset log evidence; launchd StartInterval jobs don't fire during sleep) plus overnight quiet hours (no games); a health-threshold calibration note, not an infrastructure defect. |
 
-Burn-in passes when three consecutive clean days are recorded, after
-which the research sequence starts: MLB v8 reproduction first (frozen
-benchmark, exact reproduction gate), then MLB v9 ablations.
+## Final acceptance
+
+**2026-08-17 (operator directive): `INFRASTRUCTURE_CONSOLIDATION = ACCEPTED`.**
+
+Three consecutive clean days recorded (08-15/16/17). Duration caveat
+recorded honestly: acceptance occurred at ~48h elapsed of the nominal
+≥72h window (gate would have opened 2026-08-18 05:25 UTC); the
+operator accepted early completion on the strength of three consecutive
+clean days with every anomaly classified. Infrastructure work stops
+unless a real defect appears — the research sequence starts per
+`docs/POST_BURNIN_PROMPT.md`: MLB v8 row-parity reproduction first
+(frozen benchmark), then v9 ablations.
 
 ## Mid-burn-in defect fixed (2026-08-15, day 0)
 
