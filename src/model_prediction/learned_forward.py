@@ -459,7 +459,7 @@ def build_learned_moneyline_slate(
         for event in events:
             try:
                 home_teams.append(_teams(event)[1])
-            except KeyError, TypeError, ValueError:
+            except (KeyError, TypeError, ValueError):
                 continue
         prefetch_live_weather(home_teams)
     elo = build_elo(history, key)
