@@ -166,14 +166,32 @@ def main() -> int:
             better += 1
     p_better = round(better / 2000, 4)
 
-    inc_metrics = calibration_metrics(inc_probs, [float(o) for o in outcomes], minimum_sample=1)
-    cand_metrics = calibration_metrics(cand_probs, [float(o) for o in outcomes], minimum_sample=1)
+    # Exact-line Brier computed directly: the push outcome (0.5) is not
+    # binary, so calibration_metrics (binary-only) is run on non-push rows
+    # while the headline Brier uses the exact-line outcome for every row.
+    def _exact_line_brier(probs: list[float]) -> float:
+        return sum((p - o) ** 2 for p, o in zip(probs, outcomes, strict=True)) / len(outcomes)
+
+    non_push = [i for i, o in enumerate(outcomes) if o in (0.0, 1.0)]
+    inc_metrics = calibration_metrics(
+        [inc_probs[i] for i in non_push], [float(outcomes[i]) for i in non_push], minimum_sample=1
+    )
+    cand_metrics = calibration_metrics(
+        [cand_probs[i] for i in non_push], [float(outcomes[i]) for i in non_push], minimum_sample=1
+    )
+    inc_metrics["exact_line_brier"] = round(_exact_line_brier(inc_probs), 6)
+    cand_metrics["exact_line_brier"] = round(_exact_line_brier(cand_probs), 6)
     market_only = [(p, o) for p, o in zip(market_probs, outcomes, strict=True) if not math.isnan(p)]
     market_metrics = None
     if len(market_only) >= 30:
-        market_metrics = calibration_metrics(
-            [p for p, _ in market_only], [o for _, o in market_only], minimum_sample=1
-        )
+        non_push_market = [(p, o) for p, o in market_only if o in (0.0, 1.0)]
+        if non_push_market:
+            market_metrics = calibration_metrics(
+                [p for p, _ in non_push_market], [o for _, o in non_push_market], minimum_sample=1
+            )
+            market_metrics["exact_line_brier"] = round(
+                sum((p - o) ** 2 for p, o in market_only) / len(market_only), 6
+            )
 
     report = {
         "n_eval_games": len(rows),
