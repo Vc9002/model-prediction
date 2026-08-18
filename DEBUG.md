@@ -1,6 +1,115 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-14 (see new section directly below)
+**Last audited**: 2026-08-18 (see new section directly below)
+
+## 2026-08-18 — model-ledger settlement stranded 63% of its own evidence
+
+**The bug.** `model_ledger.settle_from_pick_row` matched the row to grade
+using `_prediction_dedupe_key`, the APPEND-side key — which includes
+`observed_at_utc` — and took a single `next(...)` match. The pipeline
+re-forecasts an event several times as the line moves, writing one row
+per forecast, so only the row whose forecast timestamp exactly equalled
+the settled pick's ever graded. Every other row for the same finished
+game stayed `open` forever. The function is documented "never raises",
+so a miss was a silent no-op.
+
+This is the same silent-evidence-starvation class the hook was added to
+fix on 2026-08-02 (`ModelLedger.settle()` existed but nothing called it),
+one layer down: the hook fired, but only ever for one row per event.
+
+**Live impact, WNBA spread ledger** (`data/model_ledgers/wnba-spread-margin.xlsx`):
+67 rows, 9 settled, 58 open — of which **42 were for games that had already
+finished** (oldest 2026-08-13). Every graded event showed the signature
+1 settled + N-1 orphaned. `compute_model_evidence` therefore ran hit
+rate / Brier / calibration on 9 rows instead of 51. Three events
+(401857143/144/151) had all picks `removed` rather than settled, so no
+graded pick existed to copy from at all.
+
+**The fix.** New `_event_settlement_key` — event/market/line/model/**selection**,
+deliberately without `observed_at_utc` — plus `ModelLedger.settle_event`,
+which grades every still-open matching row in ONE lock/read/write cycle
+(N calls to `settle()` would rewrite the workbook per row and could leave
+an event half-settled). `_prediction_dedupe_key` is unchanged: the append
+side still needs the timestamp so a re-forecast is not dropped as a
+duplicate.
+
+`selection` is in the settlement key for a real reason: away +6.5 and
+home -3.5 are opposite sides of one game and resolve oppositely. Event
+401857151 has exactly that shape and grades `away → loss`, `home → win`.
+Keying without selection would have written one of them backwards as real
+evidence. No live row has flipped sides yet; this keeps a future flip
+honestly open instead of silently inverted.
+
+Operator decision 2026-08-18: `pnl_units` is written to every graded row,
+not only the row that carried the stake. `compute_model_evidence` SUMS
+that field, so a model's reported `pnl_units` now scales with the
+re-forecast count — it is a per-prediction economic record, not a
+bankroll total.
+
+**Backfill.** `scripts/backfill_model_ledger_settlement.py` grades stranded
+rows from the game's FINAL SCORE rather than copying another row's result,
+which is the only way to reach rows at a line that was never staked and
+events whose picks were all removed. It refuses to write unless it first
+reproduces EVERY already-settled row's recorded result from the score —
+that self-check is the whole safety argument. WNBA spread: 9/9 reproduced,
+0 mismatched; 42 rows settled; ledger now 51 settled / 16 open (the 16 are
+genuinely future games). Timestamped backup taken before writing.
+
+**Evidence after the repair** — and the honest reading of it: 51 settled
+rows cover only 14 distinct contracts across 12 events, because
+re-forecast rows of one game are correlated repeats, not independent
+samples. Per-row 27W-24L (52.9%); **per-contract 7W-7L (50.0%)**, Brier
+0.2856 against 0.2500 for always-predicting-0.5. The spread model's
+pricing math is correct (normal-CDF sign convention verified
+independently); it simply has no demonstrated edge and nowhere near the
+50-call minimum. Any minimum-sample gate must count distinct contracts,
+not rows.
+
+### Second finding: `last_10_total_avg` was a duplicate of `league_total_mean`
+
+`total_score.py` built the feature named "both teams' last 10 game total
+averages" as `last_10_avg = baseline` — literally the same value as
+`league_total_mean`. Ridge split one weight across two identical columns
+(both landed on -1.825776 in the 2026-08-18 WNBA refit), so the level term
+pulled twice as hard in the wrong direction. Fixed to the real
+point-in-time last-10 signal (per-team `deque(maxlen=10)` of combined
+scores, appended only AFTER the row is built). Net effect across the four
+sports that share the module: MLB 3.5503→3.5497, NBA 15.4187→15.3341,
+NFL 11.2265→10.9961 all improve; WNBA 24.0187→24.5116, already broken by
+a wide margin either way.
+
+Still present and NOT fixed: `park_factor`, `weather_factor`,
+`bullpen_rest_days`, `travel_distance` are hardcoded constants for every
+sport (all four carry 0.0 coefficients) — baseball features in a shared
+totals builder.
+
+### Third finding: the totals verdict ignores the CI it computes
+
+`total_score.py:238` sets `improved = model_metrics["mae"] < baseline_metrics["mae"]`
+— a bare point estimate — while the same artifact stores a paired
+bootstrap `mae_gain_95ci`. Current run: NFL is flagged
+`improved_vs_baseline=True` on a gain of +0.6327 whose own CI is
+[-0.0427, +1.5336], straddling zero. MLB passes on +0.0310, statistically
+clear but practically negligible. Left as-is — the verdict rule is a gate
+policy decision, not a bug to fix unilaterally.
+
+### Reproduction
+
+```
+# settlement regression (verified to fail against the pre-fix key)
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/test_model_ledger.py -q -k settle_from_pick_row
+
+# backfill, dry run (self-check must print "0 mismatched")
+.venv/bin/python scripts/backfill_model_ledger_settlement.py \
+  --ledger data/model_ledgers/wnba-spread-margin.xlsx \
+  --scores data/historical/wnba_games_all.jsonl
+
+# totals validation across all four sports
+env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli validate-totals
+```
+
+Full suite 1883 passed / 3 skipped; ruff clean. No promotion decisions;
+champions unchanged.
 
 ## 2026-08-14 (afternoon) — launchd cutover to the supervisor + health truth source
 

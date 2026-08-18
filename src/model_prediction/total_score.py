@@ -26,17 +26,17 @@ from .features.base import FeatureStore, GameRecord
 
 # ── Feature definitions ──────────────────────────────────────────────────────
 FEATURE_NAMES = (
-    "league_total_mean",          # League average run environment
-    "away_run_rate_ewma",         # Away scoring rate (10-game half-life)
-    "away_run_rate_allowed_ewma", # Away runs allowed rate
-    "home_run_rate_ewma",         # Home scoring rate
-    "home_run_rate_allowed_ewma", # Home runs allowed rate
-    "park_factor",                # Park run multiplier (Coors=1.12, etc.)
-    "weather_factor",             # Temp/wind bonus (neutral=1.0)
-    "bullpen_rest_days",          # Avg bullpen rest days (both teams)
-    "travel_distance",            # Away team travel distance (miles / 1000)
-    "last_10_total_avg",          # Both teams' last 10 game total averages
-    "season_total_std",           # Season run total standard deviation
+    "league_total_mean",  # League average run environment
+    "away_run_rate_ewma",  # Away scoring rate (10-game half-life)
+    "away_run_rate_allowed_ewma",  # Away runs allowed rate
+    "home_run_rate_ewma",  # Home scoring rate
+    "home_run_rate_allowed_ewma",  # Home runs allowed rate
+    "park_factor",  # Park run multiplier (Coors=1.12, etc.)
+    "weather_factor",  # Temp/wind bonus (neutral=1.0)
+    "bullpen_rest_days",  # Avg bullpen rest days (both teams)
+    "travel_distance",  # Away team travel distance (miles / 1000)
+    "last_10_total_avg",  # Both teams' last 10 game total averages
+    "season_total_std",  # Season run total standard deviation
 )
 
 MINIMUM_TEAM_GAMES = 8
@@ -92,9 +92,7 @@ class TotalScoreRow:
 
 def _artifact_hash(payload: dict[str, Any]) -> str:
     canonical = {k: v for k, v in payload.items() if k != "artifact_hash"}
-    return hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _ewma_update(current: float | None, new: float, alpha: float = EWMA_ALPHA) -> float:
@@ -112,6 +110,7 @@ def build_total_score_rows(
     scored_ewma: dict[str, float | None] = {}
     allowed_ewma: dict[str, float | None] = {}
     league_totals: deque[float] = deque(maxlen=200)
+    recent_totals: dict[str, deque[float]] = {}
     rows: list[TotalScoreRow] = []
 
     for game in sorted(games, key=lambda g: g.start):
@@ -136,7 +135,16 @@ def build_total_score_rows(
             weather = 1.0  # Neutral — no live weather feed yet
             bullpen_rest = 3.0  # Default 3 days rest
             travel = 0.0  # Default no travel
-            last_10_avg = baseline
+            # Was `last_10_avg = baseline` -- a placeholder that made this an
+            # exact duplicate of league_total_mean. Ridge then split one
+            # weight across two identical columns (both landed on the same
+            # -1.825776 in the 2026-08-18 WNBA refit), so the level term
+            # pulled twice as hard in the wrong direction. This is the real
+            # last-10 signal the feature name has always claimed: the mean
+            # combined score of each side's recent games, strictly from
+            # games already played.
+            recent = [t for team in (away, home) for t in recent_totals.get(team, ())]
+            last_10_avg = _mean(recent) if recent else baseline
             season_std = max(pstdev(league_totals) if len(league_totals) > 3 else 2.0, 1.0)
 
             features: tuple[float, ...] = (
@@ -168,6 +176,10 @@ def build_total_score_rows(
         scored_ewma[home] = _ewma_update(scored_ewma.get(home), float(game.home_score))
         allowed_ewma[home] = _ewma_update(allowed_ewma.get(home), float(game.away_score))
         league_totals.append(total)
+        # After the row is built, never before: this game is not information
+        # available to a decision made before it started.
+        for team in (away, home):
+            recent_totals.setdefault(team, deque(maxlen=10)).append(total)
 
     return rows
 
@@ -256,10 +268,14 @@ def predict_total(game: GameRecord, model_data: dict[str, Any]) -> float | None:
     # Simple prediction: baseline * park factor, adjust for scoring rates
     league_avg = 9.0  # default MLB
     pf = PARK_FACTORS.get(game.home_team, 1.0)
-    return round(intercept + sum(
-        c * (league_avg if f == "league_total_mean" else pf if f == "park_factor" else 1.0)
-        for f, c in zip(features, coeffs)
-    ), 4)
+    return round(
+        intercept
+        + sum(
+            c * (league_avg if f == "league_total_mean" else pf if f == "park_factor" else 1.0)
+            for f, c in zip(features, coeffs)
+        ),
+        4,
+    )
 
 
 class TotalScoreArtifact:

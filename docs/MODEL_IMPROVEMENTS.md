@@ -463,6 +463,47 @@ different game length and schedule structure, and historically thinner public
 data. The solution is stronger shrinkage and better availability capture, not
 pretending the sample is NBA-sized.
 
+### Tried and rejected — WNBA totals, 2026-08-18
+
+`wnba-total-score-ridge-v1` was evaluated for promotion and **rejected**.
+Recorded here so it is not re-proposed without new information:
+
+- **Its own shipped artifact fails the gate**: locked-holdout MAE 19.868
+  against a 17.919 rolling-league-mean baseline, `beats_baseline_mae: false`,
+  `mae_gain_95pct_interval` [-3.388, -0.393] — entirely negative, i.e.
+  *significantly worse* than the naive baseline, not merely unproven. Its
+  own `market_qualification` block already said `eligible: false`.
+- **Wrong metric for the market.** It is a score model; nothing had ever
+  measured over/under contract accuracy, which is what a totals market
+  actually pays on.
+- **Not reproducible from the tree**: the artifact carries 9 features;
+  current `total_score.py` produces 11. It was built by a code path that
+  no longer exists in this form.
+- **Nowhere to promote it to.** There is no WNBA totals serving path —
+  `config/model.yaml`'s `total_research_artifact` is read by no serving
+  code (only a dashboard display string), and the sole totals path in the
+  repo is MLB's `_forecast_mlb_totals_flat`. A `model_promotion promote`
+  would mutate the champions map and yield zero picks.
+- **Retraining does not rescue it**: refit on current data gives MAE 24.02
+  vs 16.42 baseline, mean error -19.8, gain CI [-9.94, -6.32]. The test
+  period scores materially higher than the trailing window, and the raw-total
+  formulation lets ridge assign a large *negative* weight to the league
+  scoring level (intercept compensating at ~509-603), so the model moves
+  opposite to the run environment.
+- **Best variant found so far, still not promotable**: fitting the residual
+  (`actual_total - baseline_total`) instead of the raw total, under a proper
+  60/20/20 with alpha selected on validation only, gives locked-holdout MAE
+  16.629 vs 17.270 baseline — gain +0.641, CI **[-0.478, +1.760]**. It
+  straddles zero. This moves the model from "provably worse than the
+  baseline" to "not distinguishable from it", which is progress and not a
+  promotion case.
+
+Next step if this is picked up again: the residual target is the right
+formulation, but the feature set is the binding constraint — six of the
+eleven columns are either constants or collinear restatements of the
+scoring level. Build WNBA-specific pace/efficiency inputs (roadmap item 3)
+before refitting again.
+
 | Rank | Feature group | Concrete construction | Why it can help | Timing/risk |
 |---|---|---|---|---|
 | 1 | Official availability and minutes | Snapshot each WNBA injury report; projected minutes, restriction, starter/bench role, replacement player, and report freshness | Player availability has outsized impact in a short rotation | The official report is now available, but history must be prospectively archived |

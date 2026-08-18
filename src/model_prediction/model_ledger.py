@@ -173,6 +173,36 @@ def model_id_for(league: str, market_type: str) -> str | None:
     return MODEL_ID_BY_LEAGUE_AND_MARKET.get((str(league).upper(), str(market_type)))
 
 
+def _normalized_line(row: dict[str, str]) -> str:
+    line = str(row.get("line") or "")
+    with suppress(ValueError):
+        line = str(abs(float(line))) if line else ""
+    return line
+
+
+def _event_settlement_key(row: dict[str, str]) -> tuple[str, str, str, str, str]:
+    """The contract a settlement grades: event/market/line/model/selection.
+
+    Deliberately WITHOUT `observed_at_utc`. An outcome is a property of the
+    event, not of when we happened to forecast it, so every open row for
+    this contract grades identically off one real result. See
+    `_prediction_dedupe_key` for why the append side needs the timestamp
+    and this side must not have it.
+
+    `selection` IS included: away +5.5 and home -5.5 are opposite sides of
+    one game and resolve oppositely, so a re-forecast that crossed 0.5 and
+    flipped sides must not inherit the other side's result. No live row has
+    flipped yet, so this changes nothing today -- it makes a future flip
+    stay honestly open instead of being graded backwards."""
+    return (
+        str(row.get("event_id") or ""),
+        str(row.get("market_type") or ""),
+        _normalized_line(row),
+        str(row.get("model_version") or ""),
+        str(row.get("selection") or ""),
+    )
+
+
 def _prediction_dedupe_key(row: dict[str, str]) -> tuple[str, str, str, str, str]:
     """One real decision, regardless of which old destination ledger(s)
     logged it. No `sportsbook` component: unlike ledger.py's
@@ -191,14 +221,16 @@ def _prediction_dedupe_key(row: dict[str, str]) -> tuple[str, str, str, str, str
     `observed_at_utc` and must NOT be silently dropped as a duplicate --
     found live 2026-08-02: a re-forecast WNBA pick with updated
     model_probability/decision_price was skipped entirely because only the
-    stale, previously-migrated row's key was checked."""
-    line = str(row.get("line") or "")
-    with suppress(ValueError):
-        line = str(abs(float(line))) if line else ""
+    stale, previously-migrated row's key was checked.
+
+    This is an APPEND-side key only. Settlement must use
+    `_event_settlement_key`: reusing this one there left every re-forecast
+    row of a graded event open forever (found 2026-08-18, WNBA spread --
+    42 of 67 rows stuck open, evidence computed on 9 rows instead of 51)."""
     return (
         str(row.get("event_id") or ""),
         str(row.get("market_type") or ""),
-        line,
+        _normalized_line(row),
         str(row.get("model_version") or ""),
         str(row.get("observed_at_utc") or ""),
     )
@@ -271,9 +303,7 @@ def record_from_pick_request(
     return ledger.append_prediction(record)
 
 
-def settle_from_pick_row(
-    model_ledgers_dir: str | Path, row: dict[str, Any]
-) -> dict[str, str] | None:
+def settle_from_pick_row(model_ledgers_dir: str | Path, row: dict[str, Any]) -> list[dict[str, str]]:
     """Live-pipeline settlement hook, mirroring record_from_pick_request.
 
     Found 2026-08-02 during a live-run verification: `ModelLedger.settle()`
@@ -283,39 +313,43 @@ def settle_from_pick_row(
     numbers (the whole point of "operator decides using real evidence")
     never actually populated. `PickLedger.settle()` calls this with the
     just-settled row (result/pnl_units/probability_clv/closing_* already
-    set); this finds the matching open ModelLedger row by the same dedupe
-    identity used at append time and settles it too. Never raises: a
-    missing match (unmapped league/market, or the append-side hook never
-    fired for this pick, or it's already settled) degrades to a silent
-    no-op, same contract as the append hook.
+    set); this settles EVERY still-open ModelLedger row for the same
+    event/market/line/model. Never raises: a missing match (unmapped
+    league/market, or the append-side hook never fired for this pick, or
+    it's already settled) degrades to a silent no-op, same contract as the
+    append hook.
+
+    Matching is by `_event_settlement_key`, NOT the append-side
+    `_prediction_dedupe_key`. Using the append key here was a real bug
+    (found 2026-08-18): it carries `observed_at_utc`, so only the single
+    row whose forecast timestamp equalled the settled pick's ever graded,
+    and every re-forecast row for the same finished game stayed open
+    forever. Live WNBA spread ledger: 42 of 67 rows stuck open, so
+    hit-rate/Brier/calibration ran on 9 rows instead of 51 -- the same
+    silent-evidence-starvation failure this hook was added to fix in the
+    first place, one layer down.
     """
     model_id = model_id_for(str(row.get("league", "")), str(row.get("market_type", "")))
     if model_id is None:
-        return None
+        return []
     path = Path(model_ledgers_dir) / f"{model_id}.xlsx"
     if not path.exists():
-        return None
+        return []
     ledger = ModelLedger(path)
-    key = _prediction_dedupe_key(
+    key = _event_settlement_key(
         {
             "event_id": row.get("event_id", ""),
             "market_type": row.get("market_type", ""),
             "line": row.get("line", ""),
             "model_version": row.get("model_version", ""),
-            "observed_at_utc": row.get("observed_at_utc", ""),
+            "selection": row.get("selection", ""),
         }
     )
-    match = next(
-        (candidate for candidate in ledger.rows() if _prediction_dedupe_key(candidate) == key),
-        None,
-    )
-    if match is None or match["status"] == "settled":
-        return None
     closing_price_raw = row.get("closing_raw_implied_probability") or row.get("closing_implied_probability")
     probability_clv_raw = row.get("probability_clv")
     pnl_units_raw = row.get("pnl_units")
-    return ledger.settle(
-        match["prediction_id"],
+    return ledger.settle_event(
+        key,
         result=str(row.get("result", "")),
         closing_price=float(closing_price_raw) if closing_price_raw not in (None, "") else None,
         pnl_units=float(pnl_units_raw) if pnl_units_raw not in (None, "") else None,
@@ -378,11 +412,7 @@ class ModelLedger:
             existing_ids = {row["prediction_id"] for row in rows}
             row = {field: "" for field in FIELDNAMES}
             row.update(
-                {
-                    key: "" if value is None else str(value)
-                    for key, value in record.items()
-                    if key in row
-                }
+                {key: "" if value is None else str(value) for key, value in record.items() if key in row}
             )
             chosen_id = prediction_id or uuid.uuid4().hex[:16]
             if chosen_id in existing_ids:
@@ -447,6 +477,49 @@ class ModelLedger:
             row["settled_at_utc"] = iso_utc(settled_at or utc_now())
             self._write_unlocked(rows)
             return row
+
+    def settle_event(
+        self,
+        key: tuple[str, str, str, str, str],
+        *,
+        result: str,
+        closing_price: float | None = None,
+        pnl_units: float | None = None,
+        probability_clv: float | None = None,
+        settled_at: datetime | None = None,
+    ) -> list[dict[str, str]]:
+        """Settle EVERY still-open row for one event/market/line/model.
+
+        One lock/read/write cycle rather than N calls to `settle()`: a
+        graded event routinely has several re-forecast rows, and settling
+        them one at a time would re-read and rewrite the workbook once per
+        row (and leave a partially-settled event behind on any failure).
+
+        Operator decision 2026-08-18: `pnl_units` is written to every
+        matching row, not only the row that carried the real stake. Note
+        that `compute_model_evidence` SUMS this field, so a model's
+        reported `pnl_units` scales with the re-forecast count -- it is a
+        per-prediction economic record here, not a bankroll total."""
+        settled_rows: list[dict[str, str]] = []
+        with self._lock():
+            rows = self._read_unlocked()
+            stamp = iso_utc(settled_at or utc_now())
+            for row in rows:
+                if row["status"] == "settled" or _event_settlement_key(row) != key:
+                    continue
+                row["status"] = "settled"
+                row["result"] = result
+                if closing_price is not None:
+                    row["closing_price"] = f"{closing_price:.6f}"
+                if pnl_units is not None:
+                    row["pnl_units"] = f"{pnl_units:.4f}"
+                if probability_clv is not None:
+                    row["probability_clv"] = f"{probability_clv:.6f}"
+                row["settled_at_utc"] = stamp
+                settled_rows.append(row)
+            if settled_rows:
+                self._write_unlocked(rows)
+        return settled_rows
 
     def record_operator_decision(
         self,

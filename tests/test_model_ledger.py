@@ -11,6 +11,7 @@ from model_prediction.model_ledger import (
     ModelLedger,
     compute_model_evidence,
     record_from_pick_request,
+    settle_from_pick_row,
 )
 
 _AWAY = CanonicalTeam("mlb-nyy", League.MLB, "NYY", "NYY", True, None, None, ())
@@ -148,7 +149,7 @@ def test_append_failure_writes_a_real_row_not_a_silent_drop(tmp_path) -> None:
 
 
 def test_record_operator_decision_never_touches_model_fields(tmp_path) -> None:
-    """"Not model promotion. It is an event-level decision... must not
+    """ "Not model promotion. It is an event-level decision... must not
     change the model's ledger, classification, historical statistics, or
     dashboard evidence." -- verifies the model's own fields are byte-for-
     byte unchanged after an operator decision is recorded."""
@@ -288,10 +289,137 @@ def test_record_from_pick_request_does_not_dedupe_a_refreshed_forecast(tmp_path)
     assert len(ledger.rows()) == 2
 
 
+def test_settle_from_pick_row_grades_every_reforecast_row_of_the_event(tmp_path) -> None:
+    """Real bug found live 2026-08-18 on the WNBA spread ledger: settlement
+    matched on the APPEND-side key, which carries `observed_at_utc`, so only
+    the one row whose forecast timestamp equalled the settled pick's ever
+    graded. Every re-forecast row for the same finished game stayed open
+    forever -- 42 of 67 rows stuck, so hit-rate/Brier/calibration ran on 9
+    rows instead of 51. An outcome belongs to the event, not to the moment
+    we forecast it: all three rows here must grade off one real result."""
+    eligibility = _eligibility()
+    for observed_at in ("2026-08-02T12:00:00Z", "2026-08-02T15:00:00Z", "2026-08-02T18:00:00Z"):
+        record_from_pick_request(tmp_path, _pick_request(observed_at_utc=observed_at), eligibility)
+    ledger = ModelLedger(tmp_path / "mlb-moneyline-elo-trend-lr.xlsx")
+    assert len(ledger.rows()) == 3
+
+    settled = settle_from_pick_row(
+        tmp_path,
+        {
+            "league": "MLB",
+            "market_type": "moneyline",
+            "event_id": "event-123",
+            "line": None,
+            "selection": "home",
+            "model_version": "mlb-elo-trend-lr-v7",
+            # deliberately NOT equal to any row's observed_at_utc
+            "observed_at_utc": "2026-08-02T21:00:00Z",
+            "result": "win",
+            "pnl_units": 1.5,
+            "probability_clv": 0.03,
+            "closing_implied_probability": 0.66,
+        },
+    )
+
+    assert len(settled) == 3
+    rows = ModelLedger(tmp_path / "mlb-moneyline-elo-trend-lr.xlsx").rows()
+    assert [row["status"] for row in rows] == ["settled"] * 3
+    assert {row["result"] for row in rows} == {"win"}
+    # Operator decision 2026-08-18: economic fields land on every graded row.
+    assert {row["pnl_units"] for row in rows} == {"1.5000"}
+    assert {row["probability_clv"] for row in rows} == {"0.030000"}
+
+
+def test_settle_from_pick_row_leaves_other_events_and_lines_alone(tmp_path) -> None:
+    """Event-level grading must not become league-level grading."""
+    eligibility = _eligibility()
+    record_from_pick_request(tmp_path, _pick_request(event_id="event-1"), eligibility)
+    record_from_pick_request(tmp_path, _pick_request(event_id="event-2"), eligibility)
+
+    settled = settle_from_pick_row(
+        tmp_path,
+        {
+            "league": "MLB",
+            "market_type": "moneyline",
+            "event_id": "event-1",
+            "line": None,
+            "selection": "home",
+            "model_version": "mlb-elo-trend-lr-v7",
+            "result": "win",
+        },
+    )
+
+    assert len(settled) == 1
+    rows = {row["event_id"]: row for row in ModelLedger(tmp_path / "mlb-moneyline-elo-trend-lr.xlsx").rows()}
+    assert rows["event-1"]["status"] == "settled"
+    assert rows["event-2"]["status"] == "open"
+
+
+def test_settle_from_pick_row_never_grades_the_opposite_side(tmp_path) -> None:
+    """away +L and home -L are opposite sides of one game and resolve
+    oppositely. A re-forecast that crossed 0.5 and flipped sides must stay
+    open rather than inherit the other side's result -- grading it from the
+    same pick would record a backwards outcome as real evidence."""
+    eligibility = _eligibility()
+    record_from_pick_request(
+        tmp_path,
+        _pick_request(market_type=MarketType.SPREAD, selection="away", line=5.5),
+        eligibility,
+    )
+    record_from_pick_request(
+        tmp_path,
+        _pick_request(
+            market_type=MarketType.SPREAD,
+            selection="home",
+            line=5.5,
+            observed_at_utc="2026-08-02T18:00:00Z",
+        ),
+        eligibility,
+    )
+
+    settled = settle_from_pick_row(
+        tmp_path,
+        {
+            "league": "MLB",
+            "market_type": "spread",
+            "event_id": "event-123",
+            "line": 5.5,
+            "selection": "away",
+            "model_version": "mlb-elo-trend-lr-v7",
+            "result": "win",
+        },
+    )
+
+    assert len(settled) == 1
+    rows = {row["selection"]: row for row in ModelLedger(tmp_path / "mlb-spread-measured-edge.xlsx").rows()}
+    assert rows["away"]["status"] == "settled"
+    assert rows["home"]["status"] == "open"
+
+
+def test_settle_from_pick_row_is_a_no_op_when_already_settled(tmp_path) -> None:
+    """Re-running settlement must not restamp or double-count a graded row."""
+    record_from_pick_request(tmp_path, _pick_request(), _eligibility())
+    pick_row = {
+        "league": "MLB",
+        "market_type": "moneyline",
+        "event_id": "event-123",
+        "line": None,
+        "selection": "home",
+        "model_version": "mlb-elo-trend-lr-v7",
+        "result": "win",
+        "pnl_units": 1.5,
+    }
+
+    assert len(settle_from_pick_row(tmp_path, pick_row)) == 1
+    assert settle_from_pick_row(tmp_path, pick_row) == []
+
+
 def test_record_from_pick_request_returns_none_for_an_unmapped_league(tmp_path) -> None:
     """Must degrade gracefully -- this always runs alongside the real,
     working PickLedger write and can never break it."""
-    request = _pick_request(league=League.TENNIS, market_type=MarketType.SPREAD)  # tennis has no spread mapping
+    request = _pick_request(
+        league=League.TENNIS, market_type=MarketType.SPREAD
+    )  # tennis has no spread mapping
 
     row = record_from_pick_request(tmp_path, request, _eligibility())
 
@@ -315,9 +443,15 @@ def test_compute_model_evidence_excludes_pushes_from_calibration(tmp_path) -> No
     """Matches ledger.py's own existing calibration_rows filter exactly:
     settled win/loss only -- a push is not folded in as a loss."""
     ledger = ModelLedger(tmp_path / "kbo-tie-aware-elo.xlsx")
-    win = ledger.append_prediction({"model_id": "x", "model_version": "v1", "event_id": "e1", "model_probability": 0.6})
-    loss = ledger.append_prediction({"model_id": "x", "model_version": "v1", "event_id": "e2", "model_probability": 0.6})
-    push = ledger.append_prediction({"model_id": "x", "model_version": "v1", "event_id": "e3", "model_probability": 0.6})
+    win = ledger.append_prediction(
+        {"model_id": "x", "model_version": "v1", "event_id": "e1", "model_probability": 0.6}
+    )
+    loss = ledger.append_prediction(
+        {"model_id": "x", "model_version": "v1", "event_id": "e2", "model_probability": 0.6}
+    )
+    push = ledger.append_prediction(
+        {"model_id": "x", "model_version": "v1", "event_id": "e3", "model_probability": 0.6}
+    )
     ledger.settle(win["prediction_id"], result="win")
     ledger.settle(loss["prediction_id"], result="loss")
     ledger.settle(push["prediction_id"], result="push")
@@ -333,8 +467,12 @@ def test_compute_model_evidence_excludes_pushes_from_calibration(tmp_path) -> No
 
 def test_compute_model_evidence_tracks_open_settled_and_failed_separately(tmp_path) -> None:
     ledger = ModelLedger(tmp_path / "cs2-tiered-elo.xlsx")
-    ledger.append_prediction({"model_id": "x", "model_version": "v1", "event_id": "e1", "model_probability": 0.6})
-    settled = ledger.append_prediction({"model_id": "x", "model_version": "v1", "event_id": "e2", "model_probability": 0.6})
+    ledger.append_prediction(
+        {"model_id": "x", "model_version": "v1", "event_id": "e1", "model_probability": 0.6}
+    )
+    settled = ledger.append_prediction(
+        {"model_id": "x", "model_version": "v1", "event_id": "e2", "model_probability": 0.6}
+    )
     ledger.settle(settled["prediction_id"], result="win")
     ledger.append_failure(model_id="x", model_version="v1", event_id="e3", reason="event_already_started")
 
@@ -348,8 +486,12 @@ def test_compute_model_evidence_tracks_open_settled_and_failed_separately(tmp_pa
 
 def test_compute_model_evidence_computes_real_mean_clv_and_pnl(tmp_path) -> None:
     ledger = ModelLedger(tmp_path / "dota2-tiered-elo.xlsx")
-    a = ledger.append_prediction({"model_id": "x", "model_version": "v1", "event_id": "e1", "model_probability": 0.6})
-    b = ledger.append_prediction({"model_id": "x", "model_version": "v1", "event_id": "e2", "model_probability": 0.6})
+    a = ledger.append_prediction(
+        {"model_id": "x", "model_version": "v1", "event_id": "e1", "model_probability": 0.6}
+    )
+    b = ledger.append_prediction(
+        {"model_id": "x", "model_version": "v1", "event_id": "e2", "model_probability": 0.6}
+    )
     ledger.settle(a["prediction_id"], result="win", pnl_units=1.0, probability_clv=0.02)
     ledger.settle(b["prediction_id"], result="loss", pnl_units=-0.5, probability_clv=-0.01)
 

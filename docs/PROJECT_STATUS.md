@@ -16,6 +16,36 @@ this file exists to be the short, current summary someone can read first.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
+## 2026-08-18 — model-ledger settlement repaired; WNBA totals promotion refused
+
+- **Settlement bug fixed (was silently live).** `settle_from_pick_row`
+  graded on the append-side key, which carries `observed_at_utc`, so only
+  one row per event ever settled and every re-forecast row of a finished
+  game stayed open forever. WNBA spread ledger had **42 of 67 rows stuck
+  open** for games already played, and per-model evidence was computing on
+  9 rows instead of 51. Fixed (`_event_settlement_key` +
+  `ModelLedger.settle_event`), 4 regression tests, stranded rows backfilled
+  from final scores with a 9/9 self-check. Ledger now 51 settled / 16 open.
+- **WNBA spread model is sound but has no edge.** Pricing math verified
+  correct. Now that evidence grades: **7W-7L (50.0%) across 14 distinct
+  contracts**, Brier 0.2856 vs 0.2500 for always-0.5. Far short of the
+  50-call / 60% gate. Note the 51 settled rows are only 14 contracts —
+  minimum-sample gates must count contracts, not rows.
+- **WNBA total model NOT promoted.** Its own artifact fails its locked
+  holdout (95% CI entirely negative), it is a score model never evaluated
+  on over/under accuracy, it is not reproducible from current code (9
+  features vs 11), and **no WNBA totals serving path exists** — promotion
+  would have produced zero picks. Retraining made it worse. Full record in
+  `docs/MODEL_IMPROVEMENTS.md` section 7.
+- **Shared totals builder fixed**: `last_10_total_avg` was an exact
+  duplicate of `league_total_mean`; the real point-in-time signal improves
+  MLB, NBA and NFL.
+- **Open policy question**: the totals verdict uses a point estimate while
+  storing a bootstrap CI it ignores — NFL currently reads
+  `improved_vs_baseline=True` on a gain whose CI straddles zero.
+
+Champions unchanged; no promotion decisions taken.
+
 ## 2026-08-15/16 — open-items closure (post-consolidation sweep)
 
 Every open item from the read-through was fixed, closed with evidence,
