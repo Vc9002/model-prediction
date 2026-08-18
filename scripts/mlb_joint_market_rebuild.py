@@ -1,10 +1,20 @@
 """MLB joint ML/runline/totals rebuild (Step 7 tail).
 
 One coherent distribution per game -- the gamma_poisson champion from the
-closed Step-7 distribution comparison -- priced against REAL reconstructed
+closed Step-7 distribution comparison -- priced against reconstructed
 opening lines (data/historical/mlb_market_lines_reconstructed.jsonl,
 DraftKings open, 2026-07-01..2026-08-01, 340 games) for all three markets
-at once:
+at once.
+
+DATA CAVEAT (verified 2026-08-18): every row in that line archive carries
+timestamp_valid=false and observed_at_utc AFTER its game -- the "opening"
+lines are ESPN's POSTGAME pickcenter reconstruction of the open, with
+provider attribution secondhand via ESPN. The line VALUES are ESPN's own
+recorded pre-game opens (directionally usable), but the timing metadata
+must never be treated as decision-time evidence, and any model-vs-market
+conclusion from this file is provisional until a real pre-game odds
+archive exists. Model-vs-model comparisons in this script do NOT inherit
+that weakness (both sides share the same feature data).
 
   - moneyline: P(home) / (P(home)+P(away)) from the joint score draw
   - runline: P(away cover) at the market's own away spread line
