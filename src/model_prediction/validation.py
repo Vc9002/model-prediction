@@ -262,6 +262,71 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "starter_era_gap",
         "bullpen_fatigue_gap",
     ),
+    # ── v9 ISOLATING ladder: each entry changes EXACTLY ONE term against the
+    # v8 control (elo_trend_park_weather_starter_bullpen), so a delta is
+    # attributable to that term alone. The v9 variants above each move two
+    # things at once (e.g. PIT park AND the starter stat), which confounds
+    # the rung they were meant to test.
+    "v8_iso_park_pit": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",  # <- only change vs v8 control
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_residual_trend": (
+        "elo_probability",
+        "residual_trend_gap",  # <- only change
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_starter_kbb": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_kbb_gap",  # <- only change
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_starter_fip": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_fip_gap",  # <- only change
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_bullpen_fatigue": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_fatigue_gap",  # <- only change
+    ),
+    "v8_iso_bullpen_both": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+        "bullpen_fatigue_gap",  # <- only addition
+    ),
+    # weather_factor carries 26%/97%/52% availability by year and a standard
+    # deviation of 0.0084 (near-constant). It is in the v8 control, so every
+    # ladder comparison inherits it -- this drops it to measure what it is
+    # actually contributing.
+    "v8_iso_drop_weather": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
 }
 
 
