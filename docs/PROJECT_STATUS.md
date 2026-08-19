@@ -16,6 +16,41 @@ this file exists to be the short, current summary someone can read first.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
+## 2026-08-19 — v9 ladder measured null; lineup capture live; wake planner pending operator install
+
+- **The v9 isolating ladder is a measured null.** Seven single-variable
+  changes against the v8 control, proper paired date-cluster bootstrap:
+  best is residual_trend at ΔLL −0.00017 (P=0.658); the PIT park fix does
+  not help; starter_fip is significantly worse. All six v8 features are
+  worth 0.0046 nats over the constant base rate (0.6912 → 0.6866, AUC
+  0.567). Stop optimizing the six existing abstractions — the corrected
+  plan acquires materially different information instead. NB challenger
+  REJECTED (the 203-game win excluded gamma_poisson; the 3,513-game
+  head-to-head shows NB losing). `rest_disparity`, `probable_starter_era_gap`,
+  `starter_fip`, `starter_kbb` are closed experimental branches.
+- **Prospective lineup capture is LIVE.** Hourly job
+  `com.vc.mlb-lineup-capture` verified by its own log output (exit 0,
+  clean stderr). Archive `data/point_in_time/mlb_lineups.jsonl` — 16
+  rows, 5 decision-grade, content-hash dedupe with first/last/count
+  confirmation metadata. This dataset cannot be backfilled; the clock
+  started 2026-08-18.
+- **Known exposure — the sleep gap.** launchd coalesces missed hourly
+  firings into one run at wake, so overnight sleep permanently loses
+  late-game lineups. `scripts/plan_lineup_wakes.py` schedules one-time
+  wakes that follow the slate, but `pmset` requires root — **operator
+  install of a root LaunchDaemon is PENDING.** First quality report
+  already shows the skew: 5/5 captured games in 7-9pm, zero 9pm+
+  coverage.
+- **Next experiment**: batter PIT priors (`projected_offense_pit`,
+  strictly no target-game order in history; predeclared 3-component
+  family), then reliever workload × quality. New features land in a
+  versioned `mlb_v9_feature_table_v2.parquet`; the frozen v1 table stays
+  immutable as the evidence behind the nulls.
+- Commits `a7c9669` (settlement fix), `ce89eca` (capture), `70db329`
+  (hourly + schema), `c9d5800` (planner + metrics) on
+  `research/mlb-v9-lineup-and-bullpen`. 1903 passed / 3 skipped; ruff
+  clean.
+
 ## 2026-08-18 — model-ledger settlement repaired; WNBA totals promotion refused
 
 - **Settlement bug fixed (was silently live).** `settle_from_pick_row`

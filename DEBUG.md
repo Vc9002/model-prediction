@@ -1,6 +1,133 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-18 (see new section directly below)
+**Last audited**: 2026-08-19 (see new section directly below)
+
+## 2026-08-19 — prospective lineup capture, overnight wake planning, v9 isolating ladder
+
+### The v9 ladder measured: a null result, at proper isolation
+
+Seven new isolating variants each change EXACTLY ONE term against the v8
+control (the pre-existing v9 variants moved two at once, confounded).
+2,000-bootstrap date-cluster paired resampling, 1,389-row holdout:
+
+| single change | ΔLogLoss | P(better) |
+|---|---|---|
+| park_factor → park_factor_pit | +0.00023 | 0.223 |
+| trend → residual_trend | −0.00017 | 0.658 |
+| starter_era → starter_kbb | +0.00044 | 0.391 |
+| starter_era → starter_fip | +0.00120 | **0.025 (worse)** |
+| bullpen_weakness → bullpen_fatigue | +0.00081 | 0.128 |
+| + bullpen_fatigue alongside | −0.00003 | 0.515 |
+| drop weather_factor | +0.00006 | 0.089 |
+
+Scale reference: constant home base rate (0.5309) scores 0.6912 log loss;
+v8 scores 0.6866. **All six v8 features are worth 0.0046 nats, AUC 0.567.**
+Fixing the known park lookahead leak makes v8 slightly WORSE — the leak
+was not buying spurious lift; the feature is simply weak.
+
+Also corrected on operator review: the NB challenger's 203-game OOF win
+never included gamma_poisson (only independent_poisson and skellam); the
+3,513-game head-to-head that does include it shows NB losing (0.68844 vs
+0.68813, P(better)=0.175). **NB is REJECT.** Closed experimental branches
+on the measured evidence: `rest_disparity` (90% zeros), `probable_starter_era_gap`
+(96% zeros, 100% in 2024-25), `starter_fip` (significantly worse),
+`starter_kbb` (no lift). Report:
+`outputs/research/mlb_evaluator/v9_isolating_ladder.json`.
+
+Corrected plan: batter PIT priors first (`projected_offense_pit`,
+participation weights from games preceding T only — no target-game order
+in history; `confirmed_lineup_offense_pit` is a separate feature on the
+prospective cohort), then reliever workload × quality. Predeclared
+3-component batter family (offense/discipline/power), Beta-Binomial
+shrinkage from the existing machinery. New features go into a versioned
+`mlb_v9_feature_table_v2.parquet` with its own hashes; v1 stays immutable
+as the evidence behind these nulls. Market benchmark reported only on the
+identical 293-row timestamp-valid intersection, labelled
+"market benchmark cohort — not model-selection cohort".
+
+### Lineup capture — the one input that cannot be backfilled
+
+`features/lineup_strength.py` always returned `unavailable_from_source`;
+nothing captured who is actually playing tonight, and a completed boxscore
+can never tell you what was ANNOUNCED pregame. Verified live: Stats API
+`boxscore.battingOrder` is fully populated (9 per side) at Pre-Game/Warmup,
+hours before first pitch. New `data_sources/mlb_lineups.py` captures it
+with a hard PIT contract: timestamps stamped AFTER the HTTP response (the
+KBO/NPB ordering lesson), `lineup_state` gating (`pregame` rows only are
+decision-grade — a started game has a CONFIRMED order, which is exactly
+what a pregame decision may not use; unknown statuses resolve to
+`unknown`, never optimistically to pregame).
+
+**Live data immediately caught a bug the fixtures missed** (the exact
+failure mode CLAUDE.md warns about): the store's dedupe identity included
+`observed_at_utc`, which differs on every capture by construction, so
+nothing ever deduped — three runs of an unchanged 15-game slate wrote 45
+rows (at hourly cadence, ~360 duplicates/day). Dedupe is now on
+`content_hash`. But content dedupe alone lost confirmation evidence, so
+rows carry `first_observed_at_utc` / `last_observed_at_utc` /
+`capture_count`; a re-observation advances the last two on the row it
+confirms (a lineup seen at 18:10 and reconfirmed at 20:10 is 20 minutes
+old at 20:30, not 2h20m). `last_observed_at_utc` uses max() and never
+moves backwards (daily + hourly writers, late retries); `merge()` rewrites
+under an exclusive flock because a confirmation MUTATES a row and a torn
+read-modify-write would lose lineups that cannot be re-captured. Legacy
+rows hash on demand — no migration pass needed to read an old archive.
+Archive migrated 16/16, 0 collisions.
+
+### The sleep gap and its fix
+
+launchd COALESCES missed StartInterval firings into one run at wake.
+Sleeping through three hourly opportunities is not replayed — for the
+lineup archive that is permanent loss, concentrated entirely in
+late-starting west-coast games (systematic missingness in exactly the
+variable a lineup model conditions on). Two-part answer, neither of which
+keeps the machine awake all night:
+
+- `scripts/plan_lineup_wakes.py` follows the slate (no generic repeating
+  wake): one-time `pmset wakeorpoweron` events ~35 min before first pitch
+  for games whose window falls in the sleep window, coalesced within 20
+  minutes. `pmset schedule` needs root; the script is plan-only without
+  it and must be installed as a root LaunchDaemon (or run under sudo) to
+  self-manage. **Not yet installed — operator step pending.**
+- `scripts/lineup_capture_quality.py` stratifies capture by local
+  start-time bucket so the bias is measurable before a lineup model is
+  trained. First report already shows it: all 5 captured games in the
+  7-9pm bucket, ZERO 9pm+ coverage, median first capture 24.4 min before
+  start. Note `game_start_utc` is the SCHEDULED start — a row can be
+  legitimately `pregame` slightly past it during Warmup.
+
+The collector records `scheduled_games` / `eligible_pregame_games` /
+`games_with_lineup_posted` / `boxscore_unavailable` /
+`decision_grade_capture_rate` at run time: the denominator cannot be
+reconstructed later because the schedule is mutable.
+
+### Verification discipline notes
+
+Two planner tests initially failed; BOTH were test bugs, proven by
+computing the timezone arithmetic directly instead of assuming the code
+was wrong (05:00Z wakes at 00:25 EDT, outside the window; a next-UTC-date
+game IS inside the search horizon). An empty plan is not proof of
+correctness — the planner is pinned by 8 fake-client tests at a fixed
+instant. The hourly job was verified by its log output (exit 0, clean
+stderr, real JSON), not by `launchctl print`.
+
+### Reproduction
+
+```
+# lineup collector (also runs hourly via com.vc.mlb-lineup-capture)
+.venv/bin/python scripts/capture_mlb_lineups.py
+
+# capture-quality report, stratified by local start time
+.venv/bin/python scripts/lineup_capture_quality.py
+
+# wake plan (plan-only without root; --apply under sudo)
+.venv/bin/python scripts/plan_lineup_wakes.py
+
+# tests pinning the above
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/test_mlb_lineups.py tests/test_plan_lineup_wakes.py -q
+```
+
+1903 passed, 3 skipped; ruff clean on all touched files.
 
 ## 2026-08-18 — model-ledger settlement stranded 63% of its own evidence
 

@@ -581,6 +581,66 @@ holdout is not validated merely because the file calls that cohort “locked.”
 
 ## 8. MLB feature roadmap
 
+### Corrected v9 plan — 2026-08-19 (measured evidence, operator-reviewed)
+
+The isolating ladder measured what the existing six abstractions are
+worth: **0.0046 nats over the constant home base rate** (0.6912 → 0.6866,
+AUC 0.567). Seven single-variable changes against the v8 control produced
+nothing significant, and starter_fip was significantly worse. The
+conclusion is to stop optimizing the existing abstractions and acquire
+materially different information, in this order:
+
+1. **Batter PIT priors** — the question is narrowly "does decomposing
+   offense into PIT player talent beat v8's team-level abstractions?", not
+   "can we model tonight's order". A predeclared 3-component family
+   (shrunk offensive production, discipline, power) with Beta-Binomial
+   shrinkage from the existing machinery — not 15 hitter stats searched
+   individually. Player state advances strictly sequentially
+   (game finishes → update history → available for future games); the
+   target game's own lines never update their own priors.
+2. **Reliever workload × quality** — per-reliever pitches/appearances in
+   the prior 1/2/3 days, consecutive-day flags, paired with a PIT quality
+   prior. The quantity is "how much expected bullpen quality is
+   unavailable/degraded tonight", not another team-level fatigue scalar
+   (the existing one measured ΔLL −0.00003, P=0.51 — pure noise).
+3. **Confirmed-lineup aggregate — prospective cohort only.** The
+   historical target lineup is NOT backtestable: using a final boxscore's
+   batting order in history is retrospective lineup leakage. The
+   prospective archive (`data/point_in_time/mlb_lineups.jsonl`, capture
+   live since 2026-08-18) is accumulating; `confirmed_lineup_offense_pit`
+   becomes a separate feature and separate experiment when it is deep
+   enough.
+4. **Model class only after features answer** — LR vs XGBoost on the
+   identical frozen rows, and only if the feature families move scores.
+
+**Historical aggregation rule.** `projected_offense_pit` derives player
+participation weights entirely from games PRECEDING T (expected PA share
+× PIT prior, summed over the team's recent player pool). Lookback/decay
+parameters are selected chronologically, never hand-fixed from holdout
+performance. The name is deliberate: it is NOT a confirmed lineup, and
+`lineup_strength` must not be reused for it.
+
+**Feature-table versioning.** New features land in a versioned
+`mlb_v9_feature_table_v2.parquet` with dataset/feature-schema/source
+hashes, git SHA, created_at, decision horizon. The frozen v1 table
+(6,528 × 34) is evidence supporting the null results above and stays
+immutable — mutating its schema would make those experiments
+unreproducible.
+
+**Permanent evaluator controls.** Every report carries the constant-home
+baseline, Elo-only, and no-vig market probability on the EXACT
+timestamp-valid intersection (293 games today) — labelled
+"Market benchmark cohort — not model-selection cohort", so nobody
+optimizes sports features against those 293 rows. The market stays out of
+the independent sports model; it is a predictive benchmark.
+
+**Rejected on measured evidence (2026-08-19), not to be retuned because
+theory says they ought to work:** the Negative Binomial distribution
+challenger (the 203-game OOF win excluded gamma_poisson; the 3,513-game
+head-to-head shows NB losing 0.68844 vs 0.68813, P=0.175), plus the
+`rest_disparity`, `probable_starter_era_gap`, `starter_fip`, `starter_kbb`
+branches.
+
 MLB is the clearest case where the current team-score proxy is too lossy.
 Starting pitcher, lineup, bullpen, park, roof, and weather are not optional
 details; they are major components of the run-generating process.
