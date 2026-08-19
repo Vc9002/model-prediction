@@ -208,7 +208,12 @@ def _worth_observing(snapshot: dict[str, Any]) -> bool:
     return snapshot["away"]["size"] > 0 or snapshot["home"]["size"] > 0
 
 
-def capture_date(game_date: str, *, client: MLBLineupClient | None = None) -> list[dict[str, Any]]:
+def capture_date(
+    game_date: str,
+    *,
+    client: MLBLineupClient | None = None,
+    stats: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Capture the batting orders of games that have not started yet.
 
     Schedule-aware by design, so an hourly run costs one request when
@@ -223,22 +228,37 @@ def capture_date(game_date: str, *, client: MLBLineupClient | None = None) -> li
     fourteen games, since none of them can be re-captured later.
     """
     api = client or MLBLineupClient()
+    scheduled = api.schedule(game_date)
     unstarted = [
         game
-        for game in api.schedule(game_date)
+        for game in scheduled
         if classify_lineup_state(((game.get("status") or {}).get("detailedState")) or "") == "pregame"
     ]
     snapshots: list[dict[str, Any]] = []
+    unavailable = 0
     for game in unstarted:
         try:
             boxscore = api.boxscore(int(game["gamePk"]))
         except (RuntimeError, KeyError, ValueError):
+            unavailable += 1
             continue
         # Stamped AFTER the response: see the module docstring's PIT note.
         observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         snapshot = build_lineup_snapshot(game, boxscore, observed_at_utc=observed_at)
         if _worth_observing(snapshot):
             snapshots.append(snapshot)
+    if stats is not None:
+        # The denominator for capture rate has to be recorded at capture
+        # time: the schedule is mutable, and "how many games were still
+        # capturable when we looked" cannot be reconstructed afterwards.
+        stats.update(
+            {
+                "scheduled_games": len(scheduled),
+                "eligible_pregame_games": len(unstarted),
+                "games_with_lineup_posted": len(snapshots),
+                "boxscore_unavailable": unavailable,
+            }
+        )
     return snapshots
 
 
@@ -260,16 +280,23 @@ def capture_and_store(
     into full slate coverage, and there is no way to make up the
     difference afterwards.
     """
-    snapshots = capture_date(game_date, client=client)
+    stats: dict[str, Any] = {}
+    snapshots = capture_date(game_date, client=client, stats=stats)
     store = LineupStore(archive)
     result = store.merge(snapshots)
     decision_grade = [s for s in snapshots if s["lineup_state"] == "pregame" and s["lineup_complete"]]
+    eligible = int(stats.get("eligible_pregame_games") or 0)
     return {
         "date": game_date,
         "games_seen": len(snapshots),
         "rows_written": result["written"],
         "rows_confirmed": result["confirmed"],
         "decision_grade": len(decision_grade),
+        # Capture rate against the games that were still capturable when we
+        # looked -- the number that reveals systematic missingness by start
+        # time, which is invisible in a raw row count.
+        "decision_grade_capture_rate": (round(len(decision_grade) / eligible, 4) if eligible else None),
+        **stats,
         "archive": str(archive),
     }
 
