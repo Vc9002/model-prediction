@@ -26,6 +26,7 @@ from ..data_sources.polymarket_us import probability_to_american
 from ..data_sources.the_odds_api import TheOddsAPIClient
 from ..domain import (
     EASTERN,
+    LEARNED_PRODUCTION_SPORTS,
     PRODUCTION_SPORTS,
     League,
     MarketType,
@@ -41,6 +42,7 @@ from ..eligibility import evaluate_eligibility, evaluate_gated_research_eligibil
 from ..entities import EntityResolutionError
 from ..esports import (
     TITLE_SPECS,
+    forecast_esports_slate,
     refresh_recent_matches,
     validate_all_esports_baselines,
 )
@@ -52,12 +54,21 @@ from ..international_baseball import (
 )
 from ..learned_forward import build_learned_moneyline_slate, match_executable_quote
 from ..ledger import DuplicatePickError
+from ..main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from ..models.market_residual import MarketResidualModel
 from ..models.mlb import load_formula_spec
+from ..research_ledgers import RESEARCH_LEDGER_SPORTS, research_ledger
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
-from .commands import _research_models_dir
-from .state import _LEDGER_LOCK, DAILY_INTERNATIONAL_BASEBALL_SPORTS
+from .commands import _clear_today_open, _research_models_dir
+from .state import (
+    _LEDGER_LOCK,
+    DAILY_INTERNATIONAL_BASEBALL_SPORTS,
+    DUAL_LEDGER_SPORTS,
+    ESPORTS_TITLES,
+    FLAT_LEDGER_SPORTS,
+    SPORTS,
+)
 
 logger = logging.getLogger("model_prediction.cli")
 
@@ -1905,3 +1916,166 @@ def _append_secondary_ledger(
     except DuplicatePickError as error:
         logger.debug("%s: duplicate suppressed for existing pick %s", ledger_name, error.pick_id)
         return error.pick_id
+
+
+def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict:
+    log = args.command == "log" or getattr(args, "log", False) or args.command == "flat-forecast"
+    replace_today = getattr(args, "replace_today", False) or args.command == "flat-forecast"
+    is_flat = args.command == "flat-forecast"
+    sports = (
+        [*FLAT_LEDGER_SPORTS, "soccer", "tennis"]
+        if is_flat and getattr(args, "all", False)
+        else (list(SPORTS) + list(ESPORTS_TITLES) if getattr(args, "all", False) else [args.sport or "mlb"])
+    )
+    # Constructed unconditionally (not just when is_flat) so sports whose
+    # main/flat ledgers form a pair -- soccer, matching how its research/
+    # gated ledgers already pair -- can log to both from either command.
+    flat_ledger = MultiSportPickLedger(data_root, flat=True)
+    # Scopes clearing to only the sport(s) this invocation is about to
+    # regenerate -- flat_ledger/ledger both span every Main-ledger
+    # sport (mlb/wnba/soccer/tennis), so an unscoped clear on a
+    # single-sport run (e.g. `flat-forecast --sport tennis --log`)
+    # would silently wipe every OTHER sport's still-open today rows
+    # too, with nothing in this run to regenerate them. See
+    # _clear_today_open's docstring for the 2026-08-03 incident.
+    main_ledger_sport_scope = {s.casefold() for s in sports} & set(MAIN_LEDGER_SPORTS)
+    if is_flat:
+        if replace_today and log:
+            _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
+    elif replace_today and log:
+        _clear_today_open(ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
+    data_directory = Path(ledger_path(config)).parent
+    # Soccer and tennis are the two sports whose forecast functions
+    # write BOTH main_ledger and flat_ledger unconditionally whenever
+    # `log` is true, regardless of which command ran (see
+    # _forecast_soccer_sport/_forecast_tennis_sport call sites below:
+    # `main_ledger=(ledger if log else None), flat_ledger=(flat_ledger
+    # if log else None)`) -- every other sport only ever writes the
+    # one ledger matching is_flat. The is_flat/not-is_flat branches
+    # above only clear the ledger matching the command that ran, so
+    # without this, a second same-day run of the *other* command
+    # (`forecast --sport soccer --log` after an earlier `flat-forecast`,
+    # or vice versa) duplicates that sport's rows in the ledger this
+    # run doesn't otherwise touch. Originally patched for soccer only
+    # (2026-08-03) after it was caught duplicating Main rows; tennis
+    # was added to Main+Flat the same day but missed this fix, and the
+    # symmetric non-flat-run-duplicates-Flat gap was never covered for
+    # either sport.
+    dual_ledger_sports = {s.casefold() for s in sports} & DUAL_LEDGER_SPORTS
+    if replace_today and log and not is_flat:
+        selected_research_sports = (
+            RESEARCH_LEDGER_SPORTS
+            if getattr(args, "all", False)
+            else tuple(sport for sport in sports if sport.casefold() in RESEARCH_LEDGER_SPORTS)
+        )
+        for research_sport in selected_research_sports:
+            _clear_today_open(
+                research_ledger(data_directory, research_sport),
+                args.date,
+                by_event_date=True,
+            )
+            _clear_today_open(
+                research_ledger(data_directory, research_sport, gated=True),
+                args.date,
+                by_event_date=True,
+            )
+        if dual_ledger_sports:
+            _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=dual_ledger_sports)
+    elif replace_today and log and is_flat and dual_ledger_sports:
+        # NOTE: soccer/tennis's research/gated ledgers stopped being
+        # written to entirely as of the 2026-08-03 Main+Flat-only
+        # directive (RESEARCH_LEDGER_SPORTS no longer includes either)
+        # -- this used to also clear those files, but research_ledger()
+        # now raises ValueError for a sport outside RESEARCH_LEDGER_SPORTS,
+        # so clearing them here would crash rather than no-op. Removed.
+        _clear_today_open(ledger, args.date, by_event_date=True, leagues=dual_ledger_sports)
+    results = {}
+    for sport in sports:
+        if sport == "esports":
+            continue  # handled individually as lol/cs2
+        selected_model = getattr(args, "model", "learned")
+        if selected_model == "legacy-measured-edge":
+            if sport != "mlb":
+                raise ValueError("legacy-measured-edge is available only for MLB")
+            results[sport] = _forecast_mlb(args.date, log, config, registry, bans, ledger, audit)
+        elif sport in ESPORTS_TITLES:
+            sport_research = research_ledger(data_directory, sport)
+            sport_gated = research_ledger(data_directory, sport, gated=True)
+            results[sport] = forecast_esports_slate(
+                data_root=data_directory,
+                artifact_dir=_research_models_dir(),
+                title=sport,
+                game_date=args.date,
+            )
+            if log and ledger is not None:
+                # Esports never reaches Main, so no Flat row either
+                # (operator directive, 2026-08-03) -- Research is
+                # already its "every candidate" companion.
+                _log_esports_forecast(
+                    results[sport],
+                    config,
+                    sport_research,
+                    flat_mode=is_flat,
+                    gated_ledger=sport_gated,
+                )
+        elif sport in ("kbo", "npb"):
+            # KBO/NPB never reach Main, so no Flat row either
+            # (operator directive, 2026-08-03) -- same reasoning as
+            # esports above.
+            results[sport] = _forecast_international_sport(
+                data_root=data_directory,
+                artifact_dir=_research_models_dir(),
+                league=sport,
+                args_date=args.date,
+                config=config,
+                research_ledger=(research_ledger(data_directory, sport) if log and not is_flat else None),
+                gated_ledger=(
+                    research_ledger(data_directory, sport, gated=True) if log and not is_flat else None
+                ),
+            )
+        elif sport == "soccer":
+            # Main+Flat only (operator directive 2026-08-03).
+            results[sport] = _forecast_soccer_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                main_ledger=(ledger if log else None),
+                flat_ledger=(flat_ledger if log else None),
+            )
+        elif sport == "tennis":
+            # Main+Flat only (operator directive 2026-08-03).
+            results[sport] = _forecast_tennis_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                main_ledger=(ledger if log else None),
+                flat_ledger=(flat_ledger if log else None),
+            )
+        elif sport in LEARNED_PRODUCTION_SPORTS:
+            use_ledger = flat_ledger if is_flat else ledger
+            results[sport] = _forecast_learned_sport(
+                sport,
+                args.date,
+                log,
+                config,
+                registry,
+                bans,
+                use_ledger,
+                maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                maximum_unreviewed_disagreement=float(
+                    config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                ),
+                flat_mode=is_flat,
+                force=getattr(args, "force", False),
+                research_ledger=None,
+                gated_ledger=None,
+                exposure_ledger=ledger,
+            )
+            if is_flat and sport == "mlb":
+                results["mlb_totals"] = _forecast_mlb_totals_flat(
+                    args.date, log, config, registry, bans, flat_ledger, audit
+                )
+        else:
+            results[sport] = _forecast_research_sport(sport, args.date, config)
+    output = results[sports[0]] if len(sports) == 1 else results
+    return output

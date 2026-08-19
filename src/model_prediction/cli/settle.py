@@ -26,6 +26,8 @@ from ..data_sources.polymarket_us import (
     probability_to_american,
 )
 from ..domain import EASTERN, parse_utc, utc_now
+from ..main_ledgers import MultiSportPickLedger
+from ..research_ledgers import existing_research_ledgers
 from ..tennis_forward import TENNIS_TOURS
 from .state import _LEDGER_LEAGUE_TO_ESPN, _TERMINAL_MARKET_STATES
 
@@ -566,3 +568,63 @@ def _find_soccer_result(
             except (KeyError, TypeError, ValueError):
                 continue
     return None
+
+
+def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
+    if args.all_unsettled:
+        output = _settle_all_unsettled(args, config, ledger)
+        # Also settle the flat ledger
+        flat_ledger = MultiSportPickLedger(data_root, flat=True)
+        output["flat_settlement"] = _settle_all_unsettled(args, config, flat_ledger)
+        data_directory = Path(ledger_path(config)).parent
+        research_settlement = {}
+        for sport_ledger in existing_research_ledgers(data_directory):
+            research_settlement[sport_ledger.path.stem] = _settle_all_unsettled(
+                args,
+                config,
+                sport_ledger,
+            )
+        if research_settlement:
+            output["research_settlement"] = research_settlement
+        gated_settlement = {}
+        for sport_ledger in existing_research_ledgers(
+            data_directory,
+            gated=True,
+        ):
+            gated_settlement[sport_ledger.path.stem] = _settle_all_unsettled(
+                args,
+                config,
+                sport_ledger,
+            )
+        if gated_settlement:
+            output["gated_research_settlement"] = gated_settlement
+    else:
+        if not args.pick_id or args.away_score is None or args.home_score is None:
+            raise ValueError("provide --pick-id with --away-score/--home-score, or --all-unsettled")
+        closing_line = args.closing_line
+        closing_odds = args.closing_american_odds
+        closing_probability = None
+        if closing_odds is None:
+            row = next((r for r in ledger.rows() if r["pick_id"] == args.pick_id), None)
+            if row is None:
+                raise KeyError(f"unknown pick id: {args.pick_id}")
+            quote = MarketOddsSnapshotStore(market_odds_snapshot_path(config)).closing_quote(
+                row["event_id"], row["event_start_utc"], row["market_type"], row["selection"]
+            )
+            if quote is not None:
+                closing_odds = int(quote["american_odds"])
+                closing_probability = float(quote["decision_probability"])
+                if quote.get("line") is not None:
+                    closing_line = float(quote["line"])
+        output = ledger.settle(
+            args.pick_id,
+            args.away_score,
+            args.home_score,
+            closing_line,
+            closing_odds,
+            closing_no_vig_probability=args.closing_no_vig_probability,
+            closing_consensus_probability=args.closing_consensus_probability,
+            closing_consensus_line=args.closing_consensus_line,
+            closing_raw_probability=closing_probability,
+        )
+    return output
