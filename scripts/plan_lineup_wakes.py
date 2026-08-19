@@ -87,11 +87,19 @@ def plan_wakes(
     api = client or MLBLineupClient()
     current = now or datetime.now(UTC)
     windows: list[dict[str, object]] = []
-    # Today and tomorrow in UTC: a late local game belongs to tomorrow's
-    # UTC date, and would be missed by looking at one date only.
-    for offset in (0, 1):
+    seen: set[int] = set()
+    # The schedule endpoint buckets by VENUE-LOCAL date, so a west-coast
+    # game starting 04:40Z on the 19th lives on the 18th's card. Scanning
+    # yesterday through tomorrow in UTC, deduped, covers every venue's
+    # local date no matter when this planner runs. Found by code review
+    # 2026-08-19, verified against the live API.
+    for offset in (-1, 0, 1):
         game_date = (current + timedelta(days=offset)).date().isoformat()
         for game in api.schedule(game_date):
+            game_pk = int(game.get("gamePk") or 0)
+            if game_pk in seen:
+                continue
+            seen.add(game_pk)
             state = classify_lineup_state(((game.get("status") or {}).get("detailedState")) or "")
             if state != "pregame":
                 continue
@@ -129,17 +137,51 @@ def plan_wakes(
     return coalesced
 
 
-def _scheduled_by_us() -> list[str]:
-    result = subprocess.run(["pmset", "-g", "sched"], capture_output=True, text=True, check=False)
-    return [line for line in result.stdout.splitlines() if OWNER_TAG in line]
+def _cancel_own_events(run=subprocess.run) -> int:
+    """Cancel only the events WE scheduled, never anyone else's.
+
+    `pmset schedule cancelall` deletes every power event on the system --
+    the user's backups, alarms, anything -- and a previous version of this
+    script did exactly that. Found by code review 2026-08-19. The cancel
+    subcommand takes (type, date, time, owner), so we list, parse each of
+    OUR OWNER_TAG lines, and cancel them individually. A line we cannot
+    parse is left alone (better a stale wake than a foreign event
+    deleted), and any parse failure aborts the apply so we never schedule
+    a stack of duplicates on top.
+    """
+    result = run(["pmset", "-g", "sched"], capture_output=True, text=True, check=False)
+    cancelled = 0
+    for line in result.stdout.splitlines():
+        if OWNER_TAG not in line:
+            continue
+        try:
+            # e.g. "[0]  wakeorpoweron at 08/19/2026 03:30:00 by 'owner'"
+            # The event TYPE is the last token before " at "; the stamp is
+            # everything between " at " and " by ".
+            head, _, _ = line.partition("by '")
+            before_at, _, after_at = head.partition(" at ")
+            event_type = before_at.split()[-1]
+            stamp = after_at.strip()
+            if not event_type or not stamp:
+                raise ValueError("unparseable")
+        except (IndexError, ValueError):
+            return -1  # abort: better stale than destructive
+        run(
+            ["pmset", "schedule", "cancel", event_type, stamp, OWNER_TAG],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        cancelled += 1
+    return cancelled
 
 
 def apply_wakes(wakes: list[dict[str, object]]) -> dict[str, object]:
     if os.geteuid() != 0:
         return {"status": "not_root", "scheduled": 0}
-    # Clear our own previous events first so repeated planning runs do not
-    # stack duplicates in the system power-event queue.
-    subprocess.run(["pmset", "schedule", "cancelall"], capture_output=True, text=True, check=False)
+    cleared = _cancel_own_events()
+    if cleared < 0:
+        return {"status": "aborted_unparseable_existing_event", "scheduled": 0}
     scheduled = 0
     for wake in wakes:
         stamp = wake["wake_local"].strftime("%m/%d/%y %H:%M:%S")

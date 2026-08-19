@@ -48,7 +48,7 @@ import subprocess
 import time
 import urllib.parse
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -223,15 +223,26 @@ def capture_date(
     would add a row per game per hour. Only the pregame window is
     irreplaceable, and only it is collected.
 
+    The schedule endpoint buckets games by each venue's LOCAL date, so a
+    run after midnight UTC must ALSO read the previous UTC day's card:
+    a 21:40 PDT game (04:40Z next UTC day) lives on the prior day's
+    card, and asking only for "today UTC" would silently miss precisely
+    the late west-coast games the overnight wake planner exists to cover.
+    Found by code review 2026-08-19, verified against the live API.
+
     A per-game failure degrades to a skip rather than losing the whole
     date -- a single unavailable boxscore must not cost us the other
     fourteen games, since none of them can be re-captured later.
     """
     api = client or MLBLineupClient()
-    scheduled = api.schedule(game_date)
+    target = date.fromisoformat(game_date)
+    scheduled: dict[int, dict[str, Any]] = {}
+    for day in (target - timedelta(days=1), target):
+        for game in api.schedule(day.isoformat()):
+            scheduled[int(game["gamePk"])] = game
     unstarted = [
         game
-        for game in scheduled
+        for game in scheduled.values()
         if classify_lineup_state(((game.get("status") or {}).get("detailedState")) or "") == "pregame"
     ]
     snapshots: list[dict[str, Any]] = []

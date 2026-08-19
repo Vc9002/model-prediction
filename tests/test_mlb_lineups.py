@@ -232,3 +232,44 @@ def test_store_is_idempotent_but_records_a_real_lineup_change(tmp_path) -> None:
     assert rows[0]["away"]["batting_order"][0]["player_id"] == 1
     assert rows[1]["away"]["batting_order"][0]["player_id"] == 99
     assert rows[0]["content_hash"] != rows[1]["content_hash"]
+
+
+def test_capture_reads_the_previous_utc_card_for_late_local_games() -> None:
+    """The schedule endpoint buckets by venue-LOCAL date: a 21:40 PDT game
+    (04:40Z the next UTC day) lives on the PREVIOUS day's card. A
+    post-midnight run that asked only for today-UTC would silently miss
+    exactly the late west-coast games the overnight wake planner exists to
+    cover -- found by code review 2026-08-19 and verified against the live
+    API."""
+
+    class BucketedClient:
+        def __init__(self) -> None:
+            self.requested: list[str] = []
+
+        def schedule(self, game_date: str) -> list[dict]:
+            self.requested.append(game_date)
+            if game_date == "2026-08-18":
+                return [_game(game_pk=9001, state="Pre-Game", start="2026-08-19T04:40:00Z")]
+            return []
+
+        def boxscore(self, game_pk):
+            return _boxscore()
+
+    client = BucketedClient()
+    snaps = capture_date("2026-08-19", client=client)
+
+    assert client.requested == ["2026-08-18", "2026-08-19"]
+    assert [s["game_pk"] for s in snaps] == [9001]
+
+
+def test_capture_dedupes_a_game_seen_on_both_cards() -> None:
+    class OverlappingClient:
+        def schedule(self, game_date: str) -> list[dict]:
+            return [_game(game_pk=9002, state="Pre-Game", start="2026-08-19T04:40:00Z")]
+
+        def boxscore(self, game_pk):
+            return _boxscore()
+
+    snaps = capture_date("2026-08-19", client=OverlappingClient())
+
+    assert len(snaps) == 1

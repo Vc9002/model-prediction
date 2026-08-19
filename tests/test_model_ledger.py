@@ -505,3 +505,72 @@ def test_compute_model_evidence_computes_real_mean_clv_and_pnl(tmp_path) -> None
 def test_rejects_a_non_xlsx_path(tmp_path) -> None:
     with pytest.raises(ValueError, match="must be an .xlsx workbook"):
         ModelLedger(tmp_path / "model.csv")
+
+
+def test_settle_event_never_grades_a_failed_integrity_row(tmp_path) -> None:
+    """A `failed` row is an append_failure record saying the model never made
+    a call. Settling it with a win/loss and pnl would fabricate a bet that
+    never existed -- found by code review 2026-08-19."""
+    ledger = ModelLedger(tmp_path / "wnba-spread-margin.xlsx")
+    good = ledger.append_prediction(
+        _prediction(
+            model_id="wnba-spread-margin",
+            market_type="spread",
+            line="5.5",
+            selection="away",
+        )
+    )
+    # The failure record must carry the SAME contract fields at append
+    # time -- a failure can be raised for a real event/market/line, and it
+    # must never be graded as a bet regardless.
+    failure = ledger.append_failure(
+        model_id="wnba-spread-margin",
+        model_version="mlb-elo-trend-lr-v7",
+        event_id="event-1",
+        reason="market_sides_unmapped",
+        market_type="spread",
+        line="5.5",
+        selection="away",
+    )
+    from model_prediction.model_ledger import _event_settlement_key
+
+    key = _event_settlement_key(good)
+
+    settled = ledger.settle_event(key, result="win", pnl_units=1.5)
+
+    assert len(settled) == 1
+    rows = {r["prediction_id"]: r for r in ledger.rows()}
+    assert rows[good["prediction_id"]]["status"] == "settled"
+    assert rows[failure["prediction_id"]]["status"] == "failed"
+
+
+def test_settle_event_does_not_grade_a_sign_flipped_line(tmp_path) -> None:
+    """away +1.5 and away -1.5 are opposite contracts: the selected side
+    receives vs. gives points. abs()-normalization would collapse them and
+    grade the flipped re-forecast backwards -- found by code review
+    2026-08-19."""
+    ledger = ModelLedger(tmp_path / "wnba-spread-margin.xlsx")
+    plus = ledger.append_prediction(
+        _prediction(
+            model_id="wnba-spread-margin",
+            market_type="spread",
+            line="1.5",
+            selection="away",
+        )
+    )
+    minus = ledger.append_prediction(
+        _prediction(
+            model_id="wnba-spread-margin",
+            market_type="spread",
+            line="-1.5",
+            selection="away",
+            observed_at_utc="2026-08-02T18:00:00Z",
+        )
+    )
+    from model_prediction.model_ledger import _event_settlement_key
+
+    settled = ledger.settle_event(_event_settlement_key(plus), result="win", pnl_units=1.0)
+
+    assert [r["prediction_id"] for r in settled] == [plus["prediction_id"]]
+    rows = {r["prediction_id"]: r for r in ledger.rows()}
+    assert rows[minus["prediction_id"]]["status"] == "open"

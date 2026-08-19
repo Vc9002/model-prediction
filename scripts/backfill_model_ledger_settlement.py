@@ -70,6 +70,33 @@ def grade_spread(selection: str, line: float, away_score: int, home_score: int) 
     return "push" if margin == threshold else ("win" if margin > threshold else "loss")
 
 
+def plan_settlements(
+    rows: list[dict[str, str]],
+    scores: dict[str, tuple[int, int]],
+    staked: dict[tuple[str, str, str], dict[str, str]],
+) -> tuple[list[tuple[dict[str, str], str, str | None]], list[dict[str, str]]]:
+    """Grade every still-open row with a final score available.
+
+    `row["line"] in (None, "")` is the missingness test on purpose: a
+    pick'em spread stores line "0", which is a real contract and must be
+    graded, not skipped forever as if absent -- found by code review
+    2026-08-19.
+    """
+    planned: list[tuple[dict[str, str], str, str | None]] = []
+    ungradeable: list[dict[str, str]] = []
+    for row in rows:
+        if row["status"] != "open":
+            continue
+        score = scores.get(row["event_id"])
+        if score is None or row["line"] in (None, ""):
+            ungradeable.append(row)
+            continue
+        result = grade_spread(row["selection"], float(row["line"]), *score)
+        source = staked.get((row["event_id"], row["line"], row["selection"]))
+        planned.append((row, result, source["pnl_units"] if source else None))
+    return planned, ungradeable
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ledger", required=True, type=Path)
@@ -88,7 +115,7 @@ def main() -> int:
         if row["status"] != "settled" or not row["result"]:
             continue
         score = scores.get(row["event_id"])
-        if score is None or not row["line"]:
+        if score is None or row["line"] in (None, ""):
             continue
         graded = grade_spread(row["selection"], float(row["line"]), *score)
         checked += 1
@@ -113,18 +140,7 @@ def main() -> int:
         if row["status"] == "settled" and row["pnl_units"]:
             staked[(row["event_id"], row["line"], row["selection"])] = row
 
-    planned: list[tuple[dict[str, str], str, str | None]] = []
-    ungradeable: list[dict[str, str]] = []
-    for row in rows:
-        if row["status"] != "open":
-            continue
-        score = scores.get(row["event_id"])
-        if score is None or not row["line"]:
-            ungradeable.append(row)
-            continue
-        result = grade_spread(row["selection"], float(row["line"]), *score)
-        source = staked.get((row["event_id"], row["line"], row["selection"]))
-        planned.append((row, result, source["pnl_units"] if source else None))
+    planned, ungradeable = plan_settlements(rows, scores, staked)
 
     print(f"\nto settle: {len(planned)}   still open (no final score yet): {len(ungradeable)}")
     for row, result, pnl in planned:

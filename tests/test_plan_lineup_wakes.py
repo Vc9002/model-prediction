@@ -107,3 +107,84 @@ def test_tomorrow_utc_is_searched_so_late_local_games_are_not_missed() -> None:
 
     assert len(wakes) == 1
     assert wakes[0]["covers"] == ["Away1 @ Home1"]
+
+
+def test_cancel_own_events_never_touches_foreign_events() -> None:
+    """`pmset schedule cancelall` deletes every power event on the system --
+    a previous version did exactly that. Found by code review 2026-08-19.
+    The cancel must be scoped to OWNER_TAG events only."""
+    calls: list[list[str]] = []
+    from subprocess import CompletedProcess
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args[:2] == ["pmset", "-g"]:
+            return CompletedProcess(
+                args,
+                0,
+                stdout=(
+                    "[0]  wakeorpoweron at 08/19/26 03:30:00 by 'mlb-lineup-capture'\n"
+                    "[1]  wake at 08/19/26 07:00:00 by 'com.apple.alarm.user-visible'\n"
+                    "[2]  wakeorpoweron at 08/20/26 03:45:00 by 'mlb-lineup-capture'\n"
+                ),
+                stderr="",
+            )
+        return CompletedProcess(args, 0, stdout="", stderr="")
+
+    cancelled = plan_lineup_wakes._cancel_own_events(run=fake_run)
+
+    assert cancelled == 2
+    assert "cancelall" not in " ".join(" ".join(c) for c in calls)
+    assert [
+        "pmset",
+        "schedule",
+        "cancel",
+        "wakeorpoweron",
+        "08/19/26 03:30:00",
+        "mlb-lineup-capture",
+    ] in calls
+    assert [
+        "pmset",
+        "schedule",
+        "cancel",
+        "wakeorpoweron",
+        "08/20/26 03:45:00",
+        "mlb-lineup-capture",
+    ] in calls
+    # The foreign alarm event is untouched.
+    assert not any("com.apple.alarm" in " ".join(c) for c in calls)
+
+
+def test_cancel_own_events_aborts_on_an_unparseable_own_line() -> None:
+    """Better a stale wake than a destructive guess at someone else's event."""
+
+    from subprocess import CompletedProcess
+
+    def fake_run(args, **kwargs):
+        if args[:2] == ["pmset", "-g"]:
+            return CompletedProcess(
+                args, 0, stdout="[0]  wakeorpoweron GARBLED by 'mlb-lineup-capture'\n", stderr=""
+            )
+        return CompletedProcess(args, 0, stdout="", stderr="")
+
+    assert plan_lineup_wakes._cancel_own_events(run=fake_run) == -1
+
+
+def test_planner_scans_yesterdays_utc_card_too() -> None:
+    """A 04:40Z game on the 20th lives on the venue-local card for the 19th.
+    A planner running after midnight UTC that scanned only today+tomorrow
+    would never schedule its wake -- found by code review 2026-08-19."""
+    requested = []
+
+    class LateClient:
+        def schedule(self, game_date: str) -> list[dict]:
+            requested.append(game_date)
+            if game_date == "2026-08-19":
+                return [_game(1, "2026-08-20T06:10:00Z")]
+            return []
+
+    wakes = plan_wakes(client=LateClient(), now=NOW)
+
+    assert "2026-08-18" in requested and "2026-08-19" in requested and "2026-08-20" in requested
+    assert len(wakes) == 1
+    assert wakes[0]["covers"] == ["Away1 @ Home1"]

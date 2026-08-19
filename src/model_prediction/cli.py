@@ -3789,7 +3789,12 @@ def main(argv: list[str] | None = None) -> None:
                 nonlocal mlb_lineups_result
                 try:
                     mlb_lineups_result = capture_lineups_and_store(args.date)
-                except (OSError, RuntimeError, TypeError, ValueError):
+                except Exception:
+                    # Matches every sibling capture in this pool. A narrow
+                    # tuple here would let one malformed schedule row (e.g.
+                    # a missing gamePk raising KeyError) escape the future
+                    # and abort the ENTIRE daily run -- settlement and every
+                    # other sport included. Found by code review 2026-08-19.
                     logger.warning("MLB lineup capture failed for %s", args.date, exc_info=True)
                     mlb_lineups_result = {"status": "error"}
 

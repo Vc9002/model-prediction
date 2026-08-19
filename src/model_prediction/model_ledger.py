@@ -180,6 +180,22 @@ def _normalized_line(row: dict[str, str]) -> str:
     return line
 
 
+def _signed_line(row: dict[str, str]) -> str:
+    """The line as a SIGNED number, representation-normalized.
+
+    "+5.5" and "5.5" are the same contract and must match; "+1.5" and
+    "-1.5" are OPPOSITE contracts (the selected side receives vs. gives
+    points) and must never collapse. abs()-based normalization, which is
+    right for the append-side dedupe key, would silently grade a
+    sign-flipped re-forecast backwards -- found by code review
+    2026-08-19."""
+    raw = str(row.get("line") or "")
+    try:
+        return f"{float(raw):g}"
+    except ValueError:
+        return raw
+
+
 def _event_settlement_key(row: dict[str, str]) -> tuple[str, str, str, str, str]:
     """The contract a settlement grades: event/market/line/model/selection.
 
@@ -193,11 +209,13 @@ def _event_settlement_key(row: dict[str, str]) -> tuple[str, str, str, str, str]
     one game and resolve oppositely, so a re-forecast that crossed 0.5 and
     flipped sides must not inherit the other side's result. No live row has
     flipped yet, so this changes nothing today -- it makes a future flip
-    stay honestly open instead of being graded backwards."""
+    stay honestly open instead of being graded backwards. The line itself
+    is kept SIGNED for the same reason: away +1.5 and away -1.5 are
+    different contracts that resolve oppositely."""
     return (
         str(row.get("event_id") or ""),
         str(row.get("market_type") or ""),
-        _normalized_line(row),
+        _signed_line(row),
         str(row.get("model_version") or ""),
         str(row.get("selection") or ""),
     )
@@ -505,7 +523,12 @@ class ModelLedger:
             rows = self._read_unlocked()
             stamp = iso_utc(settled_at or utc_now())
             for row in rows:
-                if row["status"] == "settled" or _event_settlement_key(row) != key:
+                # Only OPEN rows are gradeable. A `failed` row is an
+                # integrity-gate record (append_failure) that says the model
+                # never made a call -- settling it with a win/loss and pnl
+                # would fabricate a bet that never existed. Found by code
+                # review 2026-08-19.
+                if row["status"] != "open" or _event_settlement_key(row) != key:
                     continue
                 row["status"] = "settled"
                 row["result"] = result
