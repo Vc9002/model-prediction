@@ -25,10 +25,10 @@ factor_bounds:
 feature_schema_version: v3
 formula_version: mlb-analyst-poisson-trend-v0.3
 home_field_run_factor: 1.04
-league_runs_per_team_game: 4.5435
-league_starter_era: 4.1897
-league_strikeout_rate: 0.2192
-league_walk_rate: 0.0786
+league_runs_per_team_game: 4.5406
+league_starter_era: 4.1917
+league_strikeout_rate: 0.2191
+league_walk_rate: 0.0788
 offense_elasticity: 0.088237
 park_elasticity: 0.259048
 recent_half_life_games: 10.0

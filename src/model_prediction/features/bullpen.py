@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-LEAGUE_RELIEF_ERA = 4.059
+LEAGUE_RELIEF_ERA = 4.0598
 # Same shrinkage rationale as models/mlb.py's starter ERA fix: a handful of
 # relief innings is extremely noisy on its own (one blown save skews it hard)
 # and must not be trusted at full confidence just because it's nonzero.
@@ -112,10 +112,7 @@ def team_recent_relief_lines(
     index = load_relief_appearance_index(snapshot_path)
     games = [game for game in index.get(team_name, []) if game[0] < decision]
     if lookback_days is not None:
-        games = [
-            game for game in games
-            if 0 <= (decision.date() - game[0].date()).days <= lookback_days
-        ]
+        games = [game for game in games if 0 <= (decision.date() - game[0].date()).days <= lookback_days]
     recent = games[-lookback_games:]
     return [line for _, lines in recent for line in lines]
 
