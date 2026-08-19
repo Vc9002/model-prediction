@@ -30,15 +30,15 @@ from typing import Any
 
 import httpx
 
-from .audit import AuditLog
-from .backtester import walk_forward_backtest
-from .bans import TeamBanList
-from .champion_challenger import (
+from ..audit import AuditLog
+from ..backtester import walk_forward_backtest
+from ..bans import TeamBanList
+from ..champion_challenger import (
     FrozenProductionStore,
     ProductionRegistry,
     compare_champion_vs_challenger,
 )
-from .config import (
+from ..config import (
     PROJECT_ROOT,
     audit_path,
     config_path,
@@ -49,23 +49,23 @@ from .config import (
     polymarket_snapshot_path,
     unit_policy,
 )
-from .data_sources.espn import SPORT_LEAGUES, ESPNClient, ESPNMLBClient
-from .data_sources.espn_probables import capture_probable_starter_snapshot
-from .data_sources.espn_wnba_injuries import capture_espn_event_injuries
-from .data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
-from .data_sources.mlb_injuries import (
+from ..data_sources.espn import SPORT_LEAGUES, ESPNClient, ESPNMLBClient
+from ..data_sources.espn_probables import capture_probable_starter_snapshot
+from ..data_sources.espn_wnba_injuries import capture_espn_event_injuries
+from ..data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
+from ..data_sources.mlb_injuries import (
     capture_roster_snapshot,
     capture_transactions_snapshot,
     team_id_for_name,
 )
-from .data_sources.mlb_lineups import capture_and_store as capture_lineups_and_store
-from .data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
-from .data_sources.polymarket_execute import (
+from ..data_sources.mlb_lineups import capture_and_store as capture_lineups_and_store
+from ..data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
+from ..data_sources.polymarket_execute import (
     ExecutionGateError,
     OrderTicket,
     PolymarketExecutor,
 )
-from .data_sources.polymarket_us import (
+from ..data_sources.polymarket_us import (
     POLYMARKET_SPORT_LEAGUES,
     PolymarketSnapshotStore,
     PolymarketUSClient,
@@ -73,9 +73,9 @@ from .data_sources.polymarket_us import (
     probability_to_american,
     refresh_contract_snapshots,
 )
-from .data_sources.the_odds_api import TheOddsAPIClient
-from .data_sources.wnba_injuries import capture_latest_report
-from .domain import (
+from ..data_sources.the_odds_api import TheOddsAPIClient
+from ..data_sources.wnba_injuries import capture_latest_report
+from ..domain import (
     EASTERN,
     LEARNED_PRODUCTION_SPORTS,
     LOSS_CLASSIFICATIONS,
@@ -91,49 +91,49 @@ from .domain import (
     parse_utc,
     utc_now,
 )
-from .eligibility import (
+from ..eligibility import (
     evaluate_eligibility,
     evaluate_gated_research_eligibility,
 )
-from .entities import EntityRegistry, EntityResolutionError
-from .esports import (
+from ..entities import EntityRegistry, EntityResolutionError
+from ..esports import (
     TITLE_SPECS,
     backfill_esports,
     forecast_esports_slate,
     refresh_recent_matches,
     validate_all_esports_baselines,
 )
-from .features.base import FeatureStore
-from .forward import build_mlb_slate
-from .ingest import Ingestor
-from .international_baseball import (
+from ..features.base import FeatureStore
+from ..forward import build_mlb_slate
+from ..ingest import Ingestor
+from ..international_baseball import (
     LEAGUE_SPECS as INTERNATIONAL_BASEBALL_LEAGUE_SPECS,
 )
-from .international_baseball import (
+from ..international_baseball import (
     backfill_international_baseball,
     forecast_international_baseball_slate,
     refresh_recent_international_baseball_matches,
     validate_all_international_baseball_baselines,
 )
-from .learned_forward import build_learned_moneyline_slate, match_executable_quote
-from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError
-from .main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
-from .mlb_baseline_refresh import refresh_if_due
-from .models import MODEL_SPECS
-from .models.market_residual import MarketResidualModel, ResidualTrainingRow
-from .models.mlb import load_formula_spec
-from .models.registry import model_spec
-from .research_ledgers import (
+from ..learned_forward import build_learned_moneyline_slate, match_executable_quote
+from ..ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError
+from ..main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
+from ..mlb_baseline_refresh import refresh_if_due
+from ..models import MODEL_SPECS
+from ..models.market_residual import MarketResidualModel, ResidualTrainingRow
+from ..models.mlb import load_formula_spec
+from ..models.registry import model_spec
+from ..research_ledgers import (
     RESEARCH_LEDGER_SPORTS,
     existing_research_ledgers,
     research_ledger,
 )
-from .runtime_paths import rolling_models_root
-from .soccer_forward import build_soccer_total_slate
-from .tennis_forward import TENNIS_TOURS, build_tennis_slate
-from .total_score import validate_all_total_score_models
-from .units import edge_scaled_units
-from .validation import run_validation_audit, write_production_artifacts
+from ..runtime_paths import rolling_models_root
+from ..soccer_forward import build_soccer_total_slate
+from ..tennis_forward import TENNIS_TOURS, build_tennis_slate
+from ..total_score import validate_all_total_score_models
+from ..units import edge_scaled_units
+from ..validation import run_validation_audit, write_production_artifacts
 
 SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
 ESPN_SPORTS = tuple(SPORT_LEAGUES)
@@ -1088,8 +1088,8 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
     makes the row's own ``line`` exactly BasketballModel's
     ``spread_away_line`` input with no sign transform needed.
     """
-    from .learned_forward import _team_matches, _teams
-    from .models.basketball import BasketballModel, UpcomingGame
+    from ..learned_forward import _team_matches, _teams
+    from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
     model_version = "wnba-spread-margin-v1"
@@ -1229,7 +1229,7 @@ def _forecast_wnba_spread_sport(
     ``registry``/``bans`` are the same instances the daily dispatch already
     builds once for WNBA moneyline -- not reconstructed here.
     """
-    from .data_sources.polymarket_us import probability_to_american
+    from ..data_sources.polymarket_us import probability_to_american
 
     forecast = _forecast_wnba_spread_slate(data_root, args_date, ESPNClient())
     exposure_source = flat_ledger or main_ledger
@@ -1771,7 +1771,7 @@ def _log_esports_forecast(
     ``evaluate_esports_eligibility``'s own docstring for why). Returns the
     count of logged rows.
     """
-    from .data_sources.polymarket_us import probability_to_american
+    from ..data_sources.polymarket_us import probability_to_american
 
     logged = 0
     errors: list[dict] = []
@@ -1967,8 +1967,8 @@ def _forecast_international_sport(
     workbook; only calls clearing the configured executable-edge and confidence
     floors also go to its Gated Research workbook.
     """
-    from .data_sources.polymarket_us import probability_to_american
-    from .international_baseball import forecast_international_baseball_slate
+    from ..data_sources.polymarket_us import probability_to_american
+    from ..international_baseball import forecast_international_baseball_slate
 
     league_upper = league.upper()
     model_config = config["models"].get(league_upper, {})
@@ -2187,7 +2187,7 @@ def _forecast_soccer_sport(
     exists, so PolymarketExecutor.execute requires --manual-research-order
     for any actual order on these rows.
     """
-    from .data_sources.polymarket_us import probability_to_american
+    from ..data_sources.polymarket_us import probability_to_american
 
     model_config = config["models"].get("SOCCER", {})
     forecast = build_soccer_total_slate(
@@ -2397,7 +2397,7 @@ def _forecast_tennis_sport(
     tennis artifact exists, so PolymarketExecutor.execute requires
     --manual-research-order for any actual order on these rows.
     """
-    from .data_sources.polymarket_us import probability_to_american
+    from ..data_sources.polymarket_us import probability_to_american
 
     model_config = config["models"].get("TENNIS", {})
     forecast = build_tennis_slate(
@@ -2585,7 +2585,7 @@ def _forecast_research_sport(sport: str, args_date: str, config) -> dict:
                 "60% hit rate on 50+ locked-holdout calls with every called month positive."
             ),
         }
-    from .models.registry import get_model
+    from ..models.registry import get_model
 
     model = get_model(sport)
     return {
@@ -2804,7 +2804,7 @@ def _closing_probability_for_moneyline_pick(
     (None, None) if no matching pregame snapshot was ever captured for this
     market -- CLV is then simply left blank for that row, same as today.
     """
-    from .learned_forward import _team_matches
+    from ..learned_forward import _team_matches
 
     game_date = parse_utc(event_start_utc).astimezone(EASTERN).date().isoformat()
     store = PolymarketSnapshotStore.for_sport_date(data_root, sport_dir, game_date)
@@ -2851,7 +2851,7 @@ def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
     time (teams[0]=home), so the winning description maps directly onto the
     ledger's home/away teams: home won -> scores (0, 1); away won -> (1, 0).
     """
-    from .data_sources.polymarket_us import PolymarketUSClient, _amount
+    from ..data_sources.polymarket_us import PolymarketUSClient, _amount
 
     rationale = str(row.get("rationale", ""))
     slug = _extract_market_slug(rationale)
@@ -2944,7 +2944,7 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
     matches by game_date + team alias instead. Returns None while the game
     hasn't posted a final result yet.
     """
-    from .international_baseball import find_international_baseball_result
+    from ..international_baseball import find_international_baseball_result
 
     data_root = Path(ledger_path(config)).parent
     try:
@@ -3712,7 +3712,7 @@ def main(argv: list[str] | None = None) -> None:
             )
             # Run slate/BBO capture, WNBA availability, priors, soccer scores,
             # and MLB probables concurrently. These are independent I/O tasks.
-            from .data_sources.odds_soccer_scores import collect_soccer_scores
+            from ..data_sources.odds_soccer_scores import collect_soccer_scores
 
             wnba_priors_result = {"status": "skipped"}
             mlb_probables_result: dict[str, Any] = {}
@@ -3720,7 +3720,7 @@ def main(argv: list[str] | None = None) -> None:
 
             def _capture_wnba():
                 try:
-                    from .data_sources.espn import ESPNClient
+                    from ..data_sources.espn import ESPNClient
 
                     wnba_scoreboard = ESPNClient().scoreboard("WNBA", args.date)
                     wnba_event_ids = [str(event["id"]) for event in wnba_scoreboard.get("events", [])]
@@ -3746,9 +3746,9 @@ def main(argv: list[str] | None = None) -> None:
             def _build_priors():
                 nonlocal wnba_priors_result
                 try:
-                    from .data_sources.espn import ESPNClient
-                    from .features.base import FeatureStore
-                    from .wnba_availability_evaluation import build_and_save_priors
+                    from ..data_sources.espn import ESPNClient
+                    from ..features.base import FeatureStore
+                    from ..wnba_availability_evaluation import build_and_save_priors
 
                     wnba_priors_result = build_and_save_priors(
                         store=FeatureStore(data_root),
@@ -3807,7 +3807,7 @@ def main(argv: list[str] | None = None) -> None:
                 # artifact requests these feature names.
                 nonlocal mlb_availability_result
                 try:
-                    from .data_sources.espn import ESPNClient
+                    from ..data_sources.espn import ESPNClient
 
                     mlb_scoreboard = ESPNClient().scoreboard("MLB", args.date)
                     team_ids: set[int] = set()
@@ -3863,7 +3863,7 @@ def main(argv: list[str] | None = None) -> None:
                 # ingestion step's own reasoning above.
                 nonlocal mlb_starter_snapshot_result
                 try:
-                    from .data_sources.mlb_statsapi import MLBStatsAPIClient, collect_game_snapshots
+                    from ..data_sources.mlb_statsapi import MLBStatsAPIClient, collect_game_snapshots
 
                     lookback_start = (
                         datetime.fromisoformat(args.date).date() - timedelta(days=3)
@@ -4646,12 +4646,12 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "ban-team":
             output = _handle_ban(args, bans)
         elif args.command == "collect-scores":
-            from .data_sources.odds_soccer_scores import collect_soccer_scores
+            from ..data_sources.odds_soccer_scores import collect_soccer_scores
 
             output = collect_soccer_scores(days_from=args.days)
         elif args.command == "verify-checklist":
-            from .source_policy import DEFAULT_SOURCES
-            from .verification_checklist import format_checklist, run_checklist
+            from ..source_policy import DEFAULT_SOURCES
+            from ..verification_checklist import format_checklist, run_checklist
 
             sport = args.sport.lower()
             source_keys = [key for key, spec in DEFAULT_SOURCES.items() if sport in spec.leagues]
@@ -4917,7 +4917,3 @@ def _fail(message: str, reason_code: str) -> None:
         file=sys.stderr,
     )
     raise SystemExit(2)
-
-
-if __name__ == "__main__":
-    main()
