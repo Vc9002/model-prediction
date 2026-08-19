@@ -17,6 +17,7 @@ import pytest
 from model_prediction import cli
 from model_prediction.cli import _clear_today_open, _find_tennis_result, _verify_chain
 from model_prediction.cli import commands as cli_commands
+from model_prediction.cli import forecast as cli_forecast
 from model_prediction.domain import (
     League,
     MarketType,
@@ -162,7 +163,7 @@ def _esports_forecast() -> dict:
 def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_edge(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     research = _CaptureLedger()
     gated = _CaptureLedger()
     config = {
@@ -200,7 +201,7 @@ def test_esports_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypa
     duplicate was completely invisible. Confirms it now shows up in the
     forecast dict this function mutates in place (it returns only an int
     count of successfully logged rows, not a dict)."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     research = _CaptureLedger()
     gated = _DuplicateLedger("gated-existing-esports-1")
     config = {
@@ -233,7 +234,7 @@ def test_esports_exposure_check_happens_while_ledger_lock_is_held(monkeypatch) -
     _LEDGER_LOCK critical section, not as two separately-lockable steps --
     otherwise two concurrent forecast threads could both read the same stale
     exposure before either writes (in-process TOCTOU)."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
 
     lock_held_when_exposure_checked: list[bool] = []
 
@@ -266,7 +267,7 @@ def test_esports_exposure_check_happens_while_ledger_lock_is_held(monkeypatch) -
 
 
 def test_esports_flat_mode_never_writes_research_or_gated(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     research = _CaptureLedger()
     gated = _CaptureLedger()
     config = {
@@ -294,7 +295,7 @@ def test_esports_logging_failure_is_recorded_not_silently_discarded(monkeypatch)
     the forecast's errors list and logged via logger.warning -- not
     silently swallowed by a bare `except ...: continue` -- while every
     other contract in the same batch still gets processed normally."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     research = _CaptureLedger()
     gated = _CaptureLedger()
     config = {
@@ -372,16 +373,16 @@ def _mlb_totals_candidate(market_type: MarketType, selection: str, line: float |
 def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touches_main_ledger(
     monkeypatch, registry, ban_list
 ) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
-    monkeypatch.setattr(cli, "load_formula_spec", lambda path: object())
-    monkeypatch.setattr(cli, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "load_formula_spec", lambda path: object())
+    monkeypatch.setattr(cli_forecast, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
 
     candidates = [
         _mlb_totals_candidate(MarketType.MONEYLINE, "home", None),
         _mlb_totals_candidate(MarketType.SPREAD, "away", -1.5),
         _mlb_totals_candidate(MarketType.TOTAL, "over", 8.5),
     ]
-    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
+    monkeypatch.setattr(cli_forecast, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
 
     flat_ledger = _CaptureLedger()
     config = {"project": {}, "bankroll": {}}
@@ -407,12 +408,12 @@ def test_mlb_totals_main_ledger_duplicate_is_tracked_not_silently_dropped(
     """DD-2 (deep debug audit, 2026-08-04): main_ledger's secondary write
     used to be a bare `with suppress(DuplicatePickError):` -- a genuine
     duplicate was completely invisible."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
-    monkeypatch.setattr(cli, "load_formula_spec", lambda path: object())
-    monkeypatch.setattr(cli, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "load_formula_spec", lambda path: object())
+    monkeypatch.setattr(cli_forecast, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
 
     candidates = [_mlb_totals_candidate(MarketType.TOTAL, "over", 8.5)]
-    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
+    monkeypatch.setattr(cli_forecast, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
 
     flat_ledger = _CaptureLedger()
     main_ledger = _DuplicateLedger("main-existing-1")
@@ -479,8 +480,8 @@ def test_soccer_flat_ledger_logs_every_contract_regardless_of_eligibility(
     used to -- can_create_qualified_call no longer gates on promotion tier
     -- so this fixture's contract, well clear of min_edge, is QUALIFIED even
     at status="research" now; flat still logs it either way.)"""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
-    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
     flat_ledger = _CaptureLedger()
 
     result = cli._forecast_soccer_sport(
@@ -505,8 +506,8 @@ def test_soccer_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
     same eligibility result, same genuinely_eligible gate. Uses
     status=shadow_qualified here (not soccer's current real config) purely
     to exercise the CALL path this test targets."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
-    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
     research = _CaptureLedger()
     gated = _CaptureLedger()
     main = _CaptureLedger()
@@ -535,8 +536,8 @@ def test_soccer_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypat
     completely invisible, indistinguishable from "the model produced
     nothing here." Confirms the duplicate now shows up in the returned
     result dict, with the existing pick's own id."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
-    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
     research = _CaptureLedger()
     gated = _DuplicateLedger("gated-existing-1")
     main = _CaptureLedger()
@@ -563,8 +564,8 @@ def test_soccer_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypat
 def test_soccer_main_ledger_stays_empty_when_gated_ledger_does(monkeypatch) -> None:
     """A high min_edge that blocks Gated Research must also block Main --
     they share one eligibility computation."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
-    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
     research = _CaptureLedger()
     gated = _CaptureLedger()
     main = _CaptureLedger()
@@ -592,10 +593,10 @@ def test_soccer_gated_and_main_blocked_when_either_team_lacks_real_history(monke
     reach Gated Research or Main even with a comfortably clearing edge --
     "genuinely eligible" requires a real model opinion, not just a
     synthetic-prior matchup that happens to price with high edge."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
     forecast = _soccer_forecast()
     forecast["priced_contracts"][0]["feature_basis"] = {"min_team_games": 3}
-    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: forecast)
+    monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: forecast)
     research = _CaptureLedger()
     gated = _CaptureLedger()
     main = _CaptureLedger()
@@ -623,7 +624,7 @@ def test_soccer_logging_failure_is_recorded_not_silently_discarded(monkeypatch) 
     bare `except (DuplicatePickError, KeyError, ValueError): continue` this
     used to be -- and the other, valid contract in the same batch must
     still get logged."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
     forecast = _soccer_forecast()
     forecast["priced_contracts"].append(
         {
@@ -645,7 +646,7 @@ def test_soccer_logging_failure_is_recorded_not_silently_discarded(monkeypatch) 
             "observed_at_utc": "2026-07-27T10:00:00Z",
         }
     )
-    monkeypatch.setattr(cli, "build_soccer_total_slate", lambda **kwargs: forecast)
+    monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: forecast)
     research = _CaptureLedger()
 
     result = cli._forecast_soccer_sport(
@@ -834,11 +835,11 @@ def test_replace_today_clears_the_ledger_the_other_command_variant_writes(
     invoke main()/argparse (no test in this suite does), so it won't catch a
     future regression in the dispatch's own branch structure independent of
     this constant."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
     monkeypatch.setattr(
         cli_commands, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC)
     )  # _clear_today_open moved to cli/commands.py in the DD-6 split
-    monkeypatch.setattr(cli, build_slate_target, lambda **kwargs: forecast_fixture())
+    monkeypatch.setattr(cli_forecast, build_slate_target, lambda **kwargs: forecast_fixture())
     config = config_fixture(status="shadow_qualified", min_edge=0.02)
     flat = PickLedger(tmp_path / "flat_picks.xlsx")
     main = PickLedger(tmp_path / "picks.xlsx")
@@ -878,7 +879,7 @@ def test_tennis_logging_failure_is_recorded_not_silently_discarded(monkeypatch) 
     bare `except (DuplicatePickError, KeyError, ValueError): continue` this
     used to be -- and the other, valid contract in the same batch must
     still get logged."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
     forecast = _tennis_forecast()
     forecast["priced_contracts"].append(
         {
@@ -900,7 +901,7 @@ def test_tennis_logging_failure_is_recorded_not_silently_discarded(monkeypatch) 
             "observed_at_utc": "2026-07-27T10:00:00Z",
         }
     )
-    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: forecast)
+    monkeypatch.setattr(cli_forecast, "build_tennis_slate", lambda **kwargs: forecast)
     research = _CaptureLedger()
 
     result = cli._forecast_tennis_sport(
@@ -925,8 +926,8 @@ def test_tennis_logging_failure_is_recorded_not_silently_discarded(monkeypatch) 
 def test_tennis_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
     """Same relationship as soccer's equivalent test: main_ledger receives a
     pick if and only if gated_ledger does -- one shared eligibility result."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
-    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: _tennis_forecast())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "build_tennis_slate", lambda **kwargs: _tennis_forecast())
     research = _CaptureLedger()
     gated = _CaptureLedger()
     main = _CaptureLedger()
@@ -949,8 +950,8 @@ def test_tennis_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypat
     """DD-2 (deep debug audit, 2026-08-04): same regression as soccer's
     equivalent test -- gated_ledger's secondary write used to silently
     discard a duplicate."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
-    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: _tennis_forecast())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "build_tennis_slate", lambda **kwargs: _tennis_forecast())
     research = _CaptureLedger()
     gated = _DuplicateLedger("gated-existing-2")
     main = _CaptureLedger()
@@ -973,10 +974,10 @@ def test_tennis_gated_and_main_blocked_when_either_player_lacks_real_history(mon
     """A contract whose feature_basis shows a player resting on thin history
     (min_player_matches below MINIMUM_PLAYER_MATCHES) must not reach Gated
     Research or Main even with a comfortably clearing edge."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
     forecast = _tennis_forecast()
     forecast["priced_contracts"][0]["feature_basis"] = {"min_player_matches": 3}
-    monkeypatch.setattr(cli, "build_tennis_slate", lambda **kwargs: forecast)
+    monkeypatch.setattr(cli_forecast, "build_tennis_slate", lambda **kwargs: forecast)
     research = _CaptureLedger()
     gated = _CaptureLedger()
     main = _CaptureLedger()
@@ -1086,14 +1087,14 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executa
         feature_basis={"elo_probability": 0.60, "trend_gap": 0.1},
         feature_snapshot_hash="feature-hash",
     )
-    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "build_learned_moneyline_slate",
         lambda **kwargs: ([candidate], [], 1),
     )
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "match_executable_quote",
         lambda *args, **kwargs: {
             "executable_ask": 0.55,
@@ -1111,7 +1112,7 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executa
             return AWAY if team == "Boston Red Sox" else HOME
 
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
             RecordType.QUALIFIED_SHADOW_CALL,
@@ -1190,14 +1191,14 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
         feature_basis={"elo_probability": 0.55, "trend_gap": 0.0},
         feature_snapshot_hash="feature-hash-2",
     )
-    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "build_learned_moneyline_slate",
         lambda **kwargs: ([candidate], [], 1),
     )
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "match_executable_quote",
         lambda *args, **kwargs: {
             # model_probability (0.55) - executable_ask (0.65) = -0.10, well
@@ -1217,7 +1218,7 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
             return AWAY if team == "Boston Red Sox" else HOME
 
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
             RecordType.QUALIFIED_SHADOW_CALL,
@@ -1294,10 +1295,10 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
         feature_basis={"elo_probability": 0.60, "trend_gap": 0.0},
         feature_snapshot_hash="feature-hash-nba-1",
     )
-    monkeypatch.setattr(cli, "utc_now", lambda: observed)
-    monkeypatch.setattr(cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "match_executable_quote",
         lambda *args, **kwargs: {
             "executable_ask": 0.55,
@@ -1315,7 +1316,7 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
             return AWAY if team == "Boston Red Sox" else HOME
 
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
             RecordType.QUALIFIED_SHADOW_CALL,
@@ -1390,14 +1391,14 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
         feature_basis={"elo_probability": 0.55, "trend_gap": 0.0},
         feature_snapshot_hash="feature-hash-conf",
     )
-    monkeypatch.setattr(cli, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "build_learned_moneyline_slate",
         lambda **kwargs: ([candidate], [], 1),
     )
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "match_executable_quote",
         lambda *args, **kwargs: {
             "executable_ask": 0.56,
@@ -1415,7 +1416,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
             return AWAY if team == "Boston Red Sox" else HOME
 
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
             RecordType.QUALIFIED_SHADOW_CALL,
@@ -1495,10 +1496,10 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
         feature_basis={"elo_probability": 0.60, "trend_gap": 0.1},
         feature_snapshot_hash="feature-hash-3",
     )
-    monkeypatch.setattr(cli, "utc_now", lambda: observed)
-    monkeypatch.setattr(cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "match_executable_quote",
         lambda *args, **kwargs: {
             "executable_ask": 0.55,
@@ -1517,7 +1518,7 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
             return AWAY if team == "Boston Red Sox" else HOME
 
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
             RecordType.QUALIFIED_SHADOW_CALL,
@@ -1588,10 +1589,10 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
         feature_basis={"elo_probability": 0.60, "trend_gap": 0.1},
         feature_snapshot_hash="feature-hash-4",
     )
-    monkeypatch.setattr(cli, "utc_now", lambda: observed)
-    monkeypatch.setattr(cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "match_executable_quote",
         lambda *args, **kwargs: {
             "executable_ask": 0.55,
@@ -1610,7 +1611,7 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
             return AWAY if team == "Boston Red Sox" else HOME
 
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
             RecordType.QUALIFIED_SHADOW_CALL,
@@ -1658,7 +1659,7 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
 
 
 def test_international_forecast_preview_never_requires_or_writes_a_ledger(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     monkeypatch.setattr(
         "model_prediction.international_baseball.forecast_international_baseball_slate",
         lambda *args, **kwargs: _international_forecast(),
@@ -1710,7 +1711,7 @@ def test_international_forecast_observed_now_is_captured_after_slate_building_no
             contract["event_start_utc"] = start
         return forecast
 
-    monkeypatch.setattr(cli, "utc_now", fake_utc_now)
+    monkeypatch.setattr(cli_forecast, "utc_now", fake_utc_now)
     monkeypatch.setattr(
         "model_prediction.international_baseball.forecast_international_baseball_slate",
         fake_slate,
@@ -1733,7 +1734,7 @@ def test_international_forecast_observed_now_is_captured_after_slate_building_no
 
 
 def test_international_forecast_logs_low_edge_to_research_but_not_gated(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     monkeypatch.setattr(
         "model_prediction.international_baseball.forecast_international_baseball_slate",
         lambda *args, **kwargs: _international_forecast(),
@@ -1765,7 +1766,7 @@ def test_international_forecast_logging_failure_is_recorded_not_silently_discard
     recorded in the forecast's errors list, not silently swallowed by the
     bare `except (ValueError, KeyError): continue` this used to be -- and
     the other, valid contract in the same batch must still get logged."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     forecast = _international_forecast()
     forecast["priced_contracts"].append(
         {
@@ -1822,7 +1823,7 @@ def test_international_forecast_logging_failure_is_recorded_not_silently_discard
 
 
 def test_international_forecast_mirrors_only_strategy_qualified_calls(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     monkeypatch.setattr(
         "model_prediction.international_baseball.forecast_international_baseball_slate",
         lambda *args, **kwargs: _international_forecast(),
@@ -1851,7 +1852,7 @@ def test_international_forecast_gated_ledger_duplicate_is_tracked_not_silently_d
     """DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
     used to be a bare `with suppress(DuplicatePickError):` -- a genuine
     duplicate was completely invisible."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     monkeypatch.setattr(
         "model_prediction.international_baseball.forecast_international_baseball_slate",
         lambda *args, **kwargs: _international_forecast(),
@@ -1878,7 +1879,7 @@ def test_international_forecast_gated_blocked_when_team_lacks_real_history(monke
     """A contract whose min_team_games is below MINIMUM_TEAM_GAMES must not
     reach Gated Research even with a comfortably clearing edge -- same
     reasoning as soccer/tennis's equivalent test."""
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     forecast = _international_forecast()
     forecast["priced_contracts"][0]["min_team_games"] = 3
     monkeypatch.setattr(
@@ -2104,9 +2105,9 @@ def test_wnba_spread_flat_ledger_logs_every_contract_regardless_of_eligibility(
     registry,
     ban_list,
 ) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "_forecast_wnba_spread_slate",
         lambda *a, **k: _wnba_spread_forecast(selection="home", line=10.5),
     )
@@ -2132,9 +2133,9 @@ def test_wnba_spread_flat_ledger_logs_every_contract_regardless_of_eligibility(
 
 
 def test_wnba_spread_main_ledger_only_gets_call_rows(monkeypatch, registry, ban_list) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "_forecast_wnba_spread_slate",
         lambda *a, **k: _wnba_spread_forecast(selection="away", line=-10.5),
     )
@@ -2167,9 +2168,9 @@ def test_wnba_spread_main_ledger_duplicate_is_tracked_not_silently_dropped(
     registry,
     ban_list,
 ) -> None:
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
-        cli,
+        cli_forecast,
         "_forecast_wnba_spread_slate",
         lambda *a, **k: _wnba_spread_forecast(selection="away", line=-10.5),
     )
