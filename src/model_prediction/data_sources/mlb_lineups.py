@@ -15,24 +15,34 @@ consume it.
 
 Point-in-time contract:
 
-  * `observed_at_utc` is stamped AFTER the HTTP response returns, never
-    before. Stamping before a slow call claims we knew the lineup earlier
-    than we did, which is the leaking direction (see CLAUDE.md's KBO/NPB
-    timestamp-ordering incident, where exactly this ordering silently
-    zeroed every real pick).
+  * Observation timestamps are stamped AFTER the HTTP response returns,
+    never before. Stamping before a slow call claims we knew the lineup
+    earlier than we did, which is the leaking direction (see CLAUDE.md's
+    KBO/NPB timestamp-ordering incident, where exactly this ordering
+    silently zeroed every real pick).
   * `lineup_state` marks whether the capture is decision-grade. Only
     `pregame` rows may inform a pregame decision; `in_game` and `final`
     rows are recorded for completeness and audit, and consumers must
     filter them out rather than trusting the timestamp alone. A game that
     has started has a *confirmed* order, which is precisely the
     information a pregame decision is not allowed to have.
-  * Lineups change (late scratches). Every capture is appended as its own
-    row; nothing is overwritten. A consumer picks the latest row with
-    `observed_at_utc <= decision_time` and `lineup_state == "pregame"`.
+  * One row per distinct lineup, keyed by `content_hash`. A late scratch
+    changes the hash and becomes its own row; nothing is overwritten. A
+    re-observation of an unchanged lineup advances
+    `last_observed_at_utc` and increments `capture_count` on the row it
+    confirms.
+
+A consumer selects the row with the greatest `first_observed_at_utc <=
+decision_time` for that game where `lineup_state == "pregame"`, and reads
+staleness from `last_observed_at_utc` (also `<= decision_time`) rather
+than from the first sighting -- a lineup seen at 18:10 and reconfirmed at
+20:10 is 20 minutes old at 20:30, not 2h20m.
 """
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import json
 import subprocess
 import time
@@ -132,6 +142,22 @@ def _side_lineup(team_block: dict[str, Any]) -> dict[str, Any]:
     return {"size": len(entries), "batting_order": entries}
 
 
+def lineup_content_hash(game_pk: int, lineup_state: str, away: dict[str, Any], home: dict[str, Any]) -> str:
+    """Stable identity of WHAT was announced, independent of when we saw it.
+
+    A late scratch changes this hash and therefore earns its own snapshot;
+    a re-observation of the same nine does not.
+    """
+    payload = {
+        "game_pk": game_pk,
+        "lineup_state": lineup_state,
+        "away": [e["player_id"] for e in away.get("batting_order", [])],
+        "home": [e["player_id"] for e in home.get("batting_order", [])],
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def build_lineup_snapshot(
     game: dict[str, Any], boxscore: dict[str, Any], *, observed_at_utc: str
 ) -> dict[str, Any]:
@@ -139,19 +165,31 @@ def build_lineup_snapshot(
 
     `observed_at_utc` is supplied by the caller rather than read here, so
     the caller can stamp it after the network round-trip completes.
+
+    Both `first_observed_at_utc` and `last_observed_at_utc` start equal;
+    `LineupStore.merge` advances the latter when this same content is seen
+    again. Keeping both matters for staleness: a lineup first seen at 18:10
+    and reconfirmed at 20:10 is 20 minutes old to a decision made at 20:30,
+    not 2h20m -- collapsing them would make every consumer systematically
+    overstate how stale its own input is.
     """
     detailed_state = ((game.get("status") or {}).get("detailedState")) or ""
     teams = boxscore.get("teams") or {}
     away = _side_lineup(teams.get("away") or {})
     home = _side_lineup(teams.get("home") or {})
     complete = away["size"] == EXPECTED_LINEUP_SIZE and home["size"] == EXPECTED_LINEUP_SIZE
+    game_pk = int(game["gamePk"])
+    lineup_state = classify_lineup_state(detailed_state)
     return {
         "schema_version": LINEUP_SCHEMA_VERSION,
-        "game_pk": int(game["gamePk"]),
+        "game_pk": game_pk,
         "game_start_utc": game.get("gameDate"),
-        "observed_at_utc": observed_at_utc,
+        "content_hash": lineup_content_hash(game_pk, lineup_state, away, home),
+        "first_observed_at_utc": observed_at_utc,
+        "last_observed_at_utc": observed_at_utc,
+        "capture_count": 1,
         "detailed_state": detailed_state,
-        "lineup_state": classify_lineup_state(detailed_state),
+        "lineup_state": lineup_state,
         "lineup_complete": complete,
         "away_team": ((game.get("teams") or {}).get("away") or {}).get("team", {}).get("name"),
         "home_team": ((game.get("teams") or {}).get("home") or {}).get("team", {}).get("name"),
@@ -160,25 +198,47 @@ def build_lineup_snapshot(
     }
 
 
-def capture_date(game_date: str, *, client: MLBLineupClient | None = None) -> list[dict[str, Any]]:
-    """Capture every game's batting order for one date.
+def _worth_observing(snapshot: dict[str, Any]) -> bool:
+    """A lineup with nothing in it is not an observation.
 
-    Games are captured regardless of state so the archive records what was
-    knowable when; `lineup_state` is what decides usability, not omission.
+    Before MLB posts an order, the boxscore returns empty batting orders.
+    Recording those would add a row per game per hour that says only "not
+    announced yet", which is not information the archive needs to carry.
+    """
+    return snapshot["away"]["size"] > 0 or snapshot["home"]["size"] > 0
+
+
+def capture_date(game_date: str, *, client: MLBLineupClient | None = None) -> list[dict[str, Any]]:
+    """Capture the batting orders of games that have not started yet.
+
+    Schedule-aware by design, so an hourly run costs one request when
+    there is nothing to do. Games are filtered by status BEFORE any
+    boxscore is fetched: a started game's order is already recoverable
+    from its final boxscore forever, so re-recording it buys nothing and
+    would add a row per game per hour. Only the pregame window is
+    irreplaceable, and only it is collected.
+
     A per-game failure degrades to a skip rather than losing the whole
     date -- a single unavailable boxscore must not cost us the other
     fourteen games, since none of them can be re-captured later.
     """
     api = client or MLBLineupClient()
+    unstarted = [
+        game
+        for game in api.schedule(game_date)
+        if classify_lineup_state(((game.get("status") or {}).get("detailedState")) or "") == "pregame"
+    ]
     snapshots: list[dict[str, Any]] = []
-    for game in api.schedule(game_date):
+    for game in unstarted:
         try:
             boxscore = api.boxscore(int(game["gamePk"]))
         except (RuntimeError, KeyError, ValueError):
             continue
         # Stamped AFTER the response: see the module docstring's PIT note.
         observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-        snapshots.append(build_lineup_snapshot(game, boxscore, observed_at_utc=observed_at))
+        snapshot = build_lineup_snapshot(game, boxscore, observed_at_utc=observed_at)
+        if _worth_observing(snapshot):
+            snapshots.append(snapshot)
     return snapshots
 
 
@@ -202,31 +262,37 @@ def capture_and_store(
     """
     snapshots = capture_date(game_date, client=client)
     store = LineupStore(archive)
-    written = store.merge(snapshots)
+    result = store.merge(snapshots)
     decision_grade = [s for s in snapshots if s["lineup_state"] == "pregame" and s["lineup_complete"]]
     return {
         "date": game_date,
         "games_seen": len(snapshots),
-        "rows_written": written,
+        "rows_written": result["written"],
+        "rows_confirmed": result["confirmed"],
         "decision_grade": len(decision_grade),
         "archive": str(archive),
     }
 
 
 class LineupStore:
-    """Append-only JSONL archive of lineup captures.
+    """JSONL archive of lineup captures, one row per distinct lineup.
 
-    Append-only on purpose: a lineup that changes between captures is real
-    signal (a late scratch), not a correction to overwrite.
+    One row per distinct CONTENT, not per capture. Including the
+    observation timestamp in the identity made every row unique by
+    construction, so nothing ever deduped -- found immediately on live data
+    (three runs of an unchanged slate wrote 45 rows instead of 15; ~360
+    duplicate rows a day at hourly cadence).
 
-    Dedupe is on CONTENT and deliberately EXCLUDES `observed_at_utc`. That
-    field is different on every capture by construction, so including it
-    made the identity unique every time and the store never deduped at all
-    -- found immediately on live data (three runs of an unchanged slate
-    wrote 45 rows instead of 15; at the intended hourly cadence that is
-    ~360 duplicate rows per day). A row therefore records the FIRST time a
-    given lineup was seen, and a re-capture of an unchanged lineup is a
-    no-op.
+    But a re-observation is not worthless, so it is folded into the
+    existing row rather than dropped: `last_observed_at_utc` advances and
+    `capture_count` increments. A lineup first seen at 18:10 and
+    reconfirmed at 20:10 is 20 minutes old to a decision made at 20:30 --
+    keeping only the first sighting would make every consumer overstate
+    its own staleness by two hours, and would lose the evidence that the
+    lineup was still standing later.
+
+    A changed lineup (late scratch) has a different `content_hash` and so
+    becomes its own new row; nothing is ever overwritten.
     """
 
     def __init__(self, path: str | Path) -> None:
@@ -244,24 +310,64 @@ class LineupStore:
         return rows
 
     @staticmethod
-    def _identity(row: dict[str, Any]) -> tuple:
-        def order(side: str) -> tuple:
-            return tuple(e["player_id"] for e in row.get(side, {}).get("batting_order", []))
-
-        return (
-            row.get("game_pk"),
-            row.get("lineup_state"),
-            order("away"),
-            order("home"),
+    def _identity(row: dict[str, Any]) -> str:
+        cached = row.get("content_hash")
+        if cached:
+            return str(cached)
+        # Pre-content_hash rows (schema v1 archives) hash on demand so a
+        # migration is never required just to read an old file.
+        return lineup_content_hash(
+            int(row.get("game_pk") or 0),
+            str(row.get("lineup_state") or ""),
+            row.get("away") or {},
+            row.get("home") or {},
         )
 
-    def merge(self, snapshots: Iterable[dict[str, Any]]) -> int:
-        existing = {self._identity(row) for row in self.rows()}
-        fresh = [s for s in snapshots if self._identity(s) not in existing]
-        if not fresh:
-            return 0
+    def merge(self, snapshots: Iterable[dict[str, Any]]) -> dict[str, int]:
+        """Add new lineups; fold re-observations into the row they confirm.
+
+        Returns {"written": n, "confirmed": n}. The whole file is rewritten
+        under an exclusive lock because a re-observation mutates an
+        existing row -- the daily pipeline and the hourly collector can
+        both call this, and a torn read-modify-write would lose lineups
+        that cannot be re-captured.
+        """
+        snapshots = list(snapshots)
+        if not snapshots:
+            return {"written": 0, "confirmed": 0}
+
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a") as handle:
-            for row in fresh:
-                handle.write(json.dumps(row, sort_keys=True) + "\n")
-        return len(fresh)
+        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        with lock_path.open("w") as lock_handle:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+            try:
+                rows = self.rows()
+                by_hash = {self._identity(row): row for row in rows}
+                written = confirmed = 0
+                for snapshot in snapshots:
+                    key = self._identity(snapshot)
+                    current = by_hash.get(key)
+                    if current is None:
+                        rows.append(snapshot)
+                        by_hash[key] = snapshot
+                        written += 1
+                        continue
+                    seen_at = snapshot.get("last_observed_at_utc") or snapshot.get(
+                        "first_observed_at_utc", ""
+                    )
+                    # max(): captures can land out of order (a retry, or the
+                    # daily job racing the hourly one), and last_observed
+                    # must never move backwards.
+                    if seen_at > str(current.get("last_observed_at_utc") or ""):
+                        current["last_observed_at_utc"] = seen_at
+                    current["capture_count"] = int(current.get("capture_count") or 1) + 1
+                    confirmed += 1
+
+                temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+                with temporary.open("w") as handle:
+                    for row in rows:
+                        handle.write(json.dumps(row, sort_keys=True) + "\n")
+                temporary.replace(self.path)
+                return {"written": written, "confirmed": confirmed}
+            finally:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)

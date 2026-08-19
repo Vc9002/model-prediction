@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hourly prospective MLB lineup capture.
+
+  Research data acquisition ONLY. This job reads the public MLB Stats API
+  and appends to data/point_in_time/mlb_lineups.jsonl. It deliberately
+  carries no MODEL_PREDICTION_RUNTIME_ROOT or LEDGER_AUTHORITY: it must
+  never touch models, ledgers, or the runtime root, and the absence of
+  those variables is what enforces that rather than a comment asking
+  nicely.
+
+  Hourly because lineups post throughout the afternoon and a capture only
+  sees games that have not started. The script is schedule-aware: when
+  nothing is unstarted it costs a single schedule request and exits.
+
+  Known limitation: StartInterval jobs do not fire while the machine is
+  asleep (documented during the 2026-08-17 burn-in, where overnight sleep
+  produced a DEGRADED production-prediction age). Overnight sleep will
+  therefore drop captures. Because lineups cannot be backfilled, those
+  slates are lost rather than delayed.
+
+  Install:
+    cp ops/launchd/com.vc.mlb-lineup-capture.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.vc.mlb-lineup-capture.plist
+  Remove:
+    launchctl bootout gui/$(id -u)/com.vc.mlb-lineup-capture
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.vc.mlb-lineup-capture</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/vincentc9002/model-prediction/.venv/bin/python</string>
+    <string>/Users/vincentc9002/model-prediction/scripts/capture_mlb_lineups.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/vincentc9002/model-prediction</string>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/lineups/capture.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/lineups/capture.err.log</string>
+</dict>
+</plist>
