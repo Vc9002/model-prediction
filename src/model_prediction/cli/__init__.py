@@ -20,7 +20,6 @@ import json
 import logging
 import os
 import sys
-import threading
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, replace
@@ -49,7 +48,7 @@ from ..config import (
     polymarket_snapshot_path,
     unit_policy,
 )
-from ..data_sources.espn import SPORT_LEAGUES, ESPNClient, ESPNMLBClient
+from ..data_sources.espn import ESPNClient, ESPNMLBClient
 from ..data_sources.espn_probables import capture_probable_starter_snapshot
 from ..data_sources.espn_wnba_injuries import capture_espn_event_injuries
 from ..data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
@@ -135,30 +134,24 @@ from ..total_score import validate_all_total_score_models
 from ..units import edge_scaled_units
 from ..validation import run_validation_audit, write_production_artifacts
 
-SPORTS = tuple(POLYMARKET_SPORT_LEAGUES)
-ESPN_SPORTS = tuple(SPORT_LEAGUES)
-ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant", "rainbow_six")
-DAILY_LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl")
-DAILY_INTERNATIONAL_BASEBALL_SPORTS = ("kbo", "npb")
-FLAT_LEDGER_SPORTS = DAILY_LEARNED_SPORTS
-# Sports whose _forecast_*_sport function writes BOTH main_ledger and
-# flat_ledger unconditionally whenever log=True, regardless of which command
-# (forecast/log vs. flat-forecast) ran -- every other sport only ever writes
-# the one ledger matching is_flat. Any single-sport replace_today re-run must
-# clear the *other* ledger too for sports in this set, or a second same-day
-# run of the other command duplicates that sport's rows there (see the
-# dual_ledger_sports handling in the forecast/log/flat-forecast dispatch).
-DUAL_LEDGER_SPORTS = frozenset({"soccer", "tennis"})
-RESEARCH_ONLY_DAILY_SPORTS = (
-    "soccer",
-    "tennis",
-    *ESPORTS_TITLES,
-    *DAILY_INTERNATIONAL_BASEBALL_SPORTS,
+# Defined HERE, not imported from .state: ruff's BLE001 exemption for the
+# blind-except handlers in this module requires a locally-defined logger
+# (found 2026-08-19 -- importing the same logger object tripped 20 BLE001s).
+logger = logging.getLogger("model_prediction.cli")
+
+from .state import (  # noqa: F401 -- re-export for compat (DD-6 split)
+    _LEDGER_LEAGUE_TO_ESPN,
+    _LEDGER_LOCK,
+    _TERMINAL_MARKET_STATES,
+    DAILY_INTERNATIONAL_BASEBALL_SPORTS,
+    DAILY_LEARNED_SPORTS,
+    DUAL_LEDGER_SPORTS,
+    ESPN_SPORTS,
+    ESPORTS_TITLES,
+    FLAT_LEDGER_SPORTS,
+    RESEARCH_ONLY_DAILY_SPORTS,
+    SPORTS,
 )
-
-logger = logging.getLogger(__name__)
-
-_LEDGER_LOCK = threading.Lock()
 
 
 def _append_secondary_ledger(
@@ -186,36 +179,6 @@ def _append_secondary_ledger(
     except DuplicatePickError as error:
         logger.debug("%s: duplicate suppressed for existing pick %s", ledger_name, error.pick_id)
         return error.pick_id
-
-
-# League value on a ledger row -> ESPN league key(s) to search for results.
-# WORLD_CUP dropped 2026-07: tournament is over, no games left to forecast or settle.
-_LEDGER_LEAGUE_TO_ESPN = {
-    "MLB": ("MLB",),
-    "NBA": ("NBA",),
-    "WNBA": ("WNBA",),
-    "NFL": ("NFL",),
-    "SOCCER": (
-        "EPL",
-        "LA_LIGA",
-        "BUNDESLIGA",
-        "SERIE_A",
-        "MLS",
-        "UCL",
-        "BRASILEIRAO",
-        "BRAZIL_SERIE_B",
-        "ARGENTINA",
-        "ARGENTINA_2",
-        "COLOMBIA",
-        "CHILE",
-        "URUGUAY",
-        "ECUADOR",
-        "PERU",
-        "SUDAMERICANA",
-        "FRIENDLIES",
-        "CLUB_FRIENDLIES",
-    ),
-}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -2777,13 +2740,6 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
                     record["completed"] = False
             return record
     return None
-
-
-_TERMINAL_MARKET_STATES = {
-    "MARKET_STATE_EXPIRED",
-    "MARKET_STATE_RESOLVED",
-    "MARKET_STATE_SETTLED",
-}
 
 
 def _closing_probability_for_moneyline_pick(
