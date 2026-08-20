@@ -10,14 +10,14 @@ import pytest
 import dashboard_server
 
 
-def _configure_archive(monkeypatch, tmp_path: Path, rows: list[dict]) -> Path:
+def _configure_archive(monkeypatch, tmp_path: Path, rows: list[dict], patch_dash) -> Path:
     archive_path = tmp_path / "archive.json"
-    monkeypatch.setattr(dashboard_server, "ARCHIVE_FILE", archive_path)
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: rows)
+    patch_dash("ARCHIVE_FILE", archive_path)
+    patch_dash("read_picks", lambda: rows)
     return archive_path
 
 
-def test_clear_all_hides_open_zero_unit_research_rows(monkeypatch, tmp_path: Path) -> None:
+def test_clear_all_hides_open_zero_unit_research_rows(monkeypatch, tmp_path: Path, patch_dash) -> None:
     archive_path = _configure_archive(
         monkeypatch,
         tmp_path,
@@ -35,6 +35,7 @@ def test_clear_all_hides_open_zero_unit_research_rows(monkeypatch, tmp_path: Pat
                 "units": 0,
             },
         ],
+        patch_dash,
     )
 
     result = dashboard_server.archive_action("clear", "all")
@@ -45,7 +46,7 @@ def test_clear_all_hides_open_zero_unit_research_rows(monkeypatch, tmp_path: Pat
     assert json.loads(archive_path.read_text())["pick_ids"] == ["paper-open", "settled"]
 
 
-def test_clear_all_keeps_open_positive_unit_rows_visible(monkeypatch, tmp_path: Path) -> None:
+def test_clear_all_keeps_open_positive_unit_rows_visible(monkeypatch, tmp_path: Path, patch_dash) -> None:
     archive_path = _configure_archive(
         monkeypatch,
         tmp_path,
@@ -63,6 +64,7 @@ def test_clear_all_keeps_open_positive_unit_rows_visible(monkeypatch, tmp_path: 
                 "units": 0,
             },
         ],
+        patch_dash,
     )
 
     result = dashboard_server.archive_action("clear", "all")
@@ -85,14 +87,14 @@ def test_settled_pick_keeps_its_decision_time_model_size() -> None:
     assert dashboard_server._suggested_units(settled_row) == 2.0
 
 
-def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys, tmp_path: Path) -> None:
+def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys, tmp_path: Path, patch_dash) -> None:
     server = Mock()
     server.serve_forever.side_effect = KeyboardInterrupt
-    monkeypatch.setattr(dashboard_server, "ThreadingHTTPServer", Mock(return_value=server))
+    patch_dash("ThreadingHTTPServer", Mock(return_value=server))
     monkeypatch.setattr("sys.argv", ["dashboard_server.py"])
     # main() writes/unlinks the pidfile; never touch the live dashboard's
     # ownership evidence (P0-3: launchctl/lsof/server.pid must agree).
-    monkeypatch.setattr(dashboard_server, "PID_FILE", tmp_path / "server.pid")
+    patch_dash("PID_FILE", tmp_path / "server.pid")
 
     dashboard_server.main()
 
@@ -100,7 +102,7 @@ def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys, tmp_path:
     server.server_close.assert_called_once_with()
 
 
-def test_live_model_link_carries_dashboard_execution_context(monkeypatch) -> None:
+def test_live_model_link_carries_dashboard_execution_context(monkeypatch, patch_dash) -> None:
     row = {
         "pick_id": "pick-1",
         "league": "MLB",
@@ -111,9 +113,8 @@ def test_live_model_link_carries_dashboard_execution_context(monkeypatch) -> Non
         "model_probability": 0.61,
         "model_version": "model-v1",
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [row])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [row])
+    patch_dash(
         "_pick_quote",
         lambda _row: {
             "market_slug": "aec-mlb-away-home-2026-07-31",
@@ -123,7 +124,7 @@ def test_live_model_link_carries_dashboard_execution_context(monkeypatch) -> Non
             "observed_at_utc": "2026-07-31T12:00:00Z",
         },
     )
-    monkeypatch.setattr(dashboard_server, "_load_orders", lambda: {"orders": []})
+    patch_dash("_load_orders", lambda: {"orders": []})
 
     links = dashboard_server._live_model_links()
 
@@ -142,13 +143,9 @@ def test_unsupported_live_market_view_has_timestamp_and_clear_error() -> None:
     assert "unavailable for this sport" in result["error"]
 
 
-def test_market_table_name_does_not_require_public_metadata(monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "_team_name_index", dict)
-    monkeypatch.setattr(
-        dashboard_server,
-        "_public_market_question",
-        lambda _slug: pytest.fail("Market table naming must stay local"),
-    )
+def test_market_table_name_does_not_require_public_metadata(monkeypatch, patch_dash) -> None:
+    patch_dash("_team_name_index", dict)
+    patch_dash("_public_market_question", lambda _slug: pytest.fail("Market table naming must stay local"))
 
     name = dashboard_server._human_market_name(
         "tsc-mlb-bos-ath-2026-07-30-10pt5",
@@ -158,9 +155,7 @@ def test_market_table_name_does_not_require_public_metadata(monkeypatch) -> None
     assert name == "MLB · BOS @ ATH · Total 10.5"
 
 
-def test_latest_persisted_action_returns_newest_finished_job(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_latest_persisted_action_returns_newest_finished_job(monkeypatch, tmp_path: Path, patch_dash) -> None:
     jobs = tmp_path / "jobs.json"
     jobs.write_text(
         json.dumps(
@@ -184,7 +179,7 @@ def test_latest_persisted_action_returns_newest_finished_job(
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "JOBS_FILE", jobs)
+    patch_dash("JOBS_FILE", jobs)
 
     result = dashboard_server._latest_persisted_action("run_tests")
 
@@ -228,28 +223,22 @@ def test_matrix_reports_wiring_and_features_not_validation_stats() -> None:
     assert by_sport["Tennis"]["wired"] is True
 
 
-def test_matrix_reads_active_version_from_live_config(monkeypatch, tmp_path: Path) -> None:
+def test_matrix_reads_active_version_from_live_config(monkeypatch, tmp_path: Path, patch_dash) -> None:
     config = tmp_path / "model.yaml"
     config.write_text(
-        "models:\n"
-        "  MLB:\n"
-        "    active_production_version: mlb-live-v99\n",
+        "models:\n  MLB:\n    active_production_version: mlb-live-v99\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config)
+    patch_dash("CONFIG_FILE", config)
 
     result = dashboard_server.matrix()
 
-    mlb = next(
-        row
-        for row in result["rows"]
-        if row["sport"] == "MLB" and row["market"] == "Moneyline"
-    )
+    mlb = next(row for row in result["rows"] if row["sport"] == "MLB" and row["market"] == "Moneyline")
     assert "mlb-live-v99" in mlb["model"]
     assert "v6 artifact" not in mlb["model"]
 
 
-def _minimal_status_environment(monkeypatch, tmp_path: Path) -> None:
+def _minimal_status_environment(monkeypatch, tmp_path: Path, patch_dash) -> None:
     """Just enough on-disk state for status() to run end to end without
     crashing on missing files -- config/data/outputs directories that exist
     but are otherwise empty."""
@@ -260,15 +249,15 @@ def _minimal_status_environment(monkeypatch, tmp_path: Path) -> None:
     config = tmp_path / "model.yaml"
     config.write_text("models: {}\n", encoding="utf-8")
     (tmp_path / "config" / "models").mkdir(parents=True)
-    monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
-    monkeypatch.setattr(dashboard_server, "DATA", data)
-    monkeypatch.setattr(dashboard_server, "OUTPUTS", outputs)
-    monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config)
+    patch_dash("ROOT", tmp_path)
+    patch_dash("DATA", data)
+    patch_dash("OUTPUTS", outputs)
+    patch_dash("CONFIG_FILE", config)
     dashboard_server._CACHE.clear()
 
 
 def test_promotion_allowed_reflects_live_production_evidence_not_a_stale_snapshot(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     """Real bug fixed 2026-08-02: /api/status used to read promotion_allowed
     straight off a static termination-audit-*.json snapshot, completely
@@ -276,14 +265,12 @@ def test_promotion_allowed_reflects_live_production_evidence_not_a_stale_snapsho
     two endpoints could (and did) directly contradict each other. Even with
     a termination-audit file on disk claiming promotion_allowed: true,
     status() must now defer to the live evidence calculation."""
-    _minimal_status_environment(monkeypatch, tmp_path)
+    _minimal_status_environment(monkeypatch, tmp_path, patch_dash)
     (tmp_path / "outputs" / "latest" / "termination-audit-2026-07-17.json").write_text(
         json.dumps({"status": "5_qualified_models_production", "promotion_allowed": True}),
         encoding="utf-8",
     )
-    monkeypatch.setattr(
-        dashboard_server, "production_evidence", lambda: {"all_production_evidence_valid": False}
-    )
+    patch_dash("production_evidence", lambda: {"all_production_evidence_valid": False})
 
     result = dashboard_server.status()
 
@@ -292,12 +279,10 @@ def test_promotion_allowed_reflects_live_production_evidence_not_a_stale_snapsho
 
 
 def test_promotion_allowed_true_only_when_evidence_valid_and_no_error_alerts(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
-    _minimal_status_environment(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        dashboard_server, "production_evidence", lambda: {"all_production_evidence_valid": True}
-    )
+    _minimal_status_environment(monkeypatch, tmp_path, patch_dash)
+    patch_dash("production_evidence", lambda: {"all_production_evidence_valid": True})
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
 
@@ -306,9 +291,7 @@ def test_promotion_allowed_true_only_when_evidence_valid_and_no_error_alerts(
     assert result["promotion_allowed"] is True
 
 
-def test_data_inventory_uses_each_sports_real_storage_layout(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_data_inventory_uses_each_sports_real_storage_layout(monkeypatch, tmp_path: Path, patch_dash) -> None:
     data = tmp_path / "data"
     (data / "historical").mkdir(parents=True)
     (data / "historical" / "mlb_games_all.jsonl").write_text(
@@ -337,9 +320,9 @@ def test_data_inventory_uses_each_sports_real_storage_layout(
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
-    monkeypatch.setattr(dashboard_server, "DATA", data)
-    monkeypatch.setattr(dashboard_server, "SPORTS", ("mlb", "cs2", "kbo"))
+    patch_dash("ROOT", tmp_path)
+    patch_dash("DATA", data)
+    patch_dash("SPORTS", ("mlb", "cs2", "kbo"))
 
     counts, last_ingest, sources = dashboard_server._data_inventory()
 
@@ -376,10 +359,8 @@ def test_metricless_qualified_artifact_is_not_rendered_as_qualified() -> None:
     assert cell["readiness"] == "ARTIFACT_QUALIFIED_FLAG_WITHOUT_LOCKED_HOLDOUT_METRICS"
 
 
-def test_newest_validation_loads_dedicated_research_grids(monkeypatch, tmp_path: Path) -> None:
-    (tmp_path / "learned-model-validation.json").write_text(
-        json.dumps({"sports": {}}), encoding="utf-8"
-    )
+def test_newest_validation_loads_dedicated_research_grids(monkeypatch, tmp_path: Path, patch_dash) -> None:
+    (tmp_path / "learned-model-validation.json").write_text(json.dumps({"sports": {}}), encoding="utf-8")
     (tmp_path / "international-baseball-baseline-validation.json").write_text(
         json.dumps(
             {
@@ -421,7 +402,7 @@ def test_newest_validation_loads_dedicated_research_grids(monkeypatch, tmp_path:
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "OUTPUTS", tmp_path)
+    patch_dash("OUTPUTS", tmp_path)
 
     validation, source = dashboard_server._newest_validation()
 
@@ -447,22 +428,20 @@ def test_newest_validation_loads_dedicated_research_grids(monkeypatch, tmp_path:
 
 
 def test_production_artifact_falls_back_to_active_config_path(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     artifact = tmp_path / "active.json"
     artifact.write_text(json.dumps({"model_version": "active-v1"}), encoding="utf-8")
-    monkeypatch.setattr(
-        dashboard_server,
-        "_config_production_artifact_path",
-        lambda _sport: str(artifact),
-    )
+    patch_dash("_config_production_artifact_path", lambda _sport: str(artifact))
 
     loaded = dashboard_server._production_artifact({"sports": {"wnba": {}}}, "wnba")
 
     assert loaded["model_version"] == "active-v1"
 
 
-def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_path: Path) -> None:
+def test_resting_order_preview_and_submit_persist_exchange_id(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
     pick = {
         "pick_id": "qualified-1",
         "status": "open",
@@ -476,17 +455,18 @@ def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_p
         "fresh": True,
         "market_state": "MARKET_STATE_OPEN",
     }
-    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quote)
-    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
+    patch_dash("ORDERS_FILE", tmp_path / "orders.json")
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash("_pick_quote", lambda row: quote)
+    patch_dash("_unit_value_usd", lambda: 7.5)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
     monkeypatch.setattr(
         dashboard_server.subprocess,
         "run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
-            args=args[0], returncode=0,
+            args=args[0],
+            returncode=0,
             stdout=json.dumps(
                 {
                     "status": "submitted",
@@ -499,9 +479,7 @@ def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_p
         ),
     )
 
-    preview = dashboard_server.preview_order(
-        {"pick_id": "qualified-1", "price": 0.55, "size_shares": 10}
-    )
+    preview = dashboard_server.preview_order({"pick_id": "qualified-1", "price": 0.55, "size_shares": 10})
     result = dashboard_server.submit_order({"nonce": preview["nonce"]})
 
     assert preview["status"] == "preview"
@@ -514,7 +492,7 @@ def test_resting_order_preview_and_submit_persist_exchange_id(monkeypatch, tmp_p
     assert saved[-1]["exchange_price_basis"] == "long_side_probability"
 
 
-def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: Path) -> None:
+def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: Path, patch_dash) -> None:
     pick = {
         "pick_id": "qualified-prompt",
         "status": "open",
@@ -528,10 +506,10 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
         "fresh": True,
         "market_state": "MARKET_STATE_OPEN",
     }
-    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quote)
-    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
+    patch_dash("ORDERS_FILE", tmp_path / "orders.json")
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash("_pick_quote", lambda row: quote)
+    patch_dash("_unit_value_usd", lambda: 7.5)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
     accepted = {
@@ -544,14 +522,14 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
         dashboard_server.subprocess,
         "run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
-            args=args[0], returncode=0,
-            stdout="Order: BUY ... Confirm? (Y/N): " + json.dumps(accepted), stderr="",
+            args=args[0],
+            returncode=0,
+            stdout="Order: BUY ... Confirm? (Y/N): " + json.dumps(accepted),
+            stderr="",
         ),
     )
 
-    preview = dashboard_server.preview_order(
-        {"pick_id": pick["pick_id"], "price": 0.55, "size_shares": 10}
-    )
+    preview = dashboard_server.preview_order({"pick_id": pick["pick_id"], "price": 0.55, "size_shares": 10})
     result = dashboard_server.submit_order({"nonce": preview["nonce"]})
 
     assert result["status"] == "submitted"
@@ -560,7 +538,7 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
 
 
 def test_reconcile_order_marks_exchange_cancellation_and_unlocks_retry(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     orders_path = tmp_path / "orders.json"
     orders_path.write_text(
@@ -577,8 +555,8 @@ def test_reconcile_order_marks_exchange_cancellation_and_unlocks_retry(
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", orders_path)
-    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["runner"])
+    patch_dash("ORDERS_FILE", orders_path)
+    patch_dash("_resolve_runner", lambda: ["runner"])
     monkeypatch.setattr(
         dashboard_server.subprocess,
         "run",
@@ -613,17 +591,15 @@ def test_reconcile_order_marks_exchange_cancellation_and_unlocks_retry(
 
 
 def test_reconcile_order_preserves_submission_when_exchange_is_unavailable(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     orders_path = tmp_path / "orders.json"
     orders_path.write_text(
-        json.dumps(
-            {"orders": [{"status": "submitted", "order_id": "exchange-unknown"}]}
-        ),
+        json.dumps({"orders": [{"status": "submitted", "order_id": "exchange-unknown"}]}),
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", orders_path)
-    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["runner"])
+    patch_dash("ORDERS_FILE", orders_path)
+    patch_dash("_resolve_runner", lambda: ["runner"])
     monkeypatch.setattr(
         dashboard_server.subprocess,
         "run",
@@ -640,7 +616,7 @@ def test_reconcile_order_preserves_submission_when_exchange_is_unavailable(
 
 
 def test_reconcile_orders_holds_the_order_lock_around_read_and_write(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     """Real race fixed 2026-08-02: _reconcile_orders used to read+write
     orders.json without holding _ORDER_LOCK, unlike submit_order and every
@@ -651,13 +627,11 @@ def test_reconcile_orders_holds_the_order_lock_around_read_and_write(
     erasing the just-submitted order record."""
     orders_path = tmp_path / "orders.json"
     orders_path.write_text(
-        json.dumps(
-            {"orders": [{"pick_id": "model-pick-1", "status": "submitted", "order_id": "order-1"}]}
-        ),
+        json.dumps({"orders": [{"pick_id": "model-pick-1", "status": "submitted", "order_id": "order-1"}]}),
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", orders_path)
-    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["runner"])
+    patch_dash("ORDERS_FILE", orders_path)
+    patch_dash("_resolve_runner", lambda: ["runner"])
     monkeypatch.setattr(
         dashboard_server.subprocess,
         "run",
@@ -695,8 +669,8 @@ def test_reconcile_orders_holds_the_order_lock_around_read_and_write(
         lock_held_on_write.append(dashboard_server._ORDER_LOCK.locked())
         return original_save(payload)
 
-    monkeypatch.setattr(dashboard_server, "_load_orders", spy_load)
-    monkeypatch.setattr(dashboard_server, "_save_orders", spy_save)
+    patch_dash("_load_orders", spy_load)
+    patch_dash("_save_orders", spy_save)
 
     dashboard_server._reconcile_orders()
 
@@ -706,9 +680,8 @@ def test_reconcile_orders_holds_the_order_lock_around_read_and_write(
     assert not dashboard_server._ORDER_LOCK.locked()
 
 
-def test_position_sell_refuses_more_than_available(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server,
+def test_position_sell_refuses_more_than_available(monkeypatch, patch_dash) -> None:
+    patch_dash(
         "live_portfolio_view",
         lambda: {
             "status": "live",
@@ -723,11 +696,7 @@ def test_position_sell_refuses_more_than_available(monkeypatch) -> None:
             },
         },
     )
-    monkeypatch.setattr(
-        dashboard_server,
-        "_live_bbo",
-        lambda slug: {"short": {"bid": 0.35, "ask": 0.37}},
-    )
+    patch_dash("_live_bbo", lambda slug: {"short": {"bid": 0.35, "ask": 0.37}})
 
     result = dashboard_server.preview_position_sell(
         {"market_slug": "mlb-held", "side": "short", "price": 0.50, "size_shares": 19}
@@ -737,9 +706,8 @@ def test_position_sell_refuses_more_than_available(monkeypatch) -> None:
     assert "18" in result["error"]
 
 
-def test_position_sell_previews_verified_holding(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server,
+def test_position_sell_previews_verified_holding(monkeypatch, patch_dash) -> None:
+    patch_dash(
         "live_portfolio_view",
         lambda: {
             "status": "live",
@@ -754,11 +722,7 @@ def test_position_sell_previews_verified_holding(monkeypatch) -> None:
             },
         },
     )
-    monkeypatch.setattr(
-        dashboard_server,
-        "_live_bbo",
-        lambda slug: {"short": {"bid": 0.35, "ask": 0.37}},
-    )
+    patch_dash("_live_bbo", lambda slug: {"short": {"bid": 0.35, "ask": 0.37}})
 
     result = dashboard_server.preview_position_sell(
         {"market_slug": "mlb-held", "side": "short", "price": 0.50, "size_shares": 18}
@@ -768,16 +732,15 @@ def test_position_sell_previews_verified_holding(monkeypatch) -> None:
     assert result["verified_available_quantity"] == 18.0
 
 
-def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: Path) -> None:
+def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: Path, patch_dash) -> None:
     pick = {
         "pick_id": "qualified-2",
         "status": "open",
         "record_type": "QUALIFIED_SHADOW_CALL",
         "units": 1.0,
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
         "_pick_quote",
         lambda row: {
             "market_slug": "nfl-example",
@@ -789,8 +752,8 @@ def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: 
     )
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
-    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
-    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
+    patch_dash("ORDERS_FILE", tmp_path / "orders.json")
+    patch_dash("_unit_value_usd", lambda: 7.5)
     submitted = {}
 
     def fake_run(command, **kwargs):
@@ -806,9 +769,7 @@ def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: 
 
     monkeypatch.setattr(dashboard_server.subprocess, "run", fake_run)
 
-    result = dashboard_server.preview_order(
-        {"pick_id": "qualified-2", "price": 0.60, "size_shares": 10}
-    )
+    result = dashboard_server.preview_order({"pick_id": "qualified-2", "price": 0.60, "size_shares": 10})
 
     assert result["status"] == "preview"
     assert result["order_type"] == "limit_ioc"
@@ -822,16 +783,15 @@ def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: 
     assert submitted["command"][order_type_index + 1] == "limit_ioc"
 
 
-def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch) -> None:
+def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch, patch_dash) -> None:
     pick = {
         "pick_id": "qualified-cap",
         "status": "open",
         "record_type": "QUALIFIED_SHADOW_CALL",
         "units": 1.0,
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
         "_pick_quote",
         lambda row: {
             "market_slug": "nfl-example",
@@ -841,19 +801,17 @@ def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch) -> No
             "market_state": "MARKET_STATE_OPEN",
         },
     )
-    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
+    patch_dash("_unit_value_usd", lambda: 7.5)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
 
-    result = dashboard_server.preview_order(
-        {"pick_id": "qualified-cap", "price": 0.55, "size_shares": 14}
-    )
+    result = dashboard_server.preview_order({"pick_id": "qualified-cap", "price": 0.55, "size_shares": 14})
 
     assert result["status"] == "refused"
     assert "1U cap ($7.50)" in result["error"]
 
 
-def test_active_model_positive_edge_research_pick_is_manually_buyable(monkeypatch) -> None:
+def test_active_model_positive_edge_research_pick_is_manually_buyable(monkeypatch, patch_dash) -> None:
     row = {
         "record_type": "RESEARCH_OBSERVATION",
         "status": "open",
@@ -862,8 +820,7 @@ def test_active_model_positive_edge_research_pick_is_manually_buyable(monkeypatc
         "model_probability": 0.58,
         "market_implied_probability": 0.48,
     }
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash(
         "_config_payload",
         lambda: {
             "execution": {
@@ -874,8 +831,8 @@ def test_active_model_positive_edge_research_pick_is_manually_buyable(monkeypatc
             "models": {"WNBA": {"active_production_version": "wnba-elo-trend-lr-v3"}},
         },
     )
-    monkeypatch.setattr(dashboard_server, "_row_has_banned_team", lambda item: False)
-    monkeypatch.setattr(dashboard_server, "_suggested_units", lambda item: 1.25)
+    patch_dash("_row_has_banned_team", lambda item: False)
+    patch_dash("_suggested_units", lambda item: 1.25)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
     quote = {"fresh": True, "market_state": "MARKET_STATE_OPEN"}
@@ -886,7 +843,7 @@ def test_active_model_positive_edge_research_pick_is_manually_buyable(monkeypatc
     assert reason == "ready"
 
 
-def test_manual_research_limit_cannot_exceed_model_probability(monkeypatch) -> None:
+def test_manual_research_limit_cannot_exceed_model_probability(monkeypatch, patch_dash) -> None:
     pick = {
         "pick_id": "manual-edge-cap",
         "status": "open",
@@ -894,9 +851,8 @@ def test_manual_research_limit_cannot_exceed_model_probability(monkeypatch) -> N
         "units": 0,
         "model_probability": 0.58,
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
         "_decorate_pick",
         lambda row: {
             **row,
@@ -905,21 +861,15 @@ def test_manual_research_limit_cannot_exceed_model_probability(monkeypatch) -> N
             "quote": {"market_slug": "wnba-example", "side": "long", "ask": 0.64},
         },
     )
-    monkeypatch.setattr(
-        dashboard_server,
-        "_config_payload",
-        lambda: {"execution": {"manual_research_require_positive_edge": True}},
-    )
+    patch_dash("_config_payload", lambda: {"execution": {"manual_research_require_positive_edge": True}})
 
-    result = dashboard_server.preview_order(
-        {"pick_id": "manual-edge-cap", "price": 0.58, "size_shares": 10}
-    )
+    result = dashboard_server.preview_order({"pick_id": "manual-edge-cap", "price": 0.58, "size_shares": 10})
 
     assert result["status"] == "refused"
     assert "below the model probability" in result["error"]
 
 
-def test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled(monkeypatch) -> None:
+def test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled(monkeypatch, patch_dash) -> None:
     pick = {
         "pick_id": "manual-market-price",
         "status": "open",
@@ -927,9 +877,8 @@ def test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled(monke
         "units": 0,
         "model_probability": 0.58,
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
         "_decorate_pick",
         lambda row: {
             **row,
@@ -938,13 +887,9 @@ def test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled(monke
             "quote": {"market_slug": "wnba-example", "side": "long", "ask": 0.64},
         },
     )
-    monkeypatch.setattr(dashboard_server, "_suggested_units", lambda row: 1.25)
-    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 7.5)
-    monkeypatch.setattr(
-        dashboard_server,
-        "_config_payload",
-        lambda: {"execution": {"manual_research_require_positive_edge": False}},
-    )
+    patch_dash("_suggested_units", lambda row: 1.25)
+    patch_dash("_unit_value_usd", lambda: 7.5)
+    patch_dash("_config_payload", lambda: {"execution": {"manual_research_require_positive_edge": False}})
 
     result = dashboard_server.preview_order(
         {"pick_id": "manual-market-price", "price": 0.64, "size_shares": 10}
@@ -954,7 +899,9 @@ def test_manual_control_can_buy_at_ask_when_positive_edge_gate_is_disabled(monke
     assert result["order_type"] == "limit_ioc"
 
 
-def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, tmp_path: Path) -> None:
+def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
     old = {
         "pick_id": "old-v2",
         "event_id": "game-1",
@@ -979,12 +926,10 @@ def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, 
         "selection": "home",
     }
     archive_path = tmp_path / "archive.json"
-    archive_path.write_text(
-        json.dumps({"pick_ids": ["old-v2", "archived-only"]}), encoding="utf-8"
-    )
-    monkeypatch.setattr(dashboard_server, "ARCHIVE_FILE", archive_path)
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [old, latest, archived_only])
-    monkeypatch.setattr(dashboard_server, "_decorate_pick", lambda row, *args: row)
+    archive_path.write_text(json.dumps({"pick_ids": ["old-v2", "archived-only"]}), encoding="utf-8")
+    patch_dash("ARCHIVE_FILE", archive_path)
+    patch_dash("read_picks", lambda: [old, latest, archived_only])
+    patch_dash("_decorate_pick", lambda row, *args: row)
 
     ledger = dashboard_server.dashboard_picks()
     today = dashboard_server.today_picks("2026-07-17")
@@ -994,19 +939,44 @@ def test_today_and_ledger_hide_archived_duplicates_and_keep_latest(monkeypatch, 
     assert today["count"] == 1
 
 
-def test_scan_prices_targets_all_unique_open_visible_ledger_contracts(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+def test_scan_prices_targets_all_unique_open_visible_ledger_contracts(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
+    patch_dash("_resolve_runner", lambda: ["model-prediction"])
     archive_path = tmp_path / "archive.json"
     archive_path.write_text(json.dumps({"pick_ids": ["archived"]}), encoding="utf-8")
-    monkeypatch.setattr(dashboard_server, "ARCHIVE_FILE", archive_path)
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("ARCHIVE_FILE", archive_path)
+    patch_dash(
         "_all_ledger_rows_for_price_scan",
         lambda: [
-            {"pick_id": "today", "event_id": "game-1", "league": "WNBA", "status": "open", "event_start_utc": "2026-07-17T23:30:00Z"},
-            {"pick_id": "tomorrow", "event_id": "game-2", "league": "MLB", "status": "open", "event_start_utc": "2026-07-18T20:10:00Z"},
-            {"pick_id": "settled", "event_id": "game-3", "league": "MLB", "status": "settled", "event_start_utc": "2026-07-17T20:10:00Z"},
-            {"pick_id": "archived", "event_id": "game-4", "league": "NFL", "status": "open", "event_start_utc": "2026-07-18T20:10:00Z"},
+            {
+                "pick_id": "today",
+                "event_id": "game-1",
+                "league": "WNBA",
+                "status": "open",
+                "event_start_utc": "2026-07-17T23:30:00Z",
+            },
+            {
+                "pick_id": "tomorrow",
+                "event_id": "game-2",
+                "league": "MLB",
+                "status": "open",
+                "event_start_utc": "2026-07-18T20:10:00Z",
+            },
+            {
+                "pick_id": "settled",
+                "event_id": "game-3",
+                "league": "MLB",
+                "status": "settled",
+                "event_start_utc": "2026-07-17T20:10:00Z",
+            },
+            {
+                "pick_id": "archived",
+                "event_id": "game-4",
+                "league": "NFL",
+                "status": "open",
+                "event_start_utc": "2026-07-18T20:10:00Z",
+            },
         ],
     )
     quotes = {
@@ -1015,11 +985,9 @@ def test_scan_prices_targets_all_unique_open_visible_ledger_contracts(monkeypatc
         "settled": {"market_slug": "mlb-finished"},
         "archived": {"market_slug": "nfl-hidden"},
     }
-    monkeypatch.setattr(dashboard_server, "_pick_quote", lambda row: quotes[row["pick_id"]])
+    patch_dash("_pick_quote", lambda row: quotes[row["pick_id"]])
 
-    command = dashboard_server._action_command(
-        "refresh_prices", {"date": "2026-07-17"}
-    )
+    command = dashboard_server._action_command("refresh_prices", {"date": "2026-07-17"})
 
     assert command == [
         "model-prediction",
@@ -1034,7 +1002,7 @@ def test_scan_prices_targets_all_unique_open_visible_ledger_contracts(monkeypatc
     assert "--all" not in command
 
 
-def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch) -> None:
+def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch, patch_dash) -> None:
     """Confirmed real gap (2026-07-31): read_picks() only ever parsed
     picks.xlsx (Main), so every open Flat/Research/Gated Research pick's
     price silently went stale forever, since nothing else ever refreshed
@@ -1044,13 +1012,9 @@ def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch)
     _read_split_picks() now short-circuits to the SQLite dashboard cache
     and never reaches Excel parsing, so mocking _parse_picks alone leaked
     real cached rows into the scan."""
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [{"pick_id": "main-1"}])
-    monkeypatch.setattr(dashboard_server, "read_flat_picks", lambda: [{"pick_id": "flat-1"}])
-    monkeypatch.setattr(
-        dashboard_server,
-        "_parse_research_picks",
-        lambda *, gated: [{"pick_id": "gated-1" if gated else "research-1"}],
-    )
+    patch_dash("read_picks", lambda: [{"pick_id": "main-1"}])
+    patch_dash("read_flat_picks", lambda: [{"pick_id": "flat-1"}])
+    patch_dash("_parse_research_picks", lambda *, gated: [{"pick_id": "gated-1" if gated else "research-1"}])
 
     rows = dashboard_server._all_ledger_rows_for_price_scan()
 
@@ -1058,14 +1022,13 @@ def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch)
 
 
 def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     history_file = tmp_path / "portfolio_history.json"
-    monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", history_file)
-    monkeypatch.setattr(dashboard_server, "_today", lambda: "2026-07-17")
-    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("PORTFOLIO_HISTORY_FILE", history_file)
+    patch_dash("_today", lambda: "2026-07-17")
+    patch_dash("_resolve_runner", lambda: ["model-prediction"])
+    patch_dash(
         "_live_model_links",
         lambda: {
             ("market-1", "long"): {
@@ -1141,7 +1104,7 @@ def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
 
 
 def test_live_balance_unwraps_the_same_value_currency_envelope_as_every_other_amount(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     """Every other USD amount this API returns (trade price/costBasis/
     realizedPnl/fee, position cost/cashValue/realized) arrives wrapped as
@@ -1152,10 +1115,10 @@ def test_live_balance_unwraps_the_same_value_currency_envelope_as_every_other_am
     convention as every other endpoint in this same authenticated API, the
     dashboard's balance display (and _auto_adjust_unit_value's bankroll-%
     sizing, which reads balance.current_usd) would go dark with no error."""
-    monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", tmp_path / "portfolio_history.json")
-    monkeypatch.setattr(dashboard_server, "_today", lambda: "2026-07-17")
-    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
-    monkeypatch.setattr(dashboard_server, "_live_model_links", dict)
+    patch_dash("PORTFOLIO_HISTORY_FILE", tmp_path / "portfolio_history.json")
+    patch_dash("_today", lambda: "2026-07-17")
+    patch_dash("_resolve_runner", lambda: ["model-prediction"])
+    patch_dash("_live_model_links", dict)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
     raw = {
@@ -1230,9 +1193,8 @@ def test_opposite_side_exchange_activity_is_not_linked_to_model_pick() -> None:
     assert phoenix["model_pick"]["pick_id"] == "phoenix-pick"
 
 
-def test_market_slugs_are_rendered_as_readable_names(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server,
+def test_market_slugs_are_rendered_as_readable_names(monkeypatch, patch_dash) -> None:
+    patch_dash(
         "_team_name_index",
         lambda: {
             ("wnba", "conn"): "Connecticut Sun",
@@ -1241,7 +1203,7 @@ def test_market_slugs_are_rendered_as_readable_names(monkeypatch) -> None:
             ("mlb", "kc"): "Kansas City Royals",
         },
     )
-    monkeypatch.setattr(dashboard_server, "_public_market_question", lambda slug: None)
+    patch_dash("_public_market_question", lambda slug: None)
 
     assert dashboard_server._human_market_name("aec-wnba-conn-phx-2026-07-17") == (
         "WNBA · Connecticut Sun @ Phoenix Mercury · Moneyline"
@@ -1251,24 +1213,17 @@ def test_market_slugs_are_rendered_as_readable_names(monkeypatch) -> None:
     )
 
 
-def test_player_prop_market_uses_public_question(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server,
-        "_public_market_question",
-        lambda slug: "Will Kyle Tucker record at least 1 hits + runs + RBIs?",
+def test_player_prop_market_uses_public_question(monkeypatch, patch_dash) -> None:
+    patch_dash(
+        "_public_market_question", lambda slug: "Will Kyle Tucker record at least 1 hits + runs + RBIs?"
     )
 
-    name = dashboard_server._human_market_name(
-        "astatc-mlb-lad-nyy-2026-07-17-hrr-kyltuc-gte1"
-    )
+    name = dashboard_server._human_market_name("astatc-mlb-lad-nyy-2026-07-17-hrr-kyltuc-gte1")
 
-    assert name == (
-        "Kyle Tucker · 1+ hits + runs + RBIs · "
-        "Los Angeles Dodgers @ New York Yankees"
-    )
+    assert name == ("Kyle Tucker · 1+ hits + runs + RBIs · Los Angeles Dodgers @ New York Yankees")
 
 
-def test_unit_value_update_is_atomic_persistent_and_audited(monkeypatch, tmp_path: Path) -> None:
+def test_unit_value_update_is_atomic_persistent_and_audited(monkeypatch, tmp_path: Path, patch_dash) -> None:
     config_path = tmp_path / "config" / "model.yaml"
     config_path.parent.mkdir()
     config_path.write_text(
@@ -1276,8 +1231,8 @@ def test_unit_value_update_is_atomic_persistent_and_audited(monkeypatch, tmp_pat
         encoding="utf-8",
     )
     data_path = tmp_path / "data"
-    monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config_path)
-    monkeypatch.setattr(dashboard_server, "DATA", data_path)
+    patch_dash("CONFIG_FILE", config_path)
+    patch_dash("DATA", data_path)
 
     result = dashboard_server._set_unit_value_usd(25)
 
@@ -1297,7 +1252,7 @@ def test_unit_value_update_rejects_invalid_amounts() -> None:
 
 
 def test_portfolio_history_ignores_everything_before_fixed_start_date(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     history_file = tmp_path / "portfolio_history.json"
     history_file.write_text(
@@ -1320,7 +1275,7 @@ def test_portfolio_history_ignores_everything_before_fixed_start_date(
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "PORTFOLIO_HISTORY_FILE", history_file)
+    patch_dash("PORTFOLIO_HISTORY_FILE", history_file)
 
     result = dashboard_server._load_portfolio_history()
 
@@ -1329,19 +1284,13 @@ def test_portfolio_history_ignores_everything_before_fixed_start_date(
 
 
 def test_portfolio_never_falls_back_to_model_picks_when_authentication_fails(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
-    monkeypatch.setattr(
-        dashboard_server, "PORTFOLIO_HISTORY_FILE", tmp_path / "portfolio_history.json"
-    )
-    monkeypatch.setattr(dashboard_server, "_resolve_runner", lambda: ["model-prediction"])
+    patch_dash("PORTFOLIO_HISTORY_FILE", tmp_path / "portfolio_history.json")
+    patch_dash("_resolve_runner", lambda: ["model-prediction"])
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "invalid-secret")
-    monkeypatch.setattr(
-        dashboard_server,
-        "read_picks",
-        lambda: [{"pick_id": "research-row", "status": "open"}],
-    )
+    patch_dash("read_picks", lambda: [{"pick_id": "research-row", "status": "open"}])
     monkeypatch.setattr(
         dashboard_server.subprocess,
         "run",
@@ -1360,7 +1309,7 @@ def test_portfolio_never_falls_back_to_model_picks_when_authentication_fails(
     assert result["open"]["positions"] == []
 
 
-def test_pick_quote_freezes_last_valid_pregame_price(monkeypatch, tmp_path: Path) -> None:
+def test_pick_quote_freezes_last_valid_pregame_price(monkeypatch, tmp_path: Path, patch_dash) -> None:
     data = tmp_path / "data"
     path = data / "odds" / "wnba" / "2026-07-18" / "polymarket_snapshots.jsonl"
     path.parent.mkdir(parents=True)
@@ -1388,7 +1337,7 @@ def test_pick_quote_freezes_last_valid_pregame_price(monkeypatch, tmp_path: Path
         },
     ]
     path.write_text("\n".join(json.dumps(item) for item in snapshots) + "\n", encoding="utf-8")
-    monkeypatch.setattr(dashboard_server, "DATA", data)
+    patch_dash("DATA", data)
     row = {
         "league": "WNBA",
         "market_type": "moneyline",
@@ -1464,7 +1413,7 @@ def _mlb_slate_snapshots(day: str, event_start: str) -> list[dict]:
     ]
 
 
-def test_pick_quote_matches_the_exact_spread_line_and_team(monkeypatch, tmp_path: Path) -> None:
+def test_pick_quote_matches_the_exact_spread_line_and_team(monkeypatch, tmp_path: Path, patch_dash) -> None:
     """Real bug fixed 2026-08-04: _pick_quote was moneyline-only, so every
     real, sized MLB spread pick returned None ("no exact executable
     Polymarket US market mapping") even when the live market genuinely
@@ -1479,7 +1428,7 @@ def test_pick_quote_matches_the_exact_spread_line_and_team(monkeypatch, tmp_path
         "\n".join(json.dumps(item) for item in _mlb_slate_snapshots(day, event_start)) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path / "data")
+    patch_dash("DATA", tmp_path / "data")
     row = {
         "league": "MLB",
         "market_type": "spread",
@@ -1498,7 +1447,7 @@ def test_pick_quote_matches_the_exact_spread_line_and_team(monkeypatch, tmp_path
     assert quote["ask"] == 0.46
 
 
-def test_pick_quote_matches_the_exact_total_line_and_game(monkeypatch, tmp_path: Path) -> None:
+def test_pick_quote_matches_the_exact_total_line_and_game(monkeypatch, tmp_path: Path, patch_dash) -> None:
     """Same fix as the spread test, for total -- and specifically exercises
     the cross-game collision this matching must NOT make: two different
     real games both have an 8.5 total line in the fixture, and this row
@@ -1511,7 +1460,7 @@ def test_pick_quote_matches_the_exact_total_line_and_game(monkeypatch, tmp_path:
         "\n".join(json.dumps(item) for item in _mlb_slate_snapshots(day, event_start)) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path / "data")
+    patch_dash("DATA", tmp_path / "data")
     row = {
         "league": "MLB",
         "market_type": "total",
@@ -1530,7 +1479,9 @@ def test_pick_quote_matches_the_exact_total_line_and_game(monkeypatch, tmp_path:
     assert quote["ask"] == 0.44
 
 
-def test_pick_quote_never_cross_matches_another_games_spread_line(monkeypatch, tmp_path: Path) -> None:
+def test_pick_quote_never_cross_matches_another_games_spread_line(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
     """Direct regression test for the bug caught while building this fix
     (never shipped): _spread_side_for_row's line-negation branch, before
     _row_matches_snapshot_event existed, matched ANY other game's spread
@@ -1545,7 +1496,7 @@ def test_pick_quote_never_cross_matches_another_games_spread_line(monkeypatch, t
         "\n".join(json.dumps(item) for item in _mlb_slate_snapshots(day, event_start)) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path / "data")
+    patch_dash("DATA", tmp_path / "data")
     row = {
         "league": "MLB",
         "market_type": "spread",
@@ -1559,9 +1510,8 @@ def test_pick_quote_never_cross_matches_another_games_spread_line(monkeypatch, t
     assert dashboard_server._pick_quote(row) is None
 
 
-def test_filled_entry_uses_selected_side_exchange_fill(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server,
+def test_filled_entry_uses_selected_side_exchange_fill(monkeypatch, patch_dash) -> None:
+    patch_dash(
         "_load_orders",
         lambda: {
             "orders": [
@@ -1579,8 +1529,7 @@ def test_filled_entry_uses_selected_side_exchange_fill(monkeypatch) -> None:
             ]
         },
     )
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash(
         "_load_portfolio_history",
         lambda: {
             "activities": [
@@ -1667,21 +1616,18 @@ def test_settlement_reports_realized_delta_not_cumulative_total() -> None:
     assert activity["pnl_basis"] == "position_realized_delta"
 
 
-def test_team_total_history_name_uses_exact_exchange_question(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server,
+def test_team_total_history_name_uses_exact_exchange_question(monkeypatch, patch_dash) -> None:
+    patch_dash(
         "_public_market_question",
         lambda slug: "Will France score more than 0.5 goals in the first half of FRA vs ENG?",
     )
 
-    name = dashboard_server._human_market_name(
-        "tsc-fwc-fra-eng-2026-07-18-ttg-fh-fra-0pt5"
-    )
+    name = dashboard_server._human_market_name("tsc-fwc-fra-eng-2026-07-18-ttg-fh-fra-0pt5")
 
     assert name == "Will France score more than 0.5 goals in the first half of FRA vs ENG"
 
 
-def test_cached_short_trade_is_side_adjusted_in_history_summary(monkeypatch) -> None:
+def test_cached_short_trade_is_side_adjusted_in_history_summary(monkeypatch, patch_dash) -> None:
     links = {
         ("aec-wnba-ny-ind-2026-07-18", "short"): {
             "pick_id": "indiana",
@@ -1689,7 +1635,7 @@ def test_cached_short_trade_is_side_adjusted_in_history_summary(monkeypatch) -> 
             "model_version": "wnba-v3",
         }
     }
-    monkeypatch.setattr(dashboard_server, "_human_market_name", lambda slug, title="": slug)
+    patch_dash("_human_market_name", lambda slug, title="": slug)
 
     summary = dashboard_server._portfolio_history_summary(
         [
@@ -1715,7 +1661,7 @@ def test_cached_short_trade_is_side_adjusted_in_history_summary(monkeypatch) -> 
     assert trade["model_pick"]["pick_id"] == "indiana"
 
 
-def test_sell_refuses_once_the_game_has_already_started(monkeypatch) -> None:
+def test_sell_refuses_once_the_game_has_already_started(monkeypatch, patch_dash) -> None:
     """Operator directive, 2026-08-01: _pick_quote never returns a snapshot
     observed at or after event_start_utc, so once a game starts the only
     available quote is a frozen pregame snapshot that can never update
@@ -1729,12 +1675,15 @@ def test_sell_refuses_once_the_game_has_already_started(monkeypatch) -> None:
         "units": 1.0,
         "event_start_utc": "2020-01-01T00:00:00Z",
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
         "_decorate_pick",
-        lambda row: {**row, "buy_ready": True, "buy_block_reason": "ready",
-                      "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}},
+        lambda row: {
+            **row,
+            "buy_ready": True,
+            "buy_block_reason": "ready",
+            "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+        },
     )
 
     result = dashboard_server.preview_order(
@@ -1745,7 +1694,7 @@ def test_sell_refuses_once_the_game_has_already_started(monkeypatch) -> None:
     assert "already started" in result["error"]
 
 
-def test_sell_still_allowed_before_the_game_starts(monkeypatch) -> None:
+def test_sell_still_allowed_before_the_game_starts(monkeypatch, patch_dash) -> None:
     pick = {
         "pick_id": "held-pregame",
         "status": "open",
@@ -1753,12 +1702,15 @@ def test_sell_still_allowed_before_the_game_starts(monkeypatch) -> None:
         "units": 1.0,
         "event_start_utc": "2099-01-01T00:00:00Z",
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
         "_decorate_pick",
-        lambda row: {**row, "buy_ready": True, "buy_block_reason": "ready",
-                      "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}},
+        lambda row: {
+            **row,
+            "buy_ready": True,
+            "buy_block_reason": "ready",
+            "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+        },
     )
 
     result = dashboard_server.preview_order(
@@ -1768,7 +1720,9 @@ def test_sell_still_allowed_before_the_game_starts(monkeypatch) -> None:
     assert result["status"] == "preview"
 
 
-def test_submit_sell_also_refuses_once_the_game_has_already_started(monkeypatch, tmp_path: Path) -> None:
+def test_submit_sell_also_refuses_once_the_game_has_already_started(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
     # A preview created before the game started, then submitted after it
     # started, must be caught at submission time too -- not just preview
     # time -- since state can change between the two calls.
@@ -1779,14 +1733,17 @@ def test_submit_sell_also_refuses_once_the_game_has_already_started(monkeypatch,
         "units": 1.0,
         "event_start_utc": "2099-01-01T00:00:00Z",
     }
-    monkeypatch.setattr(dashboard_server, "read_picks", lambda: [pick])
-    monkeypatch.setattr(
-        dashboard_server,
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
         "_decorate_pick",
-        lambda row: {**row, "buy_ready": True, "buy_block_reason": "ready",
-                      "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}},
+        lambda row: {
+            **row,
+            "buy_ready": True,
+            "buy_block_reason": "ready",
+            "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+        },
     )
-    monkeypatch.setattr(dashboard_server, "ORDERS_FILE", tmp_path / "orders.json")
+    patch_dash("ORDERS_FILE", tmp_path / "orders.json")
 
     preview = dashboard_server.preview_order(
         {"pick_id": "held-race", "action": "sell", "price": 0.50, "size_shares": 10}
@@ -1795,10 +1752,8 @@ def test_submit_sell_also_refuses_once_the_game_has_already_started(monkeypatch,
 
     # Game has since started -- flip the row and the quote lookup used by submit_order.
     pick["event_start_utc"] = "2020-01-01T00:00:00Z"
-    monkeypatch.setattr(
-        dashboard_server,
-        "_pick_quote",
-        lambda row: {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+    patch_dash(
+        "_pick_quote", lambda row: {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}
     )
 
     result = dashboard_server.submit_order({"nonce": preview["nonce"]})
@@ -1863,12 +1818,12 @@ def test_exit_75_is_a_coalesced_skip_not_a_failure() -> None:
     assert dashboard_server._job_status_for_returncode(75) == "skipped"
 
 
-def test_job_history_survives_restart(monkeypatch, tmp_path: Path) -> None:
+def test_job_history_survives_restart(monkeypatch, tmp_path: Path, patch_dash) -> None:
     """Consolidation P1: without startup hydration the first persist after
     a restart wipes every pre-restart job. Hydration must load A/B/C,
     normalize a persisted 'running' job to 'interrupted', never resurrect
     started_monotonic, and a later persist must keep all of them."""
-    monkeypatch.setattr(dashboard_server, "JOBS_FILE", tmp_path / "jobs.json")
+    patch_dash("JOBS_FILE", tmp_path / "jobs.json")
     dashboard_server.JOBS_FILE.write_text(
         json.dumps(
             {

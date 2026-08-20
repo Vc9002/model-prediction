@@ -75,8 +75,7 @@ def test_import_rows_is_idempotent_and_preserves_pick_identity(tmp_path) -> None
 
 
 def test_existing_research_ledgers_and_dashboard_aggregate_per_sport(
-    tmp_path,
-    monkeypatch,
+    tmp_path, monkeypatch, patch_dash
 ) -> None:
     research_ledger(tmp_path, "cs2").append_call(_request("cs2-event"), 1.0, 75)
     lol_request = _request("lol-event")
@@ -87,14 +86,12 @@ def test_existing_research_ledgers_and_dashboard_aggregate_per_sport(
         "cs2",
         "lol",
     ]
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+    patch_dash("DATA", tmp_path)
     rows = dashboard_server._parse_research_picks()
     assert {row["event_id"] for row in rows} == {"cs2-event", "lol-event"}
 
 
-def test_dashboard_decoration_preserves_zero_unit_research_no_call(
-    monkeypatch,
-) -> None:
+def test_dashboard_decoration_preserves_zero_unit_research_no_call(monkeypatch, patch_dash) -> None:
     row = {
         "pick_id": "research-no-call",
         "status": "open",
@@ -107,21 +104,21 @@ def test_dashboard_decoration_preserves_zero_unit_research_no_call(
         "research_pnl_units": None,
         "result": None,
     }
-    monkeypatch.setattr(dashboard_server, "_pick_quote", lambda _: None)
+    patch_dash("_pick_quote", lambda _: None)
     monkeypatch.setattr(
         dashboard_server,
         "_order_readiness",
         lambda *_: (False, "model has no positive edge"),
     )
-    monkeypatch.setattr(dashboard_server, "_latest_order_for_pick", lambda *_: None)
+    patch_dash("_latest_order_for_pick", lambda *_: None)
     monkeypatch.setattr(
         dashboard_server,
         "_manual_research_eligibility",
         lambda _: (False, "no"),
     )
-    monkeypatch.setattr(dashboard_server, "_filled_entry_for_pick", lambda *_: None)
-    monkeypatch.setattr(dashboard_server, "_suggested_units", lambda _: 1.5)
-    monkeypatch.setattr(dashboard_server, "_unit_value_usd", lambda: 5.0)
+    patch_dash("_filled_entry_for_pick", lambda *_: None)
+    patch_dash("_suggested_units", lambda _: 1.5)
+    patch_dash("_unit_value_usd", lambda: 5.0)
 
     decorated = dashboard_server._decorate_pick(row)
 

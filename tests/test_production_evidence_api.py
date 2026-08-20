@@ -23,7 +23,7 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _configure(monkeypatch, tmp_path: Path, models: dict) -> tuple[Path, Path, Path]:
+def _configure(monkeypatch, tmp_path: Path, models: dict, patch_dash) -> tuple[Path, Path, Path]:
     config = tmp_path / "config" / "model.yaml"
     data = tmp_path / "data"
     outputs = tmp_path / "outputs" / "latest"
@@ -31,18 +31,16 @@ def _configure(monkeypatch, tmp_path: Path, models: dict) -> tuple[Path, Path, P
     data.mkdir()
     outputs.mkdir(parents=True)
     config.write_text(yaml.safe_dump({"models": models}), encoding="utf-8")
-    monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
-    monkeypatch.setattr(dashboard_server, "CONFIG_FILE", config)
-    monkeypatch.setattr(
-        dashboard_server, "FEATURE_REGISTRY_FILE", tmp_path / "config" / "tested_features.json"
-    )
-    monkeypatch.setattr(dashboard_server, "DATA", data)
-    monkeypatch.setattr(dashboard_server, "OUTPUTS", outputs)
+    patch_dash("ROOT", tmp_path)
+    patch_dash("CONFIG_FILE", config)
+    patch_dash("FEATURE_REGISTRY_FILE", tmp_path / "config" / "tested_features.json")
+    patch_dash("DATA", data)
+    patch_dash("OUTPUTS", outputs)
     return config, data, outputs
 
 
 def test_production_evidence_enumerates_artifacts_and_uses_exact_metric_sources(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     logistic = _hashed(
         {
@@ -96,6 +94,7 @@ def test_production_evidence_enumerates_artifacts_and_uses_exact_metric_sources(
             },
             "TENNIS": {"status": "deferred"},
         },
+        patch_dash,
     )
     _write_json(tmp_path / "config" / "models" / "mlb-v2.json", logistic)
     _write_json(tmp_path / "config" / "models" / "lol-v2.json", esports)
@@ -111,7 +110,7 @@ def test_production_evidence_enumerates_artifacts_and_uses_exact_metric_sources(
             }
         },
     )
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    patch_dash("_read_evidence_ledger", lambda _path: [])
 
     result = dashboard_server.production_evidence()
 
@@ -167,7 +166,7 @@ def test_production_evidence_enumerates_artifacts_and_uses_exact_metric_sources(
 
 
 def test_production_evidence_deduplicates_exact_versions_and_separates_predecessors(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     active = _hashed(
         {
@@ -213,6 +212,7 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
                 "production_artifact": "config/models/mlb-v2.json",
             }
         },
+        patch_dash,
     )
     _write_json(tmp_path / "config" / "models" / "mlb-v2.json", active)
     _write_json(tmp_path / "config" / "models" / "mlb-v1.json", predecessor)
@@ -276,11 +276,7 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
             "result": "win",
         },
     ]
-    monkeypatch.setattr(
-        dashboard_server,
-        "_read_evidence_ledger",
-        lambda path: main if path.parent.name == "main" else flat,
-    )
+    patch_dash("_read_evidence_ledger", lambda path: main if path.parent.name == "main" else flat)
 
     model = dashboard_server.production_evidence()["models"][0]
     main_result = model["main_ledger"]
@@ -318,7 +314,7 @@ def test_production_evidence_deduplicates_exact_versions_and_separates_predecess
     }
 
 
-def test_artifact_or_external_version_mismatch_fails_closed(monkeypatch, tmp_path: Path) -> None:
+def test_artifact_or_external_version_mismatch_fails_closed(monkeypatch, tmp_path: Path, patch_dash) -> None:
     wrong_version = _hashed(
         {
             "schema_version": "esports-neutral-elo-v1",
@@ -338,6 +334,7 @@ def test_artifact_or_external_version_mismatch_fails_closed(monkeypatch, tmp_pat
                 "production_artifact": "config/models/lol-v2.json",
             }
         },
+        patch_dash,
     )
     _write_json(tmp_path / "config" / "models" / "lol-v2.json", wrong_version)
     _write_json(
@@ -352,7 +349,7 @@ def test_artifact_or_external_version_mismatch_fails_closed(monkeypatch, tmp_pat
             }
         },
     )
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    patch_dash("_read_evidence_ledger", lambda _path: [])
 
     model = dashboard_server.production_evidence()["models"][0]
 
@@ -363,7 +360,9 @@ def test_artifact_or_external_version_mismatch_fails_closed(monkeypatch, tmp_pat
     assert model["evidence_valid"] is False
 
 
-def test_external_esports_metrics_require_exact_report_version(monkeypatch, tmp_path: Path) -> None:
+def test_external_esports_metrics_require_exact_report_version(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
     artifact = _hashed(
         {
             "schema_version": "esports-neutral-elo-v1",
@@ -383,6 +382,7 @@ def test_external_esports_metrics_require_exact_report_version(monkeypatch, tmp_
                 "production_artifact": "config/models/lol-v2.json",
             }
         },
+        patch_dash,
     )
     _write_json(tmp_path / "config" / "models" / "lol-v2.json", artifact)
     _write_json(
@@ -397,7 +397,7 @@ def test_external_esports_metrics_require_exact_report_version(monkeypatch, tmp_
             }
         },
     )
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    patch_dash("_read_evidence_ledger", lambda _path: [])
 
     model = dashboard_server.production_evidence()["models"][0]
 
@@ -407,7 +407,7 @@ def test_external_esports_metrics_require_exact_report_version(monkeypatch, tmp_
     assert "validation_model_version_mismatch" in model["locked_backfill"]["mismatches"]
 
 
-def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path: Path) -> None:
+def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path: Path, patch_dash) -> None:
     artifact = _hashed(
         {
             "schema_version": "1",
@@ -435,9 +435,10 @@ def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path
                 "production_artifact": "config/models/mlb-v2.json",
             }
         },
+        patch_dash,
     )
     _write_json(tmp_path / "config" / "models" / "mlb-v2.json", artifact)
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    patch_dash("_read_evidence_ledger", lambda _path: [])
 
     model = dashboard_server.production_evidence()["models"][0]
 
@@ -449,7 +450,9 @@ def test_corrupt_artifact_hash_suppresses_embedded_metrics(monkeypatch, tmp_path
     assert model["model_definition_and_backfill_valid"] is False
 
 
-def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(monkeypatch, tmp_path: Path) -> None:
+def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
     """Every configured production_artifact is valid and wired, so the
     evidence API must report valid — not fabricate a mismatch.
 
@@ -461,8 +464,8 @@ def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(monk
     mismatch-detection path itself stays covered by the synthetic-stale
     test below and by the empty-OUTPUTS rejection at the end of this test.
     """
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
-    monkeypatch.setattr(dashboard_server, "OUTPUTS", tmp_path / "outputs")
+    patch_dash("_read_evidence_ledger", lambda _path: [])
+    patch_dash("OUTPUTS", tmp_path / "outputs")
     (tmp_path / "outputs").mkdir(parents=True)
 
     esports_titles: dict[str, dict] = {}
@@ -504,9 +507,7 @@ def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(monk
     assert len(result["feature_registry"]["features"]) == 24
     assert len(result["feature_registry"]["production_ablation_summary"]) == 15
     rejected = {
-        model["sport"]
-        for model in result["models"]
-        if not model["model_definition_and_backfill_valid"]
+        model["sport"] for model in result["models"] if not model["model_definition_and_backfill_valid"]
     }
     # Post-fix (2026-08-13): config refs now match the renamed v2 files, so
     # no model is rejected for artifact integrity. The detection path stays
@@ -521,29 +522,27 @@ def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(monk
     # Fail-closed on missing external validation: without the esports and
     # international-baseball validation reports, every report-backed model
     # must be rejected, not silently passed.
-    monkeypatch.setattr(dashboard_server, "OUTPUTS", tmp_path / "empty_outputs")
+    patch_dash("OUTPUTS", tmp_path / "empty_outputs")
     result = dashboard_server.production_evidence()
     rejected = {
-        model["sport"]
-        for model in result["models"]
-        if not model["model_definition_and_backfill_valid"]
+        model["sport"] for model in result["models"] if not model["model_definition_and_backfill_valid"]
     }
     assert rejected == {"lol", "cs2", "dota2", "valorant", "kbo", "npb"}
 
 
 def test_stale_artifact_ref_is_still_surfaced_as_rejected_integrity(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     """The fail-closed detection that caught the kbo/npb v1->v2 mismatch must
     stay covered now that the real config is fixed: inject a synthetic stale
     production_artifact ref and confirm the API rejects that sport."""
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    patch_dash("_read_evidence_ledger", lambda _path: [])
 
     real = dashboard_server._config_payload()
     stale = json.loads(json.dumps(real))
     # This path was renamed away 2026-08-13; it no longer exists on disk.
     stale["models"]["KBO"]["production_artifact"] = "config/models/kbo-tie-aware-elo-v1.json"
-    monkeypatch.setattr(dashboard_server, "_config_payload", lambda: stale)
+    patch_dash("_config_payload", lambda: stale)
 
     result = dashboard_server.production_evidence()
     kbo = next(model for model in result["models"] if model["sport"] == "kbo")
@@ -554,7 +553,7 @@ def test_stale_artifact_ref_is_still_surfaced_as_rejected_integrity(
 
 
 def test_feature_registry_is_validated_and_joined_to_exact_active_features(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
     artifact = _hashed(
         {
@@ -582,6 +581,7 @@ def test_feature_registry_is_validated_and_joined_to_exact_active_features(
                 "production_artifact": "config/models/nba-v2.json",
             }
         },
+        patch_dash,
     )
     _write_json(tmp_path / "config" / "models" / "nba-v2.json", artifact)
     _write_json(
@@ -618,7 +618,7 @@ def test_feature_registry_is_validated_and_joined_to_exact_active_features(
             ],
         },
     )
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+    patch_dash("_read_evidence_ledger", lambda _path: [])
 
     result = dashboard_server.production_evidence()
 
@@ -655,8 +655,8 @@ def _render_model_card(model: dict) -> dict[str, str]:
     }
 
 
-def test_http_payload_renders_nba_verified_with_missing_ledger_dashes(monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "_read_evidence_ledger", lambda _path: [])
+def test_http_payload_renders_nba_verified_with_missing_ledger_dashes(monkeypatch, patch_dash) -> None:
+    patch_dash("_read_evidence_ledger", lambda _path: [])
     with dashboard_server._CACHE_LOCK:
         dashboard_server._CACHE.clear()
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
@@ -685,12 +685,8 @@ def test_http_payload_renders_nba_verified_with_missing_ledger_dashes(monkeypatc
         thread.join(timeout=5)
 
 
-def test_production_evidence_route_is_get_only(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server,
-        "production_evidence",
-        lambda: {"read_only": True, "models": []},
-    )
+def test_production_evidence_route_is_get_only(monkeypatch, patch_dash) -> None:
+    patch_dash("production_evidence", lambda: {"read_only": True, "models": []})
     with dashboard_server._CACHE_LOCK:
         dashboard_server._CACHE.clear()
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
@@ -771,8 +767,8 @@ def test_post_with_wrong_dashboard_token_is_refused() -> None:
         thread.join(timeout=5)
 
 
-def test_post_with_correct_dashboard_token_passes_auth(monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "dedupe_ledger", lambda: {"status": "ok", "removed": 0})
+def test_post_with_correct_dashboard_token_passes_auth(monkeypatch, patch_dash) -> None:
+    patch_dash("dedupe_ledger", lambda: {"status": "ok", "removed": 0})
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -831,8 +827,8 @@ def _write_model_ledger(path: Path, rows: list[dict]) -> None:
     workbook.save(path)
 
 
-def test_model_ledger_comparison_groups_open_predictions_by_event(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+def test_model_ledger_comparison_groups_open_predictions_by_event(tmp_path, monkeypatch, patch_dash) -> None:
+    patch_dash("DATA", tmp_path)
     _write_model_ledger(
         tmp_path / "model_ledgers" / "mlb-moneyline-elo-trend-lr.xlsx",
         [
@@ -886,8 +882,8 @@ def test_model_ledger_comparison_groups_open_predictions_by_event(tmp_path, monk
     assert model_ids_for_event_1 == {"mlb-moneyline-elo-trend-lr", "mlb-spread-measured-edge"}
 
 
-def test_model_ledger_comparison_empty_when_no_ledgers_exist(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+def test_model_ledger_comparison_empty_when_no_ledgers_exist(tmp_path, monkeypatch, patch_dash) -> None:
+    patch_dash("DATA", tmp_path)
 
     result = dashboard_server.model_ledger_comparison()
 
@@ -895,10 +891,8 @@ def test_model_ledger_comparison_empty_when_no_ledgers_exist(tmp_path, monkeypat
     assert result["models"] == {}
 
 
-def test_model_ledgers_route_is_reachable_over_http(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server, "model_ledger_comparison", lambda: {"events": [], "models": {}}
-    )
+def test_model_ledgers_route_is_reachable_over_http(monkeypatch, patch_dash) -> None:
+    patch_dash("model_ledger_comparison", lambda: {"events": [], "models": {}})
     with dashboard_server._CACHE_LOCK:
         dashboard_server._CACHE.clear()
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
@@ -918,17 +912,22 @@ def test_model_ledgers_route_is_reachable_over_http(monkeypatch) -> None:
         thread.join(timeout=5)
 
 
-def test_record_model_ledger_decision_writes_operator_fields_only(tmp_path, monkeypatch) -> None:
-    """"Not model promotion. It is an event-level decision... must not
+def test_record_model_ledger_decision_writes_operator_fields_only(tmp_path, monkeypatch, patch_dash) -> None:
+    """ "Not model promotion. It is an event-level decision... must not
     change the model's ledger, classification, historical statistics, or
     dashboard evidence." -- the model's own fields must be byte-for-byte
     unchanged after recording an operator decision."""
     from model_prediction.model_ledger import ModelLedger
 
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+    patch_dash("DATA", tmp_path)
     ledger = ModelLedger(tmp_path / "model_ledgers" / "mlb-moneyline-elo-trend-lr.xlsx")
     original = ledger.append_prediction(
-        {"model_id": "mlb-moneyline-elo-trend-lr", "model_version": "v7", "event_id": "e1", "model_probability": "0.62"}
+        {
+            "model_id": "mlb-moneyline-elo-trend-lr",
+            "model_version": "v7",
+            "event_id": "e1",
+            "model_probability": "0.62",
+        }
     )
 
     result = dashboard_server.record_model_ledger_decision(
@@ -952,8 +951,8 @@ def test_record_model_ledger_decision_writes_operator_fields_only(tmp_path, monk
         assert row[field] == original[field]
 
 
-def test_record_model_ledger_decision_refuses_unknown_model(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+def test_record_model_ledger_decision_refuses_unknown_model(tmp_path, monkeypatch, patch_dash) -> None:
+    patch_dash("DATA", tmp_path)
 
     result = dashboard_server.record_model_ledger_decision(
         {"model_id": "does-not-exist", "prediction_id": "p1", "decision": "executed"}
@@ -963,10 +962,12 @@ def test_record_model_ledger_decision_refuses_unknown_model(tmp_path, monkeypatc
     assert "unknown model_id" in result["error"]
 
 
-def test_record_model_ledger_decision_refuses_unknown_prediction_id(tmp_path, monkeypatch) -> None:
+def test_record_model_ledger_decision_refuses_unknown_prediction_id(
+    tmp_path, monkeypatch, patch_dash
+) -> None:
     from model_prediction.model_ledger import ModelLedger
 
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+    patch_dash("DATA", tmp_path)
     ModelLedger(tmp_path / "model_ledgers" / "mlb-moneyline-elo-trend-lr.xlsx").append_prediction(
         {"model_id": "mlb-moneyline-elo-trend-lr", "model_version": "v7", "event_id": "e1"}
     )
@@ -979,8 +980,8 @@ def test_record_model_ledger_decision_refuses_unknown_prediction_id(tmp_path, mo
     assert "unknown prediction_id" in result["error"]
 
 
-def test_record_model_ledger_decision_requires_the_core_fields(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "DATA", tmp_path)
+def test_record_model_ledger_decision_requires_the_core_fields(tmp_path, monkeypatch, patch_dash) -> None:
+    patch_dash("DATA", tmp_path)
 
     result = dashboard_server.record_model_ledger_decision({"model_id": "x"})
 
@@ -988,10 +989,8 @@ def test_record_model_ledger_decision_requires_the_core_fields(tmp_path, monkeyp
     assert "required" in result["error"]
 
 
-def test_model_ledger_decision_route_requires_the_dashboard_token(monkeypatch) -> None:
-    monkeypatch.setattr(
-        dashboard_server, "record_model_ledger_decision", lambda payload: {"status": "ok", "row": {}}
-    )
+def test_model_ledger_decision_route_requires_the_dashboard_token(monkeypatch, patch_dash) -> None:
+    patch_dash("record_model_ledger_decision", lambda payload: {"status": "ok", "row": {}})
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -1000,7 +999,9 @@ def test_model_ledger_decision_route_requires_the_dashboard_token(monkeypatch) -
         connection.request(
             "POST",
             "/api/model-ledgers/decision",
-            body=json.dumps({"confirm": True, "model_id": "x", "prediction_id": "p1", "decision": "executed"}),
+            body=json.dumps(
+                {"confirm": True, "model_id": "x", "prediction_id": "p1", "decision": "executed"}
+            ),
             headers={"Content-Type": "application/json"},  # no X-Dashboard-Token
         )
         response = connection.getresponse()
@@ -1012,10 +1013,12 @@ def test_model_ledger_decision_route_requires_the_dashboard_token(monkeypatch) -
         thread.join(timeout=5)
 
 
-def test_served_dashboard_html_embeds_the_real_session_token(tmp_path, monkeypatch) -> None:
+def test_served_dashboard_html_embeds_the_real_session_token(tmp_path, monkeypatch, patch_dash) -> None:
     page = tmp_path / "dashboard.html"
-    page.write_text('<head></head><body><script>\n"use strict";\nconsole.log(1);</script></body>', encoding="utf-8")
-    monkeypatch.setattr(dashboard_server, "ROOT", tmp_path)
+    page.write_text(
+        '<head></head><body><script>\n"use strict";\nconsole.log(1);</script></body>', encoding="utf-8"
+    )
+    patch_dash("ROOT", tmp_path)
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

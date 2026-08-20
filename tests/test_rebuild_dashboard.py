@@ -106,8 +106,8 @@ def test_no_fill_economics_remain_null(tmp_path: Path) -> None:
     assert payload["clv"] is None
 
 
-def test_six_rebuild_get_routes_are_read_only(monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "rebuild_view", lambda name: {"view": name})
+def test_six_rebuild_get_routes_are_read_only(monkeypatch, patch_dash) -> None:
+    patch_dash("rebuild_view", lambda name: {"view": name})
     dashboard_server._CACHE.clear()
     views = ("status", "sports", "benchmark", "economics", "runs", "health")
 
@@ -115,10 +115,8 @@ def test_six_rebuild_get_routes_are_read_only(monkeypatch) -> None:
         sent: list[tuple[object, int]] = []
         handler = dashboard_server.Handler.__new__(dashboard_server.Handler)
         handler.path = f"/api/rebuild/{view}"
-        handler._send = (
-            lambda payload, _content_type="application/json", code=200, _sent=sent: _sent.append(
-                (payload, code)
-            )
+        handler._send = lambda payload, _content_type="application/json", code=200, _sent=sent: _sent.append(
+            (payload, code)
         )
 
         dashboard_server.Handler.do_GET(handler)
@@ -126,18 +124,16 @@ def test_six_rebuild_get_routes_are_read_only(monkeypatch) -> None:
         assert sent == [({"view": view}, 200)]
 
 
-def test_six_rebuild_head_routes_are_read_only(monkeypatch) -> None:
-    monkeypatch.setattr(dashboard_server, "rebuild_view", lambda name: {"view": name})
+def test_six_rebuild_head_routes_are_read_only(monkeypatch, patch_dash) -> None:
+    patch_dash("rebuild_view", lambda name: {"view": name})
     dashboard_server._CACHE.clear()
 
     for view in ("status", "sports", "benchmark", "economics", "runs", "health"):
         sent: list[tuple[object, int]] = []
         handler = dashboard_server.Handler.__new__(dashboard_server.Handler)
         handler.path = f"/api/rebuild/{view}"
-        handler._send_head = (
-            lambda payload, _content_type="application/json", code=200, _sent=sent: _sent.append(
-                (payload, code)
-            )
+        handler._send_head = lambda payload, _content_type="application/json", code=200, _sent=sent: (
+            _sent.append((payload, code))
         )
 
         dashboard_server.Handler.do_HEAD(handler)
@@ -150,24 +146,18 @@ def test_rebuild_namespace_rejects_all_mutating_http_methods() -> None:
         sent: list[tuple[object, int]] = []
         handler = dashboard_server.Handler.__new__(dashboard_server.Handler)
         handler.path = "/api/rebuild/status"
-        handler._send = (
-            lambda payload, _content_type="application/json", code=200, _sent=sent: _sent.append(
-                (payload, code)
-            )
+        handler._send = lambda payload, _content_type="application/json", code=200, _sent=sent: _sent.append(
+            (payload, code)
         )
 
         getattr(dashboard_server.Handler, method)(handler)
 
-        assert sent == [
-            ({"error": "method not allowed", "allowed_methods": ["GET", "HEAD"]}, 405)
-        ]
+        assert sent == [({"error": "method not allowed", "allowed_methods": ["GET", "HEAD"]}, 405)]
 
 
 def test_rebuild_ui_is_labeled_and_has_no_execution_controls() -> None:
     html = (Path(__file__).resolve().parents[1] / "dashboard.html").read_text(encoding="utf-8")
-    rebuild = html.split('<section id="tab-rebuild"', 1)[1].split(
-        '<section id="tab-evidence"', 1
-    )[0]
+    rebuild = html.split('<section id="tab-rebuild"', 1)[1].split('<section id="tab-evidence"', 1)[0]
 
     assert "CLEAN-SLATE REBUILD — SHADOW ONLY" in rebuild
     assert "NO LIVE EXECUTION" in rebuild
