@@ -94,6 +94,8 @@ class ValidationRow:
     bullpen_available: bool = False
     bullpen_fatigue_gap: float = 0.0
     bullpen_fatigue_available: bool = False
+    offense_pit_gap: float = 0.0
+    offense_pit_available: bool = False
     consistency_gap: float = 0.0
     hot_cold_gap: float = 0.0
     rest_disparity: float = 0.0
@@ -262,6 +264,28 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "starter_era_gap",
         "bullpen_fatigue_gap",
     ),
+    # ── v9 Phase 3: batter PIT priors (projected_offense_pit) isolating-
+    # ladder control + single-variable candidate (docs/MODEL_IMPROVEMENTS.md
+    # section 8, corrected v9 plan 2026-08-19). "_control" is the v9 base
+    # (park_factor_pit variant of the ERA+bullpen combo) with no offense
+    # feature; "_offense_pit" adds exactly one variable to it.
+    "elo_trend_park_weather_starter_era_bullpen_control": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "elo_trend_park_weather_starter_era_bullpen_offense_pit": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+        "offense_pit_gap",
+    ),
 }
 
 
@@ -306,22 +330,18 @@ def build_walk_forward_rows(
                 # league-wide rate it used to be was a train/serve skew,
                 # fixed 2026-08-13; this also changes v9 ablation numbers,
                 # which were computed on the mismatched definition).
-                home_win_rate_30d, home_games_30d = _trailing_home_rate(
-                    history, day, game.home_team
-                )
+                home_win_rate_30d, home_games_30d = _trailing_home_rate(history, day, game.home_team)
                 schedule = matchup_schedule_load(
                     history,
                     game.home_team,
                     game.away_team,
                     game.start,
                 )
-                
+
                 # Rolling pitching quality: runs allowed per game (last 5).
                 # Shared definition with forward inference (features/team_runs).
-                pitcher_gap = pitcher_era_gap_from_history(
-                    history, game.home_team, game.away_team
-                )
-                
+                pitcher_gap = pitcher_era_gap_from_history(history, game.home_team, game.away_team)
+
                 # Real starter ERA gap from MLB Stats API snapshots (point-in-time)
                 starter_gap = _starter_era_gap(game.event_id) if sport.lower() == "mlb" else 0.0
                 # Real starter FIP gap (same methodology, FIP instead of ERA)
@@ -338,6 +358,12 @@ def build_walk_forward_rows(
                 # available tonight, as opposed to season-long bullpen quality.
                 bullpen_fatigue_gap, bullpen_fatigue_ok = (
                     _bullpen_fatigue_gap(game.event_id) if sport.lower() == "mlb" else (0.0, False)
+                )
+
+                # Batter PIT priors gap (v9 Phase 3) -- PA-share-weighted,
+                # credibility-shrunk offense composite, home minus away.
+                offense_pit_gap, offense_pit_ok = (
+                    _offense_pit_gap(game.event_id) if sport.lower() == "mlb" else (0.0, False)
                 )
 
                 # Probable starter ERA is usable in historical validation only
@@ -364,12 +390,13 @@ def build_walk_forward_rows(
                         # that a bare `pass` never surfaced at all.
                         logger.debug(
                             "validation: no point-in-time starter ERA gap for %s: %s",
-                            game.event_id, error,
+                            game.event_id,
+                            error,
                         )
 
                 # Historical weather from Open-Meteo DB
                 weather = _lookup_weather(game.home_team, game.start.astimezone(EASTERN).date().isoformat())
-                
+
                 # Static table (v8-compatible: the active
                 # mlb-elo-trend-lr-v8 artifact trained on it) and empirical
                 # PIT factor, stored separately so each variant consumes the
@@ -399,11 +426,7 @@ def build_walk_forward_rows(
                 # actual win rate diverges from Elo's expectation for this
                 # game. Positive = home is over-performing vs Elo's prior.
                 elo_prob = elo.expected_home_win(game.home_team, game.away_team)
-                residual_trend_gap = (
-                    home_win_rate_30d - elo_prob
-                    if home_games_30d >= 10
-                    else 0.0
-                )
+                residual_trend_gap = home_win_rate_30d - elo_prob if home_games_30d >= 10 else 0.0
                 rows.append(
                     ValidationRow(
                         date=day,
@@ -432,11 +455,11 @@ def build_walk_forward_rows(
                         bullpen_available=bullpen_ok,
                         bullpen_fatigue_gap=bullpen_fatigue_gap,
                         bullpen_fatigue_available=bullpen_fatigue_ok,
+                        offense_pit_gap=offense_pit_gap,
+                        offense_pit_available=offense_pit_ok,
                         park_available=park_pit["status"] == "available",
                         weather_available=weather.get("available", False),
-                        elo_neutral_probability=elo.expected_neutral_win(
-                            game.home_team, game.away_team
-                        ),
+                        elo_neutral_probability=elo.expected_neutral_win(game.home_team, game.away_team),
                         trailing_home_win_rate_30d=home_win_rate_30d,
                         trailing_home_games_30d=home_games_30d,
                         outcome_3way=outcome_3way,
@@ -519,22 +542,32 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
     if sport.lower() in ("nba", "wnba"):
         variants_to_run.append("elo_trend_defense")
     if sport.lower() == "mlb":
-        variants_to_run.extend([
-            "elo_trend_adaptive_hfa", "elo_trend_park", "elo_trend_park_weather",
-            "elo_trend_park_pitcher", "elo_trend_park_weather_pitcher",
-            "elo_trend_park_weather_pitcher_bullpen",
-            "elo_trend_park_weather_pitcher_bullpen_fatigue",
-        ])
+        variants_to_run.extend(
+            [
+                "elo_trend_adaptive_hfa",
+                "elo_trend_park",
+                "elo_trend_park_weather",
+                "elo_trend_park_pitcher",
+                "elo_trend_park_weather_pitcher",
+                "elo_trend_park_weather_pitcher_bullpen",
+                "elo_trend_park_weather_pitcher_bullpen_fatigue",
+            ]
+        )
     if sport.lower() == "soccer":
         # Tested 2026-07-25 via paired holdout ablation against the production
         # elo_trend baseline (see config/tested_features.json): none of these
         # beat it at a Holm-corrected significance level (p >= 0.37). Kept in
         # the tracked variant set so re-tests as data grows are one command,
         # not a from-scratch script — not because they're expected to win.
-        variants_to_run.extend([
-            "soccer_3way", "elo_trend_defense", "elo_trend_schedule",
-            "elo_trend_defense_schedule", "elo_trend_full",
-        ])
+        variants_to_run.extend(
+            [
+                "soccer_3way",
+                "elo_trend_defense",
+                "elo_trend_schedule",
+                "elo_trend_defense_schedule",
+                "elo_trend_full",
+            ]
+        )
     variants = {}
     for name in variants_to_run:
         if name == "soccer_3way":
@@ -554,9 +587,7 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
         "variants": variants,
         "cross_model_agreement": agreement,
         "agreement_comparison": _agreement_comparison(variants["elo_trend"], agreement),
-        "confidence_gap_audit": confidence_gap_equivalence(
-            variants["elo_trend"]["primary_65"]
-        ),
+        "confidence_gap_audit": confidence_gap_equivalence(variants["elo_trend"]["primary_65"]),
         "pitcher_feature_audit": (
             historical_pitcher_feature_audit(store) if sport.lower() == "mlb" else None
         ),
@@ -565,9 +596,7 @@ def run_sport_validation(store: FeatureStore, sport: str) -> dict[str, Any]:
     }
 
 
-def _trailing_home_rate(
-    history: Sequence[GameRecord], day: str, home_team: str
-) -> tuple[float, int]:
+def _trailing_home_rate(history: Sequence[GameRecord], day: str, home_team: str) -> tuple[float, int]:
     """Trailing-30-day HOME-TEAM win rate (wins / non-tie home games).
 
     Must match learned_forward.py's residual_trend_gap serving definition
@@ -675,9 +704,7 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
                 for competitor in competitors
             ]
             first_inning_outcomes += all(1 in values for values in periods)
-            first_five_outcomes += all(
-                set(range(1, 6)).issubset(values) for values in periods
-            )
+            first_five_outcomes += all(set(range(1, 6)).issubset(values) for values in periods)
 
     # ── Stage 2: Polymarket BBO snapshot scan (authoritative) ─────────────
     odds_root = store.data_root / "odds" / key
@@ -768,9 +795,7 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
         fg_spread_status, fg_total_status = _readiness_for_market(
             spread_snapshots, total_snapshots, "baseball"
         )
-        f5_spread_status, f5_total_status = _readiness_for_market(
-            f5_spread, f5_total, "baseball"
-        )
+        f5_spread_status, f5_total_status = _readiness_for_market(f5_spread, f5_total, "baseball")
         return {
             "events_scanned": events,
             "first_inning_outcomes": first_inning_outcomes,
@@ -784,7 +809,8 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
             "first_five_spread_lines": f5_spread,
             "first_five_total_lines": f5_total,
             "yrfi_nrfi": (
-                "DATA_READY_PENDING_BACKTEST" if yrfi_nrfi >= _MINIMUM_SNAPSHOT_COUNT
+                "DATA_READY_PENDING_BACKTEST"
+                if yrfi_nrfi >= _MINIMUM_SNAPSHOT_COUNT
                 else "BLOCKED_MISSING_POINT_IN_TIME_STARTER_INPUTS"
             ),
             "yrfi_nrfi_lines": yrfi_nrfi,
@@ -799,9 +825,7 @@ def multi_market_readiness(store: FeatureStore, sport: str) -> dict[str, Any]:
         }
 
     if key in {"kbo", "npb"}:
-        spread_status, total_status = _readiness_for_market(
-            spread_snapshots, total_snapshots, "baseball"
-        )
+        spread_status, total_status = _readiness_for_market(spread_snapshots, total_snapshots, "baseball")
         return {
             "events_scanned": events,
             "spread_lines": spread_snapshots,
@@ -840,18 +864,22 @@ def _is_sub_market_slug(slug: str, sport: str) -> bool:
     # MLB: F5 (first 5 innings), YRFI, team totals, player props
     if sport == "mlb":
         _MLB_SUB_PATTERNS = (
-            "-f5-",      # first 5 innings
-            "-yrfi",     # yes run first inning
-            "-nrfi",     # no run first inning
-            "-tt-",      # team total
+            "-f5-",  # first 5 innings
+            "-yrfi",  # yes run first inning
+            "-nrfi",  # no run first inning
+            "-tt-",  # team total
         )
         if any(pattern in slug for pattern in _MLB_SUB_PATTERNS):
             return True
     # NBA/WNBA: quarter/half markets, player props
     if sport in ("nba", "wnba"):
         _BBALL_SUB_PATTERNS = (
-            "-1q-", "-2q-", "-3q-", "-4q-",  # quarter markets
-            "-1h-", "-2h-",                    # half markets
+            "-1q-",
+            "-2q-",
+            "-3q-",
+            "-4q-",  # quarter markets
+            "-1h-",
+            "-2h-",  # half markets
         )
         if any(pattern in slug for pattern in _BBALL_SUB_PATTERNS):
             return True
@@ -867,6 +895,7 @@ def _readiness_for_market(
     sport_family: str,
 ) -> tuple[str, str]:
     """Map snapshot counts to readiness status strings."""
+
     def _status(count: int) -> str:
         if count >= _MINIMUM_SNAPSHOT_COUNT:
             return "DATA_READY_PENDING_BACKTEST"
@@ -888,13 +917,9 @@ def _readiness_reason(spread_count: int, total_count: int) -> str:
         )
     parts = []
     if spread_count < _MINIMUM_SNAPSHOT_COUNT:
-        parts.append(
-            f"spread: {spread_count}/{_MINIMUM_SNAPSHOT_COUNT} contract snapshots"
-        )
+        parts.append(f"spread: {spread_count}/{_MINIMUM_SNAPSHOT_COUNT} contract snapshots")
     if total_count < _MINIMUM_SNAPSHOT_COUNT:
-        parts.append(
-            f"total: {total_count}/{_MINIMUM_SNAPSHOT_COUNT} contract snapshots"
-        )
+        parts.append(f"total: {total_count}/{_MINIMUM_SNAPSHOT_COUNT} contract snapshots")
     if parts:
         return (
             f"Need >= {_MINIMUM_SNAPSHOT_COUNT} contract line snapshots "
@@ -908,9 +933,7 @@ def _readiness_reason(spread_count: int, total_count: int) -> str:
     )
 
 
-def _add_legacy_backfill(
-    data_root: Path, sport: str, spread_count: int, total_count: int
-) -> tuple[int, int]:
+def _add_legacy_backfill(data_root: Path, sport: str, spread_count: int, total_count: int) -> tuple[int, int]:
     """Scan legacy flat-file snapshots that predate the per-sport odds directory.
 
     Sources:
@@ -995,8 +1018,8 @@ def run_validation_audit(
         "sports": {sport.lower(): run_sport_validation(store, sport) for sport in sports},
     }
     if "mlb" in report["sports"]:
-        report["sports"]["mlb"]["historical_price_diagnostic"] = (
-            evaluate_reconstructed_mlb_moneyline(store, reconstructed_mlb_prices)
+        report["sports"]["mlb"]["historical_price_diagnostic"] = evaluate_reconstructed_mlb_moneyline(
+            store, reconstructed_mlb_prices
         )
     return report
 
@@ -1146,9 +1169,7 @@ def evaluate_reconstructed_mlb_moneyline(
         "priced_hit_rate": round(hits / priced_calls, 6) if priced_calls else None,
         "flat_pnl_at_reconstructed_odds": round(pnl, 6),
         "roi_at_reconstructed_odds": round(pnl / priced_calls, 6) if priced_calls else None,
-        "mean_model_minus_no_vig_market_probability": (
-            round(sum(edges) / len(edges), 6) if edges else None
-        ),
+        "mean_model_minus_no_vig_market_probability": (round(sum(edges) / len(edges), 6) if edges else None),
         "providers": sorted(providers),
         "timestamp_valid_values": sorted(timestamp_valid_values),
         "qualification_gate": False,
@@ -1167,12 +1188,11 @@ _FEATURE_AVAILABILITY_FLAGS: dict[str, str] = {
     "probable_starter_era_gap": "probable_starter_available",
     "bullpen_weakness_gap": "bullpen_available",
     "bullpen_fatigue_gap": "bullpen_fatigue_available",
+    "offense_pit_gap": "offense_pit_available",
 }
 
 
-def _all_rows_calibration(
-    probabilities: Sequence[float], rows: Sequence[ValidationRow]
-) -> dict[str, object]:
+def _all_rows_calibration(probabilities: Sequence[float], rows: Sequence[ValidationRow]) -> dict[str, object]:
     """Model-quality metrics over EVERY row of a split (not just called
     rows): log loss, Brier, ECE, and calibration slope/intercept. These are
     threshold-independent, so they are the honest first-order comparison
@@ -1190,11 +1210,13 @@ def _all_rows_calibration(
         "expected_calibration_error": round(float(metrics["expected_calibration_error"]), 6),
         "calibration_slope": (
             round(float(metrics["calibration_slope"]), 6)
-            if metrics["calibration_slope"] is not None else None
+            if metrics["calibration_slope"] is not None
+            else None
         ),
         "calibration_intercept": (
             round(float(metrics["calibration_intercept"]), 6)
-            if metrics["calibration_intercept"] is not None else None
+            if metrics["calibration_intercept"] is not None
+            else None
         ),
         "sample_size": metrics["sample_size"],
     }
@@ -1208,9 +1230,7 @@ def _variant_coverage(rows: Sequence[ValidationRow], feature_names: Sequence[str
     if not flagged:
         return 1.0
     available = sum(
-        1
-        for row in rows
-        if all(bool(getattr(row, _FEATURE_AVAILABILITY_FLAGS[name])) for name in flagged)
+        1 for row in rows if all(bool(getattr(row, _FEATURE_AVAILABILITY_FLAGS[name])) for name in flagged)
     )
     return round(available / len(rows), 6)
 
@@ -1253,8 +1273,7 @@ def evaluate_variant(
     return {
         "features": list(feature_names),
         "coefficients": {
-            name: round(float(value), 10)
-            for name, value in zip(feature_names, model.coef_[0], strict=True)
+            name: round(float(value), 10) for name, value in zip(feature_names, model.coef_[0], strict=True)
         },
         "intercept": round(float(model.intercept_[0]), 10),
         "primary_65": primary,
@@ -1336,7 +1355,8 @@ def evaluate_variant_3way(
     val_outcomes = [1 if s == r.outcome_3way else 0 for s, r in zip(val_selections, validation)]
     try:
         threshold, val_stats = learn_confidence_threshold(
-            val_confidences, val_outcomes,
+            val_confidences,
+            val_outcomes,
             target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
             minimum_calls=MINIMUM_CALLS,
         )
@@ -1366,7 +1386,7 @@ def evaluate_variant_3way(
             brier += sum((p[j] - (1 if j == y_true else 0)) ** 2 for j in range(3))
         brier /= len(holdout)
     hit_rate = hits / calls if calls else 0.0
-    units = hits * (10/11) - (calls - hits) if calls else 0.0
+    units = hits * (10 / 11) - (calls - hits) if calls else 0.0
 
     # Monthly breakdown — shared helper so 3-way gets partial_month on incomplete
     # final months just like the binary path does.
@@ -1382,7 +1402,9 @@ def evaluate_variant_3way(
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
 
-    every_month_positive = all(m["units_at_minus_110"] > 0 for m in monthly_list if m["qualification_status"] == "qualifying")
+    every_month_positive = all(
+        m["units_at_minus_110"] > 0 for m in monthly_list if m["qualification_status"] == "qualifying"
+    )
     qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
 
     return {
@@ -1493,10 +1515,14 @@ def qualify_soccer_poisson_model(store: FeatureStore, minimum_history_games: int
     for day in dates:
         day_games = by_date[day]
         if len(history) >= minimum_history_games:
-            relevant = [game for game in day_games if game.event_id in validation_ids or game.event_id in holdout_ids]
+            relevant = [
+                game for game in day_games if game.event_id in validation_ids or game.event_id in holdout_ids
+            ]
             if relevant:
                 upcoming = [
-                    UpcomingMatch(game.event_id, game.start.isoformat(), game.away_team, game.home_team, "SOCCER")
+                    UpcomingMatch(
+                        game.event_id, game.start.isoformat(), game.away_team, game.home_team, "SOCCER"
+                    )
                     for game in relevant
                 ]
                 predictions = {
@@ -1529,7 +1555,8 @@ def qualify_soccer_poisson_model(store: FeatureStore, minimum_history_games: int
 
     try:
         threshold, val_stats = _learn_threshold_from_confidence_hit(
-            val_confidences, val_hits,
+            val_confidences,
+            val_hits,
             target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
             minimum_calls=MINIMUM_CALLS,
         )
@@ -1551,11 +1578,15 @@ def qualify_soccer_poisson_model(store: FeatureStore, minimum_history_games: int
     hit_rate = hits / calls if calls else 0.0
     units = hits * (10 / 11) - (calls - hits) if calls else 0.0
     holdout_end = (
-        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade)
+        if selected_for_grade
+        else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
     every_month_positive = all(
-        month["units_at_minus_110"] > 0 for month in monthly_list if month["qualification_status"] == "qualifying"
+        month["units_at_minus_110"] > 0
+        for month in monthly_list
+        if month["qualification_status"] == "qualifying"
     )
     qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
 
@@ -1627,10 +1658,14 @@ def qualify_soccer_total_model(store: FeatureStore, minimum_history_games: int =
     for day in dates:
         day_games = by_date[day]
         if len(history) >= minimum_history_games:
-            relevant = [game for game in day_games if game.event_id in validation_ids or game.event_id in holdout_ids]
+            relevant = [
+                game for game in day_games if game.event_id in validation_ids or game.event_id in holdout_ids
+            ]
             if relevant:
                 upcoming = [
-                    UpcomingMatch(game.event_id, game.start.isoformat(), game.away_team, game.home_team, "SOCCER")
+                    UpcomingMatch(
+                        game.event_id, game.start.isoformat(), game.away_team, game.home_team, "SOCCER"
+                    )
                     for game in relevant
                 ]
                 predictions = {
@@ -1658,7 +1693,8 @@ def qualify_soccer_total_model(store: FeatureStore, minimum_history_games: int =
 
     try:
         threshold, val_stats = _learn_threshold_from_confidence_hit(
-            val_confidences, val_hits,
+            val_confidences,
+            val_hits,
             target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
             minimum_calls=MINIMUM_CALLS,
         )
@@ -1680,11 +1716,15 @@ def qualify_soccer_total_model(store: FeatureStore, minimum_history_games: int =
     hit_rate = hits / calls if calls else 0.0
     units = hits * (10 / 11) - (calls - hits) if calls else 0.0
     holdout_end = (
-        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade)
+        if selected_for_grade
+        else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
     every_month_positive = all(
-        month["units_at_minus_110"] > 0 for month in monthly_list if month["qualification_status"] == "qualifying"
+        month["units_at_minus_110"] > 0
+        for month in monthly_list
+        if month["qualification_status"] == "qualifying"
     )
     qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
 
@@ -1716,9 +1756,7 @@ def qualify_soccer_total_model(store: FeatureStore, minimum_history_games: int =
     }
 
 
-def qualify_tennis_elo_model(
-    data_root: str | Path, minimum_history_matches: int = 200
-) -> dict[str, Any]:
+def qualify_tennis_elo_model(data_root: str | Path, minimum_history_matches: int = 200) -> dict[str, Any]:
     """Walk-forward qualify TennisModel's surface-blended Elo, same locked
     60/20/20 date split and hit-rate/monthly-consistency gate as
     ``qualify_soccer_poisson_model``/``qualify_soccer_total_model`` above.
@@ -1752,13 +1790,19 @@ def qualify_tennis_elo_model(
                     continue
                 rows.append(row)
     if not rows:
-        return {"model": TennisModel.version, "primary_65": {"status": "no_validation_threshold", "reason": "no history"}}
+        return {
+            "model": TennisModel.version,
+            "primary_65": {"status": "no_validation_threshold", "reason": "no history"},
+        }
 
     dates = sorted({row["_date"] for row in rows})
     if len(dates) < 5:
         return {
             "model": TennisModel.version,
-            "primary_65": {"status": "no_validation_threshold", "reason": "fewer than five distinct match dates"},
+            "primary_65": {
+                "status": "no_validation_threshold",
+                "reason": "fewer than five distinct match dates",
+            },
         }
     train_count = max(1, math.floor(len(dates) * 0.60))
     validation_count = max(1, math.floor(len(dates) * 0.20))
@@ -1783,7 +1827,9 @@ def qualify_tennis_elo_model(
     for day in dates:
         day_rows = by_date[day]
         if len(history) >= minimum_history_matches:
-            relevant = [row for row in day_rows if row["event_id"] in validation_ids or row["event_id"] in holdout_ids]
+            relevant = [
+                row for row in day_rows if row["event_id"] in validation_ids or row["event_id"] in holdout_ids
+            ]
             if relevant:
                 # player_one is always the real winner here -- the model
                 # doesn't care about upcoming-match slot order (Elo lookup is
@@ -1791,15 +1837,17 @@ def qualify_tennis_elo_model(
                 # the model favor player_one" directly into the hit label.
                 upcoming = [
                     UpcomingMatch(
-                        str(row["event_id"]), str(row["event_start_utc"]),
-                        str(row["winner"]), str(row["loser"]),
-                        str(row.get("surface", "Hard")), str(row.get("league", "ATP")),
+                        str(row["event_id"]),
+                        str(row["event_start_utc"]),
+                        str(row["winner"]),
+                        str(row["loser"]),
+                        str(row.get("surface", "Hard")),
+                        str(row.get("league", "ATP")),
                     )
                     for row in relevant
                 ]
                 predictions = {
-                    prediction.event_id: prediction
-                    for prediction in model.predict_games(history, upcoming)
+                    prediction.event_id: prediction for prediction in model.predict_games(history, upcoming)
                 }
                 for row in relevant:
                     prediction = predictions.get(str(row["event_id"]))
@@ -1819,7 +1867,8 @@ def qualify_tennis_elo_model(
 
     try:
         threshold, val_stats = _learn_threshold_from_confidence_hit(
-            val_confidences, val_hits,
+            val_confidences,
+            val_hits,
             target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
             minimum_calls=MINIMUM_CALLS,
         )
@@ -1840,11 +1889,15 @@ def qualify_tennis_elo_model(
     hit_rate = hits / calls if calls else 0.0
     units = hits * (10 / 11) - (calls - hits) if calls else 0.0
     holdout_end = (
-        max(date.fromisoformat(day) for _, _, day in selected_for_grade) if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
+        max(date.fromisoformat(day) for _, _, day in selected_for_grade)
+        if selected_for_grade
+        else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
     )
     monthly_list = _monthly_grade(selected_for_grade, holdout_end=holdout_end)
     every_month_positive = all(
-        month["units_at_minus_110"] > 0 for month in monthly_list if month["qualification_status"] == "qualifying"
+        month["units_at_minus_110"] > 0
+        for month in monthly_list
+        if month["qualification_status"] == "qualifying"
     )
     qualified = calls >= MINIMUM_CALLS and hit_rate >= QUALIFICATION_MINIMUM_HIT_RATE and every_month_positive
 
@@ -2038,9 +2091,7 @@ def _grade(
     calls = len(selected)
     hits = sum(outcome for _, outcome, _ in selected)
     brier = (
-        sum((probability - outcome) ** 2 for probability, outcome, _ in selected) / calls
-        if calls
-        else None
+        sum((probability - outcome) ** 2 for probability, outcome, _ in selected) / calls if calls else None
     )
     calibration = (
         calibration_metrics(
@@ -2083,11 +2134,7 @@ def _grade(
         "every_qualifying_month_positive_at_minus_110"
     ]
     if qualification_eligible and not result["every_qualifying_month_positive_at_minus_110"]:
-        failed_months = [
-            month["month"]
-            for month in qualifying_months
-            if month["units_at_minus_110"] <= 0
-        ]
+        failed_months = [month["month"] for month in qualifying_months if month["units_at_minus_110"] <= 0]
         result["qualified"] = False
         result["meets_primary_holdout_metrics"] = False
         result["failures"] = [
@@ -2147,9 +2194,7 @@ def _feature_decisions(variants: dict[str, dict[str, Any]], sport: str) -> list[
         ("weather_factor", "elo_trend_park", "elo_trend_park_weather"),
     ]
     for feature, baseline_name, candidate_name in pairs:
-        baseline, candidate = _paired_comparison_metrics(
-            variants[baseline_name], variants[candidate_name]
-        )
+        baseline, candidate = _paired_comparison_metrics(variants[baseline_name], variants[candidate_name])
         if feature == "adaptive_hfa":
             if baseline is None or candidate is None:
                 action = "RESEARCH_ONLY_INSUFFICIENT_SELECTIVE_SAMPLE"
@@ -2200,9 +2245,10 @@ def _paired_comparison_metrics(
     for tier in ("primary_65", "diagnostic_60"):
         baseline_evaluation = baseline[tier]
         candidate_evaluation = candidate[tier]
-        if baseline_evaluation.get("status") != "evaluated" or candidate_evaluation.get(
-            "status"
-        ) != "evaluated":
+        if (
+            baseline_evaluation.get("status") != "evaluated"
+            or candidate_evaluation.get("status") != "evaluated"
+        ):
             continue
         baseline_holdout = baseline_evaluation["locked_holdout"]
         candidate_holdout = candidate_evaluation["locked_holdout"]
@@ -2228,9 +2274,10 @@ def _agreement_comparison(single: dict[str, Any], agreement: dict[str, Any]) -> 
     for tier in ("primary_65", "diagnostic_60"):
         single_evaluation = single[tier]
         agreement_evaluation = agreement[tier]
-        if single_evaluation.get("status") != "evaluated" or agreement_evaluation.get(
-            "status"
-        ) != "evaluated":
+        if (
+            single_evaluation.get("status") != "evaluated"
+            or agreement_evaluation.get("status") != "evaluated"
+        ):
             continue
         single_holdout = single_evaluation["locked_holdout"]
         agreement_holdout = agreement_evaluation["locked_holdout"]
@@ -2268,18 +2315,18 @@ def _lookup_weather(home_team: str, game_date: str) -> dict:
     """Look up historical weather for a ballpark on a given date."""
     global _WEATHER_DB
     import json as _json
-    
+
     if _WEATHER_DB is None:
         db_path = PROJECT_ROOT / "data/features/historical_weather.json"
         if db_path.exists():
             _WEATHER_DB = _json.loads(db_path.read_text())
         else:
             _WEATHER_DB = {}
-    
+
     park_data = _WEATHER_DB.get(home_team, {})
     if isinstance(park_data, dict) and park_data.get("dome"):
         return {"run_factor": 1.0, "available": True}
-    
+
     day_data = park_data.get(game_date) if isinstance(park_data, dict) else None
     if day_data:
         return {
@@ -2298,7 +2345,7 @@ _STARTER_ERA_MAP: dict[str, float] | None = None
 
 def _load_starter_era_map() -> dict[str, float]:
     """Build point-in-time starter ERA gap map from mlb_statsapi snapshots.
-    
+
     Returns dict of event_id → (home_starter_era - away_starter_era).
     Computed from rolling 5-start ERA for each confirmed starting pitcher.
     History is built strictly chronologically — the current game's stats
@@ -2306,19 +2353,19 @@ def _load_starter_era_map() -> dict[str, float]:
     global _STARTER_ERA_MAP
     if _STARTER_ERA_MAP is not None:
         return _STARTER_ERA_MAP
-    
+
     import json as _json
-    
+
     snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
     crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
     if not snap_path.exists() or not crosswalk_path.exists():
         _STARTER_ERA_MAP = {}
         return _STARTER_ERA_MAP
-    
+
     def _ip_float(v):
         w, _, f = v.partition(".")
         return int(w) + {"0": 0.0, "1": 1 / 3, "2": 2 / 3}.get(f, 0.0)
-    
+
     # Load crosswalk: (time, home, away) → event_id
     crosswalk = {}
     with crosswalk_path.open(encoding="utf-8") as f:
@@ -2327,21 +2374,21 @@ def _load_starter_era_map() -> dict[str, float]:
                 continue
             g = _json.loads(line)
             crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
-    
+
     # Load snapshots, build point-in-time ERA history
     with snap_path.open(encoding="utf-8") as f:
         snaps = [_json.loads(line) for line in f if line.strip()]
     snaps.sort(key=lambda r: r["game_start_utc"])
-    
+
     history: dict[int, list[dict]] = {}
     result: dict[str, float] = {}
-    
+
     for snap in snaps:
         key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
         eid = crosswalk.get(key)
         if not eid:
             continue
-        
+
         home_era = away_era = None
         for side_key, side_data in [("home", snap["home"]), ("away", snap["away"])]:
             order = side_data.get("pitcher_order") or []
@@ -2354,7 +2401,7 @@ def _load_starter_era_map() -> dict[str, float]:
             stats = player["pitching"]
             ip = _ip_float(stats["inningsPitched"])
             er = int(stats.get("earnedRuns", 0))
-            
+
             prior = history.get(pid, [])
             if len(prior) >= 2:
                 era = sum(g["er"] for g in prior[-5:]) / max(0.001, sum(g["ip"] for g in prior[-5:])) * 9
@@ -2362,13 +2409,13 @@ def _load_starter_era_map() -> dict[str, float]:
                     home_era = era
                 else:
                     away_era = era
-            
+
             # Update history AFTER computing this game's feature (point-in-time)
             history.setdefault(pid, []).append({"ip": ip, "er": er})
-        
+
         if home_era is not None and away_era is not None:
             result[eid] = round(home_era - away_era, 6)
-    
+
     _STARTER_ERA_MAP = result
     return result
 
@@ -2449,10 +2496,14 @@ def _load_starter_fip_map() -> dict[str, float]:
                 recent = prior[-5:]
                 pip = sum(g["ip"] for g in recent)
                 if pip > 0:
-                    fip = ((13 * sum(g["hr"] for g in recent)
+                    fip = (
+                        (
+                            13 * sum(g["hr"] for g in recent)
                             + 3 * (sum(g["bb"] for g in recent) + sum(g["hbp"] for g in recent))
-                            - 2 * sum(g["so"] for g in recent))
-                           / pip) + _FIP_CONSTANT
+                            - 2 * sum(g["so"] for g in recent)
+                        )
+                        / pip
+                    ) + _FIP_CONSTANT
                     if side_key == "home":
                         home_fip = fip
                     else:
@@ -2739,3 +2790,66 @@ def _load_bullpen_fatigue_map() -> dict[str, tuple[float, bool]]:
 def _bullpen_fatigue_gap(event_id: str) -> tuple[float, bool]:
     """Get the real bullpen fatigue gap for a given event, or (0.0, False) if unavailable."""
     return _load_bullpen_fatigue_map().get(event_id, (0.0, False))
+
+
+# ── Batter offense PIT priors gap from MLB Stats API snapshots ───────────
+
+_OFFENSE_PIT_MAP: dict[str, tuple[float, bool]] | None = None
+
+
+def _load_offense_pit_map() -> dict[str, tuple[float, bool]]:
+    """Build point-in-time ``offense_pit_gap`` map (home - away composite,
+    see ``features.batter_offense``) for every crosswalked MLB event.
+
+    Delegates the actual player-shrinkage/team-composite math to
+    ``features.batter_offense.matchup_offense_pit_gap``, which already
+    enforces point-in-time discipline (games strictly before the decision
+    time) via its own snapshot index -- this function only owns the
+    event_id crosswalk and process-lifetime memoization, mirroring
+    ``_load_bullpen_map``."""
+    global _OFFENSE_PIT_MAP
+    if _OFFENSE_PIT_MAP is not None:
+        return _OFFENSE_PIT_MAP
+
+    import json as _json
+
+    from .domain import parse_utc as _parse_utc
+    from .features.batter_offense import matchup_offense_pit_gap
+
+    snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
+    crosswalk_path = PROJECT_ROOT / "data/processed/mlb/games.jsonl"
+    if not snap_path.exists() or not crosswalk_path.exists():
+        _OFFENSE_PIT_MAP = {}
+        return _OFFENSE_PIT_MAP
+
+    crosswalk = {}
+    with crosswalk_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            g = _json.loads(line)
+            crosswalk[(g["event_start_utc"][:16], g["home_team"], g["away_team"])] = g["event_id"]
+
+    with snap_path.open(encoding="utf-8") as f:
+        snaps = [_json.loads(line) for line in f if line.strip()]
+
+    result: dict[str, tuple[float, bool]] = {}
+    for snap in snaps:
+        key = (snap["game_start_utc"][:16], snap["home"]["team_name"], snap["away"]["team_name"])
+        eid = crosswalk.get(key)
+        if not eid:
+            continue
+        decision = _parse_utc(snap["game_start_utc"])
+        gap, available = matchup_offense_pit_gap(
+            snap["home"]["team_name"], snap["away"]["team_name"], decision, snapshot_path=snap_path
+        )
+        if available:
+            result[eid] = (gap, available)
+
+    _OFFENSE_PIT_MAP = result
+    return _OFFENSE_PIT_MAP
+
+
+def _offense_pit_gap(event_id: str) -> tuple[float, bool]:
+    """Get the real offense PIT-priors gap for a given event, or (0.0, False) if unavailable."""
+    return _load_offense_pit_map().get(event_id, (0.0, False))

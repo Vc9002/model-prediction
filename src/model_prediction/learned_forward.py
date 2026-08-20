@@ -14,6 +14,7 @@ from typing import Any
 from .data_sources.espn import _probable
 from .domain import EASTERN, parse_utc
 from .features.base import FeatureStore
+from .features.batter_offense import matchup_offense_pit_gap
 from .features.bullpen import FATIGUE_WINDOW_DAYS, bullpen_profile, team_recent_relief_lines
 from .features.elo_ratings import build_elo
 from .features.mlb_player_availability import FEATURE_NAMES as MLB_AVAILABILITY_FEATURE_NAMES
@@ -160,6 +161,16 @@ def _compute_features(
         home_fatigue = sum(float(line.get("innings", 0)) for line in home_relief)
         away_fatigue = sum(float(line.get("innings", 0)) for line in away_relief)
         features["bullpen_fatigue_gap"] = round(home_fatigue - away_fatigue, 6)
+    if "offense_pit_gap" in wanted:
+        # Batter PIT priors (v9 Phase 3): calls the exact same function
+        # validation.py's training-time _offense_pit_gap crosswalk delegates
+        # to (features.batter_offense.matchup_offense_pit_gap) -- both sides
+        # only need games strictly before the decision time, so there is no
+        # separate live-serving reimplementation to keep in parity.
+        gap, available = matchup_offense_pit_gap(home_team, away_team, event_start)
+        features["offense_pit_gap"] = gap
+        if not available:
+            unavailable.append("offense_pit_gap_unavailable")
     if "residual_trend_gap" in wanted:
         # Elo-residualized trend: how much the home team's recent actual
         # win rate diverges from Elo's expectation. IDENTICAL to
