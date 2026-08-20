@@ -99,9 +99,8 @@ def main() -> None:
 
     # 2. Chronological 60/20/20 split
     print("\n[2/4] Chronological split (60/20/20) ...")
-    train, validation, holdout, split_meta = chronological_split(rows)
-    print(f"      train: {len(train)} rows, validation: {len(validation)} rows, "
-          f"holdout: {len(holdout)} rows")
+    train, validation, holdout, _split_meta = chronological_split(rows)
+    print(f"      train: {len(train)} rows, validation: {len(validation)} rows, holdout: {len(holdout)} rows")
 
     # 3. Evaluate every variant
     print(f"\n[3/4] Evaluating {len(V9_ABLATION_VARIANTS)} variants ...")
@@ -146,11 +145,8 @@ def main() -> None:
             }
             ll = all_rows.get("log_loss")
             ec = all_rows.get("expected_calibration_error")
-            print(
-                f"calls={calls}, hit_rate={hit_rate:.3f}, units={units:.1f}, "
-                f"logloss={ll}, ece={ec}"
-            )
-        except Exception as exc:
+            print(f"calls={calls}, hit_rate={hit_rate:.3f}, units={units:.1f}, logloss={ll}, ece={ec}")
+        except Exception as exc:  # noqa: BLE001 -- deliberately broad: one variant's failure must not abort the rest of the ablation sweep
             print(f"ERROR: {exc}")
             variants[name] = {"variant": name, "status": "error", "error": str(exc)}
 
@@ -179,17 +175,15 @@ def main() -> None:
     print(header)
     print("  " + "-" * (len(header) - 2))
     rows = [
-        (name, m) for name, m in variants.items()
+        (name, m)
+        for name, m in variants.items()
         if m.get("status") == "evaluated" and m.get("holdout_all_rows", {}).get("log_loss") is not None
     ]
     for name, m in sorted(rows, key=lambda x: x[1]["holdout_all_rows"]["log_loss"]):
         ar = m["holdout_all_rows"]
         ps = m.get("per_split", {})
         folds = [ps.get(k, {}).get("log_loss") for k in ("train", "validation", "holdout")]
-        fold_delta = (
-            round(max(folds) - min(folds), 4)
-            if all(v is not None for v in folds) else None
-        )
+        fold_delta = round(max(folds) - min(folds), 4) if all(v is not None for v in folds) else None
         print(
             f"  {name:55s} {ar.get('log_loss'):>8.4f} {ar.get('brier_score'):>8.4f} "
             f"{ar.get('expected_calibration_error'):>7.4f} "
@@ -206,25 +200,30 @@ def main() -> None:
     v8_name = "elo_trend_park_weather_starter_bullpen"
     v8 = variants.get(v8_name)
     if v8 and v8.get("status") == "evaluated":
-        v8_artifact = json.loads(
-            (PROJECT_ROOT / "config/models/mlb-elo-trend-lr-v8.json").read_text()
-        )
+        v8_artifact = json.loads((PROJECT_ROOT / "config/models/mlb-elo-trend-lr-v8.json").read_text())
         v8_qual = v8_artifact.get("qualification", {})
         diag = v8.get("diagnostic_60_holdout", {})
         print("\n[v8 reproduction gate]")
-        print(f"  harness {v8_name} @0.60-target: calls={diag.get('calls')}, "
-              f"hit={diag.get('hit_rate')}, brier={diag.get('brier_score')}")
-        print(f"  artifact mlb-elo-trend-lr-v8 qualification: calls={v8_qual.get('calls')}, "
-              f"hit={v8_qual.get('hit_rate')}, brier={v8_qual.get('brier_score')}")
+        print(
+            f"  harness {v8_name} @0.60-target: calls={diag.get('calls')}, "
+            f"hit={diag.get('hit_rate')}, brier={diag.get('brier_score')}"
+        )
+        print(
+            f"  artifact mlb-elo-trend-lr-v8 qualification: calls={v8_qual.get('calls')}, "
+            f"hit={v8_qual.get('hit_rate')}, brier={v8_qual.get('brier_score')}"
+        )
         if diag.get("calls") and v8_qual.get("calls"):
             call_ratio = diag["calls"] / v8_qual["calls"]
             hit_delta = abs(diag["hit_rate"] - v8_qual["hit_rate"])
             reproduced = 0.7 <= call_ratio <= 1.3 and hit_delta <= 0.03
-            print(f"  reproduced_closely: {reproduced} "
-                  f"(call_ratio={call_ratio:.3f}, hit_delta={hit_delta:.4f})")
+            print(
+                f"  reproduced_closely: {reproduced} (call_ratio={call_ratio:.3f}, hit_delta={hit_delta:.4f})"
+            )
     else:
-        print(f"\n[v8 reproduction gate] {v8_name} missing or failed — STOP: do not "
-              f"use these ablation results for promotion decisions.")
+        print(
+            f"\n[v8 reproduction gate] {v8_name} missing or failed — STOP: do not "
+            f"use these ablation results for promotion decisions."
+        )
 
     return 0
 

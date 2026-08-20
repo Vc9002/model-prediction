@@ -42,9 +42,7 @@ from model_prediction.rebuild.calibration import (
     fit_calibrator,
 )
 from model_prediction.rebuild.nfl.elo import (
-    DEFAULT_ELO,
     NFL_ELO_CONFIG,
-    WalkForwardRow,
     build_dataset,
     rows_to_frame,
 )
@@ -68,9 +66,7 @@ def _metrics(labels: np.ndarray, probs: np.ndarray) -> dict[str, Any]:
         "log_loss": float(log_loss(labels, probs)),
         "brier": float(brier_score(labels, probs)),
         "ece": float(ece(labels, probs, n_bins=10)),
-        "accuracy": float(directional_accuracy(
-            labels.astype(int).tolist(), preds.tolist()
-        )),
+        "accuracy": float(directional_accuracy(labels.astype(int).tolist(), preds.tolist())),
     }
 
 
@@ -81,9 +77,7 @@ def _split_by_dates(frame: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, np.nda
     n_dates = len(unique_dates)
     test_size = max(1, n_dates // 5)
     calib_size = max(1, n_dates // 5)
-    train_dates, calib_dates, test_dates = date_cluster_split(
-        dates_list, test_size, calib_size
-    )
+    train_dates, calib_dates, test_dates = date_cluster_split(dates_list, test_size, calib_size)
     train_mask = pl.Series(dates_list).is_in(train_dates).to_numpy()
     val_mask = pl.Series(dates_list).is_in(calib_dates).to_numpy()
     holdout_mask = pl.Series(dates_list).is_in(test_dates).to_numpy()
@@ -93,8 +87,7 @@ def _split_by_dates(frame: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, np.nda
 def main() -> None:
     # ── 1. Load data ──
     print("1. Loading NFL games (2021-2025)...")
-    result = build_dataset("data/rebuild", seasons=SEASONS,
-                           minimum_history_games=50, minimum_team_games=3)
+    result = build_dataset("data/rebuild", seasons=SEASONS, minimum_history_games=50, minimum_team_games=3)
     if not result.rows:
         print("ERROR: no walk-forward rows. Check data backfill.")
         sys.exit(1)
@@ -102,20 +95,21 @@ def main() -> None:
     frame = rows_to_frame(result.rows)
     print(f"   Total games: {result.n_total}")
     print(f"   Walk-forward rows: {frame.height}")
-    print(f"   Skipped: {result.skipped_bootstrap} bootstrap, "
-          f"{result.skipped_cold_start} cold-start")
+    print(f"   Skipped: {result.skipped_bootstrap} bootstrap, {result.skipped_cold_start} cold-start")
 
     # ── 2. Build feature matrix ──
     print("\n2. Building feature matrix...")
-    X = np.column_stack([
-        frame["elo_probability"].to_numpy().astype(np.float64),
-        frame["trend_gap"].to_numpy().astype(np.float64),
-    ])
+    X = np.column_stack(
+        [
+            frame["elo_probability"].to_numpy().astype(np.float64),
+            frame["trend_gap"].to_numpy().astype(np.float64),
+        ]
+    )
     y = frame["home_win"].to_numpy().astype(int)
 
     # ── 3. Chronological split ──
     print("\n3. Chronological 60/20/20 split...")
-    train_mask, val_mask, holdout_mask, calib_dates, test_dates = _split_by_dates(frame)
+    train_mask, val_mask, holdout_mask, _calib_dates, _test_dates = _split_by_dates(frame)
     X_train, y_train = X[train_mask], y[train_mask]
     X_val, y_val = X[val_mask], y[val_mask]
     X_holdout, y_holdout = X[holdout_mask], y[holdout_mask]
@@ -137,12 +131,16 @@ def main() -> None:
     val_metrics = _metrics(y_val, val_probs)
     raw_holdout_metrics = _metrics(y_holdout, holdout_probs)
 
-    print(f"   Train: LogLoss={train_metrics['log_loss']:.5f} "
-          f"Brier={train_metrics['brier']:.5f} ECE={train_metrics['ece']:.5f} "
-          f"Acc={train_metrics['accuracy']:.4f}")
-    print(f"   Validation: LogLoss={val_metrics['log_loss']:.5f} "
-          f"Brier={val_metrics['brier']:.5f} ECE={val_metrics['ece']:.5f} "
-          f"Acc={val_metrics['accuracy']:.4f}")
+    print(
+        f"   Train: LogLoss={train_metrics['log_loss']:.5f} "
+        f"Brier={train_metrics['brier']:.5f} ECE={train_metrics['ece']:.5f} "
+        f"Acc={train_metrics['accuracy']:.4f}"
+    )
+    print(
+        f"   Validation: LogLoss={val_metrics['log_loss']:.5f} "
+        f"Brier={val_metrics['brier']:.5f} ECE={val_metrics['ece']:.5f} "
+        f"Acc={val_metrics['accuracy']:.4f}"
+    )
 
     coefficients = dict(zip(FEATURES, lr.coef_[0].tolist()))
     intercept = float(lr.intercept_[0])
@@ -155,9 +153,7 @@ def main() -> None:
     cal_results: dict[str, Any] = {}
     for method in methods:
         try:
-            r = cross_fit_calibration_eval(
-                val_probs.tolist(), y_val.tolist(), method, n_blocks=4
-            )
+            r = cross_fit_calibration_eval(val_probs.tolist(), y_val.tolist(), method, n_blocks=4)
             cal_results[method] = {
                 "log_loss": r.log_loss,
                 "brier": r.brier,
@@ -186,8 +182,10 @@ def main() -> None:
             print(f"   {method}: SKIPPED ({m['error']})")
         else:
             marker = " <<<" if method == winning_method else ""
-            print(f"   {method}: LogLoss={m['log_loss']:.5f} Brier={m['brier']:.5f} "
-                  f"ECE={m['ece']:.5f} slope={m.get('calibration_slope','n/a')}{marker}")
+            print(
+                f"   {method}: LogLoss={m['log_loss']:.5f} Brier={m['brier']:.5f} "
+                f"ECE={m['ece']:.5f} slope={m.get('calibration_slope', 'n/a')}{marker}"
+            )
 
     # Fit winning calibrator
     if winning_method == "identity":
@@ -197,19 +195,21 @@ def main() -> None:
 
     # ── 6. Holdout evaluation ──
     print("\n6. Locked holdout evaluation...")
-    holdout_calibrated = np.array([
-        calibrator.transform(float(p)) for p in holdout_probs
-    ])
+    holdout_calibrated = np.array([calibrator.transform(float(p)) for p in holdout_probs])
     holdout_metrics_cal = _metrics(y_holdout, holdout_calibrated)
 
-    print(f"   Raw: LogLoss={raw_holdout_metrics['log_loss']:.5f} "
-          f"Brier={raw_holdout_metrics['brier']:.5f} "
-          f"ECE={raw_holdout_metrics['ece']:.5f} "
-          f"Acc={raw_holdout_metrics['accuracy']:.4f}")
-    print(f"   Calibrated: LogLoss={holdout_metrics_cal['log_loss']:.5f} "
-          f"Brier={holdout_metrics_cal['brier']:.5f} "
-          f"ECE={holdout_metrics_cal['ece']:.5f} "
-          f"Acc={holdout_metrics_cal['accuracy']:.4f}")
+    print(
+        f"   Raw: LogLoss={raw_holdout_metrics['log_loss']:.5f} "
+        f"Brier={raw_holdout_metrics['brier']:.5f} "
+        f"ECE={raw_holdout_metrics['ece']:.5f} "
+        f"Acc={raw_holdout_metrics['accuracy']:.4f}"
+    )
+    print(
+        f"   Calibrated: LogLoss={holdout_metrics_cal['log_loss']:.5f} "
+        f"Brier={holdout_metrics_cal['brier']:.5f} "
+        f"ECE={holdout_metrics_cal['ece']:.5f} "
+        f"Acc={holdout_metrics_cal['accuracy']:.4f}"
+    )
 
     try:
         cal_diag = calibration_intercept_slope(y_holdout, holdout_calibrated)
@@ -298,21 +298,27 @@ def main() -> None:
 
     results_path = Path("outputs/rebuild/nfl/nfl_rebuild_v1_training_results.json")
     results_path.parent.mkdir(parents=True, exist_ok=True)
-    results_path.write_text(json.dumps({
-        "train_metrics": train_metrics,
-        "validation_metrics": val_metrics,
-        "holdout_metrics_raw": raw_holdout_metrics,
-        "holdout_metrics_calibrated": holdout_metrics_cal,
-        "calibration_comparison": cal_results,
-        "winning_calibration_method": winning_method,
-        "coefficients": coefficients,
-        "intercept": intercept,
-        "artifact_hash": artifact_hash,
-        "calibrator_hash": calibrator_hash,
-        "n_rows_total": frame.height,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "train_metrics": train_metrics,
+                "validation_metrics": val_metrics,
+                "holdout_metrics_raw": raw_holdout_metrics,
+                "holdout_metrics_calibrated": holdout_metrics_cal,
+                "calibration_comparison": cal_results,
+                "winning_calibration_method": winning_method,
+                "coefficients": coefficients,
+                "intercept": intercept,
+                "artifact_hash": artifact_hash,
+                "calibrator_hash": calibrator_hash,
+                "n_rows_total": frame.height,
+            },
+            indent=2,
+            default=str,
+        )
+    )
 
-    print(f"   Artifacts saved to config/models/challengers/")
+    print("   Artifacts saved to config/models/challengers/")
     print(f"   Results saved to {results_path}")
     print("\nDone. NFL Elo+Trend LR rebuild v1 trained.")
 

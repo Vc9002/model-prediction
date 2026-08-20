@@ -169,7 +169,9 @@ def collect_rows(start: date, end: date, client: ESPNMLBClient) -> list[dict[str
         cursor += timedelta(days=1)
     logger.info(
         "collected %d new rows this run (%d cached from prior runs), %d skipped (unresolved probable starter)",
-        fetched, len(cache), skipped,
+        fetched,
+        len(cache),
+        skipped,
     )
     return rows
 
@@ -310,9 +312,7 @@ def main() -> None:
     bullpen_fold_results = run_cv(bullpen_design, bullpen_target, bullpen_dates)
     bullpen_coefs = [fold["coefficients"][-1] for fold in bullpen_fold_results]
     bullpen_overturned = bool(bullpen_coefs) and all(c > 0 for c in bullpen_coefs)
-    bullpen_elasticity = (
-        round(float(np.mean(bullpen_coefs)), 6) if bullpen_overturned else 0.0
-    )
+    bullpen_elasticity = round(float(np.mean(bullpen_coefs)), 6) if bullpen_overturned else 0.0
 
     unique_games = len({row["event_id"] for row in rows})
     trained_through = max(row["game_date"] for row in rows)
@@ -328,7 +328,9 @@ def main() -> None:
     }
     print(json.dumps(result, indent=2, default=str))
 
-    write_yaml(args.output, spec, elasticities, bullpen_elasticity, unique_games, trained_through, fold_results)
+    write_yaml(
+        args.output, spec, elasticities, bullpen_elasticity, unique_games, trained_through, fold_results
+    )
     logger.info("wrote %s", args.output)
 
 
@@ -353,9 +355,7 @@ def write_yaml(
     raw["park_elasticity"] = elasticities["park"]
     raw["weather_elasticity"] = elasticities["weather"]
     raw["bullpen_elasticity"] = bullpen_elasticity
-    correlations = ", ".join(
-        f"fold{fold['fold']}={fold['held_out_correlation']}" for fold in fold_results
-    )
+    correlations = ", ".join(f"fold{fold['fold']}={fold['held_out_correlation']}" for fold in fold_results)
     raw["_refit_note"] = (
         f"Refit {trained_through[:7]} by scripts/mlb_elasticity_refit.py against "
         f"{unique_games} real completed games (see rows_collected in the script's own "

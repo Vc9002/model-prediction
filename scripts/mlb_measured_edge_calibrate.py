@@ -199,8 +199,12 @@ def diagnostic_window_rows(
             markets = market_row.get("markets", {})
             spread = markets.get("spread", {})
             total = markets.get("total", {})
-            spread_line = (spread.get("away") or {}).get("closing_line") or (spread.get("away") or {}).get("line")
-            total_line = (total.get("over") or {}).get("closing_line") or (total.get("over") or {}).get("line")
+            spread_line = (spread.get("away") or {}).get("closing_line") or (spread.get("away") or {}).get(
+                "line"
+            )
+            total_line = (total.get("over") or {}).get("closing_line") or (total.get("over") or {}).get(
+                "line"
+            )
             if spread_line is None and total_line is None:
                 continue
             features = _features_from_cache_row(feature_row)
@@ -421,7 +425,9 @@ def write_artifact(
     real_market: dict[str, Any],
 ) -> None:
     if diagnostic.get("scale") is None:
-        raise SystemExit(f"{model_name}: diagnostic window fit failed (too few games) -- not writing artifact")
+        raise SystemExit(
+            f"{model_name}: diagnostic window fit failed (too few games) -- not writing artifact"
+        )
     scale, offset = diagnostic["scale"], diagnostic["offset"]
     if not 0 < scale <= 1.5:
         raise SystemExit(f"{model_name}: fitted scale {scale} outside governance bounds (0, 1.5]")
@@ -501,12 +507,20 @@ def main() -> None:
     totals_real_market = calibrate_market(real_market_rows, "total", "total_line")
 
     write_artifact(
-        args.output_margin, "Measured Edge Margin", Path(args.output_margin).stem,
-        spec.formula_version, margin_diagnostic, margin_real_market,
+        args.output_margin,
+        "Measured Edge Margin",
+        Path(args.output_margin).stem,
+        spec.formula_version,
+        margin_diagnostic,
+        margin_real_market,
     )
     write_artifact(
-        args.output_totals, "Measured Edge Totals", Path(args.output_totals).stem,
-        spec.formula_version, totals_diagnostic, totals_real_market,
+        args.output_totals,
+        "Measured Edge Totals",
+        Path(args.output_totals).stem,
+        spec.formula_version,
+        totals_diagnostic,
+        totals_real_market,
     )
 
 

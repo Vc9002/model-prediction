@@ -184,7 +184,9 @@ def migrate(*, dry_run: bool) -> dict:
         "total_source_rows_scanned": total_source_rows,
         "written": written,
         "skipped_already_migrated": skipped_existing,
-        "unmapped_league_market_combinations": {f"{league}/{market}": n for (league, market), n in unmapped.items()},
+        "unmapped_league_market_combinations": {
+            f"{league}/{market}": n for (league, market), n in unmapped.items()
+        },
         "per_model_written": per_model_counts,
     }
 

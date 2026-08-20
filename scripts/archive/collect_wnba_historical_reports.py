@@ -15,14 +15,13 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from model_prediction.data_sources.wnba_injuries import parse_report_pdf
 from model_prediction.domain import parse_utc
-
 
 BASE_URL = "https://ak-static.cms.nba.com/referee/wnba_injury"
 EASTERN = ZoneInfo("America/New_York")
@@ -53,9 +52,7 @@ def _candidate_names(events: list[dict[str, Any]]) -> list[str]:
 def _download(url: str) -> bytes:
     last_error: Exception | None = None
     for attempt in range(3):
-        request = urllib.request.Request(
-            url, headers={"User-Agent": "model-prediction-research/1.0"}
-        )
+        request = urllib.request.Request(url, headers={"User-Agent": "model-prediction-research/1.0"})
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 content_type = str(response.headers.get("Content-Type", ""))
@@ -102,9 +99,7 @@ def main() -> None:
     parser.add_argument("--project-root", default=".")
     parser.add_argument("--start-date", required=True)
     parser.add_argument("--end-date", required=True)
-    parser.add_argument(
-        "--output-dir", default="data/availability/wnba/expanded_reports"
-    )
+    parser.add_argument("--output-dir", default="data/availability/wnba/expanded_reports")
     parser.add_argument("--request-delay", type=float, default=0.05)
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
@@ -124,7 +119,7 @@ def main() -> None:
 
     manifest = {
         "schema_version": "1",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "provenance_class": "retrospectively_retrieved_official_publication_timestamp",
         "start_date": args.start_date,
         "end_date": args.end_date,
@@ -135,7 +130,11 @@ def main() -> None:
     }
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({key: manifest[key] for key in ("events", "candidate_urls", "reports_recovered")}, indent=2))
+    print(
+        json.dumps(
+            {key: manifest[key] for key in ("events", "candidate_urls", "reports_recovered")}, indent=2
+        )
+    )
     print(manifest_path)
 
 

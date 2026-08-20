@@ -26,8 +26,8 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
-from model_prediction.data_sources.espn import ESPNClient  # noqa: E402
+from model_prediction.config import PROJECT_ROOT
+from model_prediction.data_sources.espn import ESPNClient
 
 GAMES_PATH = PROJECT_ROOT / "data" / "historical" / "mlb_games_all.jsonl"
 
@@ -45,12 +45,7 @@ def _ingested_ids_by_date() -> dict[str, set[str]]:
         if not event_start:
             continue
         # ET game date, matching the walk-forward convention.
-        day = (
-            datetime.fromisoformat(event_start)
-            .astimezone(ZoneInfo("America/New_York"))
-            .date()
-            .isoformat()
-        )
+        day = datetime.fromisoformat(event_start).astimezone(ZoneInfo("America/New_York")).date().isoformat()
         by_date.setdefault(day, set()).add(str(game.get("event_id") or ""))
     return by_date
 
@@ -78,18 +73,16 @@ def main() -> int:
             print(f"{day}: provider error ({type(error).__name__})")
             report["days"].append({"date": day, "provider_error": str(error)[:120]})
             continue
-        listed = {
-            str(event.get("id") or "")
-            for event in (payload.get("events") or [])
-        }
+        listed = {str(event.get("id") or "") for event in (payload.get("events") or [])}
         have = ingested.get(day, set())
         missing = sorted(listed - have)
         missing_total += len(missing)
-        print(f"{day}: ESPN listed {len(listed)}, ingested {len(listed & have)}, "
-              f"missing {len(missing)}" + (f" -> {missing}" if missing else ""))
+        print(
+            f"{day}: ESPN listed {len(listed)}, ingested {len(listed & have)}, "
+            f"missing {len(missing)}" + (f" -> {missing}" if missing else "")
+        )
         report["days"].append(
-            {"date": day, "listed": len(listed), "ingested": len(listed & have),
-             "missing": missing}
+            {"date": day, "listed": len(listed), "ingested": len(listed & have), "missing": missing}
         )
 
     print(f"\ntotal missing across {args.days} days: {missing_total}")

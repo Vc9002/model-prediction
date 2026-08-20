@@ -6,14 +6,21 @@ Usage:
   python scripts/esports_analysis.py cs2 backtest # Backtest on settled picks
   python scripts/esports_analysis.py lol both     # Both
 """
-import json, math, sys, pandas as pd
+
+import json
+import math
+import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+import pandas as pd
 
 PROJECT = Path(__file__).resolve().parent.parent
 DATA = PROJECT / "data/esports"
 MODELS = PROJECT / "config/models"
+
+
 # Esports never reaches Main and (since 2026-08-03) no longer reaches Flat --
 # Research/Gated Research are its only ledgers, one file per title.
 def _research_ledger(title: str) -> Path:
@@ -23,12 +30,15 @@ def _research_ledger(title: str) -> Path:
 def _gated_ledger(title: str) -> Path:
     return PROJECT / f"data/gated_research/{title.lower()}.xlsx"
 
+
 # ── team name mapping ──────────────────────────────────────────────
 TEAM_CACHE: dict[str, dict] = {}
 
+
 def _load_teams(title: str) -> dict:
     if title not in TEAM_CACHE:
-        teams = json.load(open(DATA / title / "teams.json"))
+        with open(DATA / title / "teams.json") as handle:
+            teams = json.load(handle)
         name_to_id = {}
         for tid, t in teams.items():
             n = t.get("name", "").lower().strip()
@@ -37,31 +47,42 @@ def _load_teams(title: str) -> dict:
         TEAM_CACHE[title] = name_to_id
     return TEAM_CACHE[title]
 
+
 def find_team(title: str, query: str) -> str | None:
     name_to_id = _load_teams(title)
     q = str(query).lower().strip()
-    if q in name_to_id: return name_to_id[q]
-    if q.replace(" ", "") in name_to_id: return name_to_id[q.replace(" ", "")]
+    if q in name_to_id:
+        return name_to_id[q]
+    if q.replace(" ", "") in name_to_id:
+        return name_to_id[q.replace(" ", "")]
     for n, tid in name_to_id.items():
-        if q in n or n in q: return tid
+        if q in n or n in q:
+            return tid
     return None
+
 
 # ── Elo ────────────────────────────────────────────────────────────
 def elo_prob(ra: float, rb: float) -> float:
     return 1.0 / (1.0 + 10 ** ((rb - ra) / 400.0))
 
+
 def score_mult(s1, s2, bo):
-    if bo == 1: return 1.0
+    if bo == 1:
+        return 1.0
     w, l = max(s1, s2), min(s1, s2)
-    if w + l == 0: return 1.0
+    if w + l == 0:
+        return 1.0
     return 0.7 + 0.6 * (w / (w + l))
+
 
 def load_matches(title: str) -> list[dict]:
     matches = []
-    for line in open(DATA / title / "matches.jsonl"):
-        matches.append(json.loads(line))
+    with open(DATA / title / "matches.jsonl") as handle:
+        for line in handle:
+            matches.append(json.loads(line))
     matches.sort(key=lambda m: m.get("start_utc", m.get("end_utc", "")))
     return matches
+
 
 # ── grid search ────────────────────────────────────────────────────
 def grid_search(title: str) -> None:
@@ -71,15 +92,17 @@ def grid_search(title: str) -> None:
 
     dates = []
     for m in train:
-        try: dates.append(datetime.fromisoformat(m.get("start_utc", m.get("end_utc", "")).replace("Z", "+00:00")))
-        except: pass
-    latest = max(dates) if dates else datetime.now(timezone.utc)
+        try:
+            dates.append(datetime.fromisoformat(m.get("start_utc", m.get("end_utc", ""))))
+        except ValueError:
+            pass  # missing/malformed timestamp on a match just isn't used for the recency anchor
+    latest = max(dates) if dates else datetime.now(UTC)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  GRID SEARCH — {title.upper()} ({len(matches)} matches)")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"{'K':<6} {'recency':<8} {'score':<8} {'th':<6} {'Brier':<10} {'Called':>8}")
-    print(f"{'-'*50}")
+    print(f"{'-' * 50}")
 
     best_brier, best_cfg = 1.0, None
     for K in [32, 48, 64, 96]:
@@ -91,21 +114,29 @@ def grid_search(title: str) -> None:
                     p1 = elo_prob(ratings[t1], ratings[t2])
                     outcome = 1.0 if m["team1_score"] > m["team2_score"] else 0.0
                     k_eff = float(K)
-                    if use_score: k_eff *= score_mult(m["team1_score"], m["team2_score"], m.get("best_of", 3))
+                    if use_score:
+                        k_eff *= score_mult(m["team1_score"], m["team2_score"], m.get("best_of", 3))
                     if use_rec:
                         try:
-                            md = datetime.fromisoformat(m.get("start_utc", m.get("end_utc", "")).replace("Z", "+00:00"))
+                            md = datetime.fromisoformat(m.get("start_utc", m.get("end_utc", "")))
                             k_eff *= 1.0 + max(0, 0.3 * (1.0 - (latest - md).days / 180.0))
-                        except: pass
+                        except ValueError:
+                            pass  # missing/malformed timestamp: recency multiplier stays at 1.0
                     ratings[t1] += k_eff * (outcome - p1)
                     ratings[t2] += k_eff * ((1 - outcome) - (1 - p1))
 
-                preds = [(elo_prob(ratings.get(m["team1_id"], 1500), ratings.get(m["team2_id"], 1500)),
-                          1.0 if m["team1_score"] > m["team2_score"] else 0.0) for m in test]
+                preds = [
+                    (
+                        elo_prob(ratings.get(m["team1_id"], 1500), ratings.get(m["team2_id"], 1500)),
+                        1.0 if m["team1_score"] > m["team2_score"] else 0.0,
+                    )
+                    for m in test
+                ]
 
                 for th in [0.03, 0.05, 0.10, 0.15, 0.18, 0.20]:
                     sel = [(p, o) for p, o in preds if abs(p - 0.5) >= th]
-                    if len(sel) < 50: continue
+                    if len(sel) < 50:
+                        continue
                     brier = sum((p - o) ** 2 for p, o in sel) / len(sel)
                     if brier < best_brier:
                         best_brier = brier
@@ -122,21 +153,33 @@ def grid_search(title: str) -> None:
                         p1 = elo_prob(ratings[t1], ratings[t2])
                         outcome = 1.0 if m["team1_score"] > m["team2_score"] else 0.0
                         k_eff = float(K)
-                        if use_score: k_eff *= score_mult(m["team1_score"], m["team2_score"], m.get("best_of", 3))
+                        if use_score:
+                            k_eff *= score_mult(m["team1_score"], m["team2_score"], m.get("best_of", 3))
                         ratings[t1] += k_eff * (outcome - p1)
                         ratings[t2] += k_eff * ((1 - outcome) - (1 - p1))
-                    preds = [(elo_prob(ratings.get(m["team1_id"], 1500), ratings.get(m["team2_id"], 1500)),
-                              1.0 if m["team1_score"] > m["team2_score"] else 0.0) for m in test]
+                    preds = [
+                        (
+                            elo_prob(ratings.get(m["team1_id"], 1500), ratings.get(m["team2_id"], 1500)),
+                            1.0 if m["team1_score"] > m["team2_score"] else 0.0,
+                        )
+                        for m in test
+                    ]
                     sel = [(p, o) for p, o in preds if abs(p - 0.5) >= th]
-                    if len(sel) < 50: continue
+                    if len(sel) < 50:
+                        continue
                     brier = sum((p - o) ** 2 for p, o in sel) / len(sel)
                     marker = " ← BEST" if (K, use_rec, use_score, th) == best_cfg[:4] else ""
                     if marker:
-                        print(f"{K:<6} {str(use_rec):<8} {str(use_score):<8} {th:<6.2f} {brier:<10.6f} {len(sel):>8}{marker}")
+                        print(
+                            f"{K:<6} {use_rec!s:<8} {use_score!s:<8} {th:<6.2f} {brier:<10.6f} {len(sel):>8}{marker}"
+                        )
 
     if best_cfg:
         K, rec, sc, th, brier, called = best_cfg
-        print(f"\n  Best: K={K}  recency={rec}  score={sc}  th={th:.2f}  Brier={brier:.6f}  Called={called}/{len(test)}")
+        print(
+            f"\n  Best: K={K}  recency={rec}  score={sc}  th={th:.2f}  Brier={brier:.6f}  Called={called}/{len(test)}"
+        )
+
 
 # ── Platt helper ────────────────────────────────────────────────────
 def _apply_platt_anal(prob, intercept, slope):
@@ -156,24 +199,27 @@ def backtest(title: str) -> None:
         print(f"No model found for {title}")
         return
 
-    cfg = json.load(open(model_file))
+    with open(model_file) as handle:
+        cfg = json.load(handle)
     ratings = cfg.get("ratings", {})
     threshold = cfg.get("confidence_threshold", 0.10)
     platt_intercept = cfg.get("platt_intercept")
     platt_slope = cfg.get("platt_slope")
 
     for fname, label in [(_research_ledger(title), "RESEARCH"), (_gated_ledger(title), "GATED")]:
-        if not fname.exists(): continue
+        if not fname.exists():
+            continue
         df = pd.read_excel(fname, sheet_name="Picks")
         picks = df[(df["league"].str.upper() == title.upper()) & (df["pnl_units"].notna())]
-        if len(picks) == 0: continue
+        if len(picks) == 0:
+            continue
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"  BACKTEST — {title.upper()} on {label} ({len(picks)} settled)")
-        print(f"  Model: {cfg.get('model_version', '?')}  K={cfg.get('k','?')}  th={threshold}")
-        print(f"{'='*70}")
+        print(f"  Model: {cfg.get('model_version', '?')}  K={cfg.get('k', '?')}  th={threshold}")
+        print(f"{'=' * 70}")
         print(f"  {'Match':<45} {'Sd':>3} {'Raw':>7} {'Platt':>7} {'Edge':>8} {'Call':>6} {'P&L':>7}")
-        print(f"  {'-'*90}")
+        print(f"  {'-' * 90}")
 
         total_pnl, called_n, called_pnl = 0, 0, 0
         for _, r in picks.iterrows():
@@ -198,10 +244,13 @@ def backtest(title: str) -> None:
             if called == "YES":
                 called_n += 1
                 called_pnl += pnl
-            print(f"  {matchup:<45} {'H' if 'home' in str(r.get('selection','')).lower() else 'A':>3} {prob:>7.3f} {prob_platt:>7.3f} {edge:>+8.3f} {called:>6} {pnl:>+7.2f}")
+            print(
+                f"  {matchup:<45} {'H' if 'home' in str(r.get('selection', '')).lower() else 'A':>3} {prob:>7.3f} {prob_platt:>7.3f} {edge:>+8.3f} {called:>6} {pnl:>+7.2f}"
+            )
 
-        print(f"  {'-'*90}")
+        print(f"  {'-' * 90}")
         print(f"  Total: {total_pnl:+.2f}U  |  Called only: {called_pnl:+.2f}U ({called_n} picks)")
+
 
 # ── main ───────────────────────────────────────────────────────────
 if __name__ == "__main__":

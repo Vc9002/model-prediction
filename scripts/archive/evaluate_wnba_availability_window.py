@@ -7,9 +7,10 @@ import hashlib
 import json
 import random
 from collections import Counter
-from datetime import date, datetime, timedelta, timezone
+from collections.abc import Mapping
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from openpyxl import load_workbook
 
@@ -21,8 +22,8 @@ from model_prediction.features.base import FeatureStore
 from model_prediction.features.player_availability import (
     STATUS_ACTIVE_PROBABILITIES,
     _identity,
-    merge_availability_sources,
     matchup_player_availability_from_payloads,
+    merge_availability_sources,
 )
 from model_prediction.learned_forward import build_learned_moneyline_slate
 from model_prediction.models.learned_market import LearnedMarketArtifact
@@ -32,7 +33,6 @@ from model_prediction.wnba_availability_evaluation import (
     historical_margin_sigma,
     report_payload,
 )
-
 
 SCALES = (0.0, 0.5, 1.0, 1.5, 2.0)
 GATES = (0.50, 0.55, 0.60, 0.65, 0.70, 0.75)
@@ -47,7 +47,9 @@ class LocalScoreboards:
         return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _ledger_probabilities(root: Path) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str, str], dict[str, Any]]]:
+def _ledger_probabilities(
+    root: Path,
+) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str, str], dict[str, Any]]]:
     by_event: dict[str, dict[str, Any]] = {}
     by_matchup: dict[tuple[str, str, str], dict[str, Any]] = {}
     for workbook_path in (root / "data/picks.xlsx", root / "data/flat_picks.xlsx"):
@@ -127,10 +129,10 @@ def _cached_target_injuries(
     path = data_root / "availability/wnba/espn_target_injuries" / f"{event_id}.json"
     if path.exists():
         source = json.loads(path.read_text(encoding="utf-8"))
-        retrieved_at = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        retrieved_at = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
     else:
         summary = client.summary("WNBA", event_id)
-        retrieved_at = datetime.now(timezone.utc)
+        retrieved_at = datetime.now(UTC)
         source = {
             "injuries": summary.get("injuries", []),
             "header": summary.get("header", {}),
@@ -140,9 +142,7 @@ def _cached_target_injuries(
         path.write_text(json.dumps(source, sort_keys=True) + "\n", encoding="utf-8")
     if source.get("retrieved_at_utc"):
         retrieved_at = parse_utc(str(source["retrieved_at_utc"]))
-    normalized = normalize_espn_event_injuries(
-        source, event_id=event_id, observed_at=observed_at
-    )
+    normalized = normalize_espn_event_injuries(source, event_id=event_id, observed_at=observed_at)
     normalized["observed_at_utc"] = retrieved_at.isoformat()
     normalized["status_cutoff_at_utc"] = observed_at.isoformat()
     normalized["provenance_class"] = "retrospective_espn_status_timestamp_filter"
@@ -154,10 +154,7 @@ def _date_window(start_date: str, end_date: str) -> tuple[str, ...]:
     end = date.fromisoformat(end_date)
     if end < start:
         raise ValueError("end date precedes start date")
-    return tuple(
-        (start + timedelta(days=offset)).isoformat()
-        for offset in range((end - start).days + 1)
-    )
+    return tuple((start + timedelta(days=offset)).isoformat() for offset in range((end - start).days + 1))
 
 
 def _select_report(
@@ -180,9 +177,7 @@ def _player_effects(
     snapshot: Mapping[str, Any], priors: Mapping[str, Any], away: str, home: str, game_date: str
 ) -> list[dict[str, Any]]:
     statuses = {
-        (_identity(str(row["team"])), _identity(str(row["player_name"]))): str(
-            row["current_status"]
-        )
+        (_identity(str(row["team"])), _identity(str(row["player_name"]))): str(row["current_status"])
         for row in snapshot.get("entries", [])
         if str(row.get("game_date")) == game_date
     }
@@ -224,9 +219,7 @@ def _metrics(
     if include_conflict_diagnostics:
         accepted.add("diagnostic_conflict_resolution")
     settled = [
-        row
-        for row in rows
-        if row["actual_home_win"] is not None and row["availability_status"] in accepted
+        row for row in rows if row["actual_home_win"] is not None and row["availability_status"] in accepted
     ]
     calls = []
     brier = []
@@ -256,10 +249,7 @@ def _paired_bootstrap(rows: list[dict[str, Any]], samples: int = 20_000) -> dict
         base = float(row["base_home_probability"])
         adjusted = float(row["adjusted_home_probability"])
         brier_deltas.append((adjusted - outcome) ** 2 - (base - outcome) ** 2)
-        accuracy_deltas.append(
-            int((adjusted >= 0.5) == bool(outcome))
-            - int((base >= 0.5) == bool(outcome))
-        )
+        accuracy_deltas.append(int((adjusted >= 0.5) == bool(outcome)) - int((base >= 0.5) == bool(outcome)))
     rng = random.Random(20260720)
     count = len(rows)
     bootstrap_brier: list[float] = []
@@ -272,18 +262,12 @@ def _paired_bootstrap(rows: list[dict[str, Any]], samples: int = 20_000) -> dict
     bootstrap_accuracy.sort()
     low = int(samples * 0.025)
     high = int(samples * 0.975) - 1
-    flips = [
-        row
-        for row in rows
-        if row["base_selection"] != row["adjusted_selection"]
-    ]
+    flips = [row for row in rows if row["base_selection"] != row["adjusted_selection"]]
     return {
         "method": "paired_game_bootstrap_20000_fixed_seed",
         "brier_delta_mean": sum(brier_deltas) / count,
         "brier_delta_ci95": [bootstrap_brier[low], bootstrap_brier[high]],
-        "bootstrap_probability_brier_delta_nonnegative": sum(
-            value >= 0 for value in bootstrap_brier
-        )
+        "bootstrap_probability_brier_delta_nonnegative": sum(value >= 0 for value in bootstrap_brier)
         / samples,
         "accuracy_delta_mean": sum(accuracy_deltas) / count,
         "accuracy_delta_ci95": [bootstrap_accuracy[low], bootstrap_accuracy[high]],
@@ -298,12 +282,11 @@ def _cohort_summary(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         (row["base_home_probability"] >= 0.5) == row["actual_home_win"] for row in rows
     ) / len(rows)
     adjusted_accuracy = sum(bool(row["adjusted_correct"]) for row in rows) / len(rows)
-    base_brier = sum(
-        (row["base_home_probability"] - int(row["actual_home_win"])) ** 2 for row in rows
-    ) / len(rows)
+    base_brier = sum((row["base_home_probability"] - int(row["actual_home_win"])) ** 2 for row in rows) / len(
+        rows
+    )
     adjusted_brier = sum(
-        (row["adjusted_home_probability"] - int(row["actual_home_win"])) ** 2
-        for row in rows
+        (row["adjusted_home_probability"] - int(row["actual_home_win"])) ** 2 for row in rows
     ) / len(rows)
     return {
         "label": label,
@@ -367,16 +350,15 @@ def _markdown(payload: Mapping[str, Any]) -> str:
         ]
     )
     for row in payload["games"]:
-        score = (
-            f"{row['away_score']}-{row['home_score']}"
-            if row["away_score"] is not None
-            else "unsettled"
-        )
+        score = f"{row['away_score']}-{row['home_score']}" if row["away_score"] is not None else "unsettled"
         correct = "—" if row["adjusted_correct"] is None else ("yes" if row["adjusted_correct"] else "no")
-        conflicts = "; ".join(
-            f"{item['player_name']}: official {item['official_status']} / ESPN {item['espn_status']}"
-            for item in row["source_conflicts"]
-        ) or "—"
+        conflicts = (
+            "; ".join(
+                f"{item['player_name']}: official {item['official_status']} / ESPN {item['espn_status']}"
+                for item in row["source_conflicts"]
+            )
+            or "—"
+        )
         lines.append(
             f"| {row['game_date']} | {row['away_team']} @ {row['home_team']} | {score} | {row['base_home_probability']:.3%} | {row['availability_points_gap']:+.3f} | {row['adjusted_home_probability']:.3%} | {row['delta_probability']:+.2%} | {row['base_selection']} | {row['adjusted_selection']} | {correct} | {row['baseline_source']} | {row['availability_status']} | {conflicts} | {row['report_at_utc']} |"
         )
@@ -496,16 +478,14 @@ def main() -> None:
     output_dir = root / args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     report_paths = list(Path(args.report_dir).glob("*.pdf"))
-    reports = _report_rows(report_paths, datetime.now(timezone.utc))
+    reports = _report_rows(report_paths, datetime.now(UTC))
     store = FeatureStore(data_root)
     local = LocalScoreboards(data_root)
     client = ESPNClient()
     artifact_path = root / "config/models/wnba-elo-trend-lr-v3.json"
     artifact = LearnedMarketArtifact.load(artifact_path)
     window_dates = _date_window(args.start_date, args.end_date)
-    margin_sigma = historical_margin_sigma(
-        store, datetime.fromisoformat(args.start_date + "T04:00:00+00:00")
-    )
+    margin_sigma = historical_margin_sigma(store, datetime.fromisoformat(args.start_date + "T04:00:00+00:00"))
     ledger_by_event, ledger_by_matchup = _ledger_probabilities(root)
     espn_event_ids = set(args.espn_event_id) if args.espn_event_id else None
 
@@ -556,9 +536,7 @@ def main() -> None:
                 )
                 conflict_error = None
                 try:
-                    snapshot = merge_availability_sources(
-                        snapshot, espn_snapshot, game_date=day
-                    )
+                    snapshot = merge_availability_sources(snapshot, espn_snapshot, game_date=day)
                 except ValueError as error:
                     if not str(error).startswith("NO_CALL_AVAILABILITY_SOURCE_CONFLICT"):
                         raise
@@ -591,9 +569,7 @@ def main() -> None:
                     event_start=parse_utc(str(event["date"])),
                     maximum_report_age_hours=24,
                 )
-                availability_status = (
-                    "diagnostic_conflict_resolution" if source_conflicts else "complete"
-                )
+                availability_status = "diagnostic_conflict_resolution" if source_conflicts else "complete"
                 availability_error = conflict_error
                 effects = _player_effects(snapshot, priors, away, home, day)
                 prior_diagnostics = priors["team_diagnostics"]
@@ -669,9 +645,7 @@ def main() -> None:
         for gate in GATES
     ]
     status_counts = Counter(
-        entry["current_status"]
-        for report in reports
-        for entry in report["payload"].get("entries", [])
+        entry["current_status"] for report in reports for entry in report["payload"].get("entries", [])
     )
     settled_all = [row for row in rows if row["actual_home_win"] is not None]
     settled_strict = [row for row in settled_all if row["availability_status"] == "complete"]
@@ -691,9 +665,7 @@ def main() -> None:
     original_audit_rows = [row for row in settled if row["game_date"] >= "2026-07-17"]
     cohort_breakdown = []
     if pre_audit_rows:
-        cohort_breakdown.append(
-            _cohort_summary("Pre-original-audit (through July 16)", pre_audit_rows)
-        )
+        cohort_breakdown.append(_cohort_summary("Pre-original-audit (through July 16)", pre_audit_rows))
     if original_audit_rows:
         cohort_breakdown.append(
             _cohort_summary("Original audit window (July 17 onward)", original_audit_rows)
@@ -711,15 +683,11 @@ def main() -> None:
             None,
         )
         bueckers = (
-            bueckers_effect["status"]
-            if bueckers_effect is not None
-            else "Not listed (treated Available)"
+            bueckers_effect["status"] if bueckers_effect is not None else "Not listed (treated Available)"
         )
         paige_only_probability = adjust_home_probability(
             row["base_home_probability"],
-            -float(bueckers_effect["expected_points_lost"])
-            if bueckers_effect is not None
-            else 0.0,
+            -float(bueckers_effect["expected_points_lost"]) if bueckers_effect is not None else 0.0,
             margin_sigma,
         )
         outcome = (
@@ -738,7 +706,11 @@ def main() -> None:
                 "production_disposition": (
                     "NO CALL: explicit source conflict"
                     if row["source_conflicts"]
-                    else ("NO CALL: incomplete inputs" if row["availability_status"] == "fail_closed" else "eligible on availability inputs")
+                    else (
+                        "NO CALL: incomplete inputs"
+                        if row["availability_status"] == "fail_closed"
+                        else "eligible on availability inputs"
+                    )
                 ),
                 "outcome": outcome,
             }
@@ -776,7 +748,7 @@ def main() -> None:
     )
     payload = {
         "schema_version": "1",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "window": {"start_date": args.start_date, "end_date": args.end_date},
         "artifact": artifact.version,
         "artifact_hash": artifact.hash,
@@ -802,9 +774,7 @@ def main() -> None:
             "model_skips": len(model_skips),
             "model_skip_reasons": model_skips,
             "espn_secondary_games": sum(row["espn_secondary_used"] for row in rows),
-            "official_player_rows": sum(
-                len(report["payload"].get("entries", [])) for report in reports
-            ),
+            "official_player_rows": sum(len(report["payload"].get("entries", [])) for report in reports),
             "status_counts": dict(status_counts),
             "settled_games": len(settled_all),
             "settled_games_feature_complete": len(settled_strict),
@@ -836,9 +806,7 @@ def main() -> None:
     (output_dir / "wnba_availability_evaluation.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (output_dir / "WNBA_AVAILABILITY_DECISION_REVIEW.md").write_text(
-        _markdown(payload), encoding="utf-8"
-    )
+    (output_dir / "WNBA_AVAILABILITY_DECISION_REVIEW.md").write_text(_markdown(payload), encoding="utf-8")
     print(json.dumps(payload["aggregate"], indent=2, sort_keys=True))
     print(output_dir / "WNBA_AVAILABILITY_DECISION_REVIEW.md")
 

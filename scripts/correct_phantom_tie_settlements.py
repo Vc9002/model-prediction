@@ -131,7 +131,9 @@ def main() -> int:
                         and (pnl is None or m["pnl_units"] == f"{float(pnl):.4f}")
                     )
                     if not already_right:
-                        mirror.settle(m["prediction_id"], result=result, pnl_units=float(pnl) if pnl else None)
+                        mirror.settle(
+                            m["prediction_id"], result=result, pnl_units=float(pnl) if pnl else None
+                        )
                         print(f"  {league} mirror corrected: {m['prediction_id']} -> {result}")
 
     print(f"\ncorrected: {total_corrected}, still pending: {total_pending}")

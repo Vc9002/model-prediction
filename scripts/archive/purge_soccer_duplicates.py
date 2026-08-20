@@ -27,9 +27,7 @@ from pathlib import Path
 
 def _rewritten_id(row: dict) -> str:
     prefix, odds_key, _day, _old = row["event_id"].split(":", 3)
-    digest = hashlib.sha1(
-        f"{row['home_team']}|{row['away_team']}".encode("utf-8")
-    ).hexdigest()[:8]
+    digest = hashlib.sha1(f"{row['home_team']}|{row['away_team']}".encode()).hexdigest()[:8]
     return f"{prefix}:{odds_key}:{row['event_start_utc'][:10]}:{digest}"
 
 

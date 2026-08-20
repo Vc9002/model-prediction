@@ -30,6 +30,7 @@ available real dataset to trace against. This is a data-availability gap
 in the *audit environment*, not a flaw in the *serving code* -- noted in
 the audit doc.
 """
+
 from __future__ import annotations
 
 import json
@@ -41,9 +42,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT))
 
-from model_prediction.domain import EASTERN, parse_utc  # noqa: E402
-from model_prediction.features.base import GameRecord  # noqa: E402
-from model_prediction.features.elo_ratings import DEFAULT_ELO, build_elo  # noqa: E402
+from model_prediction.domain import EASTERN
+from model_prediction.features.base import GameRecord
+from model_prediction.features.elo_ratings import DEFAULT_ELO, build_elo
 
 HIST_PATH = REPO_ROOT / "data/historical/nba_games_all.jsonl"
 
@@ -92,7 +93,6 @@ def main() -> None:
     for g in games:
         by_date[g.start.astimezone(EASTERN).date().isoformat()].append(g)
 
-    history: list[GameRecord] = []
     minimum_history_games = 50
 
     # Sample: pick events spread across the season -- roughly every ~12th
@@ -122,7 +122,7 @@ def main() -> None:
     violations = []
 
     running_history: list[GameRecord] = []
-    day_index = {day: i for i, day in enumerate(all_days)}
+    {day: i for i, day in enumerate(all_days)}
 
     for day in all_days:
         day_games = sorted(by_date[day], key=lambda g: (g.start, g.event_id))

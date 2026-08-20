@@ -17,7 +17,7 @@ import openpyxl
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from model_prediction.config import load_config, ledger_path, unit_policy
+from model_prediction.config import ledger_path, load_config, unit_policy
 from model_prediction.units import edge_scaled_units
 
 V4_VERSION = "mlb-elo-trend-lr-v4"
@@ -67,9 +67,7 @@ def migrate_ledger(path: Path, policy) -> dict:
         if "rationale" in cols:
             old = str(ws.cell(r, cols["rationale"]).value or "")
             if "mlb-elo-trend-lr-v3" in old:
-                ws.cell(r, cols["rationale"]).value = old.replace(
-                    "mlb-elo-trend-lr-v3", V4_VERSION
-                )
+                ws.cell(r, cols["rationale"]).value = old.replace("mlb-elo-trend-lr-v3", V4_VERSION)
 
         updated += 1
 

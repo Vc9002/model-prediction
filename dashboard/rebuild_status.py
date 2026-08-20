@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
 
@@ -173,13 +174,21 @@ class RebuildStatusReader:
                     row
                     for row in prediction_rows
                     if str(row.get("sport") or "").casefold() == str(test_id).split("_", 1)[0].casefold()
-                    and (not record.get("test_start") or str(row.get("decision_time_utc") or "") >= str(record["test_start"]))
-                    and (not record.get("test_end") or str(row.get("decision_time_utc") or "") < str(record["test_end"]))
+                    and (
+                        not record.get("test_start")
+                        or str(row.get("decision_time_utc") or "") >= str(record["test_start"])
+                    )
+                    and (
+                        not record.get("test_end")
+                        or str(row.get("decision_time_utc") or "") < str(record["test_end"])
+                    )
                 ]
                 item.update(
                     {
                         "model_hash": matching[-1].get("model_artifact_hash") if matching else None,
-                        "calibrator_hash": matching[-1].get("calibration_artifact_hash") if matching else None,
+                        "calibrator_hash": matching[-1].get("calibration_artifact_hash")
+                        if matching
+                        else None,
                         "prediction_count": sum(int(row.get("prediction_count") or 0) for row in matching),
                         "coverage": None,
                         "performance_hidden": True,
@@ -216,8 +225,12 @@ class RebuildStatusReader:
                             "DESCRIBE SELECT * FROM read_parquet(?)", [str(parquet_path)]
                         ).fetchall()
                     }
-                    metric_column = next((name for name in ("log_loss", "value", "metric_value") if name in columns), None)
-                    model_column = next((name for name in ("model", "model_name", "baseline") if name in columns), None)
+                    metric_column = next(
+                        (name for name in ("log_loss", "value", "metric_value") if name in columns), None
+                    )
+                    model_column = next(
+                        (name for name in ("model", "model_name", "baseline") if name in columns), None
+                    )
                     if metric_column and model_column:
                         row = connection.execute(
                             f"SELECT {metric_column} FROM read_parquet(?) "
@@ -389,10 +402,9 @@ class RebuildStatusReader:
         # SQLite INTEGER affinity coerce non-numeric slugs to 0, matching
         # nothing, so executable prices shipped null in every live row.
         market_eval_ids = [
-            value for value in (
-                _as_int_or_none(row.get("evaluated_market_evaluation_id"))
-                for row in decisions
-            ) if value is not None
+            value
+            for value in (_as_int_or_none(row.get("evaluated_market_evaluation_id")) for row in decisions)
+            if value is not None
         ]
         market_evals_by_id: dict[int, dict] = {}
         if market_eval_ids:
@@ -401,8 +413,7 @@ class RebuildStatusReader:
                 self.shadow_db,
                 "SELECT id, market_id, market_type, team_or_side, line, "
                 "executable_ask, depth_adjusted_price, quote_age_seconds, "
-                "available_depth FROM market_evaluations WHERE id IN ("
-                + mev_placeholders + ")",
+                "available_depth FROM market_evaluations WHERE id IN (" + mev_placeholders + ")",
                 tuple(market_eval_ids),
             )
             market_evals_by_id = {int(row["id"]): row for row in mev_rows}
@@ -451,9 +462,7 @@ class RebuildStatusReader:
             # assignments: the earlier locals()[name]=... loop was a CPython
             # no-op (locals() does not bind names), so all three fields
             # shipped permanently None even when the JSON was populated.
-            conservative_probability = _side_probability(
-                prediction, "conservative_probabilities_json", side
-            )
+            conservative_probability = _side_probability(prediction, "conservative_probabilities_json", side)
             probability_lower = _side_probability(prediction, "probability_lower_json", side)
             probability_upper = _side_probability(prediction, "probability_upper_json", side)
 
@@ -556,7 +565,7 @@ class RebuildStatusReader:
             placeholders = ",".join("?" for _ in identifiers)
             stage_rows, _ = self._query(
                 self.shadow_db,
-                f"SELECT run_id, stage, status, completed_at, detail_json, "
+                "SELECT run_id, stage, status, completed_at, detail_json, "
                 + ", ".join(optional_stage_columns)
                 + " FROM run_stages "
                 f"WHERE run_id IN ({placeholders}) ORDER BY completed_at DESC",
@@ -575,7 +584,9 @@ class RebuildStatusReader:
                         "status": stage.get("status"),
                         "completed_at": stage.get("completed_at"),
                         "duration_seconds": stage.get("duration_seconds") or detail.get("duration_seconds"),
-                        "rows": stage.get("row_count") if stage.get("row_count") is not None else detail.get("rows"),
+                        "rows": stage.get("row_count")
+                        if stage.get("row_count") is not None
+                        else detail.get("rows"),
                         "error": stage.get("error") or detail.get("error"),
                         "mode": stage.get("mode") or detail.get("mode"),
                     }
@@ -590,7 +601,10 @@ class RebuildStatusReader:
                 pass
             output.append(
                 {
-                    **{key: row.get(key) for key in ("run_id", "created_at", "sport", "run_type", "horizon", "status")},
+                    **{
+                        key: row.get(key)
+                        for key in ("run_id", "created_at", "sport", "run_type", "horizon", "status")
+                    },
                     "finished_at": row.get("finished_at"),
                     "duration_seconds": row.get("duration_seconds"),
                     "error": row.get("error"),
@@ -637,7 +651,12 @@ class RebuildStatusReader:
         reasons = [reason for reason in (source_error, run_payload.get("reason")) if reason]
         if reasons:
             status = "degraded" if sources or runs else "unavailable"
-        return {"status": status, "reason": "; ".join(reasons) or None, "sources": sources, "stages": by_stage}
+        return {
+            "status": status,
+            "reason": "; ".join(reasons) or None,
+            "sources": sources,
+            "stages": by_stage,
+        }
 
     def sports(self) -> dict[str, Any]:
         payload, artifact_error = self._json("multisport_status.json")
@@ -681,15 +700,11 @@ class RebuildStatusReader:
                 "enabled": cfg.get("enabled"),
                 "system_state": system_state,
                 "current_model": (
-                    raw.get("current_model")
-                    or raw_model.get("model_id")
-                    or (model or {}).get("model_id")
+                    raw.get("current_model") or raw_model.get("model_id") or (model or {}).get("model_id")
                 ),
                 "dataset_size": raw.get("dataset_size"),
                 "oof_sample": (
-                    raw.get("oof_sample")
-                    or raw_model.get("oof_sample")
-                    or raw_model.get("benchmark_sample")
+                    raw.get("oof_sample") or raw_model.get("oof_sample") or raw_model.get("benchmark_sample")
                 ),
                 "prospective_sample": raw.get("prospective_sample"),
                 "last_run": sport_runs[0].get("created_at") if sport_runs else raw.get("last_run"),

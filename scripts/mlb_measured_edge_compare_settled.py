@@ -46,6 +46,7 @@ def _brier(probabilities: list[float], outcomes: list[float]) -> float:
 
 def _log_loss(probabilities: list[float], outcomes: list[float]) -> float:
     import math
+
     total = 0.0
     for p, o in zip(probabilities, outcomes, strict=True):
         p = min(max(p, 1e-6), 1 - 1e-6)
@@ -80,7 +81,8 @@ def main() -> None:
         row
         for row in rows
         if row.get("status") == "settled"
-        and str(row.get("model_version", "")).lower() in ("measured-edge-margin-v1", "measured-edge-totals-v1")
+        and str(row.get("model_version", "")).lower()
+        in ("measured-edge-margin-v1", "measured-edge-totals-v1")
         and row.get("result") in ("win", "loss")
     ]
     print(f"{len(settled)} settled measured-edge-v1 picks in {args.flat_ledger}")
@@ -126,8 +128,10 @@ def main() -> None:
             }
         )
 
-    print(f"{len(comparisons)} picks matched to cached features ({missing_features} missing -- "
-          f"run mlb_elasticity_refit.py over a window covering these event dates first)")
+    print(
+        f"{len(comparisons)} picks matched to cached features ({missing_features} missing -- "
+        f"run mlb_elasticity_refit.py over a window covering these event dates first)"
+    )
     if not comparisons:
         return
 
