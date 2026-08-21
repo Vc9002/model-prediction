@@ -102,11 +102,17 @@ class ValidationRow:
     back_to_back_gap: float = 0.0
     games_last_7_gap: float = 0.0
     schedule_available: float = 0.0
+    pythagorean_probability: float = 0.5
+    log5_probability: float = 0.5
     outcome_3way: int = 0  # 2=home, 1=draw, 0=away — used for soccer 3-way
 
 
 FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
     "elo_only": ("elo_probability",),
+    "pythagorean_only": ("pythagorean_probability",),
+    "log5_only": ("log5_probability",),
+    "elo_pythagorean": ("elo_probability", "pythagorean_probability"),
+    "elo_log5": ("elo_probability", "log5_probability"),
     "elo_trend": ("elo_probability", "trend_gap"),
     "elo_trend_defense": ("elo_probability", "trend_gap", "defensive_trend_gap"),
     "elo_trend_full": (

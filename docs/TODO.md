@@ -147,12 +147,12 @@ config, reports, ledgers, and audit state disagree.
 
 ## P2 — Open-Source Research Adaptations (MLB v9, Soccer, Baselines)
 
-- [ ] **MLB v9 Step B — Batter Offensive Priors (Baseball Hydra concept)**: Implement `features/batter_priors.py` using closed-form Empirical Bayes Beta-Binomial shrinkage over PA for $\text{xwOBA}$, $\text{K}\%$, $\text{BB}\%$, $\text{ISO}$, $\text{barrel}\%$, and $\text{hard-hit}\%$.
+- [x] **MLB v9 Step B — Batter Offensive Priors (Baseball Hydra concept)**: Implement `features/batter_priors.py` using closed-form Empirical Bayes Beta-Binomial shrinkage over PA for $\text{xwOBA}$, $\text{K}\%$, $\text{BB}\%$, $\text{ISO}$, $\text{barrel}\%$, and $\text{hard-hit}\%$.
 - [ ] **MLB v9 Step C — Rich Starter State (Market Efficiency Lab architecture)**: Build multidimensional starter state in `features/starter_state.py` including 21d/season xwOBA allowed, K%, BB%, CSW%, first-pitch strike%, fastball velocity/drift, average depth, and last-3 start deltas.
 - [ ] **MLB v9 Step D — Dynamic Bullpen State**: Implement dynamic bullpen capability model combining reliever talent (xwOBA/K-BB%), availability probability from rolling 1d/2d/3d workloads and back-to-back flags, and role leverage.
 - [ ] **MLB v9 Step E — Confirmed Lineup Aggregation**: Join prospective lineup archive (`data/point_in_time/mlb_lineups.jsonl`) with batter priors to generate batting-order-weighted xwOBA, platoon-split xwOBA, and lineup xwOBA advantage.
 - [ ] **MLB v9 Step F — Monotonic XGBoost Challenger**: Train and evaluate XGBoost with domain monotonic constraints ($\frac{\partial P}{\partial \text{SP xwOBA Allowed}} \le 0$, $\frac{\partial P}{\partial \text{Lineup xwOBA}} \ge 0$) against standardized Logistic Regression on identical frozen cohort.
-- [ ] **Permanent Baselines Ladder (Forrest31)**: Add pregame Pythagorean expectation and Log5 matchup models to the standard evaluator comparison ladder.
+- [x] **Permanent Baselines Ladder (Forrest31)**: Add pregame Pythagorean expectation and Log5 matchup models to the standard evaluator comparison ladder.
 - [ ] **Soccer Joint Bivariate Dixon-Coles Grid (penaltyblog & football-mle)**: Refactor soccer forecasting to generate a unified Dixon-Coles score grid $(\lambda_H, \lambda_A, \rho)$ driving 1X2, BTTS, O/U totals, and Asian handicaps from one joint distribution, with exponential time decay parameter $\xi$ tuned via temporal CV.
 
 ## Verified scan record

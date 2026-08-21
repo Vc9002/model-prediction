@@ -178,6 +178,24 @@ def main() -> int:
     dates = [r.date for r in exact_holdout]
     outcomes = [r.outcome for r in exact_holdout]
 
+    # Permanent Control 1: Constant Home Rate
+    train_home_rate = float(np.mean([r.outcome for r in train]))
+    const_probs = [train_home_rate] * len(exact_holdout)
+    const_metrics = _scores(const_probs, outcomes)
+    report["constant_home_baseline"] = {
+        "train_home_rate": round(train_home_rate, 4),
+        "metrics": const_metrics,
+    }
+    print(
+        f"--- Permanent Baseline Ladder ---\n"
+        f"constant_home (rate={train_home_rate:.3f}): LL={const_metrics['log_loss']:.4f} "
+        f"Brier={const_metrics['brier']:.4f} acc={const_metrics['accuracy']:.4f}\n"
+        f"v8_baseline ({args.baseline}): LL={base_metrics['log_loss']:.4f} "
+        f"Brier={base_metrics['brier']:.4f} ECE={base_cal.get('expected_calibration_error')} "
+        f"acc={base_metrics['accuracy']:.4f} AUC={base_metrics['auc']}\n"
+        f"---------------------------------"
+    )
+
     for variant in args.variants:
         names = list(FEATURE_VARIANTS[variant])
         probs = _predict(_fit(train, names), exact_holdout, names)
