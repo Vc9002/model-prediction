@@ -132,6 +132,19 @@ config, reports, ledgers, and audit state disagree.
 - [ ] Report model quality, calibration, CLV, and executable net profitability
   as separate claims.
 
+## P2 — High-Alpha MLB Features & PA Monte Carlo Simulator (from Research Literature Dive #4)
+
+- [ ] Ingest rolling Statcast Catcher Framing in the Shadow Zone (`features/catcher_framing.py`)
+  to capture the $1\text{--}2\text{pp}$ PA called-strike leverage on totals and NRFI.
+- [ ] Implement Starting Pitcher Pitch-Type Arsenal vs. Lineup Vulnerability dot-product
+  tensor (`features/pitch_arsenal.py`).
+- [ ] Build Discrete-Event Plate-Appearance (PA) 8-Class Monte Carlo Simulation Engine
+  (`models/mlb_monte_carlo.py`) simulating 5,000 iterations per game over 24 base-out states.
+- [ ] Wire Isotonic Tail-Calibrator (`meta_calibrator.py`) to post-process extreme-probability
+  tail markets (NRFI, Runline -1.5, and K-props).
+- [ ] Leverage 35-minute pre-game wake trigger (`plan_lineup_wakes.py`) to execute forecasts
+  during the golden 15–30 minute post-lineup confirmation window before sportsbook lines adjust.
+
 ## Verified scan record
 
 2026-07-26 dirty checkout at `697d765`: 410 tests passed and 4 failed; 117 Ruff

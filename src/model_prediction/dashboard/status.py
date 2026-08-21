@@ -249,3 +249,79 @@ def status() -> dict:
         "edge_filter_min": 0.02,
         "unit_value_usd": _unit_value_usd(),
     }
+
+
+def _clv_summary(sport: str | None = None) -> dict:
+    """Calculate rolling 30-day closing-line value (CLV) and beat rate across sports."""
+    from model_prediction.dashboard.picks import read_flat_picks, read_picks
+    from model_prediction.pricing import implied_probability
+
+    picks = read_flat_picks() or read_picks()
+    if sport:
+        picks = [
+            p for p in picks if str(p.get("sport") or p.get("league") or "").casefold() == sport.casefold()
+        ]
+
+    clv_records = []
+    for p in picks:
+        dec_odds = p.get("decision_american_odds") or p.get("american_odds")
+        close_odds = p.get("closing_american_odds")
+        if dec_odds is not None and close_odds is not None:
+            try:
+                dec_p = implied_probability(int(float(dec_odds)))
+                close_p = implied_probability(int(float(close_odds)))
+                clv_delta = close_p - dec_p
+                clv_records.append(
+                    {
+                        "event_id": p.get("event_id"),
+                        "date": str(p.get("event_start_utc") or p.get("created_at_utc") or "")[:10],
+                        "sport": p.get("sport") or p.get("league"),
+                        "decision_prob": round(dec_p, 4),
+                        "closing_prob": round(close_p, 4),
+                        "clv_pct": round(clv_delta * 100, 2),
+                        "beat_close": clv_delta > 0,
+                    }
+                )
+            except (ValueError, TypeError):
+                continue
+
+    n = len(clv_records)
+    if n == 0:
+        return {"count": 0, "mean_clv_pct": 0.0, "beat_close_rate": 0.0, "series": []}
+
+    mean_clv = sum(r["clv_pct"] for r in clv_records) / n
+    beat_rate = sum(1 for r in clv_records if r["beat_close"]) / n
+
+    return {
+        "count": n,
+        "mean_clv_pct": round(mean_clv, 2),
+        "beat_close_rate": round(beat_rate, 4),
+        "series": clv_records[-50:],
+    }
+
+
+def _capture_health_summary() -> dict:
+    """Report prospective BBO snapshot capture health and freshness by sport."""
+    odds_root = DATA / "odds"
+    summary_by_sport: dict = {}
+    if odds_root.exists():
+        for sport_dir in odds_root.iterdir():
+            if sport_dir.is_dir():
+                sport = sport_dir.name
+                date_dirs = sorted([d for d in sport_dir.iterdir() if d.is_dir()])
+                recent_dirs = date_dirs[-7:] if date_dirs else []
+                total_snapshots = 0
+                for d in recent_dirs:
+                    snap_file = d / "polymarket_snapshots.jsonl"
+                    if snap_file.exists():
+                        total_snapshots += _count_lines(snap_file)
+                summary_by_sport[sport] = {
+                    "recent_dates_captured": len(recent_dirs),
+                    "latest_date": recent_dirs[-1].name if recent_dirs else None,
+                    "7day_snapshot_count": total_snapshots,
+                    "status": "healthy" if recent_dirs and total_snapshots > 0 else "inactive",
+                }
+    return {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "sports": summary_by_sport,
+    }

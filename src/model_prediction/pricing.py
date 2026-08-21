@@ -13,8 +13,18 @@ def implied_probability(american_odds: int) -> float:
     return 1 / american_to_decimal(american_odds)
 
 
+def probability_to_american(p: float) -> int:
+    if not (0.0 < p < 1.0):
+        raise ValueError("Probability must be in (0, 1)")
+    if p >= 0.5:
+        return round(-100.0 * (p / (1.0 - p)))
+    return round(100.0 * ((1.0 - p) / p))
+
+
 def normalize_no_vig(raw_probabilities: list[float] | tuple[float, ...]) -> tuple[float, ...]:
-    if len(raw_probabilities) < 2 or any(probability <= 0 or probability >= 1 for probability in raw_probabilities):
+    if len(raw_probabilities) < 2 or any(
+        probability <= 0 or probability >= 1 for probability in raw_probabilities
+    ):
         raise ValueError("no-vig normalization requires at least two probabilities in (0, 1)")
     total = sum(raw_probabilities)
     if total <= 0:

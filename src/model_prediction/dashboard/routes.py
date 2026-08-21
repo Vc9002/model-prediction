@@ -83,6 +83,8 @@ from model_prediction.dashboard.picks import (
     read_picks,
 )
 from model_prediction.dashboard.status import (
+    _capture_health_summary,
+    _clv_summary,
     status,
 )
 
@@ -253,6 +255,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("bets", 15, bets_view))
             elif route == "/api/orders":
                 self._send(_load_orders())
+            elif route == "/api/clv":
+                sport = query.get("sport")
+                self._send(_cached(f"clv:{sport or 'all'}", 60, lambda: _clv_summary(sport)))
+            elif route == "/api/capture_health":
+                self._send(_cached("capture_health", 60, _capture_health_summary))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route.startswith("/api/rebuild/"):

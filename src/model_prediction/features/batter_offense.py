@@ -125,10 +125,10 @@ def _load_indexes(
                 if participants:
                     by_team_game.setdefault(team_name, []).append((game_start, participants))
 
-    for games in by_player.values():
-        games.sort(key=lambda item: item[0])
-    for games in by_team_game.values():
-        games.sort(key=lambda item: item[0])
+    for player_games in by_player.values():
+        player_games.sort(key=lambda item: item[0])
+    for team_games in by_team_game.values():
+        team_games.sort(key=lambda item: item[0])
 
     _PLAYER_INDEX_CACHE[path] = by_player
     _TEAM_GAME_INDEX_CACHE[path] = by_team_game

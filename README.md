@@ -9,23 +9,22 @@ CLI and read [`docs/rebuild/README.md`](docs/rebuild/README.md) before operating
 it. Rebuild output cannot submit live orders, write incumbent ledgers, or
 promote a model into production.
 
-**Last updated**: 2026-08-13
+**Last updated**: 2026-08-20
 
 The current operational verdict and audit evidence live in
-[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`DEBUG.md`](DEBUG.md).
-The checkout is **not release-ready**, and its real-money execution surface
-should not be used until the P0 execution-binding and ledger/audit transaction
-defects are repaired.
+[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`docs/MASTER.md`](docs/MASTER.md).
+Complete documentation index lives in **[`docs/INDEX.md`](docs/INDEX.md)**.
 
 ## Current State
 
 | Metric | Value |
 |--------|-------|
-| Tests | **1762 collected** (1759 passed, 3 skipped — 2026-08-13) |
-| Ruff | ~120 baseline findings (no new findings vs baseline) |
-| Git | `main` + 20 other local / 7 other remote branches (drifts fast — run `git branch -a` for the current list) |
+| Tests | **1,938 passed, 3 skipped, 0 failed** (2026-08-20) |
+| Ruff | **0 findings** (clean across `src/`, `tests/`, and `scripts/`) |
+| Type safety | `src/model_prediction/py.typed` marker + library overrides |
+| Git | `main` (clean branch topology) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
-| Release status | **Not released for real money** — all 6 P0 execution defects resolved, but MLB v8 is `qualified: false` (operator-override) and totals is a known gap; see `docs/PROJECT_STATUS.md` → Release verdict |
+| Documentation | Consolidated under [`docs/`](docs/) (master index: [`docs/INDEX.md`](docs/INDEX.md)) |
 
 Do not infer executable profitability from artifact hit rates, synthetic
 `-110` units, shadow-ledger P&L, or a dashboard qualification badge.

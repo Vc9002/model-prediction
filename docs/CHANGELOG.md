@@ -1,6 +1,34 @@
 # Changelog
 
-## 2026-08-13 — Champion/challenger gating, MLB v9, WNBA spread fix, settlement routing
+## 2026-08-20 — MLB YRFI/NRFI, WNBA Four Factors, Cross-Market Consistency, Meta-Calibrator & Lineup Wake Planner Daemon
+
+- **MLB YRFI / NRFI (Yes/No Run First Inning) Predictive Engine**:
+  - Implemented point-in-time feature calculation in `src/model_prediction/features/yrfi_nrfi.py`: starter 1st-inning ERA/FIP/WHIP with empirical Bayes credibility shrinkage, Top-3 batting lineup offensive profile, ballpark run environment, and independent half-inning Poisson $\lambda_{\text{top}}, \lambda_{\text{bot}}$ expectations.
+  - Implemented `MLBNRFIModel` in `src/model_prediction/models/mlb_nrfi.py`: hybrid decomposed Poisson and logistic probability model with fair odds and EV edge calculation.
+  - Empirical walk-forward holdout research backtest in `scripts/mlb_nrfi_research.py` across 6,610 games: **Holdout Brier improved from 0.25113 to 0.24844 ($\Delta\text{Brier} = -0.00268$)** and **Log Loss from 0.69541 to 0.69007 ($\Delta\text{LL} = -0.00534$)**.
+  - Unit test suite in `tests/test_mlb_nrfi.py` (5 tests passing).
+- **WNBA Pace & Four Factors Modeling**:
+  - Implemented `src/model_prediction/features/wnba_pace_four_factors.py`: Dean Oliver's Four Factors normalized for WNBA 40-minute regulation ($eFG\%$, $TOV\%$, $OREB\%$, $FTR$) with Empirical Bayes shrinkage ($n_{\text{prior}}=8$).
+  - Implemented `project_wnba_game_total()` computing pace-adjusted combined score projections and team ratings.
+  - Unit test suite in `tests/test_wnba_four_factors.py` (3 tests passing).
+- **Cross-Market Internal Consistency Engine**:
+  - Implemented `src/model_prediction/cross_market_consistency.py`: validates probabilistic monotonicity ($P(\text{Cover } -1.5) \le P(\text{Moneyline Win})$) and complementarity ($P(\text{Over}) + P(\text{Under}) = 1.0$) across betting slates.
+  - Unit test suite in `tests/test_cross_market_consistency.py` (3 tests passing).
+- **Multi-Sport Shared Meta-Calibrator**:
+  - Implemented `src/model_prediction/meta_calibrator.py`: `SharedMetaCalibrator` with multi-sport Platt scaling and Isotonic Regression for tail calibration.
+  - Unit test suite in `tests/test_meta_calibrator.py` (2 tests passing).
+- **Dashboard Observability & Health APIs**:
+  - Added `/api/clv` rolling 30-day closing-line value time series and beat rate calculation in `src/model_prediction/dashboard/status.py` and `routes.py`.
+  - Added `/api/capture_health` 7-day BBO prospective snapshot coverage reporting.
+  - Unit test suite in `tests/test_dashboard_clv_and_capture.py` (2 tests passing).
+- **Lineup Wake Root LaunchDaemon**:
+  - Created `ops/launchd/com.vc.mlb-lineup-wake-planner.plist` running `scripts/plan_lineup_wakes.py --apply` to schedule one-time `pmset` wake events ~35m before first pitch, closing the overnight sleep acquisition gap.
+- **Operator Push Notifications**:
+  - Implemented `notify_operator()` in `src/model_prediction/run_supervisor.py` supporting macOS Notification Center alerts via `osascript` and Slack webhooks.
+- **Filesystem & Type Hygiene**:
+  - Purged 11 orphaned/broken worktrees from `$HOME`.
+  - Added `src/model_prediction/py.typed` marker file and `pyproject.toml` mypy overrides.
+  - Verified 0 Ruff findings and **1,938 passing tests** (3 skipped, 0 failing).
 
 - Added `src/model_prediction/champion_challenger.py`: `ProductionRegistry`
   freeze + tamper detection, `FrozenProductionStore`, `PairedComparison`

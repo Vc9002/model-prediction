@@ -97,9 +97,7 @@ class RunSupervisor:
             self.paths = paths
         else:
             self.repo_root = Path(repo_root) if repo_root else PROJECT_ROOT
-            self.paths = RuntimePaths.resolve(
-                repo_root=self.repo_root, require_external_runtime=True
-            )
+            self.paths = RuntimePaths.resolve(repo_root=self.repo_root, require_external_runtime=True)
             migrate_legacy_state(self.paths)
         self.db_path = Path(db_path) if db_path else self.paths.runs_db
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
@@ -138,9 +136,7 @@ class RunSupervisor:
         columns = ", ".join(row)
         placeholders = ", ".join(f":{k}" for k in row)
         with self.conn:
-            self.conn.execute(
-                f"INSERT INTO runs ({columns}) VALUES ({placeholders})", row
-            )
+            self.conn.execute(f"INSERT INTO runs ({columns}) VALUES ({placeholders})", row)
 
     def _update_run(self, run_id: str, **fields: Any) -> None:
         assignments = ", ".join(f"{k} = :{k}" for k in fields)
@@ -160,9 +156,9 @@ class RunSupervisor:
         query += " ORDER BY started_at_utc DESC LIMIT ?"
         params = (*params, int(limit))
         rows = self.conn.execute(query, params).fetchall()
-        columns = [description[0] for description in self.conn.execute(
-            "SELECT * FROM runs LIMIT 0"
-        ).description]
+        columns = [
+            description[0] for description in self.conn.execute("SELECT * FROM runs LIMIT 0").description
+        ]
         return [dict(zip(columns, row)) for row in rows]
 
     # ---------------------------------------------------------------- lease
@@ -271,8 +267,7 @@ class RunSupervisor:
                     while not stop_heartbeat.wait(self.heartbeat_interval_seconds):
                         with conn:
                             conn.execute(
-                                "UPDATE runs SET heartbeat_at_utc = ? "
-                                "WHERE run_id = ?",
+                                "UPDATE runs SET heartbeat_at_utc = ? WHERE run_id = ?",
                                 (datetime.now(UTC).isoformat(), run_id),
                             )
                     conn.close()
@@ -319,9 +314,7 @@ class RunSupervisor:
         # stores them on the run row (observability item 18: source
         # latency, events seen, predictions, NO_BET, duration...).
         env["RUN_SUPERVISOR_RUN_ID"] = run_id
-        env["RUN_SUPERVISOR_METRICS_PATH"] = str(
-            log_path.with_suffix(log_path.suffix + ".metrics.json")
-        )
+        env["RUN_SUPERVISOR_METRICS_PATH"] = str(log_path.with_suffix(log_path.suffix + ".metrics.json"))
         return env
 
     @staticmethod
@@ -350,8 +343,7 @@ def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if not args or args[0] not in ("run", "status", "runs"):
         print(
-            "usage: python -m model_prediction.run_supervisor "
-            "{run <worker>|status [worker]|runs [LIMIT]}",
+            "usage: python -m model_prediction.run_supervisor {run <worker>|status [worker]|runs [LIMIT]}",
             file=sys.stderr,
         )
         return 2
@@ -395,6 +387,29 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     finally:
         supervisor.close()
+
+
+def notify_operator(title: str, message: str, level: str = "info") -> bool:
+    """Send an operational push notification to the operator via native macOS alert or webhook."""
+    if sys.platform == "darwin":
+        try:
+            escaped_msg = message.replace('"', '\\"')
+            escaped_title = title.replace('"', '\\"')
+            script = f'display notification "{escaped_msg}" with title "{escaped_title}"'
+            subprocess.run(["osascript", "-e", script], capture_output=True, timeout=2.0, check=False)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    slack_url = os.getenv("SLACK_WEBHOOK_URL")
+    if slack_url:
+        try:
+            import httpx
+
+            payload = {"text": f"*{title}* ({level.upper()}): {message}"}
+            httpx.post(slack_url, json=payload, timeout=3.0)
+        except Exception:  # noqa: BLE001, S110
+            pass
+    return True
 
 
 if __name__ == "__main__":

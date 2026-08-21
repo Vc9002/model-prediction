@@ -1,10 +1,9 @@
 # CLAUDE.md — Working Guidelines for This Project
 
 This file is auto-loaded into every session. Keep it short and durable —
-volatile status belongs in `docs/PROJECT_STATUS.md`, full audit history and
-reproduction commands in `DEBUG.md`, and per-sport feature roadmaps in
-`docs/MODEL_IMPROVEMENTS.md`. This file is about *how to work here*, not
-*what's currently true*.
+volatile status belongs in `docs/PROJECT_STATUS.md`, full audit history in
+`docs/DEBUG.md`, and the unified documentation index in `docs/INDEX.md`.
+This file is about *how to work here*, not *what's currently true*.
 
 ## 2026-08-15 — consolidation K (runtime singularity)
 

@@ -1,12 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-16, local `main` at `e933c7a` tracking
-`origin/main` (consolidation merged via PR #30 @ `37be479`, tag
-`consolidation-2026-08-15`). Burn-in day 1 of 3 passing. Ruff baseline
-cleared (0 findings), pre-commit hook installed, TODO P0/P1 fully
-resolved with evidence, docs restructured (one-shot records archived
-under `docs/archive/`), deep feature+model audit complete
-(`scripts/feature_model_audit.py`, findings on the research branch).
+**Last verified**: 2026-08-20, local `main`. **1,938 tests passed, 3 skipped, 0 failed**. **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -15,6 +9,26 @@ this file exists to be the short, current summary someone can read first.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-20 — MLB YRFI/NRFI, WNBA Four Factors, Cross-Market Consistency, Meta-Calibrator & Root Wake Daemon
+
+- **MLB YRFI / NRFI Model & Walk-Forward Research**:
+  - Implemented point-in-time feature pipeline (`features/yrfi_nrfi.py`), hybrid decomposed Poisson/logistic model (`models/mlb_nrfi.py`), and test suite (`test_mlb_nrfi.py`).
+  - Evaluated on 6,610 historical games in `scripts/mlb_nrfi_research.py`: Holdout Brier improved by $\mathbf{-0.00268}$ and Log Loss by $\mathbf{-0.00534}$.
+- **WNBA Pace & Four Factors Modeling**:
+  - Implemented Dean Oliver's Four Factors normalized for WNBA 40m regulation in `features/wnba_pace_four_factors.py` with Empirical Bayes shrinkage. Tested via `tests/test_wnba_four_factors.py`.
+- **Portfolio Integrity & Cross-Market Consistency**:
+  - Built `cross_market_consistency.py` validating monotonicity ($P(\text{Cover } -1.5) \le P(\text{Moneyline Win})$) and complementarity ($P(\text{Over}) + P(\text{Under}) = 1.0$).
+  - Built `meta_calibrator.py` providing multi-sport pooled Platt scaling and Isotonic Regression.
+- **Dashboard & Observability Endpoints**:
+  - Added `/api/clv` (rolling 30-day CLV and closing beat rate) and `/api/capture_health` (7-day BBO snapshot freshness) in `dashboard/status.py` and `routes.py`.
+  - Added push notification dispatcher (`notify_operator`) in `run_supervisor.py`.
+- **Lineup Wake Root LaunchDaemon Plist**:
+  - Created `ops/launchd/com.vc.mlb-lineup-wake-planner.plist` with full instructions for root installation to automate slate-following `pmset` wakes.
+- **Hygiene & Type Safety**:
+  - Purged 11 dead worktree directories from `$HOME`.
+  - Added `src/model_prediction/py.typed` and mypy overrides in `pyproject.toml`.
+  - **1,938 tests pass / 3 skipped / 0 failed; ruff clean.**
 
 ## 2026-08-19 — v9 ladder measured null; lineup capture live; wake planner pending operator install
 

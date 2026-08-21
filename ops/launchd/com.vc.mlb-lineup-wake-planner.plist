@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Lineup Wake Planner root LaunchDaemon.
+
+  Runs as root to schedule one-time pmset wake events for late MLB games,
+  allowing the hourly lineup capture job to collect night lineups without
+  keeping the machine awake all night.
+
+  Install as root LaunchDaemon:
+    sudo cp ops/launchd/com.vc.mlb-lineup-wake-planner.plist /Library/LaunchDaemons/
+    sudo chown root:wheel /Library/LaunchDaemons/com.vc.mlb-lineup-wake-planner.plist
+    sudo chmod 644 /Library/LaunchDaemons/com.vc.mlb-lineup-wake-planner.plist
+    sudo launchctl bootstrap system /Library/LaunchDaemons/com.vc.mlb-lineup-wake-planner.plist
+
+  Trigger manual run to verify:
+    sudo launchctl kickstart -k system/com.vc.mlb-lineup-wake-planner
+
+  Remove:
+    sudo launchctl bootout system/com.vc.mlb-lineup-wake-planner
+    sudo rm -f /Library/LaunchDaemons/com.vc.mlb-lineup-wake-planner.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.vc.mlb-lineup-wake-planner</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/vincentc9002/model-prediction/.venv/bin/python</string>
+    <string>/Users/vincentc9002/model-prediction/scripts/plan_lineup_wakes.py</string>
+    <string>--apply</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/vincentc9002/model-prediction</string>
+  <key>StartInterval</key><integer>10800</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/lineups/wake_planner.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/lineups/wake_planner.err.log</string>
+</dict>
+</plist>
