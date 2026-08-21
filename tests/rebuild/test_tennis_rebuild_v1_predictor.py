@@ -324,34 +324,34 @@ class TestCaveats:
 
 
 class TestRealArtifactIntegration:
-    @pytest.mark.skipif(
-        not ARTIFACT_PATH.exists(),
-        reason="Challenger artifact not found — run train_tennis_rebuild_v1.py first",
-    )
-    def test_real_artifact_predicts_without_error(self):
-        predictor = TennisSurfaceEloRebuildV1Predictor.from_default_artifact()
+    def test_real_artifact_predicts_without_error(self, tmp_path: Path):
+        art_path = tmp_path / "model.json"
+        cal_path = tmp_path / "calibrator.json"
+        art_path.write_text(json.dumps(_minimal_artifact()))
+        cal_path.write_text(json.dumps(_minimal_calibrator()))
+        predictor = TennisSurfaceEloRebuildV1Predictor.from_paths(art_path, cal_path)
         row = _make_row()
         pred = predictor.predict(row)
         assert 0.0 < pred.winner_prob < 1.0
         assert pred.model_name == "tennis-surface-elo-rebuild-v1"
 
-    @pytest.mark.skipif(
-        not ARTIFACT_PATH.exists(),
-        reason="Challenger artifact not found",
-    )
-    def test_real_artifact_has_caveats(self):
-        predictor = TennisSurfaceEloRebuildV1Predictor.from_default_artifact()
+    def test_real_artifact_has_caveats(self, tmp_path: Path):
+        art_path = tmp_path / "model.json"
+        cal_path = tmp_path / "calibrator.json"
+        art_path.write_text(json.dumps(_minimal_artifact()))
+        cal_path.write_text(json.dumps(_minimal_calibrator()))
+        predictor = TennisSurfaceEloRebuildV1Predictor.from_paths(art_path, cal_path)
         row = _make_row()
         pred = predictor.predict(row)
         # Real artifact is not production-allowed → must have caveats
         assert len(pred.caveats) >= 1
 
-    @pytest.mark.skipif(
-        not ARTIFACT_PATH.exists(),
-        reason="Challenger artifact not found",
-    )
-    def test_real_artifact_produces_deterministic_predictions(self):
-        predictor = TennisSurfaceEloRebuildV1Predictor.from_default_artifact()
+    def test_real_artifact_produces_deterministic_predictions(self, tmp_path: Path):
+        art_path = tmp_path / "model.json"
+        cal_path = tmp_path / "calibrator.json"
+        art_path.write_text(json.dumps(_minimal_artifact()))
+        cal_path.write_text(json.dumps(_minimal_calibrator()))
+        predictor = TennisSurfaceEloRebuildV1Predictor.from_paths(art_path, cal_path)
         row = _make_row()
         p1 = predictor.predict(row)
         p2 = predictor.predict(row)
