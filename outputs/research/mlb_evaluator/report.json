@@ -73,94 +73,295 @@
         "log_loss": {
           "observed_delta": 0.003227,
           "ci_95": [
-            0.001045,
-            0.005487
+            0.001567,
+            0.005239
           ],
           "P_challenger_better": 0.0,
-          "n_bootstrap": 500,
+          "n_bootstrap": 50,
           "seed": 20260815
         },
         "brier": {
           "observed_delta": 0.001597,
           "ci_95": [
-            0.00054,
-            0.00268
+            0.00078,
+            0.002557
           ],
           "P_challenger_better": 0.0,
-          "n_bootstrap": 500,
+          "n_bootstrap": 50,
           "seed": 20260815
         }
       }
     },
-    "elo_trend_park_weather_starter_bullpen": {
+    "pythagorean_only": {
       "features": [
-        "elo_probability",
-        "trend_gap",
-        "park_factor",
-        "weather_factor",
-        "starter_era_gap",
-        "bullpen_weakness_gap"
+        "pythagorean_probability"
       ],
       "metrics": {
-        "log_loss": 0.6866956114873531,
-        "brier": 0.24677326644780548,
-        "accuracy": 0.5593952483801296,
-        "auc": 0.5664280527025625
+        "log_loss": 0.6935584553422324,
+        "brier": 0.2502044177177725,
+        "accuracy": 0.5140388768898488,
+        "auc": 0.5
       },
       "coverage": 0.9774806474313863,
       "calibration": {
-        "log_loss": 0.686696,
-        "brier_score": 0.246773,
-        "expected_calibration_error": 0.020821,
-        "calibration_slope": 0.835285,
-        "calibration_intercept": -0.052733,
+        "log_loss": 0.693558,
+        "brier_score": 0.250204,
+        "expected_calibration_error": 0.020038,
+        "calibration_slope": null,
+        "calibration_intercept": null,
         "sample_size": 1389
       },
       "per_split": {
         "train": {
-          "log_loss": 0.680597,
-          "brier_score": 0.243833,
-          "expected_calibration_error": 0.0096,
-          "calibration_slope": 1.183962,
-          "calibration_intercept": -0.024998,
+          "log_loss": 0.690822,
+          "brier_score": 0.248838,
+          "expected_calibration_error": 8e-06,
+          "calibration_slope": null,
+          "calibration_intercept": null,
           "sample_size": 3814
         },
         "validation": {
-          "log_loss": 0.687132,
-          "brier_score": 0.24703,
-          "expected_calibration_error": 0.020232,
-          "calibration_slope": 0.672736,
-          "calibration_intercept": 0.050548,
+          "log_loss": 0.690933,
+          "brier_score": 0.248894,
+          "expected_calibration_error": 0.000805,
+          "calibration_slope": null,
+          "calibration_intercept": null,
           "sample_size": 1082
         },
         "holdout": {
-          "log_loss": 0.686696,
-          "brier_score": 0.246773,
-          "expected_calibration_error": 0.020821,
-          "calibration_slope": 0.835285,
-          "calibration_intercept": -0.052733,
+          "log_loss": 0.693558,
+          "brier_score": 0.250204,
+          "expected_calibration_error": 0.020038,
+          "calibration_slope": null,
+          "calibration_intercept": null,
           "sample_size": 1389
         }
       },
       "paired_vs_baseline": {
         "log_loss": {
-          "observed_delta": 0.0,
+          "observed_delta": 0.006863,
           "ci_95": [
-            0.0,
-            0.0
+            -0.000792,
+            0.013915
           ],
-          "P_challenger_better": 0.0,
-          "n_bootstrap": 500,
+          "P_challenger_better": 0.04,
+          "n_bootstrap": 50,
           "seed": 20260815
         },
         "brier": {
-          "observed_delta": 0.0,
+          "observed_delta": 0.003431,
           "ci_95": [
-            0.0,
-            0.0
+            -0.000269,
+            0.00695
+          ],
+          "P_challenger_better": 0.04,
+          "n_bootstrap": 50,
+          "seed": 20260815
+        }
+      }
+    },
+    "log5_only": {
+      "features": [
+        "log5_probability"
+      ],
+      "metrics": {
+        "log_loss": 0.6935584553422324,
+        "brier": 0.2502044177177725,
+        "accuracy": 0.5140388768898488,
+        "auc": 0.5
+      },
+      "coverage": 0.9774806474313863,
+      "calibration": {
+        "log_loss": 0.693558,
+        "brier_score": 0.250204,
+        "expected_calibration_error": 0.020038,
+        "calibration_slope": null,
+        "calibration_intercept": null,
+        "sample_size": 1389
+      },
+      "per_split": {
+        "train": {
+          "log_loss": 0.690822,
+          "brier_score": 0.248838,
+          "expected_calibration_error": 8e-06,
+          "calibration_slope": null,
+          "calibration_intercept": null,
+          "sample_size": 3814
+        },
+        "validation": {
+          "log_loss": 0.690933,
+          "brier_score": 0.248894,
+          "expected_calibration_error": 0.000805,
+          "calibration_slope": null,
+          "calibration_intercept": null,
+          "sample_size": 1082
+        },
+        "holdout": {
+          "log_loss": 0.693558,
+          "brier_score": 0.250204,
+          "expected_calibration_error": 0.020038,
+          "calibration_slope": null,
+          "calibration_intercept": null,
+          "sample_size": 1389
+        }
+      },
+      "paired_vs_baseline": {
+        "log_loss": {
+          "observed_delta": 0.006863,
+          "ci_95": [
+            -0.000792,
+            0.013915
+          ],
+          "P_challenger_better": 0.04,
+          "n_bootstrap": 50,
+          "seed": 20260815
+        },
+        "brier": {
+          "observed_delta": 0.003431,
+          "ci_95": [
+            -0.000269,
+            0.00695
+          ],
+          "P_challenger_better": 0.04,
+          "n_bootstrap": 50,
+          "seed": 20260815
+        }
+      }
+    },
+    "elo_pythagorean": {
+      "features": [
+        "elo_probability",
+        "pythagorean_probability"
+      ],
+      "metrics": {
+        "log_loss": 0.6899076531853037,
+        "brier": 0.24836325791037103,
+        "accuracy": 0.5457163426925846,
+        "auc": 0.5506131341425459
+      },
+      "coverage": 0.9774806474313863,
+      "calibration": {
+        "log_loss": 0.689908,
+        "brier_score": 0.248363,
+        "expected_calibration_error": 0.020285,
+        "calibration_slope": 0.704132,
+        "calibration_intercept": -0.036511,
+        "sample_size": 1389
+      },
+      "per_split": {
+        "train": {
+          "log_loss": 0.681684,
+          "brier_score": 0.244357,
+          "expected_calibration_error": 0.004191,
+          "calibration_slope": 1.205075,
+          "calibration_intercept": -0.027711,
+          "sample_size": 3814
+        },
+        "validation": {
+          "log_loss": 0.683502,
+          "brier_score": 0.245277,
+          "expected_calibration_error": 0.00994,
+          "calibration_slope": 0.918421,
+          "calibration_intercept": 0.01761,
+          "sample_size": 1082
+        },
+        "holdout": {
+          "log_loss": 0.689908,
+          "brier_score": 0.248363,
+          "expected_calibration_error": 0.020285,
+          "calibration_slope": 0.704132,
+          "calibration_intercept": -0.036511,
+          "sample_size": 1389
+        }
+      },
+      "paired_vs_baseline": {
+        "log_loss": {
+          "observed_delta": 0.003212,
+          "ci_95": [
+            0.001567,
+            0.005225
           ],
           "P_challenger_better": 0.0,
-          "n_bootstrap": 500,
+          "n_bootstrap": 50,
+          "seed": 20260815
+        },
+        "brier": {
+          "observed_delta": 0.00159,
+          "ci_95": [
+            0.000781,
+            0.002546
+          ],
+          "P_challenger_better": 0.0,
+          "n_bootstrap": 50,
+          "seed": 20260815
+        }
+      }
+    },
+    "elo_trend": {
+      "features": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "metrics": {
+        "log_loss": 0.6901025835149491,
+        "brier": 0.24844896780686923,
+        "accuracy": 0.5457163426925846,
+        "auc": 0.5505342877891897
+      },
+      "coverage": 0.9774806474313863,
+      "calibration": {
+        "log_loss": 0.690103,
+        "brier_score": 0.248449,
+        "expected_calibration_error": 0.021076,
+        "calibration_slope": 0.682393,
+        "calibration_intercept": -0.033955,
+        "sample_size": 1389
+      },
+      "per_split": {
+        "train": {
+          "log_loss": 0.681539,
+          "brier_score": 0.244281,
+          "expected_calibration_error": 0.006635,
+          "calibration_slope": 1.195588,
+          "calibration_intercept": -0.026721,
+          "sample_size": 3814
+        },
+        "validation": {
+          "log_loss": 0.684409,
+          "brier_score": 0.245719,
+          "expected_calibration_error": 0.009769,
+          "calibration_slope": 0.85792,
+          "calibration_intercept": 0.025265,
+          "sample_size": 1082
+        },
+        "holdout": {
+          "log_loss": 0.690103,
+          "brier_score": 0.248449,
+          "expected_calibration_error": 0.021076,
+          "calibration_slope": 0.682393,
+          "calibration_intercept": -0.033955,
+          "sample_size": 1389
+        }
+      },
+      "paired_vs_baseline": {
+        "log_loss": {
+          "observed_delta": 0.003407,
+          "ci_95": [
+            0.001879,
+            0.005943
+          ],
+          "P_challenger_better": 0.0,
+          "n_bootstrap": 50,
+          "seed": 20260815
+        },
+        "brier": {
+          "observed_delta": 0.001676,
+          "ci_95": [
+            0.000941,
+            0.002897
+          ],
+          "P_challenger_better": 0.0,
+          "n_bootstrap": 50,
           "seed": 20260815
         }
       }
