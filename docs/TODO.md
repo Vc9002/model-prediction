@@ -136,24 +136,24 @@ config, reports, ledgers, and audit state disagree.
 
 - [ ] Ingest rolling Statcast Catcher Framing in the Shadow Zone (`features/catcher_framing.py`)
   to capture the $1\text{--}2\text{pp}$ PA called-strike leverage on totals and NRFI.
-- [ ] Implement Starting Pitcher Pitch-Type Arsenal vs. Lineup Vulnerability dot-product
-  tensor (`features/pitch_arsenal.py`).
-- [ ] Build Discrete-Event Plate-Appearance (PA) 8-Class Monte Carlo Simulation Engine
-  (`models/mlb_monte_carlo.py`) simulating 5,000 iterations per game over 24 base-out states.
-- [ ] Wire Isotonic Tail-Calibrator (`meta_calibrator.py`) to post-process extreme-probability
-  tail markets (NRFI, Runline -1.5, and K-props).
+- [x] Implement Starting Pitcher Pitch-Type Arsenal vs. Lineup Vulnerability dot-product
+  tensor (`features/pitch_arsenal.py`). → DONE: Repertoire metric tensor & tests in `test_pitch_arsenal.py`.
+- [x] Build Discrete-Event Plate-Appearance (PA) 8-Class Monte Carlo Simulation Engine
+  (`models/mlb_monte_carlo.py`) simulating 5,000 iterations per game over 24 base-out states. → DONE: Markov state tracker, fatigue/bullpen handoff, ML/RL/Totals/F5/NRFI/K-props distributions & tests in `test_mlb_monte_carlo.py`.
+- [x] Wire Isotonic Tail-Calibrator (`meta_calibrator.py`) to post-process extreme-probability
+  tail markets (NRFI, Runline -1.5, and K-props). → DONE: `TailCalibrator` with monotonic constraints & ECE metrics in `test_meta_calibrator.py`.
 - [ ] Leverage 35-minute pre-game wake trigger (`plan_lineup_wakes.py`) to execute forecasts
   during the golden 15–30 minute post-lineup confirmation window before sportsbook lines adjust.
 
 ## P2 — Open-Source Research Adaptations (MLB v9, Soccer, Baselines)
 
 - [x] **MLB v9 Step B — Batter Offensive Priors (Baseball Hydra concept)**: Implement `features/batter_priors.py` using closed-form Empirical Bayes Beta-Binomial shrinkage over PA for $\text{xwOBA}$, $\text{K}\%$, $\text{BB}\%$, $\text{ISO}$, $\text{barrel}\%$, and $\text{hard-hit}\%$.
-- [ ] **MLB v9 Step C — Rich Starter State (Market Efficiency Lab architecture)**: Build multidimensional starter state in `features/starter_state.py` including 21d/season xwOBA allowed, K%, BB%, CSW%, first-pitch strike%, fastball velocity/drift, average depth, and last-3 start deltas.
-- [ ] **MLB v9 Step D — Dynamic Bullpen State**: Implement dynamic bullpen capability model combining reliever talent (xwOBA/K-BB%), availability probability from rolling 1d/2d/3d workloads and back-to-back flags, and role leverage.
-- [ ] **MLB v9 Step E — Confirmed Lineup Aggregation**: Join prospective lineup archive (`data/point_in_time/mlb_lineups.jsonl`) with batter priors to generate batting-order-weighted xwOBA, platoon-split xwOBA, and lineup xwOBA advantage.
-- [ ] **MLB v9 Step F — Monotonic XGBoost Challenger**: Train and evaluate XGBoost with domain monotonic constraints ($\frac{\partial P}{\partial \text{SP xwOBA Allowed}} \le 0$, $\frac{\partial P}{\partial \text{Lineup xwOBA}} \ge 0$) against standardized Logistic Regression on identical frozen cohort.
+- [x] **MLB v9 Step C — Rich Starter State (Market Efficiency Lab architecture)**: Build multidimensional starter state in `features/starter_state.py` including 21d/season xwOBA allowed, K%, BB%, CSW%, first-pitch strike%, fastball velocity/drift, average depth, and last-3 start deltas. → DONE: `PointInTimeStarterEngine` & `test_starter_state.py`.
+- [x] **MLB v9 Step D — Dynamic Bullpen State**: Implement dynamic bullpen capability model combining reliever talent (xwOBA/K-BB%), availability probability from rolling 1d/2d/3d workloads and back-to-back flags, and role leverage. → DONE: `PointInTimeBullpenEngine` & `test_bullpen_state.py`.
+- [x] **MLB v9 Step E — Confirmed Lineup Aggregation**: Join prospective lineup archive (`data/point_in_time/mlb_lineups.jsonl`) with batter priors to generate batting-order-weighted xwOBA, platoon-split xwOBA, and lineup xwOBA advantage. → DONE: `LineupStateEngine` & `test_lineup_state.py`.
+- [x] **MLB v9 Step F — Monotonic XGBoost Challenger**: Train and evaluate XGBoost with domain monotonic constraints ($\frac{\partial P}{\partial \text{SP xwOBA Allowed}} \le 0$, $\frac{\partial P}{\partial \text{Lineup xwOBA}} \ge 0$) against standardized Logistic Regression on identical frozen cohort. → DONE: `MonotonicMLBClassifier` & `test_mlb_xgboost.py`.
 - [x] **Permanent Baselines Ladder (Forrest31)**: Add pregame Pythagorean expectation and Log5 matchup models to the standard evaluator comparison ladder.
-- [ ] **Soccer Joint Bivariate Dixon-Coles Grid (penaltyblog & football-mle)**: Refactor soccer forecasting to generate a unified Dixon-Coles score grid $(\lambda_H, \lambda_A, \rho)$ driving 1X2, BTTS, O/U totals, and Asian handicaps from one joint distribution, with exponential time decay parameter $\xi$ tuned via temporal CV.
+- [x] **Soccer Joint Bivariate Dixon-Coles Grid (penaltyblog & football-mle)**: Refactor soccer forecasting to generate a unified Dixon-Coles score grid $(\lambda_H, \lambda_A, \rho)$ driving 1X2, BTTS, O/U totals, and Asian handicaps from one joint distribution, with exponential time decay parameter $\xi$ tuned via temporal CV. → DONE: `DixonColesEngine` & `test_soccer_dixon_coles.py`.
 
 ## Verified scan record
 
